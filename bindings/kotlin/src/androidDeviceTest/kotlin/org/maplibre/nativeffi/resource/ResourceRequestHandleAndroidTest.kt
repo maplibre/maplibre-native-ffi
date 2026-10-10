@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -23,7 +24,7 @@ class ResourceRequestHandleAndroidTest {
     val provider = denyingProvider { request, handle ->
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       // Only the request's own cancel callback references it once the provider returns.
-      handle.setCancelCallback { handle.close() }
+      handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
       claimed.complete(handle.binding.issued() to TestWeakReference(handle))
       ResourceProviderDecision.HANDLE
     }

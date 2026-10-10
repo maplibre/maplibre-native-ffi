@@ -2,6 +2,7 @@
 //! reaches every module, so each module's tests run once.
 
 test {
+    _ = @import("call.zig");
     _ = @import("callback.zig");
     _ = @import("completion.zig");
     _ = @import("owner.zig");

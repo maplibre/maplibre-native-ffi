@@ -6,6 +6,7 @@
 
 #include "maplibre_native_c/plugin.h"
 #include "square_plugin.h"
+#include "support/frames.h"
 #include "support/test_support.h"
 
 // One point at the camera center, which the 64x64 fixture places at (32, 32),
@@ -69,8 +70,8 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     MLN_TEST_OK(
       mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
     );
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
+    const mln_render_frame_result result =
+      mln_test_render_batch_result(batch, 0);
     mln_render_frame_batch_release(batch);
     if (result.disposition == MLN_RENDER_RESULT_RENDERED) {
       mln_test_completion readback = mln_test_completion_readback();

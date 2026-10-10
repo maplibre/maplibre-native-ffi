@@ -30,6 +30,18 @@ static void count_runtime_callback_release(void* user_data) {
 
 static void ignore_cancel(void* user_data) { (void)user_data; }
 
+static mln_resource_request_cancel_handler cancel_handler(
+  mln_resource_request_cancel_callback callback, void* user_data,
+  mln_user_data_release release_user_data
+) {
+  return (mln_resource_request_cancel_handler){
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = callback,
+    .user_data = user_data,
+    .release_user_data = release_user_data,
+  };
+}
+
 static mln_status submit_provider(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
@@ -115,8 +127,10 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   MLN_TEST_INVALID(
     mln_resource_request_complete(MLN_HANDLE_NULL, &response, NULL)
   );
+  const mln_resource_request_cancel_handler handler =
+    cancel_handler(ignore_cancel, NULL, NULL);
   MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
-    MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled, NULL
+    MLN_HANDLE_NULL, &handler, &cancelled, NULL
   ));
   MLN_TEST_INVALID(
     mln_resource_request_wait_until_retired(MLN_HANDLE_NULL, NULL)
@@ -444,6 +458,7 @@ typedef struct cancel_probe {
   atomic_bool skip_register;
   atomic_int register_status;
   atomic_bool register_reported_cancelled;
+  atomic_bool rejected_invalid_handlers;
   _Atomic mln_resource_request_handle handle;
 } cancel_probe;
 
@@ -465,6 +480,33 @@ static void count_cancel_release(void* user_data) {
   mln_test_pulse();
 }
 
+// Each invalid handler fails without taking the request's one registration
+// or releasing its user data.
+static bool rejects_invalid_cancel_handlers(
+  mln_resource_request_handle handle, cancel_probe* probe
+) {
+  mln_resource_request_cancel_handler undersized =
+    cancel_handler(count_cancel, probe, count_cancel_release);
+  undersized.size -= 1;
+  const mln_resource_request_cancel_handler without_callback =
+    cancel_handler(NULL, probe, count_cancel_release);
+  const mln_resource_request_cancel_handler* const handlers[] = {
+    NULL, &undersized, &without_callback
+  };
+  for (size_t index = 0; index < sizeof(handlers) / sizeof(*handlers);
+       ++index) {
+    bool cancelled = false;
+    if (
+      mln_resource_request_set_cancel_callback(
+        handle, handlers[index], &cancelled, NULL
+      ) != MLN_STATUS_INVALID_ARGUMENT
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static uint32_t cancel_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -473,12 +515,17 @@ static uint32_t cancel_probe_resource_provider(
   cancel_probe* probe = user_data;
   atomic_store(&probe->handle, handle);
   if (!atomic_load(&probe->skip_register)) {
-    bool cancelled = true;
     atomic_store(
-      &probe->register_status,
-      mln_resource_request_set_cancel_callback(
-        handle, count_cancel, probe, count_cancel_release, &cancelled, NULL
-      )
+      &probe->rejected_invalid_handlers,
+      rejects_invalid_cancel_handlers(handle, probe)
+    );
+    bool cancelled = true;
+    const mln_resource_request_cancel_handler handler =
+      cancel_handler(count_cancel, probe, count_cancel_release);
+    atomic_store(
+      &probe->register_status, mln_resource_request_set_cancel_callback(
+                                 handle, &handler, &cancelled, NULL
+                               )
     );
     atomic_store(&probe->register_reported_cancelled, cancelled);
   }
@@ -499,6 +546,7 @@ static mln_map start_cancel_probe_request(
   MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://cancel-style.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->provider_entered));
   if (!atomic_load(&probe->skip_register)) {
+    TEST_ASSERT_TRUE(atomic_load(&probe->rejected_invalid_handlers));
     MLN_TEST_OK(atomic_load(&probe->register_status));
     TEST_ASSERT_FALSE(atomic_load(&probe->register_reported_cancelled));
   }
@@ -532,18 +580,19 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   );
 
   cancelled = false;
+  const mln_resource_request_cancel_handler unreleased =
+    cancel_handler(count_cancel, &probe, NULL);
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled, NULL
-    )
+    MLN_STATUS_INVALID_STATE, mln_resource_request_set_cancel_callback(
+                                handle, &unreleased, &cancelled, NULL
+                              )
   );
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
 
   mln_resource_request_release(handle);
   MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, NULL, &cancelled, NULL
+    handle, &unreleased, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
@@ -584,9 +633,11 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   TEST_ASSERT_TRUE(poll.cancelled);
 
   bool cancelled = false;
-  MLN_TEST_OK(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, count_cancel_release, &cancelled, NULL
-  ));
+  const mln_resource_request_cancel_handler handler =
+    cancel_handler(count_cancel, &probe, count_cancel_release);
+  MLN_TEST_OK(
+    mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
+  );
   TEST_ASSERT_TRUE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
 
@@ -610,8 +661,10 @@ static void cancel_callback_may_release_the_request(void) {
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
+  const mln_resource_request_cancel_handler unreleased =
+    cancel_handler(count_cancel, &probe, NULL);
   MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, NULL, &cancelled, NULL
+    handle, &unreleased, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   mln_test_destroy_runtime(runtime);
@@ -681,15 +734,15 @@ static void a_pmtiles_request_carries_its_byte_range(void) {
     mln_test_provider_request_at(provider, style_url, 0);
   TEST_ASSERT_NOT_NULL(style);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, style->kind);
-  TEST_ASSERT_FALSE(style->has_range);
+  TEST_ASSERT_BITS_LOW(MLN_RESOURCE_REQUEST_RANGE, style->fields);
 
   const mln_test_provider_request* archive =
     mln_test_provider_request_at(provider, archive_url, 0);
   TEST_ASSERT_NOT_NULL(archive);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_SOURCE, archive->kind);
-  TEST_ASSERT_TRUE(archive->has_range);
-  TEST_ASSERT_EQUAL_UINT64(0, archive->range_start);
-  TEST_ASSERT_GREATER_THAN_UINT64(archive->range_start, archive->range_end);
+  TEST_ASSERT_BITS_HIGH(MLN_RESOURCE_REQUEST_RANGE, archive->fields);
+  TEST_ASSERT_EQUAL_UINT64(0, archive->range.start);
+  TEST_ASSERT_GREATER_THAN_UINT64(archive->range.start, archive->range.end);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
@@ -786,7 +839,8 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
 }
 
 // A provider error for the style becomes the map's loading failure, carrying
-// the provider's message, or a generic one when it gave none.
+// the provider's message, or a generic one when it gave none. A response whose
+// fields carry an unknown bit is malformed, and fails the same way.
 static void a_style_error_reaches_the_loading_failure(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = "custom://described.json",
@@ -797,19 +851,29 @@ static void a_style_error_reaches_the_loading_failure(void) {
          .error_message = "the style server is down",
        }},
     {.url = "custom://undescribed.json",
+     .response =
+       {
+         .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
+         .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
+       }},
+    {.url = "custom://unknown-field.json",
      .response = {
-       .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-       .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
+       .fields = UINT32_C(1) << 31,
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)tiled_style_json,
+       .byte_count = sizeof(tiled_style_json) - 1,
      }},
   };
   static const char* const expected[] = {
     "loading style failed: the style server is down",
     "loading style failed: resource provider failed",
+    "loading style failed: mln_resource_response.fields contains unknown bits",
   };
-  mln_test_provider* provider = mln_test_provider_create(resources, 2);
+  const size_t count = sizeof(resources) / sizeof(resources[0]);
+  mln_test_provider* provider = mln_test_provider_create(resources, count);
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
-  for (size_t index = 0; index < 2; index += 1) {
+  for (size_t index = 0; index < count; index += 1) {
     mln_map map = mln_test_create_map(runtime);
     MLN_TEST_OK(mln_test_map_set_style_url(map, resources[index].url));
     char message[512];
@@ -842,13 +906,12 @@ static const int64_t style_expired_unix_ms = 1700000060000;
 static mln_resource_response cacheable_style(bool must_revalidate) {
   return (mln_resource_response){
     .size = sizeof(mln_resource_response),
+    .fields = MLN_RESOURCE_RESPONSE_MODIFIED | MLN_RESOURCE_RESPONSE_EXPIRES,
     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
     .bytes = (const uint8_t*)inline_style_json,
     .byte_count = sizeof(inline_style_json) - 1,
     .must_revalidate = must_revalidate,
-    .has_modified = true,
     .modified_unix_ms = style_modified_unix_ms,
-    .has_expires = true,
     .expires_unix_ms = style_expired_unix_ms,
     .etag = "\"v1\"",
   };
@@ -860,11 +923,13 @@ static void expect_revalidation_of_cached_style(
   TEST_ASSERT_NOT_NULL(request);
   TEST_ASSERT_TRUE(request->has_prior_etag);
   TEST_ASSERT_EQUAL_STRING("\"v1\"", request->prior_etag);
-  TEST_ASSERT_TRUE(request->has_prior_modified);
+  TEST_ASSERT_BITS_HIGH(
+    MLN_RESOURCE_REQUEST_PRIOR_MODIFIED | MLN_RESOURCE_REQUEST_PRIOR_EXPIRES,
+    request->fields
+  );
   TEST_ASSERT_EQUAL_INT64(
     style_modified_unix_ms, request->prior_modified_unix_ms
   );
-  TEST_ASSERT_TRUE(request->has_prior_expires);
   TEST_ASSERT_EQUAL_INT64(
     style_expired_unix_ms, request->prior_expires_unix_ms
   );
@@ -895,7 +960,7 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
     mln_test_provider_request_at(provider, cached_style_url, 0);
   TEST_ASSERT_NOT_NULL(initial);
   TEST_ASSERT_FALSE(initial->has_prior_etag);
-  TEST_ASSERT_FALSE(initial->has_prior_modified);
+  TEST_ASSERT_BITS_LOW(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, initial->fields);
   TEST_ASSERT_EQUAL_size_t(0, initial->prior_data_size);
 
   mln_map second = load_style(runtime, cached_style_url);

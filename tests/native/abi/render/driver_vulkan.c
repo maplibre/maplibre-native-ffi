@@ -32,7 +32,6 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
     .scale_factor = 1.0,
   };
   descriptor.context = (mln_vulkan_context_descriptor){
-    .size = sizeof(mln_vulkan_context_descriptor),
     .instance = context.vulkan_instance,
     .physical_device = context.vulkan_physical_device,
     .device = context.vulkan_device,
@@ -412,7 +411,6 @@ static mln_queue_lock reset_shared_lock(void) {
   atomic_store(&shared_lock.unlocks, 0);
   atomic_store(&shared_lock.releases, 0);
   return (mln_queue_lock){
-    .size = sizeof(mln_queue_lock),
     .lock = session_takes_queue_lock,
     .unlock = session_gives_queue_lock,
     .user_data = &shared_lock,

@@ -9,18 +9,18 @@ void binding_release_forbid(void* p) {
   mlnGoCallbackRelease(p);
   binding_policy_leave(&policy);
 }
-extern uint32_t mlnGo_mln_log_set_callback_registration_callback(
+extern uint32_t mlnGo_mln_log_handler_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   char* message
 );
-uint32_t binding_mln_log_set_callback_registration_callback(
+uint32_t binding_mln_log_handler_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
   static const uint32_t operations[] = {0};
   binding_policy policy = {NULL, operations, 0, 0};
   binding_policy_enter(&policy);
-  uint32_t result = mlnGo_mln_log_set_callback_registration_callback(
+  uint32_t result = mlnGo_mln_log_handler_callback(
     (void*)user_data, severity, event, code, (char*)message
   );
   binding_policy_leave(&policy);
@@ -86,13 +86,8 @@ void binding_mln_queue_lock_unlock(void* user_data) {
   mlnGo_mln_queue_lock_unlock((void*)user_data);
   binding_policy_leave(&policy);
 }
-extern void
-mlnGo_mln_resource_request_set_cancel_callback_registration_callback(
-  void* user_data
-);
-void binding_mln_resource_request_set_cancel_callback_registration_callback(
-  void* user_data
-) {
+extern void mlnGo_mln_resource_request_cancel_handler_callback(void* user_data);
+void binding_mln_resource_request_cancel_handler_callback(void* user_data) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
     binding_operation_mln_resource_request_cancelled,
@@ -101,9 +96,7 @@ void binding_mln_resource_request_set_cancel_callback_registration_callback(
   };
   binding_policy policy = {NULL, operations, 4, mlnGoCallbackOwner(user_data)};
   binding_policy_enter(&policy);
-  mlnGo_mln_resource_request_set_cancel_callback_registration_callback(
-    (void*)user_data
-  );
+  mlnGo_mln_resource_request_cancel_handler_callback((void*)user_data);
   binding_policy_leave(&policy);
 }
 extern mln_status mlnGo_mln_http_header_transform_callback(

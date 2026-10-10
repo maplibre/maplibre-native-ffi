@@ -427,8 +427,8 @@ static void fetches_follow_the_rendered_tiles(void) {
 
     mln_camera_update update = mln_camera_update_default();
     update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-    update.camera.latitude = 10.0;
-    update.camera.longitude = 10.0;
+    update.camera.center.latitude = 10.0;
+    update.camera.center.longitude = 10.0;
     // Deep enough that the root tile is neither ideal nor one of the pan
     // tiles MapLibre Native prefetches four zooms up.
     update.camera.zoom = 6.0;
@@ -552,8 +552,8 @@ static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
   // every one of them is fetched.
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.latitude = 0.0;
-  update.camera.longitude = 0.0;
+  update.camera.center.latitude = 0.0;
+  update.camera.center.longitude = 0.0;
   update.camera.zoom = 1.0;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)

@@ -67,8 +67,8 @@ const LogProbe = struct {
         self.releases.add();
     }
 
-    fn callback(self: *LogProbe) maplibre.LogCallback {
-        return .{ .call = record, .context = self, .release_context = released };
+    fn handler(self: *LogProbe) maplibre.LogHandler {
+        return .{ .callback = record, .context = self, .release_context = released };
     }
 };
 
@@ -77,9 +77,9 @@ const LogProbe = struct {
 test "replacing the process-global log callback releases the previous one" {
     var first = LogProbe{};
     var replacement = LogProbe{};
-    try maplibre.logSetCallback(first.callback(), null);
+    try maplibre.logSetCallback(testing.allocator, first.handler(), null);
     defer maplibre.logClearCallback(null) catch |err| std.log.err("log callback clear failed: {s}", .{@errorName(err)});
-    try maplibre.logSetCallback(replacement.callback(), null);
+    try maplibre.logSetCallback(testing.allocator, replacement.handler(), null);
     try first.releases.waitFor(1);
 
     const fixture = try support.Fixture.create(.{});
@@ -249,8 +249,9 @@ const CancelProbe = struct {
 };
 
 // Registering a cancel callback after cancellation returns true, and native
-// takes no ownership of the registration. The binding then leaves the context
-// unrooted, so neither the callback nor release_context ever runs.
+// takes no ownership of the registration. The binding then frees the
+// registration before returning and leaves the context unrooted, so neither
+// the callback nor release_context ever runs.
 test "a registration that reports cancellation is never rooted" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -268,11 +269,13 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(handle, .{
-        .call = CancelProbe.cancelled,
+    const live = maplibre.testing.liveCallbackRegistrations();
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .{
+        .callback = CancelProbe.cancelled,
         .context = &probe,
         .release_context = CancelProbe.released,
     }, null));
+    try testing.expectEqual(live, maplibre.testing.liveCallbackRegistrations());
     try maplibre.resourceRequestRelease(handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());

@@ -87,6 +87,11 @@ def reentry(callback, locals_by_name):
     policy = callback.reentry_policy
     if not policy:
         return "Some((&[], 0))"
+    if policy.owner_parameter is None:
+        raise Unsupported(
+            f"{callback.native}: a callback without an owner parameter needs its "
+            "registration's receiver, which only a decision handle records"
+        )
     owner_parameter = next(
         p for p in callback.parameters if p.name == policy.owner_parameter
     )
@@ -405,26 +410,107 @@ def decision_table_name(decision) -> str:
     return f"{decision.handle.stem.upper()}_DECISION"
 
 
-def decision_reentry(bound, decision) -> tuple[str, ...]:
-    """The operations a decision handle's cancellation notification may call."""
+def cancel_notification(bound, decision):
+    """The cancel registration of a decision handle, its one callback, and its
+    record: a one-shot notification whose root native releases, which the core
+    runtime registers on the handle."""
     plan = bound.operations_by_name[decision.cancel_registration]
-    (registration,) = plan.direct_registrations
-    callback = bound.callbacks[
-        next(p.value.native for p in plan.inputs if p.name == registration.callback)
-    ]
-    return callback.reentry_policy.operations if callback.reentry_policy else ()
+    if len(plan.registrations) != 1:
+        raise Unsupported(f"{plan.name}: cancel registration needs one registration")
+    (registration,) = plan.registrations
+    record = bound.values[registration.descriptor]
+    if registration.path or len(registration.callbacks) != 1:
+        raise Unsupported(f"{plan.name}: cancel registration needs one callback")
+    if not registration.accepted_unless:
+        raise Unsupported(f"{plan.name}: cancel registration needs a cancelled report")
+    field = next(f for f in record.fields if f.name == registration.callbacks[0])
+    callback = bound.callbacks[field.value.native]
+    if (
+        [p.name for p in callback.parameters] != [callback.context]
+        or callback.result.ctype.kind != "void"
+        or not callback.reentry_policy
+        or callback.reentry_policy.owner_parameter is not None
+    ):
+        raise Unsupported(
+            f"{plan.name}: cancel callback must be a request notification"
+        )
+    return plan, registration, record, callback
+
+
+def cancel_records(bound) -> set[str]:
+    """The records that register a decision handle's cancel notification."""
+    return {
+        cancel_notification(bound, decision)[2].native
+        for decision in bound.decisions.values()
+    }
+
+
+def cancel_declaration(values, value) -> str:
+    """The record of a decision handle's cancel notification, whose callback
+    runs at most once, so it holds an `FnOnce` that the core runtime registers.
+    """
+    registration = next(
+        registration
+        for _, registration, record, _ in (
+            cancel_notification(values.bound, decision)
+            for decision in values.bound.decisions.values()
+        )
+        if record.native == value.native
+    )
+    name = values.name(value)
+    field = identifier(registration.callbacks[0])
+    function = "FnOnce() + Send + 'static"
+    return (
+        doc(values.bound, value.native) + "#[derive(Default)]\n"
+        f"pub struct {name} {{\n"
+        f"{doc(values.bound, f'{value.native}.{registration.callbacks[0]}', '    ')}"
+        f"    pub {field}: Option<Box<dyn {function}>>,\n"
+        "}\n"
+        f'impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
+        f"impl {name} {{\n"
+        f"    pub fn with_{registration.callbacks[0]}<F>(mut self, callback: F) -> Self where F: {function} {{ self.{field} = Some(Box::new(callback)); self }}\n"
+        f"    pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{registration.callbacks[0]}(callback) }}\n"
+        "}\n"
+    )
 
 
 def decision_table(bound, decision, owner: str) -> str:
-    """Declare the function table that one decision protocol's state uses."""
+    """Declare the function table that one decision protocol's state uses, and
+    the function that registers its cancel notification through the record."""
     handle = decision.handle.native
-    reentry = ", ".join(f'"{name}"' for name in decision_reentry(bound, decision))
+    plan, registration, record, callback = cancel_notification(bound, decision)
+    reentry = ", ".join(f'"{name}"' for name in callback.reentry_policy.operations)
+    size = next(f.name for f in record.fields if f.role == "size")
+    register = f"register_{decision.handle.stem}_cancel"
+    sources = {
+        plan.receiver: "handle",
+        registration.parameter: "&handler",
+        registration.accepted_unless: "out_cancelled",
+    }
+    if {p.name for p in plan.function.parameters} != set(sources):
+        raise Unsupported(f"{plan.name}: cancel registration takes other parameters")
+    arguments = [sources[p.name] for p in plan.function.parameters if p.name in sources]
     return (
+        f"unsafe fn {register}(handle: sys::{handle}, "
+        "callback: maplibre_core::decision::ContextCallback, "
+        "user_data: *mut std::ffi::c_void, "
+        "release: maplibre_core::decision::ContextCallback, "
+        "out_cancelled: *mut bool, out_diagnostic: *mut sys::mln_diagnostic) "
+        "-> sys::mln_status {\n"
+        f"    let mut handler: sys::{record.native} = unsafe {{ std::mem::zeroed() }};\n"
+        f"    handler.{size} = std::mem::size_of::<sys::{record.native}>() as _;\n"
+        f"    handler.{registration.callbacks[0]} = callback;\n"
+        f"    handler.{registration.user_data} = user_data;\n"
+        f"    handler.{registration.release} = release;\n"
+        "    // SAFETY: the caller passes the decision handle and the outputs that\n"
+        "    // the C function requires; the handler is borrowed for the call.\n"
+        f"    unsafe {{ {native_call(plan.function, arguments, diagnostic='out_diagnostic')} }}\n"
+        "}\n"
         f"pub(crate) const {decision_table_name(decision)}: "
         f"maplibre_core::decision::DecisionHandleFns<sys::{handle}> = unsafe {{ "
         f"maplibre_core::decision::DecisionHandleFns::new("
         f'"{owner}", sys::{decision.accept}, sys::{decision.pass_through}, '
-        f"sys::{decision.handle.release}, sys::{decision.cancel_registration}, "
+        f"sys::{decision.handle.release}, {register}, "
         f"&[{reentry}]) }};\n"
     )
 
@@ -454,7 +540,7 @@ def decision_declaration(values, value):
     def documented(operation):
         return doc(values.bound, operation, "    ").rstrip("\n")
 
-    cancel_registration(values, decision)
+    _, cancel, cancel_record, _ = cancel_notification(values.bound, decision)
     return f'''{doc(values.bound, value.native)}#[derive(Debug)]
 pub struct {name} {{
     state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::{decision.handle.native}>>,
@@ -478,10 +564,10 @@ impl {name} {{
         Ok(cancelled)
     }}
 {documented(decision.cancel_registration)}
-    pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {{
+    pub fn {method(decision.cancel_registration)}(&self, {identifier(cancel.parameter)}: {values.name(cancel_record)}) -> Result<bool> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
-        self.state.register_cancel(Box::new(callback))
+        self.state.register_cancel({identifier(cancel.parameter)}.{identifier(cancel.callbacks[0])})
     }}
 {documented(decision.wait_retired)}
     pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{
@@ -496,28 +582,3 @@ impl {name} {{
     }}
 }}
 '''
-
-
-def cancel_registration(values, decision):
-    """Check that the cancel registration is the one-shot request notification
-    whose root native releases, which the core runtime registers."""
-    plan = values.bound.operations_by_name[decision.cancel_registration]
-    if len(plan.direct_registrations) != 1:
-        raise Unsupported(f"{plan.name}: cancel registration needs one callback")
-    registration = plan.direct_registrations[0]
-    if not registration.release_callback or not registration.accepted_unless:
-        raise Unsupported(
-            f"{plan.name}: cancel registration needs a native release and report"
-        )
-    callback = values.bound.callbacks[
-        next(p.value.native for p in plan.inputs if p.name == registration.callback)
-    ]
-    if (
-        [p.name for p in callback.parameters] != [callback.context]
-        or callback.result.ctype.kind != "void"
-        or not callback.reentry_policy
-        or not callback.reentry_policy.registration_owner
-    ):
-        raise Unsupported(
-            f"{plan.name}: cancel callback must be a request notification"
-        )

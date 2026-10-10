@@ -73,9 +73,6 @@ class Values:
                     f"{value.native}: variant capture requires its discriminant"
                 )
             self.check(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.check(self.bound.values[group.type])
 
     def add(self, value: ValuePlan, direction: str = "both") -> str:
         """Uses `value`, which converts to native for "in", from native for
@@ -89,6 +86,10 @@ class Values:
                 for parameter in complete.inputs:
                     if parameter.name != complete.receiver:
                         self.add(parameter.value, "in")
+                from .rust_callbacks import cancel_notification
+
+                record = cancel_notification(self.bound, decision)[2]
+                self.used[record.native] = record
             return self.public(value)
         if value.response:
             self.used[value.native] = value
@@ -118,9 +119,6 @@ class Values:
                 for field in value.fields:
                     if field.role == "value":
                         self.add(field.value, added)
-                for group in value.presence_groups:
-                    if group.type:
-                        self.add(self.bound.values[group.type], added)
         return self.public(value)
 
     def name(self, value: ValuePlan) -> str:
@@ -164,8 +162,11 @@ class Values:
 
             return response_declaration(self, value)
         if value.registration:
+            from .rust_callbacks import cancel_declaration, cancel_records
             from .rust_callbacks import declaration as registration
 
+            if value.native in cancel_records(self.bound):
+                return cancel_declaration(self, value)
             return registration(self, value)
         if value.kind == "union":
             members = ", ".join(

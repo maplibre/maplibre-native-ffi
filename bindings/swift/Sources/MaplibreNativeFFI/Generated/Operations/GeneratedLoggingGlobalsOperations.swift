@@ -26,58 +26,17 @@ public extension Maplibre {
       )
     }
   }
-}
 
-public extension Maplibre {
   /// Installs a process-global MapLibre Native log callback.
   ///
   /// See `mln_log_set_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func logSetCallback(_ callback: (@Sendable (
-    LogSeverity,
-    LogEvent,
-    Int64,
-    String
-  ) throws -> UInt32)?) throws {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(owner: nil, operation: "mln_log_set_callback")
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      let token = callback.map { arena.callback($0) }
-      try checkStatus { diagnostic in arena.submit { mln_log_set_callback(
-        callback == nil ? nil : invokeMlnLogSetCallback,
-        token,
-        releaseGeneratedCallback,
+  static func logSetCallback(handler bindingArg0: LogHandler) throws {
+    try nativeInvoke("mln_log_set_callback") { _, arena, diagnostic in
+      try mln_log_set_callback(
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         diagnostic
-      ) } }
+      )
     }
   }
-}
-
-private func invokeMlnLogSetCallback(
-  user_data: UnsafeMutableRawPointer?,
-  severity: UInt32,
-  event: UInt32,
-  code: Int64,
-  message: UnsafePointer<CChar>?
-) -> UInt32 {
-  guard let user_data else { return 0 }
-  let box = Unmanaged<GeneratedCallbackBox<@Sendable (
-    LogSeverity,
-    LogEvent,
-    Int64,
-    String
-  ) throws -> UInt32>>.fromOpaque(user_data).takeUnretainedValue()
-  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
-  defer { admission.end() }
-  do { return try box.value(
-    LogSeverity(rawValue: severity),
-    LogEvent(rawValue: event),
-    code,
-    NativeString.copyCString(message)
-  ) } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_log_callback",
-    error: error
-  )); return 0 }
 }

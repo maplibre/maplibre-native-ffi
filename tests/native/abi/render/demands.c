@@ -61,22 +61,29 @@ static bool frame_woke(void* context) {
   return atomic_load(&wait->fixture->frame_wakes) != wait->before;
 }
 
-// A drain of an empty result queue reports not ready and leaves its output
-// null. The frame wake runs when the queue goes from empty to nonempty, and
-// not again for a drain. A drained batch is an owned handle: releasing it
-// twice is a no-op, releasing the null handle is a no-op, and a released
-// handle names no batch.
+// A drain of an empty result queue reports not ready, leaves its output null,
+// and clears a diagnostic left by an earlier failure. The frame wake runs when
+// the queue goes from empty to nonempty, and not again for a drain. A drained
+// batch is an owned handle: releasing it twice is a no-op, releasing the null
+// handle is a no-op, and a released handle names no batch.
 static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_render_frame_batch_view unread = {.size = sizeof(unread)};
+  MLN_TEST_INVALID(
+    mln_render_frame_batch_get(MLN_HANDLE_NULL, &unread, &diagnostic)
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
   mln_render_frame_batch empty = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY,
-    mln_render_session_drain_frame_results(fixture.session, &empty, NULL)
+    mln_render_session_drain_frame_results(fixture.session, &empty, &diagnostic)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
+  TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
   frame_wake_wait wake = {
     .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
   };
@@ -90,23 +97,29 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
   TEST_ASSERT_EQUAL_UINT32(woke, atomic_load(&fixture.frame_wakes));
 
-  size_t count = 99;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
-  TEST_ASSERT_EQUAL_size_t(1, count);
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), view.result_size);
+  TEST_ASSERT_EQUAL_size_t(1, view.result_count);
+  const mln_render_frame_result* result = mln_test_render_view_result(&view, 0);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), result->size);
+  TEST_ASSERT_EQUAL_UINT64(201, result->token);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(MLN_HANDLE_NULL);
-  count = 99;
-  MLN_TEST_INVALID_STATE(mln_render_frame_batch_count(batch, &count, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, count);
-  mln_render_frame_result result = {
-    .size = sizeof(mln_render_frame_result), .token = 99
+  mln_render_frame_batch_view stale = {
+    .size = sizeof(mln_render_frame_batch_view), .result_count = 99
   };
-  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, 0, &result, NULL));
-  MLN_TEST_INVALID(
-    mln_render_frame_batch_get(MLN_HANDLE_NULL, 0, &result, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(99, result.token);
+  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, &stale, NULL));
+  MLN_TEST_INVALID(mln_render_frame_batch_get(MLN_HANDLE_NULL, &stale, NULL));
+  TEST_ASSERT_EQUAL_size_t(99, stale.result_count);
+  // The view check runs before the lease, so the stale handle reports the
+  // invalid view rather than its state.
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, NULL, NULL));
+  mln_render_frame_batch_view small = {
+    .size = sizeof(small) - 1, .result_count = 99
+  };
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, &small, NULL));
+  TEST_ASSERT_EQUAL_size_t(99, small.result_count);
   detach(runtime, map, &fixture);
 }
 
@@ -165,11 +178,10 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
-  size_t count = 0;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool reported = false;
-  for (size_t index = 0; index < count; index += 1) {
-    reported |= mln_test_render_batch_result(batch, index).token == 503;
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    reported |= mln_test_render_view_result(&view, index)->token == 503;
   }
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_TRUE(reported);
@@ -254,6 +266,12 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     mln_render_session_resize(fixture.session, &extent, &rejected_scale, NULL)
   );
   extent.scale_factor = 1.0;
+  mln_render_target_extent undersized = extent;
+  undersized.size = sizeof(mln_render_target_extent) - 1;
+  mln_completion rejected_size = mln_test_discard_completion();
+  MLN_TEST_INVALID(mln_render_session_resize(
+    fixture.session, &undersized, &rejected_size, NULL
+  ));
   mln_test_render_request_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
@@ -280,17 +298,29 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     new_frame.extent_generation, snapshot.extent_generation
   );
 
-  mln_render_target_extent second = extent;
-  second.width = 128;
-  second.height = 72;
+  // The second caller was built against a newer header and passes a larger
+  // extent. The snapshot embeds the extent, so it reports this build's size
+  // whether or not the driver has applied the resize yet.
+  struct {
+    mln_render_target_extent extent;
+    uint8_t newer_members[16];
+  } second = {.extent = extent};
+  second.extent.size = sizeof(second);
+  second.extent.width = 128;
+  second.extent.height = 72;
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
     fixture.session, &extent, &first_resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &second, &second_resize.descriptor, NULL
+    fixture.session, &second.extent, &second_resize.descriptor, NULL
   ));
+  snapshot = read_snapshot(fixture.session);
+  TEST_ASSERT_EQUAL_UINT32(
+    sizeof(mln_render_target_extent), snapshot.extent.size
+  );
+  TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)
   );

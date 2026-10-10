@@ -292,10 +292,8 @@ internal abstract class RenderTarget : IDisposable
         var repaint = false;
         using (results)
         {
-            var count = results.Count();
-            for (ulong index = 0; index < count; index++)
+            foreach (var result in results.Get().Results)
             {
-                var result = results.Get(index);
                 demandOutstanding = false;
                 switch (result.Disposition)
                 {

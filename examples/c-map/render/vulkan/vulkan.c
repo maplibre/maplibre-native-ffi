@@ -24,7 +24,6 @@ static mln_vulkan_context_descriptor vulkan_context_descriptor(
   const vulkan_context* context
 ) {
   return (mln_vulkan_context_descriptor){
-    .size = sizeof(mln_vulkan_context_descriptor),
     .instance = context->instance,
     .physical_device = context->physical_device,
     .device = context->device,

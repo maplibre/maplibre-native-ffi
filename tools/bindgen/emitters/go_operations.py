@@ -103,10 +103,6 @@ def operation(plan, values):
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     handle = element(receiver.value) if receiver else None
     decision = values.api.decisions.get(handle.native) if handle else None
-    if plan.direct_registrations:
-        from .go_callbacks import direct_operation
-
-        return direct_operation(plan, values)
     method = method_name(plan, receiver, handle)
     operation_id = f"C.binding_operation_{plan.name}"
     if decision and plan.name == decision.handle.release:
@@ -215,6 +211,15 @@ def operation(plan, values):
             next(i for i, (_, v, _) in enumerate(outputs) if v.kind == "handle")
         ]
         adoptions.append(f"arena.accept({first}.bindingOwner)")
+    for registration in plan.registrations:
+        if registration.accepted_unless:
+            # Native kept nothing from a declined registration.
+            declined = next(
+                local
+                for p, _, local in outputs
+                if p.name == registration.accepted_unless
+            )
+            adoptions.append(f"if bool({declined}) {{ arena.decline() }}")
     if plan.consumes == "always":
         access = "Consuming"
     elif plan.consumes:
@@ -251,7 +256,8 @@ def operation(plan, values):
                 parent = parent_of(plan.completion.result_owner)
                 convert = f"completionOf(func(raw C.{result.native}) {completion_type} {{ return adopt{values.owner(result.native)}(uint64(raw), {parent}) }})"
             elif result.kind == "array":
-                if result.stride or result.item_buffer:
+                # completionListOf steps by the completion's value_size.
+                if result.item_buffer:
                     values.fail(result, "array result needs a copy adapter")
                 helper = (
                     "completionNullableListOf"

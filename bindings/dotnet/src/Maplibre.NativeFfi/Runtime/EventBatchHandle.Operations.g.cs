@@ -51,15 +51,12 @@ public sealed unsafe partial class EventBatchHandle : IDisposable, INativeOwner<
     /// See <c>mln_event_batch_get</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public RuntimeEventBatchView Get()
+    public EventBatchView Get()
     {
         using var read = state.Read(this, "mln_event_batch_get");
-        var outView = new mln_runtime_event_batch_view
-        {
-            size = (uint)sizeof(mln_runtime_event_batch_view),
-        };
+        var outView = new mln_event_batch_view { size = (uint)sizeof(mln_event_batch_view) };
         Check(NativeMethods.mln_event_batch_get(read.Handle, &outView, Diagnostic));
-        return CopyRuntimeEventBatchView(outView);
+        return CopyEventBatchView(outView);
     }
 
     /// <summary>

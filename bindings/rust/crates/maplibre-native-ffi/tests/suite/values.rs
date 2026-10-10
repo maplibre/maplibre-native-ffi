@@ -96,8 +96,8 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
         }
     }
     // SAFETY: the view is plain data, and all zeroes is a valid value.
-    let mut raw: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32;
+    let mut raw: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_event_batch_view>() as u32;
     raw.event_size = stride as u32;
     raw.events = storage.as_ptr().cast();
     raw.event_count = events.len();
@@ -105,7 +105,7 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
     raw.messages_size = messages.len();
 
     // SAFETY: every pointer in the view addresses the storage above.
-    let view = unsafe { RuntimeEventBatchView::from_native(raw) }.unwrap();
+    let view = unsafe { EventBatchView::from_native(raw) }.unwrap();
     assert_eq!(view.events.len(), 2);
     assert_eq!(view.events[0].r#type, RuntimeEventType::MapIdle);
     assert_eq!(view.events[0].payload, RuntimeEventPayload::Empty);

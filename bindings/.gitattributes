@@ -4,7 +4,6 @@
 /dart/lib/src/internal/c/maplibre_native_c.g.dart linguist-generated=true
 /dart/lib/src/runtime/generated_operations.dart linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Android/Maplibre.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Base/BufferHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Completion/CommandDisposition.g.cs linguist-generated=true
@@ -13,6 +12,7 @@
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Logging/LogHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverityMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnimationOptionField.g.cs linguist-generated=true
@@ -20,6 +20,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraDelta.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraDeltaField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraDeltaKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptions.g.cs linguist-generated=true
@@ -78,6 +79,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderSessionHandle.Operations.g.cs linguist-generated=true
@@ -107,6 +109,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.g.cs linguist-generated=true
@@ -122,9 +125,13 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequest.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelHandler.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponse.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseStatus.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs linguist-generated=true
@@ -132,7 +139,6 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCameraTransitionFinished.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs linguist-generated=true
@@ -161,6 +167,7 @@
 /dotnet/src/Maplibre.NativeFfi/Style/LocationIndicatorImageKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/PremultipliedRgba8Image.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfo.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfoField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageResult.g.cs linguist-generated=true
@@ -214,11 +221,9 @@
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/AcquiredFrameHandle.kt linguist-generated=true
-/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/BufferHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/EventBatchHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedAcquiredFrameOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedApi.kt linguist-generated=true
-/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedBufferOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedCodecs.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedEventBatchOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedGeojsonSourceDataOperations.kt linguist-generated=true
@@ -252,7 +257,6 @@
 /python/src/generated_operations.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
-/rust/crates/maplibre-native-ffi/src/generated/buffer.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/event_batch.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/geojson_source_data.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/global.rs linguist-generated=true
@@ -267,7 +271,6 @@
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseBufferOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift linguist-generated=true

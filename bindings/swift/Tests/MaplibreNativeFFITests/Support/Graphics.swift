@@ -146,7 +146,7 @@ extension RenderSessionHandle {
   func drainFrameCopies() throws -> [RenderFrameResult] {
     guard let batch = try drainFrameResults() else { return [] }
     defer { try? batch.close() }
-    return try (0 ..< batch.count()).map { try batch.get(index: $0) }
+    return try batch.get().results
   }
 
   /// Demands frames until one renders, and returns its result. Each demand

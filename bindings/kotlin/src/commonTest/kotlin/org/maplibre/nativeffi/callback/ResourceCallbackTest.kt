@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
@@ -44,10 +45,14 @@ class ResourceCallbackTest {
       val request = claimed.awaitWithin("the provider to claim the request")
       val cancels = AtomicInt(0)
 
-      assertFalse(request.setCancelCallback { cancels.addAndFetch(1) })
+      assertFalse(
+        request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) })
+      )
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
       // Native keeps the first registration, and the rejected second one keeps no root.
-      assertFailsWith<InvalidStateException> { request.setCancelCallback {} }
+      assertFailsWith<InvalidStateException> {
+        request.setCancelCallback(ResourceRequestCancelHandler {})
+      }
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
 
       // Releasing the unanswered request fails it and releases the callback, which can no longer
@@ -71,10 +76,12 @@ class ResourceCallbackTest {
       val cancelled = CompletableDeferred<Unit>()
       val cancels = AtomicInt(0)
       assertFalse(
-        request.setCancelCallback {
-          cancels.addAndFetch(1)
-          cancelled.complete(Unit)
-        }
+        request.setCancelCallback(
+          ResourceRequestCancelHandler {
+            cancels.addAndFetch(1)
+            cancelled.complete(Unit)
+          }
+        )
       )
 
       map.release().awaitWithin("the map release")
@@ -99,7 +106,7 @@ class ResourceCallbackTest {
     // The fixture has released the runtime, whose teardown cancelled the request. The request
     // outlives the runtime until the provider releases it.
     val cancels = AtomicInt(0)
-    assertTrue(request.setCancelCallback { cancels.addAndFetch(1) })
+    assertTrue(request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) }))
     assertEquals(0, request.bindingCallbacks.rootCountForTesting())
     assertEquals(0, cancels.load())
     request.close()

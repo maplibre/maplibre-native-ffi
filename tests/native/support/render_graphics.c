@@ -107,9 +107,10 @@ uint32_t mln_test_backend_driver(void) {
 
 void mln_test_release_thread_gpu_resources(void) {}
 
+// Every descriptor versions its embedded extent, so native ignores the
+// extent's own size and these extents leave it zero.
 static mln_render_target_extent host_extent(void) {
   return (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,
     .scale_factor = 1.0,
@@ -121,7 +122,6 @@ static mln_metal_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
   return (mln_metal_context_descriptor){
-    .size = sizeof(mln_metal_context_descriptor),
     .device = context->metal_device,
   };
 }
@@ -137,7 +137,6 @@ static mln_vulkan_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
   return (mln_vulkan_context_descriptor){
-    .size = sizeof(mln_vulkan_context_descriptor),
     .instance = context->vulkan_instance,
     .physical_device = context->vulkan_physical_device,
     .device = context->vulkan_device,
@@ -155,11 +154,9 @@ static mln_opengl_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
   return (mln_opengl_context_descriptor){
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL,
     .data = {
       .wgl = {
-        .size = sizeof(mln_wgl_context_descriptor),
         .device_context = context->wgl_device_context,
         .share_context = context->wgl_context,
         .get_proc_address = context->get_proc_address,
@@ -172,11 +169,9 @@ static mln_opengl_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
   return (mln_opengl_context_descriptor){
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .data = {
       .egl = {
-        .size = sizeof(mln_egl_context_descriptor),
         .display = context->egl_display,
         .config = context->egl_config,
         .share_context = context->egl_context,

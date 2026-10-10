@@ -439,7 +439,6 @@ app_error render_target_init(
 
 static mln_metal_context_descriptor metal_context_descriptor(id device) {
   return (mln_metal_context_descriptor){
-    .size = sizeof(mln_metal_context_descriptor),
     .device = device,
   };
 }

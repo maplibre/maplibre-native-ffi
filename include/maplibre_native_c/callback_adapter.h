@@ -32,7 +32,6 @@
 #include "maplibre_native_c/base.h"     // IWYU pragma: export
 #include "maplibre_native_c/logging.h"  // IWYU pragma: export
 #include "maplibre_native_c/runtime.h"  // IWYU pragma: export
-#include "maplibre_native_c/style.h"    // IWYU pragma: export
 #include "maplibre_native_c/wake.h"     // IWYU pragma: export
 
 #ifdef __cplusplus
@@ -70,8 +69,9 @@ typedef void (*mln_adapter_completion_listener)(
  * Creates a completion descriptor that copies its borrowed result before
  * notifying an asynchronous host listener.
  *
- * out_completion must point to a zeroed descriptor. element_size is used only
- * with MLN_ADAPTER_COMPLETION_COPY_FLAT and may be zero for resultless calls.
+ * out_completion must point to a zeroed descriptor.
+ * MLN_ADAPTER_COMPLETION_COPY_FLAT copies value_count elements of
+ * mln_completion_result.value_size bytes each, and the copy keeps that stride.
  * The caller passes the descriptor to exactly one asynchronous C API call. If
  * that call rejects the submission, the caller must pass the descriptor to
  * mln_adapter_completion_reject().
@@ -88,8 +88,7 @@ typedef void (*mln_adapter_completion_listener)(
  * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
  */
 MLN_API mln_status mln_adapter_completion_create(
-  uint32_t copy_kind, size_t element_size,
-  mln_adapter_completion_listener listener,
+  uint32_t copy_kind, mln_adapter_completion_listener listener,
   void* user_data MLN_BINDING("kind=context"),
   mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -107,7 +106,7 @@ MLN_API void mln_adapter_completion_reject(
  * A borrowed result requires no adoption; adopting its record has no effect.
  */
 MLN_API void mln_adapter_completion_record_adopt(
-  mln_adapter_completion_record* record
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
 ) MLN_NOEXCEPT;
 
 /**
@@ -117,7 +116,7 @@ MLN_API void mln_adapter_completion_record_adopt(
  * this directly. Native handle disposal requires no completion allocation.
  */
 MLN_API void mln_adapter_completion_record_destroy(
-  mln_adapter_completion_record* record
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
 ) MLN_NOEXCEPT;
 
 /**
@@ -204,9 +203,9 @@ MLN_API void* mln_adapter_deferred_callback_function(
 /**
  * Releases a deferred callback context exactly once.
  *
- * This function has the signature of mln_runtime_callback_release and
- * mln_log_callback_release, so a registration passes it as its release
- * callback. Call it directly when the registering call rejects the context.
+ * This function has the signature of mln_user_data_release, so a registration
+ * passes it as its release callback. Call it directly when the registering call
+ * rejects the context.
  */
 MLN_API void mln_adapter_deferred_callback_release(
   void* context MLN_BINDING("kind=context")
@@ -431,14 +430,16 @@ MLN_API mln_status mln_adapter_dart_wake_create(
 /**
  * Captures a completion and posts its token and copied result to a Dart port.
  *
- * The VM releases an undelivered result through its native-pointer message
- * finalizer. Delivered results transfer to the binding's completion decoder.
- * Rejection uses mln_adapter_completion_reject.
+ * The copy keeps the result's value_size, so the binding's completion decoder
+ * indexes an array with the stride of the native build. The VM releases an
+ * undelivered result through its native-pointer message finalizer. Delivered
+ * results transfer to the binding's completion decoder. Rejection uses
+ * mln_adapter_completion_reject.
  */
 MLN_API mln_status mln_adapter_dart_completion_create(
-  uint32_t copy_kind, size_t element_size,
-  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
-  int64_t token, mln_completion* out_completion MLN_BINDING("direction=out"),
+  uint32_t copy_kind, void* post_cobject MLN_BINDING("lifetime=process"),
+  int64_t port, int64_t token,
+  mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -483,7 +484,7 @@ MLN_API mln_status mln_adapter_arena_adopt_handle(
  * frees its allocations.
  */
 MLN_API mln_status mln_adapter_arena_adopt_release(
-  void* arena MLN_BINDING("kind=context"), mln_runtime_callback_release release,
+  void* arena MLN_BINDING("kind=context"), mln_user_data_release release,
   void* context MLN_BINDING("kind=context"), mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -628,30 +629,6 @@ MLN_BINDING(
 MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
   void* user_data MLN_BINDING("kind=context"),
   const mln_resource_request* request, mln_resource_request_handle handle
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom geometry tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_geometry_callbacks_retire(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context")
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom MVT vector tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
-  mln_custom_mvt_vector_source_tile_callback fetch_tile,
-  mln_custom_mvt_vector_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)

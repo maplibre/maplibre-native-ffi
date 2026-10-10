@@ -25,6 +25,7 @@ from ._generated_values import (
     CustomGeometrySourceOptions,
     CustomMvtVectorSourceOptions,
     EdgeInsets,
+    EventBatchView,
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
@@ -34,10 +35,8 @@ from ._generated_values import (
     LatLng,
     LatLngBounds,
     LocationIndicatorImageKind,
-    LogEvent,
+    LogHandler,
     LogicalExtent,
-    LogSetCallbackRegistration,
-    LogSeverity,
     LogSeverityMask,
     MapDebugOption,
     MapOptions,
@@ -66,15 +65,16 @@ from ._generated_values import (
     RenderBackendFlag,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
+    RenderFrameBatchView,
     RenderFrameResult,
     RenderSessionAttachOptions,
     RenderSessionCapabilities,
     RenderSessionSnapshot,
     RenderTargetExtent,
     ResourceProvider,
+    ResourceRequestCancelHandler,
     ResourceResponse,
     ResourceTransform,
-    RuntimeEventBatchView,
     RuntimeEventMask,
     RuntimeOptions,
     ScreenBox,
@@ -285,36 +285,16 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return self._native.close(consumer_completion)
 
 
-class _BufferHandleOperations(GeneratedOperations):
-    _native: _native._BufferHandle
-
-    def close(self) -> None:
-        """Destroys an owned buffer. A null handle is a no-op.
-
-        See `mln_buffer_destroy` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-        """
-        return self._native.close()
-
-    def get(self) -> bytes:
-        """Borrows the data stored by an owned buffer.
-
-        See `mln_buffer_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-        """
-        return self._native.get()
-
-
 class _EventBatchHandleOperations(GeneratedOperations):
     _native: _native._EventBatchHandle
 
-    def get(self) -> RuntimeEventBatchView:
+    def get(self) -> EventBatchView:
         """Borrows the event and message view stored by an owned event batch.
 
         See `mln_event_batch_get` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return RuntimeEventBatchView._from_native(self._native.get())
+        return EventBatchView._from_native(self._native.get())
 
     def close(self) -> None:
         """Releases an owned event batch. A null handle is a no-op.
@@ -1754,21 +1734,13 @@ class _MapProjectionHandleOperations(GeneratedOperations):
 class _RenderFrameBatchHandleOperations(GeneratedOperations):
     _native: _native._RenderFrameBatchHandle
 
-    def count(self) -> int:
-        """Returns the number of records in an owned frame-result batch.
-
-        See `mln_render_frame_batch_count` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.count()
-
-    def get(self, index: int) -> RenderFrameResult:
-        """Copies one frame-result record.
+    def get(self) -> RenderFrameBatchView:
+        """Borrows the result view stored by an owned frame-result batch.
 
         See `mln_render_frame_batch_get` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
-        return RenderFrameResult._from_native(self._native.get(index))
+        return RenderFrameBatchView._from_native(self._native.get())
 
     def close(self) -> None:
         """Releases a frame-result batch.
@@ -1970,8 +1942,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         self, source_id: str, options: SourceFeatureQueryOptions | None = None
     ) -> Future[tuple[QueriedFeature, ...]]:
         """Starts a source-feature query against the session's latest driver
-        state. The completion borrows an array of `mln_queried_feature`
-        values (value_count entries), valid only for the callback.
+        state. The completion borrows value_count `mln_queried_feature`
+        values, value_size bytes apart, valid only for the callback.
 
         See `mln_render_session_query_source_features` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -2096,14 +2068,14 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     def close(self) -> None:
         return self._native.close()
 
-    def set_cancel_callback(self, callback: Callable[[], None]) -> bool:
+    def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
         """Registers a callback that runs when MapLibre cancels a C API resource
         provider request.
 
         See `mln_resource_request_set_cancel_callback` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.set_cancel_callback(callback)
+        return self._native.set_cancel_callback(handler)
 
     def wait_until_retired(self) -> None:
         """Blocks until a resource request is released and its cancel callback
@@ -2173,13 +2145,16 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
-    def drain_events(self) -> EventBatchHandle:
+    def drain_events(self) -> EventBatchHandle | None:
         """Drains this runtime's queued events into a new owned batch.
 
         See `mln_runtime_drain_events` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return _adopt_value(self._native.drain_events(), "EventBatchHandle", None)
+        return _maybe(
+            lambda raw: _adopt_value(raw, "EventBatchHandle", None),
+            self._native.drain_events(),
+        )
 
     def get_event_mask(self) -> RuntimeEventMask:
         """Reports which runtime-scoped event types this runtime queues.
@@ -2423,15 +2398,13 @@ def log_set_async_severity_mask(mask: LogSeverityMask) -> None:
     return _native.log_set_async_severity_mask(mask)
 
 
-def log_set_callback(
-    callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None,
-) -> None:
+def log_set_callback(handler: LogHandler) -> None:
     """Installs a process-global MapLibre Native log callback.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
-    return _native.log_set_callback(LogSetCallbackRegistration(callback))
+    return _native.log_set_callback(handler)
 
 
 def network_status_get() -> NetworkStatus:

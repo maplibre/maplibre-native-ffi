@@ -163,7 +163,11 @@ static void log_mlt_fast_pfor_tile_with_the_option_off(void) {
 // assertion fails, and Unity still reports the failure.
 static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
   atomic_store(&mlt_parse_warning_logged, false);
-  MLN_TEST_OK(mln_log_set_callback(record_mlt_parse_warning, NULL, NULL, NULL));
+  const mln_log_handler handler = {
+    .size = sizeof(mln_log_handler),
+    .callback = record_mlt_parse_warning,
+  };
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
   if (TEST_PROTECT()) {
     log_mlt_fast_pfor_tile_with_the_option_off();
   }

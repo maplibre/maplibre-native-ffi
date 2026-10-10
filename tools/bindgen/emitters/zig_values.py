@@ -127,9 +127,6 @@ class Values:
                     [f"Zig: {value.native}: variant requires tag decoding"]
                 )
             self.add(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.add(self.bound.values[group.type])
         self.used[value.native] = value
 
     def capture(self, value, source):
@@ -178,9 +175,7 @@ class Values:
         fields, copies, writes = [], [], []
         for field in value.fields:
             if field.role == "presence_mask":
-                writes.append(
-                    f"        raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'};"
-                )
+                writes.append(f"        raw.{field.name} = 0;")
         for flag in value.mask_flags:
             local = identifier(flag.member)
             fields.append(
@@ -192,41 +187,13 @@ class Values:
             writes.append(
                 f"        if (self.{local}) raw.{flag.mask} |= c.{flag.name};"
             )
-        grouped = {
-            name
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
-        for group in value.presence_groups:
-            if len(group.fields) == 1:
-                continue
-            child = self.bound.values[group.type]
-            local = identifier(group.member)
-            fields.append(f"    {local}: ?{self.public(child)} = null,")
-            writes.append(
-                f"        if (self.{local}) |item| {{ raw.{identifier(group.mask)} |= c.{group.bit}; "
-                + " ".join(
-                    f"raw.{identifier(name)} = {self.materialize(next(f.value for f in value.fields if f.name == name), 'item.' + identifier(name))};"
-                    for name in group.fields
-                )
-                + " }"
-            )
-            copies.append(
-                f"            .{local} = if (raw.{identifier(group.mask)} & c.{group.bit} != 0) .{{ "
-                + ", ".join(
-                    f".{identifier(name)} = {self.capture(next(f.value for f in value.fields if f.name == name), 'raw.' + identifier(name))}"
-                    for name in group.fields
-                )
-                + " } else null,"
-            )
         for field in value.fields:
             local = identifier(field.name)
             if field.role == "size":
                 if not value.default:
                     writes.append(f"        raw.{local} = @sizeOf(c.{value.native});")
                 continue
-            if not field.public or field.name in grouped:
+            if not field.public:
                 continue
             optional = field.presence and field.presence.mask
             initial = "null" if optional else field_default(self, field)
@@ -237,12 +204,12 @@ class Values:
             copy = self.capture(field.value, f"raw.{local}")
             if optional:
                 mask, bit = identifier(field.presence.mask), field.presence.bit
-                present = f"raw.{mask} & c.{bit} != 0" if bit else f"raw.{mask}"
+                present = f"raw.{mask} & c.{bit} != 0"
                 copies.append(
                     f"            .{local} = if ({present}) {copy} else null,"
                 )
                 writes.append(
-                    f"        marshal.present(&raw.{mask}, {'c.' + bit if bit else 'true'}, &raw.{local}, self.{local});"
+                    f"        marshal.present(&raw.{mask}, c.{bit}, &raw.{local}, self.{local});"
                 )
             else:
                 copies.append(f"            .{local} = {copy},")

@@ -65,6 +65,7 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_rendered_feature_query_option_field : uint32_t {
   MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1U << 0U,
+  MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_rendered_feature_query_option_field;
 
 /** Options for rendered feature queries. */
@@ -77,8 +78,10 @@ typedef struct mln_rendered_feature_query_options {
     "bit=MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS"
   );
   size_t layer_id_count;
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  mln_buffer_view filter MLN_BINDING(
+    "encoding=json;mask=fields;bit=MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER"
+  );
 } mln_rendered_feature_query_options;
 
 /** Optional fields for mln_source_feature_query_options. */
@@ -86,6 +89,7 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_source_feature_query_option_field : uint32_t {
   MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1U << 0U,
+  MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_source_feature_query_option_field;
 
 /** Options for source feature queries. */
@@ -99,8 +103,10 @@ typedef struct mln_source_feature_query_options {
     "bit=MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS"
   );
   size_t source_layer_id_count;
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  mln_buffer_view filter MLN_BINDING(
+    "encoding=json;mask=fields;bit=MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER"
+  );
 } mln_source_feature_query_options;
 
 /** Optional fields for mln_queried_feature. */
@@ -119,7 +125,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_queried_feature_field : uint32_t {
  * object.
  */
 typedef struct mln_queried_feature {
-  uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_queried_feature_field");
   mln_buffer_view feature MLN_BINDING("encoding=json");
   mln_buffer_view source_id
@@ -157,9 +162,9 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *
  * All inputs are copied before return. Core-worker sessions execute on their
  * worker. Caller-driver sessions publish driver work and complete only after
- * the host services it on the graphics thread. The completion borrows an array
- * of mln_queried_feature values (value_count entries), valid only for the
- * callback.
+ * the host services it on the graphics thread. The completion borrows
+ * value_count mln_queried_feature values, value_size bytes apart, valid only
+ * for the callback.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
@@ -189,8 +194,8 @@ MLN_API mln_status mln_render_session_query_rendered_features(
 
 /**
  * Starts a source-feature query against the session's latest driver state.
- * The completion borrows an array of mln_queried_feature values (value_count
- * entries), valid only for the callback.
+ * The completion borrows value_count mln_queried_feature values, value_size
+ * bytes apart, valid only for the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.

@@ -73,6 +73,10 @@ type bindingArena struct {
 	allocations []unsafe.Pointer
 	callbacks   []*bindingCallbackTicket
 	leases      []func()
+	// identity is the issued id of the call's receiver, or zero for a global
+	// call. A registration whose callback may call back only into the
+	// receiver records it.
+	identity uint64
 }
 
 // lease holds a handle argument until the arena closes, and returns its raw id.
@@ -148,6 +152,15 @@ func (arena *bindingArena) accept(owner *bindingOwner) {
 			}
 		}
 		ticket.mu.Unlock()
+	}
+	arena.callbacks = nil
+}
+
+// decline releases the callback roots of a registration that native reported
+// it kept nothing from, so a later accept moves none of them to the receiver.
+func (arena *bindingArena) decline() {
+	for _, ticket := range arena.callbacks {
+		ticket.release()
 	}
 	arena.callbacks = nil
 }

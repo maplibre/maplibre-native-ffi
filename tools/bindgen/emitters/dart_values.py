@@ -126,7 +126,9 @@ class Values:
                     self.check(parameter.value)
             self.used[value.native] = value
             return
-        if value.registration and self.port_callbacks(value):
+        if value.registration and (
+            self.port_callbacks(value) or self.deferred_callback(value)
+        ):
             for field in self.fields(value):
                 self.check(field.value)
             self.used[value.native] = value
@@ -163,9 +165,6 @@ class Values:
         else:
             for field in self.fields(value):
                 self.check(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.check(self.bound.values[group.type])
         self.used[value.native] = value
 
     def port_callbacks(self, value):
@@ -177,6 +176,22 @@ class Values:
             if entry[0].native == value.native
         ]
         return entries if len(entries) == len(value.registration.callbacks) else []
+
+    def deferred_callback(self, value):
+        """The one callback of a registration that a deferred adapter answers
+        at once and delivers to this isolate later, or None.
+
+        A callback that native callback adapters serve keeps their variants.
+        """
+        if not value.registration or len(value.registration.callbacks) != 1:
+            return None
+        field = next(f for f in value.fields if f.name in value.registration.callbacks)
+        if any(
+            adapter.callback == field.value.native
+            for adapter in self.bound.callback_adapters
+        ):
+            return None
+        return field if self.bound.callbacks[field.value.native].deferred else None
 
     def registration_adapters(self, value):
         callbacks = {
@@ -331,12 +346,15 @@ class Values:
         """A registration descriptor added to the call's transaction."""
         roots = (
             "registrations.ports"
-            if self.port_callbacks(value)
+            if self.port_callbacks(value) or self.deferred_callback(value)
             else "_callbackReleases, registrations.ports"
             if self.registration_ports(value)
             else "_callbackReleases"
         )
-        return f"registrations.add(_prepare{public_name(value.native)}({expression}, {roots}))"
+        # A callback that calls back only into its registering receiver
+        # arrives after the call, so it is dropped once that receiver closes.
+        closed = ", () => isClosed" if value.registration.receiver_owned else ""
+        return f"registrations.add(_prepare{public_name(value.native)}({expression}, {roots}{closed}))"
 
     def native(self, value, expression):
         if value.registration:
@@ -500,7 +518,15 @@ class Values:
                 if value.item_buffer:
                     item_buffer = value.item_buffer
                     extra = f", {item_buffer.field}: _arenaUtf8({parent}.{item_buffer.data}.cast(), {parent}.{item_buffer.size}, {item_expression}.{item_buffer.offset}, {item_expression}.{item_buffer.length})"
-                item = f"_read{public_name(value.element.native)}({item_expression}, rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride}){extra})"
+                # Only a record that ends in a tagged union keeps the raw bytes
+                # an unknown variant forwards.
+                raw_record = (
+                    f", rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride})"
+                    if any(f.value.kind == "union" for f in value.element.fields)
+                    and len(self.fields(value.element)) > 1
+                    else ""
+                )
+                item = f"_read{public_name(value.element.native)}({item_expression}{raw_record}{extra})"
             else:
                 item = self.copy(value.element, item_expression)
             result = f"List<{self.public(value.element)}>.unmodifiable(List.generate({count}, (index) => {item}))"
@@ -520,38 +546,13 @@ class Values:
         return result
 
     def members(self, value):
-        fields = self.fields(value)
-        grouped = {
-            name: group
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
-        emitted = set()
+        """The public members of a record: (name, type, field)."""
         result = []
-        for field in fields:
-            group = grouped.get(field.name)
-            if group:
-                if group.mask in emitted:
-                    continue
-                emitted.add(group.mask)
-                name = identifier(group.member)
-                children = [f for f in fields if f.name in group.fields]
-                typ = (
-                    public_name(group.type)
-                    if group.type
-                    else "({"
-                    + ", ".join(
-                        f"{self.public(f.value)} {identifier(f.name)}" for f in children
-                    )
-                    + "})"
-                )
-                result.append((name, typ + "?", children, group))
-            else:
-                typ = self.public(field.value)
-                if field.presence and field.presence.mask and not typ.endswith("?"):
-                    typ += "?"
-                result.append((identifier(field.name), typ, [field], None))
+        for field in self.fields(value):
+            typ = self.public(field.value)
+            if field.presence and field.presence.mask and not typ.endswith("?"):
+                typ += "?"
+            result.append((identifier(field.name), typ, field))
         return result
 
     def enum_constant(self, bit):
@@ -560,18 +561,10 @@ class Values:
         return f"raw.{bit}"
 
     def present(self, mask, bit):
-        return (
-            f"(source.{mask} & {self.enum_constant(bit)}) != 0"
-            if bit
-            else f"source.{mask}"
-        )
+        return f"(source.{mask} & {self.enum_constant(bit)}) != 0"
 
     def set_present(self, mask, bit):
-        return (
-            f"result.ref.{mask} |= {self.enum_constant(bit)};"
-            if bit
-            else f"result.ref.{mask} = true;"
-        )
+        return f"result.ref.{mask} |= {self.enum_constant(bit)};"
 
     def field_default(self, field):
         """A field's default: its annotated initial value, or its type's."""
@@ -600,12 +593,10 @@ class Values:
             if any(f.value.kind == "union" for f in value.fields):
                 return None
             args = []
-            for name, typ, children, group in self.members(value):
+            for _name, typ, field in self.members(value):
                 if typ.endswith("?"):
                     continue
-                if group:
-                    return None
-                default = self.field_default(children[0])
+                default = self.field_default(field)
                 if default is None:
                     return None
                 if value.ordered:
@@ -624,7 +615,7 @@ class Values:
         local = "port" + pascal(field.name)
         return [
             f"  final {local} = ports.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}({expression}, message));",
-            f"  arena.adoptRelease(Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_deferred_callback_release), {local}.context);",
+            f"  arena.adoptRelease(Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_deferred_callback_release), {local}.context);",
             f"  result.ref.{field.name} = raw.mln_adapter_deferred_callback_function({key}).cast();",
             f"  result.ref.{context} = {local}.context;",
         ]
@@ -709,12 +700,7 @@ class Values:
             field.name: (callback, payload)
             for _, field, callback, payload in self.port_callbacks(value)
         }
-        for name, typ, children, group in self.members(value):
-            if group or len(children) != 1:
-                raise Unsupported(
-                    "port descriptor field grouping needs recursive preparation"
-                )
-            field = children[0]
+        for name, typ, field in self.members(value):
             fields.append(f"  final {typ} {name};")
             default = self.field_default(field)
             args.append(
@@ -734,8 +720,13 @@ class Values:
                     expression, offset = self.port_copy(parameter.value, offset)
                     decoded.append(expression)
                 invoke = f"value.{name}{'!' if field.value.nullable else ''}({', '.join(decoded)})"
+                delivery = (
+                    f"(message) {{ if (!receiverClosed()) {{ {invoke}; }} }}"
+                    if value.registration.receiver_owned
+                    else f"(message) => {invoke}"
+                )
                 handlers.append(
-                    f"      {'if (value.' + name + ' != null) ' if field.value.nullable else ''}{key}: (message) => {invoke},"
+                    f"      {'if (value.' + name + ' != null) ' if field.value.nullable else ''}{key}: {delivery},"
                 )
                 pointer = f"raw.mln_adapter_dart_port_function({key}).cast()"
                 writes.append(
@@ -773,9 +764,9 @@ class Values:
         )
         read_args = ", ".join(
             f"{name}: null"
-            if children[0].name in ports
-            else f"{name}: {self.copy(children[0].value, 'source.' + children[0].name)}"
-            for name, _, children, _ in self.members(value)
+            if field.name in ports
+            else f"{name}: {self.copy(field.value, 'source.' + field.name)}"
+            for name, _, field in self.members(value)
         )
         reader = (
             f"{public} _read{public}(raw.{value.native} source) => {public}({read_args});\n"
@@ -791,18 +782,81 @@ class Values:
             f"result.ref = raw.{value.default}();"
             if value.default
             else f"result.ref.size = sizeOf<raw.{value.native}>();"
+            if any(f.role == "size" for f in value.fields)
+            else ""
         )
+        initialize = f"    {initialize}\n" if initialize else ""
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n    {initialize}\n    {disabled_code}\n    port = roots.register({{\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots{', bool Function() receiverClosed' if value.registration.receiver_owned else ''}) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n{initialize}    {disabled_code}\n    port = roots.register({{\n"
             + "\n".join(handlers)
             + "\n    });\n"
             + "\n".join(writes)
-            + f"\n    result.ref.{value.registration.user_data} = port.context;\n    result.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_port_release).cast();\n    return _NativeRegistration(result, port.reject, arena.releaseAll);\n  }} catch (_) {{ port?.reject(); arena.releaseAll(); rethrow; }}\n}}\n"
+            + f"\n    result.ref.{value.registration.user_data} = port.context;\n    result.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_dart_port_release).cast();\n    return _NativeRegistration(result, port.reject, arena.releaseAll);\n  }} catch (_) {{ port?.reject(); arena.releaseAll(); rethrow; }}\n}}\n"
         )
         return declaration, conversion + reader
 
+    def render_deferred_registration(self, value):
+        """A registration whose one callback a deferred adapter delivers.
+
+        The adapter answers each call at once and posts a copy to a port on
+        this isolate, which the transaction's roots keep until native release
+        retires it. A registration that native code does not accept releases
+        the port at once.
+        """
+        public = public_name(value.native)
+        deferred = self.deferred_callback(value)
+        callback = self.bound.callbacks[deferred.value.native]
+        key = deferred_key(callback)
+        fields, args, writes = [], [], []
+        for name, typ, field in self.members(value):
+            fields.append(f"  final {typ} {name};")
+            default = self.field_default(field)
+            args.append(
+                f"this.{name}"
+                if typ.endswith("?")
+                else f"this.{name} = {default}"
+                if default
+                else f"required this.{name}"
+            )
+            if field.name == deferred.name:
+                continue
+            writes.append(
+                f"    result.ref.{field.name} = {self.native(field.value, 'value.' + name)};"
+            )
+        name = identifier(camel(deferred.name))
+        if deferred.value.nullable:
+            raise Unsupported(f"{value.native}: a deferred callback must be set")
+        declaration = (
+            f"final class {public} {{\n  const {public}({{{', '.join(args)}}});\n"
+            + "\n".join(fields)
+            + "\n}"
+        )
+        initialize = (
+            f"result.ref = raw.{value.default}();"
+            if value.default
+            else f"result.ref.size = sizeOf<raw.{value.native}>();"
+            if any(f.role == "size" for f in value.fields)
+            else ""
+        )
+        initialize = f"    {initialize}\n" if initialize else ""
+        conversion = (
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n{initialize}"
+            + "".join(line + "\n" for line in writes)
+            + f"    port = roots.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(value.{name}, message));\n"
+            + f"    result.ref.{deferred.name} = raw.mln_adapter_deferred_callback_function({key}).cast();\n"
+            + f"    result.ref.{value.registration.user_data} = port.context;\n"
+            + f"    result.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_deferred_callback_release).cast();\n"
+            + "    return _NativeRegistration(result, port.reject, arena.releaseAll);\n  } catch (_) { port?.reject(); arena.releaseAll(); rethrow; }\n}\n"
+        )
+        return declaration, conversion
+
     def render_registration(self, value):
         public = public_name(value.native)
+        sized = (
+            f"      descriptor.ref.size = sizeOf<raw.{value.native}>();\n"
+            if any(f.role == "size" for f in value.fields)
+            else ""
+        )
         declarations = [
             f"sealed class {public} {{",
             f"  const {public}._();",
@@ -813,7 +867,7 @@ class Values:
                 f"final class {public}Empty extends {public} {{ const {public}Empty() : super._(); }}"
             ],
             [
-                f"    case {public}Empty():\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      return _NativeRegistration(descriptor, arena.releaseAll, arena.releaseAll);"
+                f"    case {public}Empty():\n      final descriptor = arena<raw.{value.native}>();\n{sized}      return _NativeRegistration(descriptor, arena.releaseAll, arena.releaseAll);"
             ],
         )
         for adapter in self.registration_adapters(value):
@@ -835,7 +889,7 @@ class Values:
                 else ""
             )
             cases.append(
-                f"    case {variant}():\n      final context = _write{context}(value.value, arena{ports});\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
+                f"    case {variant}():\n      final context = _write{context}(value.value, arena{ports});\n      final descriptor = arena<raw.{value.native}>();\n{sized}      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
             )
         declarations.append("}")
         declarations.extend(children)
@@ -1052,6 +1106,11 @@ class Values:
                 declarations.append(declaration)
                 conversions.append(conversion)
                 continue
+            if value.registration and self.deferred_callback(value):
+                declaration, conversion = self.render_deferred_registration(value)
+                declarations.append(declaration)
+                conversions.append(conversion)
+                continue
             if value.registration:
                 declaration, conversion = self.render_registration(value)
                 declarations.append(declaration)
@@ -1072,13 +1131,9 @@ class Values:
             for flag in value.mask_flags:
                 flags.append((identifier(flag.member), flag))
             fields = "\n".join(
-                (
-                    doc(self.bound, f"{value.native}.{children[0].name}", "  ")
-                    if not group
-                    else ""
-                )
+                doc(self.bound, f"{value.native}.{field.name}", "  ")
                 + f"  final {typ} {name};"
-                for name, typ, children, group in members
+                for name, typ, field in members
             )
             fields += "\n" + "\n".join(
                 f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
@@ -1087,8 +1142,8 @@ class Values:
             # A record whose field order is its meaning constructs positionally.
             positional = value.ordered
             args, initializers = [], []
-            for name, typ, children, group in members:
-                default = self.field_default(children[0]) if not group else None
+            for name, typ, field in members:
+                default = self.field_default(field)
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
                 if copied:
                     args.append(
@@ -1116,7 +1171,7 @@ class Values:
             if not positional:
                 signature = "{" + signature + "}"
             compared = ", ".join(
-                [name for name, _, _, _ in members] + [name for name, _ in flags]
+                [name for name, _, _ in members] + [name for name, _ in flags]
             )
             declarations.append(
                 f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
@@ -1147,85 +1202,67 @@ class Values:
                     f"  if (value.{name}) {{ {self.set_present(flag.mask, flag.name)} }}"
                 )
                 read.append(f"    {name}: {self.present(flag.mask, flag.name)},")
-            for name, typ, children, group in members:
-                presence = group or children[0].presence
+            for name, typ, field in members:
+                presence = field.presence
                 optional = presence and presence.mask
-                source = f"value.{name}" + ("!" if optional else "")
+                expression = f"value.{name}" + ("!" if optional else "")
                 if optional:
                     write += [
                         f"  if (value.{name} != null) {{",
                         "    " + self.set_present(presence.mask, presence.bit),
                     ]
-                decoded = []
-                for field in children:
-                    expression = source + (
-                        f".{identifier(field.name)}" if group else ""
+                native_field = f"result.ref.{field.name}"
+                capture = None
+                if (
+                    field.value.kind == "buffer"
+                    and field.value.buffer_form != "view"
+                    and field.value.length not in {None, "nul", "1"}
+                ):
+                    view = (
+                        f"nativeStringView({expression}, arena).value"
+                        if field.value.encoding == "utf8"
+                        else f"nativeBufferView({expression}, arena)"
                     )
-                    native_field = f"result.ref.{field.name}"
-                    if (
-                        field.value.kind == "buffer"
-                        and field.value.buffer_form != "view"
-                        and field.value.length not in {None, "nul", "1"}
-                    ):
-                        view = (
-                            f"nativeStringView({expression}, arena).value"
-                            if field.value.encoding == "utf8"
-                            else f"nativeBufferView({expression}, arena)"
-                        )
-                        write += [
-                            f"  final bytes{name} = {view};",
-                            f"  {native_field} = bytes{name}.data.cast();",
-                            f"  result.ref.{field.value.length} = bytes{name}.size;",
-                        ]
-                    elif field.value.kind == "array":
-                        child = field.value.element
-                        # A null list leaves the zeroed pointer and count.
-                        items = expression + "!" if field.value.nullable else expression
+                    write += [
+                        f"  final bytes{name} = {view};",
+                        f"  {native_field} = bytes{name}.data.cast();",
+                        f"  result.ref.{field.value.length} = bytes{name}.size;",
+                    ]
+                elif field.value.kind == "array":
+                    child = field.value.element
+                    # A null list leaves the zeroed pointer and count.
+                    items = expression + "!" if field.value.nullable else expression
+                    lines = [
+                        f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
+                        f"  result.ref.{field.value.length} = {items}.length;",
+                        f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
+                    ]
+                    if field.value.nullable:
                         lines = [
-                            f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
-                            f"  result.ref.{field.value.length} = {items}.length;",
-                            f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
+                            f"  if ({expression} != null) {{",
+                            *lines,
+                            "  }",
                         ]
-                        if field.value.nullable:
-                            lines = [
-                                f"  if ({expression} != null) {{",
-                                *lines,
-                                "  }",
-                            ]
-                        write += lines
-                    elif deferred and field.name == deferred[0].name:
-                        write += self.write_deferred_field(
-                            field, deferred[1], expression
-                        )
-                        decoded.append(
-                            f"{identifier(field.name)}: throwInvalidState('cannot copy a registered native callback')"
-                        )
-                        continue
-                    else:
-                        write.append(
-                            f"  {native_field} = {self.native(field.value, expression)};"
-                        )
-                    copied = self.copy(
+                    write += lines
+                elif deferred and field.name == deferred[0].name:
+                    write += self.write_deferred_field(field, deferred[1], expression)
+                    capture = (
+                        "throwInvalidState('cannot copy a registered native callback')"
+                    )
+                else:
+                    write.append(
+                        f"  {native_field} = {self.native(field.value, expression)};"
+                    )
+                if capture is None:
+                    capture = self.copy(
                         field.value,
                         "source." + field.name,
                         "source." + str(field.value.length),
                     )
                     if field.value.kind == "array" and field.value.nullable:
-                        copied = f"source.{field.name} == nullptr ? null : {copied}"
-                    decoded.append(f"{identifier(field.name)}: {copied}")
+                        capture = f"source.{field.name} == nullptr ? null : {capture}"
                 if optional:
                     write.append("  }")
-                if group and group.type and self.bound.values[group.type].ordered:
-                    decoded = [item.split(": ", 1)[1] for item in decoded]
-                capture = (
-                    (public_name(group.type) if group and group.type else "")
-                    + "("
-                    + ", ".join(decoded)
-                    + ",)"
-                    if group
-                    else decoded[0].split(": ", 1)[1]
-                )
-                if optional:
                     capture = f"{self.present(presence.mask, presence.bit)} ? {capture} : null"
                 read.append(f"    {name}: {capture},")
             write += ["  return result;", "}"]

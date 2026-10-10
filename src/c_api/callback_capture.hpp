@@ -144,14 +144,12 @@ inline auto destroy_deferred(DeferredRecord* record) noexcept -> void {
   ::operator delete(record);
 }
 
-inline auto copy(
-  const mln_completion_result& source, std::uint32_t kind,
-  std::size_t element_size
-) -> Record* {
+inline auto copy(const mln_completion_result& source, std::uint32_t kind)
+  -> Record* {
   Arena<false> measure;
   static_cast<void>(buffer(measure, source.diagnostic));
   if (source.status == MLN_STATUS_OK) {
-    static_cast<void>(value(measure, source, kind, element_size));
+    static_cast<void>(value(measure, source, kind));
   }
   auto* storage = static_cast<std::byte*>(::operator new(measure.offset));
   auto* record = new (storage) Record{};
@@ -163,7 +161,7 @@ inline auto copy(
     record->view.result.diagnostic = buffer(write, source.diagnostic);
     record->view.result.value = nullptr;
     if (source.status == MLN_STATUS_OK) {
-      record->view.result.value = value(write, source, kind, element_size);
+      record->view.result.value = value(write, source, kind);
     } else {
       record->view.result.value_count = 0;
     }

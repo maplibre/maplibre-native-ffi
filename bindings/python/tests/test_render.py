@@ -251,7 +251,7 @@ class OwnedTexture:
             batch = session.drain_frame_results()
             if batch is not None:
                 with batch:
-                    self._results.extend(batch.get(i) for i in range(batch.count()))
+                    self._results.extend(batch.get().results)
             for index, frame in enumerate(self._results):
                 if frame.token == token:
                     return self._results.pop(index)

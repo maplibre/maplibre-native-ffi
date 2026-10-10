@@ -108,11 +108,11 @@ pub fn nativeOf(comptime Target: type, value: anytype) Target {
 }
 
 /// Writes an optional value into a presence-masked native field. A present
-/// value is converted into `field` and marks `presence`: a bool presence
-/// becomes true, and a mask gains `bit`. A null value leaves both unchanged.
+/// value is converted into `field` and adds `bit` to `presence`. A null value
+/// leaves both unchanged.
 pub fn present(presence: anytype, comptime bit: anytype, field: anytype, value: anytype) void {
     const item = value orelse return;
-    if (@TypeOf(presence.*) == bool) presence.* = true else presence.* |= bit;
+    presence.* |= bit;
     field.* = nativeOf(@TypeOf(field.*), item);
 }
 

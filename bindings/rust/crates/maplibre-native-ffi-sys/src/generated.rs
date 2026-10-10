@@ -22,6 +22,8 @@ pub const MLN_BOUND_OPTION_UNBOUNDED: mln_bound_option_field = 32;
 pub type mln_camera_change_mode = u32;
 pub const MLN_CAMERA_CHANGE_MODE_IMMEDIATE: mln_camera_change_mode = 0;
 pub const MLN_CAMERA_CHANGE_MODE_ANIMATED: mln_camera_change_mode = 1;
+pub type mln_camera_delta_field = u32;
+pub const MLN_CAMERA_DELTA_FIELD_ANCHOR: mln_camera_delta_field = 1;
 pub type mln_camera_delta_kind = u32;
 pub const MLN_CAMERA_DELTA_MOVE: mln_camera_delta_kind = 0;
 pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_kind = 1;
@@ -232,6 +234,7 @@ pub const MLN_RENDER_SESSION_STATE_TARGET_LOST: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
+pub const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER: mln_rendered_feature_query_option_field = 2;
 pub type mln_rendered_query_geometry_type = u32;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT: mln_rendered_query_geometry_type = 1;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX: mln_rendered_query_geometry_type = 2;
@@ -262,6 +265,14 @@ pub const MLN_RESOURCE_PRIORITY_LOW: mln_resource_priority = 1;
 pub type mln_resource_provider_decision = u32;
 pub const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH: mln_resource_provider_decision = 0;
 pub const MLN_RESOURCE_PROVIDER_DECISION_HANDLE: mln_resource_provider_decision = 1;
+pub type mln_resource_request_field = u32;
+pub const MLN_RESOURCE_REQUEST_RANGE: mln_resource_request_field = 1;
+pub const MLN_RESOURCE_REQUEST_PRIOR_MODIFIED: mln_resource_request_field = 2;
+pub const MLN_RESOURCE_REQUEST_PRIOR_EXPIRES: mln_resource_request_field = 4;
+pub type mln_resource_response_field = u32;
+pub const MLN_RESOURCE_RESPONSE_MODIFIED: mln_resource_response_field = 1;
+pub const MLN_RESOURCE_RESPONSE_EXPIRES: mln_resource_response_field = 2;
+pub const MLN_RESOURCE_RESPONSE_RETRY_AFTER: mln_resource_response_field = 4;
 pub type mln_resource_response_status = u32;
 pub const MLN_RESOURCE_RESPONSE_STATUS_OK: mln_resource_response_status = 0;
 pub const MLN_RESOURCE_RESPONSE_STATUS_ERROR: mln_resource_response_status = 1;
@@ -341,6 +352,7 @@ pub const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED: mln_runtime_event_ty
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
+pub const MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER: mln_source_feature_query_option_field = 2;
 pub type mln_status = i32;
 pub const MLN_STATUS_OK: mln_status = 0;
 pub const MLN_STATUS_INVALID_ARGUMENT: mln_status = -1;
@@ -353,6 +365,10 @@ pub const MLN_STATUS_BUSY: mln_status = -7;
 pub const MLN_STATUS_TARGET_LOST: mln_status = -8;
 pub const MLN_STATUS_NOT_READY: mln_status = -9;
 pub const MLN_STATUS_NOT_FOUND: mln_status = -10;
+pub type mln_style_image_info_field = u32;
+pub const MLN_STYLE_IMAGE_INFO_CONTENT: mln_style_image_info_field = 1;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH: mln_style_image_info_field = 2;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT: mln_style_image_info_field = 4;
 pub type mln_style_image_option_field = u32;
 pub const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO: mln_style_image_option_field = 1;
 pub const MLN_STYLE_IMAGE_OPTION_SDF: mln_style_image_option_field = 2;
@@ -378,6 +394,7 @@ pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 4;
 pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 8;
 pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 16;
 pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 32;
+pub const MLN_STYLE_SOURCE_INFO_ATTRIBUTION: mln_style_source_info_field = 64;
 pub type mln_style_source_type = u32;
 pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
@@ -431,7 +448,6 @@ pub const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS: mln_webgl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_animation_options {
-    pub size: u32,
     pub fields: u32,
     pub duration_ms: f64,
     pub velocity: f64,
@@ -460,10 +476,10 @@ pub struct mln_buffer_view {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_delta {
     pub size: u32,
+    pub fields: u32,
     pub kind: u32,
     pub offset: mln_screen_point,
     pub amount: f64,
-    pub has_anchor: bool,
     pub anchor: mln_screen_point,
     pub animation: mln_animation_options,
 }
@@ -481,8 +497,7 @@ pub struct mln_camera_fit_options {
 pub struct mln_camera_options {
     pub size: u32,
     pub fields: u32,
-    pub latitude: f64,
-    pub longitude: f64,
+    pub center: mln_lat_lng,
     pub center_altitude: f64,
     pub padding: mln_edge_insets,
     pub anchor: mln_screen_point,
@@ -495,8 +510,6 @@ pub struct mln_camera_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_query_result {
-    pub size: u32,
-    pub reserved: u32,
     pub generation: u64,
     pub camera: mln_camera_options,
 }
@@ -523,7 +536,7 @@ pub struct mln_completion {
     pub size: u32,
     pub callback: mln_completion_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_completion_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -531,7 +544,7 @@ pub struct mln_completion_result {
     pub size: u32,
     pub status: i32,
     pub disposition: u32,
-    pub reserved: u32,
+    pub value_size: u32,
     pub generation: u64,
     pub diagnostic: mln_buffer_view,
     pub value: *const std::ffi::c_void,
@@ -542,8 +555,8 @@ pub struct mln_completion_result {
 pub struct mln_custom_geometry_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_geometry_source_tile_callback,
-    pub cancel_tile: mln_custom_geometry_source_tile_callback,
+    pub fetch_tile: mln_custom_source_tile_callback,
+    pub cancel_tile: mln_custom_source_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -552,19 +565,19 @@ pub struct mln_custom_geometry_source_options {
     pub buffer: u32,
     pub clip: bool,
     pub wrap: bool,
-    pub release_user_data: mln_custom_geometry_source_release_callback,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_custom_mvt_vector_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_mvt_vector_source_tile_callback,
-    pub cancel_tile: mln_custom_mvt_vector_source_tile_callback,
+    pub fetch_tile: mln_custom_source_tile_callback,
+    pub cancel_tile: mln_custom_source_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
-    pub release_user_data: mln_custom_mvt_vector_source_release_callback,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -583,12 +596,21 @@ pub struct mln_edge_insets {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_egl_context_descriptor {
-    pub size: u32,
     pub display: *mut std::ffi::c_void,
     pub config: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
     pub client_api: u32,
     pub get_proc_address: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_event_batch_view {
+    pub size: u32,
+    pub event_size: u32,
+    pub events: *const mln_runtime_event,
+    pub event_count: usize,
+    pub messages: *const std::ffi::c_char,
+    pub messages_size: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -649,7 +671,7 @@ pub struct mln_http_header_transform {
     pub size: u32,
     pub callback: mln_http_header_transform_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -682,6 +704,14 @@ pub struct mln_lat_lng {
 pub struct mln_lat_lng_bounds {
     pub southwest: mln_lat_lng,
     pub northeast: mln_lat_lng,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_log_handler {
+    pub size: u32,
+    pub callback: mln_log_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -753,7 +783,6 @@ pub struct mln_metal_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_context_descriptor {
-    pub size: u32,
     pub device: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -787,7 +816,6 @@ pub struct mln_metal_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_geometry_region_definition {
-    pub size: u32,
     pub style_url: *const std::ffi::c_char,
     pub geometry: mln_buffer_view,
     pub min_zoom: f64,
@@ -811,7 +839,6 @@ pub union mln_offline_region_definition_data {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_offline_region_info {
-    pub size: u32,
     pub id: mln_offline_region_id,
     pub definition: mln_offline_region_definition,
     pub metadata: *const u8,
@@ -820,7 +847,6 @@ pub struct mln_offline_region_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_region_status {
-    pub size: u32,
     pub download_state: u32,
     pub completed_resource_count: u64,
     pub completed_resource_size: u64,
@@ -834,7 +860,6 @@ pub struct mln_offline_region_status {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_tile_pyramid_region_definition {
-    pub size: u32,
     pub style_url: *const std::ffi::c_char,
     pub bounds: mln_lat_lng_bounds,
     pub min_zoom: f64,
@@ -856,7 +881,6 @@ pub struct mln_opengl_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_opengl_context_descriptor {
-    pub size: u32,
     pub platform: u32,
     pub ownership: u32,
     pub data: mln_opengl_context_descriptor_data,
@@ -934,7 +958,6 @@ pub struct mln_quaternion {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_queried_feature {
-    pub size: u32,
     pub fields: u32,
     pub feature: mln_buffer_view,
     pub source_id: mln_buffer_view,
@@ -944,11 +967,10 @@ pub struct mln_queried_feature {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_queue_lock {
-    pub size: u32,
     pub lock: mln_queue_lock_callback,
     pub unlock: mln_queue_lock_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_queue_lock_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -957,6 +979,14 @@ pub struct mln_render_abandon_result {
     pub disposition: u32,
     pub quarantined_resource_count: u32,
     pub reserved: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_render_frame_batch_view {
+    pub size: u32,
+    pub result_size: u32,
+    pub results: *const mln_render_frame_result,
+    pub result_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1022,7 +1052,7 @@ pub struct mln_rendered_feature_query_options {
     pub fields: u32,
     pub layer_ids: *const mln_buffer_view,
     pub layer_id_count: usize,
-    pub filter: *const mln_buffer_view,
+    pub filter: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1053,12 +1083,19 @@ pub struct mln_resource_provider {
     pub size: u32,
     pub callback: mln_resource_provider_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_resource_range {
+    pub start: u64,
+    pub end: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_request {
     pub size: u32,
+    pub fields: u32,
     pub requested_url: *const std::ffi::c_char,
     pub resolved_url: *const std::ffi::c_char,
     pub kind: u32,
@@ -1066,12 +1103,8 @@ pub struct mln_resource_request {
     pub priority: u32,
     pub usage: u32,
     pub storage_policy: u32,
-    pub has_range: bool,
-    pub range_start: u64,
-    pub range_end: u64,
-    pub has_prior_modified: bool,
+    pub range: mln_resource_range,
     pub prior_modified_unix_ms: i64,
-    pub has_prior_expires: bool,
     pub prior_expires_unix_ms: i64,
     pub prior_etag: *const std::ffi::c_char,
     pub prior_data: *const u8,
@@ -1079,20 +1112,26 @@ pub struct mln_resource_request {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_resource_request_cancel_handler {
+    pub size: u32,
+    pub callback: mln_resource_request_cancel_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_response {
     pub size: u32,
+    pub fields: u32,
     pub status: u32,
     pub error_reason: u32,
     pub bytes: *const u8,
     pub byte_count: usize,
     pub error_message: *const std::ffi::c_char,
     pub must_revalidate: bool,
-    pub has_modified: bool,
     pub modified_unix_ms: i64,
-    pub has_expires: bool,
     pub expires_unix_ms: i64,
     pub etag: *const std::ffi::c_char,
-    pub has_retry_after: bool,
     pub retry_after_unix_ms: i64,
 }
 #[repr(C)]
@@ -1101,7 +1140,7 @@ pub struct mln_resource_transform {
     pub size: u32,
     pub callback: mln_resource_transform_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1121,16 +1160,6 @@ pub struct mln_runtime_event {
     pub message_offset: u64,
     pub message_size: u32,
     pub payload: mln_runtime_event_payload,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_batch_view {
-    pub size: u32,
-    pub event_size: u32,
-    pub events: *const mln_runtime_event,
-    pub event_count: usize,
-    pub messages: *const std::ffi::c_char,
-    pub messages_size: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1189,7 +1218,6 @@ pub struct mln_runtime_event_tile_action {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_options {
     pub size: u32,
-    pub flags: u32,
     pub asset_path: *const std::ffi::c_char,
     pub cache_path: *const std::ffi::c_char,
     pub event_mask: u64,
@@ -1220,12 +1248,12 @@ pub struct mln_source_feature_query_options {
     pub fields: u32,
     pub source_layer_ids: *const mln_buffer_view,
     pub source_layer_id_count: usize,
-    pub filter: *const mln_buffer_view,
+    pub filter: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_info {
-    pub size: u32,
+    pub fields: u32,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
@@ -1237,9 +1265,6 @@ pub struct mln_style_image_info {
     pub text_fit_height: u32,
     pub pixel_ratio: f32,
     pub sdf: bool,
-    pub has_content: bool,
-    pub has_text_fit_width: bool,
-    pub has_text_fit_height: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1259,8 +1284,6 @@ pub struct mln_style_image_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_image_info,
     pub pixels: mln_buffer_view,
     pub stretch_x: *const mln_image_stretch,
@@ -1271,8 +1294,6 @@ pub struct mln_style_image_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_stretches_result {
-    pub size: u32,
-    pub reserved: u32,
     pub stretch_x: *const mln_image_stretch,
     pub stretch_x_count: usize,
     pub stretch_y: *const mln_image_stretch,
@@ -1281,7 +1302,6 @@ pub struct mln_style_image_stretches_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_entry {
-    pub size: u32,
     pub id: mln_buffer_view,
     pub type_: mln_buffer_view,
     pub source_id: mln_buffer_view,
@@ -1290,8 +1310,6 @@ pub struct mln_style_layer_entry {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_info {
-    pub size: u32,
-    pub reserved: u32,
     pub type_: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -1300,8 +1318,6 @@ pub struct mln_style_layer_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_layer_info,
     pub source_id: mln_buffer_view,
     pub source_layer: mln_buffer_view,
@@ -1309,18 +1325,13 @@ pub struct mln_style_layer_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_info {
-    pub size: u32,
     pub type_: u32,
     pub fields: u32,
     pub id_size: usize,
     pub is_volatile: bool,
-    pub has_attribution: bool,
     pub attribution_size: usize,
     pub url_size: usize,
-    pub tile_count: usize,
-    pub min_zoom: f64,
-    pub max_zoom: f64,
-    pub scheme: u32,
+    pub tilejson: mln_style_source_tile_info,
     pub bounds: mln_lat_lng_bounds,
     pub tile_size: u32,
     pub vector_encoding: u32,
@@ -1329,8 +1340,6 @@ pub struct mln_style_source_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_source_info,
     pub attribution: mln_buffer_view,
     pub url: mln_buffer_view,
@@ -1348,8 +1357,6 @@ pub struct mln_style_source_tile_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_tile_urls_result {
-    pub size: u32,
-    pub reserved: u32,
     pub tile_urls: *const mln_buffer_view,
     pub tile_url_count: usize,
 }
@@ -1379,7 +1386,6 @@ pub struct mln_style_transition_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_texture_image_info {
-    pub size: u32,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
@@ -1388,8 +1394,6 @@ pub struct mln_texture_image_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_texture_readback_result {
-    pub size: u32,
-    pub reserved: u32,
     pub data: mln_buffer_view,
     pub info: mln_texture_image_info,
 }
@@ -1434,7 +1438,6 @@ pub struct mln_vulkan_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_context_descriptor {
-    pub size: u32,
     pub instance: *mut std::ffi::c_void,
     pub physical_device: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
@@ -1476,15 +1479,13 @@ pub struct mln_vulkan_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_wake {
-    pub size: u32,
     pub callback: mln_wake_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_wake_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgl_context_descriptor {
-    pub size: u32,
     pub kind: u32,
     pub context: i32,
     pub canvas_selector: mln_buffer_view,
@@ -1504,7 +1505,6 @@ pub struct mln_webgpu_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_context_descriptor {
-    pub size: u32,
     pub instance: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub queue: *mut std::ffi::c_void,
@@ -1542,7 +1542,6 @@ pub struct mln_webgpu_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_wgl_context_descriptor {
-    pub size: u32,
     pub device_context: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
     pub get_proc_address: *mut std::ffi::c_void,
@@ -1550,20 +1549,10 @@ pub struct mln_wgl_context_descriptor {
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_acquired_frame(pub u64);
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_buffer(pub u64);
 pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
-pub type mln_completion_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_geometry_source_release_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_geometry_source_tile_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
-pub type mln_custom_mvt_vector_source_release_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_mvt_vector_source_tile_callback =
+pub type mln_custom_source_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1588,7 +1577,6 @@ pub type mln_log_callback = Option<
         message: *const std::ffi::c_char,
     ) -> u32,
 >;
-pub type mln_log_callback_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map(pub u64);
@@ -1597,7 +1585,6 @@ pub struct mln_map(pub u64);
 pub struct mln_map_projection(pub u64);
 pub type mln_offline_region_id = i64;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_queue_lock_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_render_frame_batch(pub u64);
@@ -1627,14 +1614,11 @@ pub type mln_resource_transform_callback = Option<
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_runtime(pub u64);
-pub type mln_runtime_callback_release =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_wake_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
-    mln_buffer,
     mln_event_batch,
     mln_geojson_source_data,
     mln_map,
@@ -1699,12 +1683,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_animation_options_default() -> mln_animation_options;
     pub fn mln_bound_options_default() -> mln_bound_options;
-    pub fn mln_buffer_destroy(buffer: mln_buffer);
-    pub fn mln_buffer_get(
-        buffer: mln_buffer,
-        out_view: *mut mln_buffer_view,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_c_version() -> u32;
     pub fn mln_camera_delta_default() -> mln_camera_delta;
     pub fn mln_camera_fit_options_default() -> mln_camera_fit_options;
@@ -1714,7 +1692,7 @@ unsafe extern "C" {
     pub fn mln_custom_mvt_vector_source_options_default() -> mln_custom_mvt_vector_source_options;
     pub fn mln_event_batch_get(
         batch: mln_event_batch,
-        out_view: *mut mln_runtime_event_batch_view,
+        out_view: *mut mln_event_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_event_batch_release(batch: mln_event_batch);
@@ -1748,9 +1726,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_log_set_callback(
-        callback: mln_log_callback,
-        user_data: *mut std::ffi::c_void,
-        release_user_data: mln_log_callback_release,
+        handler: *const mln_log_handler,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_add_color_relief_layer(
@@ -2623,15 +2599,9 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_projection_mode_default() -> mln_projection_mode;
-    pub fn mln_render_frame_batch_count(
-        batch: mln_render_frame_batch,
-        out_count: *mut usize,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_frame_batch_get(
         batch: mln_render_frame_batch,
-        index: usize,
-        out_result: *mut mln_render_frame_result,
+        out_view: *mut mln_render_frame_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_frame_batch_release(batch: mln_render_frame_batch);
@@ -2768,9 +2738,7 @@ unsafe extern "C" {
     pub fn mln_resource_request_release(handle: mln_resource_request_handle);
     pub fn mln_resource_request_set_cancel_callback(
         handle: mln_resource_request_handle,
-        callback: mln_resource_request_cancel_callback,
-        user_data: *mut std::ffi::c_void,
-        release_user_data: mln_runtime_callback_release,
+        handler: *const mln_resource_request_cancel_handler,
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2930,12 +2898,10 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
-    pub fn mln_style_image_info_default() -> mln_style_image_info;
     pub fn mln_style_image_options_default() -> mln_style_image_options;
     pub fn mln_style_tile_source_options_default() -> mln_style_tile_source_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;
     pub fn mln_supported_render_backend_mask() -> u32;
-    pub fn mln_texture_image_info_default() -> mln_texture_image_info;
     pub fn mln_texture_read_premultiplied_rgba8(
         session: mln_render_session,
         completion: *const mln_completion,

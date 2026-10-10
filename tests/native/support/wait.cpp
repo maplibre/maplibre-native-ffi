@@ -181,7 +181,6 @@ extern "C" void mln_test_pulse(void) {
 
 extern "C" auto mln_test_pulse_wake(void) -> mln_wake {
   return mln_wake{
-    .size = sizeof(mln_wake),
     .callback = pulse_wake,
     .user_data = nullptr,
     .release_user_data = nullptr,

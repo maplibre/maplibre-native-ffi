@@ -8,7 +8,7 @@ only primitives, so the C side of every site has the same shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from ..model import CType
 from ..protocol import COMPLETION
@@ -86,16 +86,10 @@ def common(values):
             )
         elif value.registration:
             parameters = []
-            for member, typ, children, group in values.members(value):
-                default = (
-                    "null" if typ.endswith("?") else values.field_default(children[0])
-                )
+            for member, typ, field in values.members(value):
+                default = "null" if typ.endswith("?") else values.field_default(field)
                 parameters.append(
-                    (
-                        doc(values.bound, f"{value.native}.{children[0].name}", "  ")
-                        if not group
-                        else ""
-                    )
+                    doc(values.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"
                     + (f" = {default}" if default else "")
                 )
@@ -104,15 +98,7 @@ def common(values):
                 + ",\n".join(parameters)
                 + "\n)"
             )
-    for callback in values.direct_callbacks.values():
-        result.append(
-            f"internal class {registration_class(callback)}(val callback: {values.public(callback)})"
-        )
     return "\n".join(result) + "\n"
-
-
-def registration_class(callback):
-    return f"Generated{name(callback.native)}Registration"
 
 
 def argument(value, expression):
@@ -178,7 +164,7 @@ def sites(values):
                 (context,),
                 VOID,
                 "Unit",
-                'contain("mln_completion_release", Unit) { CompletionBridge.release(userData) }',
+                'contain("mln_user_data_release", Unit) { CompletionBridge.release(userData) }',
             ),
             Site(
                 "releaseRoot",
@@ -265,7 +251,8 @@ def callback_site(site_name, callback_value, member, root_type, values):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
     owner = None
-    if callback.reentry_policy and callback.reentry_policy.registration_owner:
+    if callback.reentry_policy and callback.reentry_policy.owner_parameter is None:
+        # The root records the receiver that registered the callback.
         owner = "{ it.owner }"
     elif callback.reentry_policy and callback.reentry_policy.owner_parameter:
         owner = "{ " + identifier(callback.reentry_policy.owner_parameter) + " }"
@@ -399,12 +386,7 @@ def put_function(value, values):
                 f"{values.size(value.native)}.toUInt()",
             )
         )
-    for member, _typ, children, group in values.members(value):
-        if group:
-            raise Unsupported(
-                "callback descriptor presence group needs recursive preparation"
-            )
-        field = children[0]
+    for member, _typ, field in values.members(value):
         if field in callbacks:
             continue
         expression = "value." + member
@@ -424,8 +406,11 @@ def put_function(value, values):
             + " && ".join(f"value.{identifier(f.name)} == null" for f in callbacks)
             + ") return"
         )
+    # A callback that calls back only into the receiver that registered it
+    # roots that receiver's handle with the value.
+    owner = ", handle" if value.registration.receiver_owned else ""
     lines.append(
-        f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value))"
+        f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value{owner}))"
     )
     for field in callbacks:
         site = callback_site(
@@ -457,8 +442,7 @@ def read_function(value, values):
     public_name = name(value.native)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
     arguments = []
-    for member, _typ, children, _group in values.members(value):
-        field = children[0]
+    for member, _typ, field in values.members(value):
         if field in callbacks:
             arguments.append(f"{member} = null")
             continue
@@ -484,8 +468,6 @@ def operation(plan, values, native):
         receiver_arguments,
     )
 
-    if plan.direct_registrations:
-        return direct_operation(plan, values, native)
     decision = next(
         (
             decision
@@ -533,7 +515,9 @@ def operation(plan, values, native):
         )
     if not plan.registrations or plan.owned_outputs:
         return None
-    if not plan.completion or plan.result or plan.outputs:
+    if not plan.completion:
+        return immediate_registration(plan, values, native)
+    if plan.result or plan.outputs:
         raise Unsupported(
             "callback registration needs its native admission transaction"
         )
@@ -551,92 +535,50 @@ def operation(plan, values, native):
     )
 
 
-def direct_operation(plan, values, native):
-    """Lower a registration whose root native releases after its last callback.
+def immediate_registration(plan, values, native):
+    """Lower a registration that native accepts before the call returns.
 
     A receiver's registration roots in that receiver's callback owner, so a
     callback that captures its receiver cannot keep it reachable, while native
     release still frees the root first when the receiver stays live. A
-    registration that native reports it did not store frees its root before
-    returning.
+    registration that native reports it kept nothing from frees its root
+    before returning.
     """
-    from .kotlin_operations import receiver_arguments
+    from .kotlin_operations import (
+        call_arguments,
+        declaration,
+        encodings,
+        parameter_name,
+        receiver_arguments,
+    )
 
-    if len(plan.direct_registrations) != 1:
+    declined = next(
+        (r.accepted_unless for r in plan.registrations if r.accepted_unless), None
+    )
+    if (
+        plan.result
+        or [p.name for p in plan.outputs] != ([declined] if declined else [])
+        or (declined and plan.function.parameters[-1].name != declined)
+    ):
         raise Unsupported(
-            "multiple direct callback registrations require separate transactions"
+            "callback registration needs its native admission transaction"
         )
-    registration = plan.direct_registrations[0]
-    callback_value = next(
-        p.value for p in plan.inputs if p.name == registration.callback
-    )
-    callback = values.bound.callbacks[callback_value.native]
-    release = next(
-        (p.value for p in plan.inputs if p.name == registration.release_callback), None
-    )
-    if release is None:
-        raise Unsupported("direct callback registration requires a native release")
-    policy = callback.reentry_policy
-    owned = bool(policy and policy.registration_owner)
-    if owned and not plan.receiver:
-        raise Unsupported("registration-owned reentry requires a receiver handle")
-    condition = registration.accepted_unless
-    if condition and callback_value.nullable:
-        raise Unsupported("a conditional registration cannot clear its callback")
-    roles = {
-        plan.receiver,
-        registration.callback,
-        registration.user_data,
-        registration.release_callback,
-        condition,
-    }
-    if any(p.name not in roles for p in plan.function.parameters):
-        raise Unsupported(
-            "direct callback registration takes only its registration parameters"
-        )
-    values.check(callback_value)
-    values.direct_callbacks[callback_value.native] = callback_value
-    wrapper = registration_class(callback_value)
-    site = callback_site(
-        name(callback_value.native)[0].lower() + name(callback_value.native)[1:],
-        replace(callback_value, nullable=False),
-        "callback",
-        wrapper,
-        values,
-    )
-    method = identifier(plan.member)
-
-    def call(disabled):
-        arguments = []
-        for parameter in plan.function.parameters:
-            if parameter.name == plan.receiver:
-                arguments.append("handle")
-            elif parameter.name == registration.callback:
-                arguments.append("0L" if disabled else f"UpcallStubs.{site}")
-            elif parameter.name == registration.user_data:
-                arguments.append("0L" if disabled else "token")
-            elif parameter.name == registration.release_callback:
-                arguments.append("0L" if disabled else "UpcallStubs.releaseRoot")
-            else:
-                arguments.append("out")
-        return native.checked(plan.function, arguments)
-
+    inputs = [p for p in plan.inputs if p.name != plan.receiver]
+    params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
+    arguments = call_arguments(plan, values)
     owner = "bindingCallbacks" if plan.receiver else "CallbackOwner.global"
-    register = (
-        f"val token = registrations.register({wrapper}(callback)"
-        + (", handle" if owned else "")
-        + ")"
-    )
-    if condition:
-        flag = identifier(condition)
-        body = f"{register}; val out = allocate(1); {call(False)}; val {flag} = readBool(out); if (!{flag}) accept({owner}); {flag}"
+    if declined:
+        flag = identifier(declined)
+        body = (
+            f"val out = allocate(1); {native.checked(plan.function, [*arguments, 'out'])}; "
+            f"val {flag} = readBool(out); if (!{flag}) accept({owner}); {flag}"
+        )
     else:
-        body = f"{register}; {call(False)}; accept({owner})"
-    if callback_value.nullable:
-        body = f"if (callback == null) {call(True)} else {{ {body} }}"
+        body = f"{native.checked(plan.function, arguments)}; accept({owner})"
     access = ", Access.READ" if plan.receiver else ""
-    returns = "Boolean" if condition else "Unit"
     return (
-        f"  public fun {method}(callback: {values.public(callback_value)}): {returns} = "
-        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access}) {{ {body} }}\n'
+        f"  public fun {identifier(plan.member)}({declaration(params)}): "
+        f"{'Boolean' if declined else 'Unit'} = "
+        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access}) '
+        f"{{ {encodings(plan)}{body} }}\n"
     )

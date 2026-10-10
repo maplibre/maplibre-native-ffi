@@ -229,22 +229,39 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
     kind = CameraDeltaKind(rawValue: raw.kind)
     offset = ScreenPoint(raw: raw.offset)
     amount = raw.amount
-    anchor = raw.has_anchor ? ScreenPoint(raw: raw.anchor) : nil
+    anchor = raw.fields & MLN_CAMERA_DELTA_FIELD_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
     animation = AnimationOptions(raw: raw.animation)
   }
 
   func nativeValue() -> mln_camera_delta {
     var raw = mln_camera_delta_default()
-    raw.has_anchor = false
+    raw.fields = 0
     raw.kind = kind.rawValue
     raw.offset = offset.nativeValue()
     raw.amount = amount
     if let item = anchor {
-      raw.has_anchor = true; raw.anchor = item.nativeValue()
+      raw.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
     }
     raw.animation = animation.nativeValue()
     return raw
   }
+}
+
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraDeltaField: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let anchor: CameraDeltaField = .init(rawValue: 1)
 }
 
 /// Relative camera operation carried by `mln_camera_delta`.
@@ -396,10 +413,8 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_camera_options) {
-    center = raw.fields & MLN_CAMERA_OPTION_CENTER.rawValue != 0 ? LatLng(
-      latitude: raw.latitude,
-      longitude: raw.longitude
-    ) : nil
+    center = raw.fields & MLN_CAMERA_OPTION_CENTER
+      .rawValue != 0 ? LatLng(raw: raw.center) : nil
     centerAltitude = raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE
       .rawValue != 0 ? raw.center_altitude : nil
     padding = raw.fields & MLN_CAMERA_OPTION_PADDING
@@ -419,8 +434,8 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
     var raw = mln_camera_options_default()
     raw.fields = 0
     if let item = center {
-      raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.latitude = item
-        .latitude; raw.longitude = item.longitude
+      raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.center = item
+        .nativeValue()
     }
     if let item = centerAltitude {
       raw.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue; raw
@@ -479,7 +494,6 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_camera_query_result {
     var raw = mln_camera_query_result()
-    raw.size = UInt32(MemoryLayout<mln_camera_query_result>.size)
     raw.generation = generation
     raw.camera = camera.nativeValue()
     return raw
@@ -1338,7 +1352,6 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
     -> mln_offline_geometry_region_definition
   {
     var raw = mln_offline_geometry_region_definition()
-    raw.size = UInt32(MemoryLayout<mln_offline_geometry_region_definition>.size)
     raw.style_url = try arena.cString(styleUrl)
     raw.geometry = arena.view(geometry)
     raw.min_zoom = minZoom
@@ -1472,7 +1485,6 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_offline_region_info {
     var raw = mln_offline_region_info()
-    raw.size = UInt32(MemoryLayout<mln_offline_region_info>.size)
     raw.id = id
     raw.definition = try definition.nativeValue(arena: arena)
     raw.metadata = arena.view(metadata).data?
@@ -1534,9 +1546,6 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
     -> mln_offline_tile_pyramid_region_definition
   {
     var raw = mln_offline_tile_pyramid_region_definition()
-    raw
-      .size = UInt32(MemoryLayout<mln_offline_tile_pyramid_region_definition>
-        .size)
     raw.style_url = try arena.cString(styleUrl)
     raw.bounds = bounds.nativeValue()
     raw.min_zoom = minZoom

@@ -16,7 +16,7 @@ internal object CompletionResultLayout {
   val SIZE: Int = 0
   val STATUS: Int = 4
   val DISPOSITION: Int = 8
-  val RESERVED: Int = 12
+  val VALUE_SIZE: Int = 12
   val GENERATION: Int = 16
   val DIAGNOSTIC: Int = 24
   val VALUE: Int = w(32, 40)

@@ -29,11 +29,9 @@ auto mln_render_session_attach_options_default() noexcept
     .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
     .requested_texture_ring_depth = 1,
     .reserved = 0,
-    .frame_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
-    .driver_work_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
-    .queue_lock = mln_queue_lock{
-      sizeof(mln_queue_lock), nullptr, nullptr, nullptr, nullptr
-    },
+    .frame_wake = mln_wake{},
+    .driver_work_wake = mln_wake{},
+    .queue_lock = mln_queue_lock{},
   };
 }
 
@@ -84,21 +82,12 @@ auto mln_render_session_drain_frame_results(
   });
 }
 
-auto mln_render_frame_batch_count(
-  mln_render_frame_batch batch, size_t* out_count,
+auto mln_render_frame_batch_get(
+  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_frame_batch_count(batch, out_count);
-  });
-}
-
-auto mln_render_frame_batch_get(
-  mln_render_frame_batch batch, size_t index,
-  mln_render_frame_result* out_result, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_frame_batch_get(batch, index, out_result);
+    return mln::core::render_frame_batch_get(batch, out_view);
   });
 }
 

@@ -158,15 +158,11 @@ func (r *renderFixture) result(t *testing.T, token uint64) (RenderResult, bool) 
 		return 0, false
 	}
 	defer batch.Close()
-	count, err := batch.Count()
+	view, err := batch.Get()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for index := range count {
-		result, err := batch.Get(index)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, result := range view.Results {
 		if result.Token == token {
 			return result.Disposition, true
 		}

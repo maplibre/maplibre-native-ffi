@@ -267,6 +267,14 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         )
         value_types.add(scoped)
         return "global", ""
+    if any(
+        value_types.bound.values[r.descriptor].registration.receiver_owned
+        for r in plan.registrations
+    ):
+        raise Unsupported(
+            "a callback that calls back only into its registering receiver "
+            "needs a decision handle, whose state records the receiver"
+        )
     consuming = bool(plan.consumes)
     receiver_plan = next(
         (
@@ -334,28 +342,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         source = "self" if parent == plan.receiver else names[parent]
         parent_line = f"let parent = {source}.inner.parent();"
         prelude.append(parent_line)
-    direct_arguments = {}
-    for registration in plan.direct_registrations:
-        from .rust_direct import add
-
-        public = add(value_types, plan, registration)
-        callback = names[registration.callback]
-        signature.append(f"{callback}: Option<{public}>")
-        callback_type = next(
-            parameter.value.native
-            for parameter in plan.inputs
-            if parameter.name == registration.callback
-        )
-        parts = [
-            registration.callback,
-            registration.user_data,
-            registration.release_callback,
-        ]
-        setup.append(
-            f"let ({', '.join(names[part] for part in parts)}) = {callback_type.removeprefix('mln_')}_registration({callback}, call.arena());"
-        )
-        direct_arguments.update((part, names[part]) for part in parts)
-        uses_call = True
     input_plans = {parameter.name: parameter for parameter in plan.inputs}
     output_plans = {parameter.name: parameter for parameter in plan.outputs}
     lengths = {}
@@ -379,9 +365,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         pointee = parameter.type.pointee
         parameter_plan = input_plans.get(parameter.name)
         value_plan = parameter_plan.value if parameter_plan else None
-        if parameter.name in direct_arguments:
-            args.append(direct_arguments[parameter.name])
-        elif parameter.name in lengths:
+        if parameter.name in lengths:
             # Counts precede the conversions, which shadow their slices.
             prelude.append(f"let {local} = convert::count({lengths[parameter.name]})?;")
             args.append(local)
@@ -677,9 +661,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
     unsafe_input = any(
         has_pointer(parameter.value)
         for parameter in plan.inputs
-        if parameter.name != plan.receiver
-        and parameter.name not in direct_arguments
-        and not parameter.value.registration
+        if parameter.name != plan.receiver and not parameter.value.registration
     )
     safety_doc = (
         "    ///\n    /// # Safety\n    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.\n"
@@ -706,7 +688,6 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     for value in bound.public_values.values():
         if value.kind == "enum":
             value_types.add(value)
-    value_types.direct_callbacks = {}
     owners = rust_owners.owned_handles(bound)
     value_types.owners = {native: rust_owners.module_name(native) for native in owners}
     value_types.handle_types = {
@@ -761,16 +742,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         decision_table(bound, decision, pascal(native))
         for native, decision in sorted(bound.decisions.items())
     ]
-    from .rust_direct import declaration as direct_declaration
-
-    declarations = [
-        value_types.render(),
-        *decision_tables,
-        *(
-            direct_declaration(value_types, *registration)
-            for registration in value_types.direct_callbacks.values()
-        ),
-    ]
+    declarations = [value_types.render(), *decision_tables]
     files[f"{root}/values.rs"] = marker + "use super::*;\n\n" + "\n".join(declarations)
     files[f"{root}/mod.rs"] = marker + rust_owners.module_index(
         owners, ["values", *modules]

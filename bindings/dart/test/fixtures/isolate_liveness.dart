@@ -13,7 +13,7 @@ Uint8List _json(String value) => Uint8List.fromList(utf8.encode(value));
 /// Each registration that native confirms returns a future, and that pending
 /// completion is what keeps the isolate alive until it resolves.
 Future<(RuntimeHandle, MapHandle)> _register() async {
-  logSetCallback((_, _, _, _) {});
+  logSetCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = runtimeCreate(
     RuntimeOptions(eventWake: Wake(callback: () {})),
   );

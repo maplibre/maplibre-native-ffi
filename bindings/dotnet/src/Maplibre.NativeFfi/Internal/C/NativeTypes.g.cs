@@ -5,8 +5,6 @@ namespace Maplibre.NativeFfi.Internal.C;
 
 internal readonly record struct MlnAcquiredFrame(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnBuffer(ulong Value) : IMlnHandle;
-
 internal readonly record struct MlnEventBatch(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;
@@ -25,7 +23,6 @@ internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal unsafe struct mln_animation_options
 {
-    public uint size;
     public mln_animation_option_field fields;
     public double duration_ms;
     public double velocity;
@@ -54,10 +51,10 @@ internal unsafe struct mln_buffer_view
 internal unsafe struct mln_camera_delta
 {
     public uint size;
+    public mln_camera_delta_field fields;
     public uint kind;
     public mln_screen_point offset;
     public double amount;
-    public byte has_anchor;
     public mln_screen_point anchor;
     public mln_animation_options animation;
 }
@@ -75,8 +72,7 @@ internal unsafe struct mln_camera_options
 {
     public uint size;
     public mln_camera_option_field fields;
-    public double latitude;
-    public double longitude;
+    public mln_lat_lng center;
     public double center_altitude;
     public mln_edge_insets padding;
     public mln_screen_point anchor;
@@ -89,8 +85,6 @@ internal unsafe struct mln_camera_options
 
 internal unsafe struct mln_camera_query_result
 {
-    public uint size;
-    public uint reserved;
     public ulong generation;
     public mln_camera_options camera;
 }
@@ -125,7 +119,7 @@ internal unsafe struct mln_completion_result
     public uint size;
     public int status;
     public uint disposition;
-    public uint reserved;
+    public uint value_size;
     public ulong generation;
     public mln_buffer_view diagnostic;
     public void* value;
@@ -183,12 +177,21 @@ internal unsafe struct mln_edge_insets
 
 internal unsafe struct mln_egl_context_descriptor
 {
-    public uint size;
     public void* display;
     public void* config;
     public void* share_context;
     public uint client_api;
     public void* get_proc_address;
+}
+
+internal unsafe struct mln_event_batch_view
+{
+    public uint size;
+    public uint event_size;
+    public mln_runtime_event* events;
+    public nuint event_count;
+    public sbyte* messages;
+    public nuint messages_size;
 }
 
 internal unsafe struct mln_feature_state_selector
@@ -289,6 +292,14 @@ internal unsafe struct mln_lat_lng_bounds
     public mln_lat_lng northeast;
 }
 
+internal unsafe struct mln_log_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
 internal unsafe struct mln_logical_extent
 {
     public uint width;
@@ -358,7 +369,6 @@ internal unsafe struct mln_metal_borrowed_texture_descriptor
 
 internal unsafe struct mln_metal_context_descriptor
 {
-    public uint size;
     public void* device;
 }
 
@@ -392,7 +402,6 @@ internal unsafe struct mln_metal_surface_descriptor
 
 internal unsafe struct mln_offline_geometry_region_definition
 {
-    public uint size;
     public sbyte* style_url;
     public mln_buffer_view geometry;
     public double min_zoom;
@@ -420,7 +429,6 @@ internal unsafe struct mln_offline_region_definition_data
 
 internal unsafe struct mln_offline_region_info
 {
-    public uint size;
     public long id;
     public mln_offline_region_definition definition;
     public byte* metadata;
@@ -429,7 +437,6 @@ internal unsafe struct mln_offline_region_info
 
 internal unsafe struct mln_offline_region_status
 {
-    public uint size;
     public uint download_state;
     public ulong completed_resource_count;
     public ulong completed_resource_size;
@@ -443,7 +450,6 @@ internal unsafe struct mln_offline_region_status
 
 internal unsafe struct mln_offline_tile_pyramid_region_definition
 {
-    public uint size;
     public sbyte* style_url;
     public mln_lat_lng_bounds bounds;
     public double min_zoom;
@@ -465,7 +471,6 @@ internal unsafe struct mln_opengl_borrowed_texture_descriptor
 
 internal unsafe struct mln_opengl_context_descriptor
 {
-    public uint size;
     public uint platform;
     public uint ownership;
     public mln_opengl_context_descriptor_data data;
@@ -549,7 +554,6 @@ internal unsafe struct mln_quaternion
 
 internal unsafe struct mln_queried_feature
 {
-    public uint size;
     public mln_queried_feature_field fields;
     public mln_buffer_view feature;
     public mln_buffer_view source_id;
@@ -559,7 +563,6 @@ internal unsafe struct mln_queried_feature
 
 internal unsafe struct mln_queue_lock
 {
-    public uint size;
     public delegate* unmanaged[Cdecl]<void*, void> @lock;
     public delegate* unmanaged[Cdecl]<void*, void> unlock;
     public void* user_data;
@@ -572,6 +575,14 @@ internal unsafe struct mln_render_abandon_result
     public uint disposition;
     public uint quarantined_resource_count;
     public uint reserved;
+}
+
+internal unsafe struct mln_render_frame_batch_view
+{
+    public uint size;
+    public uint result_size;
+    public mln_render_frame_result* results;
+    public nuint result_count;
 }
 
 internal unsafe struct mln_render_frame_result
@@ -637,7 +648,7 @@ internal unsafe struct mln_rendered_feature_query_options
     public mln_rendered_feature_query_option_field fields;
     public mln_buffer_view* layer_ids;
     public nuint layer_id_count;
-    public mln_buffer_view* filter;
+    public mln_buffer_view filter;
 }
 
 internal unsafe struct mln_rendered_query_geometry
@@ -681,9 +692,16 @@ internal unsafe struct mln_resource_provider
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
+internal unsafe struct mln_resource_range
+{
+    public ulong start;
+    public ulong end;
+}
+
 internal unsafe struct mln_resource_request
 {
     public uint size;
+    public mln_resource_request_field fields;
     public sbyte* requested_url;
     public sbyte* resolved_url;
     public uint kind;
@@ -691,33 +709,35 @@ internal unsafe struct mln_resource_request
     public uint priority;
     public uint usage;
     public uint storage_policy;
-    public byte has_range;
-    public ulong range_start;
-    public ulong range_end;
-    public byte has_prior_modified;
+    public mln_resource_range range;
     public long prior_modified_unix_ms;
-    public byte has_prior_expires;
     public long prior_expires_unix_ms;
     public sbyte* prior_etag;
     public byte* prior_data;
     public nuint prior_data_size;
 }
 
+internal unsafe struct mln_resource_request_cancel_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, void> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
 internal unsafe struct mln_resource_response
 {
     public uint size;
+    public mln_resource_response_field fields;
     public uint status;
     public uint error_reason;
     public byte* bytes;
     public nuint byte_count;
     public sbyte* error_message;
     public byte must_revalidate;
-    public byte has_modified;
     public long modified_unix_ms;
-    public byte has_expires;
     public long expires_unix_ms;
     public sbyte* etag;
-    public byte has_retry_after;
     public long retry_after_unix_ms;
 }
 
@@ -751,16 +771,6 @@ internal unsafe struct mln_runtime_event
     public ulong message_offset;
     public uint message_size;
     public mln_runtime_event_payload payload;
-}
-
-internal unsafe struct mln_runtime_event_batch_view
-{
-    public uint size;
-    public uint event_size;
-    public mln_runtime_event* events;
-    public nuint event_count;
-    public sbyte* messages;
-    public nuint messages_size;
 }
 
 internal unsafe struct mln_runtime_event_camera_transition_finished
@@ -833,7 +843,6 @@ internal unsafe struct mln_runtime_event_tile_action
 internal unsafe struct mln_runtime_options
 {
     public uint size;
-    public uint flags;
     public sbyte* asset_path;
     public sbyte* cache_path;
     public ulong event_mask;
@@ -864,12 +873,12 @@ internal unsafe struct mln_source_feature_query_options
     public mln_source_feature_query_option_field fields;
     public mln_buffer_view* source_layer_ids;
     public nuint source_layer_id_count;
-    public mln_buffer_view* filter;
+    public mln_buffer_view filter;
 }
 
 internal unsafe struct mln_style_image_info
 {
-    public uint size;
+    public mln_style_image_info_field fields;
     public uint width;
     public uint height;
     public uint stride;
@@ -881,9 +890,6 @@ internal unsafe struct mln_style_image_info
     public uint text_fit_height;
     public float pixel_ratio;
     public byte sdf;
-    public byte has_content;
-    public byte has_text_fit_width;
-    public byte has_text_fit_height;
 }
 
 internal unsafe struct mln_style_image_options
@@ -903,8 +909,6 @@ internal unsafe struct mln_style_image_options
 
 internal unsafe struct mln_style_image_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_image_info info;
     public mln_buffer_view pixels;
     public mln_image_stretch* stretch_x;
@@ -915,8 +919,6 @@ internal unsafe struct mln_style_image_result
 
 internal unsafe struct mln_style_image_stretches_result
 {
-    public uint size;
-    public uint reserved;
     public mln_image_stretch* stretch_x;
     public nuint stretch_x_count;
     public mln_image_stretch* stretch_y;
@@ -925,7 +927,6 @@ internal unsafe struct mln_style_image_stretches_result
 
 internal unsafe struct mln_style_layer_entry
 {
-    public uint size;
     public mln_buffer_view id;
     public mln_buffer_view type;
     public mln_buffer_view source_id;
@@ -934,8 +935,6 @@ internal unsafe struct mln_style_layer_entry
 
 internal unsafe struct mln_style_layer_info
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view type;
     public double min_zoom;
     public double max_zoom;
@@ -944,8 +943,6 @@ internal unsafe struct mln_style_layer_info
 
 internal unsafe struct mln_style_layer_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_layer_info info;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer;
@@ -953,18 +950,13 @@ internal unsafe struct mln_style_layer_result
 
 internal unsafe struct mln_style_source_info
 {
-    public uint size;
     public uint type;
     public mln_style_source_info_field fields;
     public nuint id_size;
     public byte is_volatile;
-    public byte has_attribution;
     public nuint attribution_size;
     public nuint url_size;
-    public nuint tile_count;
-    public double min_zoom;
-    public double max_zoom;
-    public uint scheme;
+    public mln_style_source_tile_info tilejson;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
     public uint vector_encoding;
@@ -973,8 +965,6 @@ internal unsafe struct mln_style_source_info
 
 internal unsafe struct mln_style_source_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_source_info info;
     public mln_buffer_view attribution;
     public mln_buffer_view url;
@@ -992,8 +982,6 @@ internal unsafe struct mln_style_source_tile_info
 
 internal unsafe struct mln_style_source_tile_urls_result
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view* tile_urls;
     public nuint tile_url_count;
 }
@@ -1023,7 +1011,6 @@ internal unsafe struct mln_style_transition_options
 
 internal unsafe struct mln_texture_image_info
 {
-    public uint size;
     public uint width;
     public uint height;
     public uint stride;
@@ -1032,8 +1019,6 @@ internal unsafe struct mln_texture_image_info
 
 internal unsafe struct mln_texture_readback_result
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view data;
     public mln_texture_image_info info;
 }
@@ -1078,7 +1063,6 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 
 internal unsafe struct mln_vulkan_context_descriptor
 {
-    public uint size;
     public void* instance;
     public void* physical_device;
     public void* device;
@@ -1120,7 +1104,6 @@ internal unsafe struct mln_vulkan_surface_descriptor
 
 internal unsafe struct mln_wake
 {
-    public uint size;
     public delegate* unmanaged[Cdecl]<void*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
@@ -1128,7 +1111,6 @@ internal unsafe struct mln_wake
 
 internal unsafe struct mln_webgl_context_descriptor
 {
-    public uint size;
     public uint kind;
     public int context;
     public mln_buffer_view canvas_selector;
@@ -1148,7 +1130,6 @@ internal unsafe struct mln_webgpu_borrowed_texture_descriptor
 
 internal unsafe struct mln_webgpu_context_descriptor
 {
-    public uint size;
     public void* instance;
     public void* device;
     public void* queue;
@@ -1186,7 +1167,6 @@ internal unsafe struct mln_webgpu_surface_descriptor
 
 internal unsafe struct mln_wgl_context_descriptor
 {
-    public uint size;
     public void* device_context;
     public void* share_context;
     public void* get_proc_address;
@@ -1223,6 +1203,11 @@ internal enum mln_camera_change_mode : uint
 {
     MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
     MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
+}
+
+internal enum mln_camera_delta_field : uint
+{
+    MLN_CAMERA_DELTA_FIELD_ANCHOR = 1,
 }
 
 internal enum mln_camera_delta_kind : uint
@@ -1551,6 +1536,7 @@ internal enum mln_render_session_state : uint
 internal enum mln_rendered_feature_query_option_field : uint
 {
     MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1,
+    MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_rendered_query_geometry_type : uint
@@ -1599,6 +1585,20 @@ internal enum mln_resource_provider_decision : uint
 {
     MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0,
     MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
+}
+
+internal enum mln_resource_request_field : uint
+{
+    MLN_RESOURCE_REQUEST_RANGE = 1,
+    MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 2,
+    MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 4,
+}
+
+internal enum mln_resource_response_field : uint
+{
+    MLN_RESOURCE_RESPONSE_MODIFIED = 1,
+    MLN_RESOURCE_RESPONSE_EXPIRES = 2,
+    MLN_RESOURCE_RESPONSE_RETRY_AFTER = 4,
 }
 
 internal enum mln_resource_response_status : uint
@@ -1698,6 +1698,7 @@ internal enum mln_runtime_event_type : uint
 internal enum mln_source_feature_query_option_field : uint
 {
     MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1,
+    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_status : int
@@ -1713,6 +1714,13 @@ internal enum mln_status : int
     MLN_STATUS_TARGET_LOST = -8,
     MLN_STATUS_NOT_READY = -9,
     MLN_STATUS_NOT_FOUND = -10,
+}
+
+internal enum mln_style_image_info_field : uint
+{
+    MLN_STYLE_IMAGE_INFO_CONTENT = 1,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 2,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 4,
 }
 
 internal enum mln_style_image_option_field : uint
@@ -1753,6 +1761,7 @@ internal enum mln_style_source_info_field : uint
     MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8,
     MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16,
     MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32,
+    MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64,
 }
 
 internal enum mln_style_source_type : uint

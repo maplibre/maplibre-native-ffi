@@ -171,6 +171,15 @@ fn Receiver(comptime access: Access, comptime T: type) type {
             }
         }
 
+        /// The owner that a registration the call retains calls back into.
+        fn ownerId(receiver: T) u64 {
+            return switch (access) {
+                .none => 0,
+                .scoped => @intFromPtr(receiver.native),
+                else => receiver.raw,
+            };
+        }
+
         /// Takes hold of the receiver, or returns null for a closed one.
         fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
             return .{ .state = switch (access) {
@@ -266,6 +275,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
             return .{
                 .receiver = hold,
+                .roots = .{ .owner = Hold.ownerId(receiver) },
                 .diagnostic = diagnostic,
                 .arena = if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator.init(allocator) else {},
             };
@@ -459,6 +469,34 @@ pub fn invokeUnless(
     return try op.outputs(allocator);
 }
 
+/// Calls a status-returning native function like `invoke` whose one output
+/// reports, when true, that native kept nothing from the call's registration.
+/// The roots of a declined registration release with the call, and the call
+/// returns whether native declined it.
+pub fn invokeDeclinable(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!bool {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
+    const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
+    if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
+    // Only a closing call finds its receiver closed, and a close declines nothing.
+    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    defer op.end();
+    const native = try op.arguments(args);
+    try status.call(@field(c, name), native, diagnostic);
+    const declined = try op.outputs(allocator);
+    var kept: callback.Roots = .{};
+    op.receiver.succeed(if (declined) &kept else &op.roots);
+    op.settled = true;
+    return declined;
+}
+
 /// Calls a native function that returns its result rather than a status, and
 /// decodes the result to `T`.
 pub fn direct(
@@ -614,13 +652,44 @@ pub fn orEmpty(comptime Copy: type, comptime Raw: type) type {
 pub fn slice(comptime Item: type, comptime Raw: type) type {
     return struct {
         pub const Value = marshal.OwnedValue([]const Item);
+        /// Copies each element, stepping by the completion's value_size.
         pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
-            const items = try marshal.nativeSlice(Raw, @ptrCast(@alignCast(result.value)), result.value_count);
+            const items: ?[*]const Raw = @ptrCast(@alignCast(result.value));
+            const count = result.value_count;
+            if (count != 0) _ = try marshal.stridedAt(Raw, items, count, result.value_size, count - 1);
             var arena = std.heap.ArenaAllocator.init(context.allocator.?);
             errdefer arena.deinit();
-            const copied = try arena.allocator().alloc(Item, items.len);
-            for (items, copied) |item, *target| target.* = try marshal.decode(Item, item, .{ .allocator = arena.allocator() });
+            const copied = try arena.allocator().alloc(Item, count);
+            for (copied, 0..) |*target, index| target.* = try marshal.decode(Item, try marshal.stridedAt(Raw, items, count, result.value_size, index), .{ .allocator = arena.allocator() });
             return .{ .arena = arena, .value = copied };
         }
     };
+}
+
+// A native build whose element grew reports a value_size wider than this
+// binding's element, so the copy steps by it. A stride narrower than the
+// element cannot hold one, so the copy fails.
+test "an array completion is read at its value_size" {
+    // Two coordinates, each followed by a member this binding does not know.
+    const Wide = extern struct { point: c.mln_lat_lng, newer: f64 };
+    const wide = [_]Wide{
+        .{ .point = .{ .latitude = 1, .longitude = 2 }, .newer = -1 },
+        .{ .point = .{ .latitude = 3, .longitude = 4 }, .newer = -1 },
+    };
+    var result = std.mem.zeroInit(c.mln_completion_result, .{
+        .size = @sizeOf(c.mln_completion_result),
+        .status = c.MLN_STATUS_OK,
+        .value = @as(?*const anyopaque, &wide),
+        .value_count = wide.len,
+        .value_size = @sizeOf(Wide),
+    });
+    const Copy = slice(c.mln_lat_lng, c.mln_lat_lng);
+    var points = try Copy.copy(&result, .{ .allocator = std.testing.allocator });
+    defer points.deinit();
+    try std.testing.expectEqual(@as(usize, 2), points.value.len);
+    try std.testing.expectEqual(@as(f64, 3), points.value[1].latitude);
+    try std.testing.expectEqual(@as(f64, 4), points.value[1].longitude);
+
+    result.value_size = @sizeOf(c.mln_lat_lng) - 1;
+    try std.testing.expectError(error.NativeError, Copy.copy(&result, .{ .allocator = std.testing.allocator }));
 }

@@ -101,17 +101,11 @@ public static unsafe partial class Maplibre
     /// See <c>mln_log_set_callback</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
     /// </remarks>
-    public static void LogSetCallback(Func<LogSeverity, LogEvent, long, string, uint>? callback)
+    public static void LogSetCallback(LogHandler handler)
     {
         using var scope = new NativeCallScope(null, "mln_log_set_callback");
-        Check(
-            NativeMethods.mln_log_set_callback(
-                callback is null ? null : &InvokeLogCallback,
-                callback is null ? null : scope.Register(callback),
-                &NativeCallbackRoot.Release,
-                Diagnostic
-            )
-        );
+        var nativeHandler = NativeLogHandler(handler, scope);
+        Check(NativeMethods.mln_log_set_callback(&nativeHandler, Diagnostic));
         scope.Accept();
     }
 

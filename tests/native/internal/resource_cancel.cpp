@@ -54,8 +54,14 @@ auto complete_inline_provider(
   auto& probe = *static_cast<CompletedRequest*>(user_data);
   probe.handle = handle;
   auto cancelled = true;
+  const mln_resource_request_cancel_handler handler{
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = count_cancel,
+    .user_data = &probe,
+    .release_user_data = count_cancel_release,
+  };
   probe.register_status = mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, count_cancel_release, &cancelled, nullptr
+    handle, &handler, &cancelled, nullptr
   );
   const auto response = style_response();
   static_cast<void>(mln_resource_request_complete(handle, &response, nullptr));
@@ -153,8 +159,14 @@ auto blocking_cancel_provider(
   auto& probe = *static_cast<BlockingCancel*>(user_data);
   probe.handle = handle;
   auto cancelled = true;
+  const mln_resource_request_cancel_handler handler{
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = block_in_cancel,
+    .user_data = &probe,
+    .release_user_data = nullptr,
+  };
   probe.register_status = mln_resource_request_set_cancel_callback(
-    handle, block_in_cancel, &probe, nullptr, &cancelled, nullptr
+    handle, &handler, &cancelled, nullptr
   );
   probe.register_reported_cancelled = cancelled;
   mln_test_flag_set(&probe.provider_entered);
@@ -282,9 +294,14 @@ auto blocking_registration_provider(
   auto& probe = *static_cast<BlockingRegistrationRelease*>(user_data);
   probe.handle = handle;
   auto cancelled = true;
+  const mln_resource_request_cancel_handler handler{
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = never_cancelled,
+    .user_data = &probe,
+    .release_user_data = block_in_registration_release,
+  };
   probe.register_status = mln_resource_request_set_cancel_callback(
-    handle, never_cancelled, &probe, block_in_registration_release, &cancelled,
-    nullptr
+    handle, &handler, &cancelled, nullptr
   );
   if (!probe.release_during_decision) {
     mln_test_flag_set(&probe.provider_entered);

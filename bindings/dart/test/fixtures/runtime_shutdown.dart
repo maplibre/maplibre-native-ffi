@@ -86,7 +86,7 @@ Future<void> abandonSession() async {
     // A wake that came before the result could be drained finds no batch.
     final batch = session.drainFrameResults();
     if (batch != null) {
-      drained = batch.count();
+      drained = batch.getValue().results.length;
       batch.close();
     }
   }
@@ -102,7 +102,7 @@ Future<void> abandonSession() async {
 /// keeps the isolate alive itself until the resource provider runs, with a
 /// port that the provider closes.
 Future<void> exitWithLiveCallbacks() async {
-  logSetCallback((_, _, _, _) {});
+  logSetCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = runtimeCreate(
     RuntimeOptions(eventWake: Wake(callback: () {})),
   );

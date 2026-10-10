@@ -80,6 +80,19 @@ const (
 	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
 )
 
+// CameraDeltaField corresponds to mln_camera_delta_field. Field mask values for
+// mln_camera_delta.
+//
+// See mln_camera_delta_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraDeltaField uint32
+
+const (
+	CameraDeltaFieldAnchor CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_FIELD_ANCHOR)
+)
+
+func (value CameraDeltaField) Has(flags CameraDeltaField) bool { return value&flags == flags }
+
 // CameraDeltaKind corresponds to mln_camera_delta_kind. Relative camera
 // operation carried by mln_camera_delta.
 //
@@ -726,7 +739,8 @@ const (
 type RenderedFeatureQueryOptionField uint32
 
 const (
-	RenderedFeatureQueryOptionFieldIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	RenderedFeatureQueryOptionFieldLayerIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	RenderedFeatureQueryOptionFieldFilter   RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER)
 )
 
 func (value RenderedFeatureQueryOptionField) Has(flags RenderedFeatureQueryOptionField) bool {
@@ -791,6 +805,42 @@ const (
 	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
 	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 )
+
+// ResourceRequestField corresponds to mln_resource_request_field. Field mask
+// values for mln_resource_request.
+//
+// See mln_resource_request_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRequestField uint32
+
+const (
+	// The request asks only for the bytes in range.
+	ResourceRequestFieldRange ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_RANGE)
+	// The cached copy being revalidated carries a modification time.
+	ResourceRequestFieldPriorModified ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
+	// The cached copy being revalidated carries an expiration time.
+	ResourceRequestFieldPriorExpires ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
+)
+
+func (value ResourceRequestField) Has(flags ResourceRequestField) bool { return value&flags == flags }
+
+// ResourceResponseField corresponds to mln_resource_response_field. Field mask
+// values for mln_resource_response.
+//
+// See mln_resource_response_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceResponseField uint32
+
+const (
+	// The response carries a modification time.
+	ResourceResponseFieldModified ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_MODIFIED)
+	// The response carries an expiration time.
+	ResourceResponseFieldExpires ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_EXPIRES)
+	// An ERROR response carries the earliest time to retry the request.
+	ResourceResponseFieldRetryAfter ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_RETRY_AFTER)
+)
+
+func (value ResourceResponseField) Has(flags ResourceResponseField) bool { return value&flags == flags }
 
 // ResourceResponseStatus corresponds to mln_resource_response_status. How a
 // resource provider answered a request.
@@ -933,7 +983,8 @@ const (
 type SourceFeatureQueryOptionField uint32
 
 const (
-	SourceFeatureQueryOptionFieldIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+	SourceFeatureQueryOptionFieldSourceLayerIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+	SourceFeatureQueryOptionFieldFilter         SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER)
 )
 
 func (value SourceFeatureQueryOptionField) Has(flags SourceFeatureQueryOptionField) bool {
@@ -970,6 +1021,24 @@ const (
 	// A command or operation named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
+
+// StyleImageInfoField corresponds to mln_style_image_info_field. Field mask
+// values for mln_style_image_info.
+//
+// See mln_style_image_info_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type StyleImageInfoField uint32
+
+const (
+	// The image declares a content box.
+	StyleImageInfoFieldContent StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_CONTENT)
+	// The image declares a horizontal text-fit mode.
+	StyleImageInfoFieldTextFitWidth StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
+	// The image declares a vertical text-fit mode.
+	StyleImageInfoFieldTextFitHeight StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
+)
+
+func (value StyleImageInfoField) Has(flags StyleImageInfoField) bool { return value&flags == flags }
 
 // StyleImageOptionField corresponds to mln_style_image_option_field. Field mask
 // values for mln_style_image_options.
@@ -1047,6 +1116,8 @@ const (
 	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
 	// The source exposes a DEM raster encoding.
 	StyleSourceInfoFieldRasterEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+	// The source declares an attribution string.
+	StyleSourceInfoFieldAttribution StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
 )
 
 func (value StyleSourceInfoField) Has(flags StyleSourceInfoField) bool { return value&flags == flags }
@@ -1353,7 +1424,6 @@ func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
 
 func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_animation_options {
 	raw := C.mln_animation_options_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
@@ -1432,7 +1502,7 @@ func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 	result.Kind = CameraDeltaKind(raw.kind)
 	result.Offset = copyScreenPoint(raw.offset)
 	result.Amount = float64(raw.amount)
-	result.Anchor = bindingPresent(bool(raw.has_anchor), func() ScreenPoint { return copyScreenPoint(raw.anchor) })
+	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
 	result.Animation = copyAnimationOptions(raw.animation)
 	return result
 }
@@ -1440,11 +1510,11 @@ func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delta {
 	raw := C.mln_camera_delta_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_anchor = false
+	raw.fields = 0
 	raw.kind = C.uint32_t(input.Kind)
 	raw.offset = nativeScreenPoint(input.Offset, arena)
 	raw.amount = C.double(input.Amount)
-	bindingFlagged(&raw.has_anchor, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
 	return raw
 }
@@ -1504,14 +1574,7 @@ type CameraOptions struct {
 
 func copyCameraOptions(raw C.mln_camera_options) CameraOptions {
 	var result CameraOptions
-	result.Center = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0, func() LatLng {
-		return func() LatLng {
-			var inner LatLng
-			inner.Latitude = float64(raw.latitude)
-			inner.Longitude = float64(raw.longitude)
-			return inner
-		}()
-	})
+	result.Center = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0, func() LatLng { return copyLatLng(raw.center) })
 	result.CenterAltitude = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0, func() float64 { return float64(raw.center_altitude) })
 	result.Padding = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_PADDING != 0, func() EdgeInsets { return copyEdgeInsets(raw.padding) })
 	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
@@ -1527,11 +1590,7 @@ func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_
 	raw := C.mln_camera_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Center != nil {
-		raw.latitude = C.double(input.Center.Latitude)
-		raw.longitude = C.double(input.Center.Longitude)
-		raw.fields |= C.MLN_CAMERA_OPTION_CENTER
-	}
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER, &raw.center, input.Center, arena, nativeLatLng)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, input.CenterAltitude, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
@@ -1666,12 +1725,12 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, input.Wrap, arena, bindingBool[bool, C.bool])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_custom_geometry_source_release_callback(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_geometry_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_geometry_source_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -1710,12 +1769,12 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_custom_mvt_vector_source_release_callback(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_mvt_vector_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_mvt_vector_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -1791,13 +1850,37 @@ func copyEglContextDescriptor(raw C.mln_egl_context_descriptor) EglContextDescri
 
 func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena) C.mln_egl_context_descriptor {
 	raw := C.mln_egl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
 	raw.client_api = C.uint32_t(input.ClientApi)
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
 	return raw
+}
+
+// EventBatchView corresponds to mln_event_batch_view. A borrowed view of one
+// owned runtime-event batch.
+//
+// See mln_event_batch_view in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type EventBatchView struct {
+	// Borrowed array of event_count events in queue order.
+	Events []RuntimeEvent
+}
+
+func copyEventBatchView(raw C.mln_event_batch_view) EventBatchView {
+	var result EventBatchView
+	result.Events = func() []RuntimeEvent {
+		length := bindingLength(uint64(raw.event_count))
+		result := make([]RuntimeEvent, length)
+		for i := range result {
+			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
+			result[i] = copyRuntimeEvent(item)
+			result[i].Message = bindingArenaString(unsafe.Pointer(raw.messages), uint64(raw.messages_size), uint64(item.message_offset), uint64(item.message_size))
+		}
+		return result
+	}()
+	return result
 }
 
 // FeatureStateSelector corresponds to mln_feature_state_selector. Feature-state
@@ -2024,7 +2107,7 @@ func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_http_header_transform_callback(C.binding_mln_http_header_transform_callback)
 		}
@@ -2147,8 +2230,25 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 	return raw
 }
 
-type LogSetCallbackRegistration struct {
+// LogHandler corresponds to mln_log_handler. Process-global log callback state.
+//
+// See mln_log_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
+type LogHandler struct {
 	Callback func(LogSeverity, LogEvent, int64, string) uint32
+}
+
+func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
+	raw := C.mln_log_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, 0)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		if input.Callback != nil {
+			raw.callback = C.mln_log_callback(C.binding_mln_log_handler_callback)
+		}
+	}
+	return raw
 }
 
 // LogicalExtent corresponds to mln_logical_extent. Logical map extent in UI
@@ -2411,7 +2511,6 @@ func copyMetalContextDescriptor(raw C.mln_metal_context_descriptor) MetalContext
 
 func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingArena) C.mln_metal_context_descriptor {
 	raw := C.mln_metal_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
 	return raw
 }
@@ -2551,7 +2650,6 @@ func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_defin
 
 func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition, arena *bindingArena) C.mln_offline_geometry_region_definition {
 	raw := C.mln_offline_geometry_region_definition{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.geometry = C.mln_buffer_view{data: arena.bytes(input.Geometry), size: C.size_t(len(input.Geometry))}
 	raw.min_zoom = C.double(input.MinZoom)
@@ -2683,7 +2781,6 @@ func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_regio
 
 func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefinition, arena *bindingArena) C.mln_offline_tile_pyramid_region_definition {
 	raw := C.mln_offline_tile_pyramid_region_definition{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.bounds = nativeLatLngBounds(input.Bounds, arena)
 	raw.min_zoom = C.double(input.MinZoom)
@@ -2775,7 +2872,6 @@ func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglCont
 
 func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.ownership = C.uint32_t(input.Ownership)
 	if input.Data == nil {
 		arena.fail("missing union variant")
@@ -3070,10 +3166,9 @@ type QueueLock struct {
 
 func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw := C.mln_queue_lock{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Lock != nil || input.Unlock != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_queue_lock_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Lock != nil {
 			raw.lock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_lock)
 		}
@@ -3098,8 +3193,33 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 	return result
 }
 
-// RenderFrameResult corresponds to mln_render_frame_result. Immutable result
-// record copied into an owned frame-result batch.
+// RenderFrameBatchView corresponds to mln_render_frame_batch_view. A borrowed
+// view of one owned frame-result batch.
+//
+// See mln_render_frame_batch_view in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+type RenderFrameBatchView struct {
+	// Borrowed array of result_count terminal frame results in completion order.
+	Results []RenderFrameResult
+}
+
+func copyRenderFrameBatchView(raw C.mln_render_frame_batch_view) RenderFrameBatchView {
+	var result RenderFrameBatchView
+	result.Results = func() []RenderFrameResult {
+		length := bindingLength(uint64(raw.result_count))
+		result := make([]RenderFrameResult, length)
+		for i := range result {
+			item := *(*C.mln_render_frame_result)(bindingElement(unsafe.Pointer(raw.results), i, uint64(raw.result_size), unsafe.Sizeof(*raw.results), unsafe.Alignof(*raw.results)))
+			result[i] = copyRenderFrameResult(item)
+		}
+		return result
+	}()
+	return result
+}
+
+// RenderFrameResult corresponds to mln_render_frame_result. Terminal result of
+// one frame demand, held by an owned frame-result batch and copied by
+// mln_acquired_frame_get_result().
 //
 // See mln_render_frame_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -3282,7 +3402,7 @@ func nativeRenderTargetExtent(input RenderTargetExtent, arena *bindingArena) C.m
 type RenderedFeatureQueryOptions struct {
 	// Optional style layer IDs. When absent, all rendered layers are queried.
 	LayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
 	Filter *[]byte
 }
 
@@ -3299,13 +3419,7 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			return result
 		}()
 	}
-	result.Filter = func() *[]byte {
-		if raw.filter == nil {
-			return nil
-		}
-		value := bindingBytes((*raw.filter).data, uint64((*raw.filter).size))
-		return &value
-	}()
+	result.Filter = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
 	return result
 }
 
@@ -3325,9 +3439,8 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 	}
 	if input.Filter != nil {
-		pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*raw.filter)))
-		*pointer = C.mln_buffer_view{data: arena.bytes(*input.Filter), size: C.size_t(len(*input.Filter))}
-		raw.filter = pointer
+		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
+		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER
 	}
 	return raw
 }
@@ -3416,12 +3529,31 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_provider_callback(C.binding_mln_resource_provider_callback)
 		}
 	}
 	return raw
+}
+
+// ResourceRange corresponds to mln_resource_range. Inclusive byte range of a
+// resource request.
+//
+// See mln_resource_range in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRange struct {
+	// First byte offset of the requested range.
+	Start uint64
+	// Last byte offset of the requested range, inclusive.
+	End uint64
+}
+
+func copyResourceRange(raw C.mln_resource_range) ResourceRange {
+	var result ResourceRange
+	result.Start = uint64(raw.start)
+	result.End = uint64(raw.end)
+	return result
 }
 
 type ResourceRequest struct {
@@ -3435,7 +3567,7 @@ type ResourceRequest struct {
 	Priority            ResourcePriority
 	Usage               ResourceUsage
 	StoragePolicy       ResourceStoragePolicy
-	Range               *ResourceRequestRange
+	Range               *ResourceRange
 	PriorModifiedUnixMs *int64
 	PriorExpiresUnixMs  *int64
 	PriorEtag           *string
@@ -3463,16 +3595,9 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	result.Priority = ResourcePriority(raw.priority)
 	result.Usage = ResourceUsage(raw.usage)
 	result.StoragePolicy = ResourceStoragePolicy(raw.storage_policy)
-	result.Range = bindingPresent(bool(raw.has_range), func() ResourceRequestRange {
-		return func() ResourceRequestRange {
-			var inner ResourceRequestRange
-			inner.Start = uint64(raw.range_start)
-			inner.End = uint64(raw.range_end)
-			return inner
-		}()
-	})
-	result.PriorModifiedUnixMs = bindingPresent(bool(raw.has_prior_modified), func() int64 { return int64(raw.prior_modified_unix_ms) })
-	result.PriorExpiresUnixMs = bindingPresent(bool(raw.has_prior_expires), func() int64 { return int64(raw.prior_expires_unix_ms) })
+	result.Range = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_RANGE != 0, func() ResourceRange { return copyResourceRange(raw._range) })
+	result.PriorModifiedUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0, func() int64 { return int64(raw.prior_modified_unix_ms) })
+	result.PriorExpiresUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0, func() int64 { return int64(raw.prior_expires_unix_ms) })
 	result.PriorEtag = func() *string {
 		if raw.prior_etag == nil {
 			return nil
@@ -3484,13 +3609,32 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	return result
 }
 
-type ResourceRequestRange struct {
-	Start uint64
-	End   uint64
+// ResourceRequestCancelHandler corresponds to
+// mln_resource_request_cancel_handler. Cancel callback state for one handled
+// resource request.
+//
+// See mln_resource_request_cancel_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRequestCancelHandler struct{ Callback func() }
+
+func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, arena *bindingArena) C.mln_resource_request_cancel_handler {
+	raw := C.mln_resource_request_cancel_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, arena.identity)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Callback != nil {
+			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
+		}
+	}
+	return raw
 }
 
-type ResourceRequestSetCancelCallbackRegistration struct{ Callback func() }
-
+// ResourceResponse corresponds to mln_resource_response. A resource provider's
+// answer to one request.
+//
+// See mln_resource_response in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceResponse struct {
 	Status      ResourceResponseStatus
 	ErrorReason ResourceErrorReason
@@ -3507,9 +3651,7 @@ type ResourceResponse struct {
 func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_resource_response {
 	raw := C.mln_resource_response{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_modified = false
-	raw.has_expires = false
-	raw.has_retry_after = false
+	raw.fields = 0
 	raw.status = C.uint32_t(input.Status)
 	raw.error_reason = C.uint32_t(input.ErrorReason)
 	raw.bytes = (*C.uint8_t)(arena.bytes(input.Bytes))
@@ -3518,12 +3660,12 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 		raw.error_message = arena.cstring((*input.ErrorMessage))
 	}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
-	bindingFlagged(&raw.has_modified, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
-	bindingFlagged(&raw.has_expires, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
 	if input.Etag != nil {
 		raw.etag = arena.cstring((*input.Etag))
 	}
-	bindingFlagged(&raw.has_retry_after, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
 	return raw
 }
 
@@ -3536,7 +3678,7 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_transform_callback(C.binding_mln_resource_transform_callback)
 		}
@@ -3607,31 +3749,6 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	return result
 }
 
-// RuntimeEventBatchView corresponds to mln_runtime_event_batch_view. A borrowed
-// view of one owned runtime-event batch.
-//
-// See mln_runtime_event_batch_view in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventBatchView struct {
-	// Borrowed array of event_count events in queue order.
-	Events []RuntimeEvent
-}
-
-func copyRuntimeEventBatchView(raw C.mln_runtime_event_batch_view) RuntimeEventBatchView {
-	var result RuntimeEventBatchView
-	result.Events = func() []RuntimeEvent {
-		length := bindingLength(uint64(raw.event_count))
-		result := make([]RuntimeEvent, length)
-		for i := range result {
-			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
-			result[i] = copyRuntimeEvent(item)
-			result[i].Message = bindingArenaString(unsafe.Pointer(raw.messages), uint64(raw.messages_size), uint64(item.message_offset), uint64(item.message_size))
-		}
-		return result
-	}()
-	return result
-}
-
 // RuntimeEventCameraTransitionFinished corresponds to
 // mln_runtime_event_camera_transition_finished. Payload for
 // MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
@@ -3677,9 +3794,7 @@ func copyRuntimeEventOfflineRegionResponseError(raw C.mln_runtime_event_offline_
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventOfflineRegionStatus struct {
 	RegionId int64
-	// Region status. This member keeps its own size field because the same struct
-	// is also returned by mln_runtime_offline_region_get_status().
-	Status OfflineRegionStatus
+	Status   OfflineRegionStatus
 }
 
 func copyRuntimeEventOfflineRegionStatus(raw C.mln_runtime_event_offline_region_status) RuntimeEventOfflineRegionStatus {
@@ -3771,8 +3886,6 @@ func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEven
 // See mln_runtime_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeOptions struct {
-	// No flags are currently defined. Must be zero.
-	Flags uint32
 	// Directory root for asset:// URLs. Copied during runtime creation. Null or
 	// empty selects /android_asset on Android and . elsewhere.
 	AssetPath *string
@@ -3787,7 +3900,6 @@ type RuntimeOptions struct {
 
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 	var result RuntimeOptions
-	result.Flags = uint32(raw.flags)
 	result.AssetPath = func() *string {
 		if raw.asset_path == nil {
 			return nil
@@ -3809,7 +3921,6 @@ func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runtime_options {
 	raw := C.mln_runtime_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.flags = C.uint32_t(input.Flags)
 	if input.AssetPath != nil {
 		raw.asset_path = arena.cstring((*input.AssetPath))
 	}
@@ -3918,7 +4029,7 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 type SourceFeatureQueryOptions struct {
 	// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
 	SourceLayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
 	Filter *[]byte
 }
 
@@ -3935,13 +4046,7 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			return result
 		}()
 	}
-	result.Filter = func() *[]byte {
-		if raw.filter == nil {
-			return nil
-		}
-		value := bindingBytes((*raw.filter).data, uint64((*raw.filter).size))
-		return &value
-	}()
+	result.Filter = bindingPresent(raw.fields&C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
 	return result
 }
 
@@ -3961,9 +4066,8 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 	}
 	if input.Filter != nil {
-		pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*raw.filter)))
-		*pointer = C.mln_buffer_view{data: arena.bytes(*input.Filter), size: C.size_t(len(*input.Filter))}
-		raw.filter = pointer
+		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
+		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER
 	}
 	return raw
 }
@@ -3986,13 +4090,15 @@ type StyleImageInfo struct {
 	// Interval counts for the stretchable axes.
 	StretchXCount uint
 	StretchYCount uint
-	// Content box, meaningful only when has_content is true.
+	// Content box, meaningful when fields contains CONTENT.
 	Content *ImageContent
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// One of mln_style_image_text_fit, meaningful when fields contains
+	// TEXT_FIT_WIDTH.
 	TextFitWidth *StyleImageTextFit
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// One of mln_style_image_text_fit, meaningful when fields contains
+	// TEXT_FIT_HEIGHT.
 	TextFitHeight *StyleImageTextFit
-	// Sprite pixel ratio. Defaults to 1.0.
+	// Sprite pixel ratio.
 	PixelRatio float32
 	Sdf        bool
 }
@@ -4005,36 +4111,12 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	result.ByteLength = uint(raw.byte_length)
 	result.StretchXCount = uint(raw.stretch_x_count)
 	result.StretchYCount = uint(raw.stretch_y_count)
-	result.Content = bindingPresent(bool(raw.has_content), func() ImageContent { return copyImageContent(raw.content) })
-	result.TextFitWidth = bindingPresent(bool(raw.has_text_fit_width), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
-	result.TextFitHeight = bindingPresent(bool(raw.has_text_fit_height), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
+	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
+	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
+	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
 	return result
-}
-
-func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style_image_info {
-	raw := C.mln_style_image_info_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_content = false
-	raw.has_text_fit_width = false
-	raw.has_text_fit_height = false
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.stride = C.uint32_t(input.Stride)
-	raw.byte_length = C.size_t(input.ByteLength)
-	raw.stretch_x_count = C.size_t(input.StretchXCount)
-	raw.stretch_y_count = C.size_t(input.StretchYCount)
-	bindingFlagged(&raw.has_content, &raw.content, input.Content, arena, nativeImageContent)
-	bindingFlagged(&raw.has_text_fit_width, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	bindingFlagged(&raw.has_text_fit_height, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	raw.pixel_ratio = C.float(input.PixelRatio)
-	raw.sdf = C.bool(input.Sdf)
-	return raw
-}
-
-func DefaultStyleImageInfo() StyleImageInfo {
-	return copyStyleImageInfo(C.mln_style_image_info_default())
 }
 
 // StyleImageOptions corresponds to mln_style_image_options. Options for runtime
@@ -4305,10 +4387,12 @@ type StyleSourceInfo struct {
 	IdSize uint
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution byte length, excluding any null terminator.
+	// Attribution byte length, excluding any null terminator, meaningful when
+	// fields contains ATTRIBUTION.
 	AttributionSize *uint
 	// URL byte length, meaningful when fields contains URL.
-	UrlSize  *uint
+	UrlSize *uint
+	// Inline tile metadata, meaningful when fields contains TILEJSON.
 	Tilejson *StyleSourceTileInfo
 	// Geographic bounds, meaningful when fields contains BOUNDS.
 	Bounds *LatLngBounds
@@ -4325,18 +4409,9 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.Type = StyleSourceType(raw._type)
 	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
-	result.AttributionSize = bindingPresent(bool(raw.has_attribution), func() uint { return uint(raw.attribution_size) })
+	result.AttributionSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() uint { return uint(raw.attribution_size) })
 	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
-	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo {
-		return func() StyleSourceTileInfo {
-			var inner StyleSourceTileInfo
-			inner.TileCount = uint(raw.tile_count)
-			inner.MinZoom = float64(raw.min_zoom)
-			inner.MaxZoom = float64(raw.max_zoom)
-			inner.Scheme = StyleTileScheme(raw.scheme)
-			return inner
-		}()
-	})
+	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
@@ -4359,7 +4434,7 @@ type StyleSourceResult struct {
 func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 	var result StyleSourceResult
 	result.Info = copyStyleSourceInfo(raw.info)
-	result.Attribution = bindingPresent(bool(raw.info.has_attribution), func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Attribution = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
 	result.Url = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
 	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
 		result.TileUrls = func() []string {
@@ -4381,10 +4456,14 @@ func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 // See mln_style_source_tile_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceTileInfo struct {
+	// Inline tile URL count.
 	TileCount uint
-	MinZoom   float64
-	MaxZoom   float64
-	Scheme    StyleTileScheme
+	// Minimum zoom.
+	MinZoom float64
+	// Maximum zoom.
+	MaxZoom float64
+	// One of mln_style_tile_scheme.
+	Scheme StyleTileScheme
 }
 
 func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileInfo {
@@ -4533,20 +4612,6 @@ func copyTextureImageInfo(raw C.mln_texture_image_info) TextureImageInfo {
 	result.Stride = uint32(raw.stride)
 	result.ByteLength = uint(raw.byte_length)
 	return result
-}
-
-func nativeTextureImageInfo(input TextureImageInfo, arena *bindingArena) C.mln_texture_image_info {
-	raw := C.mln_texture_image_info_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.stride = C.uint32_t(input.Stride)
-	raw.byte_length = C.size_t(input.ByteLength)
-	return raw
-}
-
-func DefaultTextureImageInfo() TextureImageInfo {
-	return copyTextureImageInfo(C.mln_texture_image_info_default())
 }
 
 // TextureReadbackResult corresponds to mln_texture_readback_result. Texture
@@ -4747,7 +4812,6 @@ func copyVulkanContextDescriptor(raw C.mln_vulkan_context_descriptor) VulkanCont
 
 func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *bindingArena) C.mln_vulkan_context_descriptor {
 	raw := C.mln_vulkan_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
 	raw.physical_device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.PhysicalDevice)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
@@ -4879,10 +4943,9 @@ type Wake struct{ Callback func() }
 
 func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_wake_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_wake_callback(C.binding_mln_wake_callback)
 		}
@@ -4915,7 +4978,6 @@ func copyWebglContextDescriptor(raw C.mln_webgl_context_descriptor) WebglContext
 
 func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.uint32_t(input.Kind)
 	raw.context = C.int32_t(input.Context)
 	raw.canvas_selector = C.mln_buffer_view{data: arena.bytes([]byte(input.CanvasSelector)), size: C.size_t(len(input.CanvasSelector))}
@@ -4999,7 +5061,6 @@ func copyWebgpuContextDescriptor(raw C.mln_webgpu_context_descriptor) WebgpuCont
 
 func nativeWebgpuContextDescriptor(input WebgpuContextDescriptor, arena *bindingArena) C.mln_webgpu_context_descriptor {
 	raw := C.mln_webgpu_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
 	raw.queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Queue)))
@@ -5146,7 +5207,6 @@ func copyWglContextDescriptor(raw C.mln_wgl_context_descriptor) WglContextDescri
 
 func nativeWglContextDescriptor(input WglContextDescriptor, arena *bindingArena) C.mln_wgl_context_descriptor {
 	raw := C.mln_wgl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.device_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.DeviceContext)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
@@ -5558,25 +5618,6 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
-// BufferHandle corresponds to mln_buffer. An owned buffer of bytes.
-//
-// See mln_buffer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type BufferHandle struct{ *bindingOwner }
-
-func adoptBufferHandle(raw uint64, parent any) *BufferHandle {
-	owner := &BufferHandle{bindingAdopt(raw, parent, "BufferHandle", func(raw uint64) { C.mln_buffer_destroy(C.mln_buffer(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *BufferHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
 // EventBatchHandle corresponds to mln_event_batch. An owned batch of runtime
 // events from one drain.
 //
@@ -5846,31 +5887,6 @@ func AndroidInit(jniEnv uintptr, jniClass uintptr, context uintptr) error {
 	})
 }
 
-// Close destroys an owned buffer. A null handle is a no-op.
-//
-// See mln_buffer_destroy in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-func (receiver *BufferHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_buffer_destroy), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_buffer_destroy(C.mln_buffer(raw))
-		return struct{}{}
-	})
-	return err
-}
-
-// Get borrows the data stored by an owned buffer.
-//
-// See mln_buffer_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-func (receiver *BufferHandle) Get() ([]byte, error) {
-	var outView C.mln_buffer_view
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_buffer_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_buffer_get(C.mln_buffer(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) []byte {
-		return bindingBytes(outView.data, uint64(outView.size))
-	})
-}
-
 // CVersion reports the C ABI contract version. The value is 0 while the ABI is
 // unstable, and will increment on each SemVer major release.
 //
@@ -5886,13 +5902,13 @@ func CVersion() (uint32, error) {
 //
 // See mln_event_batch_get in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *EventBatchHandle) Get() (RuntimeEventBatchView, error) {
-	var outView C.mln_runtime_event_batch_view
+func (receiver *EventBatchHandle) Get() (EventBatchView, error) {
+	var outView C.mln_event_batch_view
 	outView.size = C.uint32_t(unsafe.Sizeof(outView))
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_event_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_event_batch_get(C.mln_event_batch(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) RuntimeEventBatchView {
-		return copyRuntimeEventBatchView(outView)
+	}, func(arena *bindingArena) EventBatchView {
+		return copyEventBatchView(outView)
 	})
 }
 
@@ -5985,28 +6001,10 @@ func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
 //
 // See mln_log_set_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogSetCallback(callback func(LogSeverity, LogEvent, int64, string) uint32) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_log_set_callback, 0)
-		var context unsafe.Pointer
-		if callback != nil {
-			context = arena.register(LogSetCallbackRegistration{Callback: callback}, 0)
-		}
-		var nativeCallback C.mln_log_callback
-		var nativeRelease C.mln_log_callback_release
-		if callback != nil {
-			nativeCallback = C.mln_log_callback(C.binding_mln_log_set_callback_registration_callback)
-			nativeRelease = C.mln_log_callback_release(C.binding_release_forbid)
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_log_set_callback(nativeCallback, context, nativeRelease, diagnostic))
-		})
-		arena.accept(nil)
-		return struct{}{}
+func LogSetCallback(handler LogHandler) error {
+	return bindingDo(bindingGlobal(C.binding_operation_mln_log_set_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_log_set_callback(bindingStore(nativeLogHandler(handler, arena), arena), diagnostic))
 	})
-	return err
 }
 
 // AddColorReliefLayer adds a color-relief layer for a raster DEM source.
@@ -7493,30 +7491,17 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 	})
 }
 
-// Count returns the number of records in an owned frame-result batch.
-//
-// See mln_render_frame_batch_count in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Count() (uint, error) {
-	var outCount C.size_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_count), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_frame_batch_count(C.mln_render_frame_batch(raw), &outCount, diagnostic))
-	}, func(arena *bindingArena) uint {
-		return uint(outCount)
-	})
-}
-
-// Get copies one frame-result record.
+// Get borrows the result view stored by an owned frame-result batch.
 //
 // See mln_render_frame_batch_get in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Get(index uint) (RenderFrameResult, error) {
-	var outResult C.mln_render_frame_result
-	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+func (receiver *RenderFrameBatchHandle) Get() (RenderFrameBatchView, error) {
+	var outView C.mln_render_frame_batch_view
+	outView.size = C.uint32_t(unsafe.Sizeof(outView))
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), C.size_t(index), &outResult, diagnostic))
-	}, func(arena *bindingArena) RenderFrameResult {
-		return copyRenderFrameResult(outResult)
+		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), &outView, diagnostic))
+	}, func(arena *bindingArena) RenderFrameBatchView {
+		return copyRenderFrameBatchView(outView)
 	})
 }
 
@@ -7701,8 +7686,8 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 }
 
 // QuerySourceFeatures starts a source-feature query against the session's
-// latest driver state. The completion borrows an array of mln_queried_feature
-// values (value_count entries), valid only for the callback.
+// latest driver state. The completion borrows value_count mln_queried_feature
+// values, value_size bytes apart, valid only for the callback.
 //
 // See mln_render_session_query_source_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
@@ -7851,34 +7836,15 @@ func (receiver *ResourceRequestHandle) Close() error {
 //
 // See mln_resource_request_set_cancel_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool, error) {
-	return bindingCall(func() bool {
-		if receiver == nil || receiver.bindingOwner == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
+func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequestCancelHandler) (bool, error) {
+	var outCancelled C.bool
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_set_cancel_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), bindingStore(nativeResourceRequestCancelHandler(handler, arena), arena), &outCancelled, diagnostic))
+	}, func(arena *bindingArena) bool {
+		if bool(outCancelled) {
+			arena.decline()
 		}
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_resource_request_set_cancel_callback, receiver.state.issued)
-		var context unsafe.Pointer
-		if callback != nil {
-			context = arena.register(ResourceRequestSetCancelCallbackRegistration{Callback: callback}, receiver.state.issued)
-		}
-		var nativeCallback C.mln_resource_request_cancel_callback
-		var nativeRelease C.mln_runtime_callback_release
-		if callback != nil {
-			nativeCallback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback)
-			nativeRelease = C.mln_runtime_callback_release(C.binding_release)
-		}
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var rejected C.bool
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), nativeCallback, context, nativeRelease, &rejected, diagnostic))
-		})
-		if !bool(rejected) {
-			arena.accept(receiver.bindingOwner)
-		}
-		return bool(rejected)
+		return bool(outCancelled)
 	})
 }
 
@@ -7969,7 +7935,7 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) DrainEvents() (*EventBatchHandle, error) {
 	var outBatch C.mln_event_batch
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_drain_events(C.mln_runtime(raw), &outBatch, diagnostic))
 	}, func(arena *bindingArena) *EventBatchHandle {
 		adopted := adoptEventBatchHandle(uint64(outBatch), nil)
@@ -8358,8 +8324,8 @@ func (receiver *RenderSessionHandle) WebgpuSurfaceSetTarget(descriptor WebgpuSur
 	}, completionUnit)
 }
 
-//export mlnGo_mln_log_set_callback_registration_callback
-func mlnGo_mln_log_set_callback_registration_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
+//export mlnGo_mln_log_handler_callback
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	result = 0
@@ -8369,7 +8335,7 @@ func mlnGo_mln_log_set_callback_registration_callback(native_user_data unsafe.Po
 			result = 0
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[LogSetCallbackRegistration](native_user_data)
+	callbacks, ok := bindingCallbackValue[LogHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}
@@ -8383,7 +8349,7 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8400,7 +8366,7 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8417,7 +8383,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8434,7 +8400,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8496,8 +8462,8 @@ func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
 	return
 }
 
-//export mlnGo_mln_resource_request_set_cancel_callback_registration_callback
-func mlnGo_mln_resource_request_set_cancel_callback_registration_callback(native_user_data unsafe.Pointer) {
+//export mlnGo_mln_resource_request_cancel_handler_callback
+func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.Pointer) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
@@ -8505,7 +8471,7 @@ func mlnGo_mln_resource_request_set_cancel_callback_registration_callback(native
 			bindingReportCallbackPanic("mln_resource_request_cancel_callback", failure)
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[ResourceRequestSetCancelCallbackRegistration](native_user_data)
+	callbacks, ok := bindingCallbackValue[ResourceRequestCancelHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}

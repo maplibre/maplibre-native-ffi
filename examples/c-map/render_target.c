@@ -204,21 +204,21 @@ app_error render_session_drain_results(
       APP_ERROR_RENDER_FAILED, "frame result drain failed", status, &diagnostic
     );
   }
-  size_t count = 0;
-  status = mln_render_frame_batch_count(batch, &count, &diagnostic);
-  out_results->any = count > 0;
-  for (size_t i = 0; status == MLN_STATUS_OK && i < count; ++i) {
-    mln_render_frame_result result = {.size = sizeof(result)};
-    status = mln_render_frame_batch_get(batch, i, &result, &diagnostic);
-    if (status != MLN_STATUS_OK) break;
+  mln_render_frame_batch_view view = {.size = sizeof(view)};
+  status = mln_render_frame_batch_get(batch, &view, &diagnostic);
+  out_results->any = view.result_count > 0;
+  for (size_t i = 0; status == MLN_STATUS_OK && i < view.result_count; ++i) {
+    const mln_render_frame_result* result =
+      (const mln_render_frame_result*)((const char*)view.results +
+                                       i * view.result_size);
     // No update and size pending wait for the map's next update, superseded
     // demands have a newer one behind them, and no demand carries a timeout.
-    switch (result.disposition) {
+    switch (result->disposition) {
       case MLN_RENDER_RESULT_RENDERED:
         out_results->rendered = true;
-        out_results->needs_repaint = result.needs_repaint;
-        if (result.token > session->rendered_token) {
-          session->rendered_token = result.token;
+        out_results->needs_repaint = result->needs_repaint;
+        if (result->token > session->rendered_token) {
+          session->rendered_token = result->token;
         }
         break;
       case MLN_RENDER_RESULT_TARGET_NOT_READY:

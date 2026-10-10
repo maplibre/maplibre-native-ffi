@@ -234,6 +234,16 @@ class CameraChangeMode(UnknownIntEnum):
     ANIMATED = 1
 
 
+class CameraDeltaField(IntFlag):
+    """Field mask values for `mln_camera_delta`.
+
+    See `mln_camera_delta_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    ANCHOR = 1
+
+
 class CameraDeltaKind(UnknownIntEnum):
     """Relative camera operation carried by `mln_camera_delta`.
 
@@ -742,7 +752,8 @@ class RenderedFeatureQueryOptionField(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    IDS = 1
+    LAYER_IDS = 1
+    FILTER = 2
 
 
 class RenderedQueryGeometryType(UnknownIntEnum):
@@ -791,6 +802,30 @@ class ResourcePriority(UnknownIntEnum):
 class ResourceProviderDecision(UnknownIntEnum):
     PASS_THROUGH = 0
     HANDLE = 1
+
+
+class ResourceRequestField(IntFlag):
+    """Field mask values for `mln_resource_request`.
+
+    See `mln_resource_request_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    RANGE = 1
+    PRIOR_MODIFIED = 2
+    PRIOR_EXPIRES = 4
+
+
+class ResourceResponseField(IntFlag):
+    """Field mask values for `mln_resource_response`.
+
+    See `mln_resource_response_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    MODIFIED = 1
+    EXPIRES = 2
+    RETRY_AFTER = 4
 
 
 class ResourceResponseStatus(UnknownIntEnum):
@@ -917,7 +952,8 @@ class SourceFeatureQueryOptionField(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    IDS = 1
+    SOURCE_LAYER_IDS = 1
+    FILTER = 2
 
 
 class Status(UnknownIntEnum):
@@ -938,6 +974,18 @@ class Status(UnknownIntEnum):
     TARGET_LOST = -8
     NOT_READY = -9
     NOT_FOUND = -10
+
+
+class StyleImageInfoField(IntFlag):
+    """Field mask values for `mln_style_image_info`.
+
+    See `mln_style_image_info_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
+    CONTENT = 1
+    TEXT_FIT_WIDTH = 2
+    TEXT_FIT_HEIGHT = 4
 
 
 class StyleImageOptionField(IntFlag):
@@ -1003,6 +1051,7 @@ class StyleSourceInfoField(IntFlag):
     TILE_SIZE = 8
     VECTOR_ENCODING = 16
     RASTER_ENCODING = 32
+    ATTRIBUTION = 64
 
 
 class StyleSourceType(UnknownIntEnum):
@@ -1481,6 +1530,23 @@ class EglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class EventBatchView:
+    """A borrowed view of one owned runtime-event batch.
+
+    See `mln_event_batch_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    events: tuple[RuntimeEvent, ...]
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            events=tuple(RuntimeEvent._from_native(item) for item in raw["events"])
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
     """Feature-state source, feature, and key selector.
 
@@ -1715,7 +1781,13 @@ class LatLngBounds:
 
 
 @dataclass(frozen=True, slots=True)
-class LogSetCallbackRegistration:
+class LogHandler:
+    """Process-global log callback state.
+
+    See `mln_log_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+    """
+
     callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None
 
     def _invoke_callback(self, severity, event, code, message):
@@ -2444,8 +2516,28 @@ class RenderAbandonResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RenderFrameBatchView:
+    """A borrowed view of one owned frame-result batch.
+
+    See `mln_render_frame_batch_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
+    results: tuple[RenderFrameResult, ...]
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            results=tuple(
+                RenderFrameResult._from_native(item) for item in raw["results"]
+            )
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RenderFrameResult:
-    """Immutable result record copied into an owned frame-result batch.
+    """Terminal result of one frame demand, held by an owned frame-result batch
+    and copied by `mln_acquired_frame_get_result()`.
 
     See `mln_render_frame_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2684,6 +2776,22 @@ class ResourceProvider:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceRange:
+    """Inclusive byte range of a resource request.
+
+    See `mln_resource_range` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    start: int
+    end: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(start=raw["start"], end=raw["end"])
+
+
+@dataclass(frozen=True, slots=True)
 class ResourceRequest:
     kind: ResourceKind
     loading_method: ResourceLoadingMethod
@@ -2693,7 +2801,7 @@ class ResourceRequest:
     prior_data: bytes
     requested_url: str | None = None
     resolved_url: str | None = None
-    range: ResourceRequestRange | None = None
+    range: ResourceRange | None = None
     prior_modified_unix_ms: int | None = None
     prior_expires_unix_ms: int | None = None
     prior_etag: str | None = None
@@ -2708,7 +2816,7 @@ class ResourceRequest:
             priority=ResourcePriority(raw["priority"]),
             usage=ResourceUsage(raw["usage"]),
             storage_policy=ResourceStoragePolicy(raw["storage_policy"]),
-            range=_maybe(ResourceRequestRange._from_native, raw["range"]),
+            range=_maybe(ResourceRange._from_native, raw["range"]),
             prior_modified_unix_ms=raw["prior_modified_unix_ms"],
             prior_expires_unix_ms=raw["prior_expires_unix_ms"],
             prior_etag=raw["prior_etag"],
@@ -2717,17 +2825,24 @@ class ResourceRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class ResourceRequestRange:
-    start: int
-    end: int
+class ResourceRequestCancelHandler:
+    """Cancel callback state for one handled resource request.
 
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(start=raw["start"], end=raw["end"])
+    See `mln_resource_request_cancel_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    callback: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ResourceResponse:
+    """A resource provider's answer to one request.
+
+    See `mln_resource_response` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     status: ResourceResponseStatus
     error_reason: ResourceErrorReason
     bytes: bytes
@@ -2815,23 +2930,6 @@ class RuntimeEvent:
                 0,
             ),
             message=raw["message"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventBatchView:
-    """A borrowed view of one owned runtime-event batch.
-
-    See `mln_runtime_event_batch_view` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    events: tuple[RuntimeEvent, ...]
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            events=tuple(RuntimeEvent._from_native(item) for item in raw["events"])
         )
 
 
@@ -2968,7 +3066,6 @@ class RuntimeOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    flags: int
     event_mask: RuntimeEventMask
     event_wake: Wake
     asset_path: str | None = None
@@ -2977,7 +3074,6 @@ class RuntimeOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            flags=raw["flags"],
             asset_path=raw["asset_path"],
             cache_path=raw["cache_path"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
@@ -3105,12 +3201,6 @@ class StyleImageInfo:
             pixel_ratio=raw["pixel_ratio"],
             sdf=raw["sdf"],
         )
-
-    @classmethod
-    def default(cls):
-        from . import _native
-
-        return cls._from_native(_native._default_style_image_info())
 
 
 @dataclass(frozen=True, slots=True)
@@ -3453,12 +3543,6 @@ class TextureImageInfo:
             stride=raw["stride"],
             byte_length=raw["byte_length"],
         )
-
-    @classmethod
-    def default(cls):
-        from . import _native
-
-        return cls._from_native(_native._default_texture_image_info())
 
 
 @dataclass(frozen=True, slots=True)

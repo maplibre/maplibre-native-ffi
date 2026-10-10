@@ -143,7 +143,6 @@ static bool create_backend_state(void** out_state, void* out_context) {
 
   *(mln_webgpu_context_descriptor*)out_context =
     (mln_webgpu_context_descriptor){
-      .size = sizeof(mln_webgpu_context_descriptor),
       .instance = thread_webgpu_state.instance,
       .device = thread_webgpu_state.device,
       .queue = NULL,

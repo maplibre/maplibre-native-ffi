@@ -271,12 +271,15 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
             "native completion returned a null slice",
         ));
     }
-    // SAFETY: the submitting API defines value_count T elements for this callback.
-    Ok(
-        unsafe {
-            std::slice::from_raw_parts(result.value.cast::<T>(), result.value_count).to_vec()
-        },
-    )
+    // SAFETY: the submitting API defines value_count T elements for this
+    // callback, value_size bytes apart.
+    unsafe {
+        crate::convert::strided_items(
+            result.value.cast::<T>(),
+            result.value_count,
+            result.value_size,
+        )
+    }
 }
 
 #[allow(
@@ -361,7 +364,7 @@ mod tests {
     struct AcceptedSubmission {
         callback: sys::mln_completion_callback,
         user_data: *mut c_void,
-        release_user_data: sys::mln_completion_release,
+        release_user_data: sys::mln_user_data_release,
     }
 
     impl AcceptedSubmission {
@@ -439,6 +442,48 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         accepted.release();
+    }
+
+    /// A native build whose element grew reports a value_size wider than this
+    /// binding's element, so the copy steps by it. A stride narrower than the
+    /// element cannot hold one, so the copy fails.
+    #[test]
+    fn an_array_result_is_read_at_its_value_size() {
+        // Two coordinates, each followed by a member this binding does not know.
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct Wide {
+            point: sys::mln_lat_lng,
+            newer: f64,
+        }
+        let wide = [(1.0, 2.0), (3.0, 4.0)].map(|(latitude, longitude)| Wide {
+            point: sys::mln_lat_lng {
+                latitude,
+                longitude,
+            },
+            newer: -1.0,
+        });
+        // SAFETY: an all-zero completion result is a valid empty result.
+        let mut result = unsafe { std::mem::zeroed::<sys::mln_completion_result>() };
+        result.status = sys::MLN_STATUS_OK;
+        result.value = wide.as_ptr().cast();
+        result.value_count = wide.len();
+        result.value_size = std::mem::size_of::<Wide>() as u32;
+
+        let points = copy_slice::<sys::mln_lat_lng>(&result).unwrap();
+        assert_eq!(
+            points
+                .iter()
+                .map(|point| (point.latitude, point.longitude))
+                .collect::<Vec<_>>(),
+            [(1.0, 2.0), (3.0, 4.0)]
+        );
+
+        result.value_size = std::mem::size_of::<sys::mln_lat_lng>() as u32 - 1;
+        assert_eq!(
+            copy_slice::<sys::mln_lat_lng>(&result).unwrap_err().kind(),
+            crate::ErrorKind::NativeError
+        );
     }
 
     #[test]

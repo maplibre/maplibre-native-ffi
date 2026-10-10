@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.requestCollection
@@ -45,7 +46,7 @@ internal suspend fun abandonAMapAndAwaitItsDisposal() {
     val request = claimed.awaitWithin("the provider to claim the style request")
     try {
       val cancelled = CompletableDeferred<Unit>()
-      if (request.setCancelCallback { cancelled.complete(Unit) }) {
+      if (request.setCancelCallback(ResourceRequestCancelHandler { cancelled.complete(Unit) })) {
         cancelled.complete(Unit)
       }
       holder.map = null

@@ -34,7 +34,7 @@ void pinch_by(
   mln_camera_delta delta = mln_camera_delta_default();
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = scale;
-  delta.has_anchor = true;
+  delta.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta.anchor = focus;
   mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion pinch
@@ -48,7 +48,7 @@ void end_gesture(
   mln_camera_delta delta = mln_camera_delta_default();
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = residual_scale;
-  delta.has_anchor = true;
+  delta.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta.anchor = focus;
   delta.animation.fields = MLN_ANIMATION_OPTION_DURATION;
   delta.animation.duration_ms = 250.0;

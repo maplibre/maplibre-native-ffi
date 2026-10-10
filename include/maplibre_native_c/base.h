@@ -131,11 +131,6 @@ typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_close;"
   "dispose=mln_map_projection_close"
 );
-/** An owned buffer of bytes. */
-typedef uint64_t mln_buffer MLN_BINDING(
-  "kind=handle;release=mln_buffer_destroy;"
-  "dispose=mln_buffer_destroy"
-);
 /** A resource request that a resource provider handles. */
 typedef uint64_t mln_resource_request_handle MLN_BINDING(
   "kind=handle;release=mln_resource_request_release;"
@@ -177,26 +172,13 @@ typedef struct mln_buffer_view {
 } mln_buffer_view;
 
 /**
- * Borrows the data stored by an owned buffer.
+ * Releases the user_data of a callback registration.
  *
- * The view remains valid until buffer is destroyed. The caller must not access
- * it concurrently with mln_buffer_destroy().
- *
- * Returns:
- * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when buffer is an invalid handle, or out_view
- *   is null.
- * - MLN_STATUS_INVALID_STATE when buffer has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Each registration struct's release_user_data member states when native code
+ * calls it and on which thread. A null release_user_data leaves user_data with
+ * the caller.
  */
-MLN_API mln_status mln_buffer_get(
-  mln_buffer buffer,
-  mln_buffer_view* out_view MLN_BINDING("direction=out;encoding=bytes"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/** Destroys an owned buffer. A null handle is a no-op. */
-MLN_API void mln_buffer_destroy(mln_buffer buffer) MLN_NOEXCEPT;
+typedef void (*mln_user_data_release)(void* user_data);
 
 /**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,

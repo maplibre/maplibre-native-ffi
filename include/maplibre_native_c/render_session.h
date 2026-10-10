@@ -108,7 +108,14 @@ typedef struct mln_frame_demand {
   uint64_t timeout_ns;
 } mln_frame_demand;
 
-/** Immutable result record copied into an owned frame-result batch. */
+/**
+ * Terminal result of one frame demand, held by an owned frame-result batch and
+ * copied by mln_acquired_frame_get_result().
+ *
+ * Step through a batch's records by mln_render_frame_batch_view.result_size
+ * rather than by the size of this struct: a later version may append a member
+ * and widen the stride. In a batch, each record's size equals that stride.
+ */
 typedef struct mln_render_frame_result {
   uint32_t size;
   /** One mln_render_result value. */
@@ -131,6 +138,28 @@ typedef struct mln_render_frame_result {
    */
   bool needs_repaint;
 } mln_render_frame_result;
+
+/**
+ * A borrowed view of one owned frame-result batch.
+ *
+ * Step through results by result_size. The results pointer remains valid until
+ * the frame-batch handle is released.
+ */
+typedef struct mln_render_frame_batch_view {
+  uint32_t size;
+  /**
+   * Stride of one result in bytes, at least sizeof(mln_render_frame_result) in
+   * the header a caller compiled against. Index results with this value.
+   */
+  uint32_t result_size;
+  /**
+   * Borrowed array of result_count terminal frame results in completion order.
+   */
+  const mln_render_frame_result* results
+    MLN_BINDING("length=result_count;stride=result_size");
+  /** Number of results in results. */
+  size_t result_count;
+} mln_render_frame_batch_view;
 
 /** Any-thread render-session snapshot. */
 typedef struct mln_render_session_snapshot {
@@ -239,17 +268,18 @@ MLN_API mln_status mln_render_session_request_frame(
  * owned batch. The records remain stable until the batch is released.
  *
  * Returns:
- * - MLN_STATUS_OK when a batch is published in *out_batch.
+ * - MLN_STATUS_OK when a batch holding at least one result is published in
+ *   *out_batch.
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, and the caller retries
- *   after the next demand. Bindings return their language's empty form instead
- *   of an error.
+ *   *out_batch is left unchanged, no batch is allocated, the diagnostic
+ *   message is empty, and the caller retries after the next demand. Bindings
+ *   return their language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=event_batch;absent_on=MLN_STATUS_NOT_READY")
+MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
   mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),
@@ -257,33 +287,18 @@ MLN_API mln_status mln_render_session_drain_frame_results(
 ) MLN_NOEXCEPT;
 
 /**
- * Returns the number of records in an owned frame-result batch.
+ * Borrows the result view stored by an owned frame-result batch.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_count
- *   is null.
- * - MLN_STATUS_INVALID_STATE when batch has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_frame_batch_count(
-  mln_render_frame_batch batch, size_t* out_count MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one frame-result record.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, index is out
- *   of range, or out_result is null or undersized.
+ * - MLN_STATUS_OK when out_view receives the borrowed view.
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
+ *   null or out_view->size is too small.
  * - MLN_STATUS_INVALID_STATE when batch has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_frame_batch_get(
-  mln_render_frame_batch batch, size_t index,
-  mln_render_frame_result* out_result MLN_BINDING("direction=out"),
+  mln_render_frame_batch batch,
+  mln_render_frame_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

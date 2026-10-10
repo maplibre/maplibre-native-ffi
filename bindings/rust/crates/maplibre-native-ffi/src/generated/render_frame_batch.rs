@@ -12,31 +12,18 @@ native_owner! {
 }
 
 impl RenderFrameBatchHandle {
-    /// Returns the number of records in an owned frame-result batch.
-    ///
-    /// See `mln_render_frame_batch_count` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn count(&self) -> Result<usize> {
-        let mut call = self.inner.call("mln_render_frame_batch_count")?;
-        let mut out_count: usize = Default::default();
-        call.status(|batch, out_diagnostic| unsafe {
-            sys::mln_render_frame_batch_count(batch, &mut out_count, out_diagnostic)
-        })?;
-        Ok(out_count)
-    }
-
-    /// Copies one frame-result record.
+    /// Borrows the result view stored by an owned frame-result batch.
     ///
     /// See `mln_render_frame_batch_get` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn get(&self, index: usize) -> Result<RenderFrameResult> {
-        let mut call = self.inner.call("mln_render_frame_batch_get")?;
-        let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
-        out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
+    pub fn get(&self) -> Result<RenderFrameBatchView> {
+        let mut call = self.inner.read("mln_render_frame_batch_get")?;
+        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         call.status(|batch, out_diagnostic| unsafe {
-            sys::mln_render_frame_batch_get(batch, index, &mut out_result, out_diagnostic)
+            sys::mln_render_frame_batch_get(batch, &mut out_view, out_diagnostic)
         })?;
-        Ok(unsafe { from_native(out_result) }?)
+        Ok(unsafe { from_native(out_view) }?)
     }
 
     /// Releases a frame-result batch.

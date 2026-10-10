@@ -33,10 +33,6 @@ internal expect object C {
 
   fun mln_bound_options_default(returned: Long): Unit
 
-  fun mln_buffer_destroy(buffer: Long): Unit
-
-  fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int
-
   fun mln_c_version(): Int
 
   fun mln_camera_delta_default(returned: Long): Unit
@@ -87,12 +83,7 @@ internal expect object C {
 
   fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int
 
-  fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
   fun mln_map_add_color_relief_layer(
     map: Long,
@@ -967,14 +958,7 @@ internal expect object C {
 
   fun mln_projection_mode_default(returned: Long): Unit
 
-  fun mln_render_frame_batch_count(batch: Long, outCount: Long, outDiagnostic: Long): Int
-
-  fun mln_render_frame_batch_get(
-    batch: Long,
-    index: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
 
   fun mln_render_frame_batch_release(batch: Long): Unit
 
@@ -1088,9 +1072,7 @@ internal expect object C {
 
   fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
@@ -1242,8 +1224,6 @@ internal expect object C {
 
   fun mln_source_feature_query_options_default(returned: Long): Unit
 
-  fun mln_style_image_info_default(returned: Long): Unit
-
   fun mln_style_image_options_default(returned: Long): Unit
 
   fun mln_style_tile_source_options_default(returned: Long): Unit
@@ -1251,8 +1231,6 @@ internal expect object C {
   fun mln_style_transition_options_default(returned: Long): Unit
 
   fun mln_supported_render_backend_mask(): Int
-
-  fun mln_texture_image_info_default(returned: Long): Unit
 
   fun mln_texture_read_premultiplied_rgba8(
     session: Long,

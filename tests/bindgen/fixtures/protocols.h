@@ -18,13 +18,14 @@
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
   defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
-  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION)
+  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION) ||                          \
+  defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
-#define MLN_PROTOCOL_DIRECT_REGISTRATION
+#define MLN_PROTOCOL_DECLINABLE_REGISTRATION
 #endif
-#if defined(MLN_PROTOCOL_DIRECT_REGISTRATION) || \
+#if defined(MLN_PROTOCOL_DECLINABLE_REGISTRATION) || \
   defined(MLN_PROTOCOL_DEFERRED_CALLBACK)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
@@ -79,21 +80,21 @@ typedef struct mln_completion_result {
   uint32_t size;
   int status BIND("enum=mln_status");
   uint32_t disposition BIND("enum=mln_command_disposition");
-  uint32_t reserved BIND("kind=reserved");
+  uint32_t value_size;
   uint64_t generation;
   mln_buffer_view diagnostic;
-  const void* value BIND("kind=erased");
+  const void* value BIND("kind=erased;length=value_count;stride=value_size");
   size_t value_count;
 } mln_completion_result;
 typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );
-typedef void (*mln_completion_release)(void* user_data);
+typedef void (*mln_user_data_release)(void* user_data);
 typedef struct mln_completion {
   uint32_t size;
   mln_completion_callback callback;
   void* user_data BIND("kind=context");
-  mln_completion_release release_user_data;
+  mln_user_data_release release_user_data;
 } mln_completion BIND("kind=callback_registration;release=release_user_data");
 #else
 typedef struct mln_completion {
@@ -121,7 +122,7 @@ typedef unsigned long long mln_map;
 #endif
 
 #ifdef MLN_PROTOCOL_VALUES
-// Copied values: a nested record, boolean presence, nullable and required
+// Copied values: a nested record behind a presence bit, nullable and required
 // counted arrays with narrow counts, and nullable UTF-8 with explicit length.
 #ifndef MLN_PROTOCOL_GAIN_TYPE
 #define MLN_PROTOCOL_GAIN_TYPE double
@@ -130,10 +131,13 @@ typedef struct mln_probe_point {
   double type;
   MLN_PROTOCOL_GAIN_TYPE gain;
 } mln_probe_point;
+typedef enum BIND("kind=bitmask") mln_probe_option_field : uint32_t {
+  MLN_PROBE_OPTION_POINT = 1u << 0u,
+} mln_probe_option_field;
 typedef struct mln_probe_options {
   mln_buffer_view title BIND("nullable=true");
-  bool has_point;
-  mln_probe_point point BIND("mask=has_point");
+  uint32_t fields BIND("enum=mln_probe_option_field");
+  mln_probe_point point BIND("mask=fields;bit=MLN_PROBE_OPTION_POINT");
   const mln_probe_point* left BIND("length=left_count;nullable=true");
   uint16_t left_count;
   const mln_probe_point* right BIND("length=right_count");
@@ -196,7 +200,6 @@ mln_status mln_probe_settings_check(
 typedef void (*mln_probe_notify)(void* user_data, uint32_t count);
 typedef void (*mln_probe_notify_release)(void* user_data);
 typedef struct mln_probe_signal {
-  uint32_t size;
   mln_probe_notify callback BIND("nullable=true");
   void* user_data BIND("kind=context");
   mln_probe_notify_release release_user_data;
@@ -225,8 +228,10 @@ mln_status mln_keyword_combine(
 #endif
 
 #ifdef MLN_PROTOCOL_PRESENCE_MASK
-// A bitmask presence group with a default constructor, nested in a snapshot
-// that also carries a borrowed array.
+// A bitmask presence mask whose bit guards an embedded record, in a record with
+// a default constructor that a caller passes by pointer. A snapshot nests it
+// beside a borrowed array, and a borrowed route reuses the nested bit through
+// the mask path camera.fields.
 typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
@@ -238,10 +243,7 @@ typedef struct mln_lat_lng {
 typedef struct mln_camera {
   uint32_t abi_size BIND("kind=size");
   uint64_t fields BIND("enum=mln_camera_field");
-  double latitude
-    BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
-  double longitude
-    BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
+  mln_lat_lng center BIND("mask=fields;bit=MLN_CAMERA_CENTER");
   double zoom BIND("mask=fields;bit=MLN_CAMERA_ZOOM");
 } mln_camera;
 typedef struct mln_snapshot {
@@ -250,9 +252,22 @@ typedef struct mln_snapshot {
   const mln_lat_lng* coordinates BIND("length=coordinate_count");
   size_t coordinate_count;
 } mln_snapshot;
+typedef struct mln_camera_route {
+  mln_camera camera;
+  const mln_lat_lng* stops
+    BIND("length=stop_count;mask=camera.fields;bit=MLN_CAMERA_CENTER");
+  size_t stop_count;
+} mln_camera_route;
 mln_camera mln_camera_default(void);
+mln_status mln_map_jump(
+  mln_map map, const mln_camera* camera, mln_diagnostic* out_diagnostic
+);
 BIND("execution=query;result=mln_snapshot")
 mln_status mln_map_snapshot(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_camera_route")
+mln_status mln_map_camera_route(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif
@@ -317,8 +332,8 @@ mln_status mln_map_set_label(
 #ifdef MLN_PROTOCOL_PLAN_NAMES
 // Names that the semantic plan derives once for every binding: a handle whose
 // operations begin with a prefix other than its type name, a record whose field
-// order is its meaning, and presence groups whose record name shares no prefix
-// with its bit constants.
+// order is its meaning, and a mask flag whose record name shares no prefix with
+// its bit constants.
 typedef uint64_t mln_pass_handle BIND(
   "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
 );
@@ -339,16 +354,9 @@ typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
 typedef struct mln_frame_window {
   uint32_t size;
   uint32_t fields BIND("enum=mln_frame_window_field");
-  double x BIND(
-    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
-  );
-  double y BIND(
-    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
-  );
+  mln_point view_origin
+    BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN");
   double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
-  bool has_extent;
-  double width BIND("mask=has_extent");
-  double height BIND("mask=has_extent");
 } mln_frame_window;
 mln_status mln_pass_set_window(
   mln_pass_handle pass, const mln_frame_window* window,
@@ -446,12 +454,13 @@ mln_status mln_map_observe_sample(
 );
 #endif
 
-#ifdef MLN_PROTOCOL_DIRECT_REGISTRATION
-// A direct callback registration that native may decline through an output.
+#ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
+// A callback registration that native may decline through an output. The
+// cancel callback names no owner parameter, so it may call back only into the
+// ticket that registers it.
 typedef unsigned long long mln_ticket
   BIND("kind=handle;release=mln_ticket_release");
-typedef void (*mln_runtime_callback_release)(void* context);
-// The cancel callback may call back into the ticket's own protocol.
+typedef void (*mln_ticket_release_context)(void* context);
 #ifdef MLN_PROTOCOL_DECISION
 #define MLN_PROTOCOL_TICKET_CALLS                                \
   "mln_ticket_answer,mln_ticket_cancelled,mln_ticket_on_cancel," \
@@ -460,17 +469,19 @@ typedef void (*mln_runtime_callback_release)(void* context);
 #define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
 #endif
 typedef void (*mln_ticket_cancel)(void* context) BIND(
-  "reentry=protocol;reentry_owner=registration;"
+  "reentry=protocol;reentry_owner=mln_ticket;"
   "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS
 );
+typedef struct mln_ticket_cancel_handler {
+  unsigned int size;
+  mln_ticket_cancel callback;
+  void* context BIND("kind=context");
+  mln_ticket_release_context release;
+} mln_ticket_cancel_handler BIND("kind=callback_registration;release=release");
 void mln_ticket_release(mln_ticket ticket);
-BIND(
-  "registration=callback;release_callback=release;"
-  "accepted_unless=cancelled"
-)
+BIND("accepted_unless=cancelled")
 mln_status mln_ticket_on_cancel(
-  mln_ticket ticket, mln_ticket_cancel callback,
-  void* context BIND("kind=context"), mln_runtime_callback_release release,
+  mln_ticket ticket, const mln_ticket_cancel_handler* handler,
   bool* cancelled BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
 #endif
@@ -499,7 +510,7 @@ typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticke
 typedef struct mln_ticket_provider {
   mln_ticket_provider_callback callback;
   void* user_data BIND("kind=context");
-  mln_runtime_callback_release release;
+  mln_ticket_release_context release;
 } mln_ticket_provider BIND("kind=callback_registration;release=release");
 mln_status mln_host_destroy(mln_host host, mln_diagnostic* out_diagnostic);
 BIND("execution=command")
@@ -527,22 +538,31 @@ typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
   void* context, int code, const char* text
 ) BIND("failure=0;deferred=1");
-BIND("registration=callback;release_callback=release")
+// Its release must not call back into the API.
+typedef struct mln_notice_handler {
+  unsigned int size;
+  mln_notice_callback callback;
+  void* context BIND("kind=context");
+  mln_notice_release release;
+} mln_notice_handler BIND(
+  "kind=callback_registration;release=release;release_reentry=forbid"
+);
 mln_status mln_notice_set_callback(
-  mln_notice_callback callback, void* context BIND("kind=context"),
-  mln_notice_release release, mln_diagnostic* out_diagnostic
+  const mln_notice_handler* handler, mln_diagnostic* out_diagnostic
 );
 #endif
 
 // Outputs that a failure status reports as absent: each call first finds
-// nothing, then publishes its output, and then fails.
+// nothing, then publishes its output, and then fails. The parcel drain is
+// absent on MLN_STATUS_NOT_READY by convention; mln_probe_read_level is not a
+// drain, so it names the status with absent_on.
 #ifdef MLN_PROTOCOL_ABSENT_HANDLE
 typedef unsigned long long mln_probe_parcel BIND(
   "kind=handle;release=mln_probe_parcel_release;dispose=mln_probe_parcel_"
   "release"
 );
 void mln_probe_parcel_release(mln_probe_parcel parcel);
-BIND("absent_on=MLN_STATUS_NOT_READY")
+BIND("execution=event_batch")
 mln_status mln_probe_take_parcel(
   mln_probe_parcel* out_parcel BIND("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -553,6 +573,67 @@ mln_status mln_probe_take_parcel(
 BIND("absent_on=MLN_STATUS_NOT_READY")
 mln_status mln_probe_read_level(
   double* out_level BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+#endif
+
+// Plain records that native steps through by a stride it reports, which may
+// exceed the record a binding compiled. The stride versions each record, so a
+// record carries no size of its own.
+#ifdef MLN_PROTOCOL_STRIDED_RECORDS
+typedef struct mln_probe_reading {
+  uint64_t value;
+} mln_probe_reading;
+typedef struct mln_probe_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_probe_reading* readings
+    BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_probe_reading_view;
+typedef unsigned long long mln_probe_ledger BIND(
+  "kind=handle;release=mln_probe_ledger_release;dispose=mln_probe_ledger_"
+  "release"
+);
+void mln_probe_ledger_release(mln_probe_ledger ledger);
+mln_status mln_probe_ledger_open(
+  mln_probe_ledger* out_ledger BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_ledger_get(
+  mln_probe_ledger ledger,
+  mln_probe_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
+// Each struct is versioned by one thing. A window that a caller passes by
+// pointer begins with its size and keeps it where a survey embeds it. The span
+// that only a window embeds, the survey that only a completion delivers, and
+// the tallies that the survey borrows without a stride carry none.
+#ifdef MLN_PROTOCOL_VERSIONING
+typedef struct mln_probe_span {
+  double low;
+  double high;
+} mln_probe_span;
+typedef struct mln_probe_window {
+  uint32_t size;
+  mln_probe_span span;
+} mln_probe_window;
+typedef struct mln_probe_tally {
+  uint64_t hits;
+} mln_probe_tally;
+typedef struct mln_probe_survey {
+  mln_probe_window window;
+  uint64_t samples;
+  const mln_probe_tally* tallies BIND("length=tally_count");
+  size_t tally_count;
+} mln_probe_survey;
+mln_status mln_map_set_window(
+  mln_map map, const mln_probe_window* window, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_probe_survey")
+mln_status mln_map_survey(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif
 

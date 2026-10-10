@@ -212,8 +212,8 @@ int main() {
   char url[] = "retained URL";
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
   mln_style_source_result source{};
-  source.info.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  source.info.has_attribution = true;
+  source.info.fields =
+    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
   source.tile_urls = views;
   source.tile_url_count = 2;
   source.attribution = {url, 5};
@@ -222,7 +222,7 @@ int main() {
   result.value = &source;
   result.value_count = 1;
   const auto before = allocations;
-  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT, 0);
+  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT);
   assert(allocations - before == 1);
   const auto* copied = static_cast<const mln_style_source_result*>(record->view.result.value);
   assert(reinterpret_cast<std::uintptr_t>(copied) % alignof(mln_style_source_result) == 0);
@@ -234,18 +234,18 @@ int main() {
 
   result.value = views;
   result.value_count = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW);
   assert(record->view.result.value != nullptr);
   mln::capture::destroy(record);
   result.value = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW);
   assert(record->view.result.value == nullptr);
   mln::capture::destroy(record);
 
   result.value = &source;
   result.value_count = std::numeric_limits<std::size_t>::max();
   bool overflow = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0); }
+  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW); }
   catch (const std::bad_alloc&) { overflow = true; }
   assert(overflow);
 
@@ -254,23 +254,23 @@ int main() {
   result.value = &offline;
   result.value_count = 1;
   bool variant = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO, 0); }
+  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO); }
   catch (const std::invalid_argument&) { variant = true; }
   assert(variant);
 
   mln_map handle = 42;
   result.value = &handle;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
   mln::capture::destroy(record);
   assert(disposed == 1);
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
   record->claimed = true;
   mln::capture::destroy(record);
   assert(disposed == 1);
 
   fail_allocation = true;
   bool failed = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP, 0); }
+  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP); }
   catch (const std::bad_alloc&) { failed = true; }
   fail_allocation = false;
   assert(failed);
@@ -280,7 +280,7 @@ int main() {
   mln_map handles[] = {42, 43};
   result.value = handles;
   result.value_count = 2;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
   mln::capture::destroy(record);
   assert(disposed == 4);
 }
@@ -323,7 +323,7 @@ int main() {
   result.status = MLN_STATUS_OK;
   result.value = &input;
   result.value_count = 1;
-  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE, 0);
+  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
   auto* copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   std::memset(bytes, 0, sizeof(bytes));
   assert(std::memcmp(copied->nested.tile_urls[0].data, "nested", 6) == 0);
@@ -334,7 +334,7 @@ int main() {
   input.count = 0;
   input.extra = &view;
   view.size = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
   copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   assert(copied->extra != nullptr);
   assert(reinterpret_cast<std::uintptr_t>(copied->extra) % alignof(mln_buffer_view) == 0);
@@ -344,7 +344,7 @@ int main() {
 
   input.extra = nullptr;
   view.data = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
   copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   assert(copied->extra == nullptr);
   assert(copied->nested.tile_urls[0].data == nullptr);

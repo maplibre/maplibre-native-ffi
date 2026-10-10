@@ -34,7 +34,9 @@ keeps that default.
 
 One drain creates an owned batch that contains every queued event in queue order,
 together with the message text that those events carry. The batch remains
-readable across later drains and runtime close.
+readable across later drains and runtime close. When no event is queued, the
+drain reports a not-ready status and creates no batch. A binding returns its
+language's empty value instead of an error.
 
 <Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
 

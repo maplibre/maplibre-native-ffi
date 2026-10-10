@@ -228,8 +228,9 @@ fn renderStillImage(
         var results = try maplibre.renderSessionDrainFrameResults(session, null);
         if (results) |*batch| {
             defer batch.deinit();
-            for (0..try maplibre.renderFrameBatchCount(batch.*, null)) |index| {
-                const result = try maplibre.renderFrameBatchGet(batch.*, index, null);
+            var view = try maplibre.renderFrameBatchGet(allocator, batch.*, null);
+            defer view.deinit();
+            for (view.value.results) |result| {
                 switch (result.disposition) {
                     .rendered => demand = demand or result.needs_repaint,
                     // These wait for the map's next update, which demands
@@ -257,7 +258,7 @@ const MapEvents = struct {
 
 /// Drains every queued runtime event.
 fn drainMapEvents(allocator: std.mem.Allocator, runtime: *maplibre.Runtime, map: *maplibre.Map) !MapEvents {
-    var batch = try maplibre.runtimeDrainEvents(runtime.*, null);
+    var batch = try maplibre.runtimeDrainEvents(runtime.*, null) orelse return .{};
     defer batch.deinit();
     var queued = try maplibre.eventBatchGet(allocator, batch, null);
     defer queued.deinit();

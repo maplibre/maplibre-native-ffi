@@ -61,16 +61,6 @@ public extension Maplibre {
     }
   }
 
-  /// Returns texture image info defaults for this C API version.
-  ///
-  /// See `mln_texture_image_info_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  static func textureImageInfoDefault() throws -> TextureImageInfo {
-    try nativeDirect("mln_texture_image_info_default") { _ in
-      TextureImageInfo(raw: mln_texture_image_info_default())
-    }
-  }
-
   /// Returns Vulkan borrowed-texture descriptor defaults for this C API
   /// version.
   ///

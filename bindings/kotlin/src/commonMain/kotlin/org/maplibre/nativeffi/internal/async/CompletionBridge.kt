@@ -154,4 +154,7 @@ internal object CompletionBridge {
 
   /** The `value_count` of the result at [result]. */
   fun valueCount(result: Long): ULong = readSize(result + CompletionResultLayout.VALUE_COUNT)
+
+  /** The `value_size` of the result at [result]: the byte stride of its array. */
+  fun valueSize(result: Long): ULong = readU32(result + CompletionResultLayout.VALUE_SIZE).toULong()
 }

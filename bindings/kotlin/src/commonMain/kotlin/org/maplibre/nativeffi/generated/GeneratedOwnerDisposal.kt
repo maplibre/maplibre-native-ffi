@@ -11,11 +11,6 @@ internal object GeneratedOwnerDisposal {
     NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_dispose(handle, diagnostic) }
   }
 
-  fun buffer(handle: Long) {
-    CallbackAdmission.check(handle, "mln_buffer_destroy")
-    C.mln_buffer_destroy(handle)
-  }
-
   fun eventBatch(handle: Long) {
     CallbackAdmission.check(handle, "mln_event_batch_release")
     C.mln_event_batch_release(handle)

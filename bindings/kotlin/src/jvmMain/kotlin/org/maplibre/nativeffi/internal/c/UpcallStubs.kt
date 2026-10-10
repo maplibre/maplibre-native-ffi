@@ -7,10 +7,8 @@ internal actual object UpcallStubs {
   actual val completion: Long = Ffm.upcall("completion", null, JAVA_LONG, JAVA_LONG)
   actual val completionRelease: Long = Ffm.upcall("completionRelease", null, JAVA_LONG)
   actual val releaseRoot: Long = Ffm.upcall("releaseRoot", null, JAVA_LONG)
-  actual val logCallback: Long =
-    Ffm.upcall("logCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_INT, JAVA_LONG, JAVA_LONG)
-  actual val resourceRequestCancelCallback: Long =
-    Ffm.upcall("resourceRequestCancelCallback", null, JAVA_LONG)
+  actual val logHandlerCallback: Long =
+    Ffm.upcall("logHandlerCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_INT, JAVA_LONG, JAVA_LONG)
   actual val customGeometrySourceOptionsFetchTile: Long =
     Ffm.upcall("customGeometrySourceOptionsFetchTile", null, JAVA_LONG, mln_canonical_tile_id)
   actual val customGeometrySourceOptionsCancelTile: Long =
@@ -25,6 +23,8 @@ internal actual object UpcallStubs {
     Ffm.upcall("resourceProviderCallback", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   actual val resourceTransformCallback: Long =
     Ffm.upcall("resourceTransformCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
+  actual val resourceRequestCancelHandlerCallback: Long =
+    Ffm.upcall("resourceRequestCancelHandlerCallback", null, JAVA_LONG)
   actual val wakeCallback: Long = Ffm.upcall("wakeCallback", null, JAVA_LONG)
   actual val queueLockLock: Long = Ffm.upcall("queueLockLock", null, JAVA_LONG)
   actual val queueLockUnlock: Long = Ffm.upcall("queueLockUnlock", null, JAVA_LONG)

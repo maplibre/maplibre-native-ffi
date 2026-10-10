@@ -180,16 +180,18 @@ func (f *fixture) awaitEvent(t *testing.T, what string, match func(RuntimeEvent)
 		if err != nil {
 			t.Fatalf("DrainEvents: %v", err)
 		}
-		view, err := batch.Get()
-		if err != nil {
-			t.Fatalf("event batch: %v", err)
-		}
-		if err := batch.Close(); err != nil {
-			t.Fatalf("event batch close: %v", err)
-		}
-		for _, event := range view.Events {
-			if match(event) {
-				return event
+		if batch != nil {
+			view, err := batch.Get()
+			if err != nil {
+				t.Fatalf("event batch: %v", err)
+			}
+			if err := batch.Close(); err != nil {
+				t.Fatalf("event batch close: %v", err)
+			}
+			for _, event := range view.Events {
+				if match(event) {
+					return event
+				}
 			}
 		}
 		select {

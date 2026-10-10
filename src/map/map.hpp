@@ -111,9 +111,7 @@ auto deliver_style_result(
   } else if constexpr (std::is_same_v<Type, mln_style_source_result>) {
     const auto tile_urls = views(result.strings);
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_result),
-                   .reserved = 0,
-                   .info = result.source_info,
+      descriptor, {.info = result.source_info,
                    .attribution = view(result.attribution),
                    .url = view(result.url),
                    .tile_urls = tile_urls.data(),
@@ -124,18 +122,15 @@ auto deliver_style_result(
   ) {
     const auto tile_urls = views(result.strings);
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_tile_urls_result),
-                   .reserved = 0,
-                   .tile_urls = tile_urls.data(),
-                   .tile_url_count = tile_urls.size()}
+      descriptor,
+      {.tile_urls = tile_urls.data(), .tile_url_count = tile_urls.size()}
     );
   } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
     auto layers = std::vector<mln_style_layer_entry>{};
     layers.reserve(result.layers.size());
     for (const auto& entry : result.layers) {
       layers.push_back(
-        {.size = sizeof(mln_style_layer_entry),
-         .id = view(entry.id),
+        {.id = view(entry.id),
          .type = view(entry.type),
          .source_id = view(entry.source_id),
          .source_layer = view(entry.source_layer)}
@@ -144,17 +139,13 @@ auto deliver_style_result(
     Value::deliver(descriptor, layers);
   } else if constexpr (std::is_same_v<Type, mln_style_layer_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_layer_result),
-                   .reserved = 0,
-                   .info = result.layer_info,
+      descriptor, {.info = result.layer_info,
                    .source_id = view(result.source_id),
                    .source_layer = view(result.source_layer)}
     );
   } else if constexpr (std::is_same_v<Type, mln_style_image_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_result),
-                   .reserved = 0,
-                   .info = result.image_info,
+      descriptor, {.info = result.image_info,
                    .pixels = view(result.bytes),
                    .stretch_x = result.stretch_x.data(),
                    .stretch_x_count = result.stretch_x.size(),
@@ -163,9 +154,7 @@ auto deliver_style_result(
     );
   } else if constexpr (std::is_same_v<Type, mln_style_image_stretches_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_stretches_result),
-                   .reserved = 0,
-                   .stretch_x = result.stretch_x.data(),
+      descriptor, {.stretch_x = result.stretch_x.data(),
                    .stretch_x_count = result.stretch_x.size(),
                    .stretch_y = result.stretch_y.data(),
                    .stretch_y_count = result.stretch_y.size()}
@@ -443,22 +432,27 @@ auto map_list_style_layer_ids(
 auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
+// Writes the layer's style JSON, or sets out_found false when the style has no
+// such layer.
 auto map_get_style_layer_json(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
-  bool* out_found
-) -> mln_status;
+  MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
+  bool& out_found
+) -> void;
 auto map_set_global_state_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
-auto map_get_global_state(MapObject& live, mln_buffer* out_state) -> mln_status;
+auto map_get_global_state(MapObject& live) -> std::string;
 
 auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
   -> mln_status;
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
+// Writes the property's JSON, or sets out_found false when the property is
+// unset.
 auto map_get_style_light_property(
-  MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
 ) -> mln_status;
 auto map_set_style_transition_options(
   MapObject& live, const mln_style_transition_options* options
@@ -470,15 +464,20 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status;
+// Writes the property's JSON, or sets out_found false when the property is
+// unset.
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer* out_value
+  std::string& out_value, bool& out_found
 ) -> mln_status;
 auto map_set_layer_filter(
   MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status;
+// Writes the filter's JSON, or sets out_found false when the layer has no
+// filter.
 auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
+  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
+  bool& out_found
 ) -> mln_status;
 auto map_set_layer_source_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer

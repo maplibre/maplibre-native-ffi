@@ -448,12 +448,14 @@ mln_status mln_test_drain_events(
   mln_event_batch batch = MLN_HANDLE_NULL;
   mln_status status =
     mln_runtime_drain_events(runtime, &batch, MLN_TEST_DIAGNOSTIC);
+  if (status == MLN_STATUS_NOT_READY) {
+    *out_batch = mln_test_event_batch_default();
+    return MLN_STATUS_OK;
+  }
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
+  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
   status = mln_event_batch_get(batch, &view, MLN_TEST_DIAGNOSTIC);
   if (status != MLN_STATUS_OK) {
     mln_event_batch_release(batch);

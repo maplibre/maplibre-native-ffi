@@ -101,13 +101,18 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_drain_events` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn drain_events(&self) -> Result<EventBatchHandle> {
+    pub fn drain_events(&self) -> Result<Option<EventBatchHandle>> {
         let mut call = self.inner.call("mln_runtime_drain_events")?;
         let mut out_batch = sys::mln_event_batch(0);
-        call.status(|runtime, out_diagnostic| unsafe {
-            sys::mln_runtime_drain_events(runtime, &mut out_batch, out_diagnostic)
-        })?;
-        Ok(EventBatchHandle::adopt(out_batch, None)?)
+        if !call.status_unless(
+            sys::MLN_STATUS_NOT_READY,
+            |runtime, out_diagnostic| unsafe {
+                sys::mln_runtime_drain_events(runtime, &mut out_batch, out_diagnostic)
+            },
+        )? {
+            return Ok(None);
+        }
+        Ok(Some(EventBatchHandle::adopt(out_batch, None)?))
     }
 
     /// Reports which runtime-scoped event types this runtime queues.

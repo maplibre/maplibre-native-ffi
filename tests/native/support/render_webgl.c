@@ -85,11 +85,9 @@ static bool create_backend_state(void** out_state, void* out_context) {
     }
     *(mln_opengl_context_descriptor*)out_context =
       (mln_opengl_context_descriptor){
-        .size = sizeof(mln_opengl_context_descriptor),
         .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
         .data = {
           .webgl = {
-            .size = sizeof(mln_webgl_context_descriptor),
             .context = state->context,
           }
         },
@@ -144,11 +142,9 @@ static bool create_backend_state(void** out_state, void* out_context) {
 
   *(mln_opengl_context_descriptor*)out_context =
     (mln_opengl_context_descriptor){
-      .size = sizeof(mln_opengl_context_descriptor),
       .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
       .data = {
         .webgl = {
-          .size = sizeof(mln_webgl_context_descriptor),
           .context = state->context,
         }
       },
@@ -232,7 +228,6 @@ bool mln_test_transferred_webgl_surface_create(
   descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.webgl = (mln_webgl_context_descriptor){
-    .size = sizeof(mln_webgl_context_descriptor),
     .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
     .canvas_selector = mln_test_buffer_view(target, strlen(target)),
   };
@@ -240,14 +235,10 @@ bool mln_test_transferred_webgl_surface_create(
     mln_render_session_attach_options_default();
   options.driver = fixture->driver;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
-    .callback = mln_test_render_count_wake,
-    .user_data = &fixture->frame_wakes
+    .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes
   };
   options.driver_work_wake = (mln_wake){
-    .size = sizeof(mln_wake),
-    .callback = mln_test_render_count_wake,
-    .user_data = &fixture->driver_wakes
+    .callback = mln_test_render_count_wake, .user_data = &fixture->driver_wakes
   };
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status = mln_opengl_surface_attach(

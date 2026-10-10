@@ -8,8 +8,8 @@ static mln_camera_options test_camera(void) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-  camera.latitude = 37.7749;
-  camera.longitude = -122.4194;
+  camera.center.latitude = 37.7749;
+  camera.center.longitude = -122.4194;
   camera.zoom = 11.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;
@@ -55,7 +55,7 @@ static mln_camera_options query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
   MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
-  mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
+  mln_camera_query_result result = {0};
   MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))
   );

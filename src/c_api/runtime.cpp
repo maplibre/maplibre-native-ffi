@@ -12,12 +12,10 @@
 auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
   return mln_runtime_options{
     .size = sizeof(mln_runtime_options),
-    .flags = 0,
     .asset_path = nullptr,
     .cache_path = nullptr,
     .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
     .event_wake = mln_wake{
-      .size = sizeof(mln_wake),
       .callback = nullptr,
       .user_data = nullptr,
       .release_user_data = nullptr,
@@ -72,13 +70,12 @@ auto mln_resource_request_cancelled(
 
 auto mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data,
-  mln_runtime_callback_release release_user_data, bool* out_cancelled,
+  const mln_resource_request_cancel_handler* handler, bool* out_cancelled,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::set_resource_request_cancel_callback(
-      handle, callback, user_data, release_user_data, out_cancelled
+      handle, handler, out_cancelled
     );
   });
 }
@@ -317,7 +314,7 @@ auto mln_runtime_drain_events(
 }
 
 auto mln_event_batch_get(
-  mln_event_batch batch, mln_runtime_event_batch_view* out_view,
+  mln_event_batch batch, mln_event_batch_view* out_view,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

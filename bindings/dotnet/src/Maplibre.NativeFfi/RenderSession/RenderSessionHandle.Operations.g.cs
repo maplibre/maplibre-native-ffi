@@ -449,8 +449,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Starts a source-feature query against the session's latest driver state.
-    /// The completion borrows an array of <c>mln_queried_feature</c> values
-    /// (value_count entries), valid only for the callback.
+    /// The completion borrows value_count <c>mln_queried_feature</c> values,
+    /// value_size bytes apart, valid only for the callback.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_query_source_features</c> in the <see

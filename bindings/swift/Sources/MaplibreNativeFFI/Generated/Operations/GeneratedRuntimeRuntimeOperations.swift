@@ -77,15 +77,16 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_drain_events` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func drainEvents() throws -> EventBatchHandle {
+  func drainEvents() throws -> EventBatchHandle? {
     var value0: mln_event_batch = 0
-    return try nativeInvoke("mln_runtime_drain_events") { raw, _, diagnostic in
-      mln_runtime_drain_events(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try EventBatchHandle(adopting: value0) }
+    return try nativeInvoke(
+      "mln_runtime_drain_events",
+      absentOn: MLN_STATUS_NOT_READY
+    ) { raw, _, diagnostic in
+      mln_runtime_drain_events(raw, &value0, diagnostic)
+    } result: {
+      try EventBatchHandle(adopting: value0)
+    }
   }
 
   /// Reports which runtime-scoped event types this runtime queues.

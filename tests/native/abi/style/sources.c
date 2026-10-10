@@ -226,14 +226,16 @@ static void tile_sources_report_their_effective_options(void) {
       expected.tile_size, info->tile_size, label
     );
     if ((info->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tile_count, label);
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tilejson.tile_count, label);
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        expected.min_zoom, info->min_zoom, label
+        expected.min_zoom, info->tilejson.min_zoom, label
       );
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        expected.max_zoom, info->max_zoom, label
+        expected.max_zoom, info->tilejson.max_zoom, label
       );
-      TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected.scheme, info->scheme, label);
+      TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+        expected.scheme, info->tilejson.scheme, label
+      );
     }
     if ((info->fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
       TEST_ASSERT_EQUAL_MEMORY_MESSAGE(
@@ -435,7 +437,7 @@ static void sources_copy_their_url_and_attribution(void) {
   TEST_ASSERT_EQUAL_STRING("Fixture tiles", text);
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "inline", &result));
-  TEST_ASSERT_TRUE(result.info.has_attribution);
+  TEST_ASSERT_BITS_HIGH(MLN_STYLE_SOURCE_INFO_ATTRIBUTION, result.info.fields);
   TEST_ASSERT_EQUAL_size_t(strlen(text), result.info.attribution_size);
 
   TEST_ASSERT_FALSE(read_source_text(map, "inline", false, text));

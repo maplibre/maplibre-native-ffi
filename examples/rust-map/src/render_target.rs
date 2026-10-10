@@ -216,13 +216,12 @@ impl Session {
         let Some(batch) = self.session.drain_frame_results()? else {
             return Ok(FrameResults::default());
         };
-        let count = batch.count()?;
+        let view = batch.get()?;
         let mut results = FrameResults {
-            any: count > 0,
+            any: !view.results.is_empty(),
             ..FrameResults::default()
         };
-        for index in 0..count {
-            let result = batch.get(index)?;
+        for result in view.results {
             // No update and size pending wait for the map's next update,
             // superseded demands have a newer one behind them, and no demand
             // carries a timeout.

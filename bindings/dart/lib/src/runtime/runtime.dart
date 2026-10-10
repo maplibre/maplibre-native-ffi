@@ -200,8 +200,13 @@ void Function(dynamic) _callbackPortHandler(
 
 /// Decodes a synthetic native batch through the production generated converter.
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
-  raw.mln_runtime_event_batch_view batch,
-) => _readRuntimeEventBatchView(batch).events;
+  raw.mln_event_batch_view batch,
+) => _readEventBatchView(batch).events;
+
+/// Decodes a synthetic array completion of coordinates through the production
+/// element reader.
+List<LatLng> decodeLatLngListForTesting(raw.mln_completion_result result) =>
+    _resultLatLng.readList(result);
 
 /// Starts a command and decodes its receipt, including failed dispositions.
 Future<CommandCompletion> _startCommand(
@@ -209,7 +214,6 @@ Future<CommandCompletion> _startCommand(
   void Function()? onRejected,
 }) => startNativeCompletion(
   copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-  elementSize: 0,
   start: start,
   onRejected: onRejected,
   acceptErrorStatus: true,

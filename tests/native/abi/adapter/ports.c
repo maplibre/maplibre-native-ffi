@@ -174,14 +174,16 @@ static mln_adapter_completion_record* post_map_record(
 ) {
   mln_completion completion = {0};
   MLN_TEST_OK(mln_adapter_dart_completion_create(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
-    31, &completion, NULL
+    MLN_ADAPTER_COMPLETION_COPY_MAP, fake_post_address(), 23, 31, &completion,
+    NULL
   ));
   MLN_TEST_OK(mln_map_create(runtime, NULL, &completion, NULL));
   mln_adapter_completion_record* record =
     assert_pointer_message(0, 23, 31, out_finalizer);
   MLN_TEST_OK(record->result.status);
   TEST_ASSERT_EQUAL_size_t(1, record->result.value_count);
+  // The copy keeps the native stride, which the Dart decoder indexes with.
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_map), record->result.value_size);
   *out_map = *(const mln_map*)record->result.value;
   TEST_ASSERT_TRUE(mln_test_adapter_map_is_live(*out_map));
   return record;
@@ -223,15 +225,15 @@ static void a_rejected_dart_completion_posts_nothing(void) {
   reset_posts(true);
   mln_completion completion = {0};
   MLN_TEST_INVALID(mln_adapter_dart_completion_create(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), NULL, 23, 31, &completion,
+    MLN_ADAPTER_COMPLETION_COPY_MAP, NULL, 23, 31, &completion,
     MLN_TEST_DIAGNOSTIC
   ));
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "Dart receive port"), mln_test_last_error()
   );
   MLN_TEST_OK(mln_adapter_dart_completion_create(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
-    31, &completion, NULL
+    MLN_ADAPTER_COMPLETION_COPY_MAP, fake_post_address(), 23, 31, &completion,
+    NULL
   ));
   MLN_TEST_INVALID(mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL));
   mln_adapter_completion_reject(&completion);
@@ -360,7 +362,7 @@ static void dart_notification_ports_post_copied_arguments_until_released(void) {
     MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE
   );
   TEST_ASSERT_NOT_NULL(address);
-  mln_custom_geometry_source_tile_callback fetch_tile = NULL;
+  mln_custom_source_tile_callback fetch_tile = NULL;
   memcpy(&fetch_tile, &address, sizeof(fetch_tile));
 
   fetch_tile(context, (mln_canonical_tile_id){.z = 5, .x = 7, .y = 9});

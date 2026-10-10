@@ -5,6 +5,7 @@
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
 
+#include "support/frames.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
@@ -133,14 +134,13 @@ static uint32_t render_frame(
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
   );
-  size_t count = 0;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   uint32_t disposition = UINT32_MAX;
-  for (size_t index = 0; index < count; index += 1) {
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
-    if (result.token == demand.token) {
-      disposition = result.disposition;
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    const mln_render_frame_result* result =
+      mln_test_render_view_result(&view, index);
+    if (result->token == demand.token) {
+      disposition = result->disposition;
     }
   }
   mln_render_frame_batch_release(batch);

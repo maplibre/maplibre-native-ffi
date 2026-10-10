@@ -109,7 +109,7 @@ internal class OwnedTextureFixture(
 
   private fun drainResults(): List<RenderFrameResult> {
     val batch = session.drainFrameResults() ?: return emptyList()
-    return batch.use { owner -> List(owner.count().toInt()) { owner.get(it.toULong()) } }
+    return batch.use { it.get().results }
   }
 
   /**

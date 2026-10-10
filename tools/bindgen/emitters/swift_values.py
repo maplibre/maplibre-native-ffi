@@ -109,9 +109,6 @@ class Values:
                     [f"Swift: {value.native}: variant requires tag decoding"]
                 )
             self.add(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.add(self.bound.values[group.type])
         self.used[value.native] = value
 
     def copy(self, value, expression):
@@ -158,9 +155,7 @@ class Values:
         fields, init, assignments, captures, materialize = [], [], [], [], []
         for field in value.fields:
             if field.role == "presence_mask":
-                materialize.append(
-                    f"    raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'}"
-                )
+                materialize.append(f"    raw.{field.name} = 0")
         for flag in value.mask_flags:
             local = identifier(camel(flag.member))
             fields.append(
@@ -174,36 +169,6 @@ class Values:
             materialize.append(
                 f"    if {local} {{ raw.{flag.mask} |= {flag.name}.rawValue }}"
             )
-        grouped = {
-            name
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
-        for group in value.presence_groups:
-            if len(group.fields) == 1:
-                continue
-            child = self.bound.values[group.type]
-            local = identifier(camel(group.member))
-            fields.append(f"  public var {local}: {self.public(child)}?")
-            init.append(f"{local}: {self.public(child)}? = {public}.default.{local}")
-            assignments.append(f"    self.{local} = {local}")
-            members = {field.name: field for field in value.fields}
-            constructor = ", ".join(
-                f"{identifier(camel(field))}: {self.copy(members[field].value, 'raw.' + identifier(field))}"
-                for field in group.fields
-            )
-            captures.append(
-                f"    self.{local} = raw.{identifier(group.mask)} & {group.bit}.rawValue != 0 ? {self.public(child)}({constructor}) : nil"
-            )
-            materialize.append(
-                f"    if let item = {local} {{ raw.{identifier(group.mask)} |= {group.bit}.rawValue; "
-                + "; ".join(
-                    f"raw.{identifier(field)} = {self.native(members[field].value, 'item.' + identifier(camel(field)))}"
-                    for field in group.fields
-                )
-                + " }"
-            )
         for field in value.fields:
             local, raw = identifier(camel(field.name)), "raw." + identifier(field.name)
             if field.role == "size":
@@ -212,7 +177,7 @@ class Values:
                         f"    {raw} = UInt32(MemoryLayout<{value.native}>.size)"
                     )
                 continue
-            if not field.public or field.name in grouped:
+            if not field.public:
                 continue
             optional = field.presence and field.presence.mask
             field_type = self.public(field.value)
@@ -226,10 +191,8 @@ class Values:
             capture = self.copy(field.value, raw)
             if optional:
                 mask, bit = identifier(field.presence.mask), field.presence.bit
-                present = f"raw.{mask} & {bit}.rawValue != 0" if bit else f"raw.{mask}"
-                set_presence = (
-                    f"raw.{mask} |= {bit}.rawValue" if bit else f"raw.{mask} = true"
-                )
+                present = f"raw.{mask} & {bit}.rawValue != 0"
+                set_presence = f"raw.{mask} |= {bit}.rawValue"
                 captures.append(f"    self.{local} = {present} ? {capture} : nil")
                 materialize.append(
                     f"    if let item = self.{local} {{ {set_presence}; {raw} = {self.native(field.value, 'item')} }}"

@@ -225,10 +225,7 @@ internal sealed class RenderFixture : IDisposable
         using var batch = Session.DrainFrameResults();
         if (batch is null)
             return [];
-        var results = new RenderFrameResult[checked((int)batch.Count())];
-        for (var index = 0; index < results.Length; index++)
-            results[index] = batch.Get((ulong)index);
-        return results;
+        return batch.Get().Results;
     }
 
     private RenderSessionHandle Attach()

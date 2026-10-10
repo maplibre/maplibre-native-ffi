@@ -85,16 +85,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_bound_options mln_bound_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_buffer_destroy(MlnBuffer buffer);
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_buffer_get(
-        MlnBuffer buffer,
-        mln_buffer_view* out_view,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_c_version();
 
     [LibraryImport(LibraryName)]
@@ -118,7 +108,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_event_batch_get(
         MlnEventBatch batch,
-        mln_runtime_event_batch_view* out_view,
+        mln_event_batch_view* out_view,
         mln_diagnostic* out_diagnostic
     );
 
@@ -176,9 +166,7 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_log_set_callback(
-        delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback,
-        void* user_data,
-        delegate* unmanaged[Cdecl]<void*, void> release_user_data,
+        mln_log_handler* handler,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1348,17 +1336,9 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_projection_mode mln_projection_mode_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_frame_batch_count(
-        MlnRenderFrameBatch batch,
-        nuint* out_count,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_frame_batch_get(
         MlnRenderFrameBatch batch,
-        nuint index,
-        mln_render_frame_result* out_result,
+        mln_render_frame_batch_view* out_view,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1557,9 +1537,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_request_set_cancel_callback(
         MlnResourceRequest handle,
-        delegate* unmanaged[Cdecl]<void*, void> callback,
-        void* user_data,
-        delegate* unmanaged[Cdecl]<void*, void> release_user_data,
+        mln_resource_request_cancel_handler* handler,
         bool* out_cancelled,
         mln_diagnostic* out_diagnostic
     );
@@ -1779,9 +1757,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_source_feature_query_options mln_source_feature_query_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_style_image_info mln_style_image_info_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_style_image_options mln_style_image_options_default();
 
     [LibraryImport(LibraryName)]
@@ -1792,9 +1767,6 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial uint mln_supported_render_backend_mask();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_texture_image_info mln_texture_image_info_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_texture_read_premultiplied_rgba8(

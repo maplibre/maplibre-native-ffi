@@ -89,7 +89,6 @@ func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOff
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, C.mln_runtime_event_offline_region_status{
 		region_id: C.mln_offline_region_id(payload.RegionId),
 		status: C.mln_offline_region_status{
-			size:                 C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
 			download_state:       C.uint32_t(payload.Status.DownloadState),
 			completed_tile_count: C.uint64_t(payload.Status.CompletedTileCount),
 			complete:             C.bool(payload.Status.Complete),
@@ -149,8 +148,8 @@ func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []Runtime
 		messages = C.CBytes(arena)
 		defer C.free(messages)
 	}
-	return copyRuntimeEventBatchView(C.mln_runtime_event_batch_view{
-		size:          C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
+	return copyEventBatchView(C.mln_event_batch_view{
+		size:          C.uint32_t(unsafe.Sizeof(C.mln_event_batch_view{})),
 		event_size:    C.uint32_t(stride),
 		events:        (*C.mln_runtime_event)(storage),
 		event_count:   C.size_t(len(events)),
@@ -180,6 +179,31 @@ func int32CompletionForTest(convert func(int32) (int32, error)) (*Future[int32],
 		bridge.complete(&result)
 	}
 	return &Future[int32]{state: state}, deliver
+}
+
+// latLngArrayCompletionForTest delivers points to the decoder of an array
+// result as native lays them out, with value_size widen bytes wider than this
+// binding's mln_lat_lng, and returns the future that the decoded copy
+// completes. A negative widen narrows the stride.
+func latLngArrayCompletionForTest(widen int, points []LatLng) *Future[[]LatLng] {
+	stride := uintptr(int(unsafe.Sizeof(C.mln_lat_lng{})) + widen)
+	state := &futureState[[]LatLng]{ready: make(chan struct{})}
+	bridge := &completionBridge[[]LatLng]{state: state, convert: completionListOf(copyLatLng)}
+	elements := C.calloc(C.size_t(len(points)), C.size_t(max(stride, unsafe.Sizeof(C.mln_lat_lng{}))))
+	defer C.free(elements)
+	for i, point := range points {
+		*(*C.mln_lat_lng)(unsafe.Add(elements, uintptr(i)*stride)) = C.mln_lat_lng{
+			latitude:  C.double(point.Latitude),
+			longitude: C.double(point.Longitude),
+		}
+	}
+	bridge.complete(&C.mln_completion_result{
+		status:      C.MLN_STATUS_OK,
+		value:       elements,
+		value_count: C.size_t(len(points)),
+		value_size:  C.uint32_t(stride),
+	})
+	return &Future[[]LatLng]{state: state}
 }
 
 // rejectedSubmissionForTest starts a completion that native refuses, and

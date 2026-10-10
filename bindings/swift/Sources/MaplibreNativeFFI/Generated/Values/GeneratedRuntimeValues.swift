@@ -35,6 +35,46 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let animated: CameraChangeMode = .init(rawValue: 1)
 }
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct EventBatchView: Equatable, Hashable, Sendable {
+  /// Borrowed array of event_count events in queue order.
+  public var events: [RuntimeEvent]
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(events: [RuntimeEvent] = []) {
+    self.events = events
+  }
+
+  init(
+    raw: mln_event_batch_view,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    events = try NativeInputArena.copyStrided(
+      raw.events,
+      count: raw.event_count,
+      stride: raw.event_size
+    ) { item, bytes in try RuntimeEvent(
+      raw: item,
+      recordBytes: bytes,
+      message: NativeInputArena.copyUTF8Slice(
+        data: raw.messages,
+        size: raw.messages_size,
+        offset: item.message_offset,
+        length: item.message_size
+      )
+    ) }
+  }
+
+  func nativeValue(arena _: NativeInputArena) throws -> mln_event_batch_view {
+    throw NativeStringError("borrowed arena snapshots cannot be submitted")
+  }
+}
+
 public struct HttpHeaderTransform: Sendable {
   public var callback: (@Sendable (
     ResourceKind,
@@ -209,7 +249,6 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_offline_region_status {
     var raw = mln_offline_region_status()
-    raw.size = UInt32(MemoryLayout<mln_offline_region_status>.size)
     raw.download_state = downloadState.rawValue
     raw.completed_resource_count = completedResourceCount
     raw.completed_resource_size = completedResourceSize
@@ -432,17 +471,41 @@ public struct ResourceProviderDecision: RawRepresentable, NativeOpenValue,
   public static let handle: ResourceProviderDecision = .init(rawValue: 1)
 }
 
-public struct ResourceRequestRange: Equatable, Hashable, Sendable {
-  public var rangeStart: UInt64
-  public var rangeEnd: UInt64
-  public init(rangeStart: UInt64, rangeEnd: UInt64) {
-    self.rangeStart = rangeStart
-    self.rangeEnd = rangeEnd
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRange: Equatable, Hashable, Sendable {
+  /// First byte offset of the requested range.
+  public var start: UInt64
+  /// Last byte offset of the requested range, inclusive.
+  public var end: UInt64
+  public static var `default`: Self {
+    Self(raw: mln_resource_range())
+  }
+
+  public init(
+    start: UInt64 = ResourceRange.default.start,
+    end: UInt64 = ResourceRange.default.end
+  ) {
+    self.start = start
+    self.end = end
+  }
+
+  init(raw: mln_resource_range) {
+    start = raw.start
+    end = raw.end
+  }
+
+  func nativeValue() -> mln_resource_range {
+    var raw = mln_resource_range()
+    raw.start = start
+    raw.end = end
+    return raw
   }
 }
 
 public struct ResourceRequest: Equatable, Hashable, Sendable {
-  public var range: ResourceRequestRange?
   /// URL entering the network layer, before tile server normalization.
   public var requestedUrl: String?
   /// URL to fetch, after resource-kind normalization against the runtime's tile
@@ -453,6 +516,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   public var priority: ResourcePriority
   public var usage: ResourceUsage
   public var storagePolicy: ResourceStoragePolicy
+  public var range: ResourceRange?
   public var priorModifiedUnixMs: Int64?
   public var priorExpiresUnixMs: Int64?
   public var priorEtag: String?
@@ -462,7 +526,6 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   }
 
   public init(
-    range: ResourceRequestRange? = nil,
     requestedUrl: String? = nil,
     resolvedUrl: String? = nil,
     kind: ResourceKind = .init(rawValue: 0),
@@ -470,12 +533,12 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     priority: ResourcePriority = .init(rawValue: 0),
     usage: ResourceUsage = .init(rawValue: 0),
     storagePolicy: ResourceStoragePolicy = .init(rawValue: 0),
+    range: ResourceRange? = nil,
     priorModifiedUnixMs: Int64? = nil,
     priorExpiresUnixMs: Int64? = nil,
     priorEtag: String? = nil,
     priorData: Data = Data()
   ) {
-    self.range = range
     self.requestedUrl = requestedUrl
     self.resolvedUrl = resolvedUrl
     self.kind = kind
@@ -483,6 +546,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     self.priority = priority
     self.usage = usage
     self.storagePolicy = storagePolicy
+    self.range = range
     self.priorModifiedUnixMs = priorModifiedUnixMs
     self.priorExpiresUnixMs = priorExpiresUnixMs
     self.priorEtag = priorEtag
@@ -493,10 +557,6 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw: mln_resource_request,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    range = raw.has_range ? ResourceRequestRange(
-      rangeStart: raw.range_start,
-      rangeEnd: raw.range_end
-    ) : nil
     requestedUrl = raw.requested_url == nil ? nil : try NativeString
       .copyCString(raw.requested_url)
     resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
@@ -506,9 +566,12 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     priority = ResourcePriority(rawValue: raw.priority)
     usage = ResourceUsage(rawValue: raw.usage)
     storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
-    priorModifiedUnixMs = raw.has_prior_modified ? raw
-      .prior_modified_unix_ms : nil
-    priorExpiresUnixMs = raw.has_prior_expires ? raw.prior_expires_unix_ms : nil
+    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
+      .rawValue != 0 ? ResourceRange(raw: raw.range) : nil
+    priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
+      .rawValue != 0 ? raw.prior_modified_unix_ms : nil
+    priorExpiresUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
+      .rawValue != 0 ? raw.prior_expires_unix_ms : nil
     priorEtag = raw.prior_etag == nil ? nil : try NativeString
       .copyCString(raw.prior_etag)
     priorData = try NativeString.copyData(
@@ -519,13 +582,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_request {
     var raw = mln_resource_request()
-    raw.has_range = false
-    raw.has_prior_modified = false
-    raw.has_prior_expires = false
-    if let item = range {
-      raw.has_range = true; raw.range_start = item.rangeStart; raw
-        .range_end = item.rangeEnd
-    }
+    raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_resource_request>.size)
     raw.requested_url = try requestedUrl.map { try arena.cString($0) }
     raw.resolved_url = try resolvedUrl.map { try arena.cString($0) }
@@ -534,11 +591,17 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw.priority = priority.rawValue
     raw.usage = usage.rawValue
     raw.storage_policy = storagePolicy.rawValue
+    if let item = range {
+      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range = item
+        .nativeValue()
+    }
     if let item = priorModifiedUnixMs {
-      raw.has_prior_modified = true; raw.prior_modified_unix_ms = item
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
+        .prior_modified_unix_ms = item
     }
     if let item = priorExpiresUnixMs {
-      raw.has_prior_expires = true; raw.prior_expires_unix_ms = item
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES.rawValue; raw
+        .prior_expires_unix_ms = item
     }
     raw.prior_etag = try priorEtag.map { try arena.cString($0) }
     raw.prior_data = arena.view(priorData).data?
@@ -548,6 +611,92 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   }
 }
 
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRequestCancelHandler: Sendable {
+  public var callback: (@Sendable () throws -> Void)?
+  public init(callback: (@Sendable () throws -> Void)? = nil) {
+    self.callback = callback
+  }
+
+  public static var `default`: Self {
+    Self()
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_request_cancel_handler
+  {
+    var raw = mln_resource_request_cancel_handler()
+    raw.size = UInt32(MemoryLayout<mln_resource_request_cancel_handler>.size)
+    raw
+      .callback = callback == nil ? nil :
+      invokeResourceRequestCancelHandlerCallback
+    if callback != nil {
+      raw.user_data = arena.callback(NativeOwnedCallback(
+        owner: arena.receiver,
+        value: self
+      ))
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
+  "mln_resource_request_complete",
+  "mln_resource_request_cancelled",
+  "mln_resource_request_set_cancel_callback",
+  "mln_resource_request_release",
+]
+private func invokeResourceRequestCancelHandlerCallback(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box =
+    Unmanaged<
+      GeneratedCallbackBox<NativeOwnedCallback<ResourceRequestCancelHandler>>
+    >
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let receiver = box.value.owner else { return }
+  let admission = NativeCallbackGuard.enter(
+    owner: receiver,
+    operations: allowedResourceRequestCancelHandlerCallback
+  )
+  defer { admission.end() }
+  do { try box.value.value.callback?() } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_resource_request_cancel_callback",
+      error: error
+    ))
+  }
+}
+
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The request asks only for the bytes in range.
+  public static let range: ResourceRequestField = .init(rawValue: 1)
+  /// The cached copy being revalidated carries a modification time.
+  public static let priorModified: ResourceRequestField = .init(rawValue: 2)
+  /// The cached copy being revalidated carries an expiration time.
+  public static let priorExpires: ResourceRequestField = .init(rawValue: 4)
+}
+
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var status: ResourceResponseStatus
   public var errorReason: ResourceErrorReason
@@ -598,17 +747,18 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     errorMessage = raw.error_message == nil ? nil : try NativeString
       .copyCString(raw.error_message)
     mustRevalidate = raw.must_revalidate
-    modifiedUnixMs = raw.has_modified ? raw.modified_unix_ms : nil
-    expiresUnixMs = raw.has_expires ? raw.expires_unix_ms : nil
+    modifiedUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_MODIFIED
+      .rawValue != 0 ? raw.modified_unix_ms : nil
+    expiresUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_EXPIRES
+      .rawValue != 0 ? raw.expires_unix_ms : nil
     etag = raw.etag == nil ? nil : try NativeString.copyCString(raw.etag)
-    retryAfterUnixMs = raw.has_retry_after ? raw.retry_after_unix_ms : nil
+    retryAfterUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER
+      .rawValue != 0 ? raw.retry_after_unix_ms : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_response {
     var raw = mln_resource_response()
-    raw.has_modified = false
-    raw.has_expires = false
-    raw.has_retry_after = false
+    raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_resource_response>.size)
     raw.status = status.rawValue
     raw.error_reason = errorReason.rawValue
@@ -617,17 +767,40 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     raw.error_message = try errorMessage.map { try arena.cString($0) }
     raw.must_revalidate = mustRevalidate
     if let item = modifiedUnixMs {
-      raw.has_modified = true; raw.modified_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_MODIFIED.rawValue; raw
+        .modified_unix_ms = item
     }
     if let item = expiresUnixMs {
-      raw.has_expires = true; raw.expires_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_EXPIRES.rawValue; raw
+        .expires_unix_ms = item
     }
     raw.etag = try etag.map { try arena.cString($0) }
     if let item = retryAfterUnixMs {
-      raw.has_retry_after = true; raw.retry_after_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_RETRY_AFTER.rawValue; raw
+        .retry_after_unix_ms = item
     }
     return raw
   }
+}
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceResponseField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The response carries a modification time.
+  public static let modified: ResourceResponseField = .init(rawValue: 1)
+  /// The response carries an expiration time.
+  public static let expires: ResourceResponseField = .init(rawValue: 2)
+  /// An ERROR response carries the earliest time to retry the request.
+  public static let retryAfter: ResourceResponseField = .init(rawValue: 4)
 }
 
 /// How a resource provider answered a request.
@@ -848,48 +1021,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 }
 
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of event_count events in queue order.
-  public var events: [RuntimeEvent]
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(events: [RuntimeEvent] = []) {
-    self.events = events
-  }
-
-  init(
-    raw: mln_runtime_event_batch_view,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    events = try NativeInputArena.copyStrided(
-      raw.events,
-      count: raw.event_count,
-      stride: raw.event_size
-    ) { item, bytes in try RuntimeEvent(
-      raw: item,
-      recordBytes: bytes,
-      message: NativeInputArena.copyUTF8Slice(
-        data: raw.messages,
-        size: raw.messages_size,
-        offset: item.message_offset,
-        length: item.message_size
-      )
-    ) }
-  }
-
-  func nativeValue(arena _: NativeInputArena) throws
-    -> mln_runtime_event_batch_view
-  {
-    throw NativeStringError("borrowed arena snapshots cannot be submitted")
-  }
-}
-
 /// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
 ///
 /// See `mln_runtime_event_camera_transition_finished` in the
@@ -1020,8 +1151,6 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   public var regionId: Int64
-  /// Region status. This member keeps its own size field because the same
-  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
   public var status: OfflineRegionStatus
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_status())
@@ -1296,8 +1425,6 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Sendable {
-  /// No flags are currently defined. Must be zero.
-  public var flags: UInt32
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
   /// empty selects `/android_asset` on Android and `.` elsewhere.
   public var assetPath: String?
@@ -1313,13 +1440,11 @@ public struct RuntimeOptions: Sendable {
   }
 
   public init(
-    flags: UInt32 = RuntimeOptions.default.flags,
     assetPath: String? = RuntimeOptions.default.assetPath,
     cachePath: String? = RuntimeOptions.default.cachePath,
     eventMask: RuntimeEventMask = RuntimeOptions.default.eventMask,
     eventWake: Wake = RuntimeOptions.default.eventWake
   ) {
-    self.flags = flags
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.eventMask = eventMask
@@ -1330,7 +1455,6 @@ public struct RuntimeOptions: Sendable {
     raw: mln_runtime_options,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    flags = raw.flags
     assetPath = raw.asset_path == nil ? nil : try NativeString
       .copyCString(raw.asset_path)
     cachePath = raw.cache_path == nil ? nil : try NativeString
@@ -1342,7 +1466,6 @@ public struct RuntimeOptions: Sendable {
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
     var raw = mln_runtime_options_default()
     raw.size = UInt32(MemoryLayout<mln_runtime_options>.size)
-    raw.flags = flags
     raw.asset_path = try assetPath.map { try arena.cString($0) }
     raw.cache_path = try cachePath.map { try arena.cString($0) }
     raw.event_mask = eventMask.rawValue

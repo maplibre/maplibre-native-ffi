@@ -12,7 +12,6 @@
 
 #include "map/map.hpp"
 
-#include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"

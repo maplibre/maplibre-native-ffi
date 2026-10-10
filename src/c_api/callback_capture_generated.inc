@@ -14,11 +14,7 @@ auto capture_mln_camera_options(
   auto result = source;
   if ((source.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
   } else {
-    result.latitude = {};
-  }
-  if ((source.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
-  } else {
-    result.longitude = {};
+    result.center = {};
   }
   if ((source.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
   } else {
@@ -61,11 +57,7 @@ auto capture_mln_camera_query_result(
   auto result = source;
   if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
   } else {
-    result.camera.latitude = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
-  } else {
-    result.camera.longitude = {};
+    result.camera.center = {};
   }
   if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
   } else {
@@ -192,15 +184,15 @@ auto capture_mln_style_image_result(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_image_result source
 ) -> mln_style_image_result {
   auto result = source;
-  if (source.info.has_content) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_CONTENT) != 0) {
   } else {
     result.info.content = {};
   }
-  if (source.info.has_text_fit_width) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0) {
   } else {
     result.info.text_fit_width = {};
   }
-  if (source.info.has_text_fit_height) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0) {
   } else {
     result.info.text_fit_height = {};
   }
@@ -269,7 +261,7 @@ auto capture_mln_style_source_result(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_source_result source
 ) -> mln_style_source_result {
   auto result = source;
-  if (source.info.has_attribution) {
+  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
   } else {
     result.info.attribution_size = {};
   }
@@ -279,19 +271,7 @@ auto capture_mln_style_source_result(
   }
   if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
   } else {
-    result.info.tile_count = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.min_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.max_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.scheme = {};
+    result.info.tilejson = {};
   }
   if ((source.info.fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
   } else {
@@ -309,7 +289,7 @@ auto capture_mln_style_source_result(
   } else {
     result.info.raster_encoding = {};
   }
-  if (source.info.has_attribution) {
+  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
     result.attribution = buffer(arena, source.attribution);
   } else {
     result.attribution = {};
@@ -429,8 +409,7 @@ inline auto valid_kind(std::uint32_t kind) -> bool {
 }
 template <bool Writing>
 auto value(
-  Arena<Writing>& arena, const mln_completion_result& result,
-  std::uint32_t kind, std::size_t element_size
+  Arena<Writing>& arena, const mln_completion_result& result, std::uint32_t kind
 ) -> const void* {
   if (result.value_count == 0)
     return result.value == nullptr ? nullptr
@@ -440,12 +419,12 @@ auto value(
   switch (kind) {
     case MLN_ADAPTER_COMPLETION_COPY_FLAT: {
       if (
-        element_size == 0 ||
+        result.value_size == 0 ||
         result.value_count >
-          std::numeric_limits<std::size_t>::max() / element_size
+          std::numeric_limits<std::size_t>::max() / result.value_size
       )
-        throw std::invalid_argument{"invalid completion element size"};
-      const auto size = result.value_count * element_size;
+        throw std::invalid_argument{"invalid completion value size"};
+      const auto size = result.value_count * result.value_size;
       constexpr auto alignment = sizeof(std::max_align_t);
       const auto count = size / alignment + (size % alignment != 0);
       auto* target = arena.template allocate<std::max_align_t>(count);
@@ -627,10 +606,6 @@ inline auto dispose_owner(
       static_cast<mln_acquired_frame>(handle), nullptr
     );
   }
-  if (std::strcmp(native_type, "mln_buffer") == 0) {
-    mln_buffer_destroy(static_cast<mln_buffer>(handle));
-    return MLN_STATUS_OK;
-  }
   if (std::strcmp(native_type, "mln_event_batch") == 0) {
     mln_event_batch_release(static_cast<mln_event_batch>(handle));
     return MLN_STATUS_OK;
@@ -705,19 +680,15 @@ auto capture_mln_adapter_resource_provider_callback_arguments(
       auto copied_1 = element_1;
       copied_1.requested_url = string(arena, element_1.requested_url);
       copied_1.resolved_url = string(arena, element_1.resolved_url);
-      if (element_1.has_range) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
       } else {
-        copied_1.range_start = {};
+        copied_1.range = {};
       }
-      if (element_1.has_range) {
-      } else {
-        copied_1.range_end = {};
-      }
-      if (element_1.has_prior_modified) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0) {
       } else {
         copied_1.prior_modified_unix_ms = {};
       }
-      if (element_1.has_prior_expires) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0) {
       } else {
         copied_1.prior_expires_unix_ms = {};
       }

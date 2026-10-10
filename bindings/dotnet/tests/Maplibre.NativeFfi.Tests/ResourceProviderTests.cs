@@ -117,11 +117,10 @@ public sealed class ResourceProviderTests
         var request = new mln_resource_request
         {
             size = (uint)sizeof(mln_resource_request),
+            fields = mln_resource_request_field.MLN_RESOURCE_REQUEST_RANGE,
             requested_url = scope.CString(StyleUrl),
             resolved_url = scope.CString("provider-test://resolved/é"),
-            has_range = 1,
-            range_start = 0,
-            range_end = 7,
+            range = new mln_resource_range { start = 0, end = 7 },
             prior_data = (byte*)bytes.data,
             prior_data_size = bytes.size,
         };
@@ -147,7 +146,7 @@ public sealed class ResourceProviderTests
         ((byte*)bytes.data)[0] = 99;
         Assert.NotNull(copied);
         Assert.Equal(StyleUrl, copied.RequestedUrl);
-        Assert.Equal(new ResourceRequest.RangeValue(0, 7), copied.Range);
+        Assert.Equal(new ResourceRange(0, 7), copied.Range);
         Assert.Equal([1, 2, 3], copied.PriorData);
         Assert.NotNull(escaped);
         Assert.True(escaped.IsClosed);
@@ -214,7 +213,9 @@ public sealed class ResourceProviderTests
                 (_, handle) =>
                 {
                     escaped = handle;
-                    handle.SetCancelCallback(() => Interlocked.Increment(ref calls));
+                    handle.SetCancelCallback(
+                        new ResourceRequestCancelHandler(() => Interlocked.Increment(ref calls))
+                    );
                     return ResourceProviderDecision.PassThrough;
                 }
             )
@@ -285,11 +286,13 @@ public sealed class ResourceProviderTests
     )
     {
         var captured = new object();
-        var cancelled = handle.SetCancelCallback(() =>
-        {
-            GC.KeepAlive(captured);
-            onCancel();
-        });
+        var cancelled = handle.SetCancelCallback(
+            new ResourceRequestCancelHandler(() =>
+            {
+                GC.KeepAlive(captured);
+                onCancel();
+            })
+        );
         return (cancelled, new WeakReference(captured));
     }
 }

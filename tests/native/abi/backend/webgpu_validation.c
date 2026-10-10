@@ -23,16 +23,8 @@ static void surface_without_surface(void* call) {
 static void surface_without_format(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_surface.format = 0;
 }
-static void surface_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.webgpu_surface.context.size =
-    sizeof(mln_webgpu_context_descriptor) - 1;
-}
 static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_owned.context.device = NULL;
-}
-static void owned_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.webgpu_owned.context.size =
-    sizeof(mln_webgpu_context_descriptor) - 1;
 }
 static void borrowed_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_borrowed.context.device =
@@ -97,8 +89,6 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case surface_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(webgpu_surface),
     MLN_TEST_OVERFLOW_CASE(webgpu_surface),
-    {"undersized context", surface_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_webgpu_context_descriptor.size"},
     {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"unspecified format", surface_without_format, MLN_STATUS_INVALID_ARGUMENT,
@@ -119,8 +109,6 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case owned_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(webgpu_owned),
     MLN_TEST_OVERFLOW_CASE(webgpu_owned),
-    {"undersized context", owned_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_webgpu_context_descriptor.size"},
     {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,

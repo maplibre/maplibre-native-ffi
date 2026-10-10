@@ -176,6 +176,9 @@ func (state *runtimeMapState) drainRenderUpdates() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("runtime event drain failed: %w", err)
 	}
+	if batch == nil {
+		return false, nil
+	}
 	defer batch.Close()
 	events, err := batch.Get()
 	if err != nil {

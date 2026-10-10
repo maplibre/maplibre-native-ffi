@@ -105,7 +105,6 @@ void _closeIdleCompletionListener() {
 
 Future<T> startNativeCompletion<T>({
   required int copyKind,
-  required int elementSize,
   required NativeCompletionStart start,
   required NativeCompletionDecoder<T> decode,
   bool acceptErrorStatus = false,
@@ -128,7 +127,6 @@ Future<T> startNativeCompletion<T>({
       checkNativeCall(
         raw.mln_adapter_dart_completion_create(
           copyKind,
-          elementSize,
           NativeApi.postCObject.cast(),
           (_completionListener ??= _createCompletionListener())
               .sendPort

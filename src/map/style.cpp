@@ -81,7 +81,6 @@
 #include <mln/util/tileset.hpp>
 #include <mln/util/vectors.hpp>
 
-#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
@@ -716,7 +715,7 @@ auto to_c_canonical_tile_id(const mln::CanonicalTileID& tile_id)
 }
 
 auto to_native_tile_function(
-  mln_custom_geometry_source_tile_callback callback, void* user_data
+  mln_custom_source_tile_callback callback, void* user_data
 ) -> mln::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;
@@ -1168,8 +1167,16 @@ auto to_native_premultiplied_rgba8_image(
 auto style_image_info_from_native(const mln::style::Image& image)
   -> mln_style_image_info {
   const auto& pixels = image.getImage();
+  auto fields = std::uint32_t{0};
+  if (image.getContent().has_value()) fields |= MLN_STYLE_IMAGE_INFO_CONTENT;
+  if (image.getTextFitWidth().has_value()) {
+    fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;
+  }
+  if (image.getTextFitHeight().has_value()) {
+    fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;
+  }
   return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
+    .fields = fields,
     .width = pixels.size.width,
     .height = pixels.size.height,
     .stride = static_cast<uint32_t>(pixels.stride()),
@@ -1194,10 +1201,7 @@ auto style_image_info_from_native(const mln::style::Image& image)
         ? from_native_text_fit(*image.getTextFitHeight())
         : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
     .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf(),
-    .has_content = image.getContent().has_value(),
-    .has_text_fit_width = image.getTextFitWidth().has_value(),
-    .has_text_fit_height = image.getTextFitHeight().has_value()
+    .sdf = image.isSdf()
   };
 }
 
@@ -1470,7 +1474,7 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
 
 auto style_image_info_default() noexcept -> mln_style_image_info {
   return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
+    .fields = 0,
     .width = 0,
     .height = 0,
     .stride = 0,
@@ -1481,10 +1485,7 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
     .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .pixel_ratio = 1.0F,
-    .sdf = false,
-    .has_content = false,
-    .has_text_fit_width = false,
-    .has_text_fit_height = false
+    .sdf = false
   };
 }
 
@@ -1590,8 +1591,8 @@ auto map_get_style_source_info(
   MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_source_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -1603,7 +1604,6 @@ auto map_get_style_source_info(
     map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = source != nullptr;
   *out_info = mln_style_source_info{};
-  out_info->size = sizeof(mln_style_source_info);
   out_info->type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   if (source == nullptr) {
     return MLN_STATUS_OK;
@@ -1613,8 +1613,10 @@ auto map_get_style_source_info(
   out_info->type = to_c_source_type(source->getType());
   out_info->id_size = source->getID().size();
   out_info->is_volatile = source->isVolatile();
-  out_info->has_attribution = attribution.has_value();
-  out_info->attribution_size = attribution ? attribution->size() : 0;
+  if (attribution) {
+    out_info->fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+    out_info->attribution_size = attribution->size();
+  }
 
   const auto url = source_url(*source);
   if (url) {
@@ -1641,10 +1643,12 @@ auto map_get_style_source_info(
   }
 
   out_info->fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  out_info->tile_count = tileset->tiles.size();
-  out_info->min_zoom = tileset->zoomRange.min;
-  out_info->max_zoom = tileset->zoomRange.max;
-  out_info->scheme = to_c_tile_scheme(tileset->scheme);
+  out_info->tilejson = mln_style_source_tile_info{
+    .tile_count = tileset->tiles.size(),
+    .min_zoom = static_cast<double>(tileset->zoomRange.min),
+    .max_zoom = static_cast<double>(tileset->zoomRange.max),
+    .scheme = to_c_tile_scheme(tileset->scheme),
+  };
   if (tileset->bounds) {
     out_info->fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
     out_info->bounds = from_native_lat_lng_bounds(*tileset->bounds);
@@ -2410,8 +2414,8 @@ auto map_get_style_image_info(
   MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_image_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -2941,8 +2945,8 @@ auto map_get_style_layer_info(
   MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_layer_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -2954,7 +2958,6 @@ auto map_get_style_layer_info(
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   *out_found = layer != nullptr;
   *out_info = mln_style_layer_info{};
-  out_info->size = sizeof(mln_style_layer_info);
   if (layer == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -3021,27 +3024,15 @@ auto map_move_style_layer(
 }
 
 auto map_get_style_layer_json(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
-  bool* out_found
-) -> mln_status {
-  if (
-    out_layer == nullptr || *out_layer != MLN_HANDLE_NULL ||
-    out_found == nullptr
-  ) {
-    set_thread_error(
-      "out_layer must not be null, *out_layer must be the null handle, and "
-      "out_found must not be null"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
+  bool& out_found
+) -> void {
   const auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  *out_found = layer != nullptr;
-  if (layer == nullptr) {
-    return MLN_STATUS_OK;
+  out_found = layer != nullptr;
+  if (layer != nullptr) {
+    out_layer = serialize_json_value(layer->serialize());
   }
-  return create_buffer(serialize_json_value(layer->serialize()), out_layer);
 }
 
 auto map_set_global_state_property(
@@ -3060,13 +3051,9 @@ auto map_set_global_state_property(
   return MLN_STATUS_OK;
 }
 
-auto map_get_global_state(MapObject& live, mln_buffer* out_state)
-  -> mln_status {
-  return create_buffer(
-    serialize_json_value(
-      mln::Value{map_native(live).getStyle().getGlobalState()}
-    ),
-    out_state
+auto map_get_global_state(MapObject& live) -> std::string {
+  return serialize_json_value(
+    mln::Value{map_native(live).getStyle().getGlobalState()}
   );
 }
 
@@ -3119,15 +3106,10 @@ auto map_set_style_light_property(
 }
 
 auto map_get_style_light_property(
-  MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
 ) -> mln_status {
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  out_found = false;
   auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
     set_thread_error("style light does not exist");
@@ -3138,7 +3120,9 @@ auto map_get_style_light_property(
   if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
+  out_value = serialize_json_value(property.getValue());
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 auto map_set_style_transition_options(
@@ -3253,15 +3237,9 @@ auto map_set_layer_property(
 
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer* out_value
+  std::string& out_value, bool& out_found
 ) -> mln_status {
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  out_found = false;
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3273,7 +3251,9 @@ auto map_get_layer_property(
   if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
+  out_value = serialize_json_value(property.getValue());
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 auto map_set_layer_filter(
@@ -3301,15 +3281,10 @@ auto map_set_layer_filter(
 }
 
 auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
+  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
+  bool& out_found
 ) -> mln_status {
-  if (out_filter == nullptr || *out_filter != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_filter must not be null and *out_filter must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  out_found = false;
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3321,7 +3296,9 @@ auto map_get_layer_filter(
   if (filter.is<mln::NullValue>()) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(filter), out_filter);
+  out_filter = serialize_json_value(filter);
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 namespace {

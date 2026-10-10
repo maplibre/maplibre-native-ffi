@@ -32,16 +32,16 @@ checks the signature that each category requires. A function without a
 completion parameter is `immediate` unless it declares another synchronous
 category.
 
-| Execution       | Operation                                                      |
-| --------------- | -------------------------------------------------------------- |
-| `command`       | Mutates state; completes with a disposition and a generation   |
-| `query`         | Reads state; completes with a value                            |
-| `operation`     | Runs other asynchronous native work; completes with its result |
-| `lifecycle`     | Creates, attaches, or retires a handle                         |
-| `immediate`     | Returns its result synchronously                               |
-| `snapshot`      | Copies current state synchronously from a live handle          |
-| `event_batch`   | Drains queued events or frame results into an owned batch      |
-| `render_driver` | Services graphics work on the thread that the driver requires  |
+| Execution       | Operation                                                                         |
+| --------------- | --------------------------------------------------------------------------------- |
+| `command`       | Mutates state; completes with a disposition and a generation                      |
+| `query`         | Reads state; completes with a value                                               |
+| `operation`     | Runs other asynchronous native work; completes with its result                    |
+| `lifecycle`     | Creates, attaches, or retires a handle                                            |
+| `immediate`     | Returns its result synchronously                                                  |
+| `snapshot`      | Copies current state synchronously from a live handle                             |
+| `event_batch`   | Drains queued events or frame results into an owned batch, or reports none queued |
+| `render_driver` | Services graphics work on the thread that the driver requires                     |
 
 ## Follow the ABI rules
 
@@ -61,19 +61,50 @@ Each declaration follows these rules, which every binding relies on:
   value has that integer type and `MLN_BINDING("enum=<enum>")`, because native
   can write a value that an older binding does not know. An enum of flags that
   combine is `kind=bitmask`.
-- A struct that can grow begins with `uint32_t size`, and new members go at the
-  end. Native sets the size of each struct that it passes to a callback. For an
-  input struct, and for an output struct that the caller allocates, native
-  rejects a size below its own `sizeof` with `MLN_STATUS_INVALID_ARGUMENT` and
-  accepts a larger one. `mln_diagnostic` is the exception: native accepts any
-  size, writes no more than size bytes, and truncates the message to fit.
+- A struct is versioned by exactly one thing, and new members go at the end:
+  - A struct that a caller passes through a pointer, as an input or as an output
+    that the caller allocates, or that native passes by pointer as a callback
+    argument, begins with `uint32_t size`. Native sets the size of each struct
+    that it passes to a callback. For an input struct, and for an output struct
+    that the caller allocates, native rejects a size below its own `sizeof` with
+    `MLN_STATUS_INVALID_ARGUMENT` and accepts a larger one. `mln_diagnostic` is
+    the exception: native accepts any size, writes no more than size bytes, and
+    truncates the message to fit.
+  - A record that native only delivers in borrowed storage carries no size. The
+    stride of that storage versions it: `mln_completion_result.value_size` for a
+    completion value, and `event_size` or `result_size` for an element of a
+    strided view. A binding steps through an array by that stride. A record that
+    is also passed by pointer keeps its size, and native sets it when delivering
+    the record, as with `mln_camera_options`.
+  - A struct that the public headers only embed by value carries no size. Its
+    container versions it, and it cannot grow within an epoch, because growing
+    it moves every later member of its parent.
+  - When a sized struct is embedded by value, native ignores its size on input
+    and sets it on output, as with the `camera` member of `mln_camera_update`
+    and of `mln_map_snapshot`.
+  - Small value types, such as coordinates, points, IDs, and `mln_buffer_view`,
+    are frozen and carry no size. Changing one means adding a new type.
+
+  The schema rejects a size on a struct that the public headers reach only by
+  value inside records, or only as a completion value or a strided element. An
+  array that one of those records borrows reaches its elements the same way: a
+  binding indexes an array without a stride by its own size, so those elements
+  are frozen like an embedded struct.
 - An input struct whose defaults are not all zero has a `mln_<struct>_default()`
   function. It returns the struct with size set and every member at its default.
   A binding starts each record from that function, or from zero with size set
-  when the struct has none.
-- A versioned struct embedded by value cannot grow within an epoch, because
-  growing it moves every later member of its parent. Native validates the size
-  of both, as it does for the `camera` member of `mln_camera_update`.
+  when the struct has none. The schema rejects a default function for a record
+  that native never reads, directly or embedded in an input.
+- An optional scalar or aggregate member of a struct names its bit in the
+  struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
+  enum: `MLN_BINDING("mask=fields;bit=<constant>")`. Each optional member has
+  its own bit. Values that are present together form a record embedded under one
+  bit, and the schema rejects a bit that guards two members of one struct. An
+  array's count takes the array's presence and carries no mask or bit. Native
+  treats an unknown bit in an input mask as invalid. A pointer-shaped value,
+  such as a callback, an owned handle, a nul-terminated string, or a by-pointer
+  parameter, is optional through `nullable=true`. A buffer-view parameter,
+  result, or member that treats an empty view as absent is `optional=empty`.
 - A reserved member is `kind=reserved`, and every writer sets it to zero.
 - A handle output parameter owns the handle that it receives, and `*out_handle`
   must equal `MLN_HANDLE_NULL` on entry. Every other pointer is borrowed for the
@@ -84,8 +115,9 @@ While `API_EPOCH` is `0`, a change may break the ABI, and growing a struct
 breaks every caller built against the older header; see
 [Versioning](../../docs/src/content/docs/development/versioning.md). A stable
 epoch must accept every earlier published size of a struct and fill the missing
-members from their defaults. The size member and the default function make that
-possible, so new structs follow the size and default rules now.
+members from their defaults, and every binding must index an array by the stride
+that native reports. The size member, the delivery stride, and the default
+function make that possible, so new structs follow these rules now.
 
 ## Annotate only what convention leaves open
 
@@ -101,6 +133,7 @@ the rest: `lifetime=completion` for an array completion result, and
 | Declaration                         | Default                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
 | Function without a completion       | `execution=immediate`                                                                      |
+| `execution=event_batch`             | `absent_on=MLN_STATUS_NOT_READY`                                                           |
 | Completion function                 | `result=void`; a value result has `shape=value` and is `borrowed`, or `owned` for a handle |
 | Parameter                           | `direction=in`; an output pointer to a handle is `owned`                                   |
 | Pointer                             | `ownership=borrowed`, except a callback                                                    |
@@ -114,17 +147,18 @@ the rest: `lifetime=completion` for an array completion result, and
 | `kind=reserved` member              | `default=0`                                                                                |
 | Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                     |
 | Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
-| Callback registration               | `user_data` names its one `kind=context` member or parameter                               |
+| Callback registration               | `user_data` names its one `kind=context` member                                            |
 | Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
 
 `STRUCT_SIZE_FIELD` in `schema.py` names the size member, because other structs
 begin with an unrelated `uint32_t` member. A struct whose size member has
 another name annotates it `kind=size`. `protocol.py` names the protocol types
 that every handwritten runtime is written against: the status enum, the
-diagnostic, the completion and its result, and the buffer view. No other rule
+diagnostic, the completion and its result, and the buffer view. It also names
+`MLN_STATUS_NOT_READY`, which reports a drain with nothing queued. No other rule
 reads a declaration's name.
 
-Five keys state what a C shape cannot:
+Eight keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -140,14 +174,16 @@ Five keys state what a C shape cannot:
   with a native default keeps such a registration at its disabled default.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
-  for a drain with nothing queued. A binding returns its language's empty form
-  for that status, such as `None`, `nil`, or `null`, and reads or adopts the
-  output only on success. The schema accepts the key only on a function that
-  returns a status, takes no completion, and has exactly one output. The
-  semantic plan also rejects it on a borrowed view, a consuming operation, and a
-  call that passes a callback registration, because an absent call publishes
-  nothing. Dart, Go, Rust, Swift, and Zig return any output as absent; .NET,
-  Kotlin, and Python return only an owned handle as absent.
+  for `mln_render_session_acquire_frame` when no frame has rendered. A drain is
+  absent on `MLN_STATUS_NOT_READY` by convention, so a drain writes the key only
+  to name another status. A binding returns its language's empty form for that
+  status, such as `None`, `nil`, or `null`, and reads or adopts the output only
+  on success. The schema accepts the key only on a function that returns a
+  status, takes no completion, and has exactly one output. The semantic plan
+  also rejects it on a borrowed view, a consuming operation, and a call that
+  passes a callback registration, because an absent call publishes nothing.
+  Dart, Go, Rust, Swift, and Zig return any output as absent; .NET, Kotlin, and
+  Python return only an owned handle as absent.
 - `default=` on a field states the nonzero value that the field holds in its
   record's native default: a decimal integer, a decimal with a point, `true`, or
   a constant of the field's enum. Dart, Kotlin, and Zig build a record from
@@ -159,6 +195,23 @@ Five keys state what a C shape cannot:
   required fields. The cases skip optional fields, unions, union tags, buffer
   views, and arrays, so those fields take no `default=`, and neither does a
   record that only those fields reach.
+- `accepted_unless=` on a function names a boolean output that, when set on
+  success, reports that native kept nothing from the function's one callback
+  registration, as `out_cancelled` does for
+  `mln_resource_request_set_cancel_callback`. The caller still owns that
+  registration, so a binding releases its roots before returning.
+- `release_reentry=forbid` on a callback registration says that its release runs
+  where host code must not call the C API, as with the log handler and the
+  custom source options. Every registration shares the release typedef
+  `mln_user_data_release`, so the registration carries this rule.
+- `reentry_owner=` on a protocol callback names the parameter whose operations
+  the callback may call. A callback without such a parameter names the handle
+  type instead, as `mln_resource_request_cancel_callback` does, and may call
+  back only into the receiver of the call that registers it. A binding records
+  that receiver with the registration.
+
+Every callback registration is a struct with `kind=callback_registration`, which
+a function takes by pointer.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment
@@ -222,7 +275,6 @@ case and escapes keywords:
 | `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                              |
 | `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
 | `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
-| `PresenceGroup.member`  | A bit without its enum's shared prefix, or a boolean mask without `has_`                    |
 | `MaskFlag.member`       | The flag constant without its enum's shared prefix                                          |
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |

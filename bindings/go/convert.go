@@ -91,16 +91,6 @@ func bindingMasked[In, Out any, Mask ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int
 	*mask |= bit
 }
 
-// bindingFlagged writes a present optional value into a native field whose
-// presence is a bool flag. An absent value leaves both unchanged.
-func bindingFlagged[In, Out any, Flag ~bool](flag *Flag, field *Out, value *In, arena *bindingArena, convert func(In, *bindingArena) Out) {
-	if value == nil {
-		return
-	}
-	*field = convert(*value, arena)
-	*flag = true
-}
-
 // bindingPresent copies an optional native field: value runs only when the
 // field is present, and an absent field is nil.
 func bindingPresent[T any](present bool, value func() T) *T {

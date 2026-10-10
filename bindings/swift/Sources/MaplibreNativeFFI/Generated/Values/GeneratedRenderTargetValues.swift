@@ -61,7 +61,6 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_egl_context_descriptor {
     var raw = mln_egl_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_egl_context_descriptor>.size)
     raw.display = display.unsafeMutableRawPointer
     raw.config = config.unsafeMutableRawPointer
     raw.share_context = shareContext.unsafeMutableRawPointer
@@ -157,7 +156,6 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_metal_context_descriptor {
     var raw = mln_metal_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_metal_context_descriptor>.size)
     raw.device = device.unsafeMutableRawPointer
     return raw
   }
@@ -238,7 +236,6 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
     -> mln_opengl_context_descriptor
   {
     var raw = mln_opengl_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_opengl_context_descriptor>.size)
     raw.ownership = ownership.rawValue
     switch data {
     case let .wgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
@@ -349,7 +346,6 @@ public struct QueueLock: Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_queue_lock {
     var raw = mln_queue_lock()
-    raw.size = UInt32(MemoryLayout<mln_queue_lock>.size)
     raw.lock = lock == nil ? nil : invokeQueueLockLock
     raw.unlock = unlock == nil ? nil : invokeQueueLockUnlock
     if lock != nil || unlock != nil {
@@ -650,7 +646,6 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_vulkan_context_descriptor {
     var raw = mln_vulkan_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_context_descriptor>.size)
     raw.instance = instance.unsafeMutableRawPointer
     raw.physical_device = physicalDevice.unsafeMutableRawPointer
     raw.device = device.unsafeMutableRawPointer
@@ -704,7 +699,6 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
     -> mln_webgl_context_descriptor
   {
     var raw = mln_webgl_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_webgl_context_descriptor>.size)
     raw.kind = kind.rawValue
     raw.context = context
     raw.canvas_selector = arena.view(canvasSelector)
@@ -768,7 +762,6 @@ public struct WebgpuContextDescriptor: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_webgpu_context_descriptor {
     var raw = mln_webgpu_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_webgpu_context_descriptor>.size)
     raw.instance = instance.unsafeMutableRawPointer
     raw.device = device.unsafeMutableRawPointer
     raw.queue = queue.unsafeMutableRawPointer
@@ -820,7 +813,6 @@ public struct WglContextDescriptor: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_wgl_context_descriptor {
     var raw = mln_wgl_context_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_wgl_context_descriptor>.size)
     raw.device_context = deviceContext.unsafeMutableRawPointer
     raw.share_context = shareContext.unsafeMutableRawPointer
     raw.get_proc_address = getProcAddress.unsafeMutableRawPointer

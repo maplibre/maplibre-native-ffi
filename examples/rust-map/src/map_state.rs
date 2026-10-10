@@ -179,15 +179,12 @@ impl MapState {
     /// a render update.
     pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
         let source = self.map.id();
-        Ok(self
-            .runtime
-            .drain_events()?
-            .get()?
-            .events
-            .iter()
-            .any(|event| {
-                event.source == source && event.r#type == RuntimeEventType::MapRenderUpdateAvailable
-            }))
+        let Some(batch) = self.runtime.drain_events()? else {
+            return Ok(false);
+        };
+        Ok(batch.get()?.events.iter().any(|event| {
+            event.source == source && event.r#type == RuntimeEventType::MapRenderUpdateAvailable
+        }))
     }
 
     pub fn close(self) -> Result<(), Box<dyn Error>> {

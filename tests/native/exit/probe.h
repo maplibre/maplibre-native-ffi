@@ -210,9 +210,12 @@ static inline uint32_t probe_provide(
 // delivering every severity on MapLibre's logging thread.
 static inline void probe_start(void) {
   probe_write_points();
+  const mln_log_handler handler = {
+    .size = sizeof(mln_log_handler),
+    .callback = probe_consume_log,
+  };
   probe_require(
-    mln_log_set_callback(probe_consume_log, NULL, NULL, NULL),
-    "installing the log callback"
+    mln_log_set_callback(&handler, NULL), "installing the log callback"
   );
   probe_require(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ALL, NULL),
@@ -223,8 +226,7 @@ static inline void probe_start(void) {
 // Creates a runtime with an event wake and the probe's resource provider.
 static inline mln_runtime probe_create_runtime(void) {
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake =
-    (mln_wake){.size = sizeof(mln_wake), .callback = probe_ignore_wake};
+  options.event_wake = (mln_wake){.callback = probe_ignore_wake};
   mln_runtime runtime = MLN_HANDLE_NULL;
   probe_require(
     mln_runtime_create(&options, &runtime, NULL), "creating a runtime"

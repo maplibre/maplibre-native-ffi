@@ -23,6 +23,12 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
 
     internal NativeCallScope() { }
 
+    /// <summary>
+    /// The owner whose operation registers callbacks through this scope, which
+    /// a callback that may call back only into that owner records.
+    /// </summary>
+    internal object? Receiver { get; init; }
+
     internal void* Register(object descriptor)
     {
         var root = new NativeCallbackRoot(descriptor);

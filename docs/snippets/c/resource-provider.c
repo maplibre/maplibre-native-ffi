@@ -60,10 +60,15 @@ static void abort_pending_fetch(void* user_data) {
 void watch_for_cancellation(
   mln_resource_request_handle handle, pending_fetch* fetch
 ) {
+  const mln_resource_request_cancel_handler handler = {
+    .size = sizeof(handler),
+    .callback = abort_pending_fetch,
+    .user_data = fetch,
+  };
   bool already_cancelled = false;
   if (
     mln_resource_request_set_cancel_callback(
-      handle, abort_pending_fetch, fetch, NULL, &already_cancelled, NULL
+      handle, &handler, &already_cancelled, NULL
     ) == MLN_STATUS_OK &&
     already_cancelled
   ) {

@@ -400,48 +400,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         if parameter.value.kind in {"array", "buffer"}
         and parameter.value.length not in {None, "nul"}
     }
-    direct = {
-        registration.callback: registration
-        for registration in plan.direct_registrations
-    }
-    direct_contexts = {
-        registration.user_data: registration
-        for registration in plan.direct_registrations
-    }
-    for registration in plan.direct_registrations:
-        if not registration.release_callback:
-            raise Unsupported("direct callback requires a native release")
-    direct_releases = {
-        registration.release_callback for registration in plan.direct_registrations
-    }
     outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
     for parameter in function.parameters:
         if parameter.name == (plan.receiver or plan.scoped_receiver):
-            continue
-        if parameter.name in direct_contexts:
-            registration = direct_contexts[parameter.name]
-            callback = camel(registration.callback)
-            callback_value = input_plans[registration.callback]
-            # A callback restricted to its registration owner carries that owner.
-            descriptor = (
-                f"new NativeOwnedCallback({callback}, this)"
-                if values.owned_direct_callback(callback_value)
-                else callback
-            )
-            args.append(f"{callback} is null ? null : scope.Register({descriptor})")
-            continue
-        if parameter.name in direct_releases:
-            args.append("&NativeCallbackRoot.Release")
-            continue
-        if parameter.name in direct:
-            callback_value = input_plans[parameter.name]
-            values.supported(callback_value)
-            name = camel(parameter.name)
-            parameters.append(f"{values.public_type(callback_value)} {name}")
-            scoped = True
-            args.append(
-                f"{name} is null ? null : &Invoke{public_type(callback_value.native)}"
-            )
             continue
         name = camel(parameter.name)
         if parameter.name in counts:
@@ -661,19 +622,30 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     # Entering checks the callback guard, keeps the receiver reachable, and, for
     # an owner-less operation, loads the native library. A scope that enters
     # for its receiver roots registrations in it, so only an owner can.
+    # A registration whose callback calls back only into this receiver
+    # records it through the scope.
+    receiver_init = (
+        " { Receiver = this }"
+        if handle_plan
+        and any(
+            values.record(registration.descriptor).registration.receiver_owned
+            for registration in plan.registrations
+        )
+        else ""
+    )
     if reads:
         entry = [f'using var read = state.Read(this, "{function.name}");']
         if scoped:
-            entry.append("using var scope = new NativeCallScope();")
+            entry.append(f"using var scope = new NativeCallScope(){receiver_init};")
         args[0] = "read.Handle"
     elif (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [
-            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}");'
+            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}"){receiver_init};'
         ]
     else:
         entry = [f'using var call = Enter({owner_expression}, "{function.name}");']
         if scoped:
-            entry.append("using var scope = new NativeCallScope();")
+            entry.append(f"using var scope = new NativeCallScope(){receiver_init};")
     # The claim follows argument conversion, so an argument error leaves the
     # request open.
     claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
@@ -838,14 +810,14 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         if scoped:
             accept = (
                 "scope.Accept(CallbackOwner);"
-                if handle_plan and (plan.registrations or plan.direct_registrations)
+                if handle_plan and plan.registrations
                 else "scope.Accept();"
             )
             # A rejected registration stores nothing, so the scope releases it.
             rejected = next(
                 (
                     registration.accepted_unless
-                    for registration in plan.direct_registrations
+                    for registration in plan.registrations
                     if registration.accepted_unless
                 ),
                 None,
@@ -1123,20 +1095,6 @@ def emit(api: Api | BoundApi) -> Emission:
             converters.append(
                 values.encoder(plan).replace("private static", "internal static")
             )
-    direct_callbacks = {
-        parameter.value.native: parameter.value
-        for plan in bound.operations
-        if plan.function.name in supported
-        for parameter in plan.inputs
-        if any(
-            parameter.name == registration.callback
-            for registration in plan.direct_registrations
-        )
-    }
-    converters.extend(
-        values.direct_callback_method(value)
-        for _, value in sorted(direct_callbacks.items())
-    )
     files["Internal/Struct/GeneratedValues.g.cs"] = (
         HEADER
         + VALUE_HELPERS
@@ -1213,8 +1171,8 @@ def emit(api: Api | BoundApi) -> Emission:
         name = public_type(native)
         directory = directory_for(api.records_by_name[native].location.path)
         properties = "".join(
-            f"    public {values.member_type(value, member, fields)} {member} => scope.Active(value).{member};\n"
-            for member, fields in values.members(value)
+            f"    public {values.member_type(value, member, field)} {member} => scope.Active(value).{member};\n"
+            for member, field in values.members(value)
         )
         files[f"{directory}/{name}View.g.cs"] = (
             HEADER + f"namespace {NAMESPACE};\n\npublic sealed class {name}View\n{{\n"

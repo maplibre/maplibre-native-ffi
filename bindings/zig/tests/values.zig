@@ -62,7 +62,7 @@ test "optional fields and masks round-trip through presence bits" {
 // record size the binding was built with, and a payload tag the binding does
 // not know decodes as `.unknown` with its raw value.
 test "a strided event batch with an unknown payload arm decodes without loss" {
-    const RawBatch = @typeInfo(@TypeOf(maplibre.RuntimeEventBatchView.fromNative)).@"fn".params[1].type.?;
+    const RawBatch = @typeInfo(@TypeOf(maplibre.EventBatchView.fromNative)).@"fn".params[1].type.?;
     const RawEvent = @typeInfo(@FieldType(RawBatch, "events")).pointer.child;
     const Record = extern struct { event: RawEvent, newer_fields: [24]u8 };
 
@@ -87,7 +87,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
 
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
-    const view = try maplibre.RuntimeEventBatchView.fromNative(arena.allocator(), raw);
+    const view = try maplibre.EventBatchView.fromNative(arena.allocator(), raw);
     try testing.expectEqual(@as(usize, 2), view.events.len);
     try testing.expectEqual(@as(u32, 999), @intFromEnum(view.events[0].type));
     try testing.expectEqual(@as(u64, 0xfeed_0000_0000_0001), view.events[0].source);

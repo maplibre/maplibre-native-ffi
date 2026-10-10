@@ -3,9 +3,9 @@ package org.maplibre.nativeffi.runtime
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlinx.cinterop.*
-import org.maplibre.nativeffi.generated.readRuntimeEventBatchView
+import org.maplibre.nativeffi.generated.readEventBatchView
+import org.maplibre.nativeffi.internal.cinterop.mln_event_batch_view
 import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event
-import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event_batch_view
 import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event_payload
 import platform.posix.memset
 
@@ -38,15 +38,15 @@ class RuntimeEventNativeTest {
       }
       val messages = allocArray<ByteVar>(STRIDED_MESSAGES.size)
       STRIDED_MESSAGES.forEachIndexed { index, byte -> messages[index] = byte }
-      val view = alloc<mln_runtime_event_batch_view>()
-      view.size = sizeOf<mln_runtime_event_batch_view>().toUInt()
+      val view = alloc<mln_event_batch_view>()
+      view.size = sizeOf<mln_event_batch_view>().toUInt()
       view.event_size = stride.toUInt()
       view.events = bytes.reinterpret()
       view.event_count = STRIDED_EVENT_COUNT.convert()
       view.messages = messages
       view.messages_size = STRIDED_MESSAGES.size.convert()
       // The decoded batch owns copies, so overwriting the source afterwards changes nothing.
-      readRuntimeEventBatchView(view.ptr.toLong()).events.also {
+      readEventBatchView(view.ptr.toLong()).events.also {
         memset(bytes, 0, (stride * STRIDED_EVENT_COUNT).convert())
         memset(messages, 0, STRIDED_MESSAGES.size.convert())
       }
@@ -57,12 +57,12 @@ class RuntimeEventNativeTest {
   @Test
   fun aNativeCountPastTheListRangeIsRefusedBeforeDecoding() {
     memScoped {
-      val view = alloc<mln_runtime_event_batch_view>()
-      view.size = sizeOf<mln_runtime_event_batch_view>().toUInt()
+      val view = alloc<mln_event_batch_view>()
+      view.size = sizeOf<mln_event_batch_view>().toUInt()
       view.event_size = sizeOf<mln_runtime_event>().toUInt()
       view.events = alloc<mln_runtime_event>().ptr
       view.event_count = UNLISTABLE_EVENT_COUNT.convert()
-      assertFailsWith<IllegalArgumentException> { readRuntimeEventBatchView(view.ptr.toLong()) }
+      assertFailsWith<IllegalArgumentException> { readEventBatchView(view.ptr.toLong()) }
     }
   }
 }

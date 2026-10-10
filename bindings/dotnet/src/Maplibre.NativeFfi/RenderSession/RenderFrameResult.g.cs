@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Immutable result record copied into an owned frame-result batch.
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by <c>mln_acquired_frame_get_result()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_frame_result</c> in the <see

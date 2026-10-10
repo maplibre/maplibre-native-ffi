@@ -120,12 +120,12 @@ static void ambient_cache_changes_reach_the_next_request(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = cached_style_url,
      .response = {
+       .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
        .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
        .bytes = (const uint8_t*)cached_style_json,
        .byte_count = sizeof(cached_style_json) - 1,
        .etag = "\"ambient\"",
        // Fresh until 2100, so only a cache change makes it stale.
-       .has_expires = true,
        .expires_unix_ms = 4102444800000,
      }},
   };

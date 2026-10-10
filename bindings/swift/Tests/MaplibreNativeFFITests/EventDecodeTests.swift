@@ -29,7 +29,7 @@ import Testing
     stride: MemoryLayout<mln_runtime_event>.size + 16,
     messages: arena.bytes
   ) { synthesized in
-    try RuntimeEventBatchView(raw: synthesized.batch)
+    try EventBatchView(raw: synthesized.batch)
   }
 
   #expect(batch.events.map { $0.type.rawValue } == [4, 8, 9])
@@ -64,7 +64,7 @@ import Testing
     messages: arena.bytes,
     payloadWindows: [0: window]
   ) { synthesized in
-    let batch = try RuntimeEventBatchView(raw: synthesized.batch)
+    let batch = try EventBatchView(raw: synthesized.batch)
     synthesized.records.copyBytes(
       from: repeatElement(UInt8(0xFF), count: synthesized.records.count)
     )
@@ -111,7 +111,7 @@ import Testing
   let batch = try withSynthesizedEventBatch(
     events: [frame, tile, transition]
   ) { synthesized in
-    try RuntimeEventBatchView(raw: synthesized.batch)
+    try EventBatchView(raw: synthesized.batch)
   }
   let decoded = batch.events
   let payloads = decoded.map(\.payload)

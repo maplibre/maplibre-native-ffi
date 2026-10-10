@@ -164,11 +164,7 @@ class Synthesizer:
                 continue
             if presence and presence.mask:
                 mask = f"{target}.{presence.mask}"
-                lines.append(
-                    f"  {mask} |= {presence.bit};"
-                    if presence.bit
-                    else f"  {mask} = true;"
-                )
+                lines.append(f"  {mask} |= {presence.bit};")
             lines += self.fill(value, member, target, f"{path}.{field.name}")
         return lines
 

@@ -345,14 +345,14 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             "}",
             "template <bool Writing>",
             "auto value(Arena<Writing>& arena, const mln_completion_result& result,",
-            "           std::uint32_t kind, std::size_t element_size) -> const void* {",
+            "           std::uint32_t kind) -> const void* {",
             "  if (result.value_count == 0) return result.value == nullptr ? nullptr : empty_pointer<std::max_align_t>();",
             '  if (result.value == nullptr) throw std::invalid_argument{"null completion result"};',
             "  switch (kind) {",
             "    case MLN_ADAPTER_COMPLETION_COPY_FLAT: {",
-            "      if (element_size == 0 || result.value_count > std::numeric_limits<std::size_t>::max() / element_size)",
-            '        throw std::invalid_argument{"invalid completion element size"};',
-            "      const auto size = result.value_count * element_size;",
+            "      if (result.value_size == 0 || result.value_count > std::numeric_limits<std::size_t>::max() / result.value_size)",
+            '        throw std::invalid_argument{"invalid completion value size"};',
+            "      const auto size = result.value_count * result.value_size;",
             "      constexpr auto alignment = sizeof(std::max_align_t);",
             "      const auto count = size / alignment + (size % alignment != 0);",
             "      auto* target = arena.template allocate<std::max_align_t>(count);",
@@ -485,11 +485,7 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
                     ]
                 )
             elif selector and selector.mask:
-                condition = (
-                    f"({source}.{selector.mask} & {selector.bit}) != 0"
-                    if selector.bit
-                    else f"{source}.{selector.mask}"
-                )
+                condition = f"({source}.{selector.mask} & {selector.bit}) != 0"
                 lines.append(f"{indent}if ({condition}) {{")
                 lines.extend(
                     _capture(child, child_source, child_target, source, depth + 1)

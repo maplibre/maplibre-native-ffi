@@ -51,43 +51,21 @@ public sealed unsafe partial class RenderFrameBatchHandle
     }
 
     /// <summary>
-    /// Returns the number of records in an owned frame-result batch.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_frame_batch_count</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public ulong Count()
-    {
-        using var read = state.Read(this, "mln_render_frame_batch_count");
-        nuint outCount = default;
-        Check(NativeMethods.mln_render_frame_batch_count(read.Handle, &outCount, Diagnostic));
-        return (ulong)outCount;
-    }
-
-    /// <summary>
-    /// Copies one frame-result record.
+    /// Borrows the result view stored by an owned frame-result batch.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_frame_batch_get</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public RenderFrameResult Get(ulong index)
+    public RenderFrameBatchView Get()
     {
         using var read = state.Read(this, "mln_render_frame_batch_get");
-        var outResult = new mln_render_frame_result
+        var outView = new mln_render_frame_batch_view
         {
-            size = (uint)sizeof(mln_render_frame_result),
+            size = (uint)sizeof(mln_render_frame_batch_view),
         };
-        Check(
-            NativeMethods.mln_render_frame_batch_get(
-                read.Handle,
-                checked((nuint)index),
-                &outResult,
-                Diagnostic
-            )
-        );
-        return CopyRenderFrameResult(outResult);
+        Check(NativeMethods.mln_render_frame_batch_get(read.Handle, &outView, Diagnostic));
+        return CopyRenderFrameBatchView(outView);
     }
 
     /// <summary>

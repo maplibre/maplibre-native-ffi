@@ -58,12 +58,10 @@ static mln_opengl_context_descriptor dedicated_context(
   const dedicated_state* state
 ) {
   return (mln_opengl_context_descriptor){
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
     .data = {
       .egl = {
-        .size = sizeof(mln_egl_context_descriptor),
         .display = state->context.egl_display,
         .config = state->context.egl_config,
         .share_context = NULL,

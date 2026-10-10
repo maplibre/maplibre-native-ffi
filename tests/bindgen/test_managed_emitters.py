@@ -34,18 +34,20 @@ void mln_measurement_destroy(mln_measurement_handle owner);
         api = self.parse(
             """
 typedef void (*mln_release)(void *context);
-typedef void (*mln_watch)(void *context) BIND("reentry=protocol;reentry_owner=registration;reentry_calls=mln_map_close");
-BIND("registration=callback;release_callback=release;accepted_unless=done")
-mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("kind=context"), mln_release release, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef void (*mln_watch)(void *context) BIND("reentry=protocol;reentry_owner=mln_map;reentry_calls=mln_map_close");
+typedef struct mln_watcher { unsigned size; mln_watch callback; void *context BIND("kind=context"); mln_release release; } mln_watcher BIND("kind=callback_registration;release=release");
+BIND("accepted_unless=done")
+mln_status mln_map_watch(mln_map map, const mln_watcher *watcher, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """,
             map_handle=True,
         )
         self.assertEqual(kotlin.coverage(api)["unsupported"], {})
         bound = compile_api(api)
-        (registration,) = bound.operations_by_name["mln_map_watch"].direct_registrations
+        (registration,) = bound.operations_by_name["mln_map_watch"].registrations
         # Native keeps nothing it reports through the condition.
         self.assertEqual(registration.accepted_unless, "done")
-        self.assertTrue(bound.callbacks["mln_watch"].reentry_policy.registration_owner)
+        # The callback calls back only into the map that registers it.
+        self.assertTrue(bound.values["mln_watcher"].registration.receiver_owned)
 
     def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
         api = parse(
@@ -124,8 +126,8 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         source = """
 typedef void (*mln_notice_release)(void *context);
 typedef unsigned (*mln_notice_callback)(void *context, int code, const char *text) BIND("failure=0;deferred=1");
-BIND("registration=callback;release_callback=release")
-mln_status mln_notice_set_callback(mln_notice_callback callback, void *context BIND("kind=context"), mln_notice_release release, mln_diagnostic *out_diagnostic);
+typedef struct mln_notice_handler { unsigned size; mln_notice_callback callback; void *context BIND("kind=context"); mln_notice_release release; } mln_notice_handler BIND("kind=callback_registration;release=release");
+mln_status mln_notice_set_callback(const mln_notice_handler *handler, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(source)
         self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])
@@ -263,7 +265,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 """)
         self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
 
-    def test_dotnet_values_preserve_grouped_presence_defaults_and_keyword_fields(self):
+    def test_dotnet_values_preserve_embedded_presence_defaults_and_keyword_fields(self):
         api = self.parse(
             """
 typedef struct mln_metric { double event; } mln_metric;
@@ -334,7 +336,8 @@ using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 namespace Maplibre.NativeFfi.Internal.C {
   static partial class NativeMethods {
     public static mln_camera mln_camera_default() => new() {
-      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM, latitude = 80, longitude = 90, zoom = 99
+      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM,
+      center = new mln_lat_lng { latitude = 80, longitude = 90 }, zoom = 99
     };
   }
 }
@@ -348,17 +351,19 @@ namespace Maplibre.NativeFfi.Internal.C {
     var absent = NativeCamera(new Camera());
     Check(absent.fields == 0 && absent.abi_size == sizeof(mln_camera));
     var zero = NativeCamera(new Camera { Center = new LatLng(0, 0), Zoom = 0 });
-    Check((ulong)zero.fields == ((1UL << 40) | 2) && zero.latitude == 0 && zero.longitude == 0 && zero.zoom == 0);
+    Check((ulong)zero.fields == ((1UL << 40) | 2) && zero.center.latitude == 0 && zero.center.longitude == 0 && zero.zoom == 0);
     var coordinates = stackalloc mln_lat_lng[2];
     coordinates[0] = new mln_lat_lng { latitude = 4, longitude = 5 };
     coordinates[1] = new mln_lat_lng { latitude = 6, longitude = 7 };
     var raw = new mln_snapshot {
       coordinates = coordinates, coordinate_count = 2,
       generation = 42,
-      camera = new mln_camera { fields = MLN_CAMERA_CENTER, latitude = 13, longitude = -9, zoom = 55 }
+      camera = new mln_camera {
+        fields = MLN_CAMERA_CENTER, center = new mln_lat_lng { latitude = 13, longitude = -9 }, zoom = 55
+      }
     };
     var copy = CopySnapshot(raw);
-    raw.camera.latitude = 100;
+    raw.camera.center.latitude = 100;
     Check(copy.Generation == 42 && copy.Camera.Center == new LatLng(13, -9) && copy.Camera.Zoom == null);
     coordinates[0].latitude = 99;
     Check(copy.Coordinates[0] == new LatLng(4, 5) && copy.Coordinates[1] == new LatLng(6, 7));

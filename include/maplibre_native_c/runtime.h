@@ -47,7 +47,6 @@ typedef enum mln_offline_region_download_state : uint32_t {
 
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
-  uint32_t size;
   /** One of mln_offline_region_download_state. */
   uint32_t download_state MLN_BINDING("enum=mln_offline_region_download_state");
   uint64_t completed_resource_count;
@@ -378,8 +377,6 @@ MLN_API mln_status mln_network_status_set(
 /** Options used when creating a runtime. */
 typedef struct mln_runtime_options {
   uint32_t size;
-  /** No flags are currently defined. Must be zero. */
-  uint32_t flags;
   /**
    * Directory root for asset:// URLs. Copied during runtime creation.
    * Null or empty selects `/android_asset` on Android and `.` elsewhere.
@@ -410,7 +407,7 @@ typedef struct mln_runtime_options {
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
  *
  * This struct has no size field, because it is a member of
- * mln_runtime_event_payload. mln_runtime_event_batch_view.event_size covers the
+ * mln_runtime_event_payload. mln_event_batch_view.event_size covers the
  * whole event, including its payload.
  */
 typedef struct mln_rendering_stats {
@@ -480,10 +477,6 @@ typedef struct mln_runtime_event_camera_transition_finished {
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
-  /**
-   * Region status. This member keeps its own size field because the same struct
-   * is also returned by mln_runtime_offline_region_get_status().
-   */
   mln_offline_region_status status;
 } mln_runtime_event_offline_region_status;
 
@@ -509,7 +502,7 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
  * A host that decodes a payload type this version does not define treats the
  * payload as opaque bytes and forwards them unchanged. Those bytes run from the
  * payload's offset within mln_runtime_event to
- * mln_runtime_event_batch_view.event_size.
+ * mln_event_batch_view.event_size.
  */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame
@@ -539,7 +532,7 @@ typedef union mln_runtime_event_payload {
  * batch with one memory copy.
  *
  * Step through an array of these by
- * mln_runtime_event_batch_view.event_size rather than by the size of this
+ * mln_event_batch_view.event_size rather than by the size of this
  * struct: a later version may add a member to
  * mln_runtime_event_payload and widen the stride. Every field below, payload
  * included, keeps its offset across versions.
@@ -567,7 +560,7 @@ typedef struct mln_runtime_event {
   uint32_t payload_type MLN_BINDING("enum=mln_runtime_event_payload_type");
   /**
    * Byte offset of this event's message inside
-   * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
+   * mln_event_batch_view.messages. Zero when message_size is 0.
    */
   uint64_t message_offset;
   /**
@@ -587,7 +580,7 @@ typedef struct mln_runtime_event {
  * Step through events by event_size. The event and message pointers remain
  * valid until the event-batch handle is released.
  */
-typedef struct mln_runtime_event_batch_view {
+typedef struct mln_event_batch_view {
   uint32_t size;
   /**
    * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
@@ -610,7 +603,7 @@ typedef struct mln_runtime_event_batch_view {
   const char* messages MLN_BINDING("length=messages_size;encoding=bytes");
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
-} mln_runtime_event_batch_view;
+} mln_event_batch_view;
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
@@ -674,27 +667,22 @@ typedef mln_status (*mln_resource_transform_callback)(
   mln_resource_transform_response* out_response MLN_BINDING("direction=out")
 );
 
-/**
- * Releases callback user data after its final possible invocation.
- *
- * For each accepted registration with a non-null release callback, the C API
- * invokes the callback exactly once after replacement, clear, or runtime
- * teardown has retired the registration and every in-flight callback has
- * returned. It
- * may run on a runtime, worker, network, or closing thread. The C API never
- * invokes it for a rejected registration. Another thread may retire an
- * accepted registration before its registration function returns, so the
- * caller transfers user_data ownership before entering that function and
- * reclaims it only when registration is rejected.
- */
-typedef void (*mln_runtime_callback_release)(void* user_data);
-
 typedef struct mln_resource_transform {
   uint32_t size;
   mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_resource_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -764,14 +752,43 @@ typedef struct mln_http_header_transform {
   uint32_t size;
   mln_http_header_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_http_header_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
+/** Inclusive byte range of a resource request. */
+typedef struct mln_resource_range {
+  /** First byte offset of the requested range. */
+  uint64_t start;
+  /** Last byte offset of the requested range, inclusive. */
+  uint64_t end;
+} mln_resource_range MLN_BINDING("fields=ordered");
+
+/** Field mask values for mln_resource_request. */
+typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
+  /** The request asks only for the bytes in range. */
+  MLN_RESOURCE_REQUEST_RANGE = 1U << 0U,
+  /** The cached copy being revalidated carries a modification time. */
+  MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 1U << 1U,
+  /** The cached copy being revalidated carries an expiration time. */
+  MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 1U << 2U,
+} mln_resource_request_field;
+
 typedef struct mln_resource_request {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_resource_request_field");
   /**
    * URL entering the network layer, before tile server normalization.
    *
@@ -799,21 +816,39 @@ typedef struct mln_resource_request {
   uint32_t priority MLN_BINDING("enum=mln_resource_priority");
   uint32_t usage MLN_BINDING("enum=mln_resource_usage");
   uint32_t storage_policy MLN_BINDING("enum=mln_resource_storage_policy");
-  bool has_range;
-  uint64_t range_start MLN_BINDING("mask=has_range");
-  uint64_t range_end MLN_BINDING("mask=has_range");
-  bool has_prior_modified;
-  int64_t prior_modified_unix_ms MLN_BINDING("mask=has_prior_modified");
-  bool has_prior_expires;
-  int64_t prior_expires_unix_ms MLN_BINDING("mask=has_prior_expires");
+  mln_resource_range range
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
+  int64_t prior_modified_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_MODIFIED");
+  int64_t prior_expires_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_EXPIRES");
   const char* prior_etag MLN_BINDING("nullable=true");
   const uint8_t* prior_data
     MLN_BINDING("length=prior_data_size;encoding=bytes");
   size_t prior_data_size;
 } mln_resource_request;
 
+/** Field mask values for mln_resource_response. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_resource_response_field : uint32_t {
+  /** The response carries a modification time. */
+  MLN_RESOURCE_RESPONSE_MODIFIED = 1U << 0U,
+  /** The response carries an expiration time. */
+  MLN_RESOURCE_RESPONSE_EXPIRES = 1U << 1U,
+  /** An ERROR response carries the earliest time to retry the request. */
+  MLN_RESOURCE_RESPONSE_RETRY_AFTER = 1U << 2U,
+} mln_resource_response_field;
+
+/**
+ * A resource provider's answer to one request.
+ *
+ * A fields value with bits outside mln_resource_response_field is malformed,
+ * and mln_resource_request_complete() converts it to a provider error response.
+ */
 typedef struct mln_resource_response {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_resource_response_field");
   uint32_t status MLN_BINDING("enum=mln_resource_response_status");
   uint32_t error_reason MLN_BINDING("enum=mln_resource_error_reason");
   /** Response bytes. May be null only when byte_count is 0. */
@@ -821,13 +856,13 @@ typedef struct mln_resource_response {
   size_t byte_count;
   const char* error_message MLN_BINDING("nullable=true");
   bool must_revalidate;
-  bool has_modified;
-  int64_t modified_unix_ms MLN_BINDING("mask=has_modified");
-  bool has_expires;
-  int64_t expires_unix_ms MLN_BINDING("mask=has_expires");
+  int64_t modified_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
+  int64_t expires_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
   const char* etag MLN_BINDING("nullable=true");
-  bool has_retry_after;
-  int64_t retry_after_unix_ms MLN_BINDING("mask=has_retry_after");
+  int64_t retry_after_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
 } mln_resource_response;
 
 /**
@@ -901,7 +936,7 @@ typedef uint32_t (*mln_resource_provider_callback)(
  */
 MLN_BINDING(
   "reentry=protocol;"
-  "reentry_owner=registration;"
+  "reentry_owner=mln_resource_request_handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
   "mln_resource_request_cancelled,"
@@ -910,12 +945,43 @@ MLN_BINDING(
 )
 typedef void (*mln_resource_request_cancel_callback)(void* user_data);
 
+/**
+ * Cancel callback state for one handled resource request.
+ *
+ * The struct itself is borrowed for the registering call.
+ */
+typedef struct mln_resource_request_cancel_handler {
+  uint32_t size;
+  mln_resource_request_cancel_callback callback;
+  void* user_data MLN_BINDING("kind=context");
+  /**
+   * Optional. Releases user_data exactly once for an accepted registration,
+   * after the callback can no longer run: when the callback returns, on the
+   * thread that ran it, or when the request is released without the callback
+   * having run, on the releasing thread. It never runs for a rejected
+   * registration or for a request that was already cancelled.
+   */
+  mln_user_data_release release_user_data;
+} mln_resource_request_cancel_handler MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
+
 typedef struct mln_resource_provider {
   uint32_t size;
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_resource_provider MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -936,9 +1002,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
  * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
- *   small, options->flags or options->event_mask holds unknown bits, the wake
- *   descriptor is invalid, or out_runtime is null or does not point to the null
- *   handle.
+ *   small, options->event_mask holds unknown bits, the wake descriptor is
+ *   invalid, or out_runtime is null or does not point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
@@ -1065,11 +1130,9 @@ MLN_API mln_status mln_resource_request_cancelled(
  * handle. A request accepts one registration: a later call fails and leaves the
  * first registration in place.
  *
- * MLN_STATUS_OK with out_cancelled false transfers callback, user_data, and
- * release_user_data to the C API. The callback runs at most once. The C API
- * invokes release_user_data exactly once, after the callback can no longer run:
- * when the callback returns, or when the request is released without the
- * callback having run. release_user_data may be null.
+ * MLN_STATUS_OK with out_cancelled false transfers the handler's callback,
+ * user_data, and release_user_data to the C API. The callback runs at most
+ * once. The handler struct itself is borrowed for the call.
  *
  * A request that is already cancelled and not completed stores nothing and
  * reports true through out_cancelled. The caller keeps user_data and handles
@@ -1082,20 +1145,16 @@ MLN_API mln_status mln_resource_request_cancelled(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or when
- *   callback or out_cancelled is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, when handler
+ *   or out_cancelled is null, when handler->size is too small, or when
+ *   handler->callback is null.
  * - MLN_STATUS_INVALID_STATE when handle has been released, or the request
  *   already has a cancel callback.
  */
-MLN_BINDING(
-  "registration=callback;release_callback=release_user_data;"
-  "accepted_unless=out_cancelled"
-)
+MLN_BINDING("accepted_unless=out_cancelled")
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback,
-  void* user_data MLN_BINDING("kind=context"),
-  mln_runtime_callback_release release_user_data,
+  const mln_resource_request_cancel_handler* handler,
   bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -1418,7 +1477,8 @@ MLN_API mln_status mln_runtime_dispose(
  * Drains this runtime's queued events into a new owned batch.
  *
  * The drain transfers every event that the queue holds, in queue order. Events
- * that arrive later enter the next batch. The returned handle owns the event
+ * that arrive later enter the next batch, and the event wake fires again when
+ * the first of them arrives. The returned handle owns the event
  * records and their message arena. Later drains and runtime destruction leave
  * the batch readable. Release each batch with mln_event_batch_release().
  *
@@ -1431,8 +1491,12 @@ MLN_API mln_status mln_runtime_dispose(
  * discarded with the runtime.
  *
  * Returns:
- * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
- *   batch.
+ * - MLN_STATUS_OK when a batch holding at least one event is published in
+ *   *out_batch.
+ * - MLN_STATUS_NOT_READY when no event is queued. This is not an error:
+ *   *out_batch is left unchanged, no batch is allocated, the diagnostic
+ *   message is empty, and the caller drains again after the next event wake.
+ *   Bindings return their language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
@@ -1456,7 +1520,7 @@ MLN_API mln_status mln_runtime_drain_events(
  */
 MLN_API mln_status mln_event_batch_get(
   mln_event_batch batch,
-  mln_runtime_event_batch_view* out_view MLN_BINDING("direction=out"),
+  mln_event_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

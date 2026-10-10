@@ -85,8 +85,8 @@ _Unreachable _abandonedRuntime() =>
 bool _runtimeIsLive(int runtime) => withNativeArena((arena) {
   final batch = arena<Uint64>();
   final status = raw.mln_runtime_drain_events(runtime, batch, nullptr);
-  if (status == 0) raw.mln_event_batch_release(batch.value);
-  return status == 0;
+  if (status == raw.MLN_STATUS_OK) raw.mln_event_batch_release(batch.value);
+  return status == raw.MLN_STATUS_OK || status == raw.MLN_STATUS_NOT_READY;
 });
 
 /// Collects what the binding writes to standard error.

@@ -44,7 +44,7 @@ struct ResourceRequestObject {
   bool claimed = false;
   bool released_while_deciding = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
-  mln_runtime_callback_release cancel_release = nullptr;
+  mln_user_data_release cancel_release = nullptr;
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
@@ -160,6 +160,15 @@ auto response_from_abi(const mln_resource_response& provider_response)
       mln::Response::Error::Reason::Other
     );
   }
+  constexpr auto known_fields = MLN_RESOURCE_RESPONSE_MODIFIED |
+                                MLN_RESOURCE_RESPONSE_EXPIRES |
+                                MLN_RESOURCE_RESPONSE_RETRY_AFTER;
+  if ((provider_response.fields & ~known_fields) != 0U) {
+    return error_response(
+      "mln_resource_response.fields contains unknown bits",
+      mln::Response::Error::Reason::Other
+    );
+  }
   switch (provider_response.status) {
     case MLN_RESOURCE_RESPONSE_STATUS_OK:
     case MLN_RESOURCE_RESPONSE_STATUS_ERROR:
@@ -185,10 +194,10 @@ auto response_from_abi(const mln_resource_response& provider_response)
   response.notModified =
     provider_response.status == MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED;
   response.mustRevalidate = provider_response.must_revalidate;
-  if (provider_response.has_modified) {
+  if ((provider_response.fields & MLN_RESOURCE_RESPONSE_MODIFIED) != 0U) {
     response.modified = from_unix_ms(provider_response.modified_unix_ms);
   }
-  if (provider_response.has_expires) {
+  if ((provider_response.fields & MLN_RESOURCE_RESPONSE_EXPIRES) != 0U) {
     response.expires = from_unix_ms(provider_response.expires_unix_ms);
   }
   if (provider_response.etag != nullptr) {
@@ -204,7 +213,7 @@ auto response_from_abi(const mln_resource_response& provider_response)
       message = provider_response.error_message;
     }
     auto retry_after = std::optional<mln::Timestamp>{};
-    if (provider_response.has_retry_after) {
+    if ((provider_response.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER) != 0U) {
       retry_after = from_unix_ms(provider_response.retry_after_unix_ms);
     }
     response.error = std::make_unique<mln::Response::Error>(
@@ -251,7 +260,7 @@ void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
 // completed. Callers hold no lock; the callback may call back into this handle.
 void run_cancel_callback(ResourceRequestObject& object) noexcept {
   mln_resource_request_cancel_callback callback = nullptr;
-  mln_runtime_callback_release release = nullptr;
+  mln_user_data_release release = nullptr;
   void* user_data = nullptr;
   {
     const std::scoped_lock lock(object.mutex);
@@ -306,7 +315,7 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     return;
   }
   // A registration whose callback never ran retires with the request.
-  mln_runtime_callback_release release = nullptr;
+  mln_user_data_release release = nullptr;
   void* user_data = nullptr;
   {
     auto lock = std::unique_lock{object->mutex};
@@ -373,8 +382,13 @@ auto make_request_view(
   const auto* prior_data = resource.priorData == nullptr
                              ? nullptr
                              : bytes_from_string(*resource.priorData);
+  auto fields = std::uint32_t{0};
+  if (resource.dataRange) fields |= MLN_RESOURCE_REQUEST_RANGE;
+  if (resource.priorModified) fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED;
+  if (resource.priorExpires) fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES;
   auto request = mln_resource_request{
     .size = sizeof(mln_resource_request),
+    .fields = fields,
     .requested_url = resource.url.c_str(),
     .resolved_url = resolved_url.c_str(),
     .kind = kind_to_abi(resource.kind),
@@ -389,13 +403,13 @@ auto make_request_view(
       resource.storagePolicy == mln::Resource::StoragePolicy::Volatile
         ? MLN_RESOURCE_STORAGE_POLICY_VOLATILE
         : MLN_RESOURCE_STORAGE_POLICY_PERMANENT,
-    .has_range = resource.dataRange.has_value(),
-    .range_start = resource.dataRange ? resource.dataRange->first : 0,
-    .range_end = resource.dataRange ? resource.dataRange->second : 0,
-    .has_prior_modified = resource.priorModified.has_value(),
+    .range =
+      resource.dataRange
+        ? mln_resource_range{.start = resource.dataRange->first,
+                             .end = resource.dataRange->second}
+        : mln_resource_range{},
     .prior_modified_unix_ms =
       resource.priorModified ? to_unix_ms(*resource.priorModified) : 0,
-    .has_prior_expires = resource.priorExpires.has_value(),
     .prior_expires_unix_ms =
       resource.priorExpires ? to_unix_ms(*resource.priorExpires) : 0,
     .prior_etag = resource.priorEtag ? resource.priorEtag->c_str() : nullptr,
@@ -424,18 +438,16 @@ auto fail_request(
 ) noexcept -> void {
   const auto response = mln_resource_response{
     .size = sizeof(mln_resource_response),
+    .fields = 0,
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
     .bytes = nullptr,
     .byte_count = 0,
     .error_message = message,
     .must_revalidate = false,
-    .has_modified = false,
     .modified_unix_ms = 0,
-    .has_expires = false,
     .expires_unix_ms = 0,
     .etag = nullptr,
-    .has_retry_after = false,
     .retry_after_unix_ms = 0,
   };
   try {
@@ -538,18 +550,16 @@ auto request_custom_resource(
   } catch (...) {
     auto response = mln_resource_response{
       .size = sizeof(mln_resource_response),
+      .fields = 0,
       .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
       .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
       .bytes = nullptr,
       .byte_count = 0,
       .error_message = "resource request setup failed",
       .must_revalidate = false,
-      .has_modified = false,
       .modified_unix_ms = 0,
-      .has_expires = false,
       .expires_unix_ms = 0,
       .etag = nullptr,
-      .has_retry_after = false,
       .retry_after_unix_ms = 0,
     };
     static_cast<void>(complete_resource_request(handle, &response));
@@ -624,11 +634,18 @@ auto resource_request_cancelled(
 
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data,
-  mln_runtime_callback_release release_user_data, bool* out_cancelled
+  const mln_resource_request_cancel_handler* handler, bool* out_cancelled
 ) -> mln_status {
-  if (callback == nullptr) {
-    set_thread_error("callback must not be null");
+  if (handler == nullptr) {
+    set_thread_error("cancel handler must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (handler->size < sizeof(mln_resource_request_cancel_handler)) {
+    set_thread_error("mln_resource_request_cancel_handler.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (handler->callback == nullptr) {
+    set_thread_error("cancel handler callback must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_cancelled == nullptr) {
@@ -650,9 +667,9 @@ auto set_resource_request_cancel_callback(
   live->cancel_callback_registered = true;
   *out_cancelled = live->cancelled && !live->completed;
   if (!*out_cancelled) {
-    live->cancel_callback = callback;
-    live->cancel_release = release_user_data;
-    live->cancel_user_data = user_data;
+    live->cancel_callback = handler->callback;
+    live->cancel_release = handler->release_user_data;
+    live->cancel_user_data = handler->user_data;
   }
   return MLN_STATUS_OK;
 }

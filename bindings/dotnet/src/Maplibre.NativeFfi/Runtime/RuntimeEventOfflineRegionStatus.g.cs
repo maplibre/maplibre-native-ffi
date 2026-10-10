@@ -9,10 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event_offline_region_status</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Status">
-/// Region status. This member keeps its own size field because the same struct
-/// is also returned by <c>mln_runtime_offline_region_get_status()</c>.
-/// </param>
 public readonly partial record struct RuntimeEventOfflineRegionStatus(
     long RegionId,
     OfflineRegionStatus Status

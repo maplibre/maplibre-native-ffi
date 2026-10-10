@@ -84,7 +84,6 @@ static mln_status attach_owned_texture(still_image_job* job) {
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 1;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = frames_ready,
     .user_data = job,
   };
@@ -196,17 +195,16 @@ void advance_still_image(still_image_job* job) {
       mln_render_session_drain_frame_results(job->session, &batch, NULL) ==
       MLN_STATUS_OK
     ) {
-      size_t count = 0;
-      (void)mln_render_frame_batch_count(batch, &count, NULL);
-      for (size_t index = 0; index < count; ++index) {
-        mln_render_frame_result frame = {.size = sizeof(frame)};
-        if (
-          mln_render_frame_batch_get(batch, index, &frame, NULL) ==
-            MLN_STATUS_OK &&
-          frame.token == 1
-        ) {
+      mln_render_frame_batch_view view = {.size = sizeof(view)};
+      const bool read =
+        mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK;
+      for (size_t index = 0; read && index < view.result_count; ++index) {
+        const mln_render_frame_result* frame =
+          (const mln_render_frame_result*)((const char*)view.results +
+                                           index * view.result_size);
+        if (frame->token == 1) {
           job->frame_pending = false;
-          job->rendered = frame.disposition == MLN_RENDER_RESULT_RENDERED;
+          job->rendered = frame->disposition == MLN_RENDER_RESULT_RENDERED;
         }
       }
       mln_render_frame_batch_release(batch);

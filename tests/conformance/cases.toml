@@ -40,6 +40,7 @@
 "VAL-04" = "Integer narrowing is checked, open enums keep unknown values, and 64-bit carriers round-trip"
 "VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
 "VAL-06" = "A record built from its constructor defaults equals the native default"
+"VAL-07" = "An array completion is read at the result's value_size stride, and a stride narrower than the element is rejected"
 
 # Views and rendering
 "VIEW-01" = "A borrowed view expires with its scope, and its owner refuses to close while it is borrowed"

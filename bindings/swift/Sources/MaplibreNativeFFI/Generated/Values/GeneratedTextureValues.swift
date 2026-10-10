@@ -377,7 +377,7 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   /// Required output buffer byte length.
   public var byteLength: Int
   public static var `default`: Self {
-    Self(raw: mln_texture_image_info_default())
+    Self(raw: mln_texture_image_info())
   }
 
   public init(
@@ -400,7 +400,7 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_texture_image_info {
-    var raw = mln_texture_image_info_default()
+    var raw = mln_texture_image_info()
     raw.width = width
     raw.height = height
     raw.stride = self.stride
@@ -438,7 +438,6 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
     -> mln_texture_readback_result
   {
     var raw = mln_texture_readback_result()
-    raw.size = UInt32(MemoryLayout<mln_texture_readback_result>.size)
     raw.data = arena.view(data)
     raw.info = info.nativeValue()
     return raw

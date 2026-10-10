@@ -295,10 +295,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       binding,
       "mln_render_session_query_rendered_features",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(40, 72).toLong(),
+          CompletionBridge.valueSize(result),
+          w(36, 72),
         ) {
           readQueriedFeature(it)
         }
@@ -317,7 +318,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   /**
    * Starts a source-feature query against the session's latest driver state. The completion borrows
-   * an array of `mln_queried_feature` values (value_count entries), valid only for the callback.
+   * value_count `mln_queried_feature` values, value_size bytes apart, valid only for the callback.
    *
    * See `mln_render_session_query_source_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -331,10 +332,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       binding,
       "mln_render_session_query_source_features",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(40, 72).toLong(),
+          CompletionBridge.valueSize(result),
+          w(36, 72),
         ) {
           readQueriedFeature(it)
         }

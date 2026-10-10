@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlin.system.exitProcess
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal object Main {
@@ -14,10 +15,12 @@ internal object Main {
     check(supportsUsableBackend(backends)) {
       "The loaded MapLibre native library does not support a backend usable by lwjgl-map"
     }
-    GeneratedApi.logSetCallback { severity, event, code, message ->
-      System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
-      1u
-    }
+    GeneratedApi.logSetCallback(
+      LogHandler { severity, event, code, message ->
+        System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
+        1u
+      }
+    )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
     }

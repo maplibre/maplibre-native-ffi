@@ -227,16 +227,20 @@ typedef struct mln_edge_insets {
   double right;
 } mln_edge_insets;
 
+/** Geographic coordinate in degrees used by map and projection APIs. */
+typedef struct mln_lat_lng {
+  /** Latitude in degrees. Input latitude must be finite and within [-90, 90].
+   */
+  double latitude;
+  /** Longitude in degrees. Input longitude must be finite. */
+  double longitude;
+} mln_lat_lng MLN_BINDING("fields=ordered");
+
 /** Camera fields used by snapshots and camera updates. */
 typedef struct mln_camera_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_camera_option_field");
-  double latitude MLN_BINDING(
-    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
-  );
-  double longitude MLN_BINDING(
-    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
-  );
+  mln_lat_lng center MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER");
   double center_altitude
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER_ALTITUDE");
   mln_edge_insets padding
@@ -261,7 +265,6 @@ typedef struct mln_unit_bezier {
 
 /** Optional animation controls for camera transitions. */
 typedef struct mln_animation_options {
-  uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_animation_option_field");
   /**
    * Duration in milliseconds. Must be finite and non-negative. Values that
@@ -317,22 +320,29 @@ typedef enum mln_camera_delta_kind : uint32_t {
   MLN_CAMERA_DELTA_PITCH = 3,
 } mln_camera_delta_kind;
 
+/** Field mask values for mln_camera_delta. */
+typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
+  MLN_CAMERA_DELTA_FIELD_ANCHOR = 1U << 0U,
+} mln_camera_delta_field;
+
 /**
  * One relative camera operation.
  *
  * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
  * PITCH read amount as degrees, added to the current value: a positive PITCH
  * amount tilts the camera further from straight down, the opposite of
- * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when
- * has_anchor is true. Every operation reads animation.
+ * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when fields
+ * contains MLN_CAMERA_DELTA_FIELD_ANCHOR, which no other kind accepts. Every
+ * operation reads animation.
  */
 typedef struct mln_camera_delta {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
   uint32_t kind MLN_BINDING("enum=mln_camera_delta_kind");
   mln_screen_point offset;
   double amount;
-  bool has_anchor;
-  mln_screen_point anchor MLN_BINDING("mask=has_anchor");
+  mln_screen_point anchor
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_FIELD_ANCHOR");
   mln_animation_options animation;
 } mln_camera_delta;
 
@@ -417,15 +427,6 @@ typedef struct mln_free_camera_options {
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_ORIENTATION");
 } mln_free_camera_options;
 
-/** Geographic coordinate in degrees used by map and projection APIs. */
-typedef struct mln_lat_lng {
-  /** Latitude in degrees. Input latitude must be finite and within [-90, 90].
-   */
-  double latitude;
-  /** Longitude in degrees. Input longitude must be finite. */
-  double longitude;
-} mln_lat_lng MLN_BINDING("fields=ordered");
-
 /** Optional fields for mln_feature_state_selector. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -474,7 +475,6 @@ typedef struct mln_bound_options {
 
 /** Tile-pyramid offline region definition. */
 typedef struct mln_offline_tile_pyramid_region_definition {
-  uint32_t size;
   /** Style URL. Copied during region creation. */
   const char* style_url;
   mln_lat_lng_bounds bounds;
@@ -490,7 +490,6 @@ typedef struct mln_offline_tile_pyramid_region_definition {
 
 /** Geometry offline region definition. */
 typedef struct mln_offline_geometry_region_definition {
-  uint32_t size;
   /** Style URL. Copied during region creation. */
   const char* style_url;
   /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
@@ -529,7 +528,6 @@ typedef struct mln_offline_region_definition {
  * completion callback.
  */
 typedef struct mln_offline_region_info {
-  uint32_t size;
   mln_offline_region_id id;
   mln_offline_region_definition definition;
   /** Metadata bytes. */
@@ -595,7 +593,7 @@ MLN_API mln_status mln_runtime_offline_region_get(
  * Starts listing the offline regions in the runtime database.
  *
  * A successful completion borrows value_count mln_offline_region_info values,
- * valid only for the duration of the callback.
+ * value_size bytes apart, valid only for the duration of the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
@@ -634,7 +632,8 @@ MLN_API mln_status mln_runtime_offline_regions_list(
  * diagnostic.
  *
  * A successful completion borrows value_count mln_offline_region_info values,
- * one per merged region, valid only for the duration of the callback.
+ * value_size bytes apart and one per merged region, valid only for the
+ * duration of the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
@@ -916,8 +915,6 @@ typedef struct mln_map_snapshot {
 
 /** Camera result borrowed for an ordered camera-query completion. */
 typedef struct mln_camera_query_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   uint64_t generation;
   mln_camera_options camera;
 } mln_camera_query_result;

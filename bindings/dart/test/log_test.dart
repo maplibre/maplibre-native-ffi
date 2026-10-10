@@ -19,9 +19,13 @@ bool _isDumpRule(String message) => message.startsWith('-----');
 /// Installs a log callback that collects dump rules, and returns them.
 List<(LogSeverity, LogEvent)> _collectDumpRules() {
   final rules = <(LogSeverity, LogEvent)>[];
-  logSetCallback((severity, event, _, message) {
-    if (_isDumpRule(message)) rules.add((severity, event));
-  });
+  logSetCallback(
+    LogHandler(
+      callback: (severity, event, _, message) {
+        if (_isDumpRule(message)) rules.add((severity, event));
+      },
+    ),
+  );
   return rules;
 }
 
@@ -98,7 +102,9 @@ void main() {
   test('a log callback error reaches the zone that installed it', () async {
     final zoneErrors = <Object>[];
     runZonedGuarded(
-      () => logSetCallback((_, _, _, _) => throw StateError('log failed')),
+      () => logSetCallback(
+        LogHandler(callback: (_, _, _, _) => throw StateError('log failed')),
+      ),
       (error, _) => zoneErrors.add(error),
     );
     await dump();

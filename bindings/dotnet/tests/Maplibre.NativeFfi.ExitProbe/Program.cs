@@ -6,7 +6,7 @@ using NativeMaplibre = Maplibre.NativeFfi.Maplibre;
 
 NativeMaplibre.LoadNativeLibrary();
 NativeMaplibre.LogSetAsyncSeverityMask(LogSeverityMask.All);
-NativeMaplibre.LogSetCallback((_, _, _, _) => 0);
+NativeMaplibre.LogSetCallback(new LogHandler((_, _, _, _) => 0));
 
 var held = new TaskCompletionSource<ResourceRequestHandle>(
     TaskCreationOptions.RunContinuationsAsynchronously
@@ -16,7 +16,7 @@ await runtime.SetResourceProviderAsync(
     new ResourceProvider(
         (_, request) =>
         {
-            request.SetCancelCallback(() => { });
+            request.SetCancelCallback(new ResourceRequestCancelHandler(() => { }));
             held.TrySetResult(request);
             return ResourceProviderDecision.Handle;
         }

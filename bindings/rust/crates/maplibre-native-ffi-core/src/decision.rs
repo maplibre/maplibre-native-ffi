@@ -19,7 +19,10 @@ pub type ContextCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 /// Registers a one-shot cancellation notification on a decision handle and
 /// reports whether the handle was already cancelled.
-pub type CancelRegistrationFn<H> = unsafe extern "C" fn(
+///
+/// The generated binding implements it by passing the callback, its context,
+/// and the release in the protocol's registration record.
+pub type CancelRegistrationFn<H> = unsafe fn(
     H,
     ContextCallback,
     *mut c_void,
@@ -223,7 +226,11 @@ impl<H: NativeHandle> DecisionHandleState<H> {
     /// An accepted registration transfers the callback to the C API, which
     /// releases it once it can no longer run. A rejected registration or an
     /// already cancelled handle drops the callback unrun before returning.
-    pub fn register_cancel(&self, callback: Box<dyn FnOnce() + Send + 'static>) -> Result<bool> {
+    /// Without a callback, native rejects the registration.
+    pub fn register_cancel(
+        &self,
+        callback: Option<Box<dyn FnOnce() + Send + 'static>>,
+    ) -> Result<bool> {
         type Registration = (
             u64,
             &'static [&'static str],
@@ -247,15 +254,16 @@ impl<H: NativeHandle> DecisionHandleState<H> {
             }));
         }
         let handle = self.native_for_call()?;
+        let present = callback.is_some();
         let registration: Box<Registration> =
-            Box::new((handle.to_raw(), self.fns.reentry, Some(callback)));
+            Box::new((handle.to_raw(), self.fns.reentry, callback));
         let user_data = Box::into_raw(registration).cast();
         let mut cancelled = false;
         let register = self.fns.cancel_registration;
         let registered = crate::check(|diagnostic| unsafe {
             register(
                 handle,
-                Some(invoke),
+                present.then_some(invoke as unsafe extern "C" fn(*mut c_void)),
                 user_data,
                 Some(release),
                 &mut cancelled,
@@ -461,7 +469,7 @@ mod tests {
         })
     }
 
-    unsafe extern "C" fn fake_cancel_registration(
+    unsafe fn fake_cancel_registration(
         _handle: sys::mln_resource_request_handle,
         _callback: ContextCallback,
         _user_data: *mut c_void,

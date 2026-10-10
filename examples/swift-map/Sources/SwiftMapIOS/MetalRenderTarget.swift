@@ -118,8 +118,7 @@ final class MetalRenderTarget {
     var results = FrameResults()
     // No update and size pending wait for the map's next update, superseded
     // demands have a newer one behind them, and no demand carries a timeout.
-    for index in try 0 ..< (batch.count()) {
-      let result = try batch.get(index: index)
+    for result in try batch.get().results {
       if result.disposition == .rendered {
         results.rendered = true
         results.needsRepaint = result.needsRepaint

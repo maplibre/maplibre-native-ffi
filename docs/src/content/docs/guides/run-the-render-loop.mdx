@@ -71,7 +71,8 @@ Frame readiness is level-triggered. Drain an owned frame-result batch from any
 thread after the frame wake runs. Each batch remains stable until release. Keep
 draining until the queue is empty, which the drain reports with a not-ready
 status and no batch. A binding returns its language's empty value instead of an
-error.
+error. In C, read a batch through one borrowed view and step through its results
+by the stride that the view reports.
 
 A rendered result means that a frame was presented or became available for
 acquisition or readback. No update and size pending wait for a newer map update,

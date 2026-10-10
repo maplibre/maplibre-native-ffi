@@ -7,6 +7,7 @@ export 'src/runtime/runtime.dart'
     hide
         CallbackPortLifecycleProbe,
         adoptOwnedForTesting,
+        decodeLatLngListForTesting,
         decodeRuntimeEventBatchForTesting,
         globalCallbackPortProbeForTesting,
         singleCallbackPortProbeForTesting;

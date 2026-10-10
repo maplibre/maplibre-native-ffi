@@ -1,8 +1,9 @@
 """Semantic mutation tests shared by every static language backend."""
 
+import re
 import unittest
 
-from support import parse
+from support import parse, parse_sources, protocol_header
 
 from tools.bindgen import default_cases, native_ports
 from tools.bindgen.emitters import dart
@@ -204,15 +205,17 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
 typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
 typedef struct extent { unsigned width; } extent;
 typedef struct turn { double w; } turn;
+typedef enum BIND("kind=bitmask") settings_field : unsigned {
+  SETTINGS_TURN = 1, SETTINGS_ZOOM = 2
+} settings_field;
 typedef struct settings {
   unsigned size;
-  bool has_zoom;
-  bool has_turn;
+  unsigned fields BIND("enum=settings_field");
   extent area;
-  turn orientation BIND("mask=has_turn");
+  turn orientation BIND("mask=fields;bit=SETTINGS_TURN");
   unsigned level;
   unsigned mode BIND("enum=mode");
-  double zoom BIND("mask=has_zoom");
+  double zoom BIND("mask=fields;bit=SETTINGS_ZOOM");
   unsigned reserved BIND("kind=reserved");
 } settings;
 settings settings_default(void);
@@ -236,8 +239,8 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
             ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
             (
-                'BIND("mask=has_zoom")',
-                'BIND("mask=has_zoom;default=1.0")',
+                'BIND("mask=fields;bit=SETTINGS_ZOOM")',
+                'BIND("mask=fields;bit=SETTINGS_ZOOM;default=1.0")',
                 "plain value",
             ),
             ("extent area;", 'extent area BIND("default=1");', "plain value"),
@@ -277,49 +280,107 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             FieldInitial("256", 256),
         )
 
-    def test_mask_group_preserves_joint_presence(self):
+    def test_each_struct_is_versioned_by_one_thing(self):
+        header = protocol_header(groups=("versioning", "strided_records"))
+        bind(parse_sources({"api.h": header}), require_complete=True)
+        message = "struct versioned by its container or stride must not carry size"
+        for name in (
+            "mln_probe_span",
+            "mln_probe_survey",
+            "mln_probe_tally",
+            "mln_probe_reading",
+        ):
+            with (
+                self.subTest(record=name),
+                self.assertRaisesRegex(ModelError, rf"{name}: {message}"),
+            ):
+                bind(
+                    parse_sources(
+                        {
+                            "api.h": header.replace(
+                                f"typedef struct {name} {{\n",
+                                f"typedef struct {name} {{\n  uint32_t size;\n",
+                            )
+                        }
+                    )
+                )
+        # A default initializes a record that native reads, so a record that
+        # only a completion delivers has none.
+        with self.assertRaisesRegex(
+            ModelError, "mln_probe_survey: default requires a record that native reads"
+        ):
+            bind(
+                parse_sources(
+                    {
+                        "api.h": header
+                        + "mln_probe_survey mln_probe_survey_default(void);\n"
+                    }
+                )
+            )
+
+    def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
 typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;
 typedef struct options {
   unsigned fields BIND("enum=fields");
   double latitude BIND("mask=fields;bit=CENTER");
-  double longitude BIND("mask=fields;bit=CENTER");
-  double zoom BIND("mask=fields;bit=ZOOM");
+  double longitude BIND("mask=fields;bit=ZOOM");
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
-        self.assertEqual(value.presence_groups[0].fields, ("latitude", "longitude"))
         self.assertEqual(value.fields[0].role, "presence_mask")
         self.assertEqual(value.fields[0].value.enum_kind, "bitmask")
-        with self.assertRaisesRegex(ModelError, "both mask and bit"):
+        with self.assertRaisesRegex(
+            ModelError,
+            r"options\.longitude: presence bit CENTER guards more than one "
+            "member; embed a record",
+        ):
             bind(
-                self.parse(source.replace("mask=fields;bit=ZOOM", "mask=fields")),
+                self.parse(source.replace("bit=ZOOM", "bit=CENTER")),
+                require_complete=True,
+            )
+        with self.assertRaisesRegex(ModelError, "both mask and bit") as raised:
+            bind(
+                self.parse(re.sub(r";bit=\w+", "", source)),
+                require_complete=True,
+            )
+        self.assertNotIn("guards more than one member", str(raised.exception))
+        with self.assertRaisesRegex(
+            ModelError,
+            r"options\.item_count: a count takes its array's presence; "
+            "drop mask and bit",
+        ):
+            bind(
+                self.parse(
+                    source.replace(
+                        'double longitude BIND("mask=fields;bit=ZOOM");',
+                        "const double *items "
+                        'BIND("length=item_count;mask=fields;bit=ZOOM");\n'
+                        'unsigned long item_count BIND("mask=fields;bit=ZOOM");',
+                    )
+                ),
                 require_complete=True,
             )
 
-    def test_boolean_presence_preserves_optional_groups(self):
-        source = """
-typedef struct range_value {
-  bool has_range;
-  unsigned start BIND("mask=has_range");
-  unsigned end BIND("mask=has_range");
-} range_value;
-mln_status write_range(const range_value *value, mln_diagnostic *out_diagnostic);
-"""
-        api = bind(self.parse(source), require_complete=True)
-        value = api.operations[0].inputs[0].value.element
-        group = value.presence_groups[0]
-        self.assertEqual(
-            (group.mask, group.bit, group.fields), ("has_range", None, ("start", "end"))
+    def test_a_nested_presence_bit_guards_a_member_of_each_record(self):
+        # The route reuses the camera's bit through the mask path
+        # camera.fields, as a source result reuses its info's bits.
+        api = bind(parse(groups=("presence_mask",)), require_complete=True)
+        route = api.values["mln_camera_route"]
+        stops = next(field for field in route.fields if field.name == "stops")
+        center = next(
+            field for field in api.values["mln_camera"].fields if field.name == "center"
         )
-        self.assertEqual(value.fields[0].role, "presence_mask")
-        with self.assertRaisesRegex(ModelError, "boolean mask"):
-            bind(
-                self.parse(source.replace("bool has_range", "unsigned has_range")),
-                require_complete=True,
-            )
+        self.assertEqual(
+            (stops.presence.mask, stops.presence.bit),
+            ("camera.fields", "MLN_CAMERA_CENTER"),
+        )
+        self.assertEqual(
+            (center.presence.mask, center.presence.bit),
+            ("fields", "MLN_CAMERA_CENTER"),
+        )
 
     def test_copied_values_hold_registrations_only_in_defaults(self):
         source = """
@@ -372,11 +433,12 @@ mln_status configure(const settings *options, const hook *events, const request 
 typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
-typedef struct settings { bool has_wake; FIELD } settings;
+typedef enum BIND("kind=bitmask") settings_field : unsigned { SETTINGS_WAKE = 1 } settings_field;
+typedef struct settings { unsigned fields BIND("enum=settings_field"); FIELD } settings;
 settings settings_default(void);
 """
         for field in (
-            'signals wake BIND("mask=has_wake");',
+            'signals wake BIND("mask=fields;bit=SETTINGS_WAKE");',
             'const signals *wake BIND("nullable=true");',
         ):
             with (
@@ -792,11 +854,12 @@ typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
+typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
 typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("accepted_unless=cancelled") mln_status on_cancel(
+  request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
@@ -809,9 +872,9 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         )
         self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
-        registration = model.operations_by_name["on_cancel"].direct_registrations[0]
+        (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
-            (registration.release_callback, registration.accepted_unless),
+            (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
         )
         for before, after, error in (
@@ -830,9 +893,9 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             ),
             ("accepted_unless=cancelled", "accepted_unless=value", "boolean output"),
             (
-                "release_callback=release",
-                "release_callback=value",
-                "void callback taking its context",
+                "const cancel_handler *handler",
+                "cancel callback",
+                "one registration parameter",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
@@ -869,6 +932,12 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             ),
             ("absent_on=MLN_STATUS_MISSING", one, "failure enumerator"),
             ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
+            # A drain is absent on MLN_STATUS_NOT_READY by convention.
+            (
+                "execution=event_batch;absent_on=MLN_STATUS_NOT_READY",
+                one,
+                "absent_on=MLN_STATUS_NOT_READY restates the default",
+            ),
         ):
             source = f'BIND("{annotation}") mln_status read({parameters});'
             with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
@@ -880,20 +949,14 @@ typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 """
-        for annotation, parameters in (
-            ("absent_on=MLN_STATUS_NOT_READY", "const signals *events, " + one),
-            (
-                "registration=signal;release_callback=retire;absent_on=MLN_STATUS_NOT_READY",
-                'notify signal, void *state BIND("kind=context"), release retire, '
-                + one,
-            ),
-        ):
-            source = callbacks + f'BIND("{annotation}") mln_status read({parameters});'
-            with (
-                self.subTest(source=source),
-                self.assertRaisesRegex(ModelError, "without registrations"),
-            ):
-                bind(self.parse(source), require_complete=True)
+        source = (
+            callbacks
+            + 'BIND("absent_on=MLN_STATUS_NOT_READY") mln_status read(const signals *events, '
+            + one
+            + ");"
+        )
+        with self.assertRaisesRegex(ModelError, "without registrations"):
+            bind(self.parse(source), require_complete=True)
 
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
         source = """
@@ -901,12 +964,13 @@ typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
+typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
 typedef unsigned (*provider)(void *context, const char *url, request ticket) BIND("enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 typedef unsigned (*logger)(void *context, int code) BIND("failure=0;deferred=1");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("accepted_unless=cancelled") mln_status on_cancel(
+  request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
@@ -940,8 +1004,8 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
 BIND("synchronous=true") typedef void (*gate)(void *context);
 typedef void (*notify)(void *context);
 typedef void (*release)(void *context);
-typedef struct gates { unsigned size; gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
-typedef struct signals { unsigned size; notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct gates { gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
+typedef struct signals { notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 typedef struct settings { unsigned size; signals wake; gates guard; } settings;
 settings settings_default(void);
 mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
@@ -1001,13 +1065,22 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         )
 
     def test_receiver_registration_transfers_its_root_unless_declined(self):
-        model = bind(parse(groups=("direct_registration",)), require_complete=True)
+        model = bind(parse(groups=("declinable_registration",)), require_complete=True)
         operation = model.operations_by_name["mln_ticket_on_cancel"]
         self.assertEqual(operation.receiver, "ticket")
-        (registration,) = operation.direct_registrations
+        (registration,) = operation.registrations
         self.assertEqual(
-            (registration.release_callback, registration.accepted_unless),
+            (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
+        )
+        # The cancel callback names its owner by handle type, so it calls back
+        # only into the ticket that registers it.
+        policy = model.callbacks["mln_ticket_cancel"].reentry_policy
+        self.assertEqual(
+            (policy.owner_parameter, policy.owner_type), (None, "mln_ticket")
+        )
+        self.assertTrue(
+            model.values["mln_ticket_cancel_handler"].registration.receiver_owned
         )
 
     def test_disposal_support_requires_a_handle_consumer(self):

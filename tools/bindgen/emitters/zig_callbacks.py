@@ -81,8 +81,9 @@ def parts(values, value):
                 converted.append(expression)
         policy = plan.reentry_policy
         owner = "0"
-        if policy and policy.registration_owner:
-            owner = "state.value.owner"
+        if policy and policy.owner_parameter is None:
+            # The receiver that registered the callback, which the roots record.
+            owner = "state.owner"
         elif policy:
             parameter = next(
                 p for p in plan.parameters if p.name == policy.owner_parameter

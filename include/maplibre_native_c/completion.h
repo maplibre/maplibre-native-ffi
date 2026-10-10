@@ -42,14 +42,20 @@ typedef struct mln_completion_result {
   int32_t status MLN_BINDING("enum=mln_status");
   /** One of mln_command_disposition. */
   uint32_t disposition MLN_BINDING("enum=mln_command_disposition");
-  uint32_t reserved MLN_BINDING("kind=reserved");
+  /**
+   * Byte stride of one element of value: sizeof the result record in the
+   * native build, at least sizeof in the caller's header. Zero when value is
+   * null. Index array results with this value.
+   */
+  uint32_t value_size;
   /** Map snapshot generation published by a committed command, or zero. */
   uint64_t generation;
   /** Borrowed diagnostic bytes, empty on success. */
   mln_buffer_view diagnostic;
   /** Borrowed function-specific result, or null when the function has none. */
-  const void* value MLN_BINDING("kind=erased");
-  /** Function-specific element or byte count for value. */
+  const void* value
+    MLN_BINDING("kind=erased;length=value_count;stride=value_size");
+  /** Function-specific element count for value. */
   size_t value_count;
 } mln_completion_result;
 
@@ -57,9 +63,6 @@ typedef struct mln_completion_result {
 typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );
-
-/** Releases user_data after its completion can no longer run. */
-typedef void (*mln_completion_release)(void* user_data);
 
 /**
  * Callback state for one asynchronous submission.
@@ -79,7 +82,11 @@ typedef struct mln_completion {
   uint32_t size;
   mln_completion_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  mln_completion_release release_user_data;
+  /**
+   * Optional. Releases user_data on the completing thread after the completion
+   * returns.
+   */
+  mln_user_data_release release_user_data;
 } mln_completion MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

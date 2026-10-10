@@ -98,5 +98,11 @@ do {
   )
 }
 
+// A strided view decodes each plain record at the stride native reports.
+let ledger = try Maplibre.probeLedgerOpen()
+let readings = try ledger.get().readings.map(\.value)
+check(readings == [7, 9], "strided readings: \(readings)")
+try ledger.close()
+
 try check(Maplibre.probeReadLevel() == nil, "absent level")
 try check(Maplibre.probeReadLevel() == 0.5, "published level")

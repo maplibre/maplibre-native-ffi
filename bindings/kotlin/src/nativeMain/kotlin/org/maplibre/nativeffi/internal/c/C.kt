@@ -125,17 +125,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_buffer_destroy(buffer: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_buffer_destroy(buffer.toULong())
-  }
-
-  actual fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_buffer_get(
-      buffer.toULong(),
-      outView.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
 
   actual fun mln_camera_delta_default(returned: Long) {
@@ -261,16 +250,9 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_log_set_callback(
-      callback.toCPointer(),
-      userData.toCPointer<CPointed>(),
-      releaseUserData.toCPointer(),
+      handler.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2132,23 +2114,10 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_render_frame_batch_count(batch: Long, outCount: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_count(
-      batch.toULong(),
-      outCount.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_frame_batch_get(
-    batch: Long,
-    index: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_get(
       batch.toULong(),
-      index.convert(),
-      outResult.toCPointer(),
+      outView.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2436,17 +2405,13 @@ internal actual object C {
 
   actual fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_resource_request_set_cancel_callback(
       handle.toULong(),
-      callback.toCPointer(),
-      userData.toCPointer<CPointed>(),
-      releaseUserData.toCPointer(),
+      handler.toCPointer(),
       outCancelled.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -2768,12 +2733,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_style_image_info_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_image_info_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_style_image_options_default(returned: Long) {
     org.maplibre.nativeffi.internal.cinterop
       .mln_style_image_options_default()
@@ -2794,12 +2753,6 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_supported_render_backend_mask().toInt()
-
-  actual fun mln_texture_image_info_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_texture_image_info_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_texture_read_premultiplied_rgba8(
     session: Long,

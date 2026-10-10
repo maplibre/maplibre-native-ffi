@@ -16,9 +16,6 @@ TRAIT_COPY = "unsafe {{ from_native({}) }}?"
 def dynamic(value):
     return (
         bool(value.registration)
-        or any(
-            len(group.fields) > 1 and not group.type for group in value.presence_groups
-        )
         or value.kind in {"buffer", "array", "reference", "union"}
         or any(dynamic(f.value) for f in value.fields if f.role == "value")
     )
@@ -91,7 +88,9 @@ def decode(values, value, source, context="raw"):
         if value.kind == "buffer" and value.length == "nul":
             return TRAIT_COPY.format(source)
         if value.kind == "reference":
-            return f"unsafe {{ convert::copy_optional_reference({source}) }}?"
+            # An optional record member takes a presence bit, so only a
+            # pointer-shaped value is nullable.
+            raise Unsupported(f"{source}: a copied record holds a nullable reference")
         if (
             value.kind == "array"
             and value.ctype.kind != "array"
@@ -160,7 +159,7 @@ def comparable(value):
 
 def presence(mask, bit):
     """The mask place and the bit that marks one optional field."""
-    return mask, (f"sys::{bit}" if bit else "true")
+    return mask, f"sys::{bit}"
 
 
 def declaration(values, value):
@@ -169,11 +168,9 @@ def declaration(values, value):
     raw = f"sys::{value.native}"
     copyable = not dynamic(value)
     fields, writes, copies, args, names = [], [], [], [], []
-    extra = []
     for field in value.fields:
         if field.role == "presence_mask":
-            reset = "false" if field.value.ctype.canonical in {"_Bool", "bool"} else "0"
-            writes.append(f"raw.{native_identifier(field.name)} = {reset};")
+            writes.append(f"raw.{native_identifier(field.name)} = 0;")
         elif field.role == "size":
             writes.insert(
                 0,
@@ -187,50 +184,11 @@ def declaration(values, value):
             f"convert::set_flag(&mut raw.{mask}, sys::{flag.name}, self.{local});"
         )
         copies.append(f"{local}: raw.{mask} & sys::{flag.name} != 0,")
-    members = {field.name: field for field in value.fields}
-    grouped = set()
-    for group in value.presence_groups:
-        if len(group.fields) < 2:
-            continue
-        grouped.update(group.fields)
-        mask, bit = presence(f"raw.{native_identifier(group.mask)}", group.bit)
-        local = identifier(group.member)
-        if group.type:
-            # The group type supplies the member names and their conversion
-            # rules.
-            group_name = values.public(values.bound.values[group.type])
-        else:
-            group_name = name + pascal(group.member)
-            extra.append(
-                f"#[derive(Debug, Clone, PartialEq, Default)] pub struct {group_name} {{ "
-                + ", ".join(
-                    f"pub {identifier(member)}: {values.public(members[member].value)}"
-                    for member in group.fields
-                )
-                + " }"
-            )
-        fields.append(f"    pub {local}: Option<{group_name}>,")
-        assigned = " ".join(
-            f"raw.{native_identifier(member)} = {encode(values, members[member].value, 'item.' + identifier(member))};"
-            for member in group.fields
-        )
-        writes.append(
-            f"if let Some(item) = &self.{local} {{ {mask_mark(mask, bit)}; {assigned} }}"
-        )
-        copied = ", ".join(
-            f"{identifier(member)}: {decode(values, members[member].value, 'raw.' + native_identifier(member))}"
-            for member in group.fields
-        )
-        copies.append(
-            f"{local}: if {mask_test(mask, bit)} {{ Some({group_name} {{ {copied} }}) }} else {{ None }},"
-        )
     item_buffer = values.item_buffers.get(value.native)
     if item_buffer:
         fields.append(f"    pub {identifier(item_buffer.field)}: String,")
         copies.append(f"{identifier(item_buffer.field)}: String::new(),")
     for field in value.fields:
-        if field.name in grouped:
-            continue
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
             continue
         place, local = f"raw.{native_identifier(field.name)}", identifier(field.name)
@@ -298,7 +256,9 @@ def declaration(values, value):
             constructors.append(
                 f"pub fn {method}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {union_name}::{pascal(member.name)}(value) }} }}"
             )
-    elif copyable and not value.presence_groups:
+    elif copyable and not any(
+        field.presence and field.presence.mask for field in value.fields
+    ):
         constructors.append(
             f"pub const fn new({', '.join(args)}) -> Self {{ Self {{ {', '.join(names)} }} }}"
         )
@@ -341,8 +301,7 @@ def declaration(values, value):
         else ""
     )
     return (
-        "\n".join(extra)
-        + f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name} {{\n"
+        f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
         + default
@@ -372,8 +331,8 @@ def masked_field(values, field, place, local):
 
 
 def mask_mark(mask, bit):
-    return f"{mask} = true" if bit == "true" else f"{mask} |= {bit}"
+    return f"{mask} |= {bit}"
 
 
 def mask_test(mask, bit):
-    return mask if bit == "true" else f"{mask} & {bit} != 0"
+    return f"{mask} & {bit} != 0"

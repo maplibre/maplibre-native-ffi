@@ -212,13 +212,10 @@ pub fn log_set_async_severity_mask(mask: LogSeverityMask) -> Result<()> {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_set_callback(callback_: Option<LogCallback>) -> Result<()> {
+pub fn log_set_callback(handler: LogHandler) -> Result<()> {
     let mut call = Call::global("mln_log_set_callback")?;
-    let (callback_, user_data, release_user_data) =
-        log_callback_registration(callback_, call.arena());
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_log_set_callback(callback_, user_data, release_user_data, out_diagnostic)
-    })?;
+    let handler = call.reference(&handler)?;
+    call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
     Ok(())
 }
 
@@ -509,16 +506,6 @@ pub fn source_feature_query_options_default() -> Result<SourceFeatureQueryOption
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn style_image_info_default() -> Result<StyleImageInfo> {
-    let mut call = Call::global("mln_style_image_info_default")?;
-    let value = call.run(|_| unsafe { sys::mln_style_image_info_default() });
-    Ok(unsafe { from_native(value) }?)
-}
-
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the
@@ -556,16 +543,6 @@ pub fn style_transition_options_default() -> Result<StyleTransitionOptions> {
 pub fn supported_render_backend_mask() -> Result<RenderBackendFlag> {
     let mut call = Call::global("mln_supported_render_backend_mask")?;
     let value = call.run(|_| unsafe { sys::mln_supported_render_backend_mask() });
-    Ok(unsafe { from_native(value) }?)
-}
-
-/// Returns texture image info defaults for this C API version.
-///
-/// See `mln_texture_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn texture_image_info_default() -> Result<TextureImageInfo> {
-    let mut call = Call::global("mln_texture_image_info_default")?;
-    let value = call.run(|_| unsafe { sys::mln_texture_image_info_default() });
     Ok(unsafe { from_native(value) }?)
 }
 

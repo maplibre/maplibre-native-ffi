@@ -42,7 +42,7 @@ func packMessageArena(
 
 /// One batch a test built over storage it owns.
 struct SynthesizedEventBatch {
-  let batch: mln_runtime_event_batch_view
+  let batch: mln_event_batch_view
   /// The event records, for a test that overwrites them after a decode.
   let records: UnsafeMutableRawBufferPointer
   /// The message arena, for the same reason.
@@ -87,8 +87,8 @@ func withSynthesizedEventBatch<Result>(
         }
       }
 
-      var batch = mln_runtime_event_batch_view()
-      batch.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
+      var batch = mln_event_batch_view()
+      batch.size = UInt32(MemoryLayout<mln_event_batch_view>.size)
       batch.event_size = UInt32(stride)
       batch.events = events.isEmpty
         ? nil

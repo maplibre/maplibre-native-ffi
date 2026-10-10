@@ -298,7 +298,6 @@ typedef struct mln_opengl_owned_texture_frame {
 
 /** CPU image readback metadata for a texture target frame. */
 typedef struct mln_texture_image_info {
-  uint32_t size;
   /** Physical image width in device pixels. */
   uint32_t width;
   /** Physical image height in device pixels. */
@@ -311,8 +310,6 @@ typedef struct mln_texture_image_info {
 
 /** Texture readback borrowed for a completion callback. */
 typedef struct mln_texture_readback_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   /** Borrowed pixel bytes, valid only during the callback. */
   mln_buffer_view data MLN_BINDING("encoding=bytes");
   mln_texture_image_info info;
@@ -365,12 +362,6 @@ mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_webgpu_borrowed_texture_descriptor
 mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns texture image info defaults for this C API version.
- */
-MLN_API mln_texture_image_info
-mln_texture_image_info_default(void) MLN_NOEXCEPT;
 
 /**
  * Starts attachment of a session-owned Metal texture ring.

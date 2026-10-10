@@ -283,8 +283,8 @@ def test_replacing_the_log_callback_releases_the_previous_one(
     logged = second.called
 
     try:
-        mln.log_set_callback(first)
-        mln.log_set_callback(second)
+        mln.log_set_callback(mln.LogHandler(first))
+        mln.log_set_callback(mln.LogHandler(second))
         del first
         assert first_retired.wait(TIMEOUT)
 
@@ -316,7 +316,9 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
 
     callback = _Retiring()
     retired = callback.retired
-    assert handle.set_cancel_callback(callback) is True
+    assert (
+        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback)) is True
+    )
     del callback
     assert retired.is_set()
     handle.close()

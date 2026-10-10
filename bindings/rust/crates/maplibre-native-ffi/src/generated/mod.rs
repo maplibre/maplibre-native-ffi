@@ -14,8 +14,6 @@ mod values;
 pub use values::*;
 mod acquired_frame;
 pub use acquired_frame::*;
-mod buffer;
-pub use buffer::*;
 mod event_batch;
 pub use event_batch::*;
 mod geojson_source_data;
@@ -35,8 +33,6 @@ pub use global::*;
 
 #[cfg(test)]
 static_assertions::assert_impl_all!(AcquiredFrameHandle: Send, Sync);
-#[cfg(test)]
-static_assertions::assert_impl_all!(BufferHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(EventBatchHandle: Send, Sync);
 #[cfg(test)]

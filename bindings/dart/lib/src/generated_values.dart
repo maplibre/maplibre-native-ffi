@@ -65,6 +65,17 @@ final class CameraChangeMode extends _Enum {
   static const animated = CameraChangeMode.fromRawValue(1);
 }
 
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraDeltaField extends _Flags<CameraDeltaField> {
+  const CameraDeltaField.fromRawValue(super.rawValue);
+  static const anchor = CameraDeltaField.fromRawValue(1);
+  @override
+  CameraDeltaField _of(int rawValue) => CameraDeltaField.fromRawValue(rawValue);
+}
+
 /// Relative camera operation carried by `mln_camera_delta`.
 ///
 /// See `mln_camera_delta_kind` in the
@@ -670,7 +681,8 @@ final class RenderSessionState extends _Enum {
 final class RenderedFeatureQueryOptionField
     extends _Flags<RenderedFeatureQueryOptionField> {
   const RenderedFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const ids = RenderedFeatureQueryOptionField.fromRawValue(1);
+  static const layerIds = RenderedFeatureQueryOptionField.fromRawValue(1);
+  static const filter = RenderedFeatureQueryOptionField.fromRawValue(2);
   @override
   RenderedFeatureQueryOptionField _of(int rawValue) =>
       RenderedFeatureQueryOptionField.fromRawValue(rawValue);
@@ -726,6 +738,46 @@ final class ResourceProviderDecision extends _Enum {
   const ResourceProviderDecision.fromRawValue(super.rawValue);
   static const passThrough = ResourceProviderDecision.fromRawValue(0);
   static const handle = ResourceProviderDecision.fromRawValue(1);
+}
+
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRequestField extends _Flags<ResourceRequestField> {
+  const ResourceRequestField.fromRawValue(super.rawValue);
+
+  /// The request asks only for the bytes in range.
+  static const range = ResourceRequestField.fromRawValue(1);
+
+  /// The cached copy being revalidated carries a modification time.
+  static const priorModified = ResourceRequestField.fromRawValue(2);
+
+  /// The cached copy being revalidated carries an expiration time.
+  static const priorExpires = ResourceRequestField.fromRawValue(4);
+  @override
+  ResourceRequestField _of(int rawValue) =>
+      ResourceRequestField.fromRawValue(rawValue);
+}
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceResponseField extends _Flags<ResourceResponseField> {
+  const ResourceResponseField.fromRawValue(super.rawValue);
+
+  /// The response carries a modification time.
+  static const modified = ResourceResponseField.fromRawValue(1);
+
+  /// The response carries an expiration time.
+  static const expires = ResourceResponseField.fromRawValue(2);
+
+  /// An ERROR response carries the earliest time to retry the request.
+  static const retryAfter = ResourceResponseField.fromRawValue(4);
+  @override
+  ResourceResponseField _of(int rawValue) =>
+      ResourceResponseField.fromRawValue(rawValue);
 }
 
 /// How a resource provider answered a request.
@@ -871,7 +923,8 @@ final class RuntimeEventType extends _Enum {
 final class SourceFeatureQueryOptionField
     extends _Flags<SourceFeatureQueryOptionField> {
   const SourceFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const ids = SourceFeatureQueryOptionField.fromRawValue(1);
+  static const sourceLayerIds = SourceFeatureQueryOptionField.fromRawValue(1);
+  static const filter = SourceFeatureQueryOptionField.fromRawValue(2);
   @override
   SourceFeatureQueryOptionField _of(int rawValue) =>
       SourceFeatureQueryOptionField.fromRawValue(rawValue);
@@ -914,6 +967,26 @@ final class Status extends _Enum {
 
   /// A command or operation named an ID with no live object behind it.
   static const notFound = Status.fromRawValue(-10);
+}
+
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class StyleImageInfoField extends _Flags<StyleImageInfoField> {
+  const StyleImageInfoField.fromRawValue(super.rawValue);
+
+  /// The image declares a content box.
+  static const content = StyleImageInfoField.fromRawValue(1);
+
+  /// The image declares a horizontal text-fit mode.
+  static const textFitWidth = StyleImageInfoField.fromRawValue(2);
+
+  /// The image declares a vertical text-fit mode.
+  static const textFitHeight = StyleImageInfoField.fromRawValue(4);
+  @override
+  StyleImageInfoField _of(int rawValue) =>
+      StyleImageInfoField.fromRawValue(rawValue);
 }
 
 /// Field mask values for `mln_style_image_options`.
@@ -989,6 +1062,9 @@ final class StyleSourceInfoField extends _Flags<StyleSourceInfoField> {
 
   /// The source exposes a DEM raster encoding.
   static const rasterEncoding = StyleSourceInfoField.fromRawValue(32);
+
+  /// The source declares an attribution string.
+  static const attribution = StyleSourceInfoField.fromRawValue(64);
   @override
   StyleSourceInfoField _of(int rawValue) =>
       StyleSourceInfoField.fromRawValue(rawValue);
@@ -1260,7 +1336,8 @@ final class GpuSync extends _Value {
   List<Object?> get _members => [kind, object, value];
 }
 
-/// Immutable result record copied into an owned frame-result batch.
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1696,11 +1773,12 @@ final class CanonicalTileId extends _Value {
   List<Object?> get _members => [z, x, y];
 }
 
-/// Callback invoked for custom geometry source tile requests and cancels.
+/// Callback invoked for custom geometry and custom MVT vector source tile
+/// requests and cancels.
 ///
-/// See `mln_custom_geometry_source_tile_callback` in the
+/// See `mln_custom_source_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomGeometrySourceTileCallback = void Function(CanonicalTileId);
+typedef CustomSourceTileCallback = void Function(CanonicalTileId);
 
 /// Options for custom geometry sources.
 ///
@@ -1718,8 +1796,8 @@ final class CustomGeometrySourceOptions {
     this.clip,
     this.wrap,
   });
-  final CustomGeometrySourceTileCallback? fetchTile;
-  final CustomGeometrySourceTileCallback? cancelTile;
+  final CustomSourceTileCallback? fetchTile;
+  final CustomSourceTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
   final double? tolerance;
@@ -1728,12 +1806,6 @@ final class CustomGeometrySourceOptions {
   final bool? clip;
   final bool? wrap;
 }
-
-/// Callback invoked for custom MVT vector source tile requests and cancels.
-///
-/// See `mln_custom_mvt_vector_source_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomMvtVectorSourceTileCallback = void Function(CanonicalTileId);
 
 /// Options for custom MVT vector sources.
 ///
@@ -1746,8 +1818,8 @@ final class CustomMvtVectorSourceOptions {
     this.minZoom,
     this.maxZoom,
   });
-  final CustomMvtVectorSourceTileCallback? fetchTile;
-  final CustomMvtVectorSourceTileCallback? cancelTile;
+  final CustomSourceTileCallback? fetchTile;
+  final CustomSourceTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
 }
@@ -1928,9 +2000,6 @@ final class RuntimeEventOfflineRegionStatus extends _Value {
     required this.status,
   });
   final int regionId;
-
-  /// Region status. This member keeps its own size field because the same
-  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
   final OfflineRegionStatus status;
 
   @override
@@ -2067,10 +2136,10 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 
 /// A borrowed view of one owned runtime-event batch.
 ///
-/// See `mln_runtime_event_batch_view` in the
+/// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventBatchView extends _Value {
-  RuntimeEventBatchView({required List<RuntimeEvent> events})
+final class EventBatchView extends _Value {
+  EventBatchView({required List<RuntimeEvent> events})
     : events = List.unmodifiable(events);
 
   /// Borrowed array of event_count events in queue order.
@@ -2251,6 +2320,15 @@ final class ProjectedMeters extends _Value {
 /// See `mln_log_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
+
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+final class LogHandler {
+  const LogHandler({required this.callback});
+  final LogCallback callback;
+}
 
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
@@ -2495,7 +2573,7 @@ final class StyleImageInfo extends _Value {
     this.content,
     this.textFitWidth,
     this.textFitHeight,
-    this.pixelRatio = 1.0,
+    this.pixelRatio = 0,
     this.sdf = false,
   });
   final int width;
@@ -2509,16 +2587,18 @@ final class StyleImageInfo extends _Value {
   final int stretchXCount;
   final int stretchYCount;
 
-  /// Content box, meaningful only when has_content is true.
+  /// Content box, meaningful when fields contains CONTENT.
   final ImageContent? content;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_WIDTH.
   final StyleImageTextFit? textFitWidth;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_HEIGHT.
   final StyleImageTextFit? textFitHeight;
 
-  /// Sprite pixel ratio. Defaults to 1.0.
+  /// Sprite pixel ratio.
   final double pixelRatio;
   final bool sdf;
 
@@ -2620,9 +2700,17 @@ final class StyleSourceTileInfo extends _Value {
     this.maxZoom = 0,
     this.scheme = const StyleTileScheme.fromRawValue(0),
   });
+
+  /// Inline tile URL count.
   final int tileCount;
+
+  /// Minimum zoom.
   final double minZoom;
+
+  /// Maximum zoom.
   final double maxZoom;
+
+  /// One of `mln_style_tile_scheme`.
   final StyleTileScheme scheme;
 
   @override
@@ -2656,11 +2744,14 @@ final class StyleSourceInfo extends _Value {
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution byte length, excluding any null terminator.
+  /// Attribution byte length, excluding any null terminator, meaningful when
+  /// fields contains ATTRIBUTION.
   final int? attributionSize;
 
   /// URL byte length, meaningful when fields contains URL.
   final int? urlSize;
+
+  /// Inline tile metadata, meaningful when fields contains TILEJSON.
   final StyleSourceTileInfo? tilejson;
 
   /// Geographic bounds, meaningful when fields contains BOUNDS.
@@ -3376,6 +3467,21 @@ final class OpenglSurfaceDescriptor extends _Value {
   List<Object?> get _members => [extent, context, surface];
 }
 
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class RenderFrameBatchView extends _Value {
+  RenderFrameBatchView({required List<RenderFrameResult> results})
+    : results = List.unmodifiable(results);
+
+  /// Borrowed array of result_count terminal frame results in completion order.
+  final List<RenderFrameResult> results;
+
+  @override
+  List<Object?> get _members => [results];
+}
+
 final class RenderAbandonResult extends _Value {
   const RenderAbandonResult({
     this.disposition = const RenderAbandonDisposition.fromRawValue(0),
@@ -3566,7 +3672,7 @@ final class RenderedFeatureQueryOptions extends _Value {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
   @override
@@ -3614,13 +3720,17 @@ final class SourceFeatureQueryOptions extends _Value {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
   @override
   List<Object?> get _members => [sourceLayerIds, filter];
 }
 
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceResponse extends _Value {
   ResourceResponse({
     this.status = const ResourceResponseStatus.fromRawValue(0),
@@ -3665,21 +3775,26 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRequestCancelHandler {
+  const ResourceRequestCancelHandler({required this.callback});
+  final ResourceRequestCancelCallback callback;
+}
+
 /// Options used when creating a runtime.
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
   const RuntimeOptions({
-    this.flags = 0,
     this.assetPath,
     this.cachePath,
     this.eventMask = RuntimeEventMask.all,
     this.eventWake = const Wake(),
   });
-
-  /// No flags are currently defined. Must be zero.
-  final int flags;
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
   /// empty selects `/android_asset` on Android and `.` elsewhere.
@@ -3696,13 +3811,7 @@ final class RuntimeOptions extends _Value {
   final Wake eventWake;
 
   @override
-  List<Object?> get _members => [
-    flags,
-    assetPath,
-    cachePath,
-    eventMask,
-    eventWake,
-  ];
+  List<Object?> get _members => [assetPath, cachePath, eventMask, eventWake];
 }
 
 /// Tile-pyramid offline region definition.
@@ -3950,6 +4059,23 @@ final class AdapterResourceRoute extends _Value {
   List<Object?> get _members => [kind, flags, url];
 }
 
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRange extends _Value {
+  const ResourceRange(this.start, this.end);
+
+  /// First byte offset of the requested range.
+  final BigInt start;
+
+  /// Last byte offset of the requested range, inclusive.
+  final BigInt end;
+
+  @override
+  List<Object?> get _members => [start, end];
+}
+
 final class ResourceRequest extends _Value {
   ResourceRequest({
     this.requestedUrl,
@@ -3979,7 +4105,7 @@ final class ResourceRequest extends _Value {
   final ResourcePriority priority;
   final ResourceUsage usage;
   final ResourceStoragePolicy storagePolicy;
-  final ({BigInt rangeStart, BigInt rangeEnd})? range;
+  final ResourceRange? range;
   final int? priorModifiedUnixMs;
   final int? priorExpiresUnixMs;
   final String? priorEtag;

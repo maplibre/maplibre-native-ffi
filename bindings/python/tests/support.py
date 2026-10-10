@@ -144,8 +144,10 @@ class Harness:
         runtime's event wake fires."""
 
         def check() -> mln.RuntimeEvent | None:
-            with self.runtime.drain_events() as batch:
-                self._pending.extend(batch.get().events)
+            batch = self.runtime.drain_events()
+            if batch is not None:
+                with batch:
+                    self._pending.extend(batch.get().events)
             for index, event in enumerate(self._pending):
                 if event.type == event_type and match(event):
                     del self._pending[index]

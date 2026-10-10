@@ -17,17 +17,21 @@ internal object Upcalls {
 
   @JvmStatic
   fun completionRelease(userData: Long): Unit =
-    contain("mln_completion_release", Unit) { CompletionBridge.release(userData) }
+    contain("mln_user_data_release", Unit) { CompletionBridge.release(userData) }
 
   @JvmStatic
   fun releaseRoot(userData: Long): Unit =
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
-  fun logCallback(userData: Long, severity: Int, event: Int, code: Long, message: Long): Int =
-    upcall<GeneratedLogCallbackRegistration, Int>("mln_log_callback", userData, 0, setOf()) {
-      value,
-      scope ->
+  fun logHandlerCallback(
+    userData: Long,
+    severity: Int,
+    event: Int,
+    code: Long,
+    message: Long,
+  ): Int =
+    upcall<LogHandler, Int>("mln_log_callback", userData, 0, setOf()) { value, scope ->
       value
         .callback(
           LogSeverity(severity.toUInt()),
@@ -39,26 +43,9 @@ internal object Upcalls {
     }
 
   @JvmStatic
-  fun resourceRequestCancelCallback(userData: Long): Unit =
-    upcall<GeneratedResourceRequestCancelCallbackRegistration, Unit>(
-      "mln_resource_request_cancel_callback",
-      userData,
-      Unit,
-      setOf(
-        "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-      ),
-      { it.owner },
-    ) { value, scope ->
-      value.callback()
-    }
-
-  @JvmStatic
   fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
     upcall<CustomGeometrySourceOptions, Unit>(
-      "mln_custom_geometry_source_tile_callback",
+      "mln_custom_source_tile_callback",
       userData,
       Unit,
       null,
@@ -70,7 +57,7 @@ internal object Upcalls {
   @JvmStatic
   fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
     upcall<CustomGeometrySourceOptions, Unit>(
-      "mln_custom_geometry_source_tile_callback",
+      "mln_custom_source_tile_callback",
       userData,
       Unit,
       null,
@@ -82,7 +69,7 @@ internal object Upcalls {
   @JvmStatic
   fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
     upcall<CustomMvtVectorSourceOptions, Unit>(
-      "mln_custom_mvt_vector_source_tile_callback",
+      "mln_custom_source_tile_callback",
       userData,
       Unit,
       null,
@@ -94,7 +81,7 @@ internal object Upcalls {
   @JvmStatic
   fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
     upcall<CustomMvtVectorSourceOptions, Unit>(
-      "mln_custom_mvt_vector_source_tile_callback",
+      "mln_custom_source_tile_callback",
       userData,
       Unit,
       null,
@@ -160,6 +147,23 @@ internal object Upcalls {
     }
 
   @JvmStatic
+  fun resourceRequestCancelHandlerCallback(userData: Long): Unit =
+    upcall<ResourceRequestCancelHandler, Unit>(
+      "mln_resource_request_cancel_callback",
+      userData,
+      Unit,
+      setOf(
+        "mln_resource_request_complete",
+        "mln_resource_request_cancelled",
+        "mln_resource_request_set_cancel_callback",
+        "mln_resource_request_release",
+      ),
+      { it.owner },
+    ) { value, scope ->
+      value.callback()
+    }
+
+  @JvmStatic
   fun wakeCallback(userData: Long): Unit =
     upcall<Wake, Unit>("mln_wake_callback", userData, Unit, null) { value, scope ->
       val invoke = value.callback ?: return@upcall Unit
@@ -186,8 +190,7 @@ internal expect object UpcallStubs {
   val completion: Long
   val completionRelease: Long
   val releaseRoot: Long
-  val logCallback: Long
-  val resourceRequestCancelCallback: Long
+  val logHandlerCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
   val customMvtVectorSourceOptionsFetchTile: Long
@@ -195,6 +198,7 @@ internal expect object UpcallStubs {
   val httpHeaderTransformCallback: Long
   val resourceProviderCallback: Long
   val resourceTransformCallback: Long
+  val resourceRequestCancelHandlerCallback: Long
   val wakeCallback: Long
   val queueLockLock: Long
   val queueLockUnlock: Long

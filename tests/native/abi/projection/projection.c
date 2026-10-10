@@ -43,7 +43,7 @@ static void projection_outlives_its_source_map_and_runtime(void) {
 
   mln_test_destroy_runtime(runtime);
   const mln_camera_options source_camera = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.center.latitude);
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 
@@ -72,8 +72,8 @@ static void creation_observes_earlier_map_camera_commands(void) {
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera = mln_camera_options_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.latitude = 12.0;
-  update.camera.longitude = 34.0;
+  update.camera.center.latitude = 12.0;
+  update.camera.center.longitude = 34.0;
   update.camera.zoom = 4.0;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
@@ -83,8 +83,8 @@ static void creation_observes_earlier_map_camera_commands(void) {
   // copies the committed transform state.
   mln_map_projection projection = create_projection(map);
   const mln_camera_options camera = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 12.0, camera.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 12.0, camera.center.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 4.0, camera.zoom);
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
@@ -97,19 +97,22 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_map_projection projection = create_projection(map);
 
+  // A camera passed by pointer versions itself, unlike one embedded in an
+  // update.
   mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
   MLN_TEST_INVALID(mln_map_projection_get_camera(projection, &too_small, NULL));
   MLN_TEST_INVALID(mln_map_projection_get_camera(projection, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_projection_set_camera(projection, &too_small, NULL));
 
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 20.0;
-  camera.longitude = 40.0;
+  camera.center.latitude = 20.0;
+  camera.center.longitude = 40.0;
   camera.zoom = 6.0;
   MLN_TEST_OK(mln_map_projection_set_camera(projection, &camera, NULL));
   const mln_camera_options committed = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, committed.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, committed.center.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, committed.zoom);
 
   // A committed camera changes what later conversions observe: the new center
@@ -148,8 +151,8 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
     projection, coordinates, 2, (mln_edge_insets){0}, NULL
   ));
   const mln_camera_options fitted = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.center.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.center.longitude);
   mln_screen_point origin_after_fit = {0};
   MLN_TEST_OK(mln_map_projection_pixel_for_lat_lng(
     projection, origin, &origin_after_fit, NULL
@@ -200,8 +203,8 @@ static void map_lat_lngs_for_pixels(
 static void jump_to(mln_map map, double longitude, double zoom) {
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.latitude = 0.0;
-  update.camera.longitude = longitude;
+  update.camera.center.latitude = 0.0;
+  update.camera.center.longitude = longitude;
   update.camera.zoom = zoom;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
@@ -335,13 +338,13 @@ static void visible_geometry_fits_like_its_coordinates(void) {
   ));
   const mln_camera_options geometry_fit = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(
-    1e-9, coordinate_fit.latitude, geometry_fit.latitude
+    1e-9, coordinate_fit.center.latitude, geometry_fit.center.latitude
   );
   TEST_ASSERT_DOUBLE_WITHIN(
-    1e-9, coordinate_fit.longitude, geometry_fit.longitude
+    1e-9, coordinate_fit.center.longitude, geometry_fit.center.longitude
   );
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, coordinate_fit.zoom, geometry_fit.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 5.0, geometry_fit.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 5.0, geometry_fit.center.longitude);
 
   static const char* const unframeable[] = {
     "",
@@ -369,7 +372,9 @@ static void visible_geometry_fits_like_its_coordinates(void) {
   ));
   const mln_camera_options unchanged = read_camera(projection);
   TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.zoom, unchanged.zoom);
-  TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.longitude, unchanged.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(
+    geometry_fit.center.longitude, unchanged.center.longitude
+  );
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   MLN_TEST_INVALID_STATE(mln_map_projection_set_visible_geometry(
@@ -535,8 +540,8 @@ static void projection_foreign_thread(void* argument) {
   projection_thread_probe* probe = argument;
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 15.0;
-  camera.longitude = 25.0;
+  camera.center.latitude = 15.0;
+  camera.center.longitude = 25.0;
   camera.zoom = 3.0;
   probe->set_camera_status =
     mln_map_projection_set_camera(probe->projection, &camera, NULL);
@@ -624,8 +629,8 @@ static void projection_setters_reject_invalid_values(void) {
   );
 
   const mln_camera_options after = read_camera(projection);
-  TEST_ASSERT_EQUAL_DOUBLE(before.latitude, after.latitude);
-  TEST_ASSERT_EQUAL_DOUBLE(before.longitude, after.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(before.center.latitude, after.center.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(before.center.longitude, after.center.longitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.zoom, after.zoom);
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   mln_test_destroy_map(map);

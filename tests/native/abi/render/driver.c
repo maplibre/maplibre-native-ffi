@@ -251,25 +251,28 @@ static void drain_tokens(maintenance_probe* probe) {
   if (drained == MLN_STATUS_NOT_READY) {
     return;
   }
-  size_t count = 0;
+  mln_render_frame_batch_view view = {
+    .size = sizeof(mln_render_frame_batch_view)
+  };
   if (
     drained != MLN_STATUS_OK ||
-    mln_render_frame_batch_count(batch, &count, NULL) != MLN_STATUS_OK
+    mln_render_frame_batch_get(batch, &view, NULL) != MLN_STATUS_OK
   ) {
     probe->drain_failed = true;
     mln_render_frame_batch_release(batch);
     return;
   }
-  for (size_t index = 0; index < count; index += 1) {
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  for (size_t index = 0; index < view.result_count; index += 1) {
     if (
-      probe->token_count == sizeof(probe->tokens) / sizeof(probe->tokens[0]) ||
-      mln_render_frame_batch_get(batch, index, &result, NULL) != MLN_STATUS_OK
+      probe->token_count == sizeof(probe->tokens) / sizeof(probe->tokens[0])
     ) {
       probe->drain_failed = true;
       break;
     }
-    probe->tokens[probe->token_count] = result.token;
+    const mln_render_frame_result* result =
+      (const mln_render_frame_result*)((const char*)view.results +
+                                       (index * view.result_size));
+    probe->tokens[probe->token_count] = result->token;
     probe->token_count += 1;
   }
   mln_render_frame_batch_release(batch);
@@ -577,7 +580,6 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = count_nothing,
     .user_data = &released,
     .release_user_data = flag_release,
@@ -627,7 +629,6 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = count_nothing,
     .user_data = &released,
     .release_user_data = flag_release,
@@ -753,18 +754,18 @@ static void drain_inside_frame_wake(void* context) {
     while ((status = mln_render_session_drain_frame_results(
               host->session, &batch, NULL
             )) == MLN_STATUS_OK) {
-      size_t count = 0;
-      if (mln_render_frame_batch_count(batch, &count, NULL) != MLN_STATUS_OK)
+      mln_render_frame_batch_view view = {
+        .size = sizeof(mln_render_frame_batch_view)
+      };
+      if (mln_render_frame_batch_get(batch, &view, NULL) != MLN_STATUS_OK)
         atomic_fetch_add(&host->failures, 1U);
-      for (size_t index = 0; index < count; index += 1) {
-        mln_render_frame_result result = {
-          .size = sizeof(mln_render_frame_result)
-        };
+      for (size_t index = 0; index < view.result_count; index += 1) {
+        const mln_render_frame_result* result =
+          (const mln_render_frame_result*)((const char*)view.results +
+                                           (index * view.result_size));
         if (
-          mln_render_frame_batch_get(batch, index, &result, NULL) ==
-            MLN_STATUS_OK &&
-          result.token == host->token &&
-          result.disposition == MLN_RENDER_RESULT_RENDERED
+          result->token == host->token &&
+          result->disposition == MLN_RENDER_RESULT_RENDERED
         )
           atomic_store(&host->rendered, true);
       }
@@ -823,12 +824,10 @@ static void wakes_may_call_back_into_the_session(void) {
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = drain_inside_frame_wake,
     .user_data = &reentrant,
   };
   options.driver_work_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = service_inside_driver_wake,
     .user_data = &reentrant,
   };

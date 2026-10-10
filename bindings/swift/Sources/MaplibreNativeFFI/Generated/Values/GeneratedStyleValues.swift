@@ -184,7 +184,7 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_geometry_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -199,7 +199,7 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_geometry_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -295,7 +295,7 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_mvt_vector_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -310,7 +310,7 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_mvt_vector_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -661,17 +661,19 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   /// Interval counts for the stretchable axes.
   public var stretchXCount: Int
   public var stretchYCount: Int
-  /// Content box, meaningful only when has_content is true.
+  /// Content box, meaningful when fields contains CONTENT.
   public var content: ImageContent?
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_WIDTH.
   public var textFitWidth: StyleImageTextFit?
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_HEIGHT.
   public var textFitHeight: StyleImageTextFit?
-  /// Sprite pixel ratio. Defaults to 1.0.
+  /// Sprite pixel ratio.
   public var pixelRatio: Float
   public var sdf: Bool
   public static var `default`: Self {
-    Self(raw: mln_style_image_info_default())
+    Self(raw: mln_style_image_info())
   }
 
   public init(
@@ -707,22 +709,19 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     byteLength = raw.byte_length
     stretchXCount = raw.stretch_x_count
     stretchYCount = raw.stretch_y_count
-    content = raw.has_content ? ImageContent(raw: raw.content) : nil
-    textFitWidth = raw
-      .has_text_fit_width ? StyleImageTextFit(rawValue: raw.text_fit_width) :
-      nil
-    textFitHeight = raw
-      .has_text_fit_height ? StyleImageTextFit(rawValue: raw.text_fit_height) :
-      nil
+    content = raw.fields & MLN_STYLE_IMAGE_INFO_CONTENT
+      .rawValue != 0 ? ImageContent(raw: raw.content) : nil
+    textFitWidth = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH
+      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_width) : nil
+    textFitHeight = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT
+      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_height) : nil
     pixelRatio = raw.pixel_ratio
     sdf = raw.sdf
   }
 
   func nativeValue() -> mln_style_image_info {
-    var raw = mln_style_image_info_default()
-    raw.has_content = false
-    raw.has_text_fit_width = false
-    raw.has_text_fit_height = false
+    var raw = mln_style_image_info()
+    raw.fields = 0
     raw.width = width
     raw.height = height
     raw.stride = self.stride
@@ -730,18 +729,41 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     raw.stretch_x_count = stretchXCount
     raw.stretch_y_count = stretchYCount
     if let item = content {
-      raw.has_content = true; raw.content = item.nativeValue()
+      raw.fields |= MLN_STYLE_IMAGE_INFO_CONTENT.rawValue; raw.content = item
+        .nativeValue()
     }
     if let item = textFitWidth {
-      raw.has_text_fit_width = true; raw.text_fit_width = item.rawValue
+      raw.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH.rawValue; raw
+        .text_fit_width = item.rawValue
     }
     if let item = textFitHeight {
-      raw.has_text_fit_height = true; raw.text_fit_height = item.rawValue
+      raw.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT.rawValue; raw
+        .text_fit_height = item.rawValue
     }
     raw.pixel_ratio = pixelRatio
     raw.sdf = sdf
     return raw
   }
+}
+
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct StyleImageInfoField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The image declares a content box.
+  public static let content: StyleImageInfoField = .init(rawValue: 1)
+  /// The image declares a horizontal text-fit mode.
+  public static let textFitWidth: StyleImageInfoField = .init(rawValue: 2)
+  /// The image declares a vertical text-fit mode.
+  public static let textFitHeight: StyleImageInfoField = .init(rawValue: 4)
 }
 
 /// Field mask values for `mln_style_image_options`.
@@ -916,7 +938,6 @@ public struct StyleImageResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_result {
     var raw = mln_style_image_result()
-    raw.size = UInt32(MemoryLayout<mln_style_image_result>.size)
     raw.info = info.nativeValue()
     raw.pixels = arena.view(pixels)
     raw.stretch_x = arena.array(stretchX.map { $0.nativeValue() })
@@ -961,7 +982,6 @@ public struct StyleImageStretchesResult: Equatable, Hashable, Sendable {
     -> mln_style_image_stretches_result
   {
     var raw = mln_style_image_stretches_result()
-    raw.size = UInt32(MemoryLayout<mln_style_image_stretches_result>.size)
     raw.stretch_x = arena.array(stretchX.map { $0.nativeValue() })
     raw.stretch_x_count = try NativeInputArena.count(stretchX.count)
     raw.stretch_y = arena.array(stretchY.map { $0.nativeValue() })
@@ -1030,7 +1050,6 @@ public struct StyleLayerEntry: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_entry {
     var raw = mln_style_layer_entry()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_entry>.size)
     raw.id = arena.view(id)
     raw.type = arena.view(type)
     raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
@@ -1081,7 +1100,6 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_info {
     var raw = mln_style_layer_info()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_info>.size)
     raw.type = arena.view(type)
     raw.min_zoom = minZoom
     raw.max_zoom = maxZoom
@@ -1131,7 +1149,6 @@ public struct StyleLayerResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_result {
     var raw = mln_style_layer_result()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_result>.size)
     raw.info = try info.nativeValue(arena: arena)
     raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
     raw.source_layer = sourceLayer.map { arena.view($0) } ?? mln_buffer_view()
@@ -1177,17 +1194,19 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
-  public var tilejson: StyleSourceTileInfo?
   /// One of `mln_style_source_type`.
   public var type: StyleSourceType
   /// Source ID byte length, excluding any null terminator.
   public var idSize: Int
   /// Whether the source is marked volatile.
   public var isVolatile: Bool
-  /// Attribution byte length, excluding any null terminator.
+  /// Attribution byte length, excluding any null terminator, meaningful when
+  /// fields contains ATTRIBUTION.
   public var attributionSize: Int?
   /// URL byte length, meaningful when fields contains URL.
   public var urlSize: Int?
+  /// Inline tile metadata, meaningful when fields contains TILEJSON.
+  public var tilejson: StyleSourceTileInfo?
   /// Geographic bounds, meaningful when fields contains BOUNDS.
   public var bounds: LatLngBounds?
   /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
@@ -1201,12 +1220,12 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 
   public init(
-    tilejson: StyleSourceTileInfo? = StyleSourceInfo.default.tilejson,
     type: StyleSourceType = StyleSourceInfo.default.type,
     idSize: Int = StyleSourceInfo.default.idSize,
     isVolatile: Bool = StyleSourceInfo.default.isVolatile,
     attributionSize: Int? = StyleSourceInfo.default.attributionSize,
     urlSize: Int? = StyleSourceInfo.default.urlSize,
+    tilejson: StyleSourceTileInfo? = StyleSourceInfo.default.tilejson,
     bounds: LatLngBounds? = StyleSourceInfo.default.bounds,
     tileSize: UInt32? = StyleSourceInfo.default.tileSize,
     vectorEncoding: StyleVectorTileEncoding? = StyleSourceInfo.default
@@ -1214,12 +1233,12 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     rasterEncoding: StyleRasterDemEncoding? = StyleSourceInfo.default
       .rasterEncoding
   ) {
-    self.tilejson = tilejson
     self.type = type
     self.idSize = idSize
     self.isVolatile = isVolatile
     self.attributionSize = attributionSize
     self.urlSize = urlSize
+    self.tilejson = tilejson
     self.bounds = bounds
     self.tileSize = tileSize
     self.vectorEncoding = vectorEncoding
@@ -1227,19 +1246,15 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_style_source_info) {
-    tilejson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
-      .rawValue != 0 ? StyleSourceTileInfo(
-        tileCount: raw.tile_count,
-        minZoom: raw.min_zoom,
-        maxZoom: raw.max_zoom,
-        scheme: StyleTileScheme(rawValue: raw.scheme)
-      ) : nil
     type = StyleSourceType(rawValue: raw.type)
     idSize = raw.id_size
     isVolatile = raw.is_volatile
-    attributionSize = raw.has_attribution ? raw.attribution_size : nil
+    attributionSize = raw.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION
+      .rawValue != 0 ? raw.attribution_size : nil
     urlSize = raw.fields & MLN_STYLE_SOURCE_INFO_URL.rawValue != 0 ? raw
       .url_size : nil
+    tilejson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
+      .rawValue != 0 ? StyleSourceTileInfo(raw: raw.tilejson) : nil
     bounds = raw.fields & MLN_STYLE_SOURCE_INFO_BOUNDS
       .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
     tileSize = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue != 0 ? raw
@@ -1255,21 +1270,19 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   func nativeValue() -> mln_style_source_info {
     var raw = mln_style_source_info()
     raw.fields = 0
-    raw.has_attribution = false
-    if let item = tilejson {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue; raw
-        .tile_count = item.tileCount; raw.min_zoom = item.minZoom; raw
-        .max_zoom = item.maxZoom; raw.scheme = item.scheme.rawValue
-    }
-    raw.size = UInt32(MemoryLayout<mln_style_source_info>.size)
     raw.type = type.rawValue
     raw.id_size = idSize
     raw.is_volatile = isVolatile
     if let item = attributionSize {
-      raw.has_attribution = true; raw.attribution_size = item
+      raw.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION.rawValue; raw
+        .attribution_size = item
     }
     if let item = urlSize {
       raw.fields |= MLN_STYLE_SOURCE_INFO_URL.rawValue; raw.url_size = item
+    }
+    if let item = tilejson {
+      raw.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue; raw.tilejson = item
+        .nativeValue()
     }
     if let item = bounds {
       raw.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue; raw.bounds = item
@@ -1315,6 +1328,8 @@ public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
   public static let vectorEncoding: StyleSourceInfoField = .init(rawValue: 16)
   /// The source exposes a DEM raster encoding.
   public static let rasterEncoding: StyleSourceInfoField = .init(rawValue: 32)
+  /// The source declares an attribution string.
+  public static let attribution: StyleSourceInfoField = .init(rawValue: 64)
 }
 
 /// Complete source metadata borrowed for a completion callback.
@@ -1347,10 +1362,11 @@ public struct StyleSourceResult: Equatable, Hashable, Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     info = StyleSourceInfo(raw: raw.info)
-    attribution = raw.info.has_attribution ? try NativeString.copyUTF8(
-      data: raw.attribution.data,
-      size: raw.attribution.size
-    ) : nil
+    attribution = raw.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION
+      .rawValue != 0 ? try NativeString.copyUTF8(
+        data: raw.attribution.data,
+        size: raw.attribution.size
+      ) : nil
     url = raw.info.fields & MLN_STYLE_SOURCE_INFO_URL
       .rawValue != 0 ? try NativeString.copyUTF8(
         data: raw.url.data,
@@ -1365,10 +1381,10 @@ public struct StyleSourceResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_source_result {
     var raw = mln_style_source_result()
-    raw.size = UInt32(MemoryLayout<mln_style_source_result>.size)
     raw.info = info.nativeValue()
     if let item = attribution {
-      raw.info.has_attribution = true; raw.attribution = arena.view(item)
+      raw.info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION.rawValue; raw
+        .attribution = arena.view(item)
     }
     if let item = url {
       raw.info.fields |= MLN_STYLE_SOURCE_INFO_URL.rawValue; raw.url = arena
@@ -1388,9 +1404,13 @@ public struct StyleSourceResult: Equatable, Hashable, Sendable {
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
+  /// Inline tile URL count.
   public var tileCount: Int
+  /// Minimum zoom.
   public var minZoom: Double
+  /// Maximum zoom.
   public var maxZoom: Double
+  /// One of `mln_style_tile_scheme`.
   public var scheme: StyleTileScheme
   public static var `default`: Self {
     Self(raw: mln_style_source_tile_info())
@@ -1453,7 +1473,6 @@ public struct StyleSourceTileUrlsResult: Equatable, Hashable, Sendable {
     -> mln_style_source_tile_urls_result
   {
     var raw = mln_style_source_tile_urls_result()
-    raw.size = UInt32(MemoryLayout<mln_style_source_tile_urls_result>.size)
     raw.tile_urls = arena.array(tileUrls.map { arena.view($0) })
     raw.tile_url_count = try NativeInputArena.count(tileUrls.count)
     return raw

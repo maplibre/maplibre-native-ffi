@@ -510,7 +510,6 @@ void attach_observed(
   auto options = mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = mln_wake{
-    .size = sizeof(mln_wake),
     .callback = [](void*) {},
     .user_data = &released,
     .release_user_data = flag_wake_release,

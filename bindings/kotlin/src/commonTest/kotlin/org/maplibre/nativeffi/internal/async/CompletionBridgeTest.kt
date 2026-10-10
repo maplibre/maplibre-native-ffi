@@ -8,12 +8,18 @@ import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
+import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.readLatLng
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
+import org.maplibre.nativeffi.internal.memory.readStrided
 import org.maplibre.nativeffi.internal.memory.readU64
+import org.maplibre.nativeffi.internal.memory.writeAddress
+import org.maplibre.nativeffi.internal.memory.writeF64
 import org.maplibre.nativeffi.internal.memory.writeI32
+import org.maplibre.nativeffi.internal.memory.writeSize
 import org.maplibre.nativeffi.internal.memory.writeU32
 import org.maplibre.nativeffi.internal.memory.writeU64
 import org.maplibre.nativeffi.runSuspendTest
@@ -50,7 +56,7 @@ internal class HandDeliveredCompletion<T>(
 /** Calls the `mln_completion_callback` at [callback] on this thread. */
 internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 
-/** Calls the `mln_completion_release` at [release] on this thread. */
+/** Calls the completion's `mln_user_data_release` at [release] on this thread. */
 internal expect fun callCompletionRelease(release: Long, userData: Long)
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
@@ -88,6 +94,40 @@ internal fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> 
 
 /** The completion bridge and its upcall stubs, driven without native. */
 class CompletionBridgeTest {
+  /**
+   * A native build whose element grew reports a value_size wider than this binding's element, so an
+   * array result is read at that stride, as the generated decoders read it. A stride narrower than
+   * the element cannot hold one.
+   */
+  @Test
+  fun anArrayResultIsReadAtItsValueSize() {
+    NativeArena().use { arena ->
+      // Two coordinates, each followed by a member this binding does not know.
+      val stride = 24
+      val points = arena.allocate(2 * stride)
+      listOf(1.0, 2.0, -1.0, 3.0, 4.0, -1.0).forEachIndexed { index, value ->
+        writeF64(points + index * 8, value)
+      }
+      val result = arena.allocate(CompletionResultLayout.SIZEOF)
+      writeAddress(result + CompletionResultLayout.VALUE, points)
+      writeSize(result + CompletionResultLayout.VALUE_COUNT, 2u)
+      writeU32(result + CompletionResultLayout.VALUE_SIZE, stride.toUInt())
+      fun read() =
+        readStrided(
+          CompletionBridge.valuePointer(result),
+          CompletionBridge.valueCount(result),
+          CompletionBridge.valueSize(result),
+          16,
+        ) {
+          readLatLng(it)
+        }
+
+      assertEquals(listOf(LatLng(1.0, 2.0), LatLng(3.0, 4.0)), read())
+      writeU32(result + CompletionResultLayout.VALUE_SIZE, 15u)
+      assertFailsWith<IllegalArgumentException> { read() }
+    }
+  }
+
   @Test
   fun aCompletionKeepsItsFirstResultAndIgnoresDeliveryAfterRelease(): Unit = runSuspendTest {
     val completion = handDeliveredGeneration()

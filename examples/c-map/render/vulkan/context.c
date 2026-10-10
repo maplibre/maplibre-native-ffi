@@ -249,7 +249,6 @@ static void unlock_queue(void* user_data) { SDL_UnlockMutex(user_data); }
 
 mln_queue_lock vulkan_context_queue_lock(const vulkan_context* context) {
   return (mln_queue_lock){
-    .size = sizeof(mln_queue_lock),
     .lock = lock_queue,
     .unlock = unlock_queue,
     .user_data = context->queue_mutex,

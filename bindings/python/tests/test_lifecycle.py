@@ -60,7 +60,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
         request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
     ) -> None:
         handles.append(handle)
-        handle.set_cancel_callback(cancelled.set)
+        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(cancelled.set))
         # The last reference goes on the provider's stack, where the map
         # cannot be disposed without reentering native.
         assert submitted.wait(TIMEOUT)
@@ -114,7 +114,7 @@ def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
     callback = CloseOnCancel(handle)
-    handle.set_cancel_callback(callback)
+    handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback))
     owner, root = weakref.ref(handle), weakref.ref(callback)
     del callback, handle
     gc.collect()
@@ -132,7 +132,7 @@ runtime = m.runtime_create()
 runtime.set_resource_provider(
     m.ResourceProvider(lambda request, handle: m.ResourceProviderDecision.HANDLE)
 ).result(10)
-m.log_set_callback(lambda severity, event, code, message: 1)
+m.log_set_callback(m.LogHandler(lambda severity, event, code, message: 1))
 live = runtime.map_create().result(10)
 live.set_style_url("custom://never-answered.json")
 """

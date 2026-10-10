@@ -39,10 +39,6 @@ auto QueueLock::unlock() const noexcept -> void {
 }
 
 auto validate_queue_lock(const mln_queue_lock* lock) -> mln_status {
-  if (lock->size < sizeof(mln_queue_lock)) {
-    set_thread_error("mln_queue_lock.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if ((lock->lock == nullptr) != (lock->unlock == nullptr)) {
     set_thread_error("a queue lock needs both its lock and unlock callbacks");
     return MLN_STATUS_INVALID_ARGUMENT;

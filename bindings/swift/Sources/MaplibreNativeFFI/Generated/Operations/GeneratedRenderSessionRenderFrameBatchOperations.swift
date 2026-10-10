@@ -4,36 +4,20 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderFrameBatchHandle {
-  /// Returns the number of records in an owned frame-result batch.
-  ///
-  /// See `mln_render_frame_batch_count` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func count() throws -> Int {
-    var value0 = 0
-    return try nativeInvoke("mln_render_frame_batch_count") { raw, _, diagnostic in
-      mln_render_frame_batch_count(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { value0 }
-  }
-
-  /// Copies one frame-result record.
+  /// Borrows the result view stored by an owned frame-result batch.
   ///
   /// See `mln_render_frame_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func get(index bindingArg0: Int) throws -> RenderFrameResult {
-    var value0 = mln_render_frame_result()
-    value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
+  func get() throws -> RenderFrameBatchView {
+    var value0 = mln_render_frame_batch_view()
+    value0.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
     return try nativeInvoke("mln_render_frame_batch_get") { raw, _, diagnostic in
       mln_render_frame_batch_get(
         raw,
-        bindingArg0,
         &value0,
         diagnostic
       )
-    } result: { RenderFrameResult(raw: value0) }
+    } result: { try RenderFrameBatchView(raw: value0) }
   }
 
   /// Releases a frame-result batch.

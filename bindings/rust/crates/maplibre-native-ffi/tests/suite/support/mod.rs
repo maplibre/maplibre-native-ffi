@@ -287,11 +287,13 @@ impl Fixture {
         let source = self.map().id();
         loop {
             let seen = self.events.seen();
-            let batch = self.runtime().drain_events().unwrap();
-            if let Some(event) = batch
-                .get()
+            let events = self
+                .runtime()
+                .drain_events()
                 .unwrap()
-                .events
+                .map(|batch| batch.get().unwrap().events)
+                .unwrap_or_default();
+            if let Some(event) = events
                 .into_iter()
                 .find(|event| event.source == source && matches(event))
             {
@@ -437,8 +439,11 @@ impl Session {
             let seen = self.wakes.signal.seen();
             self.service();
             if let Some(batch) = self.handle.drain_frame_results().unwrap() {
-                let found = (0..batch.count().unwrap())
-                    .map(|index| batch.get(index).unwrap())
+                let found = batch
+                    .get()
+                    .unwrap()
+                    .results
+                    .into_iter()
                     .find(|result| result.token == token);
                 if let Some(result) = found {
                     return result;

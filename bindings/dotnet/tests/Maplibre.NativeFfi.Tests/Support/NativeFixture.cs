@@ -102,7 +102,7 @@ internal sealed class NativeFixture : IAsyncDisposable
         {
             using (var batch = Runtime.DrainEvents())
             {
-                foreach (var runtimeEvent in batch.Get().Events)
+                foreach (var runtimeEvent in batch?.Get().Events ?? [])
                 {
                     if (
                         runtimeEvent.Type == type

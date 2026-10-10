@@ -7,7 +7,7 @@ from support import parse
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
-from tools.bindgen.semantic import DefaultSupport
+from tools.bindgen.semantic import DefaultSupport, bind
 
 # A handle, a callback registration, and an operation that opens the handle,
 # each annotated only where it departs from convention.
@@ -229,6 +229,7 @@ BIND("execution=command") mln_status session_flush(
 typedef struct options { double zoom; } options;
 options make_options(void);
 options other_options(void);
+void use_options(const options *value);
 """
         bound = compile_api(parse(source))
         self.assertIsNone(bound.values["options"].default)
@@ -270,6 +271,37 @@ typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;
                     )
                 )
             )
+
+    def test_a_callback_without_an_owner_parameter_calls_back_into_its_receiver(
+        self,
+    ):
+        source = """
+typedef unsigned long long request BIND("kind=handle;release=request_close");
+typedef unsigned long long other BIND("kind=handle;release=other_close");
+void request_close(request value);
+void other_close(other value);
+typedef void (*cancel)(void *context) BIND("reentry=protocol;reentry_owner=request;reentry_calls=request_close");
+typedef void (*release)(void *context);
+typedef struct watcher { unsigned size; cancel callback; void *context BIND("kind=context"); release retire; } watcher BIND("kind=callback_registration;release=retire");
+mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diagnostic);
+"""
+        bound = compile_api(parse(source))
+        self.assertTrue(bound.values["watcher"].registration.receiver_owned)
+        for before, after, error in (
+            (
+                "reentry_owner=request",
+                "reentry_owner=missing",
+                "reentry_owner names an absent parameter 'missing'",
+            ),
+            ("watch(request value", "watch(other value", "must be the receiver"),
+            (
+                "typedef void (*release)(void *context);",
+                'typedef void (*release)(void *context) BIND("release_reentry=forbid");',
+                "release_reentry requires a callback registration",
+            ),
+        ):
+            with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
+                bind(parse(source.replace(before, after)), require_complete=True)
 
     def test_a_callback_failure_must_be_a_result_it_can_return(self):
         source = """

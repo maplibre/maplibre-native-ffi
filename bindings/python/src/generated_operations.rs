@@ -111,9 +111,11 @@ fn generated_copy_mln_camera_delta(
     dict.set_item("amount", generated_value(py, value.amount)?)?;
     dict.set_item(
         "anchor",
-        generated_optional(py, value.has_anchor, || {
-            generated_copy_mln_screen_point(py, &value.anchor)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_CAMERA_DELTA_FIELD_ANCHOR != 0,
+            || generated_copy_mln_screen_point(py, &value.anchor),
+        )?,
     )?;
     dict.set_item(
         "animation",
@@ -164,14 +166,7 @@ fn generated_copy_mln_camera_options(
         generated_optional(
             py,
             value.fields & sys::MLN_CAMERA_OPTION_CENTER != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("latitude", generated_value(py, value.latitude)?)?;
-                    inner.set_item("longitude", generated_value(py, value.longitude)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_lat_lng(py, &value.center),
         )?,
     )?;
     dict.set_item(
@@ -466,6 +461,37 @@ fn generated_copy_mln_egl_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_event_batch_view(
+    py: Python<'_>,
+    value: &sys::mln_event_batch_view,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "events",
+        generated_list(
+            py,
+            unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
+            |element| {
+                Ok({
+                    let item = generated_copy_mln_runtime_event(py, &element)?;
+                    item.bind(py)
+                        .cast::<PyDict>()?
+                        .set_item("message", unsafe {
+                            generated_arena_string(
+                                value.messages,
+                                value.messages_size,
+                                element.message_offset,
+                                element.message_size,
+                            )?
+                        })?;
+                    item
+                })
+            },
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_frame_demand(
     py: Python<'_>,
     value: &sys::mln_frame_demand,
@@ -696,7 +722,7 @@ fn generated_copy_mln_lat_lng_bounds(
     Ok(dict.into_any().unbind())
 }
 
-unsafe extern "C" fn generated_callback_mln_log_set_callback_registration_callback(
+unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     user_data: *mut std::ffi::c_void,
     severity: sys::mln_log_severity,
     event: sys::mln_log_event,
@@ -1352,6 +1378,24 @@ fn generated_copy_mln_render_abandon_result(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_render_frame_batch_view(
+    py: Python<'_>,
+    value: &sys::mln_render_frame_batch_view,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "results",
+        generated_list(
+            py,
+            unsafe {
+                generated_strided_values(value.results, value.result_count, value.result_size)?
+            },
+            |element| generated_copy_mln_render_frame_result(py, &element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_render_frame_result(
     py: Python<'_>,
     value: &sys::mln_render_frame_result,
@@ -1483,12 +1527,11 @@ fn generated_copy_mln_rendered_feature_query_options(
     )?;
     dict.set_item(
         "filter",
-        generated_optional(py, !value.filter.is_null(), || {
-            Ok({
-                let referenced = unsafe { *value.filter };
-                unsafe { generated_bytes(py, referenced) }?
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0,
+            || unsafe { generated_bytes(py, value.filter) },
+        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1592,6 +1635,16 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     )
 }
 
+fn generated_copy_mln_resource_range(
+    py: Python<'_>,
+    value: &sys::mln_resource_range,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("start", generated_value(py, value.start)?)?;
+    dict.set_item("end", generated_value(py, value.end)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_resource_request(
     py: Python<'_>,
     value: &sys::mln_resource_request,
@@ -1610,26 +1663,27 @@ fn generated_copy_mln_resource_request(
     dict.set_item("storage_policy", generated_value(py, value.storage_policy)?)?;
     dict.set_item(
         "range",
-        generated_optional(py, value.has_range, || {
-            Ok({
-                let inner = PyDict::new(py);
-                inner.set_item("start", generated_value(py, value.range_start)?)?;
-                inner.set_item("end", generated_value(py, value.range_end)?)?;
-                inner.into_any().unbind()
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_RANGE != 0,
+            || generated_copy_mln_resource_range(py, &value.range),
+        )?,
     )?;
     dict.set_item(
         "prior_modified_unix_ms",
-        generated_optional(py, value.has_prior_modified, || {
-            generated_value(py, value.prior_modified_unix_ms)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0,
+            || generated_value(py, value.prior_modified_unix_ms),
+        )?,
     )?;
     dict.set_item(
         "prior_expires_unix_ms",
-        generated_optional(py, value.has_prior_expires, || {
-            generated_value(py, value.prior_expires_unix_ms)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0,
+            || generated_value(py, value.prior_expires_unix_ms),
+        )?,
     )?;
     dict.set_item("prior_etag", unsafe {
         generated_c_string(py, value.prior_etag, true)
@@ -1748,37 +1802,6 @@ fn generated_copy_mln_runtime_event(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_runtime_event_batch_view(
-    py: Python<'_>,
-    value: &sys::mln_runtime_event_batch_view,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "events",
-        generated_list(
-            py,
-            unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
-            |element| {
-                Ok({
-                    let item = generated_copy_mln_runtime_event(py, &element)?;
-                    item.bind(py)
-                        .cast::<PyDict>()?
-                        .set_item("message", unsafe {
-                            generated_arena_string(
-                                value.messages,
-                                value.messages_size,
-                                element.message_offset,
-                                element.message_size,
-                            )?
-                        })?;
-                    item
-                })
-            },
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_runtime_event_camera_transition_finished(
     py: Python<'_>,
     value: &sys::mln_runtime_event_camera_transition_finished,
@@ -1863,7 +1886,6 @@ fn generated_copy_mln_runtime_options(
     value: &sys::mln_runtime_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("flags", generated_value(py, value.flags)?)?;
     dict.set_item("asset_path", unsafe {
         generated_c_string(py, value.asset_path, true)
     }?)?;
@@ -1933,12 +1955,11 @@ fn generated_copy_mln_source_feature_query_options(
     )?;
     dict.set_item(
         "filter",
-        generated_optional(py, !value.filter.is_null(), || {
-            Ok({
-                let referenced = unsafe { *value.filter };
-                unsafe { generated_bytes(py, referenced) }?
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0,
+            || unsafe { generated_bytes(py, value.filter) },
+        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1962,21 +1983,27 @@ fn generated_copy_mln_style_image_info(
     )?;
     dict.set_item(
         "content",
-        generated_optional(py, value.has_content, || {
-            generated_copy_mln_image_content(py, &value.content)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_CONTENT != 0,
+            || generated_copy_mln_image_content(py, &value.content),
+        )?,
     )?;
     dict.set_item(
         "text_fit_width",
-        generated_optional(py, value.has_text_fit_width, || {
-            generated_value(py, value.text_fit_width)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0,
+            || generated_value(py, value.text_fit_width),
+        )?,
     )?;
     dict.set_item(
         "text_fit_height",
-        generated_optional(py, value.has_text_fit_height, || {
-            generated_value(py, value.text_fit_height)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0,
+            || generated_value(py, value.text_fit_height),
+        )?,
     )?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
     dict.set_item("sdf", generated_value(py, value.sdf)?)?;
@@ -2180,9 +2207,11 @@ fn generated_copy_mln_style_source_info(
     dict.set_item("is_volatile", generated_value(py, value.is_volatile)?)?;
     dict.set_item(
         "attribution_size",
-        generated_optional(py, value.has_attribution, || {
-            generated_value(py, value.attribution_size)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
+            || generated_value(py, value.attribution_size),
+        )?,
     )?;
     dict.set_item(
         "url_size",
@@ -2197,16 +2226,7 @@ fn generated_copy_mln_style_source_info(
         generated_optional(
             py,
             value.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("tile_count", generated_value(py, value.tile_count)?)?;
-                    inner.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
-                    inner.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
-                    inner.set_item("scheme", generated_value(py, value.scheme)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_style_source_tile_info(py, &value.tilejson),
         )?,
     )?;
     dict.set_item(
@@ -2255,9 +2275,11 @@ fn generated_copy_mln_style_source_result(
     )?;
     dict.set_item(
         "attribution",
-        generated_optional(py, value.info.has_attribution, || {
-            generated_text(py, value.attribution)
-        })?,
+        generated_optional(
+            py,
+            value.info.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
+            || generated_text(py, value.attribution),
+        )?,
     )?;
     dict.set_item(
         "url",
@@ -2281,6 +2303,18 @@ fn generated_copy_mln_style_source_result(
             },
         )?,
     )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_style_source_tile_info(
+    py: Python<'_>,
+    value: &sys::mln_style_source_tile_info,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("tile_count", generated_value(py, value.tile_count)?)?;
+    dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
+    dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
+    dict.set_item("scheme", generated_value(py, value.scheme)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2713,7 +2747,6 @@ fn generated_input_mln_animation_options<'py>(
         return Ok(unsafe { sys::mln_animation_options_default() });
     }
     let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
-    raw.size = std::mem::size_of::<sys::mln_animation_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
@@ -2784,7 +2817,7 @@ fn generated_input_mln_camera_delta<'py>(
     }
     let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-    raw.has_anchor = false;
+    raw.fields = 0;
     raw.kind = value
         .getattr("kind")?
         .extract::<sys::mln_camera_delta_kind>()?;
@@ -2792,7 +2825,7 @@ fn generated_input_mln_camera_delta<'py>(
     raw.amount = value.getattr("amount")?.extract::<f64>()?;
     if let Some(field) = generated_present(value, "anchor")? {
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
-        raw.has_anchor = true;
+        raw.fields |= sys::MLN_CAMERA_DELTA_FIELD_ANCHOR;
     }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
     Ok(raw)
@@ -2834,8 +2867,7 @@ fn generated_input_mln_camera_options<'py>(
     raw.size = std::mem::size_of::<sys::mln_camera_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "center")? {
-        raw.latitude = field.getattr("latitude")?.extract::<f64>()?;
-        raw.longitude = field.getattr("longitude")?.extract::<f64>()?;
+        raw.center = generated_input_mln_lat_lng(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
     }
     if let Some(field) = generated_present(value, "center_altitude")? {
@@ -3027,7 +3059,6 @@ fn generated_input_mln_egl_context_descriptor<'py>(
 ) -> PyResult<sys::mln_egl_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_egl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_egl_context_descriptor>() as _;
     raw.display = value.getattr("display")?.extract::<usize>()? as _;
     raw.config = value.getattr("config")?.extract::<usize>()? as _;
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
@@ -3244,6 +3275,26 @@ fn generated_input_mln_lat_lng_bounds<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_log_handler<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_log_handler> {
+    let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
+    let callback_enabled = !value.getattr("callback")?.is_none();
+    if callback_enabled {
+        raw.user_data =
+            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.callback = if callback_enabled {
+            Some(generated_callback_mln_log_handler_callback)
+        } else {
+            None
+        };
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_logical_extent<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3365,7 +3416,6 @@ fn generated_input_mln_metal_context_descriptor<'py>(
 ) -> PyResult<sys::mln_metal_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_context_descriptor>() as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -3408,7 +3458,6 @@ fn generated_input_mln_offline_geometry_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_geometry_region_definition> {
     let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as _;
     raw.style_url = storage.c_string(value.getattr("style_url")?)?;
     raw.geometry = storage.buffer(value.getattr("geometry")?, false)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
@@ -3450,7 +3499,6 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_tile_pyramid_region_definition> {
     let mut raw: sys::mln_offline_tile_pyramid_region_definition = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as _;
     raw.style_url = storage.c_string(value.getattr("style_url")?)?;
     raw.bounds = generated_input_mln_lat_lng_bounds(&value.getattr("bounds")?, storage)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
@@ -3485,7 +3533,6 @@ fn generated_input_mln_opengl_context_descriptor<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_opengl_context_descriptor> {
     let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_opengl_context_descriptor>() as _;
     raw.ownership = value
         .getattr("ownership")?
         .extract::<sys::mln_opengl_context_ownership>()?;
@@ -3619,7 +3666,6 @@ fn generated_input_mln_queue_lock<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_queue_lock> {
     let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
     let lock_enabled = !value.getattr("lock")?.is_none();
     let unlock_enabled = !value.getattr("unlock")?.is_none();
     if lock_enabled || unlock_enabled {
@@ -3697,15 +3743,10 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     }
-    let field = value.getattr("filter")?;
-    raw.filter = if field.is_none() {
-        std::ptr::null()
-    } else {
-        {
-            let value = storage.buffer(field, false)?;
-            storage.keep_one(value)
-        }
-    };
+    if let Some(field) = generated_present(value, "filter")? {
+        raw.filter = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+    }
     Ok(raw)
 }
 
@@ -3760,9 +3801,7 @@ fn generated_input_mln_resource_response<'py>(
 ) -> PyResult<sys::mln_resource_response> {
     let mut raw: sys::mln_resource_response = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_response>() as _;
-    raw.has_modified = false;
-    raw.has_expires = false;
-    raw.has_retry_after = false;
+    raw.fields = 0;
     raw.status = value
         .getattr("status")?
         .extract::<sys::mln_resource_response_status>()?;
@@ -3783,11 +3822,11 @@ fn generated_input_mln_resource_response<'py>(
     raw.must_revalidate = value.getattr("must_revalidate")?.extract::<bool>()?;
     if let Some(field) = generated_present(value, "modified_unix_ms")? {
         raw.modified_unix_ms = field.extract::<i64>()?;
-        raw.has_modified = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_MODIFIED;
     }
     if let Some(field) = generated_present(value, "expires_unix_ms")? {
         raw.expires_unix_ms = field.extract::<i64>()?;
-        raw.has_expires = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_EXPIRES;
     }
     let field = value.getattr("etag")?;
     raw.etag = if field.is_none() {
@@ -3797,7 +3836,7 @@ fn generated_input_mln_resource_response<'py>(
     };
     if let Some(field) = generated_present(value, "retry_after_unix_ms")? {
         raw.retry_after_unix_ms = field.extract::<i64>()?;
-        raw.has_retry_after = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     }
     Ok(raw)
 }
@@ -3831,7 +3870,6 @@ fn generated_input_mln_runtime_options<'py>(
     }
     let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-    raw.flags = value.getattr("flags")?.extract::<u32>()?;
     let field = value.getattr("asset_path")?;
     raw.asset_path = if field.is_none() {
         std::ptr::null()
@@ -3906,15 +3944,10 @@ fn generated_input_mln_source_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     }
-    let field = value.getattr("filter")?;
-    raw.filter = if field.is_none() {
-        std::ptr::null()
-    } else {
-        {
-            let value = storage.buffer(field, false)?;
-            storage.keep_one(value)
-        }
-    };
+    if let Some(field) = generated_present(value, "filter")? {
+        raw.filter = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    }
     Ok(raw)
 }
 
@@ -4098,7 +4131,6 @@ fn generated_input_mln_vulkan_context_descriptor<'py>(
 ) -> PyResult<sys::mln_vulkan_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_vulkan_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_context_descriptor>() as _;
     raw.instance = value.getattr("instance")?.extract::<usize>()? as _;
     raw.physical_device = value.getattr("physical_device")?.extract::<usize>()? as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
@@ -4151,7 +4183,6 @@ fn generated_input_mln_wake<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_wake> {
     let mut raw: sys::mln_wake = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wake>() as _;
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -4171,7 +4202,6 @@ fn generated_input_mln_webgl_context_descriptor<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_webgl_context_descriptor> {
     let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_webgl_context_descriptor>() as _;
     raw.kind = value
         .getattr("kind")?
         .extract::<sys::mln_webgl_context_kind>()?;
@@ -4207,7 +4237,6 @@ fn generated_input_mln_webgpu_context_descriptor<'py>(
 ) -> PyResult<sys::mln_webgpu_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as _;
     raw.instance = value.getattr("instance")?.extract::<usize>()? as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
     raw.queue = value.getattr("queue")?.extract::<usize>()? as _;
@@ -4254,7 +4283,6 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
 ) -> PyResult<sys::mln_wgl_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_wgl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wgl_context_descriptor>() as _;
     raw.device_context = value.getattr("device_context")?.extract::<usize>()? as _;
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
     raw.get_proc_address = value.getattr("get_proc_address")?.extract::<usize>()? as _;
@@ -4450,13 +4478,6 @@ fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> 
 }
 
 #[pyfunction]
-fn _default_style_image_info(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_style_image_info_default() };
-    generated_copy_mln_style_image_info(py, &value)
-}
-
-#[pyfunction]
 fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_image_options_default() };
@@ -4475,13 +4496,6 @@ fn _default_style_transition_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_transition_options_default() };
     generated_copy_mln_style_transition_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_texture_image_info(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_texture_image_info_default() };
-    generated_copy_mln_texture_image_info(py, &value)
 }
 
 #[pyfunction]
@@ -4530,11 +4544,6 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     handle: sys::mln_acquired_frame,
 ) -> sys::mln_status {
     unsafe { sys::mln_acquired_frame_dispose(handle, std::ptr::null_mut()) }
-}
-
-unsafe extern "C" fn generated_dispose_mln_buffer(handle: sys::mln_buffer) -> sys::mln_status {
-    unsafe { sys::mln_buffer_destroy(handle) };
-    sys::MLN_STATUS_OK
 }
 
 unsafe extern "C" fn generated_dispose_mln_event_batch(
@@ -4698,44 +4707,18 @@ impl AcquiredFrameHandle {
 }
 
 #[pymethods]
-impl BufferHandle {
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_buffer_destroy", self.admission())?;
-        let Some(mut reservation) = self.reserve()? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_buffer_destroy(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_buffer_get", self.admission())?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_view: sys::mln_buffer_view = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| sys::mln_buffer_get(handle, &mut out_view, diagnostic))
-        }?;
-        unsafe { generated_bytes(py, out_view) }
-    }
-}
-
-#[pymethods]
 impl EventBatchHandle {
     #[pyo3(signature = ())]
     fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_event_batch_get", self.admission())?;
         let read = self.read()?;
         let handle = read.handle;
-        let mut out_view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
-        out_view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as _;
+        let mut out_view: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_event_batch_view>() as _;
         unsafe {
             call.status(|diagnostic| sys::mln_event_batch_get(handle, &mut out_view, diagnostic))
         }?;
-        generated_copy_mln_runtime_event_batch_view(py, &out_view)
+        generated_copy_mln_event_batch_view(py, &out_view)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -5724,8 +5707,8 @@ impl MapHandle {
                 return Ok(py.None());
             }
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6222,8 +6205,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6260,8 +6243,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6286,8 +6269,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
+            for value in generated_completion_values::<sys::mln_buffer_view>(result)? {
+                list.append(generated_text(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6306,8 +6289,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_style_layer_entry>(result)? {
-                list.append(generated_copy_mln_style_layer_entry(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_style_layer_entry>(result)? {
+                list.append(generated_copy_mln_style_layer_entry(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6326,8 +6309,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
+            for value in generated_completion_values::<sys::mln_buffer_view>(result)? {
+                list.append(generated_text(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6439,8 +6422,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_screen_point>(result)? {
-                list.append(generated_copy_mln_screen_point(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_screen_point>(result)? {
+                list.append(generated_copy_mln_screen_point(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8234,29 +8217,18 @@ impl MapProjectionHandle {
 #[pymethods]
 impl RenderFrameBatchHandle {
     #[pyo3(signature = ())]
-    fn count(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_frame_batch_count", self.admission())?;
-        let handle = self.live()?;
-        let mut out_count: usize = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_render_frame_batch_count(handle, &mut out_count, diagnostic)
-            })
-        }?;
-        generated_value(py, out_count)
-    }
-    #[pyo3(signature = (index))]
-    fn get(&self, py: Python<'_>, index: usize) -> PyResult<Py<PyAny>> {
+    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_render_frame_batch_get", self.admission())?;
-        let handle = self.live()?;
-        let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
-        out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
+        let read = self.read()?;
+        let handle = read.handle;
+        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_render_frame_batch_get(handle, index, &mut out_result, diagnostic)
+                sys::mln_render_frame_batch_get(handle, &mut out_view, diagnostic)
             })
         }?;
-        generated_copy_mln_render_frame_result(py, &out_result)
+        generated_copy_mln_render_frame_batch_view(py, &out_view)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8618,8 +8590,8 @@ impl RenderSessionHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
+                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8659,8 +8631,8 @@ impl RenderSessionHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
+                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8930,18 +8902,21 @@ impl ResourceRequestHandle {
         unsafe { call.run(|| self.state.close()) };
         Ok(py.None())
     }
-    fn set_cancel_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {
+    fn set_cancel_callback(&self, handler: &Bound<'_, PyAny>) -> PyResult<bool> {
         let callback_owner =
             maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
         generated_check_operation("mln_resource_request_set_cancel_callback", callback_owner)?;
-        if !callback.bind(py).is_callable() {
-            return Err(invalid_argument_error("callback must be callable"));
-        }
-        let root = GeneratedCallbackRootOwner::new(vec![callback]);
-        let weak = root.downgrade();
-        let cancelled = self
-            .state
-            .register_cancel(Box::new(move || {
+        let callback = handler.getattr("callback")?;
+        let mut weak = std::sync::Weak::new();
+        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {
+            None
+        } else {
+            if !callback.is_callable() {
+                return Err(invalid_argument_error("callback must be callable"));
+            }
+            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
+            weak = root.downgrade();
+            Some(Box::new(move || {
                 Python::try_attach(|py| {
                     if let Some(callback) = root.get(py, 0)
                         && let Err(error) = callback.bind(py).call0()
@@ -8950,6 +8925,10 @@ impl ResourceRequestHandle {
                     }
                 });
             }))
+        };
+        let cancelled = self
+            .state
+            .register_cancel(registration)
             .map_err(map_error)?;
         if !cancelled {
             *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
@@ -9093,11 +9072,14 @@ impl RuntimeHandle {
         let mut call = GeneratedCall::new(py, "mln_runtime_drain_events", self.admission())?;
         let handle = self.live()?;
         let mut out_batch: sys::mln_event_batch = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_runtime_drain_events(handle, &mut out_batch, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { EventBatchHandle::adopt(py, out_batch, Vec::new()) }
     }
     #[pyo3(signature = ())]
@@ -9322,8 +9304,8 @@ impl RuntimeHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_offline_region_info>(result)? {
-                list.append(generated_copy_mln_offline_region_info(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
+                list.append(generated_copy_mln_offline_region_info(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -9352,8 +9334,8 @@ impl RuntimeHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_offline_region_info>(result)? {
-                list.append(generated_copy_mln_offline_region_info(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
+                list.append(generated_copy_mln_offline_region_info(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -9551,14 +9533,6 @@ generated_owner!(
     )
 );
 generated_owner!(
-    BufferHandle,
-    "_BufferHandle",
-    mln_buffer,
-    Some(generated_dispose_mln_buffer),
-    None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_buffer, _>(Arc::clone(&owner.state))
-);
-generated_owner!(
     EventBatchHandle,
     "_EventBatchHandle",
     mln_event_batch,
@@ -9662,6 +9636,30 @@ impl ResourceRequestHandle {
         }
     }
 }
+unsafe fn register_resource_request_cancel(
+    handle: sys::mln_resource_request_handle,
+    callback: maplibre_core::decision::ContextCallback,
+    user_data: *mut std::ffi::c_void,
+    release: maplibre_core::decision::ContextCallback,
+    out_cancelled: *mut bool,
+    out_diagnostic: *mut sys::mln_diagnostic,
+) -> sys::mln_status {
+    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+    handler.callback = callback;
+    handler.user_data = user_data;
+    handler.release_user_data = release;
+    // SAFETY: the caller passes the decision handle and the outputs that
+    // the C function requires; the handler is borrowed for the call.
+    unsafe {
+        sys::mln_resource_request_set_cancel_callback(
+            handle,
+            &handler,
+            out_cancelled,
+            out_diagnostic,
+        )
+    }
+}
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
     sys::mln_resource_request_handle,
 > = unsafe {
@@ -9670,7 +9668,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,
-        sys::mln_resource_request_set_cancel_callback,
+        register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
@@ -9784,33 +9782,14 @@ fn log_set_async_severity_mask(
 }
 
 #[pyfunction]
-fn log_set_callback(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {
-    generated_check_reentry()?;
-    let storage = &mut GeneratedInputStorage::default();
-    let enabled = !callback.getattr("callback")?.is_none();
-    let context = if enabled {
-        storage.register_callbacks(vec![callback.getattr("_invoke_callback")?.unbind()])
-    } else {
-        std::ptr::null_mut()
-    };
-    let native_callback: sys::mln_log_callback = if enabled {
-        Some(generated_callback_mln_log_set_callback_registration_callback)
-    } else {
-        None
-    };
-    let release = if enabled {
-        Some(generated_release_callbacks_no_reentry as unsafe extern "C" fn(*mut c_void))
-    } else {
-        None
-    };
-    maplibre_core::check(|diagnostic| unsafe {
-        generated_native_call(py, || {
-            sys::mln_log_set_callback(native_callback, context, release, diagnostic)
-        })
-    })
-    .map_err(map_error)?;
-    storage.accept_callbacks();
-    Ok(())
+#[pyo3(signature = (handler))]
+fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py, "mln_log_set_callback", 0)?;
+    let storage = &mut call.storage;
+    let handler_value = generated_input_mln_log_handler(&handler.clone(), storage)?;
+    unsafe { call.status(|diagnostic| sys::mln_log_set_callback(&handler_value, diagnostic)) }?;
+    call.accept_callbacks();
+    Ok(py.None())
 }
 
 #[pyfunction]
@@ -9967,7 +9946,6 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
-    module.add_class::<BufferHandle>()?;
     module.add_class::<EventBatchHandle>()?;
     module.add_class::<GeojsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
@@ -10038,14 +10016,12 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         _default_source_feature_query_options,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(_default_style_image_info, module)?)?;
     module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_style_tile_source_options,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(_default_style_transition_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_texture_image_info, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_vulkan_borrowed_texture_descriptor,
         module

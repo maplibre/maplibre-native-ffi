@@ -251,7 +251,11 @@ int main(int argc, char** argv) {
 
   app_error error = validate_native_render_backend();
   if (error == APP_OK) {
-    mln_log_set_callback(diagnostics_log_record, nullptr, nullptr, NULL);
+    const mln_log_handler log_handler = {
+      .size = sizeof(log_handler),
+      .callback = diagnostics_log_record,
+    };
+    mln_log_set_callback(&log_handler, NULL);
     render_target_apply_sdl_hints();
     if (SDL_Init(SDL_INIT_VIDEO)) {
       error = run(mode);

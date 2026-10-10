@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.C
-import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -33,7 +32,7 @@ public object GeneratedApi {
    */
   public fun animationOptionsDefault(): AnimationOptions =
     nativeCall(null, null, "mln_animation_options_default") {
-      val out = sized(72, 8)
+      val out = allocate(72, 8)
       C.mln_animation_options_default(out)
       readAnimationOptions(out)
     }
@@ -286,12 +285,9 @@ public object GeneratedApi {
    * See `mln_log_set_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
-  public fun logSetCallback(callback: LogCallback): Unit =
+  public fun logSetCallback(handler: LogHandler): Unit =
     nativeCall(null, null, "mln_log_set_callback") {
-      val token = registrations.register(GeneratedLogCallbackRegistration(callback))
-      check(
-        C.mln_log_set_callback(UpcallStubs.logCallback, token, UpcallStubs.releaseRoot, diagnostic)
-      )
+      check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
       accept(CallbackOwner.global)
     }
 
@@ -355,7 +351,7 @@ public object GeneratedApi {
    */
   public fun metalOwnedTextureDescriptorDefault(): MetalOwnedTextureDescriptor =
     nativeCall(null, null, "mln_metal_owned_texture_descriptor_default") {
-      val out = sized(w(40, 48), 8)
+      val out = sized(40, 8)
       C.mln_metal_owned_texture_descriptor_default(out)
       readMetalOwnedTextureDescriptor(out)
     }
@@ -368,7 +364,7 @@ public object GeneratedApi {
    */
   public fun metalSurfaceDescriptorDefault(): MetalSurfaceDescriptor =
     nativeCall(null, null, "mln_metal_surface_descriptor_default") {
-      val out = sized(w(48, 56), 8)
+      val out = sized(w(40, 48), 8)
       C.mln_metal_surface_descriptor_default(out)
       readMetalSurfaceDescriptor(out)
     }
@@ -405,7 +401,7 @@ public object GeneratedApi {
    */
   public fun openglBorrowedTextureDescriptorDefault(): OpenglBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_opengl_borrowed_texture_descriptor_default") {
-      val out = sized(w(88, 112), 8)
+      val out = sized(w(80, 96), 8)
       C.mln_opengl_borrowed_texture_descriptor_default(out)
       readOpenglBorrowedTextureDescriptor(out)
     }
@@ -418,7 +414,7 @@ public object GeneratedApi {
    */
   public fun openglOwnedTextureDescriptorDefault(): OpenglOwnedTextureDescriptor =
     nativeCall(null, null, "mln_opengl_owned_texture_descriptor_default") {
-      val out = sized(w(72, 96), 8)
+      val out = sized(w(64, 80), 8)
       C.mln_opengl_owned_texture_descriptor_default(out)
       readOpenglOwnedTextureDescriptor(out)
     }
@@ -443,7 +439,7 @@ public object GeneratedApi {
    */
   public fun openglSurfaceDescriptorDefault(): OpenglSurfaceDescriptor =
     nativeCall(null, null, "mln_opengl_surface_descriptor_default") {
-      val out = sized(w(72, 104), 8)
+      val out = sized(w(64, 88), 8)
       C.mln_opengl_surface_descriptor_default(out)
       readOpenglSurfaceDescriptor(out)
     }
@@ -508,7 +504,7 @@ public object GeneratedApi {
    */
   public fun renderSessionAttachOptionsDefault(): RenderSessionAttachOptions =
     nativeCall(null, null, "mln_render_session_attach_options_default") {
-      val out = sized(w(68, 120), w(4, 8))
+      val out = sized(w(56, 96), w(4, 8))
       C.mln_render_session_attach_options_default(out)
       readRenderSessionAttachOptions(out)
     }
@@ -544,7 +540,7 @@ public object GeneratedApi {
    */
   public fun renderedFeatureQueryOptionsDefault(): RenderedFeatureQueryOptions =
     nativeCall(null, null, "mln_rendered_feature_query_options_default") {
-      val out = sized(w(20, 32), w(4, 8))
+      val out = sized(w(24, 40), w(4, 8))
       C.mln_rendered_feature_query_options_default(out)
       readRenderedFeatureQueryOptions(out)
     }
@@ -645,7 +641,7 @@ public object GeneratedApi {
    */
   public fun runtimeOptionsDefault(): RuntimeOptions =
     nativeCall(null, null, "mln_runtime_options_default") {
-      val out = sized(w(40, 64), 8)
+      val out = sized(w(40, 56), 8)
       C.mln_runtime_options_default(out)
       readRuntimeOptions(out)
     }
@@ -658,22 +654,9 @@ public object GeneratedApi {
    */
   public fun sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions =
     nativeCall(null, null, "mln_source_feature_query_options_default") {
-      val out = sized(w(20, 32), w(4, 8))
+      val out = sized(w(24, 40), w(4, 8))
       C.mln_source_feature_query_options_default(out)
       readSourceFeatureQueryOptions(out)
-    }
-
-  /**
-   * Returns default runtime style image metadata.
-   *
-   * See `mln_style_image_info_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun styleImageInfoDefault(): StyleImageInfo =
-    nativeCall(null, null, "mln_style_image_info_default") {
-      val out = sized(w(60, 72), w(4, 8))
-      C.mln_style_image_info_default(out)
-      readStyleImageInfo(out)
     }
 
   /**
@@ -728,19 +711,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns texture image info defaults for this C API version.
-   *
-   * See `mln_texture_image_info_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun textureImageInfoDefault(): TextureImageInfo =
-    nativeCall(null, null, "mln_texture_image_info_default") {
-      val out = sized(w(20, 24), w(4, 8))
-      C.mln_texture_image_info_default(out)
-      readTextureImageInfo(out)
-    }
-
-  /**
    * Returns Vulkan borrowed-texture descriptor defaults for this C API version.
    *
    * See `mln_vulkan_borrowed_texture_descriptor_default` in the
@@ -748,7 +718,7 @@ public object GeneratedApi {
    */
   public fun vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_vulkan_borrowed_texture_descriptor_default") {
-      val out = sized(w(104, 136), 8)
+      val out = sized(w(104, 128), 8)
       C.mln_vulkan_borrowed_texture_descriptor_default(out)
       readVulkanBorrowedTextureDescriptor(out)
     }
@@ -761,7 +731,7 @@ public object GeneratedApi {
    */
   public fun vulkanOwnedTextureDescriptorDefault(): VulkanOwnedTextureDescriptor =
     nativeCall(null, null, "mln_vulkan_owned_texture_descriptor_default") {
-      val out = sized(w(64, 96), 8)
+      val out = sized(w(64, 88), 8)
       C.mln_vulkan_owned_texture_descriptor_default(out)
       readVulkanOwnedTextureDescriptor(out)
     }
@@ -774,7 +744,7 @@ public object GeneratedApi {
    */
   public fun vulkanSurfaceDescriptorDefault(): VulkanSurfaceDescriptor =
     nativeCall(null, null, "mln_vulkan_surface_descriptor_default") {
-      val out = sized(w(72, 104), 8)
+      val out = sized(w(72, 96), 8)
       C.mln_vulkan_surface_descriptor_default(out)
       readVulkanSurfaceDescriptor(out)
     }
@@ -787,7 +757,7 @@ public object GeneratedApi {
    */
   public fun webgpuBorrowedTextureDescriptorDefault(): WebgpuBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_webgpu_borrowed_texture_descriptor_default") {
-      val out = sized(w(72, 96), 8)
+      val out = sized(w(64, 88), 8)
       C.mln_webgpu_borrowed_texture_descriptor_default(out)
       readWebgpuBorrowedTextureDescriptor(out)
     }
@@ -800,7 +770,7 @@ public object GeneratedApi {
    */
   public fun webgpuOwnedTextureDescriptorDefault(): WebgpuOwnedTextureDescriptor =
     nativeCall(null, null, "mln_webgpu_owned_texture_descriptor_default") {
-      val out = sized(w(48, 64), 8)
+      val out = sized(w(48, 56), 8)
       C.mln_webgpu_owned_texture_descriptor_default(out)
       readWebgpuOwnedTextureDescriptor(out)
     }
@@ -813,7 +783,7 @@ public object GeneratedApi {
    */
   public fun webgpuSurfaceDescriptorDefault(): WebgpuSurfaceDescriptor =
     nativeCall(null, null, "mln_webgpu_surface_descriptor_default") {
-      val out = sized(w(56, 80), 8)
+      val out = sized(w(56, 72), 8)
       C.mln_webgpu_surface_descriptor_default(out)
       readWebgpuSurfaceDescriptor(out)
     }

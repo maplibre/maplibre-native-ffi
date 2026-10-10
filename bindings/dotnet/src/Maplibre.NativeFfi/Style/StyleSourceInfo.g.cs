@@ -27,7 +27,8 @@ public sealed record StyleSourceInfo
     public bool IsVolatile { get; set; }
 
     /// <summary>
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     /// </summary>
     public ulong? AttributionSize { get; set; }
 
@@ -35,6 +36,10 @@ public sealed record StyleSourceInfo
     /// URL byte length, meaningful when fields contains URL.
     /// </summary>
     public ulong? UrlSize { get; set; }
+
+    /// <summary>
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    /// </summary>
     public StyleSourceTileInfo? Tilejson { get; set; }
 
     /// <summary>

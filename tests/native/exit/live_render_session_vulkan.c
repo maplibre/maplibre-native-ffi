@@ -80,7 +80,6 @@ static mln_status attach(
     context->vulkan_get_device_proc_addr;
   mln_render_session_attach_options locked = *options;
   locked.queue_lock = (mln_queue_lock){
-    .size = sizeof(mln_queue_lock),
     .lock = session_locks_queue,
     .unlock = session_unlocks_queue,
     .user_data = &queue_lock,

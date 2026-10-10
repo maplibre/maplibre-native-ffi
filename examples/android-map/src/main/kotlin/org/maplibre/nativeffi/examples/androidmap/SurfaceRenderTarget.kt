@@ -70,8 +70,7 @@ private constructor(
       var rendered = false
       var needsRepaint = false
       var targetNotReady = false
-      for (index in 0uL until results.count()) {
-        val result = results.get(index)
+      for (result in results.get().results) {
         when (result.disposition) {
           RenderResult.RENDERED -> rendered = true
           RenderResult.TARGET_NOT_READY -> targetNotReady = true

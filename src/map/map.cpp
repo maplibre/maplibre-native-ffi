@@ -84,7 +84,6 @@
 
 #include "map/map.hpp"
 
-#include "bytes/buffer.hpp"
 #include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
@@ -1011,17 +1010,9 @@ auto validate_lat_lng(mln_lat_lng coordinate) -> mln_status;
 auto validate_edge_insets(mln_edge_insets padding) -> mln_status;
 auto validate_screen_point(mln_screen_point point) -> mln_status;
 
-auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
-  if (camera == nullptr) {
-    mln::core::set_thread_error("camera must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (camera->size < sizeof(mln_camera_options)) {
-    mln::core::set_thread_error("mln_camera_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+// Validates the members of a camera, whose size its container versions when it
+// is embedded.
+auto validate_camera_fields(const mln_camera_options* camera) -> mln_status {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_CAMERA_OPTION_CENTER) | MLN_CAMERA_OPTION_ZOOM |
     MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
@@ -1035,9 +1026,7 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   }
 
   if ((camera->fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
-    const auto status = validate_lat_lng(
-      mln_lat_lng{.latitude = camera->latitude, .longitude = camera->longitude}
-    );
+    const auto status = validate_lat_lng(camera->center);
     if (status != MLN_STATUS_OK) {
       return status;
     }
@@ -1075,6 +1064,19 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+// Validates a camera that a caller passes by pointer.
+auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
+  if (camera == nullptr) {
+    mln::core::set_thread_error("camera must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (camera->size < sizeof(mln_camera_options)) {
+    mln::core::set_thread_error("mln_camera_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return validate_camera_fields(camera);
+}
+
 using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
 
 auto max_native_duration_ms() -> double {
@@ -1107,11 +1109,6 @@ auto validate_animation_options(const mln_animation_options* animation)
   if (animation == nullptr) {
     return MLN_STATUS_OK;
   }
-  if (animation->size < sizeof(mln_animation_options)) {
-    mln::core::set_thread_error("mln_animation_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
@@ -1615,7 +1612,7 @@ auto from_native_edge_insets(const mln::EdgeInsets& insets) -> mln_edge_insets;
 auto to_native_camera(const mln_camera_options& camera) -> mln::CameraOptions {
   auto result = mln::CameraOptions{};
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
-    result.withCenter(mln::LatLng{camera.latitude, camera.longitude});
+    result.withCenter(to_native_lat_lng(camera.center));
   }
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U) {
     result.withCenterAltitude(camera.center_altitude);
@@ -1649,8 +1646,7 @@ auto from_native_camera(const mln::CameraOptions& camera)
   auto result = mln::core::camera_options_default();
   if (camera.center) {
     result.fields |= MLN_CAMERA_OPTION_CENTER;
-    result.latitude = camera.center->latitude();
-    result.longitude = camera.center->longitude();
+    result.center = from_native_lat_lng(*camera.center);
   }
   if (camera.centerAltitude) {
     result.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -2305,8 +2301,7 @@ auto camera_options_default() noexcept -> mln_camera_options {
   return mln_camera_options{
     .size = sizeof(mln_camera_options),
     .fields = 0,
-    .latitude = 0,
-    .longitude = 0,
+    .center = {.latitude = 0, .longitude = 0},
     .center_altitude = 0,
     .padding = {.top = 0, .left = 0, .bottom = 0, .right = 0},
     .anchor = {.x = 0, .y = 0},
@@ -2320,7 +2315,6 @@ auto camera_options_default() noexcept -> mln_camera_options {
 
 auto animation_options_default() noexcept -> mln_animation_options {
   return mln_animation_options{
-    .size = sizeof(mln_animation_options),
     .fields = 0,
     .duration_ms = 0,
     .velocity = 0,
@@ -2333,10 +2327,10 @@ auto animation_options_default() noexcept -> mln_animation_options {
 auto camera_delta_default() noexcept -> mln_camera_delta {
   return mln_camera_delta{
     .size = sizeof(mln_camera_delta),
+    .fields = 0,
     .kind = MLN_CAMERA_DELTA_MOVE,
     .offset = {},
     .amount = 0,
-    .has_anchor = false,
     .anchor = {},
     .animation = animation_options_default()
   };
@@ -3767,7 +3761,7 @@ auto map_update_camera(
     set_thread_error("camera update mode or gesture phase is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto camera_status = validate_camera_options(&update->camera);
+  const auto camera_status = validate_camera_fields(&update->camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
   }
@@ -3829,10 +3823,15 @@ auto map_apply_camera_delta(
     set_thread_error("camera delta must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if ((delta->fields & ~MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0U) {
+    set_thread_error("mln_camera_delta.fields contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (delta->kind > MLN_CAMERA_DELTA_PITCH) {
     set_thread_error("camera delta kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto has_anchor = (delta->fields & MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0U;
   if (
     delta->kind == MLN_CAMERA_DELTA_MOVE &&
     validate_screen_point(delta->offset) != MLN_STATUS_OK
@@ -3855,33 +3854,30 @@ auto map_apply_camera_delta(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    delta->has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
+    has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
     delta->kind != MLN_CAMERA_DELTA_BEARING
   ) {
     set_thread_error("only scale and bearing camera deltas accept an anchor");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    delta->has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK
-  ) {
+  if (has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (validate_animation_options(&delta->animation) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto copied = *delta;
+  const auto anchor =
+    has_anchor ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
+                   delta->anchor
+                 )}
+               : std::nullopt;
   return submit_camera_command(
     map,
-    [copied](MapObject& live, mln_map map_handle) -> void {
+    [copied, anchor](MapObject& live, mln_map map_handle) -> void {
       const auto animation = to_native_animation(
         live.runtime, map_handle, live.event_state, &copied.animation
       );
-      const auto anchor =
-        copied.has_anchor
-          ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
-              copied.anchor
-            )}
-          : std::nullopt;
       switch (copied.kind) {
         case MLN_CAMERA_DELTA_MOVE:
           live.map->moveBy(to_native_screen_point(copied.offset), animation);
@@ -3959,8 +3955,6 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
         state->complete(
           MLN_STATUS_OK, {},
           std::any{mln_camera_query_result{
-            .size = sizeof(mln_camera_query_result),
-            .reserved = 0,
             .generation = generation,
             .camera = from_native_camera(live->map->getCameraOptions())
           }}

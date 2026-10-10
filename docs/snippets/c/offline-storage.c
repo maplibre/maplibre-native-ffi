@@ -23,12 +23,15 @@ static void regions_listed(
   offline_cleanup* cleanup = user_data;
   // #region result
   if (result->status != MLN_STATUS_OK) return;
-  const mln_offline_region_info* regions = result->value;
+  const unsigned char* regions = result->value;
   // #endregion result
 
   // #region entries
   for (size_t index = 0; index < result->value_count; index++) {
-    const mln_offline_region_info* info = &regions[index];
+    // Elements lie value_size bytes apart, which may exceed this header's
+    // sizeof(mln_offline_region_info).
+    const mln_offline_region_info* info =
+      (const void*)(regions + index * result->value_size);
     // Copy the definition and metadata here if the host keeps them.
     // #endregion entries
     if (

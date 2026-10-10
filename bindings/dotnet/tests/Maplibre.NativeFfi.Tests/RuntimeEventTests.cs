@@ -12,7 +12,7 @@ public sealed unsafe class RuntimeEventTests
     {
         var record = new mln_runtime_event { message_offset = 3, message_size = 2 };
         byte message = 0;
-        var batch = new mln_runtime_event_batch_view
+        var batch = new mln_event_batch_view
         {
             event_size = (uint)sizeof(mln_runtime_event) - 1,
             events = &record,
@@ -20,13 +20,9 @@ public sealed unsafe class RuntimeEventTests
             messages = (sbyte*)&message,
             messages_size = 1,
         };
-        Assert.Throws<InvalidOperationException>(() =>
-            GeneratedValues.CopyRuntimeEventBatchView(batch)
-        );
+        Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyEventBatchView(batch));
         batch.event_size++;
-        Assert.Throws<InvalidOperationException>(() =>
-            GeneratedValues.CopyRuntimeEventBatchView(batch)
-        );
+        Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyEventBatchView(batch));
     }
 
     private static int OffsetOf(string fieldName) =>

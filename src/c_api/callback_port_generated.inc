@@ -39,16 +39,16 @@ void port_MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE(
   };
   dart_port_notify(user_data, values);
 }
-void port_MLN_ADAPTER_DART_PORT_WAKE_CALLBACK(void* user_data) {
-  const std::int64_t values[] = {MLN_ADAPTER_DART_PORT_WAKE_CALLBACK};
-  dart_port_notify(user_data, values);
-}
-void port_MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK(
+void port_MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK(
   void* user_data
 ) {
   const std::int64_t values[] = {
-    MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK
+    MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK
   };
+  dart_port_notify(user_data, values);
+}
+void port_MLN_ADAPTER_DART_PORT_WAKE_CALLBACK(void* user_data) {
+  const std::int64_t values[] = {MLN_ADAPTER_DART_PORT_WAKE_CALLBACK};
   dart_port_notify(user_data, values);
 }
 auto dart_port_function(std::uint32_t id) noexcept -> void* {
@@ -69,12 +69,12 @@ auto dart_port_function(std::uint32_t id) noexcept -> void* {
       return reinterpret_cast<void*>(
         &port_MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE
       );
+    case MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK:
+      return reinterpret_cast<void*>(
+        &port_MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK
+      );
     case MLN_ADAPTER_DART_PORT_WAKE_CALLBACK:
       return reinterpret_cast<void*>(&port_MLN_ADAPTER_DART_PORT_WAKE_CALLBACK);
-    case MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK:
-      return reinterpret_cast<void*>(
-        &port_MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK
-      );
     default:
       return nullptr;
   }

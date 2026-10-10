@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.LogSeverity
 import org.maplibre.nativeffi.generated.LogSeverityMask
 import org.maplibre.nativeffi.generated.MapHandle
@@ -50,12 +51,14 @@ object LogProcessExitProbe {
     val received = CountDownLatch(1)
     Maplibre.loadNativeLibrary()
     GeneratedApi.logSetAsyncSeverityMask(LogSeverityMask.WARNING)
-    GeneratedApi.logSetCallback({ severity, event, _, _ ->
-      if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {
-        received.countDown()
+    GeneratedApi.logSetCallback(
+      LogHandler { severity, event, _, _ ->
+        if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {
+          received.countDown()
+        }
+        1u
       }
-      1u
-    })
+    )
     if (callbackState == "live") {
       // The runtime keeps its provider and wake, and the map a loaded style, as the process exits.
       runSuspendTest {

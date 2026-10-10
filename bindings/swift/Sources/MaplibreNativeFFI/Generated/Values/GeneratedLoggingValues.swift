@@ -34,6 +34,58 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let timing: LogEvent = .init(rawValue: 16)
 }
 
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+public struct LogHandler: Sendable {
+  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
+    -> UInt32)?
+  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,
+                                    String) throws -> UInt32)? = nil)
+  {
+    self.callback = callback
+  }
+
+  public static var `default`: Self {
+    Self()
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_log_handler {
+    var raw = mln_log_handler()
+    raw.size = UInt32(MemoryLayout<mln_log_handler>.size)
+    raw.callback = callback == nil ? nil : invokeLogHandlerCallback
+    if callback != nil {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private func invokeLogHandlerCallback(
+  user_data: UnsafeMutableRawPointer?,
+  severity: UInt32,
+  event: UInt32,
+  code: Int64,
+  message: UnsafePointer<CChar>?
+) -> UInt32 {
+  guard let user_data else { return 0 }
+  let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
+    .takeUnretainedValue()
+  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
+  defer { admission.end() }
+  do { return try box.value.callback?(
+    LogSeverity(rawValue: severity),
+    LogEvent(rawValue: event),
+    code,
+    NativeString.copyCString(message)
+  ) ?? 0 } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_log_callback",
+    error: error
+  )); return 0 }
+}
+
 /// Log severity values emitted by MapLibre Native.
 ///
 /// See `mln_log_severity` in the

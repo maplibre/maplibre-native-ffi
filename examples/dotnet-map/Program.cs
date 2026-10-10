@@ -31,7 +31,7 @@ internal static class Program
             }
 
             Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.All);
-            Maplibre.LogSetCallback(PrintNativeLog);
+            Maplibre.LogSetCallback(new LogHandler(PrintNativeLog));
             try
             {
                 return Shell.Run(parseResult.Mode.Value, backends, parseResult.Smoke) ? 0 : 1;

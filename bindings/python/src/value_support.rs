@@ -71,10 +71,20 @@ unsafe fn generated_slice<'a, T>(data: *const T, count: impl TryInto<usize>) -> 
     Ok(unsafe { std::slice::from_raw_parts(data, count) })
 }
 
-fn generated_completion_slice<T>(result: &sys::mln_completion_result) -> PyResult<&[T]> {
+/// Copies each element of a completion's array, value_size bytes apart.
+fn generated_completion_values<T: Copy>(
+    result: &sys::mln_completion_result,
+) -> PyResult<impl Iterator<Item = T>> {
     // SAFETY: the generated callback selects T from the submitting operation's
-    // resolved result contract; the borrowed result bounds the returned slice.
-    unsafe { generated_slice(result.value.cast::<T>(), result.value_count) }
+    // resolved result contract, and native lays out value_count elements
+    // value_size bytes apart for the duration of the callback.
+    unsafe {
+        generated_strided_values(
+            result.value.cast::<T>(),
+            result.value_count,
+            result.value_size,
+        )
+    }
 }
 
 /// Removes a public owner before a consuming call and restores it on rejection.
@@ -519,22 +529,8 @@ unsafe fn generated_strided_values<T: Copy>(
     stride: impl TryInto<usize>,
 ) -> PyResult<impl Iterator<Item = T>> {
     let (count, stride) = (generated_count(count)?, generated_count(stride)?);
-    if count != 0
-        && (data.is_null()
-            || stride < std::mem::size_of::<T>()
-            || count > isize::MAX as usize / stride)
-    {
-        return Err(native_error("invalid native record stride"));
-    }
-    Ok((0..count).map(move |index| {
-        // SAFETY: the array contract supplies count records of the given stride.
-        unsafe {
-            data.cast::<u8>()
-                .add(index * stride)
-                .cast::<T>()
-                .read_unaligned()
-        }
-    }))
+    // SAFETY: the array contract supplies count records of the given stride.
+    unsafe { maplibre_core::ptr::strided_records(data, count, stride) }.map_err(map_error)
 }
 
 unsafe fn generated_arena_string<P>(

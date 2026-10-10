@@ -55,17 +55,30 @@ static uint32_t ignore_log_record(
 
 static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
 
+static mln_log_handler log_handler(
+  mln_log_callback callback, void* user_data,
+  mln_user_data_release release_user_data
+) {
+  return (mln_log_handler){
+    .size = sizeof(mln_log_handler),
+    .callback = callback,
+    .user_data = user_data,
+    .release_user_data = release_user_data,
+  };
+}
+
 LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   int first_releases = 0;
   int second_releases = 0;
-  MLN_TEST_OK(mln_log_set_callback(
-    ignore_log_record, &first_releases, count_log_callback_release, NULL
-  ));
+  const mln_log_handler first =
+    log_handler(ignore_log_record, &first_releases, count_log_callback_release);
+  MLN_TEST_OK(mln_log_set_callback(&first, NULL));
   TEST_ASSERT_EQUAL_INT(0, first_releases);
 
-  MLN_TEST_OK(mln_log_set_callback(
-    ignore_log_record, &second_releases, count_log_callback_release, NULL
-  ));
+  const mln_log_handler second = log_handler(
+    ignore_log_record, &second_releases, count_log_callback_release
+  );
+  MLN_TEST_OK(mln_log_set_callback(&second, NULL));
   TEST_ASSERT_EQUAL_INT(1, first_releases);
   TEST_ASSERT_EQUAL_INT(0, second_releases);
 
@@ -75,23 +88,31 @@ LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   TEST_ASSERT_EQUAL_INT(1, second_releases);
 }
 
-// A null callback clears the registration, releasing the old user data, and
-// releases the user data passed with it before returning.
-LOG_STATE_CASE(a_null_callback_clears_and_releases_the_user_data_it_passes) {
+// A rejected handler leaves the installed one in place and releases neither
+// its own user data nor the installed handler's.
+LOG_STATE_CASE(a_rejected_handler_keeps_the_installed_one) {
   int installed_releases = 0;
-  int passed_releases = 0;
-  MLN_TEST_OK(mln_log_set_callback(
-    ignore_log_record, &installed_releases, count_log_callback_release, NULL
-  ));
+  int rejected_releases = 0;
+  const mln_log_handler installed = log_handler(
+    ignore_log_record, &installed_releases, count_log_callback_release
+  );
+  MLN_TEST_OK(mln_log_set_callback(&installed, NULL));
 
-  MLN_TEST_OK(mln_log_set_callback(
-    NULL, &passed_releases, count_log_callback_release, NULL
-  ));
-  TEST_ASSERT_EQUAL_INT(1, installed_releases);
-  TEST_ASSERT_EQUAL_INT(1, passed_releases);
+  MLN_TEST_INVALID(mln_log_set_callback(NULL, NULL));
+  mln_log_handler undersized = log_handler(
+    ignore_log_record, &rejected_releases, count_log_callback_release
+  );
+  undersized.size = sizeof(mln_log_handler) - 1;
+  MLN_TEST_INVALID(mln_log_set_callback(&undersized, NULL));
+  const mln_log_handler without_callback =
+    log_handler(NULL, &rejected_releases, count_log_callback_release);
+  MLN_TEST_INVALID(mln_log_set_callback(&without_callback, NULL));
+  TEST_ASSERT_EQUAL_INT(0, installed_releases);
+  TEST_ASSERT_EQUAL_INT(0, rejected_releases);
+
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, installed_releases);
-  TEST_ASSERT_EQUAL_INT(1, passed_releases);
+  TEST_ASSERT_EQUAL_INT(0, rejected_releases);
 }
 
 // Counts the releases a deferred log context hands its listener.
@@ -122,9 +143,9 @@ LOG_STATE_CASE(a_deferred_log_registration_releases_its_context_once) {
   mln_log_callback callback = NULL;
   memcpy(&callback, &address, sizeof(callback));
 
-  MLN_TEST_OK(mln_log_set_callback(
-    callback, context, mln_adapter_deferred_callback_release, NULL
-  ));
+  const mln_log_handler handler =
+    log_handler(callback, context, mln_adapter_deferred_callback_release);
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&releases));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
@@ -245,7 +266,8 @@ static void dump_debug_logs(dump_probe* probe) {
   atomic_init(&probe->unexpected, 0);
   atomic_init(&probe->count_at_completion, -1);
   atomic_init(&probe->completed, false);
-  MLN_TEST_OK(mln_log_set_callback(record_dump, probe, NULL, NULL));
+  const mln_log_handler handler = log_handler(record_dump, probe, NULL);
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -394,7 +416,7 @@ LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
 
 MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
-  RUN_TEST(a_null_callback_clears_and_releases_the_user_data_it_passes);
+  RUN_TEST(a_rejected_handler_keeps_the_installed_one);
   RUN_TEST(a_deferred_log_registration_releases_its_context_once);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);

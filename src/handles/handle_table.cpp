@@ -45,8 +45,6 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_map_projection";
     case HandleKind::RenderSession:
       return "mln_render_session";
-    case HandleKind::Buffer:
-      return "mln_buffer";
     case HandleKind::ResourceRequest:
       return "mln_resource_request_handle";
     case HandleKind::EventBatch:

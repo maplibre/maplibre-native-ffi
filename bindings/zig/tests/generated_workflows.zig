@@ -10,7 +10,7 @@ test "generated owners preserve rejected release and copied event snapshots" {
     const command = try support.resolve(try maplibre.mapSetStyleJson(fixture.map, support.style_json, null));
     try command.statusError();
     try fixture.barrier();
-    var batch = try maplibre.runtimeDrainEvents(fixture.runtime, null);
+    var batch = try maplibre.runtimeDrainEvents(fixture.runtime, null) orelse return error.EventNotObserved;
     defer batch.deinit();
     var copied = try maplibre.eventBatchGet(testing.allocator, batch, null);
     defer copied.deinit();

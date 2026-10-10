@@ -29,6 +29,10 @@ pub const Diagnostic = diagnostics.Diagnostic;
 pub const validateAbiVersion = status.validateAbiVersion;
 pub const CallbackErrorReporter = callback.ErrorReporter;
 pub const setCallbackErrorReporter = callback.setErrorReporter;
+/// Test builds only: the callback registrations that the binding holds.
+pub const testing = if (@import("builtin").is_test) struct {
+    pub const liveCallbackRegistrations = callback.liveRegistrations;
+} else struct {};
 
 /// A rendered frame that a render session lends until its release.
 ///
@@ -37,15 +41,6 @@ pub const setCallbackErrorReporter = callback.setErrorReporter;
 pub const AcquiredFrame = owner.Handle("mln_acquired_frame", "AcquiredFrame", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
-    }
-}.dispose);
-/// An owned buffer of bytes.
-///
-/// See `mln_buffer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const Buffer = owner.Handle("mln_buffer", "Buffer", struct {
-    fn dispose(raw: u64) status.Error!void {
-        c.mln_buffer_destroy(raw);
     }
 }.dispose);
 /// An owned batch of runtime events from one drain.
@@ -278,11 +273,11 @@ pub const CameraDelta = struct {
     animation: AnimationOptions = .{},
     pub fn toNative(self: CameraDelta) c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
-        raw.has_anchor = false;
+        raw.fields = 0;
         raw.kind = self.kind.toNative();
         raw.offset = self.offset.toNative();
         raw.amount = self.amount;
-        marshal.present(&raw.has_anchor, true, &raw.anchor, self.anchor);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, self.anchor);
         raw.animation = self.animation.toNative();
         return raw;
     }
@@ -291,10 +286,26 @@ pub const CameraDelta = struct {
             .kind = CameraDeltaKind.fromNative(raw.kind),
             .offset = ScreenPoint.fromNative(raw.offset),
             .amount = raw.amount,
-            .anchor = if (raw.has_anchor) ScreenPoint.fromNative(raw.anchor) else null,
+            .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
             .animation = AnimationOptions.fromNative(raw.animation),
         };
     }
+};
+
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraDeltaField = struct {
+    anchor: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{1};
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Relative camera operation carried by `mln_camera_delta`.
@@ -396,11 +407,7 @@ pub const CameraOptions = struct {
     pub fn toNative(self: CameraOptions) c.mln_camera_options {
         var raw = c.mln_camera_options_default();
         raw.fields = 0;
-        if (self.center) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_CENTER;
-            raw.latitude = item.latitude;
-            raw.longitude = item.longitude;
-        }
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER, &raw.center, self.center);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, self.center_altitude);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_PADDING, &raw.padding, self.padding);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, self.anchor);
@@ -413,7 +420,7 @@ pub const CameraOptions = struct {
     }
     pub fn fromNative(raw: c.mln_camera_options) CameraOptions {
         return .{
-            .center = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER != 0) .{ .latitude = raw.latitude, .longitude = raw.longitude } else null,
+            .center = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER != 0) LatLng.fromNative(raw.center) else null,
             .center_altitude = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0) raw.center_altitude else null,
             .padding = if (raw.fields & c.MLN_CAMERA_OPTION_PADDING != 0) EdgeInsets.fromNative(raw.padding) else null,
             .anchor = if (raw.fields & c.MLN_CAMERA_OPTION_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
@@ -435,7 +442,6 @@ pub const CameraQueryResult = struct {
     camera: CameraOptions = .{},
     pub fn toNative(self: CameraQueryResult) c.mln_camera_query_result {
         var raw = std.mem.zeroes(c.mln_camera_query_result);
-        raw.size = @sizeOf(c.mln_camera_query_result);
         raw.generation = self.generation;
         raw.camera = self.camera.toNative();
         return raw;
@@ -600,37 +606,37 @@ pub const CustomGeometrySourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_geometry_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_geometry_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_geometry_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_geometry_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
@@ -696,37 +702,37 @@ pub const CustomMvtVectorSourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
@@ -793,7 +799,6 @@ pub const EglContextDescriptor = struct {
     get_proc_address: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: EglContextDescriptor) c.mln_egl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_egl_context_descriptor);
-        raw.size = @sizeOf(c.mln_egl_context_descriptor);
         raw.display = self.display;
         raw.config = self.config;
         raw.share_context = self.share_context;
@@ -808,6 +813,42 @@ pub const EglContextDescriptor = struct {
             .share_context = raw.share_context,
             .client_api = OpenglClientApi.fromNative(raw.client_api),
             .get_proc_address = raw.get_proc_address,
+        };
+    }
+};
+
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const EventBatchView = struct {
+    events: []const RuntimeEvent = &.{},
+    pub fn toNative(self: EventBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_event_batch_view {
+        var raw = std.mem.zeroes(c.mln_event_batch_view);
+        raw.size = @sizeOf(c.mln_event_batch_view);
+        raw.events = blk: {
+            const items = try allocator.alloc(c.mln_runtime_event, self.events.len);
+            for (self.events, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.event_count = std.math.cast(@TypeOf(raw.event_count), self.events.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_event_batch_view) status.Error!EventBatchView {
+        return .{
+            .events = blk: {
+                const copied = try allocator.alloc(RuntimeEvent, raw.event_count);
+                for (0..raw.event_count) |index| {
+                    const item = try marshal.stridedAt(c.mln_runtime_event, raw.events, raw.event_count, raw.event_size, index);
+                    copied[index] = blk_item: {
+                        var converted = try RuntimeEvent.fromNative(allocator, item);
+                        converted.message = try marshal.copyArenaString(allocator, raw.messages, raw.messages_size, item.message_offset, item.message_size);
+                        break :blk_item converted;
+                    };
+                }
+                break :blk copied;
+            },
         };
     }
 };
@@ -1297,6 +1338,52 @@ pub const LogEvent = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+pub const LogHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque, LogSeverity, LogEvent, i64, []const u8) status.Error!u32 = null,
+    pub fn toNative(self: LogHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_log_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_log_handler);
+        raw.size = @sizeOf(c.mln_log_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(LogHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(LogHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), native_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) callconv(.c) marshal.CallbackResult(c.mln_log_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) status.Error!marshal.CallbackResult(c.mln_log_callback) {
+                const state = callback.Registration(LogHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return 0;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{}, 0);
+                defer scope.leave();
+                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
+                defer arena.deinit();
+                const allocator = arena.allocator();
+                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try allocator.dupe(u8, std.mem.span(callback_arg_4 orelse return error.NativeError))) catch |err| {
+                    callback.reportError("mln_log_callback", err);
+                    return 0;
+                };
+                return result;
+            }
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3, native_arg_4) catch |err| {
+            callback.reportError("mln_log_callback", err);
+            return 0;
+        };
+    }
+};
+
 /// Log severity values emitted by MapLibre Native.
 ///
 /// See `mln_log_severity` in the
@@ -1647,7 +1734,6 @@ pub const MetalContextDescriptor = struct {
     device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalContextDescriptor) c.mln_metal_context_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_context_descriptor);
-        raw.size = @sizeOf(c.mln_metal_context_descriptor);
         raw.device = self.device;
         return raw;
     }
@@ -1792,7 +1878,6 @@ pub const OfflineGeometryRegionDefinition = struct {
     pub fn toNative(self: OfflineGeometryRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_geometry_region_definition {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_offline_geometry_region_definition);
-        raw.size = @sizeOf(c.mln_offline_geometry_region_definition);
         raw.style_url = try marshal.cString(allocator, self.style_url);
         raw.geometry = marshal.view(self.geometry);
         raw.min_zoom = self.min_zoom;
@@ -1884,7 +1969,6 @@ pub const OfflineRegionInfo = struct {
     metadata: []const u8 = &.{},
     pub fn toNative(self: OfflineRegionInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_region_info {
         var raw = std.mem.zeroes(c.mln_offline_region_info);
-        raw.size = @sizeOf(c.mln_offline_region_info);
         raw.id = self.id;
         raw.definition = try self.definition.toNative(allocator, roots);
         raw.metadata = @ptrCast(self.metadata.ptr);
@@ -1918,7 +2002,6 @@ pub const OfflineRegionStatus = struct {
     complete: bool = std.mem.zeroes(bool),
     pub fn toNative(self: OfflineRegionStatus) c.mln_offline_region_status {
         var raw = std.mem.zeroes(c.mln_offline_region_status);
-        raw.size = @sizeOf(c.mln_offline_region_status);
         raw.download_state = self.download_state.toNative();
         raw.completed_resource_count = self.completed_resource_count;
         raw.completed_resource_size = self.completed_resource_size;
@@ -1959,7 +2042,6 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     pub fn toNative(self: OfflineTilePyramidRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_tile_pyramid_region_definition {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_offline_tile_pyramid_region_definition);
-        raw.size = @sizeOf(c.mln_offline_tile_pyramid_region_definition);
         raw.style_url = try marshal.cString(allocator, self.style_url);
         raw.bounds = self.bounds.toNative();
         raw.min_zoom = self.min_zoom;
@@ -2041,7 +2123,6 @@ pub const OpenglContextDescriptor = struct {
     data: OpenglContextDescriptorData = .{ .unknown = 0 },
     pub fn toNative(self: OpenglContextDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_opengl_context_descriptor);
-        raw.size = @sizeOf(c.mln_opengl_context_descriptor);
         raw.ownership = self.ownership.toNative();
         switch (self.data) {
             .wgl => |item| {
@@ -2382,7 +2463,6 @@ pub const QueriedFeature = struct {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_queried_feature);
         raw.fields = 0;
-        raw.size = @sizeOf(c.mln_queried_feature);
         raw.feature = marshal.view(self.feature);
         if (self.source_id) |item| {
             raw.fields |= c.MLN_QUERIED_FEATURE_SOURCE_ID;
@@ -2440,7 +2520,6 @@ pub const QueueLock = struct {
     pub fn toNative(self: QueueLock, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_queue_lock {
         _ = allocator;
         var raw = std.mem.zeroes(c.mln_queue_lock);
-        raw.size = @sizeOf(c.mln_queue_lock);
         raw.lock = if (self.lock != null) lockTrampoline else null;
         raw.unlock = if (self.unlock != null) unlockTrampoline else null;
         if (!(self.lock == null and self.unlock == null)) {
@@ -2561,7 +2640,41 @@ pub const RenderDriverKind = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Immutable result record copied into an owned frame-result batch.
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub const RenderFrameBatchView = struct {
+    results: []const RenderFrameResult = &.{},
+    pub fn toNative(self: RenderFrameBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_frame_batch_view {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_render_frame_batch_view);
+        raw.size = @sizeOf(c.mln_render_frame_batch_view);
+        raw.results = blk: {
+            const items = try allocator.alloc(c.mln_render_frame_result, self.results.len);
+            for (self.results, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.result_count = std.math.cast(@TypeOf(raw.result_count), self.results.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_render_frame_batch_view) status.Error!RenderFrameBatchView {
+        return .{
+            .results = blk: {
+                const copied = try allocator.alloc(RenderFrameResult, raw.result_count);
+                for (0..raw.result_count) |index| {
+                    const item = try marshal.stridedAt(c.mln_render_frame_result, raw.results, raw.result_count, raw.result_size, index);
+                    copied[index] = RenderFrameResult.fromNative(item);
+                }
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2835,9 +2948,10 @@ pub const RenderTargetExtent = struct {
 /// See `mln_rendered_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const RenderedFeatureQueryOptionField = struct {
-    ids: bool = false,
+    layer_ids: bool = false,
+    filter: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
+    pub const native_bits = [_]u32{ 1, 2 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -2867,7 +2981,10 @@ pub const RenderedFeatureQueryOptions = struct {
             };
         }
         raw.layer_id_count = std.math.cast(@TypeOf(raw.layer_id_count), if (self.layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        raw.filter = if (self.filter) |array_item_0| try marshal.store(allocator, marshal.view(array_item_0)) else null;
+        if (self.filter) |item| {
+            raw.fields |= c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = marshal.view(item);
+        }
         return raw;
     }
 
@@ -2878,7 +2995,7 @@ pub const RenderedFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.layer_ids, raw.layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.filter == null) null else try marshal.copyView(allocator, (raw.filter orelse return error.NativeError).*),
+            .filter = if (raw.fields & c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
         };
     }
 };
@@ -3076,9 +3193,30 @@ pub const ResourceProviderDecision = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-pub const ResourceRequestRange = struct { range_start: u64, range_end: u64 };
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRange = struct {
+    /// First byte offset of the requested range.
+    start: u64 = std.mem.zeroes(u64),
+    /// Last byte offset of the requested range, inclusive.
+    end: u64 = std.mem.zeroes(u64),
+    pub fn toNative(self: ResourceRange) c.mln_resource_range {
+        var raw = std.mem.zeroes(c.mln_resource_range);
+        raw.start = self.start;
+        raw.end = self.end;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_resource_range) ResourceRange {
+        return .{
+            .start = raw.start,
+            .end = raw.end,
+        };
+    }
+};
+
 pub const ResourceRequest = struct {
-    range: ?ResourceRequestRange = null,
     requested_url: ?[]const u8 = null,
     resolved_url: ?[]const u8 = null,
     kind: ResourceKind = std.mem.zeroes(ResourceKind),
@@ -3086,6 +3224,7 @@ pub const ResourceRequest = struct {
     priority: ResourcePriority = std.mem.zeroes(ResourcePriority),
     usage: ResourceUsage = std.mem.zeroes(ResourceUsage),
     storage_policy: ResourceStoragePolicy = std.mem.zeroes(ResourceStoragePolicy),
+    range: ?ResourceRange = null,
     prior_modified_unix_ms: ?i64 = null,
     prior_expires_unix_ms: ?i64 = null,
     prior_etag: ?[]const u8 = null,
@@ -3093,14 +3232,7 @@ pub const ResourceRequest = struct {
     pub fn toNative(self: ResourceRequest, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_request);
-        raw.has_prior_expires = false;
-        raw.has_prior_modified = false;
-        raw.has_range = false;
-        if (self.range) |item| {
-            raw.has_range = true;
-            raw.range_start = item.range_start;
-            raw.range_end = item.range_end;
-        }
+        raw.fields = 0;
         raw.size = @sizeOf(c.mln_resource_request);
         raw.requested_url = if (self.requested_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.resolved_url = if (self.resolved_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
@@ -3109,8 +3241,9 @@ pub const ResourceRequest = struct {
         raw.priority = self.priority.toNative();
         raw.usage = self.usage.toNative();
         raw.storage_policy = self.storage_policy.toNative();
-        marshal.present(&raw.has_prior_modified, true, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
-        marshal.present(&raw.has_prior_expires, true, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_RANGE, &raw.range, self.range);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
         raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.prior_data = @ptrCast(self.prior_data.ptr);
         raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
@@ -3119,7 +3252,6 @@ pub const ResourceRequest = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request) status.Error!ResourceRequest {
         return .{
-            .range = if (raw.has_range) .{ .range_start = raw.range_start, .range_end = raw.range_end } else null,
             .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
             .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
             .kind = ResourceKind.fromNative(raw.kind),
@@ -3127,14 +3259,82 @@ pub const ResourceRequest = struct {
             .priority = ResourcePriority.fromNative(raw.priority),
             .usage = ResourceUsage.fromNative(raw.usage),
             .storage_policy = ResourceStoragePolicy.fromNative(raw.storage_policy),
-            .prior_modified_unix_ms = if (raw.has_prior_modified) raw.prior_modified_unix_ms else null,
-            .prior_expires_unix_ms = if (raw.has_prior_expires) raw.prior_expires_unix_ms else null,
+            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
+            .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
+            .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
             .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
             .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
         };
     }
 };
 
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRequestCancelHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque) status.Error!void = null,
+    pub fn toNative(self: ResourceRequestCancelHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request_cancel_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_resource_request_cancel_handler);
+        raw.size = @sizeOf(c.mln_resource_request_cancel_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(ResourceRequestCancelHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(ResourceRequestCancelHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+                const state = callback.Registration(ResourceRequestCancelHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.owner);
+                defer scope.leave();
+                host(state.value.context) catch |err| {
+                    callback.reportError("mln_resource_request_cancel_callback", err);
+                    return;
+                };
+            }
+        }.invoke(native_arg_0) catch |err| {
+            callback.reportError("mln_resource_request_cancel_callback", err);
+            return;
+        };
+    }
+};
+
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRequestField = struct {
+    /// The request asks only for the bytes in range.
+    range: bool = false,
+    /// The cached copy being revalidated carries a modification time.
+    prior_modified: bool = false,
+    /// The cached copy being revalidated carries an expiration time.
+    prior_expires: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
+};
+
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceResponse = struct {
     status: ResourceResponseStatus = std.mem.zeroes(ResourceResponseStatus),
     error_reason: ResourceErrorReason = std.mem.zeroes(ResourceErrorReason),
@@ -3148,9 +3348,7 @@ pub const ResourceResponse = struct {
     pub fn toNative(self: ResourceResponse, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_response {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_response);
-        raw.has_retry_after = false;
-        raw.has_expires = false;
-        raw.has_modified = false;
+        raw.fields = 0;
         raw.size = @sizeOf(c.mln_resource_response);
         raw.status = self.status.toNative();
         raw.error_reason = self.error_reason.toNative();
@@ -3158,10 +3356,10 @@ pub const ResourceResponse = struct {
         raw.byte_count = std.math.cast(@TypeOf(raw.byte_count), self.bytes.len) orelse return error.InvalidArgument;
         raw.error_message = if (self.error_message) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.must_revalidate = self.must_revalidate;
-        marshal.present(&raw.has_modified, true, &raw.modified_unix_ms, self.modified_unix_ms);
-        marshal.present(&raw.has_expires, true, &raw.expires_unix_ms, self.expires_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, self.modified_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, self.expires_unix_ms);
         raw.etag = if (self.etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        marshal.present(&raw.has_retry_after, true, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
         return raw;
     }
 
@@ -3172,12 +3370,33 @@ pub const ResourceResponse = struct {
             .bytes = try marshal.copyView(allocator, .{ .data = raw.bytes, .size = raw.byte_count }),
             .error_message = if (raw.error_message == null) null else try allocator.dupe(u8, std.mem.span(raw.error_message orelse return error.NativeError)),
             .must_revalidate = raw.must_revalidate,
-            .modified_unix_ms = if (raw.has_modified) raw.modified_unix_ms else null,
-            .expires_unix_ms = if (raw.has_expires) raw.expires_unix_ms else null,
+            .modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_MODIFIED != 0) raw.modified_unix_ms else null,
+            .expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_EXPIRES != 0) raw.expires_unix_ms else null,
             .etag = if (raw.etag == null) null else try allocator.dupe(u8, std.mem.span(raw.etag orelse return error.NativeError)),
-            .retry_after_unix_ms = if (raw.has_retry_after) raw.retry_after_unix_ms else null,
+            .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
+};
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceResponseField = struct {
+    /// The response carries a modification time.
+    modified: bool = false,
+    /// The response carries an expiration time.
+    expires: bool = false,
+    /// An ERROR response carries the earliest time to retry the request.
+    retry_after: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// How a resource provider answered a request.
@@ -3333,42 +3552,6 @@ pub const RuntimeEvent = struct {
     }
 };
 
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventBatchView = struct {
-    events: []const RuntimeEvent = &.{},
-    pub fn toNative(self: RuntimeEventBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event_batch_view {
-        var raw = std.mem.zeroes(c.mln_runtime_event_batch_view);
-        raw.size = @sizeOf(c.mln_runtime_event_batch_view);
-        raw.events = blk: {
-            const items = try allocator.alloc(c.mln_runtime_event, self.events.len);
-            for (self.events, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
-            break :blk items.ptr;
-        };
-        raw.event_count = std.math.cast(@TypeOf(raw.event_count), self.events.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event_batch_view) status.Error!RuntimeEventBatchView {
-        return .{
-            .events = blk: {
-                const copied = try allocator.alloc(RuntimeEvent, raw.event_count);
-                for (0..raw.event_count) |index| {
-                    const item = try marshal.stridedAt(c.mln_runtime_event, raw.events, raw.event_count, raw.event_size, index);
-                    copied[index] = blk_item: {
-                        var converted = try RuntimeEvent.fromNative(allocator, item);
-                        converted.message = try marshal.copyArenaString(allocator, raw.messages, raw.messages_size, item.message_offset, item.message_size);
-                        break :blk_item converted;
-                    };
-                }
-                break :blk copied;
-            },
-        };
-    }
-};
-
 /// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
 ///
 /// See `mln_runtime_event_camera_transition_finished` in the
@@ -3458,8 +3641,6 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionStatus = struct {
     region_id: i64 = std.mem.zeroes(i64),
-    /// Region status. This member keeps its own size field because the same
-    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
     status: OfflineRegionStatus = .{},
     pub fn toNative(self: RuntimeEventOfflineRegionStatus) c.mln_runtime_event_offline_region_status {
         var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_status);
@@ -3650,7 +3831,6 @@ pub const RuntimeEventType = enum(u32) {
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeOptions = struct {
-    flags: u32 = std.mem.zeroes(u32),
     asset_path: ?[]const u8 = null,
     cache_path: ?[]const u8 = null,
     event_mask: RuntimeEventMask = RuntimeEventMask.all,
@@ -3658,7 +3838,6 @@ pub const RuntimeOptions = struct {
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
         var raw = c.mln_runtime_options_default();
         raw.size = @sizeOf(c.mln_runtime_options);
-        raw.flags = self.flags;
         raw.asset_path = if (self.asset_path) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.cache_path = if (self.cache_path) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.event_mask = self.event_mask.toNative();
@@ -3668,7 +3847,6 @@ pub const RuntimeOptions = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_options) status.Error!RuntimeOptions {
         return .{
-            .flags = raw.flags,
             .asset_path = if (raw.asset_path == null) null else try allocator.dupe(u8, std.mem.span(raw.asset_path orelse return error.NativeError)),
             .cache_path = if (raw.cache_path == null) null else try allocator.dupe(u8, std.mem.span(raw.cache_path orelse return error.NativeError)),
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
@@ -3753,9 +3931,10 @@ pub const ScreenPoint = struct {
 /// See `mln_source_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeatureQueryOptionField = struct {
-    ids: bool = false,
+    source_layer_ids: bool = false,
+    filter: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
+    pub const native_bits = [_]u32{ 1, 2 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -3785,7 +3964,10 @@ pub const SourceFeatureQueryOptions = struct {
             };
         }
         raw.source_layer_id_count = std.math.cast(@TypeOf(raw.source_layer_id_count), if (self.source_layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        raw.filter = if (self.filter) |array_item_0| try marshal.store(allocator, marshal.view(array_item_0)) else null;
+        if (self.filter) |item| {
+            raw.fields |= c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = marshal.view(item);
+        }
         return raw;
     }
 
@@ -3796,7 +3978,7 @@ pub const SourceFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.source_layer_ids, raw.source_layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.filter == null) null else try marshal.copyView(allocator, (raw.filter orelse return error.NativeError).*),
+            .filter = if (raw.fields & c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
         };
     }
 };
@@ -3845,31 +4027,29 @@ pub const StyleImageInfo = struct {
     /// Interval counts for the stretchable axes.
     stretch_x_count: usize = std.mem.zeroes(usize),
     stretch_y_count: usize = std.mem.zeroes(usize),
-    /// Content box, meaningful only when has_content is true.
+    /// Content box, meaningful when fields contains CONTENT.
     content: ?ImageContent = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_WIDTH.
     text_fit_width: ?StyleImageTextFit = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_HEIGHT.
     text_fit_height: ?StyleImageTextFit = null,
-    /// Sprite pixel ratio. Defaults to 1.0.
-    pixel_ratio: f32 = 1.0,
+    /// Sprite pixel ratio.
+    pixel_ratio: f32 = std.mem.zeroes(f32),
     sdf: bool = std.mem.zeroes(bool),
     pub fn toNative(self: StyleImageInfo) c.mln_style_image_info {
-        var raw = c.mln_style_image_info_default();
-        raw.has_content = false;
-        raw.has_text_fit_width = false;
-        raw.has_text_fit_height = false;
+        var raw = std.mem.zeroes(c.mln_style_image_info);
+        raw.fields = 0;
         raw.width = self.width;
         raw.height = self.height;
         raw.stride = self.stride;
         raw.byte_length = self.byte_length;
         raw.stretch_x_count = self.stretch_x_count;
         raw.stretch_y_count = self.stretch_y_count;
-        marshal.present(&raw.has_content, true, &raw.content, self.content);
-        marshal.present(&raw.has_text_fit_width, true, &raw.text_fit_width, self.text_fit_width);
-        marshal.present(&raw.has_text_fit_height, true, &raw.text_fit_height, self.text_fit_height);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, self.content);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, self.text_fit_width);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
         raw.pixel_ratio = self.pixel_ratio;
         raw.sdf = self.sdf;
         return raw;
@@ -3882,13 +4062,34 @@ pub const StyleImageInfo = struct {
             .byte_length = raw.byte_length,
             .stretch_x_count = raw.stretch_x_count,
             .stretch_y_count = raw.stretch_y_count,
-            .content = if (raw.has_content) ImageContent.fromNative(raw.content) else null,
-            .text_fit_width = if (raw.has_text_fit_width) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
-            .text_fit_height = if (raw.has_text_fit_height) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
+            .content = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_CONTENT != 0) ImageContent.fromNative(raw.content) else null,
+            .text_fit_width = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
+            .text_fit_height = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
             .pixel_ratio = raw.pixel_ratio,
             .sdf = raw.sdf,
         };
     }
+};
+
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const StyleImageInfoField = struct {
+    /// The image declares a content box.
+    content: bool = false,
+    /// The image declares a horizontal text-fit mode.
+    text_fit_width: bool = false,
+    /// The image declares a vertical text-fit mode.
+    text_fit_height: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Field mask values for `mln_style_image_options`.
@@ -3989,7 +4190,6 @@ pub const StyleImageResult = struct {
     pub fn toNative(self: StyleImageResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_result {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_image_result);
-        raw.size = @sizeOf(c.mln_style_image_result);
         raw.info = self.info.toNative();
         raw.pixels = marshal.view(self.pixels);
         raw.stretch_x = blk: {
@@ -4035,7 +4235,6 @@ pub const StyleImageStretchesResult = struct {
     pub fn toNative(self: StyleImageStretchesResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_stretches_result {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_image_stretches_result);
-        raw.size = @sizeOf(c.mln_style_image_stretches_result);
         raw.stretch_x = blk: {
             const items = try allocator.alloc(c.mln_image_stretch, self.stretch_x.len);
             for (self.stretch_x, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
@@ -4093,7 +4292,6 @@ pub const StyleLayerEntry = struct {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_layer_entry);
-        raw.size = @sizeOf(c.mln_style_layer_entry);
         raw.id = marshal.view(self.id);
         raw.type = marshal.view(self.type);
         raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
@@ -4124,7 +4322,6 @@ pub const StyleLayerInfo = struct {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_layer_info);
-        raw.size = @sizeOf(c.mln_style_layer_info);
         raw.type = marshal.view(self.type);
         raw.min_zoom = self.min_zoom;
         raw.max_zoom = self.max_zoom;
@@ -4152,7 +4349,6 @@ pub const StyleLayerResult = struct {
     source_layer: ?[]const u8 = null,
     pub fn toNative(self: StyleLayerResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_result {
         var raw = std.mem.zeroes(c.mln_style_layer_result);
-        raw.size = @sizeOf(c.mln_style_layer_result);
         raw.info = try self.info.toNative(allocator, roots);
         raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.source_layer = if (self.source_layer) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
@@ -4197,17 +4393,19 @@ pub const StyleRasterDemEncoding = enum(u32) {
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceInfo = struct {
-    tilejson: ?StyleSourceTileInfo = null,
     /// One of `mln_style_source_type`.
     type: StyleSourceType = std.mem.zeroes(StyleSourceType),
     /// Source ID byte length, excluding any null terminator.
     id_size: usize = std.mem.zeroes(usize),
     /// Whether the source is marked volatile.
     is_volatile: bool = std.mem.zeroes(bool),
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     attribution_size: ?usize = null,
     /// URL byte length, meaningful when fields contains URL.
     url_size: ?usize = null,
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    tilejson: ?StyleSourceTileInfo = null,
     /// Geographic bounds, meaningful when fields contains BOUNDS.
     bounds: ?LatLngBounds = null,
     /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
@@ -4219,20 +4417,12 @@ pub const StyleSourceInfo = struct {
     pub fn toNative(self: StyleSourceInfo) c.mln_style_source_info {
         var raw = std.mem.zeroes(c.mln_style_source_info);
         raw.fields = 0;
-        raw.has_attribution = false;
-        if (self.tilejson) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
-            raw.tile_count = item.tile_count;
-            raw.min_zoom = item.min_zoom;
-            raw.max_zoom = item.max_zoom;
-            raw.scheme = item.scheme.toNative();
-        }
-        raw.size = @sizeOf(c.mln_style_source_info);
         raw.type = self.type.toNative();
         raw.id_size = self.id_size;
         raw.is_volatile = self.is_volatile;
-        marshal.present(&raw.has_attribution, true, &raw.attribution_size, self.attribution_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION, &raw.attribution_size, self.attribution_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_URL, &raw.url_size, self.url_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILEJSON, &raw.tilejson, self.tilejson);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
@@ -4241,12 +4431,12 @@ pub const StyleSourceInfo = struct {
     }
     pub fn fromNative(raw: c.mln_style_source_info) StyleSourceInfo {
         return .{
-            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) .{ .tile_count = raw.tile_count, .min_zoom = raw.min_zoom, .max_zoom = raw.max_zoom, .scheme = StyleTileScheme.fromNative(raw.scheme) } else null,
             .type = StyleSourceType.fromNative(raw.type),
             .id_size = raw.id_size,
             .is_volatile = raw.is_volatile,
-            .attribution_size = if (raw.has_attribution) raw.attribution_size else null,
+            .attribution_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) raw.attribution_size else null,
             .url_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) raw.url_size else null,
+            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) StyleSourceTileInfo.fromNative(raw.tilejson) else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
             .vector_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
@@ -4272,8 +4462,10 @@ pub const StyleSourceInfoField = struct {
     vector_encoding: bool = false,
     /// The source exposes a DEM raster encoding.
     raster_encoding: bool = false,
+    /// The source declares an attribution string.
+    attribution: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4294,10 +4486,9 @@ pub const StyleSourceResult = struct {
     pub fn toNative(self: StyleSourceResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_result {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_source_result);
-        raw.size = @sizeOf(c.mln_style_source_result);
         raw.info = self.info.toNative();
         if (self.attribution) |item| {
-            raw.info.has_attribution = true;
+            raw.info.fields |= c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
             raw.attribution = marshal.view(item);
         }
         if (self.url) |item| {
@@ -4319,7 +4510,7 @@ pub const StyleSourceResult = struct {
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_result) status.Error!StyleSourceResult {
         return .{
             .info = StyleSourceInfo.fromNative(raw.info),
-            .attribution = if (raw.info.has_attribution) try marshal.copyView(allocator, raw.attribution) else null,
+            .attribution = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
             .url = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) try marshal.copyView(allocator, raw.url) else null,
             .tile_urls = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) blk: {
                 const copied = try allocator.alloc([]const u8, raw.tile_url_count);
@@ -4335,9 +4526,13 @@ pub const StyleSourceResult = struct {
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceTileInfo = struct {
+    /// Inline tile URL count.
     tile_count: usize = std.mem.zeroes(usize),
+    /// Minimum zoom.
     min_zoom: f64 = std.mem.zeroes(f64),
+    /// Maximum zoom.
     max_zoom: f64 = std.mem.zeroes(f64),
+    /// One of `mln_style_tile_scheme`.
     scheme: StyleTileScheme = std.mem.zeroes(StyleTileScheme),
     pub fn toNative(self: StyleSourceTileInfo) c.mln_style_source_tile_info {
         var raw = std.mem.zeroes(c.mln_style_source_tile_info);
@@ -4366,7 +4561,6 @@ pub const StyleSourceTileUrlsResult = struct {
     pub fn toNative(self: StyleSourceTileUrlsResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_tile_urls_result {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_source_tile_urls_result);
-        raw.size = @sizeOf(c.mln_style_source_tile_urls_result);
         raw.tile_urls = blk: {
             const items = try allocator.alloc(c.mln_buffer_view, self.tile_urls.len);
             for (self.tile_urls, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
@@ -4565,7 +4759,7 @@ pub const TextureImageInfo = struct {
     /// Required output buffer byte length.
     byte_length: usize = std.mem.zeroes(usize),
     pub fn toNative(self: TextureImageInfo) c.mln_texture_image_info {
-        var raw = c.mln_texture_image_info_default();
+        var raw = std.mem.zeroes(c.mln_texture_image_info);
         raw.width = self.width;
         raw.height = self.height;
         raw.stride = self.stride;
@@ -4593,7 +4787,6 @@ pub const TextureReadbackResult = struct {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_texture_readback_result);
-        raw.size = @sizeOf(c.mln_texture_readback_result);
         raw.data = marshal.view(self.data);
         raw.info = self.info.toNative();
         return raw;
@@ -4811,7 +5004,6 @@ pub const VulkanContextDescriptor = struct {
     get_device_proc_addr: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: VulkanContextDescriptor) c.mln_vulkan_context_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_context_descriptor);
-        raw.size = @sizeOf(c.mln_vulkan_context_descriptor);
         raw.instance = self.instance;
         raw.physical_device = self.physical_device;
         raw.device = self.device;
@@ -4953,7 +5145,6 @@ pub const Wake = struct {
     pub fn toNative(self: Wake, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_wake {
         _ = allocator;
         var raw = std.mem.zeroes(c.mln_wake);
-        raw.size = @sizeOf(c.mln_wake);
         raw.callback = if (self.callback != null) callbackTrampoline else null;
         if (!(self.callback == null)) {
             const retained = try roots.retain(Wake, self);
@@ -4993,7 +5184,6 @@ pub const WebglContextDescriptor = struct {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_webgl_context_descriptor);
-        raw.size = @sizeOf(c.mln_webgl_context_descriptor);
         raw.kind = self.kind.toNative();
         raw.context = self.context;
         raw.canvas_selector = marshal.view(self.canvas_selector);
@@ -5082,7 +5272,6 @@ pub const WebgpuContextDescriptor = struct {
     queue: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: WebgpuContextDescriptor) c.mln_webgpu_context_descriptor {
         var raw = std.mem.zeroes(c.mln_webgpu_context_descriptor);
-        raw.size = @sizeOf(c.mln_webgpu_context_descriptor);
         raw.instance = self.instance;
         raw.device = self.device;
         raw.queue = self.queue;
@@ -5221,7 +5410,6 @@ pub const WglContextDescriptor = struct {
     get_proc_address: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: WglContextDescriptor) c.mln_wgl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_wgl_context_descriptor);
-        raw.size = @sizeOf(c.mln_wgl_context_descriptor);
         raw.device_context = self.device_context;
         raw.share_context = self.share_context;
         raw.get_proc_address = self.get_proc_address;
@@ -5379,22 +5567,6 @@ pub fn boundOptionsDefault() status.Error!BoundOptions {
     return call.direct("mln_bound_options_default", .none, {}, BoundOptions, null, .{});
 }
 
-/// Destroys an owned buffer. A null handle is a no-op.
-///
-/// See `mln_buffer_destroy` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn bufferDestroy(buffer: Buffer) status.Error!void {
-    return call.direct("mln_buffer_destroy", .close, buffer, void, null, .{});
-}
-
-/// Borrows the data stored by an owned buffer.
-///
-/// See `mln_buffer_get` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const u8) {
-    return call.invoke("mln_buffer_get", .borrow, buffer, allocator, diagnostic, .{call.out(OwnedValue([]const u8))});
-}
-
 /// Reports the C ABI contract version. The value is 0 while the ABI is
 /// unstable, and will increment on each SemVer major release.
 ///
@@ -5456,8 +5628,8 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
 ///
 /// See `mln_event_batch_get` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(RuntimeEventBatchView) {
-    return call.invoke("mln_event_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(RuntimeEventBatchView))});
+pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(EventBatchView) {
+    return call.invoke("mln_event_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(EventBatchView))});
 }
 
 /// Releases an owned event batch. A null handle is a no-op.
@@ -5548,52 +5720,12 @@ pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic: ?*diagnostics.
     return call.invoke("mln_log_set_async_severity_mask", .none, {}, null, diagnostic, .{mask});
 }
 
-pub const LogCallback = struct {
-    context: ?*anyopaque = null,
-    release_context: ?*const fn (?*anyopaque) void = null,
-    call: ?*const fn (?*anyopaque, LogSeverity, LogEvent, i64, []const u8) status.Error!u32 = null,
-    fn callTrampoline(native_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), native_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) callconv(.c) marshal.CallbackResult(c.mln_log_callback) {
-        return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) status.Error!marshal.CallbackResult(c.mln_log_callback) {
-                const state = callback.Registration(LogCallback).get(callback_arg_0);
-                const host = state.value.call orelse {
-                    return 0;
-                };
-                var scope: callback.Scope = .{};
-                scope.enter(&.{}, 0);
-                defer scope.leave();
-                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
-                defer arena.deinit();
-                const allocator = arena.allocator();
-                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try allocator.dupe(u8, std.mem.span(callback_arg_4 orelse return error.NativeError))) catch |err| {
-                    callback.reportError("mln_log_callback", err);
-                    return 0;
-                };
-                return result;
-            }
-        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3, native_arg_4) catch |err| {
-            callback.reportError("mln_log_callback", err);
-            return 0;
-        };
-    }
-};
 /// Installs a process-global MapLibre Native log callback.
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logSetCallback(callback_input: ?LogCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    const binding_arg_0 = callback_input;
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_log_set_callback", 0);
-    var roots: callback.Roots = .{};
-    defer roots.deinit();
-    var context: ?*anyopaque = null;
-    if (binding_arg_0) |value| {
-        if (value.call != null) context = try roots.retain(LogCallback, value);
-    }
-    try status.call(c.mln_log_set_callback, .{ if (context != null) &LogCallback.callTrampoline else null, context, if (context != null) &callback.Registration(LogCallback).releaseNative else null }, diagnostic);
-    roots.accept();
+pub fn logSetCallback(allocator: std.mem.Allocator, handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_log_set_callback", .none, {}, allocator, diagnostic, .{handler});
 }
 
 /// Adds a color-relief layer for a raster DEM source.
@@ -6779,20 +6911,12 @@ pub fn projectionModeDefault() status.Error!ProjectionMode {
     return call.direct("mln_projection_mode_default", .none, {}, ProjectionMode, null, .{});
 }
 
-/// Returns the number of records in an owned frame-result batch.
-///
-/// See `mln_render_frame_batch_count` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchCount(batch: RenderFrameBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!usize {
-    return call.invoke("mln_render_frame_batch_count", .lease, batch, null, diagnostic, .{call.out(usize)});
-}
-
-/// Copies one frame-result record.
+/// Borrows the result view stored by an owned frame-result batch.
 ///
 /// See `mln_render_frame_batch_get` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameResult {
-    return call.invoke("mln_render_frame_batch_get", .lease, batch, null, diagnostic, .{ index, call.sizedOut(RenderFrameResult) });
+pub fn renderFrameBatchGet(allocator: std.mem.Allocator, batch: RenderFrameBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(RenderFrameBatchView) {
+    return call.invoke("mln_render_frame_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(RenderFrameBatchView))});
 }
 
 /// Releases a frame-result batch.
@@ -6937,8 +7061,8 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
 }
 
 /// Starts a source-feature query against the session's latest driver state. The
-/// completion borrows an array of `mln_queried_feature` values (value_count
-/// entries), valid only for the callback.
+/// completion borrows value_count `mln_queried_feature` values, value_size
+/// bytes apart, valid only for the callback.
 ///
 /// See `mln_render_session_query_source_features` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -7050,58 +7174,13 @@ pub fn resourceRequestRelease(handle: ResourceRequestHandle) status.Error!void {
     return call.direct("mln_resource_request_release", .close, handle, void, null, .{});
 }
 
-pub const ResourceRequestCancelCallback = struct {
-    context: ?*anyopaque = null,
-    release_context: ?*const fn (?*anyopaque) void = null,
-    call: ?*const fn (?*anyopaque) status.Error!void = null,
-    owner: u64 = 0,
-    fn callTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
-        return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
-                const state = callback.Registration(ResourceRequestCancelCallback).get(callback_arg_0);
-                const host = state.value.call orelse {
-                    return;
-                };
-                var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.value.owner);
-                defer scope.leave();
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_resource_request_cancel_callback", err);
-                    return;
-                };
-            }
-        }.invoke(native_arg_0) catch |err| {
-            callback.reportError("mln_resource_request_cancel_callback", err);
-            return;
-        };
-    }
-};
 /// Registers a callback that runs when MapLibre cancels a C API resource
 /// provider request.
 ///
 /// See `mln_resource_request_set_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_input: ?ResourceRequestCancelCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
-    const binding_arg_0 = handle;
-    const binding_arg_1 = callback_input;
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_resource_request_set_cancel_callback", binding_arg_0.raw);
-    const lease = try binding_arg_0.lease(diagnostic);
-    defer lease.release();
-    var roots: callback.Roots = .{};
-    defer roots.deinit();
-    var context: ?*anyopaque = null;
-    if (binding_arg_1) |value| {
-        var retained = value;
-        retained.owner = binding_arg_0.raw;
-        if (retained.call != null) context = try roots.retain(ResourceRequestCancelCallback, retained);
-    }
-    var rejected: bool = false;
-    try status.call(c.mln_resource_request_set_cancel_callback, .{ lease.native, if (context != null) &ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) &callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected }, diagnostic);
-    if (rejected) return true;
-    roots.accept();
-    return false;
+pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequestHandle, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+    return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
 }
 
 /// Blocks until a resource request is released and its cancel callback
@@ -7175,8 +7254,8 @@ pub fn runtimeDispose(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) st
 ///
 /// See `mln_runtime_drain_events` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!EventBatch {
-    return call.invoke("mln_runtime_drain_events", .lease, runtime, null, diagnostic, .{call.adopt(EventBatch, .none)});
+pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!?EventBatch {
+    return call.invokeUnless("mln_runtime_drain_events", .lease, runtime, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(EventBatch, .none)});
 }
 
 /// Reports which runtime-scoped event types this runtime queues.
@@ -7339,14 +7418,6 @@ pub fn sourceFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.Err
     return call.direct("mln_source_feature_query_options_default", .none, {}, OwnedValue(SourceFeatureQueryOptions), allocator, .{});
 }
 
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleImageInfoDefault() status.Error!StyleImageInfo {
-    return call.direct("mln_style_image_info_default", .none, {}, StyleImageInfo, null, .{});
-}
-
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the
@@ -7377,14 +7448,6 @@ pub fn styleTransitionOptionsDefault() status.Error!StyleTransitionOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn supportedRenderBackendMask() status.Error!RenderBackendFlag {
     return call.direct("mln_supported_render_backend_mask", .none, {}, RenderBackendFlag, null, .{});
-}
-
-/// Returns texture image info defaults for this C API version.
-///
-/// See `mln_texture_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn textureImageInfoDefault() status.Error!TextureImageInfo {
-    return call.direct("mln_texture_image_info_default", .none, {}, TextureImageInfo, null, .{});
 }
 
 /// Starts readback of the latest rendered texture frame.

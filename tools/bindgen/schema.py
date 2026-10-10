@@ -12,6 +12,10 @@ from dataclasses import replace
 from .model import Api, CType, Function, ModelError
 from .protocol import (
     BUFFER_VIEW,
+    COMPLETION_RESULT,
+    COMPLETION_VALUE_COUNT,
+    COMPLETION_VALUE_SIZE,
+    NOT_READY,
     STATUS,
     is_buffer_view,
     is_completion,
@@ -49,6 +53,7 @@ ANNOTATION_VALUES = {
     "lifetime": frozenset({"call", "owner", "process"}),
     "consumes": frozenset({"success"}),
     "reentry": frozenset({"forbid", "protocol"}),
+    "release_reentry": frozenset({"forbid"}),
     "handle_access": frozenset({"issued"}),
     "synchronous": frozenset({"true"}),
 }
@@ -64,9 +69,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "consumes",
         "kind",
         "length",
-        "registration",
-        "user_data",
-        "release_callback",
         "accepted_unless",
         "absent_on",
         "view_owner",
@@ -90,7 +92,6 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "variant",
         "empty_variant",
         "kind",
-        "group_type",
         "stride",
         "item_name",
         "item_buffer",
@@ -101,12 +102,22 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
     }
 )
 RECORD_KEYS = COMMON_KEYS | frozenset(
-    {"kind", "default", "mask", "tag", "release", "user_data", "fields"}
+    {
+        "kind",
+        "default",
+        "mask",
+        "tag",
+        "release",
+        "release_reentry",
+        "user_data",
+        "fields",
+    }
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     {
         "kind",
         "release",
+        "release_reentry",
         "parent",
         "dispose",
         "view_begin",
@@ -326,22 +337,16 @@ class Conventions:
         return {**self.value(field.type, {**defaults, **explicit}), **defaults}
 
     def function(self, function: Function) -> dict[str, str]:
-        """A function without a completion runs immediately; a completion
-        without a result delivers none, and a result is one borrowed value
-        unless it is a handle, which the completion transfers. A callback
-        registration passes its context parameter as the user data."""
+        """A function without a completion runs immediately, and a drain
+        reports nothing queued as an absent output; a completion without a
+        result delivers none, and a result is one borrowed value unless it is a
+        handle, which the completion transfers."""
         explicit = function.metadata
         defaults = {}
-        if "registration" in explicit:
-            contexts = [
-                parameter.name
-                for parameter in function.parameters
-                if parameter.metadata.get("kind") == "context"
-            ]
-            if len(contexts) == 1:
-                defaults["user_data"] = contexts[0]
         if not has_completion(function):
             defaults["execution"] = "immediate"
+            if explicit.get("execution") == "event_batch":
+                defaults["absent_on"] = NOT_READY
             if not is_status(function.return_type) and (
                 function.return_type.kind != "void"
             ):
@@ -738,63 +743,8 @@ def validate(api: Api) -> None:
                 f"{context}: variadic public functions cannot be generated safely"
             )
         parameters = {parameter.name: parameter for parameter in function.parameters}
-        if (
-            metadata.keys() & {"user_data", "release_callback", "accepted_unless"}
-            and "registration" not in metadata
-        ):
-            errors.append(
-                f"{context}: registration lifetime metadata requires a callback registration"
-            )
-        if "registration" in metadata:
-            callback = parameters.get(metadata["registration"])
-            callback_type = (
-                api.typedefs_by_name.get(callback.type.declaration or "")
-                if callback
-                else None
-            )
-            signature = callback_type.type.pointee if callback_type else None
-            if signature is None or signature.kind != "function":
-                errors.append(f"{context}: registration requires a callback parameter")
-            user_data = parameters.get(metadata.get("user_data", ""))
-            if (
-                user_data is None
-                or user_data.type.spelling != "void *"
-                or user_data.metadata.get("kind") != "context"
-            ):
-                errors.append(
-                    f"{context}: registration user_data requires a void context parameter"
-                )
-            if "release_callback" not in metadata:
-                errors.append(f"{context}: registration requires a release callback")
-            if "release_callback" in metadata:
-                release = parameters.get(metadata["release_callback"])
-                release_type = (
-                    api.typedefs_by_name.get(release.type.declaration or "")
-                    if release
-                    else None
-                )
-                signature = release_type.type.pointee if release_type else None
-                if (
-                    signature is None
-                    or signature.result is None
-                    or signature.result.kind != "void"
-                    or len(signature.parameters) != 1
-                    or signature.parameters[0].spelling != "void *"
-                ):
-                    errors.append(
-                        f"{context}: release_callback requires a void callback taking its context"
-                    )
-            if "accepted_unless" in metadata:
-                condition = parameters.get(metadata["accepted_unless"])
-                if (
-                    condition is None
-                    or condition.metadata.get("direction") != "out"
-                    or condition.type.pointee is None
-                    or condition.type.pointee.kind != "bool"
-                ):
-                    errors.append(
-                        f"{context}: accepted_unless requires a boolean output"
-                    )
+        if "accepted_unless" in metadata:
+            errors.extend(acceptance_errors(api, function, context))
         for parameter in function.parameters:
             pcontext = f"{context} parameter {parameter.name}"
             errors.extend(
@@ -842,6 +792,35 @@ def validate(api: Api) -> None:
         )
         if "fields" in record.metadata:
             errors.extend(ordered_errors(record, record.metadata["fields"], context))
+        # A presence bit guards one member, so a value that several fields
+        # describe together is a record embedded under that bit. An array's
+        # count takes the array's presence and names no bit of its own. A
+        # member of another record may reuse the bit through a longer mask
+        # path.
+        counts = {
+            field.metadata["length"]
+            for field in record.fields
+            if "length" in field.metadata
+        }
+        guarded = set()
+        for field in record.fields:
+            if field.name in counts and (
+                "mask" in field.metadata or "bit" in field.metadata
+            ):
+                errors.append(
+                    f"{field.location}: {record.name}.{field.name}: a count takes "
+                    "its array's presence; drop mask and bit"
+                )
+                continue
+            if "mask" not in field.metadata or "bit" not in field.metadata:
+                continue
+            presence = (field.metadata["mask"], field.metadata["bit"])
+            if presence in guarded:
+                errors.append(
+                    f"{field.location}: {record.name}.{field.name}: presence bit "
+                    f"{presence[1]} guards more than one member; embed a record"
+                )
+            guarded.add(presence)
         for field in record.fields:
             fcontext = f"{field.location}: {record.name}.{field.name}"
             errors.extend(
@@ -919,11 +898,7 @@ def validate(api: Api) -> None:
             }:
                 errors.append(f"{fcontext}: enum names an absent enum")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
-                presence = field_path(record.name, field.metadata.get("mask", ""))
-                if presence is None or presence.type.kind != "bool":
-                    errors.append(
-                        f"{fcontext}: presence requires both mask and bit or a boolean mask"
-                    )
+                errors.append(f"{fcontext}: presence requires both mask and bit")
             if "bit" in field.metadata:
                 constant = enum_constants.get(field.metadata["bit"])
                 if (
@@ -980,35 +955,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{fcontext}: tagged union variants must have distinct values"
                     )
-            if "group_type" in field.metadata:
-                group_type = api.records_by_name.get(field.metadata["group_type"])
-                if group_type is None or "mask" not in field.metadata:
-                    errors.append(
-                        f"{fcontext}: group_type requires a record and masked presence"
-                    )
-                else:
-                    group_fields = [
-                        member
-                        for member in record.fields
-                        if member.metadata.get("mask") == field.metadata.get("mask")
-                        and member.metadata.get("bit") == field.metadata.get("bit")
-                    ]
-                    if any(
-                        member.metadata.get("group_type") != group_type.name
-                        for member in group_fields
-                    ):
-                        errors.append(
-                            f"{fcontext}: presence group members must agree on group_type"
-                        )
-                    if [
-                        (member.name, member.type.canonical) for member in group_fields
-                    ] != [
-                        (member.name, member.type.canonical)
-                        for member in group_type.fields
-                    ]:
-                        errors.append(
-                            f"{fcontext}: group_type fields must match presence group names and types"
-                        )
             if (
                 field.metadata.get("kind") == "size"
                 and field.type.canonical != "unsigned int"
@@ -1090,6 +1036,10 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context pointer"
                 )
+        elif "release_reentry" in typedef.metadata:
+            errors.append(
+                f"{context}: release_reentry requires a callback registration"
+            )
         default = typedef.metadata.get("default")
         if default:
             constructor = api.functions_by_name.get(default)
@@ -1151,37 +1101,13 @@ def validate(api: Api) -> None:
                 if key in {"dispose", "abandon"} and has_completion(operation):
                     errors.append(f"{context}: {key} must have synchronous acceptance")
         if typedef.metadata.get("reentry") == "protocol":
-            owner_name = typedef.metadata.get("reentry_owner")
-            owner = next(
-                (
-                    p.type.pointee or p.type
-                    for p in typedef.parameters
-                    if p.name == owner_name
-                ),
-                None,
-            )
-            if owner_name == "registration":
-                owners = [
-                    f.parameters[0].type
-                    for f in api.functions
-                    if f.metadata.get("registration")
-                    and any(
-                        p.name == f.metadata["registration"]
-                        and p.type.declaration == typedef.name
-                        for p in f.parameters
-                    )
-                ]
-                owner = (
-                    owners[0]
-                    if owners and len({o.declaration for o in owners}) == 1
-                    else None
-                )
+            owner = reentry_owner(api, typedef)
             names = tuple(
                 filter(None, typedef.metadata.get("reentry_calls", "").split(","))
             )
             if owner is None or not names:
                 errors.append(
-                    f"{context}: protocol reentry requires a callback or registration owner and operations"
+                    f"{context}: protocol reentry requires an owner parameter or handle and operations"
                 )
             for name in names:
                 operation = api.functions_by_name.get(name)
@@ -1333,8 +1259,172 @@ def validate(api: Api) -> None:
         )
     errors.extend(reference_errors(api))
     errors.extend(field_default_errors(api))
+    errors.extend(versioning_errors(api))
     if errors:
         raise ModelError(errors)
+
+
+# How the public interface reaches a record. A record that a caller passes by
+# pointer, that native passes to a callback by pointer, or that a function takes
+# or returns by value versions itself. An embedded record is versioned by its
+# container, and a completion value or a strided element by its stride.
+BY_POINTER = "pointer"
+EMBEDDED = "embedded"
+DELIVERED = "delivered"
+
+
+def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
+    """How the public interface reaches each record, and which it takes in.
+
+    The first map gives each record the ways the public functions and callbacks
+    reach it. A record default function is not a reach, since it only
+    initializes a record that something else takes. The set holds the records
+    that native reads from the host: an input parameter, an output that a
+    callback fills for native, and every record that one of those holds.
+
+    A borrowed array inside a record takes its reach from that record. Inside
+    a record that versions itself or that native reads, the array's elements
+    version themselves too. Inside a record that native only delivers or
+    embeds, the elements are delivered when the array carries a stride, and
+    are otherwise indexed by the binding's own size, which freezes them as an
+    embedded record is frozen.
+    """
+    conventions = Conventions(api)
+    reaches: dict[str, set[str]] = {}
+    inputs: set[str] = set()
+    internal = set(api.runtime_types)
+    defaults = {
+        typedef.metadata["default"]
+        for typedef in api.typedefs
+        if "default" in typedef.metadata
+    }
+
+    def record_of(type_: CType) -> str | None:
+        name = conventions.resolve(type_).declaration
+        return name if name in api.records_by_name else None
+
+    def reach(
+        type_: CType,
+        how: str,
+        metadata: dict[str, str],
+        incoming: bool,
+        unstrided: str = BY_POINTER,
+    ):
+        resolved = conventions.resolve(type_)
+        if resolved.kind == "pointer" and resolved.pointee is not None:
+            if metadata.get("kind") in OPAQUE_POINTER_KINDS:
+                return
+            how = DELIVERED if "stride" in metadata else unstrided
+            resolved = conventions.resolve(resolved.pointee)
+        name = record_of(resolved)
+        if name is None:
+            return
+        reaches.setdefault(name, set()).add(how)
+        if incoming:
+            take(name)
+
+    def take(name: str):
+        if name in inputs:
+            return
+        inputs.add(name)
+        for field in api.records_by_name[name].fields:
+            reach(field.type, EMBEDDED, field.metadata, True)
+
+    for function in api.public_functions:
+        for parameter in function.parameters:
+            if is_completion(parameter.type):
+                continue
+            reach(
+                parameter.type,
+                BY_POINTER,
+                parameter.metadata,
+                parameter.metadata.get("direction", "in") != "out",
+            )
+        if function.name not in defaults and function.return_type.kind != "void":
+            reach(function.return_type, BY_POINTER, {}, False)
+        result = function.metadata.get("result")
+        if result and result != "void" and result in api.records_by_name:
+            reaches.setdefault(result, set()).add(DELIVERED)
+    for typedef in api.typedefs:
+        if typedef.name in internal:
+            continue
+        for parameter in typedef.parameters:
+            reach(
+                parameter.type,
+                BY_POINTER,
+                parameter.metadata,
+                parameter.metadata.get("direction", "in") == "out",
+            )
+    # A record's members reach further records only as the record itself is
+    # reached, so this repeats until a pass adds nothing. Reaches only grow,
+    # and a record that a later pass finds versioning itself also passes that
+    # to its arrays.
+    while True:
+        before = sum(len(how) for how in reaches.values())
+        for record in api.records:
+            if record.name in internal or record.name not in reaches:
+                continue
+            versions_itself = (
+                BY_POINTER in reaches[record.name] or record.name in inputs
+            )
+            for field in record.fields:
+                reach(
+                    field.type,
+                    EMBEDDED,
+                    field.metadata,
+                    False,
+                    BY_POINTER if versions_itself else EMBEDDED,
+                )
+        if sum(len(how) for how in reaches.values()) == before:
+            return reaches, inputs
+
+
+def versioning_errors(api: Api) -> list[str]:
+    """Check that each struct is versioned by exactly one thing.
+
+    A struct that a caller passes by pointer, or that native passes to a
+    callback by pointer, carries its own size. A struct that the interface only
+    embeds by value is versioned by its container, and a completion value or a
+    strided element by the stride that native delivers with it, so neither
+    carries a size. A record default initializes a record that native reads, so
+    an output-only record has none. Every binding steps through an array result
+    by the stride that the completion result reports beside its count.
+    """
+    reaches, inputs = record_reaches(api)
+    errors = []
+    completion = api.records_by_name.get(COMPLETION_RESULT)
+    for field in completion.fields if completion else ():
+        if field.metadata.get("kind") == "erased" and (
+            field.metadata.get("length"),
+            field.metadata.get("stride"),
+        ) != (COMPLETION_VALUE_COUNT, COMPLETION_VALUE_SIZE):
+            errors.append(
+                f"{field.location}: {COMPLETION_RESULT}.{field.name}: requires "
+                f"length={COMPLETION_VALUE_COUNT};stride={COMPLETION_VALUE_SIZE}"
+            )
+    for record in api.records:
+        how = reaches.get(record.name)
+        if (
+            how
+            and BY_POINTER not in how
+            and any(field.metadata.get("kind") == "size" for field in record.fields)
+        ):
+            errors.append(
+                f"{record.location}: {record.name}: struct versioned by its "
+                "container or stride must not carry size"
+            )
+    for typedef in api.typedefs:
+        if (
+            "default" in typedef.metadata
+            and typedef.name in api.records_by_name
+            and typedef.name in reaches
+            and typedef.name not in inputs
+        ):
+            errors.append(
+                f"{typedef.location}: {typedef.name}: default requires a record "
+                "that native reads"
+            )
+    return errors
 
 
 def defaulted_records(api: Api) -> set[str]:
@@ -1460,13 +1550,7 @@ FUNCTION_REFERENCES = {
     ),
 }
 PARAMETER_REFERENCES = {
-    "function": (
-        "view_owner",
-        "registration",
-        "user_data",
-        "release_callback",
-        "accepted_unless",
-    ),
+    "function": ("view_owner", "accepted_unless"),
     "typedef": ("decision_handle", "reentry_owner"),
 }
 
@@ -1491,8 +1575,8 @@ def reference_errors(api: Api) -> list[str]:
         parameters = {parameter.name for parameter in declaration.parameters}
         for key in PARAMETER_REFERENCES[site]:
             name = metadata.get(key)
-            if key == "reentry_owner" and name == "registration":
-                continue  # The callback's registration function owns its reentry.
+            if key == "reentry_owner" and is_handle(api, name):
+                continue  # A callback without an owner parameter names its handle.
             if name is not None and name not in parameters:
                 errors.append(f"{context}: {key} names an absent parameter {name!r}")
 
@@ -1500,6 +1584,67 @@ def reference_errors(api: Api) -> list[str]:
         check("function", function, f"{function.location}: {function.name}")
     for typedef in api.typedefs:
         check("typedef", typedef, f"{typedef.location}: {typedef.name}")
+    return errors
+
+
+def is_handle(api: Api, name: str | None) -> bool:
+    typedef = api.typedefs_by_name.get(name or "")
+    return typedef is not None and typedef.metadata.get("kind") == "handle"
+
+
+def reentry_owner(api: Api, typedef):
+    """The type whose operations a protocol callback may call: the type of its
+    `reentry_owner` parameter, or the handle that the key names when the
+    callback has no parameter that identifies its owner."""
+    name = typedef.metadata.get("reentry_owner")
+    owner = next(
+        (p.type.pointee or p.type for p in typedef.parameters if p.name == name),
+        None,
+    )
+    if owner is None and is_handle(api, name):
+        owner = api.typedefs_by_name[name].type
+        owner = CType("typedef", name, owner.canonical, name)
+    return owner
+
+
+def registration_parameters(api: Api, function: Function) -> list:
+    """The parameters that pass a callback registration record by pointer."""
+    result = []
+    for parameter in function.parameters:
+        pointee = parameter.type.pointee
+        typedef = api.typedefs_by_name.get(
+            (pointee.declaration if pointee else None) or ""
+        )
+        if typedef and typedef.metadata.get("kind") == "callback_registration":
+            result.append(parameter)
+    return result
+
+
+def acceptance_errors(api: Api, function: Function, context: str) -> list[str]:
+    """Check `accepted_unless`: a boolean output that, when set on success,
+    reports that native kept nothing from the call's one registration."""
+    errors = []
+    condition = next(
+        (
+            p
+            for p in function.parameters
+            if p.name == function.metadata["accepted_unless"]
+        ),
+        None,
+    )
+    if (
+        condition is None
+        or condition.metadata.get("direction") != "out"
+        or condition.type.pointee is None
+        or condition.type.pointee.kind != "bool"
+    ):
+        errors.append(f"{context}: accepted_unless requires a boolean output")
+    if len(registration_parameters(api, function)) != 1:
+        errors.append(f"{context}: accepted_unless requires one registration parameter")
+    if has_completion(function) or not is_status(function.return_type):
+        errors.append(
+            f"{context}: accepted_unless requires a status return without a completion"
+        )
     return errors
 
 

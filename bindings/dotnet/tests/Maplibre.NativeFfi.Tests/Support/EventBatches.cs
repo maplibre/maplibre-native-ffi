@@ -39,16 +39,16 @@ internal static unsafe class EventBatches
         fixed (byte* recordBytes = records)
         fixed (byte* messageBytes = messages)
         {
-            var batch = new mln_runtime_event_batch_view
+            var batch = new mln_event_batch_view
             {
-                size = (uint)Unsafe.SizeOf<mln_runtime_event_batch_view>(),
+                size = (uint)Unsafe.SizeOf<mln_event_batch_view>(),
                 event_size = eventSize,
                 events = (mln_runtime_event*)recordBytes,
                 event_count = eventCount,
                 messages = (sbyte*)messageBytes,
                 messages_size = (nuint)messages.Length,
             };
-            return GeneratedValues.CopyRuntimeEventBatchView(batch).Events;
+            return GeneratedValues.CopyEventBatchView(batch).Events;
         }
     }
 

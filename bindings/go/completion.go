@@ -182,14 +182,11 @@ func completionValue[T any](result *C.mln_completion_result) (T, error) {
 	return *(*T)(result.value), nil
 }
 
-func completionSlice[T any](result *C.mln_completion_result) ([]T, error) {
-	if result.value_count == 0 {
-		return []T{}, nil
-	}
-	if result.value == nil {
-		return nil, newBindingError(ErrInvalidState, "native completion returned a null slice")
-	}
-	return unsafe.Slice((*T)(result.value), bindingLength(uint64(result.value_count))), nil
+// completionItem returns element index of the completion's native array, which
+// native lays out with a stride of value_size bytes.
+func completionItem[T any](result *C.mln_completion_result, index int) *T {
+	var item T
+	return (*T)(bindingElement(result.value, index, uint64(result.value_size), unsafe.Sizeof(item), unsafe.Alignof(item)))
 }
 
 //export mln_go_completion_callback

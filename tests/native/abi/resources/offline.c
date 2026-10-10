@@ -27,7 +27,6 @@ static mln_offline_region_definition tile_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .size = sizeof(mln_offline_tile_pyramid_region_definition),
       .style_url = offline_style_url,
       .bounds =
         {
@@ -47,7 +46,6 @@ static mln_offline_region_definition geometry_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
     .data.geometry = {
-      .size = sizeof(mln_offline_geometry_region_definition),
       .style_url = offline_style_url,
       .geometry = MLN_BUFFER_LITERAL(line_geometry),
       .min_zoom = 5.0,
@@ -440,7 +438,6 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
 
   mln_offline_region_status status = {0};
   MLN_TEST_OK(get_region_status(runtime, id, &status));
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_offline_region_status), status.size);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, status.download_state
   );
@@ -834,7 +831,9 @@ static void a_download_completes_from_provider_served_resources(void) {
   const mln_test_provider_request* revalidation =
     mln_test_provider_request_at(provider, offline_style_url, 1);
   TEST_ASSERT_NOT_NULL(revalidation);
-  TEST_ASSERT_FALSE(revalidation->has_prior_expires);
+  TEST_ASSERT_BITS_LOW(
+    MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, revalidation->fields
+  );
   TEST_ASSERT_EQUAL_size_t(0, revalidation->prior_data_size);
   // An answer would refresh the cached copy, and could land after the
   // invalidation, so the revalidation ends unanswered with its map.
@@ -852,7 +851,7 @@ static void a_download_completes_from_provider_served_resources(void) {
   const mln_test_provider_request* refetch =
     mln_test_provider_request_at(provider, offline_style_url, 2);
   TEST_ASSERT_NOT_NULL(refetch);
-  TEST_ASSERT_TRUE(refetch->has_prior_expires);
+  TEST_ASSERT_BITS_HIGH(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, refetch->fields);
   TEST_ASSERT_EQUAL_INT64(0, refetch->prior_expires_unix_ms);
   TEST_ASSERT_EQUAL_size_t(
     sizeof(offline_style_json) - 1, refetch->prior_data_size

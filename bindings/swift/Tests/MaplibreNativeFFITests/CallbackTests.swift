@@ -82,9 +82,9 @@ func installProvider(
       on: fixture.runtime,
       for: "custom://dropped.json"
     ) { handle in
-      _ = try handle.setCancelCallback { [sentinel = ReleaseProbe(releases)]
-        in withExtendedLifetime(sentinel) {}
-      }
+      _ = try handle.setCancelCallback(handler: ResourceRequestCancelHandler {
+        [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
+      })
       request.update { $0 = handle }
       return .handle
     }
@@ -236,9 +236,11 @@ func installProvider(
     }
 
     let releases = LockedBox(0)
-    let cancelled = try request.setCancelCallback {
-      [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
-    }
+    let cancelled = try request.setCancelCallback(
+      handler: ResourceRequestCancelHandler {
+        [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
+      }
+    )
     #expect(cancelled)
     #expect(releases.value == 1)
     try request.close()

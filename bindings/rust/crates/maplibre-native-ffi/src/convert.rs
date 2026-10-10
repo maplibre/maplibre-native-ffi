@@ -237,8 +237,7 @@ pub(crate) unsafe fn counted<P, T: FromNative<sys::mln_buffer_view>>(
     unsafe { T::from_native(view) }
 }
 
-/// A C mask that records which optional fields are present: a bit mask, or a
-/// boolean for a record with one optional field.
+/// A C bit mask that records which optional fields are present.
 pub(crate) trait Presence: Copy {
     fn has(self, bit: Self) -> bool;
     fn mark(&mut self, bit: Self);
@@ -258,15 +257,6 @@ macro_rules! mask {
 }
 
 mask!(u32, u64);
-
-impl Presence for bool {
-    fn has(self, _: Self) -> bool {
-        self
-    }
-    fn mark(&mut self, _: Self) {
-        *self = true;
-    }
-}
 
 /// Copies an optional field when `mask` has `bit`.
 ///
@@ -484,21 +474,6 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
     unsafe { T::from_native(*value) }
 }
 
-/// Copies the value a C pointer addresses, or `None` for a null pointer.
-///
-/// # Safety
-///
-/// As for [`copy_reference`].
-pub(crate) unsafe fn copy_optional_reference<N: Copy, T: FromNative<N>>(
-    pointer: *const N,
-) -> Result<Option<T>> {
-    if pointer.is_null() {
-        return Ok(None);
-    }
-    // SAFETY: the caller upholds the pointer contract.
-    unsafe { copy_reference(pointer) }.map(Some)
-}
-
 /// Owns temporary C input allocations through native submission.
 #[derive(Default)]
 pub struct InputArena {
@@ -586,25 +561,8 @@ unsafe fn strided_values<T: Copy>(
     count: usize,
     stride: usize,
 ) -> Result<Vec<T>> {
-    if count == 0 {
-        return Ok(Vec::new());
-    }
-    if pointer.is_null()
-        || stride < std::mem::size_of::<T>()
-        || count > isize::MAX as usize / stride
-    {
-        return Err(Error::invalid_argument("invalid native stride"));
-    }
-    Ok((0..count)
-        // SAFETY: the caller guarantees each strided entry.
-        .map(|index| unsafe {
-            pointer
-                .cast::<u8>()
-                .add(index * stride)
-                .cast::<T>()
-                .read_unaligned()
-        })
-        .collect())
+    // SAFETY: the caller guarantees each strided entry.
+    Ok(unsafe { maplibre_core::ptr::strided_records(pointer, count, stride) }?.collect())
 }
 
 /// Copies a UTF-8 range from a native batch's shared message storage.

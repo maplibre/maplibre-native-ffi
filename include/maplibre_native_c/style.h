@@ -107,6 +107,8 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 4U,
   /** The source exposes a DEM raster encoding. */
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
+  /** The source declares an attribution string. */
+  MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
 } mln_style_source_info_field;
 
 /** Field mask values for mln_style_tile_source_options. */
@@ -157,8 +159,6 @@ typedef struct mln_image_stretch {
 
 /** Borrowed image-stretch arrays available during a completion callback. */
 typedef struct mln_style_image_stretches_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
   size_t stretch_x_count;
   const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
@@ -168,8 +168,6 @@ typedef struct mln_style_image_stretches_result {
 /** Borrowed inline TileJSON tile URLs available during a completion callback.
  */
 typedef struct mln_style_source_tile_urls_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
   size_t tile_url_count;
 } mln_style_source_tile_urls_result;
@@ -251,6 +249,16 @@ typedef enum MLN_BINDING(
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
 } mln_style_image_option_field;
 
+/** Field mask values for mln_style_image_info. */
+typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
+  /** The image declares a content box. */
+  MLN_STYLE_IMAGE_INFO_CONTENT = 1U << 0U,
+  /** The image declares a horizontal text-fit mode. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 1U << 1U,
+  /** The image declares a vertical text-fit mode. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 1U << 2U,
+} mln_style_image_info_field;
+
 /** Field mask values for mln_style_transition_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -269,15 +277,18 @@ typedef enum mln_location_indicator_image_kind : uint32_t {
 
 /** Inline tile metadata selected as one value by the source-info field mask. */
 typedef struct mln_style_source_tile_info {
+  /** Inline tile URL count. */
   size_t tile_count;
+  /** Minimum zoom. */
   double min_zoom;
+  /** Maximum zoom. */
   double max_zoom;
+  /** One of mln_style_tile_scheme. */
   uint32_t scheme MLN_BINDING("enum=mln_style_tile_scheme");
 } mln_style_source_tile_info;
 
 /** Fixed source metadata included in mln_style_source_result. */
 typedef struct mln_style_source_info {
-  uint32_t size;
   /** One of mln_style_source_type. */
   uint32_t type MLN_BINDING("enum=mln_style_source_type");
   /** Bitwise combination of mln_style_source_info_field values. */
@@ -286,31 +297,17 @@ typedef struct mln_style_source_info {
   size_t id_size;
   /** Whether the source is marked volatile. */
   bool is_volatile;
-  bool has_attribution;
-  /** Attribution byte length, excluding any null terminator. */
-  size_t attribution_size MLN_BINDING("mask=has_attribution");
+  /**
+   * Attribution byte length, excluding any null terminator, meaningful when
+   * fields contains ATTRIBUTION.
+   */
+  size_t attribution_size
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
   /** URL byte length, meaningful when fields contains URL. */
   size_t url_size MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
-  /** Inline tile URL count, meaningful when fields contains TILEJSON. */
-  size_t tile_count MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Minimum zoom, meaningful when fields contains TILEJSON. */
-  double min_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Maximum zoom, meaningful when fields contains TILEJSON. */
-  double max_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** One of mln_style_tile_scheme, meaningful when fields contains TILEJSON. */
-  uint32_t scheme MLN_BINDING(
-    "enum=mln_style_tile_scheme;mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;"
-    "group_type=mln_style_source_tile_info"
-  );
+  /** Inline tile metadata, meaningful when fields contains TILEJSON. */
+  mln_style_source_tile_info tilejson
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON");
   /** Geographic bounds, meaningful when fields contains BOUNDS. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_BOUNDS");
@@ -337,7 +334,6 @@ typedef struct mln_style_source_info {
  * no source, and source_layer is empty when the layer names none.
  */
 typedef struct mln_style_layer_entry {
-  uint32_t size;
   mln_buffer_view id;
   mln_buffer_view type;
   mln_buffer_view source_id MLN_BINDING("optional=empty");
@@ -346,10 +342,9 @@ typedef struct mln_style_layer_entry {
 
 /** Complete source metadata borrowed for a completion callback. */
 typedef struct mln_style_source_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_source_info info;
-  mln_buffer_view attribution MLN_BINDING("mask=info.has_attribution");
+  mln_buffer_view attribution
+    MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
   mln_buffer_view url
     MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_URL");
   const mln_buffer_view* tile_urls MLN_BINDING(
@@ -361,8 +356,6 @@ typedef struct mln_style_source_result {
 
 /** Fixed layer metadata included in mln_style_layer_result. */
 typedef struct mln_style_layer_info {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   /** View of a static style-spec layer type string. It stays valid for the
      life of the process. */
   mln_buffer_view type;
@@ -376,8 +369,6 @@ typedef struct mln_style_layer_info {
 
 /** Complete layer metadata borrowed for a completion callback. */
 typedef struct mln_style_layer_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_layer_info info;
   /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id MLN_BINDING("optional=empty");
@@ -495,25 +486,22 @@ typedef struct mln_canonical_tile_id {
   uint32_t y;
 } mln_canonical_tile_id;
 
-/** Callback invoked for custom geometry source tile requests and cancels. */
-typedef void (*mln_custom_geometry_source_tile_callback)(
+/**
+ * Callback invoked for custom geometry and custom MVT vector source tile
+ * requests and cancels.
+ */
+typedef void (*mln_custom_source_tile_callback)(
   void* user_data, mln_canonical_tile_id tile_id
 );
-
-/** Releases a custom geometry source's callback context. */
-MLN_BINDING("reentry=forbid")
-typedef void (*mln_custom_geometry_source_release_callback)(void* user_data);
 
 /** Options for custom geometry sources. */
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_custom_geometry_source_option_field");
   /** Required tile fetch callback. */
-  mln_custom_geometry_source_tile_callback fetch_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. */
-  mln_custom_geometry_source_tile_callback cancel_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback cancel_tile MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -546,30 +534,19 @@ typedef struct mln_custom_geometry_source_options {
    * inside MapLibre's dispatch. Free callback state and return. Schedule native
    * owner cleanup after this callback returns.
    */
-  mln_custom_geometry_source_release_callback release_user_data;
+  mln_user_data_release release_user_data;
 } mln_custom_geometry_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data"
+  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
 );
-
-/** Callback invoked for custom MVT vector source tile requests and cancels. */
-typedef void (*mln_custom_mvt_vector_source_tile_callback)(
-  void* user_data, mln_canonical_tile_id tile_id
-);
-
-/** Releases a custom MVT vector source's callback context. */
-MLN_BINDING("reentry=forbid")
-typedef void (*mln_custom_mvt_vector_source_release_callback)(void* user_data);
 
 /** Options for custom MVT vector sources. */
 typedef struct mln_custom_mvt_vector_source_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_custom_mvt_vector_source_option_field");
   /** Required tile fetch callback. */
-  mln_custom_mvt_vector_source_tile_callback fetch_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. */
-  mln_custom_mvt_vector_source_tile_callback cancel_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback cancel_tile MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -592,9 +569,9 @@ typedef struct mln_custom_mvt_vector_source_options {
    * inside MapLibre's dispatch. Free callback state and return. Schedule native
    * owner cleanup after this callback returns.
    */
-  mln_custom_mvt_vector_source_release_callback release_user_data;
+  mln_user_data_release release_user_data;
 } mln_custom_mvt_vector_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data"
+  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
 );
 
 /** Caller-owned premultiplied RGBA8 image pixels. */
@@ -654,7 +631,8 @@ typedef struct mln_style_image_options {
 
 /** Fixed metadata for one runtime style image. */
 typedef struct mln_style_image_info {
-  uint32_t size;
+  /** Bitwise combination of mln_style_image_info_field values. */
+  uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
   uint32_t width;
   uint32_t height;
   /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
@@ -665,26 +643,32 @@ typedef struct mln_style_image_info {
    */
   size_t stretch_x_count;
   size_t stretch_y_count;
-  /** Content box, meaningful only when has_content is true. */
-  mln_image_content content MLN_BINDING("mask=has_content");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_width
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_width");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_height
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_height");
-  /** Sprite pixel ratio. Defaults to 1.0. */
-  float pixel_ratio MLN_BINDING("default=1.0");
+  /** Content box, meaningful when fields contains CONTENT. */
+  mln_image_content content
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
+  /**
+   * One of mln_style_image_text_fit, meaningful when fields contains
+   * TEXT_FIT_WIDTH.
+   */
+  uint32_t text_fit_width MLN_BINDING(
+    "enum=mln_style_image_text_fit;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH"
+  );
+  /**
+   * One of mln_style_image_text_fit, meaningful when fields contains
+   * TEXT_FIT_HEIGHT.
+   */
+  uint32_t text_fit_height MLN_BINDING(
+    "enum=mln_style_image_text_fit;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT"
+  );
+  /** Sprite pixel ratio. */
+  float pixel_ratio;
   bool sdf;
-  bool has_content;
-  bool has_text_fit_width;
-  bool has_text_fit_height;
 } mln_style_image_info;
 
 /** Complete style image borrowed for a completion callback. */
 typedef struct mln_style_image_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_image_info info;
   mln_buffer_view pixels MLN_BINDING("encoding=bytes");
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
@@ -771,9 +755,6 @@ mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
 /** Returns default runtime style image options. */
 MLN_API mln_style_image_options
 mln_style_image_options_default(void) MLN_NOEXCEPT;
-
-/** Returns default runtime style image metadata. */
-MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
 
 /** Returns default global style transition options. */
 MLN_API mln_style_transition_options
@@ -2077,8 +2058,9 @@ MLN_API mln_status mln_map_list_style_layer_ids(
 /**
  * Starts an ordered query of every style layer in style order.
  *
- * The completion borrows mln_style_layer_entry[value_count]. Copy retained
- * entries and their string views before the callback returns.
+ * The completion borrows value_count mln_style_layer_entry values, value_size
+ * bytes apart. Copy retained entries and their string views before the
+ * callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.

@@ -243,7 +243,7 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   result.ref.offset = _writeScreenPoint(value.offset, arena).ref;
   result.ref.amount = value.amount;
   if (value.anchor != null) {
-    result.ref.has_anchor = true;
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_FIELD_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
   result.ref.animation = _writeAnimationOptions(value.animation, arena).ref;
@@ -254,7 +254,9 @@ CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
   kind: CameraDeltaKind.fromRawValue(source.kind),
   offset: _readScreenPoint(source.offset),
   amount: source.amount,
-  anchor: source.has_anchor ? _readScreenPoint(source.anchor) : null,
+  anchor: (source.fields & raw.MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0
+      ? _readScreenPoint(source.anchor)
+      : null,
   animation: _readAnimationOptions(source.animation),
 );
 
@@ -316,8 +318,7 @@ Pointer<raw.mln_camera_options> _writeCameraOptions(
   result.ref = raw.mln_camera_options_default();
   if (value.center != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
-    result.ref.latitude = value.center!.latitude;
-    result.ref.longitude = value.center!.longitude;
+    result.ref.center = _writeLatLng(value.center!, arena).ref;
   }
   if (value.centerAltitude != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -358,7 +359,7 @@ CameraOptions _readCameraOptions(
   raw.mln_camera_options source,
 ) => CameraOptions(
   center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
-      ? LatLng(source.latitude, source.longitude)
+      ? _readLatLng(source.center)
       : null,
   centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
       ? source.center_altitude
@@ -492,10 +493,9 @@ _prepareCustomGeometrySourceOptions(
     }
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -577,10 +577,9 @@ _prepareCustomMvtVectorSourceOptions(
     }
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -734,42 +733,41 @@ RuntimeEvent _readRuntimeEvent(
   },
 );
 
-RuntimeEventBatchView _readRuntimeEventBatchView(
-  raw.mln_runtime_event_batch_view source,
-) => RuntimeEventBatchView(
-  events: (() {
-    if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
-      throwInvalidState('native record stride is too small');
-    }
-    return List<RuntimeEvent>.unmodifiable(
-      List.generate(
-        source.event_count,
-        (index) => _readRuntimeEvent(
-          (source.events.cast<Uint8>() + index * source.event_size)
-              .cast<raw.mln_runtime_event>()
-              .ref,
-          rawRecord: () =>
+EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
+    EventBatchView(
+      events: (() {
+        if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
+          throwInvalidState('native record stride is too small');
+        }
+        return List<RuntimeEvent>.unmodifiable(
+          List.generate(
+            source.event_count,
+            (index) => _readRuntimeEvent(
               (source.events.cast<Uint8>() + index * source.event_size)
                   .cast<raw.mln_runtime_event>()
-                  .cast<Uint8>()
-                  .asTypedList(source.event_size),
-          message: _arenaUtf8(
-            source.messages.cast(),
-            source.messages_size,
-            (source.events.cast<Uint8>() + index * source.event_size)
-                .cast<raw.mln_runtime_event>()
-                .ref
-                .message_offset,
-            (source.events.cast<Uint8>() + index * source.event_size)
-                .cast<raw.mln_runtime_event>()
-                .ref
-                .message_size,
+                  .ref,
+              rawRecord: () =>
+                  (source.events.cast<Uint8>() + index * source.event_size)
+                      .cast<raw.mln_runtime_event>()
+                      .cast<Uint8>()
+                      .asTypedList(source.event_size),
+              message: _arenaUtf8(
+                source.messages.cast(),
+                source.messages_size,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_offset,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_size,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      })(),
     );
-  })(),
-);
 
 Pointer<raw.mln_frame_demand> _writeFrameDemand(
   FrameDemand value,
@@ -986,6 +984,37 @@ void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
     );
   } finally {
     raw.mln_adapter_deferred_call_record_destroy(record);
+  }
+}
+
+_NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
+  LogHandler value,
+  _NativeCallbackPorts roots,
+) {
+  final arena = Arena();
+  _NativeCallbackPort? port;
+  try {
+    final result = arena<raw.mln_log_handler>();
+    result.ref.size = sizeOf<raw.mln_log_handler>();
+    port = roots.registerDeferred(
+      (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
+      (message) => _deliverLogCallback(value.callback, message),
+    );
+    result.ref.callback = raw
+        .mln_adapter_deferred_callback_function(
+          (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
+        )
+        .cast();
+    result.ref.user_data = port.context;
+    result.ref.release_user_data =
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_deferred_callback_release,
+        ).cast();
+    return _NativeRegistration(result, port.reject, arena.releaseAll);
+  } catch (_) {
+    port?.reject();
+    arena.releaseAll();
+    rethrow;
   }
 }
 
@@ -1206,24 +1235,27 @@ ImageContent _readImageContent(raw.mln_image_content source) => ImageContent(
   bottom: source.bottom,
 );
 
-StyleImageInfo _readStyleImageInfo(raw.mln_style_image_info source) =>
-    StyleImageInfo(
-      width: source.width,
-      height: source.height,
-      stride: source.stride,
-      byteLength: source.byte_length,
-      stretchXCount: source.stretch_x_count,
-      stretchYCount: source.stretch_y_count,
-      content: source.has_content ? _readImageContent(source.content) : null,
-      textFitWidth: source.has_text_fit_width
-          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-          : null,
-      textFitHeight: source.has_text_fit_height
-          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-          : null,
-      pixelRatio: source.pixel_ratio,
-      sdf: source.sdf,
-    );
+StyleImageInfo _readStyleImageInfo(
+  raw.mln_style_image_info source,
+) => StyleImageInfo(
+  width: source.width,
+  height: source.height,
+  stride: source.stride,
+  byteLength: source.byte_length,
+  stretchXCount: source.stretch_x_count,
+  stretchYCount: source.stretch_y_count,
+  content: (source.fields & raw.MLN_STYLE_IMAGE_INFO_CONTENT) != 0
+      ? _readImageContent(source.content)
+      : null,
+  textFitWidth: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+      : null,
+  textFitHeight: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+      : null,
+  pixelRatio: source.pixel_ratio,
+  sdf: source.sdf,
+);
 
 StyleImageResult _readStyleImageResult(raw.mln_style_image_result source) =>
     StyleImageResult(
@@ -1262,22 +1294,29 @@ StyleLayerResult _readStyleLayerResult(raw.mln_style_layer_result source) =>
           : utf8.decode(_copyBufferView(source.source_layer)),
     );
 
+StyleSourceTileInfo _readStyleSourceTileInfo(
+  raw.mln_style_source_tile_info source,
+) => StyleSourceTileInfo(
+  tileCount: source.tile_count,
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  scheme: StyleTileScheme.fromRawValue(source.scheme),
+);
+
 StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
     StyleSourceInfo(
       type: StyleSourceType.fromRawValue(source.type),
       idSize: source.id_size,
       isVolatile: source.is_volatile,
-      attributionSize: source.has_attribution ? source.attribution_size : null,
+      attributionSize:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
+          ? source.attribution_size
+          : null,
       urlSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
           ? source.url_size
           : null,
       tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
-          ? StyleSourceTileInfo(
-              tileCount: source.tile_count,
-              minZoom: source.min_zoom,
-              maxZoom: source.max_zoom,
-              scheme: StyleTileScheme.fromRawValue(source.scheme),
-            )
+          ? _readStyleSourceTileInfo(source.tilejson)
           : null,
       bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
           ? _readLatLngBounds(source.bounds)
@@ -1298,7 +1337,8 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
 StyleSourceResult _readStyleSourceResult(raw.mln_style_source_result source) =>
     StyleSourceResult(
       info: _readStyleSourceInfo(source.info),
-      attribution: source.info.has_attribution
+      attribution:
+          (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
           ? utf8.decode(_copyBufferView(source.attribution))
           : null,
       url: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
@@ -1692,7 +1732,6 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
   _NativeCallbackPort? port;
   try {
     final result = arena<raw.mln_wake>();
-    result.ref.size = sizeOf<raw.mln_wake>();
     if (value.callback == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
@@ -1710,10 +1749,9 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
               .cast();
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -1758,7 +1796,6 @@ Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_metal_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_context_descriptor>();
   result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
   return result;
 }
@@ -1811,7 +1848,6 @@ Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_wgl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_wgl_context_descriptor>();
   result.ref.device_context = Pointer<Void>.fromAddress(
     value.deviceContext.address,
   ).cast();
@@ -1837,7 +1873,6 @@ Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_egl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_egl_context_descriptor>();
   result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
   result.ref.config = Pointer<Void>.fromAddress(value.config.address).cast();
   result.ref.share_context = Pointer<Void>.fromAddress(
@@ -1865,7 +1900,6 @@ Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_webgl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_webgl_context_descriptor>();
   result.ref.kind = value.kind.rawValue;
   result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
   result.ref.canvas_selector = nativeStringView(
@@ -1888,7 +1922,7 @@ Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_opengl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_opengl_context_descriptor>();
+
   result.ref.ownership = value.ownership.rawValue;
   switch (value.data) {
     case OpenglContextDescriptorDataWgl(:final value):
@@ -2009,6 +2043,26 @@ OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
   extent: _readRenderTargetExtent(source.extent),
   context: _readOpenglContextDescriptor(source.context),
   surface: NativePointer(source.surface.address),
+);
+
+RenderFrameBatchView _readRenderFrameBatchView(
+  raw.mln_render_frame_batch_view source,
+) => RenderFrameBatchView(
+  results: (() {
+    if (source.result_size < sizeOf<raw.mln_render_frame_result>()) {
+      throwInvalidState('native record stride is too small');
+    }
+    return List<RenderFrameResult>.unmodifiable(
+      List.generate(
+        source.result_count,
+        (index) => _readRenderFrameResult(
+          (source.results.cast<Uint8>() + index * source.result_size)
+              .cast<raw.mln_render_frame_result>()
+              .ref,
+        ),
+      ),
+    );
+  })(),
 );
 
 RenderAbandonResult _readRenderAbandonResult(
@@ -2139,13 +2193,10 @@ _writeRenderedFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = value.filter == null
-      ? nullptr
-      : (() {
-          final storage = arena<raw.mln_buffer_view>();
-          storage.ref = nativeBufferView(value.filter!, arena);
-          return storage;
-        })();
+  if (value.filter != null) {
+    result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+    result.ref.filter = nativeBufferView(value.filter!, arena);
+  }
   return result;
 }
 
@@ -2161,7 +2212,9 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
           ),
         )
       : null,
-  filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
+  filter: (source.fields & raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0
+      ? _copyBufferView(source.filter)
+      : null,
 );
 
 QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
@@ -2198,13 +2251,10 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = value.filter == null
-      ? nullptr
-      : (() {
-          final storage = arena<raw.mln_buffer_view>();
-          storage.ref = nativeBufferView(value.filter!, arena);
-          return storage;
-        })();
+  if (value.filter != null) {
+    result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    result.ref.filter = nativeBufferView(value.filter!, arena);
+  }
   return result;
 }
 
@@ -2222,7 +2272,9 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
           ),
         )
       : null,
-  filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
+  filter: (source.fields & raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0
+      ? _copyBufferView(source.filter)
+      : null,
 );
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
@@ -2241,21 +2293,60 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
       : nativeUtf8CString(value.errorMessage!, arena).pointer.cast<Char>();
   result.ref.must_revalidate = value.mustRevalidate;
   if (value.modifiedUnixMs != null) {
-    result.ref.has_modified = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_MODIFIED;
     result.ref.modified_unix_ms = value.modifiedUnixMs!;
   }
   if (value.expiresUnixMs != null) {
-    result.ref.has_expires = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_EXPIRES;
     result.ref.expires_unix_ms = value.expiresUnixMs!;
   }
   result.ref.etag = value.etag == null
       ? nullptr
       : nativeUtf8CString(value.etag!, arena).pointer.cast<Char>();
   if (value.retryAfterUnixMs != null) {
-    result.ref.has_retry_after = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
   }
   return result;
+}
+
+_NativeRegistration<raw.mln_resource_request_cancel_handler>
+_prepareResourceRequestCancelHandler(
+  ResourceRequestCancelHandler value,
+  _NativeCallbackPorts roots,
+  bool Function() receiverClosed,
+) {
+  final arena = Arena();
+  _NativeCallbackPort? port;
+  try {
+    final result = arena<raw.mln_resource_request_cancel_handler>();
+    result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
+
+    port = roots.register({
+      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+          0xffffffff): (message) {
+        if (!receiverClosed()) {
+          value.callback();
+        }
+      },
+    });
+    result.ref.callback = raw
+        .mln_adapter_dart_port_function(
+          (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+              0xffffffff),
+        )
+        .cast();
+    result.ref.user_data = port.context;
+    result.ref.release_user_data =
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
+    return _NativeRegistration(result, port.reject, arena.releaseAll);
+  } catch (_) {
+    port?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
 }
 
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
@@ -2265,7 +2356,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
-  result.ref.flags = _nativeInteger(value.flags, 0, 4294967295);
   result.ref.asset_path = value.assetPath == null
       ? nullptr
       : nativeUtf8CString(value.assetPath!, arena).pointer.cast<Char>();
@@ -2281,7 +2371,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 
 RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
     RuntimeOptions(
-      flags: source.flags,
       assetPath: source.asset_path == nullptr
           ? null
           : source.asset_path.cast<Utf8>().toDartString(),
@@ -2298,7 +2387,6 @@ _writeOfflineTilePyramidRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_tile_pyramid_region_definition>();
-  result.ref.size = sizeOf<raw.mln_offline_tile_pyramid_region_definition>();
   result.ref.style_url = nativeUtf8CString(
     value.styleUrl,
     arena,
@@ -2328,7 +2416,6 @@ _writeOfflineGeometryRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_geometry_region_definition>();
-  result.ref.size = sizeOf<raw.mln_offline_geometry_region_definition>();
   result.ref.style_url = nativeUtf8CString(
     value.styleUrl,
     arena,
@@ -2482,9 +2569,9 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
             >(raw.mln_adapter_http_header_transform_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2547,6 +2634,9 @@ Pointer<raw.mln_adapter_resource_route> _writeAdapterResourceRoute(
   return result;
 }
 
+ResourceRange _readResourceRange(raw.mln_resource_range source) =>
+    ResourceRange(uint64FromNative(source.start), uint64FromNative(source.end));
+
 ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
     ResourceRequest(
       requestedUrl: source.requested_url == nullptr
@@ -2560,16 +2650,15 @@ ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
       priority: ResourcePriority.fromRawValue(source.priority),
       usage: ResourceUsage.fromRawValue(source.usage),
       storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
-      range: source.has_range
-          ? (
-              rangeStart: uint64FromNative(source.range_start),
-              rangeEnd: uint64FromNative(source.range_end),
-            )
+      range: (source.fields & raw.MLN_RESOURCE_REQUEST_RANGE) != 0
+          ? _readResourceRange(source.range)
           : null,
-      priorModifiedUnixMs: source.has_prior_modified
+      priorModifiedUnixMs:
+          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0
           ? source.prior_modified_unix_ms
           : null,
-      priorExpiresUnixMs: source.has_prior_expires
+      priorExpiresUnixMs:
+          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0
           ? source.prior_expires_unix_ms
           : null,
       priorEtag: source.prior_etag == nullptr
@@ -2627,7 +2716,7 @@ _writeAdapterRoutedResourceProvider(
     (message) => _deliverResourceProviderCallback(value.callback, message),
   );
   arena.adoptRelease(
-    Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(
+    Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
       raw.mln_adapter_deferred_callback_release,
     ),
     portCallback.context,
@@ -2668,9 +2757,9 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
             >(raw.mln_adapter_resource_provider_rules_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2691,9 +2780,9 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
             >(raw.mln_adapter_routed_resource_provider_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2770,9 +2859,9 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
             >(raw.mln_adapter_resource_transform_rewrite_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2808,7 +2897,6 @@ Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_vulkan_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_vulkan_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -2943,7 +3031,6 @@ Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_webgpu_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_webgpu_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -3387,34 +3474,17 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetCallback(LogCallback callback) {
+void logSetCallback(LogHandler handler) {
   ensureAbiVersion();
-  final port = _globalCallbackPorts.registerDeferred(
-    (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-    (message) => _deliverLogCallback(callback, message),
-  );
-  var accepted = false;
-  try {
-    _check(
-      raw.mln_log_set_callback(
-        raw
-            .mln_adapter_deferred_callback_function(
-              (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-            )
-            .cast(),
-        port.context,
-        Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(
-          raw.mln_adapter_deferred_callback_release,
-        ).cast(),
+  final registrations = _NativeRegistrations(_globalCallbackPorts);
+  _check(
+    registrations.run(
+      () => raw.mln_log_set_callback(
+        registrations.add(_prepareLogHandler(handler, registrations.ports)),
         nativeDiagnostic,
       ),
-    );
-    accepted = true;
-  } finally {
-    if (!accepted) {
-      port.reject();
-    }
-  }
+    ),
+  );
 }
 
 /// Returns map options initialized for this C API version.
@@ -3723,16 +3793,6 @@ SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   return _readSourceFeatureQueryOptions(nativeResult);
 }
 
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleImageInfo styleImageInfoDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_image_info_default();
-  return _readStyleImageInfo(nativeResult);
-}
-
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the
@@ -3771,16 +3831,6 @@ RenderBackendFlag supportedRenderBackendMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
-}
-
-/// Returns texture image info defaults for this C API version.
-///
-/// See `mln_texture_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-TextureImageInfo textureImageInfoDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_texture_image_info_default();
-  return _readTextureImageInfo(nativeResult);
 }
 
 /// Returns Vulkan borrowed-texture descriptor defaults for this C API
@@ -4007,47 +4057,6 @@ final class AcquiredFrameHandle implements Finalizable {
   );
 }
 
-/// Issued `mln_buffer` handle id.
-extension type const NativeBuffer(int raw) implements NativeHandle {}
-
-/// Owner of one native `mln_buffer` handle.
-///
-/// An owned buffer of bytes.
-///
-/// See `mln_buffer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class BufferHandle implements Finalizable {
-  BufferHandle._(NativeBuffer handle)
-    : _state = NativeHandleState(handle, 'BufferHandle');
-  final NativeHandleState<NativeBuffer> _state;
-  NativeBuffer get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
-
-  /// Destroys an owned buffer. A null handle is a no-op.
-  ///
-  /// See `mln_buffer_destroy` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-  void close() => _state.close((handle) {
-    raw.mln_buffer_destroy(handle.raw);
-    return nativeStatusOk;
-  });
-
-  /// Borrows the data stored by an owned buffer.
-  ///
-  /// See `mln_buffer_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-  Uint8List getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_buffer_view>();
-    _check(raw.mln_buffer_get(_handle.raw, outView, nativeDiagnostic));
-    return _copyBufferView(outView.ref);
-  });
-}
-
 /// Issued `mln_event_batch` handle id.
 extension type const NativeEventBatch(int raw) implements NativeHandle {}
 
@@ -4073,11 +4082,11 @@ final class EventBatchHandle implements Finalizable {
   ///
   /// See `mln_event_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  RuntimeEventBatchView getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_runtime_event_batch_view>();
-    outView.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+  EventBatchView getValue() => withNativeArena((arena) {
+    final outView = arena<raw.mln_event_batch_view>();
+    outView.ref.size = sizeOf<raw.mln_event_batch_view>();
     _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
-    return _readRuntimeEventBatchView(outView.ref);
+    return _readEventBatchView(outView.ref);
   });
 
   /// Releases an owned event batch. A null handle is a no-op.
@@ -6516,38 +6525,17 @@ final class RenderFrameBatchHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Returns the number of records in an owned frame-result batch.
-  ///
-  /// See `mln_render_frame_batch_count` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  int count() => withNativeArena((arena) {
-    final outCount = arena<Size>();
-    _check(
-      raw.mln_render_frame_batch_count(_handle.raw, outCount, nativeDiagnostic),
-    );
-    return outCount.value;
-  });
-
-  /// Copies one frame-result record.
+  /// Borrows the result view stored by an owned frame-result batch.
   ///
   /// See `mln_render_frame_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  RenderFrameResult getValue(int indexValue) => withNativeArena((arena) {
-    final outResult = arena<raw.mln_render_frame_result>();
-    outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
+  RenderFrameBatchView getValue() => withNativeArena((arena) {
+    final outView = arena<raw.mln_render_frame_batch_view>();
+    outView.ref.size = sizeOf<raw.mln_render_frame_batch_view>();
     _check(
-      raw.mln_render_frame_batch_get(
-        _handle.raw,
-        _nativeInteger(
-          indexValue,
-          0,
-          sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
-        ),
-        outResult,
-        nativeDiagnostic,
-      ),
+      raw.mln_render_frame_batch_get(_handle.raw, outView, nativeDiagnostic),
     );
-    return _readRenderFrameResult(outResult.ref);
+    return _readRenderFrameBatchView(outView.ref);
   });
 
   /// Releases a frame-result batch.
@@ -6887,8 +6875,8 @@ final class RenderSessionHandle implements Finalizable {
   );
 
   /// Starts a source-feature query against the session's latest driver state.
-  /// The completion borrows an array of `mln_queried_feature` values
-  /// (value_count entries), valid only for the callback.
+  /// The completion borrows value_count `mln_queried_feature` values,
+  /// value_size bytes apart, valid only for the callback.
   ///
   /// See `mln_render_session_query_source_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -7115,47 +7103,29 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  bool setCancelCallback(
-    ResourceRequestCancelCallback callback,
-  ) => withNativeArena((arena) {
-    final handle = _handle;
-    final declined = arena<Bool>();
-    final port = _callbackPorts.register({
-      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
-          0xffffffff): (message) {
-        if (!isClosed) {
-          callback();
-        }
-      },
-    });
-    var accepted = false;
-    try {
-      _check(
-        raw.mln_resource_request_set_cancel_callback(
-          handle.raw,
-          raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
-                    0xffffffff),
-              )
-              .cast(),
-          port.context,
-          Native.addressOf<
-                NativeFunction<raw.mln_runtime_callback_releaseFunction>
-              >(raw.mln_adapter_dart_port_release)
-              .cast(),
-          declined,
-          nativeDiagnostic,
-        ),
-      );
-      accepted = !declined.value;
-      return declined.value;
-    } finally {
-      if (!accepted) {
-        port.reject();
-      }
-    }
-  });
+  bool setCancelCallback(ResourceRequestCancelHandler handler) =>
+      withNativeArena((arena) {
+        final outCancelled = arena<Bool>();
+        final registrations = _NativeRegistrations(_callbackPorts);
+        _check(
+          registrations.run(
+            () => raw.mln_resource_request_set_cancel_callback(
+              _handle.raw,
+              registrations.add(
+                _prepareResourceRequestCancelHandler(
+                  handler,
+                  registrations.ports,
+                  () => isClosed,
+                ),
+              ),
+              outCancelled,
+              nativeDiagnostic,
+            ),
+            declined: () => outCancelled.value,
+          ),
+        );
+        return outCancelled.value;
+      });
 
   /// Blocks until a resource request is released and its cancel callback
   /// registration has retired: the callback, if it ran, and release_user_data
@@ -7273,11 +7243,14 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_runtime_drain_events` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  EventBatchHandle drainEvents() => withNativeArena((arena) {
+  EventBatchHandle? drainEvents() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
-    _check(
+    if (!_present(
       raw.mln_runtime_drain_events(_handle.raw, outBatch, nativeDiagnostic),
-    );
+      raw.MLN_STATUS_NOT_READY,
+    )) {
+      return null;
+    }
     return _adoptOwned(
       outBatch.value,
       () => EventBatchHandle._(NativeEventBatch(outBatch.value)),

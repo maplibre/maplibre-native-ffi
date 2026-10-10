@@ -1,7 +1,7 @@
 //! Handle ownership: the ABI check at creation, close, parent retention,
 //! discarded creations, and exit.
 
-use std::sync::{Arc, mpsc};
+use std::sync::mpsc;
 
 use maplibre_native_ffi::*;
 
@@ -155,7 +155,7 @@ fn kill(id: u32) {
 fn exit_with_live_handles_and_callbacks() -> ! {
     let fixture = Fixture::new();
     fixture.load_style(BACKGROUND_STYLE_JSON);
-    log_set_callback(Some(Arc::new(|_, _, _, _| 1))).unwrap();
+    log_set_callback(LogHandler::new(|_, _, _, _| 1)).unwrap();
     let projection = wait_for(fixture.map().projection_create());
     std::mem::forget((fixture, projection));
     std::process::exit(0);

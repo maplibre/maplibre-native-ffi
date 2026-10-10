@@ -4,7 +4,6 @@ from dataclasses import replace
 
 from .. import docs
 from .python_values import public_name, rust_field, scalar_type
-from .rust import native_call
 from .rust_callbacks import decision_table_name
 
 
@@ -38,9 +37,6 @@ def validate(values, plan):
     for field in plain.fields:
         if field.public:
             values.supported(field.value, input=True)
-    for group in plain.presence_groups:
-        if len(group.fields) > 1:
-            values.supported(values.group_value(plain, group), input=True)
     for name in descriptor.callbacks:
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]
@@ -77,12 +73,9 @@ def input_source(plan, values):
     lines.append(
         f"raw.{descriptor.user_data} = storage.register_callbacks(vec![{methods}]);"
     )
-    release_callback = next(
-        f.value.native for f in plan.fields if f.name == descriptor.release
-    )
     release_fn = (
         "generated_release_callbacks_no_reentry"
-        if values.api.callbacks[release_callback].reentry == "forbid"
+        if descriptor.release_reentry == "forbid"
         else "generated_release_callbacks"
     )
     lines.append(f"raw.{descriptor.release} = Some({release_fn});")
@@ -100,7 +93,12 @@ def input_source(plan, values):
 
 def sources(values, plan):
     from .python import OWNERS
+    from .rust_callbacks import cancel_notification
 
+    for decision in values.api.decisions.values():
+        _, registration, record, _ = cancel_notification(values.api, decision)
+        if record.native == plan.native:
+            return cancel_sources(values, plan, registration)
     rust, python = [], []
     descriptor = plan.registration
     fields, methods = [], []
@@ -224,115 +222,76 @@ def sources(values, plan):
     return "\n".join(rust), "\n".join(python)
 
 
-def direct_operation(plan, values):
-    from ..semantic import FieldPlan, RegistrationDescriptorPlan, ValuePlan
-    from .python import OWNERS, owned_decision, unsupported
+def cancel_operation(plan, values, receiver):
+    """A decision handle's cancel registration, which the core runtime
+    registers through the protocol's record."""
+    from .python import OWNERS, unsupported
+    from .rust import Unsupported
+    from .rust_callbacks import cancel_notification
 
-    registration = plan.direct_registrations[0]
-    parameter = next(p for p in plan.inputs if p.name == registration.callback)
-    callback = values.api.callbacks[parameter.value.native]
-    receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
-    decision = owned_decision(values.api, receiver.value.native) if receiver else None
-    if decision and decision.cancel_registration == plan.name:
-        if (
-            not registration.release_callback
-            or not registration.accepted_unless
-            or len(callback.parameters) != 1
-            or callback.result.native != "void"
-        ):
-            raise unsupported(
-                plan.function,
-                "cancel registration needs a native release and a notification callback",
-            )
-        owner = OWNERS[receiver.value.native]
-        name = plan.member
-        # The core registration enters the callback's reentry policy and
-        # contains panics; this root only keeps the callback visible to the
-        # owner's garbage collection.
-        native = f"""    fn {name}(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {{
+    try:
+        _, registration, record, _ = cancel_notification(
+            values.api, values.api.decisions[receiver.value.native]
+        )
+    except Unsupported as error:
+        raise unsupported(plan.function, str(error)) from error
+    values.records[record.native] = record
+    owner = OWNERS[receiver.value.native]
+    name = plan.member
+    parameter = registration.parameter
+    field = registration.callbacks[0]
+    record_type = public_name(record.native)
+    # The core registration enters the callback's reentry policy and
+    # contains panics; this root only keeps the callback visible to the
+    # owner's garbage collection. Without a callback, native rejects the
+    # registration.
+    native = f"""    fn {name}(&self, {parameter}: &Bound<'_, PyAny>) -> PyResult<bool> {{
         let callback_owner = maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
         generated_check_operation("{plan.name}", callback_owner)?;
-        if !callback.bind(py).is_callable() {{ return Err(invalid_argument_error("callback must be callable")); }}
-        let root = GeneratedCallbackRootOwner::new(vec![callback]);
-        let weak = root.downgrade();
-        let cancelled = self.state.register_cancel(Box::new(move || {{
-            Python::try_attach(|py| {{
-                if let Some(callback) = root.get(py, 0)
-                    && let Err(error) = callback.bind(py).call0()
-                {{
-                    generated_report_unraisable(py, error);
-                }}
-            }});
-        }})).map_err(map_error)?;
+        let callback = {parameter}.getattr("{field}")?;
+        let mut weak = std::sync::Weak::new();
+        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {{
+            None
+        }} else {{
+            if !callback.is_callable() {{ return Err(invalid_argument_error("{field} must be callable")); }}
+            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
+            weak = root.downgrade();
+            Some(Box::new(move || {{
+                Python::try_attach(|py| {{
+                    if let Some(callback) = root.get(py, 0)
+                        && let Err(error) = callback.bind(py).call0()
+                    {{
+                        generated_report_unraisable(py, error);
+                    }}
+                }});
+            }}))
+        }};
+        let cancelled = self.state.register_cancel(registration).map_err(map_error)?;
         if !cancelled {{
             *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
         }}
         Ok(cancelled)
     }}
 """
-        facade = f"""    def {name}(self, callback: Callable[[], None]) -> bool:
-{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}(callback)
-"""
-        return (
-            owner,
-            native,
-            facade,
-            f"    def {name}(self, callback: Callable[[], None]) -> bool: ...\n",
-            None,
-        )
-    if receiver or not registration.release_callback:
-        raise unsupported(
-            plan.function, "direct registration requires native release notification"
-        )
-    descriptor = ValuePlan(
-        kind="record",
-        native=plan.name + "_registration",
-        ctype=parameter.value.ctype,
-        fields=(FieldPlan(registration.callback, parameter.value),),
-        registration=RegistrationDescriptorPlan(
-            (registration.callback,),
-            registration.user_data,
-            registration.release_callback,
-        ),
-    )
-    validate(values, descriptor)
-    values.records[descriptor.native] = descriptor
-    name = plan.member
-    arguments = {
-        registration.callback: "native_callback",
-        registration.user_data: "context",
-        registration.release_callback: "release",
-    }
-    call = native_call(
-        plan.function, [arguments[p.name] for p in plan.function.parameters]
-    )
-    native = f'''#[pyfunction]
-fn {name}(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {{
-    generated_check_reentry()?;
-    let storage = &mut GeneratedInputStorage::default();
-    let enabled = !callback.getattr("{registration.callback}")?.is_none();
-    let context = if enabled {{ storage.register_callbacks(vec![callback.getattr("_invoke_{registration.callback}")?.unbind()]) }} else {{ std::ptr::null_mut() }};
-    let native_callback: sys::{parameter.value.native} = if enabled {{ Some(generated_callback_{descriptor.native}_{registration.callback}) }} else {{ None }};
-    let release = if enabled {{ Some({"generated_release_callbacks_no_reentry" if values.api.callbacks[next(p.value.native for p in plan.inputs if p.name == registration.release_callback)].reentry == "forbid" else "generated_release_callbacks"} as unsafe extern "C" fn(*mut c_void)) }} else {{ None }};
-    maplibre_core::check(|diagnostic| unsafe {{ generated_native_call(py, || {call}) }}).map_err(map_error)?;
-    storage.accept_callbacks();
-    Ok(())
-}}
-'''
-    parameter_types = ", ".join(
-        values.type(p.value) for p in callback.parameters if p.name != callback.context
-    )
-    result_type = (
-        "None" if callback.result.native == "void" else values.type(callback.result)
-    )
-    public_type = f"Callable[[{parameter_types}], {result_type}] | None"
-    facade = f"""def {name}(callback: {public_type} = None) -> None:
-{docs.docstring(values.api.doc(plan.name), "    ")}    return _native.{name}({public_name(descriptor.native)}(callback))
+    facade = f"""    def {name}(self, {parameter}: {record_type}) -> bool:
+{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}({parameter})
 """
     return (
-        "",
+        owner,
         native,
         facade,
-        f"def {name}(callback: {public_type} = None) -> None: ...\n",
+        f"    def {name}(self, {parameter}: {record_type}) -> bool: ...\n",
         None,
     )
+
+
+def cancel_sources(values, plan, registration):
+    """The Python class of a decision handle's cancel notification record,
+    whose callback the core runtime registers, so it needs no trampoline."""
+    field = registration.callbacks[0]
+    _, python = values.record_sources(
+        plain_fields(plan),
+        extra_fields=[f"    {field}: Callable[[], None] | None = None"],
+        copied=False,
+    )
+    return "", python

@@ -109,17 +109,16 @@ public sealed unsafe partial class ResourceRequestHandle
     /// See <c>mln_resource_request_set_cancel_callback</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public bool SetCancelCallback(Action? callback)
+    public bool SetCancelCallback(ResourceRequestCancelHandler handler)
     {
         using var read = state.Read(this, "mln_resource_request_set_cancel_callback");
-        using var scope = new NativeCallScope();
+        using var scope = new NativeCallScope() { Receiver = this };
+        var nativeHandler = NativeResourceRequestCancelHandler(handler, scope);
         bool outCancelled = default;
         Check(
             NativeMethods.mln_resource_request_set_cancel_callback(
                 read.Handle,
-                callback is null ? null : &InvokeResourceRequestCancelCallback,
-                callback is null ? null : scope.Register(new NativeOwnedCallback(callback, this)),
-                &NativeCallbackRoot.Release,
+                &nativeHandler,
                 &outCancelled,
                 Diagnostic
             )

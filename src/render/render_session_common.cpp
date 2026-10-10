@@ -39,7 +39,6 @@
 #include <mln/vulkan/renderable_resource.hpp>
 #endif
 
-#include "bytes/buffer.hpp"
 #include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
@@ -60,8 +59,8 @@ auto render_target_extent_physical_size(
   const mln_render_target_extent* extent, uint32_t* out_width,
   uint32_t* out_height
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
+  if (extent == nullptr || extent->size < sizeof(mln_render_target_extent)) {
+    set_thread_error("extent must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_width == nullptr || out_height == nullptr) {
@@ -102,7 +101,6 @@ auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 auto opengl_context_descriptor_default() noexcept
   -> mln_opengl_context_descriptor {
   auto result = mln_opengl_context_descriptor{
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
     .data = {},
@@ -110,7 +108,6 @@ auto opengl_context_descriptor_default() noexcept
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   result.data.wgl = mln_wgl_context_descriptor{
-    .size = sizeof(mln_wgl_context_descriptor),
     .device_context = nullptr,
     .share_context = nullptr,
     .get_proc_address = nullptr,
@@ -118,7 +115,6 @@ auto opengl_context_descriptor_default() noexcept
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   result.data.egl = mln_egl_context_descriptor{
-    .size = sizeof(mln_egl_context_descriptor),
     .display = nullptr,
     .config = nullptr,
     .share_context = nullptr,
@@ -128,7 +124,6 @@ auto opengl_context_descriptor_default() noexcept
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   result.data.webgl = mln_webgl_context_descriptor{
-    .size = sizeof(mln_webgl_context_descriptor),
     .kind = MLN_WEBGL_CONTEXT_EXISTING,
     .context = 0,
     .canvas_selector = {},
@@ -184,7 +179,6 @@ auto webgpu_surface_descriptor_default() noexcept
       },
     .context =
       mln_webgpu_context_descriptor{
-        .size = sizeof(mln_webgpu_context_descriptor),
         .instance = nullptr,
         .device = nullptr,
         .queue = nullptr,
@@ -214,10 +208,6 @@ auto opengl_surface_descriptor_default() noexcept
 // a null queue means the device's default queue.
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
   -> mln_status {
-  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
-    set_thread_error("mln_webgpu_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (context.device == nullptr) {
     set_thread_error("WebGPU device must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -228,10 +218,6 @@ auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
 auto validate_opengl_context(
   const mln_opengl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status {
-  if (context.size < sizeof(mln_opengl_context_descriptor)) {
-    set_thread_error("mln_opengl_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED &&
     context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
@@ -249,10 +235,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL WGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.wgl.size < sizeof(mln_wgl_context_descriptor)) {
-      set_thread_error("mln_wgl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (context.data.wgl.device_context == nullptr) {
       set_thread_error("WGL device_context must not be null");
@@ -283,10 +265,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL EGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.egl.size < sizeof(mln_egl_context_descriptor)) {
-      set_thread_error("mln_egl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (
       context.data.egl.display == nullptr || context.data.egl.config == nullptr
@@ -331,10 +309,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL WebGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.webgl.size < sizeof(mln_webgl_context_descriptor)) {
-      set_thread_error("mln_webgl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (context.data.webgl.kind == MLN_WEBGL_CONTEXT_EXISTING) {
       if (dedicated) {
@@ -557,19 +531,6 @@ auto validate_screen_point(mln_screen_point point) -> bool {
   return true;
 }
 
-template <typename Handle>
-auto validate_result_output(Handle* out_result) -> mln_status {
-  if (out_result == nullptr) {
-    mln::core::set_thread_error("out_result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_result != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error("*out_result must be the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
 auto make_string_vector(std::span<const mln_buffer_view> strings)
   -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
@@ -652,7 +613,8 @@ auto to_rendered_query_options(
     );
     return std::nullopt;
   }
-  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS |
+                                MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("rendered feature query has unknown fields");
     return std::nullopt;
@@ -670,8 +632,8 @@ auto to_rendered_query_options(
     }
     layer_ids = make_string_vector(views);
   }
-  if (options->filter != nullptr) {
-    auto converted_filter = mln::core::to_native_style_filter(options->filter);
+  if ((options->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0) {
+    auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
     }
@@ -694,7 +656,8 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     return std::nullopt;
   }
   constexpr auto known_fields =
-    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS |
+    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("source feature query has unknown fields");
     return std::nullopt;
@@ -716,8 +679,8 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     }
     source_layer_ids = make_string_vector(views);
   }
-  if (options->filter != nullptr) {
-    auto converted_filter = mln::core::to_native_style_filter(options->filter);
+  if ((options->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0) {
+    auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
     }
@@ -847,23 +810,13 @@ auto to_feature_extension_arguments(const mln_buffer_view* arguments)
   return std::optional<std::map<std::string, mln::Value>>{std::move(result)};
 }
 
-auto create_feature_extension_result(
-  mln::FeatureExtensionValue value, mln_buffer* out_result
-) -> mln_status {
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
+auto serialize_feature_extension_result(const mln::FeatureExtensionValue& value)
+  -> std::string {
   if (value.is<mln::Value>()) {
-    return mln::core::create_buffer(
-      mln::core::serialize_json_value(value.get<mln::Value>()), out_result
-    );
+    return mln::core::serialize_json_value(value.get<mln::Value>());
   }
-  return mln::core::create_buffer(
-    mln::core::serialize_feature_collection(
-      value.get<mln::FeatureCollection>()
-    ),
-    out_result
+  return mln::core::serialize_feature_collection(
+    value.get<mln::FeatureCollection>()
   );
 }
 
@@ -2324,16 +2277,12 @@ auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_buffer* out_result
+  std::string& out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
-  }
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   if (
     !validate_non_empty_string(source_id, "source_id") ||
@@ -2361,11 +2310,12 @@ auto render_session_query_feature_extensions(
   auto query_feature = mln::Feature{std::move(*native_feature)};
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
-  auto result = live->renderer->queryFeatureExtensions(
+  const auto result = live->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)
   );
-  return create_feature_extension_result(std::move(result), out_result);
+  out_result = serialize_feature_extension_result(result);
+  return MLN_STATUS_OK;
 }
 
 namespace {
@@ -2375,6 +2325,9 @@ auto publish_frame_result_locked(
 ) noexcept -> void {
   session.latest_result = static_cast<mln_render_result>(result.disposition);
   session.latest_demand_token = result.token;
+  // A batch view's stride is the record size, so every queued record carries
+  // it whichever path built it.
+  result.size = sizeof(mln_render_frame_result);
   session.frame_results.push_back(result);
   if (session.frame_wake && !session.frame_wake_pending) {
     session.frame_wake_pending = true;
@@ -2909,49 +2862,50 @@ auto render_session_drain_frame_results(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto results = std::deque<mln_render_frame_result>{};
-  {
-    const auto lock = std::scoped_lock{live->control_mutex};
-    results.swap(live->frame_results);
-    live->frame_wake_pending = false;
-  }
   // An empty queue is a normal poll, so it neither allocates a batch nor sets
   // a diagnostic.
-  if (results.empty()) return MLN_STATUS_NOT_READY;
-  auto batch = std::make_shared<mln_render_frame_batch_object>();
-  batch->results = std::move(results);
-  *out_batch = handle_table<mln_render_frame_batch_object>().insert(batch);
-  return MLN_STATUS_OK;
-}
-
-auto render_frame_batch_count(
-  mln_render_frame_batch batch, std::size_t* out_count
-) -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    if (live->frame_results.empty()) {
+      live->frame_wake_pending = false;
+      return MLN_STATUS_NOT_READY;
+    }
   }
-  const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
-  if (live == nullptr) return recorded_handle_fault_status();
-  *out_count = live->results.size();
+  // Allocating and registering the batch before the swap means a failure
+  // loses no results: nothing after the swap can throw. The handle stays
+  // private until this call returns it.
+  const auto batch = std::make_shared<mln_render_frame_batch_object>();
+  const auto handle =
+    handle_table<mln_render_frame_batch_object>().insert(batch);
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    batch->results.swap(live->frame_results);
+    live->frame_wake_pending = false;
+  }
+  // A concurrent drain can empty the queue between the two locks.
+  if (batch->results.empty()) {
+    render_frame_batch_release(handle);
+    return MLN_STATUS_NOT_READY;
+  }
+  *out_batch = handle;
   return MLN_STATUS_OK;
 }
 
 auto render_frame_batch_get(
-  mln_render_frame_batch batch, std::size_t index,
-  mln_render_frame_result* out_result
+  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view
 ) -> mln_status {
-  if (out_result == nullptr || out_result->size < sizeof(*out_result)) {
-    set_thread_error("out_result must not be null and must have a valid size");
+  if (out_view == nullptr || out_view->size < sizeof(*out_view)) {
+    set_thread_error("out_view must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (index >= live->results.size()) {
-    set_thread_error("frame result index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_result = live->results[index];
+  *out_view = mln_render_frame_batch_view{
+    .size = sizeof(mln_render_frame_batch_view),
+    .result_size = sizeof(mln_render_frame_result),
+    .results = live->results.data(),
+    .result_count = live->results.size(),
+  };
   return MLN_STATUS_OK;
 }
 
@@ -3337,8 +3291,8 @@ auto render_session_resize_start(
   mln_render_session session, const mln_render_target_extent* extent,
   const mln_completion* completion
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
+  if (extent == nullptr || extent->size < sizeof(mln_render_target_extent)) {
+    set_thread_error("extent must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto valid = validate_render_target_extent(
@@ -3397,7 +3351,10 @@ auto render_session_resize_start(
     async
   );
   if (registered != MLN_STATUS_OK) return registered;
-  const auto copied = *extent;
+  // The snapshot reports this extent as an embedded member, so it carries the
+  // size of this build's struct rather than the caller's.
+  auto copied = *extent;
+  copied.size = sizeof(mln_render_target_extent);
   auto ticket = uint64_t{0};
   {
     const auto lock = std::scoped_lock{live->control_mutex};

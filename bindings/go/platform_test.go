@@ -42,7 +42,7 @@ func TestProcessExitsCleanlyWithLiveHandles(t *testing.T) {
 }
 
 func exitWithLiveHandles(t *testing.T) {
-	if err := LogSetCallback(func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }); err != nil {
+	if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }}); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{events: make(chan struct{}, 1)}

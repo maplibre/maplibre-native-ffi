@@ -50,7 +50,6 @@ impl Default for AnimationOptions {
 impl ToNative<sys::mln_animation_options> for AnimationOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_animation_options> {
         let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
-        raw.size = std::mem::size_of::<sys::mln_animation_options>() as _;
         raw.fields = 0;
         if let Some(item) = &self.duration_ms {
             raw.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
@@ -222,12 +221,12 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_delta> {
         let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
         raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-        raw.has_anchor = false;
+        raw.fields = 0;
         raw.kind = to_native(&self.kind, arena)?;
         raw.offset = to_native(&self.offset, arena)?;
         raw.amount = self.amount;
         if let Some(item) = &self.anchor {
-            raw.has_anchor = true;
+            raw.fields |= sys::MLN_CAMERA_DELTA_FIELD_ANCHOR;
             raw.anchor = to_native(&*item, arena)?;
         }
         raw.animation = to_native(&self.animation, arena)?;
@@ -240,10 +239,22 @@ impl FromNative<sys::mln_camera_delta> for CameraDelta {
             kind: unsafe { from_native(raw.kind) }?,
             offset: unsafe { from_native(raw.offset) }?,
             amount: raw.amount,
-            anchor: unsafe { convert::present(raw.has_anchor, true, raw.anchor) }?,
+            anchor: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_DELTA_FIELD_ANCHOR, raw.anchor)
+            }?,
             animation: unsafe { from_native(raw.animation) }?,
         })
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub struct CameraDeltaField: u32 {
+    const ANCHOR = 1;
+}
 }
 
 native_enum! {
@@ -365,8 +376,7 @@ impl ToNative<sys::mln_camera_options> for CameraOptions {
         raw.fields = 0;
         if let Some(item) = &self.center {
             raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
-            raw.latitude = item.latitude;
-            raw.longitude = item.longitude;
+            raw.center = to_native(&*item, arena)?;
         }
         if let Some(item) = &self.center_altitude {
             raw.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -406,14 +416,9 @@ impl ToNative<sys::mln_camera_options> for CameraOptions {
 impl FromNative<sys::mln_camera_options> for CameraOptions {
     unsafe fn from_native(raw: sys::mln_camera_options) -> Result<Self> {
         Ok(Self {
-            center: if raw.fields & sys::MLN_CAMERA_OPTION_CENTER != 0 {
-                Some(LatLng {
-                    latitude: raw.latitude,
-                    longitude: raw.longitude,
-                })
-            } else {
-                None
-            },
+            center: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_OPTION_CENTER, raw.center)
+            }?,
             center_altitude: (raw.fields & sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0)
                 .then_some(raw.center_altitude),
             padding: unsafe {
@@ -654,7 +659,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -666,7 +671,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -809,15 +814,10 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(
-            "mln_custom_mvt_vector_source_tile_callback",
-            None,
-            (),
-            || {
-                callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
-                Ok(())
-            },
-        )
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+            callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
+            Ok(())
+        })
     }
     unsafe extern "C" fn cancel_tile_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -826,15 +826,10 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(
-            "mln_custom_mvt_vector_source_tile_callback",
-            None,
-            (),
-            || {
-                callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
-                Ok(())
-            },
-        )
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+            callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
+            Ok(())
+        })
     }
 }
 impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
@@ -969,7 +964,6 @@ impl EglContextDescriptor {
 impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_egl_context_descriptor> {
         let mut raw: sys::mln_egl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_egl_context_descriptor>() as _;
         raw.display = self.display;
         raw.config = self.config;
         raw.share_context = self.share_context;
@@ -986,6 +980,37 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
             share_context: raw.share_context,
             client_api: unsafe { from_native(raw.client_api) }?,
             get_proc_address: raw.get_proc_address,
+        })
+    }
+}
+
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EventBatchView {
+    /// Borrowed array of event_count events in queue order.
+    pub events: Vec<RuntimeEvent>,
+}
+impl FromNative<sys::mln_event_batch_view> for EventBatchView {
+    unsafe fn from_native(raw: sys::mln_event_batch_view) -> Result<Self> {
+        Ok(Self {
+            events: unsafe { convert::strided_items(raw.events, raw.event_count, raw.event_size) }?
+                .into_iter()
+                .map(|item| -> Result<RuntimeEvent> {
+                    let mut value: RuntimeEvent = unsafe { from_native(item) }?;
+                    value.message = unsafe {
+                        convert::arena_string(
+                            raw.messages,
+                            raw.messages_size,
+                            item.message_offset,
+                            item.message_size,
+                        )
+                    }?;
+                    Ok(value)
+                })
+                .collect::<Result<Vec<_>>>()?,
         })
     }
 }
@@ -1719,6 +1744,73 @@ pub enum LogEvent: u32 {
 } Unknown
 }
 
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+#[derive(Clone, Default)]
+pub struct LogHandler {
+    pub callback: Option<
+        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>,
+    >,
+}
+impl std::fmt::Debug for LogHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LogHandler").finish_non_exhaustive()
+    }
+}
+impl LogHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+    {
+        self.callback = Some(std::sync::Arc::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+    unsafe extern "C" fn callback_trampoline(
+        user_data: *mut std::ffi::c_void,
+        severity: u32,
+        event: u32,
+        code: i64,
+        message: *const std::ffi::c_char,
+    ) -> u32 {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
+            let value = callback::require(&state.callback)?(
+                unsafe { from_native(severity) }?,
+                unsafe { from_native(event) }?,
+                code,
+                unsafe { from_native(message) }?,
+            );
+            Ok(value)
+        })
+    }
+}
+impl ToNative<sys::mln_log_handler> for LogHandler {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_log_handler> {
+        let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
+    }
+}
+
 native_enum! {
 /// Log severity values emitted by MapLibre Native.
 ///
@@ -2225,7 +2317,6 @@ impl MetalContextDescriptor {
 impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_metal_context_descriptor> {
         let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_metal_context_descriptor>() as _;
         raw.device = self.device;
         Ok(raw)
     }
@@ -2432,7 +2523,6 @@ impl ToNative<sys::mln_offline_geometry_region_definition> for OfflineGeometryRe
         arena: &mut InputArena,
     ) -> Result<sys::mln_offline_geometry_region_definition> {
         let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as _;
         raw.style_url = to_native(&self.style_url, arena)?;
         raw.geometry = to_native(&self.geometry, arena)?;
         raw.min_zoom = self.min_zoom;
@@ -2651,7 +2741,6 @@ impl ToNative<sys::mln_offline_tile_pyramid_region_definition>
     ) -> Result<sys::mln_offline_tile_pyramid_region_definition> {
         let mut raw: sys::mln_offline_tile_pyramid_region_definition =
             unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as _;
         raw.style_url = to_native(&self.style_url, arena)?;
         raw.bounds = to_native(&self.bounds, arena)?;
         raw.min_zoom = self.min_zoom;
@@ -2765,7 +2854,6 @@ pub struct OpenglContextDescriptor {
 impl ToNative<sys::mln_opengl_context_descriptor> for OpenglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_opengl_context_descriptor> {
         let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_opengl_context_descriptor>() as _;
         raw.ownership = to_native(&self.ownership, arena)?;
         match &self.data {
             OpenglContextDescriptorData::Wgl(item) => {
@@ -3300,7 +3388,6 @@ impl QueueLock {
 impl ToNative<sys::mln_queue_lock> for QueueLock {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_queue_lock> {
         let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
         raw.lock = self.lock.as_ref().map(|_| Self::lock_trampoline as _);
         raw.unlock = self.unlock.as_ref().map(|_| Self::unlock_trampoline as _);
         if !(raw.lock.is_none() && raw.unlock.is_none()) {
@@ -3380,7 +3467,28 @@ pub enum RenderDriverKind: u32 {
 } Unknown
 }
 
-/// Immutable result record copied into an owned frame-result batch.
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RenderFrameBatchView {
+    /// Borrowed array of result_count terminal frame results in completion
+    /// order.
+    pub results: Vec<RenderFrameResult>,
+}
+impl FromNative<sys::mln_render_frame_batch_view> for RenderFrameBatchView {
+    unsafe fn from_native(raw: sys::mln_render_frame_batch_view) -> Result<Self> {
+        Ok(Self {
+            results: unsafe {
+                convert::copy_strided(raw.results, raw.result_count, raw.result_size)
+            }?,
+        })
+    }
+}
+
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3717,7 +3825,8 @@ native_flags! {
 /// See `mln_rendered_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct RenderedFeatureQueryOptionField: u32 {
-    const IDS = 1;
+    const LAYER_IDS = 1;
+    const FILTER = 2;
 }
 }
 
@@ -3729,7 +3838,7 @@ pub struct RenderedFeatureQueryOptionField: u32 {
 pub struct RenderedFeatureQueryOptions {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     pub layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for RenderedFeatureQueryOptions {
@@ -3749,7 +3858,10 @@ impl ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryO
         }
         raw.layer_id_count =
             convert::count(self.layer_ids.as_ref().map_or(0, |items| items.len()))?;
-        raw.filter = convert::optional_reference(self.filter.as_ref(), arena)?;
+        if let Some(item) = &self.filter {
+            raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -3761,7 +3873,13 @@ impl FromNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQuer
             } else {
                 None
             },
-            filter: unsafe { convert::copy_optional_reference(raw.filter) }?,
+            filter: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
+                    raw.filter,
+                )
+            }?,
         })
     }
 }
@@ -4055,14 +4173,33 @@ pub enum ResourceProviderDecision: u32 {
 } Unknown
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct ResourceRequestRange {
-    pub range_start: u64,
-    pub range_end: u64,
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ResourceRange {
+    /// First byte offset of the requested range.
+    pub start: u64,
+    /// Last byte offset of the requested range, inclusive.
+    pub end: u64,
 }
+impl ResourceRange {
+    pub const fn new(start: u64, end: u64) -> Self {
+        Self { start, end }
+    }
+}
+impl FromNative<sys::mln_resource_range> for ResourceRange {
+    unsafe fn from_native(raw: sys::mln_resource_range) -> Result<Self> {
+        Ok(Self {
+            start: raw.start,
+            end: raw.end,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequest {
-    pub range: Option<ResourceRequestRange>,
     /// URL entering the network layer, before tile server normalization.
     pub requested_url: Option<String>,
     /// URL to fetch, after resource-kind normalization against the runtime's
@@ -4073,6 +4210,7 @@ pub struct ResourceRequest {
     pub priority: ResourcePriority,
     pub usage: ResourceUsage,
     pub storage_policy: ResourceStoragePolicy,
+    pub range: Option<ResourceRange>,
     pub prior_modified_unix_ms: Option<i64>,
     pub prior_expires_unix_ms: Option<i64>,
     pub prior_etag: Option<String>,
@@ -4081,14 +4219,6 @@ pub struct ResourceRequest {
 impl FromNative<sys::mln_resource_request> for ResourceRequest {
     unsafe fn from_native(raw: sys::mln_resource_request) -> Result<Self> {
         Ok(Self {
-            range: if raw.has_range {
-                Some(ResourceRequestRange {
-                    range_start: raw.range_start,
-                    range_end: raw.range_end,
-                })
-            } else {
-                None
-            },
             requested_url: unsafe { from_native(raw.requested_url) }?,
             resolved_url: unsafe { from_native(raw.resolved_url) }?,
             kind: unsafe { from_native(raw.kind) }?,
@@ -4096,12 +4226,62 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
             priority: unsafe { from_native(raw.priority) }?,
             usage: unsafe { from_native(raw.usage) }?,
             storage_policy: unsafe { from_native(raw.storage_policy) }?,
-            prior_modified_unix_ms: (raw.has_prior_modified).then_some(raw.prior_modified_unix_ms),
-            prior_expires_unix_ms: (raw.has_prior_expires).then_some(raw.prior_expires_unix_ms),
+            range: unsafe {
+                convert::present(raw.fields, sys::MLN_RESOURCE_REQUEST_RANGE, raw.range)
+            }?,
+            prior_modified_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0)
+                .then_some(raw.prior_modified_unix_ms),
+            prior_expires_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0)
+                .then_some(raw.prior_expires_unix_ms),
             prior_etag: unsafe { from_native(raw.prior_etag) }?,
             prior_data: unsafe { convert::counted(raw.prior_data, raw.prior_data_size) }?,
         })
     }
+}
+
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Default)]
+pub struct ResourceRequestCancelHandler {
+    pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
+}
+impl std::fmt::Debug for ResourceRequestCancelHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceRequestCancelHandler")
+            .finish_non_exhaustive()
+    }
+}
+impl ResourceRequestCancelHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.callback = Some(Box::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+}
+
+native_flags! {
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceRequestField: u32 {
+    /// The request asks only for the bytes in range.
+    const RANGE = 1;
+    /// The cached copy being revalidated carries a modification time.
+    const PRIOR_MODIFIED = 2;
+    /// The cached copy being revalidated carries an expiration time.
+    const PRIOR_EXPIRES = 4;
+}
 }
 
 /// A resource request that a resource provider handles.
@@ -4150,10 +4330,10 @@ impl ResourceRequestHandle {
     ///
     /// See `mln_resource_request_set_cancel_callback` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_cancel_callback(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {
+    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
-        self.state.register_cancel(Box::new(callback))
+        self.state.register_cancel(handler.callback)
     }
     /// Blocks until a resource request is released and its cancel callback
     /// registration has retired: the callback, if it ran, and release_user_data
@@ -4178,6 +4358,10 @@ impl ResourceRequestHandle {
     }
 }
 
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceResponse {
     pub status: ResourceResponseStatus,
@@ -4195,9 +4379,7 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_response> {
         let mut raw: sys::mln_resource_response = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_response>() as _;
-        raw.has_modified = false;
-        raw.has_expires = false;
-        raw.has_retry_after = false;
+        raw.fields = 0;
         raw.status = to_native(&self.status, arena)?;
         raw.error_reason = to_native(&self.error_reason, arena)?;
         raw.bytes = self.bytes.as_ptr().cast();
@@ -4205,20 +4387,35 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
         raw.error_message = to_native(&self.error_message, arena)?;
         raw.must_revalidate = self.must_revalidate;
         if let Some(item) = &self.modified_unix_ms {
-            raw.has_modified = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_MODIFIED;
             raw.modified_unix_ms = *item;
         }
         if let Some(item) = &self.expires_unix_ms {
-            raw.has_expires = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_EXPIRES;
             raw.expires_unix_ms = *item;
         }
         raw.etag = to_native(&self.etag, arena)?;
         if let Some(item) = &self.retry_after_unix_ms {
-            raw.has_retry_after = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
             raw.retry_after_unix_ms = *item;
         }
         Ok(raw)
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceResponseField: u32 {
+    /// The response carries a modification time.
+    const MODIFIED = 1;
+    /// The response carries an expiration time.
+    const EXPIRES = 2;
+    /// An ERROR response carries the earliest time to retry the request.
+    const RETRY_AFTER = 4;
+}
 }
 
 native_enum! {
@@ -4435,37 +4632,6 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
     }
 }
 
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct RuntimeEventBatchView {
-    /// Borrowed array of event_count events in queue order.
-    pub events: Vec<RuntimeEvent>,
-}
-impl FromNative<sys::mln_runtime_event_batch_view> for RuntimeEventBatchView {
-    unsafe fn from_native(raw: sys::mln_runtime_event_batch_view) -> Result<Self> {
-        Ok(Self {
-            events: unsafe { convert::strided_items(raw.events, raw.event_count, raw.event_size) }?
-                .into_iter()
-                .map(|item| -> Result<RuntimeEvent> {
-                    let mut value: RuntimeEvent = unsafe { from_native(item) }?;
-                    value.message = unsafe {
-                        convert::arena_string(
-                            raw.messages,
-                            raw.messages_size,
-                            item.message_offset,
-                            item.message_size,
-                        )
-                    }?;
-                    Ok(value)
-                })
-                .collect::<Result<Vec<_>>>()?,
-        })
-    }
-}
-
 /// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
 ///
 /// See `mln_runtime_event_camera_transition_finished` in the
@@ -4565,8 +4731,6 @@ impl FromNative<sys::mln_runtime_event_offline_region_response_error>
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionStatus {
     pub region_id: i64,
-    /// Region status. This member keeps its own size field because the same
-    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
     pub status: OfflineRegionStatus,
 }
 impl RuntimeEventOfflineRegionStatus {
@@ -4783,8 +4947,6 @@ pub enum RuntimeEventType: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
-    /// No flags are currently defined. Must be zero.
-    pub flags: u32,
     /// Directory root for asset:// URLs. Copied during runtime creation. Null
     /// or empty selects `/android_asset` on Android and `.` elsewhere.
     pub asset_path: Option<String>,
@@ -4805,7 +4967,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_options> {
         let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
         raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-        raw.flags = self.flags;
         raw.asset_path = to_native(&self.asset_path, arena)?;
         raw.cache_path = to_native(&self.cache_path, arena)?;
         raw.event_mask = to_native(&self.event_mask, arena)?;
@@ -4816,7 +4977,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
 impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
     unsafe fn from_native(raw: sys::mln_runtime_options) -> Result<Self> {
         Ok(Self {
-            flags: raw.flags,
             asset_path: unsafe { from_native(raw.asset_path) }?,
             cache_path: unsafe { from_native(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
@@ -4915,7 +5075,8 @@ native_flags! {
 /// See `mln_source_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct SourceFeatureQueryOptionField: u32 {
-    const IDS = 1;
+    const SOURCE_LAYER_IDS = 1;
+    const FILTER = 2;
 }
 }
 
@@ -4928,7 +5089,7 @@ pub struct SourceFeatureQueryOptions {
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
     pub source_layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for SourceFeatureQueryOptions {
@@ -4951,7 +5112,10 @@ impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptio
                 .as_ref()
                 .map_or(0, |items| items.len()),
         )?;
-        raw.filter = convert::optional_reference(self.filter.as_ref(), arena)?;
+        if let Some(item) = &self.filter {
+            raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -4967,7 +5131,13 @@ impl FromNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOpt
             } else {
                 None
             },
-            filter: unsafe { convert::copy_optional_reference(raw.filter) }?,
+            filter: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
+                    raw.filter,
+                )
+            }?,
         })
     }
 }
@@ -5006,7 +5176,7 @@ pub enum Status: i32 {
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleImageInfo {
     pub width: u32,
     pub height: u32,
@@ -5016,22 +5186,17 @@ pub struct StyleImageInfo {
     /// Interval counts for the stretchable axes.
     pub stretch_x_count: usize,
     pub stretch_y_count: usize,
-    /// Content box, meaningful only when has_content is true.
+    /// Content box, meaningful when fields contains CONTENT.
     pub content: Option<ImageContent>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_WIDTH.
     pub text_fit_width: Option<StyleImageTextFit>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_HEIGHT.
     pub text_fit_height: Option<StyleImageTextFit>,
-    /// Sprite pixel ratio. Defaults to 1.0.
+    /// Sprite pixel ratio.
     pub pixel_ratio: f32,
     pub sdf: bool,
-}
-impl Default for StyleImageInfo {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_style_image_info_default() })
-    }
 }
 impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
     unsafe fn from_native(raw: sys::mln_style_image_info) -> Result<Self> {
@@ -5042,17 +5207,42 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
             byte_length: raw.byte_length,
             stretch_x_count: raw.stretch_x_count,
             stretch_y_count: raw.stretch_y_count,
-            content: unsafe { convert::present(raw.has_content, true, raw.content) }?,
+            content: unsafe {
+                convert::present(raw.fields, sys::MLN_STYLE_IMAGE_INFO_CONTENT, raw.content)
+            }?,
             text_fit_width: unsafe {
-                convert::present(raw.has_text_fit_width, true, raw.text_fit_width)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
+                    raw.text_fit_width,
+                )
             }?,
             text_fit_height: unsafe {
-                convert::present(raw.has_text_fit_height, true, raw.text_fit_height)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+                    raw.text_fit_height,
+                )
             }?,
             pixel_ratio: raw.pixel_ratio,
             sdf: raw.sdf,
         })
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub struct StyleImageInfoField: u32 {
+    /// The image declares a content box.
+    const CONTENT = 1;
+    /// The image declares a horizontal text-fit mode.
+    const TEXT_FIT_WIDTH = 2;
+    /// The image declares a vertical text-fit mode.
+    const TEXT_FIT_HEIGHT = 4;
+}
 }
 
 native_flags! {
@@ -5328,17 +5518,19 @@ pub enum StyleRasterDemEncoding: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceInfo {
-    pub tilejson: Option<StyleSourceTileInfo>,
     /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
     /// Source ID byte length, excluding any null terminator.
     pub id_size: usize,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     pub attribution_size: Option<usize>,
     /// URL byte length, meaningful when fields contains URL.
     pub url_size: Option<usize>,
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    pub tilejson: Option<StyleSourceTileInfo>,
     /// Geographic bounds, meaningful when fields contains BOUNDS.
     pub bounds: Option<LatLngBounds>,
     /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
@@ -5351,21 +5543,19 @@ pub struct StyleSourceInfo {
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
         Ok(Self {
-            tilejson: if raw.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-                Some(StyleSourceTileInfo {
-                    tile_count: raw.tile_count,
-                    min_zoom: raw.min_zoom,
-                    max_zoom: raw.max_zoom,
-                    scheme: unsafe { from_native(raw.scheme) }?,
-                })
-            } else {
-                None
-            },
             r#type: unsafe { from_native(raw.type_) }?,
             id_size: raw.id_size,
             is_volatile: raw.is_volatile,
-            attribution_size: (raw.has_attribution).then_some(raw.attribution_size),
+            attribution_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0)
+                .then_some(raw.attribution_size),
             url_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0).then_some(raw.url_size),
+            tilejson: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_TILEJSON,
+                    raw.tilejson,
+                )
+            }?,
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_BOUNDS, raw.bounds)
             }?,
@@ -5407,6 +5597,8 @@ pub struct StyleSourceInfoField: u32 {
     const VECTOR_ENCODING = 16;
     /// The source exposes a DEM raster encoding.
     const RASTER_ENCODING = 32;
+    /// The source declares an attribution string.
+    const ATTRIBUTION = 64;
 }
 }
 
@@ -5426,7 +5618,11 @@ impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
         Ok(Self {
             info: unsafe { from_native(raw.info) }?,
             attribution: unsafe {
-                convert::present(raw.info.has_attribution, true, raw.attribution)
+                convert::present(
+                    raw.info.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+                    raw.attribution,
+                )
             }?,
             url: unsafe {
                 convert::present(raw.info.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url)
@@ -5446,9 +5642,13 @@ impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceTileInfo {
+    /// Inline tile URL count.
     pub tile_count: usize,
+    /// Minimum zoom.
     pub min_zoom: f64,
+    /// Maximum zoom.
     pub max_zoom: f64,
+    /// One of `mln_style_tile_scheme`.
     pub scheme: StyleTileScheme,
 }
 impl StyleSourceTileInfo {
@@ -5738,7 +5938,7 @@ pub enum StyleVectorTileEncoding: u32 {
 ///
 /// See `mln_texture_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct TextureImageInfo {
     /// Physical image width in device pixels.
     pub width: u32,
@@ -5748,11 +5948,6 @@ pub struct TextureImageInfo {
     pub stride: u32,
     /// Required output buffer byte length.
     pub byte_length: usize,
-}
-impl Default for TextureImageInfo {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_texture_image_info_default() })
-    }
 }
 impl TextureImageInfo {
     pub const fn new(width: u32, height: u32, stride: u32, byte_length: usize) -> Self {
@@ -6090,7 +6285,6 @@ impl VulkanContextDescriptor {
 impl ToNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_vulkan_context_descriptor> {
         let mut raw: sys::mln_vulkan_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_vulkan_context_descriptor>() as _;
         raw.instance = self.instance;
         raw.physical_device = self.physical_device;
         raw.device = self.device;
@@ -6323,7 +6517,6 @@ impl Wake {
 impl ToNative<sys::mln_wake> for Wake {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_wake> {
         let mut raw: sys::mln_wake = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_wake>() as _;
         raw.callback = self
             .callback
             .as_ref()
@@ -6354,7 +6547,6 @@ pub struct WebglContextDescriptor {
 impl ToNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_webgl_context_descriptor> {
         let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgl_context_descriptor>() as _;
         raw.kind = to_native(&self.kind, arena)?;
         raw.context = self.context;
         raw.canvas_selector = to_native(&self.canvas_selector, arena)?;
@@ -6495,7 +6687,6 @@ impl WebgpuContextDescriptor {
 impl ToNative<sys::mln_webgpu_context_descriptor> for WebgpuContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_context_descriptor> {
         let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as _;
         raw.instance = self.instance;
         raw.device = self.device;
         raw.queue = self.queue;
@@ -6713,7 +6904,6 @@ impl WglContextDescriptor {
 impl ToNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_wgl_context_descriptor> {
         let mut raw: sys::mln_wgl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_wgl_context_descriptor>() as _;
         raw.device_context = self.device_context;
         raw.share_context = self.share_context;
         raw.get_proc_address = self.get_proc_address;
@@ -6730,6 +6920,30 @@ impl FromNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     }
 }
 
+unsafe fn register_resource_request_cancel(
+    handle: sys::mln_resource_request_handle,
+    callback: maplibre_core::decision::ContextCallback,
+    user_data: *mut std::ffi::c_void,
+    release: maplibre_core::decision::ContextCallback,
+    out_cancelled: *mut bool,
+    out_diagnostic: *mut sys::mln_diagnostic,
+) -> sys::mln_status {
+    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+    handler.callback = callback;
+    handler.user_data = user_data;
+    handler.release_user_data = release;
+    // SAFETY: the caller passes the decision handle and the outputs that
+    // the C function requires; the handler is borrowed for the call.
+    unsafe {
+        sys::mln_resource_request_set_cancel_callback(
+            handle,
+            &handler,
+            out_cancelled,
+            out_diagnostic,
+        )
+    }
+}
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
     sys::mln_resource_request_handle,
 > = unsafe {
@@ -6738,7 +6952,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,
-        sys::mln_resource_request_set_cancel_callback,
+        register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
@@ -6747,48 +6961,3 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         ],
     )
 };
-
-/// Receives a MapLibre Native log record.
-///
-/// See `mln_log_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub type LogCallback =
-    std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>;
-pub(crate) fn log_callback_registration(
-    callback: Option<LogCallback>,
-    arena: &mut InputArena,
-) -> (
-    sys::mln_log_callback,
-    *mut std::ffi::c_void,
-    sys::mln_log_callback_release,
-) {
-    unsafe extern "C" fn invoke(
-        user_data: *mut std::ffi::c_void,
-        severity: u32,
-        event: u32,
-        code: i64,
-        message: *const std::ffi::c_char,
-    ) -> u32 {
-        // SAFETY: native passes the registration that this trampoline's
-        // descriptor transferred.
-        let state = unsafe { callback::state::<LogCallback>(user_data) };
-        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
-            let value = state(
-                unsafe { from_native(severity) }?,
-                unsafe { from_native(event) }?,
-                code,
-                unsafe { from_native(message) }?,
-            );
-            Ok(value)
-        })
-    }
-    match callback {
-        // SAFETY: the release reclaims exactly this state.
-        Some(callback) => (
-            Some(invoke),
-            unsafe { arena.registration(callback, callback::release::<LogCallback>) },
-            Some(callback::release::<LogCallback>),
-        ),
-        None => (None, std::ptr::null_mut(), None),
-    }
-}

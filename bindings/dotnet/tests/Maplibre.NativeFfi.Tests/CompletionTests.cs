@@ -65,6 +65,36 @@ public sealed class CompletionTests
         completion.callback(completion.user_data, &result);
     }
 
+    // A native build whose element grew reports a value_size wider than this binding's element,
+    // so the decoder steps by it. A stride narrower than the element cannot hold one.
+    [Fact]
+    public unsafe void AnArrayResultIsReadAtItsValueSize()
+    {
+        // Two coordinates, each followed by a member this binding does not know.
+        double* wide = stackalloc double[] { 1, 2, -1, 3, 4, -1 };
+        var result = new mln_completion_result
+        {
+            size = (uint)sizeof(mln_completion_result),
+            status = (int)mln_status.MLN_STATUS_OK,
+            value = wide,
+            value_size = 3 * sizeof(double),
+            value_count = 2,
+        };
+
+        var points = NativeCompletion.Values<mln_lat_lng>(&result);
+
+        Assert.Equal(
+            new[] { (1.0, 2.0), (3.0, 4.0) },
+            points.Select(point => (point.latitude, point.longitude))
+        );
+        var narrow = result;
+        narrow.value_size = (uint)sizeof(mln_lat_lng) - 1;
+        Assert.Throws<InvalidOperationException>(() => ReadLatLngs(narrow));
+    }
+
+    private static unsafe mln_lat_lng[] ReadLatLngs(mln_completion_result result) =>
+        NativeCompletion.Values<mln_lat_lng>(&result);
+
     [Fact]
     public void ARejectedSubmissionFreesItsCompletionState()
     {

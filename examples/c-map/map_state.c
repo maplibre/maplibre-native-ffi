@@ -87,8 +87,8 @@ static app_error configure_map(map_state* state, bool smoke) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-  camera.latitude = 37.7749;
-  camera.longitude = -122.4194;
+  camera.center.latitude = 37.7749;
+  camera.center.longitude = -122.4194;
   camera.zoom = 13.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;
@@ -196,12 +196,13 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status =
     mln_runtime_drain_events(state->runtime, &batch, &diagnostic);
+  if (status == MLN_STATUS_NOT_READY) return APP_OK;
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status, &diagnostic);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view),
+  mln_event_batch_view view = {
+    .size = sizeof(mln_event_batch_view),
   };
   status = mln_event_batch_get(batch, &view, &diagnostic);
   if (status != MLN_STATUS_OK) {

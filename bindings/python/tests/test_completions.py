@@ -101,7 +101,7 @@ def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
     map_handle.set_style_url("custom://pending.json")
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
-    handle.set_cancel_callback(block_retirement)
+    handle.set_cancel_callback(mln.ResourceRequestCancelHandler(block_retirement))
 
     # Map retirement runs the cancel callback, and the runtime's ordered
     # submissions hold every later creation behind it.

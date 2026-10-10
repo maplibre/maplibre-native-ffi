@@ -10,29 +10,16 @@ public abstract class GeneratedRenderFrameBatchOperations internal constructor()
   internal abstract val binding: HandleStateCore
 
   /**
-   * Returns the number of records in an owned frame-result batch.
-   *
-   * See `mln_render_frame_batch_count` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  public fun count(): ULong =
-    nativeCall(this, binding, "mln_render_frame_batch_count") {
-      val out = allocate(w(4, 8), w(4, 8))
-      check(C.mln_render_frame_batch_count(handle, out, diagnostic))
-      readSize(out)
-    }
-
-  /**
-   * Copies one frame-result record.
+   * Borrows the result view stored by an owned frame-result batch.
    *
    * See `mln_render_frame_batch_get` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  public fun get(indexValue: ULong): RenderFrameResult =
-    nativeCall(this, binding, "mln_render_frame_batch_get") {
-      val out = sized(48, 8)
-      check(C.mln_render_frame_batch_get(handle, indexValue.toLong(), out, diagnostic))
-      readRenderFrameResult(out)
+  public fun get(): RenderFrameBatchView =
+    nativeCall(this, binding, "mln_render_frame_batch_get", Access.READ) {
+      val out = sized(w(16, 24), w(4, 8))
+      check(C.mln_render_frame_batch_get(handle, out, diagnostic))
+      readRenderFrameBatchView(out)
     }
 
   /**
