@@ -152,7 +152,7 @@ impl RenderTarget {
                 } {
                     Ok(completion) => completion,
                     Err(error) => {
-                        close_ring(replacement, Some(gl));
+                        close_ring(*replacement, Some(gl));
                         return Err(error.into());
                     }
                 };
@@ -183,7 +183,7 @@ impl RenderTarget {
         } = self
         {
             while let Some(retired) = replacements.take_completed(session, wakes)? {
-                close_ring(retired, Some(graphics.opengl()));
+                close_ring(*retired, Some(graphics.opengl()));
             }
         }
         Ok(())
@@ -239,10 +239,10 @@ impl RenderTarget {
             } => {
                 session.close()?;
                 for retired in replacements.take_all() {
-                    close_ring(retired, gl);
+                    close_ring(*retired, gl);
                 }
                 compositor.close(gl);
-                close_ring(ring, gl);
+                close_ring(*ring, gl);
                 Ok(())
             }
             Self::Surface { session } => session.close(),
@@ -273,8 +273,8 @@ fn ring(gl: &OpenGLContext, viewport: Viewport) -> maplibre_native_ffi::Result<B
     }
 }
 
-fn close_ring(ring: Box<OpenGLRing>, gl: Option<&OpenGLContext>) {
-    for texture in *ring {
+fn close_ring(ring: OpenGLRing, gl: Option<&OpenGLContext>) {
+    for texture in ring {
         texture.close(gl);
     }
 }

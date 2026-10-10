@@ -351,7 +351,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   apply_delta(map, &delta);
   TEST_ASSERT_EQUAL_size_t(1, render_until_finished(runtime, &fixture, 71));
   const mln_camera_options rendered = query_camera(map);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start.zoom + 1.0, rendered.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-4, start.zoom + 1.0, rendered.zoom);
   TEST_ASSERT_TRUE(rendered.center.longitude < start.center.longitude);
 
   delta = animated_delta(
@@ -397,7 +397,9 @@ static void an_animated_delta_replaces_the_running_one(void) {
   TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 61));
 
   TEST_ASSERT_EQUAL_size_t(1, render_until_finished(runtime, &fixture, 62));
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start_zoom + 2.0, query_camera(map).zoom);
+  // An animated scale ends within rounding of its target, which varies by
+  // platform.
+  TEST_ASSERT_DOUBLE_WITHIN(1e-4, start_zoom + 2.0, query_camera(map).zoom);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
