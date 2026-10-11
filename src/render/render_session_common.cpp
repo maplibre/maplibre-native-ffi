@@ -893,8 +893,11 @@ auto abandon_render_session(
   mln_render_abandon_result* out_result,
   AbandonedGraphics graphics = AbandonedGraphics::DestroyWhenSafe
 ) -> mln_status;
+// Who retires the session: the host's destroy, or the disposal that already
+// released the host's handle.
+enum class DestroyCaller : std::uint8_t { Host, Disposal };
 auto destroy_render_session(
-  const std::shared_ptr<mln_render_session_object>& live
+  const std::shared_ptr<mln_render_session_object>& live, DestroyCaller caller
 ) -> mln_status;
 }  // namespace
 
@@ -2281,18 +2284,29 @@ auto render_session_projection_create(
 auto render_session_destroy(mln_render_session session) -> mln_status {
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
-  return destroy_render_session(live);
+  mln::testing::hit(mln::testing::SyncPoint::RenderDestroyLeased);
+  return destroy_render_session(live, DestroyCaller::Host);
 }
 
 namespace {
 auto destroy_render_session(
-  const std::shared_ptr<mln_render_session_object>& live
+  const std::shared_ptr<mln_render_session_object>& live, DestroyCaller caller
 ) -> mln_status {
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
   {
     auto lock = std::unique_lock{live->control_mutex};
+    // A dispose that ran after this destroy leased the session released the
+    // handle, and its teardown lane retires the session. Disposal may never
+    // start an abandonment, for example when a detach finishes first, so the
+    // wait below could last forever.
+    if (caller == DestroyCaller::Host && live->disposal_requested.load()) {
+      return report_handle_fault(
+        HandleTraits<mln_render_session_object>::kind, live->self,
+        HandleFault::Stale
+      );
+    }
     if (
       live->views_invalidated &&
       live->state != MLN_RENDER_SESSION_STATE_DETACHED
@@ -4349,7 +4363,9 @@ auto dispose_render_session(
           session.disposal_keeps_graphics ? AbandonedGraphics::Keep
                                           : AbandonedGraphics::DestroyWhenSafe
         ));
-        static_cast<void>(destroy_render_session(owned));
+        static_cast<void>(
+          destroy_render_session(owned, DestroyCaller::Disposal)
+        );
         session.disposal_owner.reset();
       } catch (...) {
         // Native destruction can allocate after admission. Preserve ownership

@@ -718,11 +718,13 @@ MLN_API mln_status mln_render_session_abandon(
  * Returns:
  * - MLN_STATUS_OK when the handle is retired.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when session has been released or is neither
- *   detached nor abandoned, or a detached session still has an acquired frame.
+ * - MLN_STATUS_INVALID_STATE when session has been released, including by a
+ *   dispose that runs during this call, or is neither detached nor abandoned,
+ *   or a detached session still has an acquired frame.
  * - MLN_STATUS_BUSY when pending abandonment still waits on a scope from
- *   mln_acquired_frame_view_begin() or on driver work. The session owner
- *   remains live.
+ *   mln_acquired_frame_view_begin() or on driver work, or the calling thread is
+ *   the one abandoning the session, as in a completion that the abandonment
+ *   delivers. The session owner remains live.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_destroy(

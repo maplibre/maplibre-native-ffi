@@ -572,6 +572,50 @@ void disposal_detaches_an_attached_core_worker_session() {
   mln_test_destroy_runtime(runtime);
 }
 
+// A destroy that leased its session before a dispose released the handle finds
+// the handle released, without waiting for the session's driver. Disposal
+// starts no abandonment when the session's detach finishes first, so a destroy
+// that waited for one could wait forever.
+void a_destroy_that_races_dispose_finds_the_handle_released() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  const auto core_worker = fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER;
+  // The detach queues behind the blocker, so the session stays detaching.
+  auto blocker = DriverBlocker{};
+  MLN_TEST_OK(blocker.submit(fixture.session));
+  if (core_worker)
+    TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
+  auto detach = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_render_session_detach(fixture.session, &detach.descriptor, nullptr)
+  );
+  sync_points.hold(SyncPoint::RenderDestroyLeased);
+  auto destroyed = std::atomic_int{MLN_STATUS_OK};
+  auto destroyer = std::thread{[&] {
+    destroyed = mln_render_session_destroy(fixture.session, nullptr);
+  }};
+  TEST_ASSERT_TRUE(
+    sync_points.wait_for_hits(SyncPoint::RenderDestroyLeased, 1)
+  );
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
+  sync_points.release(SyncPoint::RenderDestroyLeased);
+  destroyer.join();
+  MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, destroyed.load());
+  mln_test_gate_release(blocker.gate.get());
+  static_cast<void>(mln_test_completion_settle(&blocker.completion));
+  blocker.submitted = false;
+  static_cast<void>(mln_test_completion_settle(&detach));
+  TEST_ASSERT_TRUE(wake_released(released));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A session whose frame the host still holds keeps its target in the host's
 // hands, so disposal abandons it on every driver. The abandon keeps the ring,
 // and a kept Vulkan ring is a child of the host's device.
@@ -1014,6 +1058,7 @@ MLN_TEST_GROUP {
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(disposal_detaches_an_attached_core_worker_session);
   RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
+  RUN_TEST(a_destroy_that_races_dispose_finds_the_handle_released);
   RUN_TEST(finalization_abandons_an_attached_session);
   RUN_TEST(
     abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync
