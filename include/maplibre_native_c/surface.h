@@ -243,6 +243,11 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
  * ratio; the surface is replaced either way.
  *
+ * Unlike mln_render_session_resize(), this function does not set the map's
+ * size when the extent has the session's current width and height, so the map
+ * publishes no render update. The next mln_render_session_render_update()
+ * renders the map's latest render update into the replacement.
+ *
  * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
  * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR may mean a replacement was already under way, which

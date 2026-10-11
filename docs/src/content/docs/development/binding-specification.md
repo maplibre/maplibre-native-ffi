@@ -1170,26 +1170,27 @@ When the binding routes provider requests through
 
 ### Rendering
 
-| ID      | Test                                                                                                                                                      |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                           |
-| BND-161 | Render-target descriptors materialize extents, `NativePointer` resources, and `VulkanHandle` non-dispatchable handles without taking ownership.           |
-| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
-| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
-| BND-164 | `render_update` reports a result other than a rendered frame without closing the session.                                                                 |
-| BND-165 | Resize updates extent through the public render session API.                                                                                              |
-| BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                  |
-| BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.  |
-| BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
-| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
-| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |
-| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
-| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
-| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
-| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
-| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
-| BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                   |
-| BND-177 | Projection creation snapshots the rendered update, works during frame acquisition, and returns a helper that survives session/map closure.                |
+| ID      | Test                                                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                                                      |
+| BND-161 | Render-target descriptors materialize extents, `NativePointer` resources, and `VulkanHandle` non-dispatchable handles without taking ownership.                                      |
+| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape.                            |
+| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                                             |
+| BND-164 | `render_update` reports a result other than a rendered frame without closing the session.                                                                                            |
+| BND-165 | Resize updates extent through the public render session API.                                                                                                                         |
+| BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                                             |
+| BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.                             |
+| BND-199 | After `set_target` with the session's current width and height, `render_update` renders the map's latest render update into the replacement, and the map publishes no render update. |
+| BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.                                         |
+| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                                                |
+| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                                                      |
+| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                                                 |
+| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                                                          |
+| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                                                         |
+| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                                             |
+| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                                            |
+| BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                                              |
+| BND-177 | Projection creation snapshots the rendered update, works during frame acquisition, and returns a helper that survives session/map closure.                                           |
 
 ### Conditional tests
 

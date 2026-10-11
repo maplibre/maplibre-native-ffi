@@ -315,6 +315,96 @@ class MetalRenderTargetTest {
     }
   }
 
+  // BND-199: a host that renders into same-size textures in turn passes the next
+  // one to the session before each frame. If each replacement made the map publish
+  // a render update, the host would render continuously while the map is unchanged.
+
+  @Test
+  fun metalSetTargetAtTheSameSizeRendersWithoutARenderUpdate() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val texture = createMetalTexture(device, 32, 16)
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 32
+            height = 16
+          },
+        )
+      try {
+        val session =
+          map.attachMetalBorrowedTexture(
+            MetalBorrowedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              physicalWidth = 32,
+              physicalHeight = 16,
+              texture = NativePointer.ofAddress(texture.address()),
+            )
+          )
+        try {
+          map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
+          // A render update after the idle event means that the map is not idle yet.
+          var idle = false
+          repeat(10_000) {
+            if (idle) return@repeat
+            runtime.pump(1)
+            var dirty = false
+            for (event in runtime.drainEvents().events) {
+              when (event.type) {
+                RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE -> {
+                  dirty = true
+                  idle = false
+                }
+                RuntimeEventType.MAP_IDLE -> idle = true
+                else -> {}
+              }
+            }
+            if (dirty) session.renderUpdate()
+          }
+          assertTrue(idle, "the map should become idle")
+
+          val replacementTexture = createMetalTexture(device, 32, 16)
+          session.setMetalBorrowedTextureTarget(
+            MetalBorrowedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              physicalWidth = 32,
+              physicalHeight = 16,
+              texture = NativePointer.ofAddress(replacementTexture.address()),
+            )
+          )
+          // The session renders the map's latest render update into the replacement.
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+          assertTrue(
+            readMetalTextureRgba(device, replacementTexture, 32, 16).any { it != 0.toByte() },
+            "the replacement texture should have been rendered into",
+          )
+
+          repeat(10) {
+            runtime.pump(0)
+            assertTrue(
+              runtime.drainEvents().events.none {
+                it.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+              },
+              "a same-size replacement should not make the map publish a render update",
+            )
+          }
+          assertEquals(32, map.size.width)
+          assertEquals(16, map.size.height)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
   // BND-176: a borrowed texture session and a surface session reject each
   // other's set-target pairing.
 

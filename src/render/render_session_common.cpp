@@ -1194,6 +1194,9 @@ auto render_session_set_target(
     return replace_status;
   }
 
+  const bool size_changed =
+    extent.width != live->width || extent.height != live->height;
+
   // Land the session's own bookkeeping before anything that can fail again, so
   // a later failure leaves only a session waiting for the map to catch up.
   //
@@ -1218,10 +1221,14 @@ auto render_session_set_target(
   }
   ++live->generation;
 
-  const auto size_status =
-    map_post_set_size(live->map, extent.width, extent.height);
-  if (size_status != MLN_STATUS_OK) {
-    return size_status;
+  // Posting the same size again makes the map publish a redundant render
+  // update.
+  if (size_changed) {
+    const auto size_status =
+      map_post_set_size(live->map, extent.width, extent.height);
+    if (size_status != MLN_STATUS_OK) {
+      return size_status;
+    }
   }
   warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
   return MLN_STATUS_OK;

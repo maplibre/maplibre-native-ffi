@@ -3024,6 +3024,91 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
 }
 
 #[test]
+// Spec coverage: BND-199.
+fn set_target_at_the_same_size_renders_without_a_render_update() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
+
+    let extent = RenderTargetExtent::new(128, 128, 1.0);
+    let (mut texture, session) =
+        create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), extent.clone())
+            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut idle = false;
+    while Instant::now() < deadline && !idle {
+        runtime.pump(Some(Duration::from_millis(10)), None).unwrap();
+        let batch = runtime.drain_events(0).unwrap();
+        let mut dirty = false;
+        for event in batch.iter() {
+            match event.event_type() {
+                RuntimeEventType::MapRenderUpdateAvailable => {
+                    dirty = true;
+                    idle = false;
+                }
+                RuntimeEventType::MapIdle => idle = true,
+                _ => {}
+            }
+        }
+        if dirty {
+            session.render_update().unwrap();
+        }
+    }
+    assert!(idle, "the map should become idle");
+
+    // A host that renders into same-size textures in turn passes the next one
+    // to the session before each frame. If each replacement made the map
+    // publish a render update, the host would render continuously while the
+    // map is unchanged.
+    let replacement = texture.allocate_replacement(128, 128).unwrap();
+    session
+        .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+            extent,
+            128,
+            128,
+            texture.descriptor(),
+            replacement.0.get(),
+            gl_api::TEXTURE_2D,
+        ))
+        .unwrap();
+    texture.adopt(replacement, 128, 128).unwrap();
+
+    // The session renders the map's latest render update into the replacement.
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+    assert!(
+        texture
+            .read_rgba()
+            .unwrap()
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+        "the session should render into the replacement texture"
+    );
+
+    for _ in 0..10 {
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
+        let batch = runtime.drain_events(0).unwrap();
+        assert!(
+            batch
+                .iter()
+                .all(|event| event.event_type() != RuntimeEventType::MapRenderUpdateAvailable),
+            "a same-size replacement should not make the map publish a render update"
+        );
+    }
+    assert_eq!(map.size().unwrap(), (128, 128, 1.0));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-176.
 fn set_target_reports_unsupported_for_a_session_owned_texture() {
     if !has_test_owned_texture_session_backend() {
