@@ -60,6 +60,10 @@ handling another map's event.
 Runtime events also use the queue. Check the source kind before comparing a map
 handle.
 
+Each binding exposes a handle's value as the handle's ID. Compare an event's
+source with that ID. The ID stays readable after the handle closes, so a host
+can route an event that it drains later.
+
 ## Read a payload by its type
 
 An event carries its structured data inline, and the payload type names which

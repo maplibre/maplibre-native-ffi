@@ -12,6 +12,7 @@
 "LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeHandleStateTests.cs::ABorrowHoldsOffACloseFromAnotherThreadUntilItEnds"
 "LIFE-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::AnAbandonedHandleIsDisposedAndReportedAsALeak"
 "LIFE-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::AChildKeepsItsParentAlive"
+"LIFE-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::AHandleIdNamesItsEventsAndOutlivesClose"
 "COMP-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ACompletionDeliversOnceAndAFailedConversionFaultsItsTask"
 "COMP-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ARejectedSubmissionFreesItsCompletionState"
 "COMP-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ADroppedCreationTaskRetiresTheMapItCreates"

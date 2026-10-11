@@ -17,12 +17,9 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
 
     with mln.runtime_create() as runtime:
         with result(runtime.create_map()) as map_handle:
-            issued = map_handle.id
             assert not map_handle.closed
         assert map_handle.closed
         assert result(map_handle.close()) is None
-        # Events drained after close still name the handle that sent them.
-        assert map_handle.id == issued
         with pytest.raises(mln.InvalidStateError, match="^MapHandle is closed$"):
             map_handle.get_snapshot()
     assert runtime.closed
@@ -32,6 +29,17 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
     data.close()
     data.close()
     assert data.closed
+
+
+def test_a_handle_id_names_its_events_and_outlives_close(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    result(map_handle.set_style_json(EMPTY_STYLE))
+    event = harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+    assert event.source == map_handle.id
+    result(map_handle.close())
+    # A host routes events that it drains after close by the id it kept.
+    assert map_handle.id == event.source
 
 
 def test_a_refused_close_leaves_the_handle_usable(

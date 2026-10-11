@@ -121,6 +121,13 @@ def owner(bound, native, plans):
             '  @Suppress("unused") private val cleanup = trackLeak(this, binding.leakReport)'
         )
         body.append("  public val isClosed: Boolean get() = binding.isReleased()")
+    body.append(
+        "  /**\n"
+        "   * The native handle value, which runtime events report as their source. It stays readable\n"
+        "   * after close, so events drained later still match this handle.\n"
+        "   */\n"
+        "  public val id: ULong get() = binding.issued().toULong()"
+    )
     if closes and not closes.inherited:
         body.append(
             f"  public override fun close() {{ {closes.method}() }}"

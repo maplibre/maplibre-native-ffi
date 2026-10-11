@@ -28,6 +28,19 @@ public sealed class HandleLifecycleTests
     }
 
     [Fact]
+    public async Task AHandleIdNamesItsEventsAndOutlivesClose()
+    {
+        await using var fixture = await NativeFixture.CreateAsync();
+        await fixture.Map.SetStyleJsonAsync(NativeFixture.EmptyStyle, TestWaits.Token);
+        var loaded = await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+        Assert.Equal(fixture.Map.Id, loaded.Source);
+
+        await fixture.Map.CloseAsync();
+        // A host routes events that it drains after close by the id it kept.
+        Assert.Equal(loaded.Source, fixture.Map.Id);
+    }
+
+    [Fact]
     public async Task ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds()
     {
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);

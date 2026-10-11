@@ -550,8 +550,11 @@ def render_owner(native, handle, bodies, bound, ports):
         + "\n".join(fields)
         + "\n\n  /// Whether this binding object has released its native handle.\n"
         "  bool get isClosed => _state.isClosed;\n\n"
-        "  /// The issued native handle id.\n"
-        "  BigInt get identity => uint64FromNative(_state.handleId);\n\n"
+        "  /// The native handle id, which runtime events report as their source.\n"
+        "  ///\n"
+        "  /// It stays readable after close, so events drained later still match\n"
+        "  /// this handle.\n"
+        "  BigInt get id => uint64FromNative(_state.handleId);\n\n"
         + "".join(bodies)
         + "}\n"
     )

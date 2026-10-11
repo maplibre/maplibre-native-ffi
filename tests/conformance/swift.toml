@@ -16,6 +16,7 @@
 "LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"
 "LIFE-04" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::anAbandonedHandleIsDisposedOffTheCallbackStackAndReported"
 "LIFE-05" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aMapKeepsItsRuntimeAlive"
+"LIFE-06" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aHandleIdNamesItsEventsAndOutlivesClose"
 "COMP-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aCompletionDeliversOnceAndAFailedConversionIsDisposed"
 "COMP-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aRejectedSubmissionFreesItsCompletionState"
 "COMP-03" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::cancellingACreationWaitRetiresTheCreatedMap"

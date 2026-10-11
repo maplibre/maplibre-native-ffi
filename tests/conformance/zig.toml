@@ -15,6 +15,7 @@
 # disposal off the callback stack.
 "LIFE-04" = "bindings/zig/src/owner.zig::an owner abandoned inside a callback scope disposes off the callback stack"
 "LIFE-05" = "bindings/zig/tests/lifecycle.zig::a child map keeps its disposed runtime's callbacks alive"
+"LIFE-06" = "bindings/zig/tests/lifecycle.zig::a handle's raw value names its events and outlives close"
 # A Zig conversion runs in the completion callback and disposes what it built,
 # so a value that fails to convert never reaches the future; the test covers
 # the error it reports instead.

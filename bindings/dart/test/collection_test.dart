@@ -19,7 +19,7 @@ typedef _Unreachable = (int, WeakReference<RuntimeHandle>);
 /// Checks that native knows [runtime] while this still holds it: once the
 /// caller drops it, any allocation may collect it.
 _Unreachable _unreachable(RuntimeHandle runtime) {
-  final identity = runtime.identity.toSigned(64).toInt();
+  final identity = runtime.id.toSigned(64).toInt();
   expect(_runtimeIsLive(identity), isTrue);
   return (identity, WeakReference(runtime));
 }
@@ -30,7 +30,7 @@ _Unreachable _unreachableRuntimeWithWake() {
     RuntimeOptions(
       eventWake: Wake(
         callback: () {
-          runtime.identity;
+          runtime.id;
         },
       ),
     ),
@@ -42,7 +42,7 @@ Future<_Unreachable> _unreachableRuntimeWithProvider() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
   await runtime.setResourceProvider(
     routedProvider([styleRoute('capture://style')], (_, request) {
-      runtime.identity;
+      runtime.id;
       request.close();
     }),
   );

@@ -46,11 +46,7 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
 	state.mapRef = mapHandle
-	state.mapID, err = mapHandle.Id()
-	if err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("map identity read failed: %w", err)
-	}
+	state.mapID = mapHandle.Id()
 	if smoke {
 		_, err = mapHandle.SetStyleJson([]byte(smokeStyle))
 	} else {

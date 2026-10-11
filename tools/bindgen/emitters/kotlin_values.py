@@ -136,6 +136,26 @@ def literal(number, typ):
     return str(number)
 
 
+def content_equality(public, members):
+    """The class body that makes a data class compare its ByteArray members by content.
+
+    A data class compares an array member by identity, so a class with one replaces the equals and
+    hashCode that the compiler derives. A deep array comparison keeps the derived semantics for
+    every other member, including the total order of floating-point values. Other classes keep the
+    derived members and get no body.
+    """
+    if not any(typ.rstrip("?") == "ByteArray" for _, typ in members):
+        return ""
+    names = ", ".join(member for member, _ in members)
+    return (
+        " {\n"
+        f"  private fun contentFields(): Array<Any?> = arrayOf({names})\n"
+        f"  override fun equals(other: Any?): Boolean = this === other || other is {public} && contentFields().contentDeepEquals(other.contentFields())\n"
+        "  override fun hashCode(): Int = contentFields().contentDeepHashCode()\n"
+        "}"
+    )
+
+
 class Values:
     def __init__(self, bound):
         self.bound = bound
@@ -392,12 +412,18 @@ class Values:
                 union_name = public + pascal(field.name)
                 variants = [
                     f"{doc(self.bound, f'{field.value.native}.{v.name}', '  ')}  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
+                    + content_equality(
+                        pascal(v.name), [("value", self.public(v.value))]
+                    )
                     for v in field.value.fields
                 ]
                 if field.value.empty_variant:
                     variants.append(f"  public data object None: {union_name}")
                 variants.append(
                     f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {union_name}"
+                    + content_equality(
+                        "Unknown", [("tag", "UInt"), ("bytes", "ByteArray")]
+                    )
                 )
                 result.append(
                     f"{doc(self.bound, field.value.native)}public sealed interface {union_name} {{\n"
@@ -405,7 +431,9 @@ class Values:
                     + "\n}"
                 )
             args = []
+            typed = []
             for member, typ, field in self.members(value):
+                typed.append((member, typ))
                 default = "null" if typ.endswith("?") else self.field_default(field)
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
@@ -414,6 +442,12 @@ class Values:
                 )
             if value.native in self.item_buffers:
                 arena = self.item_buffers[value.native]
+                typed.append(
+                    (
+                        identifier(arena.field),
+                        "String" if arena.encoding == "utf8" else "ByteArray",
+                    )
+                )
                 args.append(
                     f"  public val {identifier(arena.field)}: "
                     + (
@@ -425,6 +459,9 @@ class Values:
             args.extend(
                 f"{doc(self.bound, flag.name, '  ')}  public val {self.flag_name(value, flag)}: Boolean = false"
                 for flag in value.mask_flags
+            )
+            typed.extend(
+                (self.flag_name(value, flag), "Boolean") for flag in value.mask_flags
             )
             if value.native in self.views:
                 args = [arg.replace("public val ", "") for arg in args]
@@ -444,10 +481,15 @@ class Values:
                     f"{doc(self.bound, value.native)}public data class {public}(\n"
                     + ",\n".join(args)
                     + "\n)"
+                    + content_equality(public, typed)
                 )
         for public, (field, value) in self.attachments.items():
             result.append(
                 f"public data class {public}(public val {field}: {self.public(value)}, public val ready: kotlinx.coroutines.Deferred<Unit>)"
+                + content_equality(
+                    public,
+                    [(field, self.public(value)), ("ready", "Deferred")],
+                )
             )
         for public, fields in self.multiple.items():
             result.append(
@@ -457,6 +499,9 @@ class Values:
                     for field, value in fields
                 )
                 + "\n)"
+                + content_equality(
+                    public, [(field, self.public(value)) for field, value in fields]
+                )
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 

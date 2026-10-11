@@ -65,6 +65,9 @@ pub fn Handle(comptime name: []const u8, comptime public: []const u8, comptime d
         pub const type_name = public;
         var mutex: std.Io.Mutex = .init;
         var registry: std.AutoHashMapUnmanaged(u64, *State) = .empty;
+        /// The native handle value, which runtime events report as their
+        /// source. A close leaves it in place, so events drained later still
+        /// match this handle.
         raw: u64,
 
         fn lock() void {
