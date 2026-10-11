@@ -487,7 +487,13 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
     &fixture, animated_change_recorded, NULL,
     "the ease never reported its final camera change"
   ));
-  // Destroying the map ends its events, so the recorder is read unshared.
+  // Events still queued when the map is destroyed have no snapshot to read, so
+  // the checks cover the events drained while the map lived.
+  recorder_drain();
+  recorder_lock();
+  atomic_store(&recorder.map, MLN_HANDLE_NULL);
+  const size_t live_events = recorder.count;
+  recorder_unlock();
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
@@ -496,7 +502,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   size_t loading_finished = 0;
   size_t idle = 0;
   const recorded_event* final_change = NULL;
-  for (size_t index = 0; index < recorder.count; index += 1) {
+  for (size_t index = 0; index < live_events; index += 1) {
     const recorded_event* event = &recorder.events[index];
     if (event->source != map) continue;
     switch (event->type) {
