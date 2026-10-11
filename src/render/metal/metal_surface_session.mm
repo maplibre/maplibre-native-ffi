@@ -412,6 +412,13 @@ auto metal_surface_set_target_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
   const auto copied = *descriptor;
   auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
   auto device =

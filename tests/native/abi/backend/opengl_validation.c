@@ -335,6 +335,7 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(opengl_surface),
+    MLN_TEST_OVERFLOW_CASE(opengl_surface),
     {"no drawable", surface_without_its_drawable, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_OPENGL)

@@ -241,6 +241,7 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(metal_surface),
+    MLN_TEST_OVERFLOW_CASE(metal_surface),
     {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,

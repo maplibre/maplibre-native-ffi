@@ -1021,7 +1021,8 @@ auto enqueue_borrowed_texture_retarget(
 // Queues the replacement of a surface for render_session_set_target(). A
 // surface's physical size follows from its logical extent rather than being
 // stated by the caller. The per-backend entry point validates its own
-// descriptor first, and `replace` owns a copy of it.
+// descriptor and that physical size first, since the submission resizes the
+// map, and `replace` owns a copy of the descriptor.
 auto enqueue_surface_retarget(
   mln_render_session session, const mln_logical_extent& extent,
   RenderTargetReplacer replace, const mln_completion* completion,

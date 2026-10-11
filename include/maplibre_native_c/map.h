@@ -1073,14 +1073,15 @@ MLN_API mln_status mln_map_get_snapshot(
  * extent.scale_factor must equal the scale factor the map was created with;
  * only width and height may change. A render session sizes the map to its
  * target: attaching a target, replacing it, and mln_render_session_resize()
- * each submit this command with the target's width and height. A replacement
- * that the driver then refuses leaves the map at the size that it named. While
- * a render session is attached, size the map through the session; a direct map
+ * each submit this command with the target's width and height when the call
+ * is accepted. An attach that then fails, or a replacement that the driver
+ * then refuses, leaves the map at the size that the target named. While a
+ * render session is attached, size the map through the session; a direct map
  * resize to a different extent leaves the session waiting for an update that
- * the map never publishes. The completion reports terminal
- * disposition and the snapshot generation that the resize published. A
- * resize that a later one replaces before the worker runs it completes as
- * superseded.
+ * the map never publishes. The completion reports terminal disposition and
+ * the snapshot generation that the resize published. A resize that a later
+ * one replaces before the worker runs it completes as superseded, including a
+ * resize that an attach replaces.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.

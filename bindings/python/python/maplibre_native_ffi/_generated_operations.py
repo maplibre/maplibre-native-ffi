@@ -1864,11 +1864,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.request_frame(demand)
 
     def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
-        """Starts an ordered logical resize. The completion runs after the
-        selected driver applies the extent and updates the map viewport. On a
-        static or tile map, which publishes a render update only for a still
-        image, the driver applies the extent without waiting for the map, and
-        the next still image renders at it.
+        """Starts an ordered logical resize, which also resizes the map. On a
+        continuous map, the completion runs after the map's viewport takes
+        the new extent and the selected driver applies it. A static or tile
+        map publishes a render update only for a still image, so on those
+        maps the driver applies the extent without waiting for the map's
+        viewport, and the next still image renders at the new extent.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

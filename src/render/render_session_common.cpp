@@ -1886,11 +1886,12 @@ auto render_session_set_target(
 
 namespace {
 
-// Queues a target replacement and sizes the map to the replacement's extent,
-// in submission order with session resizes, which size it the same way. The
-// map heads for that extent from here, so a resize accepted earlier is
-// superseded, and the snapshot reports the applied extent until the
-// replacement runs.
+// Queues a target replacement and sizes the map to the replacement's extent.
+// Submissions from one thread size the map in the order they were made, along
+// with session resizes, which size it the same way; submissions that race from
+// two threads can post their map resizes in the other order. The map heads for
+// the extent from here, so a resize accepted earlier is superseded, and the
+// snapshot reports the applied extent until the replacement runs.
 auto submit_retarget(
   mln_render_session session, const mln_logical_extent& extent,
   RenderDriverCallable work, const mln_completion* completion,
@@ -1982,13 +1983,6 @@ auto enqueue_surface_retarget(
   return submit_retarget(
     session, extent,
     [extent, replace = std::move(replace)](mln_render_session_object& target) {
-      const auto physical_status = validate_physical_size(
-        extent.width, extent.height, extent.scale_factor,
-        "scaled surface dimensions are too large"
-      );
-      if (physical_status != MLN_STATUS_OK) {
-        return physical_status;
-      }
       return render_session_set_target(
         target.self, RetargetTargetKind::Surface, extent,
         physical_dimension(extent.width, extent.scale_factor),
@@ -3562,16 +3556,39 @@ auto make_ordered_resize_work(
     [session, operation, extent, ticket]() {
       // A resize the host replaced before the driver reached it is done: the
       // map is heading for the newer extent, so waiting for this one would
-      // park the whole queue behind an update that never arrives.
-      auto superseded = false;
-      auto detaching = false;
+      // park the whole queue behind an update that never arrives. A resize
+      // that runs once detach has started fails. Otherwise the resize waits
+      // for the map's update at the new extent. A static or tile map
+      // publishes an update only for a still image, so there the resize
+      // applies at once, and the next still image renders at the new extent.
+      // One lock covers all three decisions, so a detach or a newer
+      // submission cannot slip in between a check and the wait.
+      enum class Next { Superseded, Detaching, Wait, Apply };
+      const auto continuous = map_is_continuous(session->map);
+      auto next = Next::Apply;
       {
         const auto lock = std::scoped_lock{session->control_mutex};
-        superseded = ticket != session->resize_submission;
-        detaching = session->state != MLN_RENDER_SESSION_STATE_ATTACHED;
-        if (detaching && !superseded) session->pending_extent.reset();
+        if (ticket != session->resize_submission) {
+          next = Next::Superseded;
+        } else if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
+          session->pending_extent.reset();
+          next = Next::Detaching;
+        } else if (continuous) {
+          const auto update = map_latest_update(session->map);
+          if (
+            !update || update->transformState.getSize() !=
+                         mln::Size{extent.width, extent.height}
+          ) {
+            session->waiting_update_work.push_back(
+              make_ordered_resize_work(session, operation, extent, ticket)
+            );
+            splice_work(session->driver_work, session->waiting_update_work);
+            next = Next::Wait;
+          }
+        }
       }
-      if (superseded) {
+      if (next == Next::Wait) return;
+      if (next == Next::Superseded) {
         operation->complete(
           MLN_STATUS_OK, {},
           std::any{
@@ -3580,31 +3597,12 @@ auto make_ordered_resize_work(
         );
         return;
       }
-      if (detaching) {
+      if (next == Next::Detaching) {
         operation->complete(
           MLN_STATUS_INVALID_STATE,
           "render session detached before the resize applied", {}
         );
         return;
-      }
-      // The resize waits for the map's update at the new extent. A static or
-      // tile map publishes an update only for a still image, so there the
-      // resize applies at once, and the next still image renders at the new
-      // extent.
-      const auto map_behind = [&]() {
-        const auto update = map_latest_update(session->map);
-        return !update || update->transformState.getSize() !=
-                            mln::Size{extent.width, extent.height};
-      };
-      if (map_is_continuous(session->map) && map_behind()) {
-        const auto lock = std::scoped_lock{session->control_mutex};
-        if (map_behind()) {
-          session->waiting_update_work.push_back(
-            make_ordered_resize_work(session, operation, extent, ticket)
-          );
-          splice_work(session->driver_work, session->waiting_update_work);
-          return;
-        }
       }
       const auto physical_width =
         physical_dimension(extent.width, extent.scale_factor);

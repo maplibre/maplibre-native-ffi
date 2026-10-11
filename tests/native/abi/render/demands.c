@@ -399,7 +399,9 @@ static void attaching_sizes_the_map_to_the_target(void) {
 
 // A resize waits for the map's update at the new extent, which an open command
 // group holds. Detach ends that wait rather than waiting for the group: the
-// resize fails, since the session detaches before it applies.
+// resize fails, since the session detaches before it applies. A caller driver
+// starts the resize waiting before the detach; a core worker may instead reach
+// the resize after the detach starts, which ends the same way.
 static void detach_ends_a_resize_that_waits_for_the_map(void) {
   mln_runtime runtime;
   mln_map map;
@@ -414,6 +416,7 @@ static void detach_ends_a_resize_that_waits_for_the_map(void) {
     (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
     &resize.descriptor, NULL
   ));
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)

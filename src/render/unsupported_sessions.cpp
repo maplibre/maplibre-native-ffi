@@ -148,6 +148,11 @@ auto metal_surface_set_target_start(
     status != MLN_STATUS_OK
   )
     return status;
+  if (
+    const auto status = validate_surface_extent(descriptor->extent);
+    status != MLN_STATUS_OK
+  )
+    return status;
   return unsupported("Metal surface sessions are not supported by this build");
 }
 #endif
@@ -257,6 +262,11 @@ auto vulkan_surface_set_target_start(
     status != MLN_STATUS_OK
   )
     return status;
+  if (
+    const auto status = validate_surface_extent(descriptor->extent);
+    status != MLN_STATUS_OK
+  )
+    return status;
   return unsupported("Vulkan surface sessions are not supported by this build");
 }
 #endif
@@ -347,6 +357,11 @@ auto opengl_surface_set_target_start(
 ) -> mln_status {
   if (
     const auto status = validate_opengl_surface_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
@@ -475,6 +490,11 @@ auto webgpu_surface_set_target_start(
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
