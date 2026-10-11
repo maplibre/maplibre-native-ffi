@@ -572,12 +572,19 @@ mln_test_graphics* mln_test_render_fixture_graphics(
 mln_test_graphics_texture* mln_test_render_fixture_new_texture(
   const mln_test_render_fixture* fixture
 ) {
+  return mln_test_render_fixture_new_sized_texture(
+    fixture, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+  );
+}
+
+mln_test_graphics_texture* mln_test_render_fixture_new_sized_texture(
+  const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
+) {
   host_state* state = fixture->backend_state;
   for (size_t index = 0; state != NULL && index < EXTRA_TARGETS; index += 1) {
     if (state->extra_textures[index] == NULL) {
-      state->extra_textures[index] = mln_test_graphics_texture_create(
-        state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-      );
+      state->extra_textures[index] =
+        mln_test_graphics_texture_create(state->graphics, width, height);
       if (state->extra_textures[index] == NULL) {
         report("the render fixture could not create another texture");
       }
@@ -590,12 +597,19 @@ mln_test_graphics_texture* mln_test_render_fixture_new_texture(
 mln_test_graphics_surface* mln_test_render_fixture_new_surface(
   const mln_test_render_fixture* fixture
 ) {
+  return mln_test_render_fixture_new_sized_surface(
+    fixture, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+  );
+}
+
+mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
+  const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
+) {
   host_state* state = fixture->backend_state;
   for (size_t index = 0; state != NULL && index < EXTRA_TARGETS; index += 1) {
     if (state->extra_surfaces[index] == NULL) {
-      state->extra_surfaces[index] = mln_test_graphics_surface_create(
-        state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-      );
+      state->extra_surfaces[index] =
+        mln_test_graphics_surface_create(state->graphics, width, height);
       if (state->extra_surfaces[index] == NULL) {
         report("the render fixture could not create another surface");
       }

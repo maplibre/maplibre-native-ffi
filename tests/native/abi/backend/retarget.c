@@ -586,11 +586,10 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   );
 
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
-  mln_test_graphics_texture* texture = NULL;
-  mln_test_graphics_surface* surface = NULL;
   mln_test_completion completion = mln_test_completion_default(0);
   if (kind == TARGET_SURFACE) {
-    surface = mln_test_graphics_surface_create(graphics, width, height);
+    mln_test_graphics_surface* surface =
+      mln_test_render_fixture_new_sized_surface(fixture, width, height);
     TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
@@ -600,7 +599,8 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
       mln_test_last_error()
     );
   } else {
-    texture = mln_test_graphics_texture_create(graphics, width, height);
+    mln_test_graphics_texture* texture =
+      mln_test_render_fixture_new_sized_texture(fixture, width, height);
     TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
@@ -621,8 +621,6 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
   );
   close_map(&map);
-  mln_test_graphics_texture_destroy(texture);
-  mln_test_graphics_surface_destroy(surface);
 }
 
 static void a_borrowed_retarget_sizes_the_map(void) {

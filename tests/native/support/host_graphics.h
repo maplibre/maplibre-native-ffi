@@ -121,13 +121,21 @@ mln_test_graphics* mln_test_render_fixture_graphics(
 
 // Creates another texture or surface of the host size on the fixture's
 // graphics object, for a case to hand the session. The fixture destroys it
-// after its session, and holds two of each at most. Returns null when the
-// graphics object cannot create one or the fixture holds two already.
+// after its session and before its graphics object, and holds two of each at
+// most. Returns null when the graphics object cannot create one or the fixture
+// holds two already.
 mln_test_graphics_texture* mln_test_render_fixture_new_texture(
   const mln_test_render_fixture* fixture
 );
 mln_test_graphics_surface* mln_test_render_fixture_new_surface(
   const mln_test_render_fixture* fixture
+);
+// The same, at `width` by `height` pixels.
+mln_test_graphics_texture* mln_test_render_fixture_new_sized_texture(
+  const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
+);
+mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
+  const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
 );
 
 // Submits the backend's borrowed-texture or surface set_target for the
