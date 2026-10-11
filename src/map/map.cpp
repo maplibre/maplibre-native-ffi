@@ -3798,6 +3798,11 @@ auto map_scale_factor(mln_map map) -> double {
                          : live->logical_extent.scale_factor;
 }
 
+auto map_is_continuous(mln_map map) -> bool {
+  const auto* live = handle_table<MapObject>().try_resolve(map);
+  return live != nullptr && live->map_mode == MLN_MAP_MODE_CONTINUOUS;
+}
+
 auto map_native(MapObject& map) -> mln::Map& { return *map.map; }
 
 namespace {
@@ -3815,11 +3820,20 @@ auto discarded_completion() noexcept -> mln_completion {
 
 }  // namespace
 
-// Render-session resize enters the same ordered extent command as public
-// resize, so one path owns logical extent and scale after map creation.
-auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status {
+// A render session sizes its map through the same ordered extent command as
+// public resize, so one path owns the logical extent after map creation. The
+// map keeps the scale factor it was created with, which may differ from the
+// session's.
+auto map_post_resize(mln_map map, uint32_t width, uint32_t height)
+  -> mln_status {
   const auto completion = discarded_completion();
-  return map_resize(map, extent, &completion);
+  return map_resize(
+    map,
+    mln_logical_extent{
+      .width = width, .height = height, .scale_factor = map_scale_factor(map)
+    },
+    &completion
+  );
 }
 
 auto map_post_trigger_repaint(mln_map map) -> mln_status {

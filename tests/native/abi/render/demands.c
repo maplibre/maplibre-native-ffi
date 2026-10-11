@@ -369,6 +369,66 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   detach(runtime, map, &fixture);
 }
 
+static void expect_map_size(mln_map map, uint32_t width, uint32_t height) {
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  TEST_ASSERT_EQUAL_UINT32(width, snapshot.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(height, snapshot.logical_extent.height);
+}
+
+// Attaching sizes the map to the target, so the first frame renders without
+// the host resizing the map.
+static void attaching_sizes_the_map_to_the_target(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent =
+    (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0};
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  // The barrier completes after the resize that the attach submitted.
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  expect_map_size(map, 64, 64);
+
+  mln_test_render_request_forced(&fixture, 701);
+  const mln_render_frame_result result = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  detach(runtime, map, &fixture);
+}
+
+// A resize waits for the map's update at the new extent, which an open command
+// group holds. Detach ends that wait rather than waiting for the group: the
+// resize fails, since the session detaches before it applies.
+static void detach_ends_a_resize_that_waits_for_the_map(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  MLN_TEST_AWAIT_OK(
+    mln_map_begin_command_group(map, &completion.descriptor, NULL)
+  );
+  mln_test_completion resize = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session,
+    (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+    &resize.descriptor, NULL
+  ));
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&resize, -1));
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE, mln_test_completion_status(&resize)
+  );
+  mln_test_completion_destroy(&resize);
+  MLN_TEST_AWAIT_OK(
+    mln_map_end_command_group(map, &completion.descriptor, NULL)
+  );
+  detach(runtime, map, &fixture);
+}
+
 typedef struct keepalive_wait {
   const mln_test_render_fixture* fixture;
   mln_test_completion* still;
@@ -559,6 +619,8 @@ MLN_TEST_GROUP {
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
   RUN_TEST(resizes_order_extent_generations_and_supersede_each_other);
   RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
+  RUN_TEST(attaching_sizes_the_map_to_the_target);
+  RUN_TEST(detach_ends_a_resize_that_waits_for_the_map);
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
   RUN_TEST(a_waiting_demand_renders_the_next_map_update);
   RUN_TEST(a_waiting_demand_ends_by_supersession_barrier_or_detach);

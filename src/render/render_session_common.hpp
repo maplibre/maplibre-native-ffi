@@ -996,7 +996,8 @@ using RenderTargetReplacer =
 // live, attached, owned by this thread, and of the kind the descriptor targets,
 // then calls `replace`. On success the session takes the new extent and the
 // renderer is kept unless the scale factor changed. The per-backend entry point
-// validates its own descriptor first.
+// validates its own descriptor first. The submissions below queue it, and size
+// the map to the new extent as they do.
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
   const mln_logical_extent& extent, uint32_t physical_width,
@@ -1017,11 +1018,14 @@ auto enqueue_borrowed_texture_retarget(
   const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status;
 
-// render_session_set_target() for a surface, whose physical size follows from
-// its logical extent rather than being stated by the caller.
-auto surface_session_set_target(
+// Queues the replacement of a surface for render_session_set_target(). A
+// surface's physical size follows from its logical extent rather than being
+// stated by the caller. The per-backend entry point validates its own
+// descriptor first, and `replace` owns a copy of it.
+auto enqueue_surface_retarget(
   mln_render_session session, const mln_logical_extent& extent,
-  const RenderTargetReplacer& replace
+  RenderTargetReplacer replace, const mln_completion* completion,
+  ValuelessCompletion valueless
 ) -> mln_status;
 auto render_session_projection_create(
   mln_render_session session, mln_map_projection* out_projection

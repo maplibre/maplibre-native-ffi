@@ -438,7 +438,10 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Starts an ordered logical resize. The completion runs after the selected
-    /// driver applies the extent and updates the map viewport.
+    /// driver applies the extent and updates the map viewport. On a static or
+    /// tile map, which publishes a render update only for a still image, the
+    /// driver applies the extent without waiting for the map, and the next
+    /// still image renders at it.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_resize</c> in the <see

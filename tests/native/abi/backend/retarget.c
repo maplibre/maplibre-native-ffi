@@ -1,6 +1,7 @@
 // Retargeting a session: a borrowed texture or surface that the host replaces
-// through its backend's set_target, and the replacements a session refuses.
-// Every refusal leaves the session rendering into its old target.
+// through its backend's set_target, which sizes the map to the replacement,
+// and the replacements a session refuses. Every refusal leaves the session
+// rendering into its old target.
 //
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
@@ -572,6 +573,66 @@ static void a_surface_retarget_presents_through_the_new_surface(void) {
   close_map(&map);
 }
 
+// A replacement sizes the map to its own extent, so the first frame after it
+// renders without the host resizing the map.
+static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
+  enum { width = 48, height = 40 };
+  retarget_map map = {0};
+  open_map(kind, &map);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  const uint32_t flags = kind == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
+  );
+
+  mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
+  mln_test_graphics_texture* texture = NULL;
+  mln_test_graphics_surface* surface = NULL;
+  mln_test_completion completion = mln_test_completion_default(0);
+  if (kind == TARGET_SURFACE) {
+    surface = mln_test_graphics_surface_create(graphics, width, height);
+    TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_surface(
+        fixture, graphics, surface, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  } else {
+    texture = mln_test_graphics_texture_create(graphics, width, height);
+    TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
+    restore_fixture_context(fixture);
+    MLN_TEST_OK_MESSAGE(
+      mln_test_render_fixture_set_textures(
+        fixture, graphics, &texture, 1, &completion.descriptor
+      ),
+      mln_test_last_error()
+    );
+  }
+  finish(fixture, &completion, MLN_STATUS_OK, "the replacement");
+  // The barrier completes after the resize that the replacement submitted.
+  MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map.map, &snapshot, NULL));
+  TEST_ASSERT_EQUAL_UINT32(width, snapshot.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(height, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
+  );
+  close_map(&map);
+  mln_test_graphics_texture_destroy(texture);
+  mln_test_graphics_surface_destroy(surface);
+}
+
+static void a_borrowed_retarget_sizes_the_map(void) {
+  a_retarget_sizes_the_map_to_the_new_target(TARGET_BORROWED);
+}
+
+static void a_surface_retarget_sizes_the_map(void) {
+  a_retarget_sizes_the_map_to_the_new_target(TARGET_SURFACE);
+}
+
 // Where a replacement comes from.
 enum target_origin {
   // The graphics object the session attached with.
@@ -823,6 +884,8 @@ MLN_TEST_GROUP {
   RUN_TEST(frames_published_before_a_retarget_cannot_be_acquired);
   RUN_TEST(a_borrowed_retarget_renders_a_waiting_demand);
   RUN_TEST(a_surface_retarget_presents_through_the_new_surface);
+  RUN_TEST(a_borrowed_retarget_sizes_the_map);
+  RUN_TEST(a_surface_retarget_sizes_the_map);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);
 #endif
 }

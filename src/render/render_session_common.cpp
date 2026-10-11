@@ -1676,6 +1676,11 @@ auto start_attach_render_session(
     async.completion->accept();
     push_driver_work_locked(*session, std::move(attach_work), wakes);
   }
+  // The map takes the target's width and height, ahead of any command that
+  // the host submits once this returns.
+  static_cast<void>(
+    map_post_resize(session->map, session->width, session->height)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -1874,11 +1879,42 @@ auto render_session_set_target(
     resume_update_waiting_demands_locked(*live, wakes);
   }
 
-  // Target replacement changes only the graphics resource. Map creation and
-  // explicit resize commands remain the sole extent authorities.
+  // The submission already sized the map to this extent.
   warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
   return MLN_STATUS_OK;
 }
+
+namespace {
+
+// Queues a target replacement and sizes the map to the replacement's extent,
+// in submission order with session resizes, which size it the same way. The
+// map heads for that extent from here, so a resize accepted earlier is
+// superseded, and the snapshot reports the applied extent until the
+// replacement runs.
+auto submit_retarget(
+  mln_render_session session, const mln_logical_extent& extent,
+  RenderDriverCallable work, const mln_completion* completion,
+  const ValuelessCompletion& valueless, RenderDriverAdmission admit
+) -> mln_status {
+  auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
+  auto map = mln_map{MLN_HANDLE_NULL};
+  admit.commit =
+    [&map, commit = std::move(admit.commit)](mln_render_session_object& live) {
+      if (commit) commit(live);
+      ++live.resize_submission;
+      live.pending_extent.reset();
+      map = live.map;
+    };
+  const auto status = submit_driver_work(
+    session, completion, std::move(deliver), make_work, admit
+  );
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(map_post_resize(map, extent.width, extent.height));
+  }
+  return status;
+}
+
+}  // namespace
 
 auto enqueue_borrowed_texture_retarget(
   mln_render_session session, std::size_t texture_count,
@@ -1886,7 +1922,8 @@ auto enqueue_borrowed_texture_retarget(
   uint32_t physical_height, RenderTargetReplacer replace,
   const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
-  auto [deliver, make_work] = valueless_driver_work(
+  return submit_retarget(
+    session, extent,
     [extent, physical_width, physical_height,
      replace = std::move(replace)](mln_render_session_object& target) {
       // Acquisition resumes once the replacement has run, whatever it
@@ -1908,10 +1945,7 @@ auto enqueue_borrowed_texture_retarget(
         physical_width, physical_height, replace
       );
     },
-    valueless
-  );
-  return submit_driver_work(
-    session, completion, std::move(deliver), make_work,
+    completion, valueless,
     RenderDriverAdmission{
       .check =
         [texture_count](const mln_render_session_object& live) {
@@ -1940,21 +1974,28 @@ auto enqueue_borrowed_texture_retarget(
   );
 }
 
-auto surface_session_set_target(
+auto enqueue_surface_retarget(
   mln_render_session session, const mln_logical_extent& extent,
-  const RenderTargetReplacer& replace
+  RenderTargetReplacer replace, const mln_completion* completion,
+  ValuelessCompletion valueless
 ) -> mln_status {
-  const auto physical_status = validate_physical_size(
-    extent.width, extent.height, extent.scale_factor,
-    "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  return render_session_set_target(
-    session, RetargetTargetKind::Surface, extent,
-    physical_dimension(extent.width, extent.scale_factor),
-    physical_dimension(extent.height, extent.scale_factor), replace
+  return submit_retarget(
+    session, extent,
+    [extent, replace = std::move(replace)](mln_render_session_object& target) {
+      const auto physical_status = validate_physical_size(
+        extent.width, extent.height, extent.scale_factor,
+        "scaled surface dimensions are too large"
+      );
+      if (physical_status != MLN_STATUS_OK) {
+        return physical_status;
+      }
+      return render_session_set_target(
+        target.self, RetargetTargetKind::Surface, extent,
+        physical_dimension(extent.width, extent.scale_factor),
+        physical_dimension(extent.height, extent.scale_factor), replace
+      );
+    },
+    completion, valueless, {}
   );
 }
 
@@ -3523,9 +3564,12 @@ auto make_ordered_resize_work(
       // map is heading for the newer extent, so waiting for this one would
       // park the whole queue behind an update that never arrives.
       auto superseded = false;
+      auto detaching = false;
       {
         const auto lock = std::scoped_lock{session->control_mutex};
         superseded = ticket != session->resize_submission;
+        detaching = session->state != MLN_RENDER_SESSION_STATE_ATTACHED;
+        if (detaching && !superseded) session->pending_extent.reset();
       }
       if (superseded) {
         operation->complete(
@@ -3536,17 +3580,25 @@ auto make_ordered_resize_work(
         );
         return;
       }
-      auto update = map_latest_update(session->map);
-      if (
-        !update || update->transformState.getSize() !=
-                     mln::Size{extent.width, extent.height}
-      ) {
+      if (detaching) {
+        operation->complete(
+          MLN_STATUS_INVALID_STATE,
+          "render session detached before the resize applied", {}
+        );
+        return;
+      }
+      // The resize waits for the map's update at the new extent. A static or
+      // tile map publishes an update only for a still image, so there the
+      // resize applies at once, and the next still image renders at the new
+      // extent.
+      const auto map_behind = [&]() {
+        const auto update = map_latest_update(session->map);
+        return !update || update->transformState.getSize() !=
+                            mln::Size{extent.width, extent.height};
+      };
+      if (map_is_continuous(session->map) && map_behind()) {
         const auto lock = std::scoped_lock{session->control_mutex};
-        update = map_latest_update(session->map);
-        if (
-          !update || update->transformState.getSize() !=
-                       mln::Size{extent.width, extent.height}
-        ) {
+        if (map_behind()) {
           session->waiting_update_work.push_back(
             make_ordered_resize_work(session, operation, extent, ticket)
           );
@@ -3669,15 +3721,7 @@ auto render_session_resize_start(
     // the first new-size frame when the host next acquires the oldest result.
     invalidate_unacquired_texture_frames_locked(*live);
   }
-  // The map's scale factor is fixed at creation and may differ from the
-  // session's, so the map takes the new size at its own scale.
-  const auto post = map_post_resize(
-    live->map, mln_logical_extent{
-                 .width = extent.width,
-                 .height = extent.height,
-                 .scale_factor = map_scale_factor(live->map),
-               }
-  );
+  const auto post = map_post_resize(live->map, extent.width, extent.height);
   if (post != MLN_STATUS_OK) {
     {
       // No driver work will clear the extent the snapshot is already
@@ -3902,6 +3946,10 @@ auto render_session_detach_start(
     live->state = MLN_RENDER_SESSION_STATE_DETACHING;
     ++live->barrier_epoch;
     ++live->generation;
+    // A resize that waits for the map holds back the work behind it. Detach
+    // ends that wait: the resize finds the session detaching and fails, and
+    // the work behind it runs ahead of the detach.
+    splice_work(live->waiting_update_work, live->driver_work);
     // The work is queued under the lock that marks the session detaching. An
     // abandon that takes the lock later finds the work in the queue and
     // completes it as abandoned; one queued after the abandon emptied the

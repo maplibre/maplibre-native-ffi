@@ -577,14 +577,10 @@ auto opengl_surface_set_target_start(
     return descriptor_status;
   }
   const auto copied = *descriptor;
-  return enqueue_driver_operation(
-    session,
-    [copied](mln_render_session_object& target) {
-      return surface_session_set_target(
-        target.self, copied.extent, [&copied](mln_render_session_object& live) {
-          return live.surface.backend->set_opengl_target(copied);
-        }
-      );
+  return enqueue_surface_retarget(
+    session, copied.extent,
+    [copied](mln_render_session_object& live) {
+      return live.surface.backend->set_opengl_target(copied);
     },
     completion,
     valueless_completion<&mln_render_session_set_opengl_surface_target>()

@@ -241,7 +241,7 @@ typedef mln_opengl_surface_descriptor surface_descriptor;
 #endif
 
 // Describes `textures`, which the graphics object with `context` created, as a
-// borrowed ring of the host size. The descriptor's array points at `entries`,
+// borrowed ring of their size. The descriptor's array points at `entries`,
 // which has room for `count` entries.
 static bool describe_ring(
   const mln_test_graphics_context* context,
@@ -283,7 +283,9 @@ static bool describe_ring(
   out->textures = entries;
   out->texture_count = count;
   // Physical and logical sizes agree at a scale factor of 1.
-  out->extent = host_extent();
+  out->extent = (mln_logical_extent){
+    .width = info.width, .height = info.height, .scale_factor = 1.0
+  };
   out->physical_width = info.width;
   out->physical_height = info.height;
   return true;
@@ -308,7 +310,9 @@ static bool describe_surface(
   *out = mln_opengl_surface_descriptor_default();
   out->surface = info.opengl_surface;
 #endif
-  out->extent = host_extent();
+  out->extent = (mln_logical_extent){
+    .width = info.width, .height = info.height, .scale_factor = 1.0
+  };
   out->context = host_context(context);
   return true;
 }

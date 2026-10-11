@@ -469,7 +469,10 @@ MLN_API void mln_acquired_frame_view_end(
 
 /**
  * Starts an ordered logical resize. The completion runs after the selected
- * driver applies the extent and updates the map viewport.
+ * driver applies the extent and updates the map viewport. On a static or tile
+ * map, which publishes a render update only for a still image, the driver
+ * applies the extent without waiting for the map, and the next still image
+ * renders at it.
  *
  * scale_factor must equal the session's current value, set at attachment or by
  * the latest target replacement, because the renderer bakes its pixel ratio
@@ -491,10 +494,10 @@ MLN_API void mln_acquired_frame_view_end(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_COMMITTED once the driver renders
- *   at the new extent.
+ * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_COMMITTED once the driver applies
+ *   the new extent.
  * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_SUPERSEDED when a later resize
- *   replaced this one.
+ *   or target replacement replaced this one.
  * - MLN_STATUS_INVALID_STATE when the session starts detaching before the
  *   driver applies the extent.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
