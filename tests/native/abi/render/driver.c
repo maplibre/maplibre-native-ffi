@@ -7,6 +7,8 @@
 
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/frames.h"
+#include "support/map.h"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -842,14 +844,25 @@ static mln_status service_on_graphics_thread(reentrant_host* host) {
 // Services inline on the graphics thread, the one thread that a caller driver
 // takes service from. A wake on that thread while a service runs further up its
 // stack finds the driver busy, and the running service takes the work. A wake
-// on another thread leaves the service to the case's wait.
+// on another thread, which can hold a MapLibre Native lock that the service
+// needs, reads the session without waiting and leaves the service to the
+// case's wait.
 static void service_inside_driver_wake(void* context) {
   reentrant_host* host = context;
   if (atomic_load(&host->armed)) {
-    if (!on_graphics_thread)
+    if (!on_graphics_thread) {
+      mln_render_session_snapshot snapshot = {
+        .size = sizeof(mln_render_session_snapshot)
+      };
+      if (
+        mln_render_session_get_snapshot(host->session, &snapshot, NULL) !=
+        MLN_STATUS_OK
+      )
+        atomic_fetch_add(&host->failures, 1U);
       atomic_store(&host->service_requested, true);
-    else if (service_on_graphics_thread(host) == MLN_STATUS_OK)
+    } else if (service_on_graphics_thread(host) == MLN_STATUS_OK) {
       atomic_fetch_add(&host->inline_services, 1U);
+    }
   }
   mln_test_pulse();
 }
@@ -861,6 +874,38 @@ static bool reentrant_frame_rendered(void* context) {
   return atomic_load(&host->rendered) || atomic_load(&host->failures) != 0;
 }
 
+// Attaches `map` with the reentrant host's driver-work wake and `frame_wake`,
+// on the calling thread as the graphics thread, and arms the host.
+static void attach_reentrant_host(
+  mln_map map, uint64_t token, mln_wake frame_wake,
+  mln_test_render_fixture* fixture
+) {
+  reentrant = (reentrant_host){.token = token};
+  on_graphics_thread = true;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
+  options.frame_wake = frame_wake;
+  options.driver_work_wake = (mln_wake){
+    .callback = service_inside_driver_wake,
+    .user_data = &reentrant,
+  };
+  mln_test_completion attach = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &attach));
+  mln_test_completion_destroy(&attach);
+  reentrant.session = fixture->session;
+  atomic_store(&reentrant.armed, true);
+}
+
+static void disarm_reentrant_host(void) {
+  atomic_store(&reentrant.armed, false);
+  on_graphics_thread = false;
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&reentrant.failures));
+}
+
 // Native code invokes wakes outside the session's locks, so a host may drain
 // results inside its frame wake and service a caller driver inside its
 // driver-work wake. A caller driver's demand then renders and reports from
@@ -870,37 +915,19 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(runtime, map);
-  reentrant = (reentrant_host){.token = 7};
-  on_graphics_thread = true;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
-  options.requested_texture_ring_depth = 2;
-  options.frame_wake = (mln_wake){
-    .callback = drain_inside_frame_wake,
-    .user_data = &reentrant,
-  };
-  options.driver_work_wake = (mln_wake){
-    .callback = service_inside_driver_wake,
-    .user_data = &reentrant,
-  };
-  mln_test_completion attach = mln_test_completion_default(0);
   mln_test_render_fixture fixture = {0};
-  MLN_TEST_OK(mln_test_render_fixture_start_attach(
-    map, &options, &attach.descriptor, &fixture
-  ));
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
-  mln_test_completion_destroy(&attach);
-  reentrant.session = fixture.session;
-  atomic_store(&reentrant.armed, true);
+  attach_reentrant_host(
+    map, 7,
+    (mln_wake){.callback = drain_inside_frame_wake, .user_data = &reentrant},
+    &fixture
+  );
 
   mln_test_render_request_forced(&fixture, reentrant.token);
   TEST_ASSERT_TRUE(mln_test_await(
     reentrant_frame_rendered, &reentrant, mln_test_deadline_default(),
     "a frame result drained inside the frame wake"
   ));
-  atomic_store(&reentrant.armed, false);
-  on_graphics_thread = false;
-  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&reentrant.failures));
+  disarm_reentrant_host();
   if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     TEST_ASSERT_NOT_EQUAL_UINT(0, atomic_load(&reentrant.inline_services));
   }
@@ -908,6 +935,100 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+// One vector tile that the session's renderer requests. Its request belongs to
+// the session, so the response reaches the session from MapLibre Native's
+// resource loader thread, which wakes the driver while it holds the lock of
+// the request's mailbox. The service that delivers the response then destroys
+// the request, which takes that lock.
+static const char wake_tile_style_json[] =
+  "{\"version\":8,\"sources\":{\"tiles\":{\"type\":\"vector\",\"tiles\":"
+  "[\"custom://tiles/{z}/{x}/{y}.pbf\"],\"minzoom\":0,\"maxzoom\":0}},"
+  "\"layers\":[{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"tiles\","
+  "\"source-layer\":\"any\"}]}";
+static const char wake_tile_url[] = "custom://tiles/0/0/0.pbf";
+
+typedef struct held_tile_wait {
+  const mln_test_render_fixture* fixture;
+  mln_test_provider* provider;
+} held_tile_wait;
+
+// A static map renders its still image only inside a frame, so this keeps a
+// frame demand in flight until the renderer requests the tile.
+static bool tile_requested(void* context) {
+  held_tile_wait* wait = context;
+  if (mln_test_provider_requests(wait->provider, wake_tile_url) >= 1)
+    return true;
+  if (read_snapshot(wait->fixture->session).pending_demand_count == 0)
+    mln_test_render_request_forced(wait->fixture, 1);
+  return false;
+}
+
+static bool driver_woken_off_the_graphics_thread(void* context) {
+  reentrant_host* host = context;
+  return atomic_load(&host->service_requested) ||
+         atomic_load(&host->failures) != 0;
+}
+
+// A tile response wakes an idle caller driver from the resource loader thread.
+// That wake reads the session and returns, and the graphics thread services
+// the response and destroys its request. Every wake on the graphics thread
+// services inline. The still image that waits for the tile completes.
+static void a_tile_response_wakes_a_host_that_services_inline(void) {
+  static const mln_test_provided_resource resources[] = {
+    {.url = wake_tile_url, .held = true},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map_options map_options = mln_map_options_default();
+  map_options.initial_extent =
+    (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
+  map_options.map_mode = MLN_MAP_MODE_STATIC;
+  mln_map map = mln_test_create_map_with_options(runtime, &map_options);
+  mln_test_load_style_and_wait(
+    runtime, map, MLN_BUFFER_LITERAL(wake_tile_style_json)
+  );
+  mln_test_render_fixture fixture = {0};
+  // The still image wait drains the frame results itself.
+  attach_reentrant_host(map, 0, mln_test_pulse_wake(), &fixture);
+
+  mln_test_completion still = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
+  held_tile_wait wait = {.fixture = &fixture, .provider = provider};
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, tile_requested, &wait, mln_test_deadline_default(),
+    "the held tile request"
+  ));
+  // A service with nothing queued leaves no wake pending, so the response
+  // raises a wake of its own.
+  atomic_store(&reentrant.service_requested, false);
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+  const mln_test_provider_request* request =
+    mln_test_provider_request_at(provider, wake_tile_url, 0);
+  TEST_ASSERT_NOT_NULL(request);
+  const mln_resource_response response = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+  };
+  MLN_TEST_OK(mln_resource_request_complete(request->handle, &response, NULL));
+  mln_resource_request_release(request->handle);
+  if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+    TEST_ASSERT_TRUE(mln_test_await(
+      driver_woken_off_the_graphics_thread, &reentrant,
+      mln_test_deadline_default(), "a driver-work wake from the tile response"
+    ));
+  }
+
+  MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &still));
+  mln_test_completion_destroy(&still);
+  disarm_reentrant_host();
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
 }
 
 // Set from MapLibre's logging threads, so it lives in static storage that
@@ -968,6 +1089,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_disposed_attached_session_releases_its_wakes_before_the_device);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
+  RUN_TEST(a_tile_response_wakes_a_host_that_services_inline);
   RUN_TEST(attach_checks_the_queue_lock);
   RUN_TEST(a_target_scale_that_differs_from_the_map_attaches_with_a_warning);
 }

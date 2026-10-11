@@ -3,7 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Receiver wake callback copied by a successful owning call.
+/// Receiver wake callback copied by a successful owning call. The callback
+/// schedules service by the receiver and returns without waiting for another
+/// thread.
 /// </summary>
 /// <remarks>
 /// See <c>mln_wake</c> in the <see

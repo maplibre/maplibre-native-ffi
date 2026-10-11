@@ -18,14 +18,25 @@ extern "C" {
 typedef void (*mln_wake_callback)(void* user_data);
 
 /**
- * Receiver wake callback copied by a successful owning call.
+ * Receiver wake callback copied by a successful owning call. The callback
+ * schedules service by the receiver and returns without waiting for another
+ * thread.
  *
- * Native code may invoke callback from any thread, and calls may coalesce or
- * overlap. Native code holds none of the owner's internal locks while it
- * invokes callback, so a callback may call the owner's functions, such as one
- * that drains its queue. The callback should still only schedule receiver work
- * and return, because it can run on a thread that is doing native work. It must
- * not destroy the object that owns the wake. Native code calls
+ * Native code may invoke callback from any thread, including a MapLibre Native
+ * thread, and calls may coalesce or overlap. The invoking thread can hold
+ * MapLibre Native's internal locks, such as the lock of the mailbox that it
+ * posts work to. Work that the owner runs on another thread can wait for those
+ * locks, as driver service does when its work closes that mailbox. Callback
+ * therefore must not wait for another thread, directly or through a lock that
+ * the other thread can hold while it calls this library. A callback that
+ * dispatches synchronously to the graphics thread deadlocks when driver
+ * service on that thread waits for a lock that the invoking thread holds.
+ *
+ * A callback may call the owner's functions that return without waiting, such
+ * as one that drains its queue. On the graphics thread, a callback may also
+ * service a caller driver inline: a service that already runs further up that
+ * thread's stack returns MLN_STATUS_BUSY and runs the new work itself. The
+ * callback must not destroy the object that owns the wake. Native code calls
  * release_user_data after all callback invocations have returned.
  *
  * A descriptor whose callback is null disables waking, and a disabled wake
