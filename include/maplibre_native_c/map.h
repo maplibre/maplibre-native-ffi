@@ -175,8 +175,8 @@ typedef struct mln_map_options {
    * Initial logical extent. Width and height must be nonzero, and scale_factor
    * must be finite and positive. scale_factor is fixed for the map's lifetime.
    *
-   * After creation, mln_map_resize() is the only function that changes the
-   * width and height.
+   * After creation, only mln_map_resize() changes the width and height. A
+   * render session submits it to size the map to its target.
    */
   mln_logical_extent initial_extent;
   /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
@@ -1071,10 +1071,13 @@ MLN_API mln_status mln_map_get_snapshot(
  * Submits the sole post-creation logical extent update.
  *
  * extent.scale_factor must equal the scale factor the map was created with;
- * only width and height may change. While a render session is attached, resize
- * through mln_render_session_resize(), which submits this command itself; a
- * direct map resize to a different extent leaves the session waiting for an
- * update that the map never publishes. The completion reports terminal
+ * only width and height may change. A render session sizes the map to its
+ * target: attaching a target, replacing it, and mln_render_session_resize()
+ * each submit this command with the target's width and height. A replacement
+ * that the driver then refuses leaves the map at the size that it named. While
+ * a render session is attached, size the map through the session; a direct map
+ * resize to a different extent leaves the session waiting for an update that
+ * the map never publishes. The completion reports terminal
  * disposition and the snapshot generation that the resize published. A
  * resize that a later one replaces before the worker runs it completes as
  * superseded.

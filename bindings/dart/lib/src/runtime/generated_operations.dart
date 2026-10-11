@@ -6875,7 +6875,10 @@ final class RenderSessionHandle implements Finalizable {
   });
 
   /// Starts an ordered logical resize. The completion runs after the selected
-  /// driver applies the extent and updates the map viewport.
+  /// driver applies the extent and updates the map viewport. On a static or
+  /// tile map, which publishes a render update only for a still image, the
+  /// driver applies the extent without waiting for the map, and the next still
+  /// image renders at it.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

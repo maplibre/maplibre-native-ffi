@@ -81,6 +81,10 @@ from any thread. A caller driver applies them when the host next services ready
 work on the graphics thread. Resize assigns a new extent generation; later frame
 demands capture that generation.
 
+The map takes its width and height from the render target. Attaching, resizing,
+and replacing the target each resize the map, so the host sizes an attached map
+only through its render session.
+
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
 A borrowed texture gets its size from the host allocation, so resizing it

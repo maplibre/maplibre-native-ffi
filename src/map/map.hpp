@@ -655,11 +655,15 @@ auto map_set_projection_mode(
 // Validates that a map handle is non-null and live.
 auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status;
 auto map_scale_factor(mln_map map) -> double;
+// Whether the map publishes render updates of its own. A static or tile map
+// publishes one only while a still image is pending.
+auto map_is_continuous(mln_map map) -> bool;
 // Returns worker-owned native state. Callers must already run on the runtime
 // worker or use the posting helpers below.
 auto map_native(MapObject& map) -> mln::Map&;
 
-auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status;
+auto map_post_resize(mln_map map, uint32_t width, uint32_t height)
+  -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
 auto map_latest_update_generation(mln_map map) noexcept -> uint64_t;

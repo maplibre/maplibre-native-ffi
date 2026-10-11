@@ -1,6 +1,7 @@
 // Still images: a static or tile map renders one on request through its render
-// session, a map in another mode refuses the request, only one request is
-// pending at a time, and closing the map cancels the pending one.
+// session, which resizes between them, a map in another mode refuses the
+// request, only one request is pending at a time, and closing the map cancels
+// the pending one.
 
 #include "support/map.h"
 #include "support/test_support.h"
@@ -13,9 +14,11 @@ static mln_map create_map_in_mode(mln_runtime runtime, uint32_t map_mode) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Reads back the center pixel of the frame the session rendered last.
+// Reads back the center pixel of the frame the session rendered last, which
+// is `width` by `height` pixels.
 static void read_center_pixel(
-  const mln_test_render_fixture* fixture, uint8_t out_rgba[4]
+  const mln_test_render_fixture* fixture, uint32_t width, uint32_t height,
+  uint8_t out_rgba[4]
 ) {
   mln_test_completion readback = mln_test_completion_readback();
   MLN_TEST_OK(mln_render_session_read_texture(
@@ -26,11 +29,11 @@ static void read_center_pixel(
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &image, sizeof(image))
   );
-  TEST_ASSERT_EQUAL_UINT32(64, image.info.width);
-  TEST_ASSERT_EQUAL_UINT32(64, image.info.height);
-  TEST_ASSERT_EQUAL_size_t((size_t)64 * 64 * 4, image.data.size);
+  TEST_ASSERT_EQUAL_UINT32(width, image.info.width);
+  TEST_ASSERT_EQUAL_UINT32(height, image.info.height);
+  TEST_ASSERT_EQUAL_size_t((size_t)width * height * 4, image.data.size);
   const uint8_t* pixels = image.data.data;
-  memcpy(out_rgba, pixels + ((32 * 64) + 32) * 4, 4);
+  memcpy(out_rgba, pixels + (((size_t)height / 2 * width) + width / 2) * 4, 4);
   mln_test_completion_destroy(&readback);
 }
 
@@ -47,7 +50,7 @@ static void a_still_image_renders_the_current_style(uint32_t map_mode) {
 
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   uint8_t rgba[4] = {0};
-  read_center_pixel(&fixture, rgba);
+  read_center_pixel(&fixture, 64, 64, rgba);
   TEST_ASSERT_EQUAL_UINT8(255, rgba[0]);
   TEST_ASSERT_EQUAL_UINT8(0, rgba[1]);
   TEST_ASSERT_EQUAL_UINT8(0, rgba[2]);
@@ -60,7 +63,7 @@ static void a_still_image_renders_the_current_style(uint32_t map_mode) {
     runtime, map, MLN_BUFFER_LITERAL(green_background_style_json)
   );
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
-  read_center_pixel(&fixture, rgba);
+  read_center_pixel(&fixture, 64, 64, rgba);
   TEST_ASSERT_EQUAL_UINT8(0, rgba[0]);
   TEST_ASSERT_EQUAL_UINT8(255, rgba[1]);
   TEST_ASSERT_EQUAL_UINT8(0, rgba[2]);
@@ -77,6 +80,42 @@ static void a_static_map_renders_still_images(void) {
 
 static void a_tile_map_renders_still_images(void) {
   a_still_image_renders_the_current_style(MLN_MAP_MODE_TILE);
+}
+
+// A static map publishes a render update only for a still image, so a session
+// resize applies without waiting for one. The next still image renders at the
+// new extent, and detach, which runs after the resize, completes.
+static void a_static_map_session_resizes_between_still_images(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
+  mln_test_load_style_and_wait(
+    runtime, map, mln_test_red_background_style_json
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_resize(
+      fixture.session,
+      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+      &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+  uint8_t rgba[4] = {0};
+  read_center_pixel(&fixture, 96, 48, rgba);
+  TEST_ASSERT_EQUAL_UINT8(255, rgba[0]);
+  TEST_ASSERT_EQUAL_UINT8(0, rgba[1]);
+
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 // A continuous map renders frames on demand and has no still image to give.
@@ -123,6 +162,7 @@ static void map_close_cancels_the_pending_still_image(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_static_map_renders_still_images);
   RUN_TEST(a_tile_map_renders_still_images);
+  RUN_TEST(a_static_map_session_resizes_between_still_images);
   RUN_TEST(a_continuous_map_refuses_a_still_image);
   RUN_TEST(map_close_cancels_the_pending_still_image);
 }

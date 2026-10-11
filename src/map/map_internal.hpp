@@ -42,6 +42,7 @@ struct MapObject {
   // Runtime release waits until all map resources and worker pools retire.
   // Member order keeps the runtime alive until this lease releases.
   ControlLease runtime_cleanup_lease;
+  // Fixed at creation, so map_is_continuous() may read it from any thread.
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
   // Width and height follow resize on the runtime worker; scale_factor is
   // fixed at creation, so map_scale_factor() may read it from any thread.

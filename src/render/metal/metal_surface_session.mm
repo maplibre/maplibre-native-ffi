@@ -416,19 +416,14 @@ auto metal_surface_set_target_start(
   auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
   auto device =
     NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
-  return enqueue_driver_operation(
-    session,
+  return enqueue_surface_retarget(
+    session, copied.extent,
     [copied, layer = std::move(layer),
-     device = std::move(device)](mln_render_session_object& target) {
+     device = std::move(device)](mln_render_session_object& live) {
       auto retained = copied;
       retained.layer = layer.get();
       retained.context.device = device.get();
-      return surface_session_set_target(
-        target.self, retained.extent,
-        [&retained](mln_render_session_object& live) {
-          return live.surface.backend->set_metal_target(retained);
-        }
-      );
+      return live.surface.backend->set_metal_target(retained);
     },
     completion,
     valueless_completion<&mln_render_session_set_metal_surface_target>()
