@@ -2342,7 +2342,29 @@ public data class GeojsonSourceOptions(
   public val cluster: Boolean? = null,
   /** Slices requested tiles inline during the update pass. Defaults to false. */
   public val synchronousTiling: Boolean? = null,
-)
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      minZoom,
+      maxZoom,
+      tolerance,
+      clusterMaxZoom,
+      clusterProperties,
+      tileSize,
+      buffer,
+      clusterRadius,
+      clusterMinPoints,
+      lineMetrics,
+      cluster,
+      synchronousTiling,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is GeojsonSourceOptions && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * Lower-level Spherical Mercator projected-meter coordinate.
@@ -2586,7 +2608,14 @@ public sealed interface OpenglContextDescriptorData {
   public data class Webgl(public val value: WebglContextDescriptor) : OpenglContextDescriptorData
 
   public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    OpenglContextDescriptorData
+    OpenglContextDescriptorData {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
 }
 
 /**
@@ -2697,7 +2726,15 @@ public data class PremultipliedRgba8Image(
   public val stride: UInt = 0u,
   /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
   public val pixels: ByteArray = byteArrayOf(),
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(width, height, stride, pixels)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is PremultipliedRgba8Image && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * MapLibre axonometric rendering options used for snapshots and commands.
@@ -2751,7 +2788,16 @@ public data class RenderedFeatureQueryOptions(
   public val layerIds: List<String>? = null,
   /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
   public val filter: ByteArray? = null,
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(layerIds, filter)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is RenderedFeatureQueryOptions &&
+        contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * Screen-space box in logical map pixels.
@@ -2789,7 +2835,14 @@ public sealed interface RenderedQueryGeometryData {
   public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometryData
 
   public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    RenderedQueryGeometryData
+    RenderedQueryGeometryData {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
 }
 
 /**
@@ -2834,7 +2887,15 @@ public data class SourceFeatureQueryOptions(
   public val sourceLayerIds: List<String>? = null,
   /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
   public val filter: ByteArray? = null,
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(sourceLayerIds, filter)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is SourceFeatureQueryOptions && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * One stretchable interval along an image axis, in image pixels.
@@ -3295,7 +3356,15 @@ public sealed interface RuntimeEventPayload {
 
   public data object None : RuntimeEventPayload
 
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) : RuntimeEventPayload
+  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
+    RuntimeEventPayload {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
 }
 
 /**
@@ -3428,7 +3497,27 @@ public data class StyleImageInfo(
   public val pixelRatio: Float = 0f,
   /** Whether the image is a signed distance field icon. */
   public val sdf: Boolean = false,
-)
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      width,
+      height,
+      pixels,
+      stretchX,
+      stretchY,
+      content,
+      textFitWidth,
+      textFitHeight,
+      pixelRatio,
+      sdf,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is StyleImageInfo && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * One style layer, borrowed for a completion callback.
@@ -3573,7 +3662,15 @@ public data class QueriedFeature(
   public val sourceId: String? = null,
   public val sourceLayerId: String? = null,
   public val state: ByteArray? = null,
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(feature, sourceId, sourceLayerId, state)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is QueriedFeature && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * CPU image readback metadata for a texture target frame.
@@ -3602,7 +3699,15 @@ public data class TextureReadbackResult(
   /** Borrowed pixel bytes, valid only during the callback. */
   public val data: ByteArray = byteArrayOf(),
   public val info: TextureImageInfo = TextureImageInfo(),
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(data, info)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is TextureReadbackResult && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * A resource provider's answer to one request.
@@ -3621,7 +3726,26 @@ public data class ResourceResponse(
   public val expiresUnixMs: Long? = null,
   public val etag: String? = null,
   public val retryAfterUnixMs: Long? = null,
-)
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      status,
+      errorReason,
+      bytes,
+      errorMessage,
+      mustRevalidate,
+      modifiedUnixMs,
+      expiresUnixMs,
+      etag,
+      retryAfterUnixMs,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is ResourceResponse && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * Tile-pyramid offline region definition.
@@ -3662,7 +3786,17 @@ public data class OfflineGeometryRegionDefinition(
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
   public val includeIdeographs: Boolean = false,
-)
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(styleUrl, geometry, minZoom, maxZoom, pixelRatio, includeIdeographs)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is OfflineGeometryRegionDefinition &&
+        contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * Offline region definition data.
@@ -3678,7 +3812,14 @@ public sealed interface OfflineRegionDefinitionData {
     OfflineRegionDefinitionData
 
   public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    OfflineRegionDefinitionData
+    OfflineRegionDefinitionData {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
 }
 
 /**
@@ -3700,7 +3841,15 @@ public data class OfflineRegionInfo(
   public val definition: OfflineRegionDefinition,
   /** Metadata bytes. */
   public val metadata: ByteArray = byteArrayOf(),
-)
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(id, definition, metadata)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is OfflineRegionInfo && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 /**
  * Inclusive byte range of a resource request.
@@ -3733,7 +3882,29 @@ public data class ResourceRequest(
   public val priorExpiresUnixMs: Long? = null,
   public val priorEtag: String? = null,
   public val priorData: ByteArray = byteArrayOf(),
-)
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      requestedUrl,
+      resolvedUrl,
+      kind,
+      loadingMethod,
+      priority,
+      usage,
+      storagePolicy,
+      range,
+      priorModifiedUnixMs,
+      priorExpiresUnixMs,
+      priorEtag,
+      priorData,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is ResourceRequest && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
 
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,

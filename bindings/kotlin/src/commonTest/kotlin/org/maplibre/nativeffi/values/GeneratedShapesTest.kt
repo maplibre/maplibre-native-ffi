@@ -128,6 +128,10 @@ class GeneratedShapesTest {
         // The submission copies the rows out of the padded stride, and the readback is unpadded.
         val copied = map.getStyleImage("image").awaitWithin("the image")
         assertContentEquals(expected, copied?.pixels)
+        // A record compares and hashes its byte arrays by content, not by identity.
+        val equal = copied?.copy(pixels = expected.copyOf())
+        assertEquals(copied, equal)
+        assertEquals(copied.hashCode(), equal.hashCode())
       }
     }
   }
