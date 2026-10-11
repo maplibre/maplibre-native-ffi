@@ -33,6 +33,20 @@ test "copied handles share one close and close twice safely" {
     try testing.expectError(error.InvalidState, maplibre.runtimeDrainEvents(runtime_copy, null));
 }
 
+// A handle's raw value is the source that its events carry, and a close leaves
+// it in place, so a host can route events that it drains later.
+test "a handle's raw value names its events and outlives close" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    try support.expectCommitted(try maplibre.mapSetStyleJson(fixture.map, support.style_json, null));
+    var loaded = try fixture.waitForEvent(.map_style_loaded);
+    defer loaded.deinit();
+    try testing.expectEqual(fixture.map.raw, loaded.value.source);
+    const map = fixture.map;
+    try fixture.closeMap();
+    try testing.expectEqual(loaded.value.source, map.raw);
+}
+
 // Native refuses to release a runtime with a live map. The refusal rolls the
 // binding's close back, so the runtime keeps working and closes later.
 test "a refused close leaves the handle usable and a later close succeeds" {

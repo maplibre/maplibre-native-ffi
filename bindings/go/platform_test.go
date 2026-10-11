@@ -70,10 +70,7 @@ func TestCollectorDisposesAndLogsALeakedHandle(t *testing.T) {
 	leaks := captureLeakLogs(t)
 	f := newRuntimeFixture(t)
 	dropped := await(t, submitted(f.runtime.CreateMap(DefaultMapOptions())))
-	id, err := dropped.Id()
-	if err != nil {
-		t.Fatal(err)
-	}
+	id := dropped.Id()
 	dropped = nil
 	closeOnceCollected(t, f.runtime, "the disposal of the dropped map")
 	for {

@@ -41,6 +41,19 @@ void main() {
     },
   );
 
+  test('a handle id names its events and outlives close', () async {
+    final fixture = await openRuntime();
+    final map = await fixture.openStyledMap();
+    final loaded = await fixture.awaitEventType(
+      RuntimeEventType.mapStyleLoaded,
+    );
+    expect(loaded.source, map.id);
+
+    await within(map.close(), 'map close');
+    // A host routes events that it drains after close by the id it kept.
+    expect(map.id, loaded.source);
+  });
+
   test('a refused close leaves the handle usable for a later close', () async {
     final runtime = runtimeCreate(runtimeOptionsDefault());
     final map = await within(

@@ -22,6 +22,20 @@ import Testing
   }
 }
 
+/// A handle's id is the source that its events carry, and it stays readable
+/// after close, so a host can route events that it drains later.
+@Test func aHandleIdNamesItsEventsAndOutlivesClose() async throws {
+  try await withMapFixture { fixture in
+    try await fixture.map.setStyleJson(json: emptyStyle)
+    let loaded = try await fixture.awaitEvent("the style load") {
+      $0.type == .mapStyleLoaded
+    }
+    #expect(loaded?.source == fixture.map.id)
+    try await fixture.map.close()
+    #expect(fixture.map.id == loaded?.source)
+  }
+}
+
 /// Native refuses to release a runtime that still has a map, and the refusal
 /// leaves the runtime usable, so the host closes the map and then the runtime.
 @Test func aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds(

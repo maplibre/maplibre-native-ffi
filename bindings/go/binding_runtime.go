@@ -579,7 +579,12 @@ func (state *bindingState) closeDecision() {
 	}
 }
 
-// Id returns the live generation ID used to correlate native events.
-func (owner *bindingOwner) Id() (uint64, error) {
-	return bindingCall(func() uint64 { raw, done := owner.bindingAcquire(false); defer done(); return raw })
+// Id returns the native handle value, which runtime events report as their
+// source. It stays readable after Close, so events drained later still match
+// this handle.
+func (owner *bindingOwner) Id() uint64 {
+	if owner == nil || owner.state == nil {
+		return 0
+	}
+	return owner.state.issued
 }

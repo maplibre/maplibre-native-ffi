@@ -162,7 +162,7 @@ void main() {
           view.ref.size = sizeOf<raw.mln_event_batch_view>();
           expect(
             raw.mln_runtime_drain_events(
-              runtime.identity.toSigned(64).toInt(),
+              runtime.id.toSigned(64).toInt(),
               outBatch,
               nullptr,
             ),

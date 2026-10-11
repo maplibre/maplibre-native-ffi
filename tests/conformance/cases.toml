@@ -15,6 +15,7 @@
 "LIFE-03" = "A borrow in progress on another thread holds off a close until the borrow ends"
 "LIFE-04" = "An abandoned handle is disposed off the callback stack, and the leak is reported through the binding's public output"
 "LIFE-05" = "A child handle keeps its parent alive"
+"LIFE-06" = "A handle's ID equals the source of the events it raises and stays readable after close"
 
 # Completions
 "COMP-01" = "A completion delivers exactly once, and a value that fails to convert is disposed"

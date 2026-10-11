@@ -31,7 +31,7 @@ void main() {
     final loaded = await fixture.awaitEventType(
       RuntimeEventType.mapStyleLoaded,
     );
-    expect(loaded.source, map.identity);
+    expect(loaded.source, map.id);
   });
 
   test('a provider answers a request after its callback returns', () async {

@@ -28,7 +28,7 @@ void main() {
           final options = arena<raw.mln_map_options>();
           options.ref = raw.mln_map_options_default();
           return raw.mln_runtime_create_map(
-            fixture.runtime.identity.toSigned(64).toInt(),
+            fixture.runtime.id.toSigned(64).toInt(),
             options,
             completion,
             nativeDiagnostic,

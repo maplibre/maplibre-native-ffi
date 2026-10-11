@@ -20,6 +20,7 @@
 # warning reaches stderr through IOOverrides.
 "LIFE-04" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed and reported when collected"
 "LIFE-05" = "bindings/dart/test/collection_test.dart::a map keeps its runtime reachable"
+"LIFE-06" = "bindings/dart/test/lifecycle_test.dart::a handle id names its events and outlives close"
 "COMP-01" = "bindings/dart/test/completion_test.dart::a completion delivers once and disposes a value that fails to convert"
 "COMP-02" = "bindings/dart/test/completion_test.dart::a submission native rejects frees its completion state"
 "COMP-03" = "bindings/dart/test/collection_test.dart::a dropped creation is disposed once its owner is collected"

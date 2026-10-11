@@ -148,9 +148,8 @@ class GeneratedShapesTest {
       // A map's event source is its handle, whose top byte carries the handle kind.
       map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
-      val handle = map.binding.handle().toULong()
-      assertTrue(handle shr 56 != 0uL, "a map handle carries its kind in the top byte")
-      assertEquals(handle, event.source)
+      assertTrue(map.id shr 56 != 0uL, "a map handle carries its kind in the top byte")
+      assertEquals(map.id, event.source)
     }
   }
 

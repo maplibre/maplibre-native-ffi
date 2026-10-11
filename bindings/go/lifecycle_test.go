@@ -20,16 +20,13 @@ func TestClosingTwiceIsSafe(t *testing.T) {
 	default:
 		t.Fatal("the second close submitted native work")
 	}
-	_, err = f.m.Id()
+	_, err = f.m.SetStyleJson([]byte(emptyStyle))
 	var closed *Error
 	if !errors.As(err, &closed) || !errors.Is(err, ErrInvalidState) || closed.Diagnostic() != "MapHandle is closed" {
-		t.Fatalf("Id() after close = %v, want ErrInvalidState for a closed MapHandle", err)
+		t.Fatalf("SetStyleJson after close = %v, want ErrInvalidState for a closed MapHandle", err)
 	}
 	if _, hasStatus := closed.RawStatus(); hasStatus {
-		t.Fatalf("Id() after close = %v, want no native status", err)
-	}
-	if _, err := f.m.SetStyleJson([]byte(emptyStyle)); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("SetStyleJson after close = %v, want ErrInvalidState", err)
+		t.Fatalf("SetStyleJson after close = %v, want no native status", err)
 	}
 
 	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -58,6 +55,22 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 	await(t, submitted(f.runtime.Barrier()))
 	await(t, submitted(f.m.Close()))
 	await(t, submitted(f.runtime.Close()))
+}
+
+// A handle's id is the source that its events carry, and it stays readable
+// after close, so a host can route events that it drains later.
+func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
+	f := newFixture(t)
+	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	event := f.awaitEvent(t, "the style load", isStyleLoaded)
+	id := f.m.Id()
+	if event.Source != id {
+		t.Fatalf("event source = %#x, want the map id %#x", event.Source, id)
+	}
+	await(t, submitted(f.m.Close()))
+	if got := f.m.Id(); got != id {
+		t.Fatalf("Id() after close = %#x, want %#x", got, id)
+	}
 }
 
 // A nil pointer or a zero value of a handle type fails with the binding's

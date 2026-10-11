@@ -51,6 +51,22 @@ fn closing_a_handle_twice_does_nothing() {
 }
 
 #[test]
+fn a_handle_id_names_its_events_and_outlives_close() {
+    let fixture = Fixture::new();
+    let loaded = fixture
+        .map()
+        .set_style_json(BACKGROUND_STYLE_JSON.as_bytes());
+    let event = fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+    wait_for(loaded);
+    assert_eq!(event.source, fixture.map().id());
+    let (runtime, map) = fixture.into_parts();
+    wait_for(map.release());
+    // A host routes events that it drains after close by the id it kept.
+    assert_eq!(map.id(), event.source);
+    wait_for(runtime.release());
+}
+
+#[test]
 fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
     let (runtime, map) = Fixture::new().into_parts();
 

@@ -12,12 +12,14 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
@@ -57,6 +59,19 @@ class HandleLifecycleTest {
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")
     assertTrue(runtime.isClosed)
+  }
+
+  @Test
+  fun aHandleIdNamesItsEventsAndOutlivesRelease(): Unit = runSuspendTest {
+    RuntimeFixture.use {
+      val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
+      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
+      val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
+      assertEquals(map.id, event.source)
+      map.release().awaitWithin("the map release")
+      // A host routes events that it drains after the release by the id it kept.
+      assertEquals(event.source, map.id)
+    }
   }
 
   @Test

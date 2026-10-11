@@ -3988,8 +3988,11 @@ final class AcquiredFrameHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Consumes an acquired frame and quarantines its slot of the texture ring.
   ///
@@ -4147,8 +4150,11 @@ final class EventBatchHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Borrows the event and message view stored by an owned event batch.
   ///
@@ -4184,8 +4190,11 @@ final class GeojsonSourceDataHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Releases prepared GeoJSON source data.
   ///
@@ -4221,8 +4230,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Adds a color-relief layer for a raster DEM source.
   ///
@@ -6341,8 +6353,11 @@ final class MapProjectionHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Closes a standalone projection.
   ///
@@ -6513,8 +6528,11 @@ final class RenderFrameBatchHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Borrows the result view stored by an owned frame-result batch.
   ///
@@ -6560,8 +6578,11 @@ final class RenderSessionHandle implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Irreversibly closes control and mailboxes and disposes of the session's
   /// graphics objects.
@@ -7058,8 +7079,11 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Completes a C API resource provider request.
   ///
@@ -7164,8 +7188,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _state.isClosed;
 
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
 
   /// Starts an ordered runtime barrier.
   ///
