@@ -24,20 +24,31 @@ typedef void (*mln_wake_callback)(void* user_data);
  *
  * Native code may invoke callback from any thread, including a MapLibre Native
  * thread, and calls may coalesce or overlap. The invoking thread can hold
- * MapLibre Native's internal locks, such as the lock of the mailbox that it
- * posts work to. Work that the owner runs on another thread can wait for those
- * locks, as driver service does when its work closes that mailbox. Callback
- * therefore must not wait for another thread, directly or through a lock that
- * the other thread can hold while it calls this library. A callback that
- * dispatches synchronously to the graphics thread deadlocks when driver
- * service on that thread waits for a lock that the invoking thread holds.
+ * internal locks of MapLibre Native or of this library, such as the lock of the
+ * mailbox that it posts work to. Work that the owner runs on another thread can
+ * wait for those locks, as driver service does when its work closes that
+ * mailbox. The callback therefore must not wait for another thread, either
+ * directly or through a host lock that the other thread holds while it calls
+ * this library. A callback that dispatches synchronously to the graphics
+ * thread deadlocks when driver service on that thread waits for a lock that the
+ * invoking thread holds.
  *
  * A callback may call the owner's functions that return without waiting, such
  * as one that drains its queue. On the graphics thread, a callback may also
- * service a caller driver inline: a service that already runs further up that
- * thread's stack returns MLN_STATUS_BUSY and runs the new work itself. The
- * callback must not destroy the object that owns the wake. Native code calls
- * release_user_data after all callback invocations have returned.
+ * service its own caller-driver session inline. A service of that session that
+ * already runs further up the stack returns MLN_STATUS_BUSY, and the running
+ * service takes the new work. Inline service nests, though. A service that
+ * stops with work still queued raises the wake again before it returns, so a
+ * small max_work adds one service to the stack for each wake. A wake for one
+ * session can also arrive inside the service of another session on the same
+ * thread, where an inline service renders inside that other session's driver
+ * call. A host that drives several sessions on one thread, or that limits
+ * max_work, schedules the service instead.
+ *
+ * The callback must not destroy the object that owns the wake. Native code
+ * calls release_user_data after all callback invocations have returned. It can
+ * call release_user_data on any thread that invoked callback, under the same
+ * locks, so release_user_data also returns without waiting for another thread.
  *
  * A descriptor whose callback is null disables waking, and a disabled wake
  * must not carry release_user_data.

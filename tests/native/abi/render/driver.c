@@ -971,10 +971,13 @@ static bool driver_woken_off_the_graphics_thread(void* context) {
          atomic_load(&host->failures) != 0;
 }
 
-// A tile response wakes an idle caller driver from the resource loader thread.
-// That wake reads the session and returns, and the graphics thread services
-// the response and destroys its request. Every wake on the graphics thread
-// services inline. The still image that waits for the tile completes.
+// A tile response wakes an idle caller driver from a MapLibre Native thread,
+// which raises the wake under its mailbox lock but outside the session's own
+// locks, so the wake can read the session. The wait accepts any wake from
+// another thread, so it does not prove which thread raised it, and the case
+// does not force the graphics thread to close the mailbox while that wake
+// runs. Every wake on the graphics thread services inline, and the still image
+// that waits for the tile completes.
 static void a_tile_response_wakes_a_host_that_services_inline(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = wake_tile_url, .held = true},

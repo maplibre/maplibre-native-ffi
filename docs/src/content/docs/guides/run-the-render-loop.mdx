@@ -55,7 +55,9 @@ still renders, and a presenting target keeps whatever it presented last.
 
 When the driver-work callback wakes the host, schedule the driver-service call
 on the thread or realm where the target's graphics context is usable. The first
-successful call fixes that graphics-thread identity. Service calls run one at a
+successful call fixes that graphics-thread identity. The callback can run on a
+MapLibre Native thread that holds a lock that driver service needs, so the
+callback posts the service and returns without waiting for the graphics thread. Service calls run one at a
 time, and a work limit of zero drains the mailbox in one call. Continue service
 while presentation callbacks are paused, because attach, resize, queries,
 readback, barriers, and detach also use the mailbox.
