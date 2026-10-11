@@ -1081,7 +1081,8 @@ MLN_API mln_status mln_map_get_snapshot(
  * the map never publishes. The completion reports terminal disposition and
  * the snapshot generation that the resize published. A resize that a later
  * one replaces before the worker runs it completes as superseded, including a
- * resize that an attach replaces.
+ * resize that an attach replaces. A resize to the map's current width and
+ * height changes nothing and publishes no render update.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.

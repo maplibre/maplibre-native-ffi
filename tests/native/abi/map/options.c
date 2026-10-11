@@ -517,6 +517,18 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.logical_extent.height);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
 
+  // A resize to the current size publishes no render update.
+  const uint64_t render_update = snapshot.latest_render_update_generation;
+  MLN_TEST_AWAIT_OK(mln_map_resize(
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  snapshot = read_snapshot(map);
+  TEST_ASSERT_EQUAL_UINT64(
+    render_update, snapshot.latest_render_update_generation
+  );
+
   // The renderer fixes its pixel ratio at creation, so a resize may change
   // only the width and height.
   mln_completion rejected = mln_test_discard_completion();

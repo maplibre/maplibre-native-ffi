@@ -3357,6 +3357,14 @@ auto map_resize(
       complete_map_command(
         completion_state,
         run_map_transaction(live, [extent](MapObject& map) -> mln_status {
+          // Map::setSize publishes a render update even when the size is
+          // unchanged.
+          if (
+            map.logical_extent.width == extent.width &&
+            map.logical_extent.height == extent.height
+          ) {
+            return MLN_STATUS_OK;
+          }
           map.logical_extent.width = extent.width;
           map.logical_extent.height = extent.height;
           map.map->setSize(mln::Size{extent.width, extent.height});
