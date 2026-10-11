@@ -6,6 +6,8 @@
 
 #include <assert.h>
 
+#include "support/resources.h"
+#include "support/style.h"
 #include "support/test_support.h"
 
 // A binding copies an undeclared payload kind as the bytes from the payload to
@@ -39,6 +41,16 @@ static const char remote_source_style_json[] =
   "{\"version\":8,\"sources\":{\"remote\":{\"type\":\"geojson\",\"data\":"
   "\"test://missing.geojson\"}},\"layers\":[{\"id\":\"dots\",\"type\":"
   "\"circle\",\"source\":\"remote\"}]}";
+
+// A vector source described by TileJSON that only the provider serves.
+static const char tilejson_source_id[] = "described";
+static const char tilejson_url[] = "test://tiles.json";
+static const char tilejson_style_json[] =
+  "{\"version\":8,\"sources\":{\"described\":{\"type\":\"vector\","
+  "\"url\":\"test://tiles.json\"}},\"layers\":[]}";
+static const char tilejson[] =
+  "{\"tilejson\":\"2.2.0\",\"tiles\":[\"test://tiles/{z}/{x}/{y}.pbf\"],"
+  "\"attribution\":\"Served tiles\"}";
 
 typedef struct recorded_event {
   mln_runtime_event event;
@@ -134,6 +146,7 @@ typedef enum scenario {
   SCENARIO_STILL_IMAGE,
   SCENARIO_STILL_IMAGE_FAILURE,
   SCENARIO_OFFLINE,
+  SCENARIO_SOURCE_DESCRIPTION,
   // No local input reaches the event; the row's reason says why.
   SCENARIO_UNREACHABLE,
 } scenario;
@@ -272,6 +285,8 @@ static const payload_row payload_rows[] = {
    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, sizeof(mln_runtime_event_tile_action),
    .message = MESSAGE_TEXT, .expected_message = geojson_source_id,
    .check = check_tile_action},
+  {MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED, SCENARIO_SOURCE_DESCRIPTION, MAP,
+   .message = MESSAGE_TEXT, .expected_message = tilejson_source_id},
   {MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED, SCENARIO_OFFLINE,
    MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
@@ -803,6 +818,84 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static bool source_change_logged(void* context) {
+  scenario_context* scenario = context;
+  log_drain_quietly(scenario->runtime, &scenario_log);
+  return scenario_log.drain_failed || scenario_log.overflowed ||
+         log_contains(
+           &scenario_log, MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED, scenario->map
+         );
+}
+
+// Records the attribution one source query delivered.
+typedef struct attribution_probe {
+  atomic_bool done;
+  mln_status status;
+  char attribution[32];
+} attribution_probe;
+
+static void copy_attribution(
+  void* user_data, const mln_completion_result* result
+) {
+  attribution_probe* probe = user_data;
+  probe->status = result->status;
+  if (result->status == MLN_STATUS_OK && result->value_count == 1) {
+    const mln_style_source_info* info = result->value;
+    snprintf(
+      probe->attribution, sizeof(probe->attribution), "%.*s",
+      (int)info->attribution.size, (const char*)info->attribution.data
+    );
+  }
+  mln_test_flag_set(&probe->done);
+}
+
+// A source whose TileJSON arrives reports the change, and a source query
+// submitted after the event reads the attribution the TileJSON carried.
+static void a_source_reports_the_description_its_tilejson_brings(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  static const mln_test_provided_resource resources[] = {
+    {.url = tilejson_url,
+     .response = {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)tilejson,
+       .byte_count = sizeof(tilejson) - 1,
+     }},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_test_provider_install(runtime, provider);
+  mln_map map = mln_test_create_map(runtime);
+  scenario_context context = {.runtime = runtime, .map = map};
+  mln_test_drain_all(runtime);
+  log_reset(&scenario_log);
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(tilejson_style_json), &completion.descriptor, NULL
+  ));
+  TEST_ASSERT_TRUE(mln_test_await(
+    source_change_logged, &context, mln_test_deadline_default(),
+    "a source change"
+  ));
+  check_scenario_rows(SCENARIO_SOURCE_DESCRIPTION, &scenario_log, &context);
+
+  attribution_probe probe = {.status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe.done, false);
+  const mln_completion query = {
+    .size = sizeof(mln_completion),
+    .callback = copy_attribution,
+    .user_data = &probe,
+  };
+  MLN_TEST_OK(mln_map_get_style_source(
+    map, mln_test_view_of(tilejson_source_id), &query, NULL
+  ));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.done));
+  MLN_TEST_OK(probe.status);
+  TEST_ASSERT_EQUAL_STRING("Served tiles", probe.attribution);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 // A map created with an empty mask queues nothing, through a camera change and
 // a rendered still image, whose completion fences the check.
 static void a_map_created_with_an_empty_mask_queues_nothing(void) {
@@ -834,5 +927,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_still_image_reports_that_it_finished);
   RUN_TEST(failed_loads_report_their_text);
   RUN_TEST(an_observed_offline_download_reports_status_and_errors);
+  RUN_TEST(a_source_reports_the_description_its_tilejson_brings);
   RUN_TEST(a_map_created_with_an_empty_mask_queues_nothing);
 }

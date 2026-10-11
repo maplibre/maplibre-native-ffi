@@ -97,6 +97,10 @@ typedef struct mln_offline_region_status {
  *   NONE.
  * - MAP_TILE_ACTION: code is 0; message carries the source ID; payload
  *   TILE_ACTION.
+ * - MAP_SOURCE_CHANGED: a style source changed its description, such as when
+ *   its TileJSON arrives with new attribution or tile URLs, or its GeoJSON data
+ *   is replaced; code is 0; message carries the source ID; payload NONE. A
+ *   style query submitted after the event observes the change.
  * - OFFLINE_REGION_STATUS_CHANGED: code is 0; payload OFFLINE_REGION_STATUS.
  * - OFFLINE_REGION_RESPONSE_ERROR: code is 0; message carries the resource
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
@@ -129,6 +133,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
+  MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 23,
 } mln_runtime_event_type;
 
 /**
@@ -188,6 +193,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+  MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED =
+    1ULL << MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED,
   /** Selects every map-originated event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS =
     MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE |
@@ -207,7 +214,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING |
-    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION,
+    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION |
+    MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED,
   /** Selects every runtime-originated event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS =
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED |

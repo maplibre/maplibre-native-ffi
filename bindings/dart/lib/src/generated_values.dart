@@ -870,15 +870,16 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   );
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventMask.fromRawValue(2097152);
+  static const mapSourceChanged = RuntimeEventMask.fromRawValue(8388608);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventMask.fromRawValue(524286);
+  static const allMapEvents = RuntimeEventMask.fromRawValue(8912894);
 
   /// Selects every runtime-originated event type this version defines.
   static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventMask.fromRawValue(4194302);
+  static const all = RuntimeEventMask.fromRawValue(12582910);
   @override
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
@@ -938,6 +939,7 @@ final class RuntimeEventType extends _Enum {
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(20);
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(21);
+  static const mapSourceChanged = RuntimeEventType.fromRawValue(23);
 }
 
 /// Optional fields for `mln_source_feature_query_options`.

@@ -1129,12 +1129,13 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventMask = RuntimeEventMask(1048576uL)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventMask =
       RuntimeEventMask(2097152uL)
+    public val MAP_SOURCE_CHANGED: RuntimeEventMask = RuntimeEventMask(8388608uL)
     /** Selects every map-originated event type this version defines. */
-    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(524286uL)
+    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(8912894uL)
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask = RuntimeEventMask(3670016uL)
     /** Selects every event type this version defines. */
-    public val ALL: RuntimeEventMask = RuntimeEventMask(4194302uL)
+    public val ALL: RuntimeEventMask = RuntimeEventMask(12582910uL)
   }
 }
 
@@ -1199,6 +1200,7 @@ public data class RuntimeEventType(public val rawValue: UInt) {
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(19u)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(20u)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(21u)
+    public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(23u)
   }
 }
 

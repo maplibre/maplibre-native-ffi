@@ -722,6 +722,13 @@ class HeadlessObserver final : public mln::MapObserver {
     queue_current(MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, 0, image_id);
   }
 
+  void onSourceChanged(mln::style::Source& source) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)) {
+      return;
+    }
+    queue_current(MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED, 0, source.getID());
+  }
+
   void onTileAction(
     mln::TileOperation operation, const mln::OverscaledTileID& tile_id,
     const std::string& source_id

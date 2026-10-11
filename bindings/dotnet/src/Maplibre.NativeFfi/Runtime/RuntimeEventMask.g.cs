@@ -36,11 +36,12 @@ public enum RuntimeEventMask : ulong
     OfflineRegionStatusChanged = 524288,
     OfflineRegionResponseError = 1048576,
     OfflineRegionTileCountLimitExceeded = 2097152,
+    MapSourceChanged = 8388608,
 
     /// <summary>
     /// Selects every map-originated event type this version defines.
     /// </summary>
-    AllMapEvents = 524286,
+    AllMapEvents = 8912894,
 
     /// <summary>
     /// Selects every runtime-originated event type this version defines.
@@ -50,5 +51,5 @@ public enum RuntimeEventMask : ulong
     /// <summary>
     /// Selects every event type this version defines.
     /// </summary>
-    All = 4194302,
+    All = 12582910,
 }

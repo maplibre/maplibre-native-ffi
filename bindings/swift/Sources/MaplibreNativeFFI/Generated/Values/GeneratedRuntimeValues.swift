@@ -1069,13 +1069,15 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     .init(rawValue: 1_048_576)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventMask =
     .init(rawValue: 2_097_152)
+  public static let mapSourceChanged: RuntimeEventMask =
+    .init(rawValue: 8_388_608)
   /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 524_286)
+  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_912_894)
   /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventMask =
     .init(rawValue: 3_670_016)
   /// Selects every event type this version defines.
-  public static let all: RuntimeEventMask = .init(rawValue: 4_194_302)
+  public static let all: RuntimeEventMask = .init(rawValue: 12_582_910)
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -1382,6 +1384,7 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
     .init(rawValue: 20)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 21)
+  public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 23)
 }
 
 /// Options used when creating a runtime.

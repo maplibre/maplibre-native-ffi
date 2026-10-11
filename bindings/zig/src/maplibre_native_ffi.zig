@@ -3728,8 +3728,9 @@ pub const RuntimeEventMask = struct {
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
     offline_region_tile_count_limit_exceeded: bool = false,
+    map_source_changed: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -3737,9 +3738,9 @@ pub const RuntimeEventMask = struct {
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
     pub const none = fromNative(0);
-    pub const all_map_events = fromNative(524286);
+    pub const all_map_events = fromNative(8912894);
     pub const all_runtime_events = fromNative(3670016);
-    pub const all = fromNative(4194302);
+    pub const all = fromNative(12582910);
 };
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -3926,6 +3927,7 @@ pub const RuntimeEventTileAction = struct {
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventType = enum(u32) {
+    map_source_changed = 23,
     offline_region_tile_count_limit_exceeded = 21,
     offline_region_response_error = 20,
     offline_region_status_changed = 19,

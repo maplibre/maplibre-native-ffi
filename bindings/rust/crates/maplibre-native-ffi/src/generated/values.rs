@@ -4829,12 +4829,13 @@ pub struct RuntimeEventMask: u64 {
     const OFFLINE_REGION_STATUS_CHANGED = 524288;
     const OFFLINE_REGION_RESPONSE_ERROR = 1048576;
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
+    const MAP_SOURCE_CHANGED = 8388608;
     /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 524286;
+    const ALL_MAP_EVENTS = 8912894;
     /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 3670016;
     /// Selects every event type this version defines.
-    const ALL = 4194302;
+    const ALL = 12582910;
 }
 }
 
@@ -5077,6 +5078,7 @@ pub enum RuntimeEventType: u32 {
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
+    MapSourceChanged = 23,
 } Unknown
 }
 

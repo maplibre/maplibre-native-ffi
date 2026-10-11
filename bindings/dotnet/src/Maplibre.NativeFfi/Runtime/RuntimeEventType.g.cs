@@ -31,4 +31,5 @@ public enum RuntimeEventType : uint
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
+    MapSourceChanged = 23,
 }

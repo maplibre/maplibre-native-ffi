@@ -312,9 +312,10 @@ pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_even
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_mask = 1048576;
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_mask =
     2097152;
-pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 524286;
+pub const MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED: mln_runtime_event_mask = 8388608;
+pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 8912894;
 pub const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS: mln_runtime_event_mask = 3670016;
-pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 4194302;
+pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 12582910;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
@@ -350,6 +351,7 @@ pub const MLN_RUNTIME_EVENT_MAP_TILE_ACTION: mln_runtime_event_type = 18;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_type = 19;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 20;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 21;
+pub const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED: mln_runtime_event_type = 23;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
