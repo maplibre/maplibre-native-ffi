@@ -2592,7 +2592,9 @@ final class MetalBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 typedef WakeCallback = void Function();
 
-/// Receiver wake callback copied by a successful owning call.
+/// Receiver wake callback copied by a successful owning call. The callback
+/// schedules service by the receiver and returns without waiting for another
+/// thread.
 ///
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
