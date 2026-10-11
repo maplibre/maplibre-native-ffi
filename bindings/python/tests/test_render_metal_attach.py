@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -274,6 +275,80 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                     assert map_handle.get_size() == (
                         96,
                         48,
+                        pytest.approx(1.0),
+                    )
+            finally:
+                session.close()
+
+
+def test_metal_borrowed_texture_set_target_at_the_same_size_renders_without_a_render_update() -> (
+    None
+):
+    """Spec coverage: BND-199.
+
+    A host that renders into same-size textures in turn passes the next one to
+    the session before each frame. If each replacement made the map publish a
+    render update, the host would render continuously while the map is
+    unchanged.
+    """
+    with _metal_context() as context, _metal_borrowed_texture(context) as texture:
+        descriptor = texture.descriptor()
+
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_metal_borrowed_texture(descriptor)
+            try:
+                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+                # A render update after the idle event means that the map is not idle
+                # yet.
+                idle = False
+                for _ in range(5000):
+                    runtime.pump()
+                    dirty = False
+                    for event in runtime.drain_events().events:
+                        if (
+                            event.event_type
+                            == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+                        ):
+                            dirty = True
+                            idle = False
+                        elif event.event_type == mln.RuntimeEventType.MAP_IDLE:
+                            idle = True
+                    if dirty:
+                        session.render_update()
+                    elif idle:
+                        break
+                    time.sleep(0.001)
+                assert idle, "the map never became idle"
+                assert _is_painted_red(texture)
+
+                with _metal_borrowed_texture(context) as replacement:
+                    session.set_metal_borrowed_texture_target(replacement.descriptor())
+
+                    # The session renders the map's latest render update into the
+                    # replacement.
+                    assert (
+                        session.render_update().result == render.RenderResult.RENDERED
+                    )
+                    assert _is_painted_red(replacement)
+
+                    for _ in range(10):
+                        runtime.pump()
+                        assert not any(
+                            event.event_type
+                            == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+                            for event in runtime.drain_events().events
+                        )
+                    assert map_handle.get_size() == (
+                        descriptor.extent.width,
+                        descriptor.extent.height,
                         pytest.approx(1.0),
                     )
             finally:

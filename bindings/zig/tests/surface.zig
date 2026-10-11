@@ -120,6 +120,80 @@ test "Metal surface set target presents through a replacement layer" {
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 }
 
+// Spec coverage: BND-199.
+test "Metal surface set target at the same size presents without a render update" {
+    if (!build_options.supports_metal) return error.SkipZigTest;
+
+    const pool = try metal_support.AutoreleasePool.init();
+    defer pool.deinit();
+
+    var window_layer = try metal_support.createCountingWindowLayer(64, 64);
+    defer window_layer.deinit();
+    var replacement_layer = try metal_support.createCountingWindowLayer(64, 64);
+    defer replacement_layer.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var surface = try maplibre.attachMetalSurface(&map, .{
+        .extent = .{ .width = 64, .height = 64 },
+        .layer = nativePointer(window_layer.layer.?),
+    });
+    defer surface.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    // A render update after the idle event means that the map is not idle yet.
+    var idle = false;
+    for (0..5000) |_| {
+        try runtime.pump(0, null);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
+        defer batch.deinit();
+        var dirty = false;
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            if (std.meta.eql(event.event_type, .map_render_update_available)) {
+                dirty = true;
+                idle = false;
+            } else if (std.meta.eql(event.event_type, .map_idle)) {
+                idle = true;
+            }
+        }
+        if (dirty) {
+            _ = try surface.renderUpdate();
+        } else if (idle) {
+            break;
+        }
+        try testing.io.sleep(.fromMilliseconds(1), .awake);
+    }
+    try testing.expect(idle);
+
+    // A host that uses same-size surfaces in turn passes the next one to the
+    // session before each frame. If each replacement made the map publish a
+    // render update, the host would render continuously while the map is
+    // unchanged.
+    try surface.setMetalSurfaceTarget(.{
+        .extent = .{ .width = 64, .height = 64 },
+        .layer = nativePointer(replacement_layer.layer.?),
+    });
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
+    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(replacement_layer.layer.?));
+
+    for (0..10) |_| {
+        try runtime.pump(0, null);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            try testing.expect(!std.meta.eql(event.event_type, .map_render_update_available));
+        }
+    }
+    const size = try map.getSize();
+    try testing.expectEqual(@as(u32, 64), size.width);
+    try testing.expectEqual(@as(u32, 64), size.height);
+}
+
 test "surface public descriptors report invalid native arguments" {
     if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
