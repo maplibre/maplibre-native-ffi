@@ -41,38 +41,34 @@ internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSou
     markPresent(target + 4, 16u)
     putView(target + 40, it)
   }
-  value.tileSize?.let {
+  value.buffer?.let {
     markPresent(target + 4, 32u)
     writeU32(target + w(48, 56), it)
   }
-  value.buffer?.let {
+  value.clusterRadius?.let {
     markPresent(target + 4, 64u)
     writeU32(target + w(52, 60), it)
   }
-  value.clusterRadius?.let {
+  value.clusterMinPoints?.let {
     markPresent(target + 4, 128u)
     writeU32(target + w(56, 64), it)
   }
-  value.clusterMinPoints?.let {
-    markPresent(target + 4, 256u)
-    writeU32(target + w(60, 68), it)
-  }
   value.lineMetrics?.let {
-    markPresent(target + 4, 512u)
-    writeBool(target + w(64, 72), it)
+    markPresent(target + 4, 256u)
+    writeBool(target + w(60, 68), it)
   }
   value.cluster?.let {
-    markPresent(target + 4, 1024u)
-    writeBool(target + w(65, 73), it)
+    markPresent(target + 4, 512u)
+    writeBool(target + w(61, 69), it)
   }
   value.synchronousTiling?.let {
-    markPresent(target + 4, 2048u)
-    writeBool(target + w(66, 74), it)
+    markPresent(target + 4, 1024u)
+    writeBool(target + w(62, 70), it)
   }
 }
 
 internal fun NativeArena.writeGeojsonSourceOptions(value: GeojsonSourceOptions): Long =
-  allocate(w(72, 80), 8).also { putGeojsonSourceOptions(it, value) }
+  allocate(w(64, 72), 8).also { putGeojsonSourceOptions(it, value) }
 
 internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)
@@ -1175,15 +1171,14 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions =
     tolerance = if ((readU32(source + 4) and 4u) != 0u) readF64(source + 24) else null,
     clusterMaxZoom = if ((readU32(source + 4) and 8u) != 0u) readF64(source + 32) else null,
     clusterProperties = if ((readU32(source + 4) and 16u) != 0u) readView(source + 40) else null,
-    tileSize = if ((readU32(source + 4) and 32u) != 0u) readU32(source + w(48, 56)) else null,
-    buffer = if ((readU32(source + 4) and 64u) != 0u) readU32(source + w(52, 60)) else null,
-    clusterRadius = if ((readU32(source + 4) and 128u) != 0u) readU32(source + w(56, 64)) else null,
+    buffer = if ((readU32(source + 4) and 32u) != 0u) readU32(source + w(48, 56)) else null,
+    clusterRadius = if ((readU32(source + 4) and 64u) != 0u) readU32(source + w(52, 60)) else null,
     clusterMinPoints =
-      if ((readU32(source + 4) and 256u) != 0u) readU32(source + w(60, 68)) else null,
-    lineMetrics = if ((readU32(source + 4) and 512u) != 0u) readBool(source + w(64, 72)) else null,
-    cluster = if ((readU32(source + 4) and 1024u) != 0u) readBool(source + w(65, 73)) else null,
+      if ((readU32(source + 4) and 128u) != 0u) readU32(source + w(56, 64)) else null,
+    lineMetrics = if ((readU32(source + 4) and 256u) != 0u) readBool(source + w(60, 68)) else null,
+    cluster = if ((readU32(source + 4) and 512u) != 0u) readBool(source + w(61, 69)) else null,
     synchronousTiling =
-      if ((readU32(source + 4) and 2048u) != 0u) readBool(source + w(66, 74)) else null,
+      if ((readU32(source + 4) and 1024u) != 0u) readBool(source + w(62, 70)) else null,
   )
 
 internal fun readLatLng(source: Long): LatLng =

@@ -1360,7 +1360,6 @@ auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
     .tolerance = defaults.tolerance,
     .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
     .cluster_properties = {},
-    .tile_size = defaults.tileSize,
     .buffer = defaults.buffer,
     .cluster_radius = defaults.clusterRadius,
     .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),

@@ -244,11 +244,6 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
   ) {
     result.cluster_properties = options->cluster_properties;
   }
-  if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
-  ) {
-    result.tile_size = options->tile_size;
-  }
   if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
     result.buffer = options->buffer;
   }
@@ -298,7 +293,7 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
     MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
@@ -338,10 +333,6 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     set_thread_error("tolerance must be finite and non-negative");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
-    set_thread_error("tile_size must be within [1, 65535]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (effective.buffer > 512U) {
     set_thread_error("buffer must be at most 512");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -371,7 +362,6 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   auto native = mln::style::GeoJSONOptions{};
   native.minzoom = static_cast<uint8_t>(options.min_zoom);
   native.maxzoom = static_cast<uint8_t>(options.max_zoom);
-  native.tileSize = static_cast<uint16_t>(options.tile_size);
   native.buffer = static_cast<uint16_t>(options.buffer);
   native.tolerance = options.tolerance;
   native.lineMetrics = options.line_metrics;
@@ -453,8 +443,7 @@ auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& right
 ) -> bool {
   return left.minzoom == right.minzoom && left.maxzoom == right.maxzoom &&
-         left.tileSize == right.tileSize && left.buffer == right.buffer &&
-         left.tolerance == right.tolerance &&
+         left.buffer == right.buffer && left.tolerance == right.tolerance &&
          left.lineMetrics == right.lineMetrics &&
          left.cluster == right.cluster &&
          left.clusterRadius == right.clusterRadius &&

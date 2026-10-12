@@ -4142,14 +4142,13 @@ internal val mln_geojson_source_options: GroupLayout =
     JAVA_DOUBLE.withName("tolerance"),
     JAVA_DOUBLE.withName("cluster_max_zoom"),
     mln_buffer_view.withName("cluster_properties"),
-    JAVA_INT.withName("tile_size"),
     JAVA_INT.withName("buffer"),
     JAVA_INT.withName("cluster_radius"),
     JAVA_INT.withName("cluster_min_points"),
     JAVA_BOOLEAN.withName("line_metrics"),
     JAVA_BOOLEAN.withName("cluster"),
     JAVA_BOOLEAN.withName("synchronous_tiling"),
-    Ffm.pad(5),
+    Ffm.pad(1),
   )
 internal val mln_gpu_sync: GroupLayout =
   Ffm.struct(

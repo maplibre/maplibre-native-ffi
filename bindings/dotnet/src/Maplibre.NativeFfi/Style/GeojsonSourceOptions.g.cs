@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for GeoJSON sources.
+/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+/// size.
 /// </summary>
 /// <remarks>
 /// See <c>mln_geojson_source_options</c> in the <see
@@ -21,7 +22,6 @@ public sealed record GeojsonSourceOptions
         set => ClusterPropertiesStorage = ValueArray.CopyOptional(value);
     }
     internal ValueArray<byte>? ClusterPropertiesStorage { get; set; }
-    public uint? TileSize { get; set; }
     public uint? Buffer { get; set; }
     public uint? ClusterRadius { get; set; }
     public uint? ClusterMinPoints { get; set; }

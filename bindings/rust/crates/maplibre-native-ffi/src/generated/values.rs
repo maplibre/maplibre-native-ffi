@@ -1342,17 +1342,17 @@ pub struct GeojsonSourceOptionField: u32 {
     const TOLERANCE = 4;
     const CLUSTER_MAX_ZOOM = 8;
     const CLUSTER_PROPERTIES = 16;
-    const TILE_SIZE = 32;
-    const BUFFER = 64;
-    const CLUSTER_RADIUS = 128;
-    const CLUSTER_MIN_POINTS = 256;
-    const LINE_METRICS = 512;
-    const CLUSTER = 1024;
-    const SYNCHRONOUS_TILING = 2048;
+    const BUFFER = 32;
+    const CLUSTER_RADIUS = 64;
+    const CLUSTER_MIN_POINTS = 128;
+    const LINE_METRICS = 256;
+    const CLUSTER = 512;
+    const SYNCHRONOUS_TILING = 1024;
 }
 }
 
-/// Options for GeoJSON sources.
+/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+/// size.
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1370,8 +1370,6 @@ pub struct GeojsonSourceOptions {
     /// whose members follow the MapLibre Style Spec clusterProperties form. The
     /// UTF-8 bytes are borrowed for the call.
     pub cluster_properties: Option<Vec<u8>>,
-    /// Tile extent in pixels. Defaults to 512.
-    pub tile_size: Option<u32>,
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     pub buffer: Option<u32>,
     /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -1415,10 +1413,6 @@ impl ToNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
         if let Some(item) = &self.cluster_properties {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
             raw.cluster_properties = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.tile_size {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = *item;
         }
         if let Some(item) = &self.buffer {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
@@ -1465,8 +1459,6 @@ impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
                     raw.cluster_properties,
                 )
             }?,
-            tile_size: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0)
-                .then_some(raw.tile_size),
             buffer: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0).then_some(raw.buffer),
             cluster_radius: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0)
                 .then_some(raw.cluster_radius),

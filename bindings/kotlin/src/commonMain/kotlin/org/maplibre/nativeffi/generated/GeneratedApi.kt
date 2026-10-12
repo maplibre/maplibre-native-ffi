@@ -198,7 +198,7 @@ public object GeneratedApi {
    */
   public fun geojsonSourceOptionsDefault(): GeojsonSourceOptions =
     nativeCall(null, null, "mln_geojson_source_options_default") {
-      val out = sized(w(72, 80), 8)
+      val out = sized(w(64, 72), 8)
       C.mln_geojson_source_options_default(out)
       readGeojsonSourceOptions(out)
     }

@@ -387,13 +387,12 @@ public data class GeojsonSourceOptionField(public val rawValue: UInt) {
     public val TOLERANCE: GeojsonSourceOptionField = GeojsonSourceOptionField(4u)
     public val CLUSTER_MAX_ZOOM: GeojsonSourceOptionField = GeojsonSourceOptionField(8u)
     public val CLUSTER_PROPERTIES: GeojsonSourceOptionField = GeojsonSourceOptionField(16u)
-    public val TILE_SIZE: GeojsonSourceOptionField = GeojsonSourceOptionField(32u)
-    public val BUFFER: GeojsonSourceOptionField = GeojsonSourceOptionField(64u)
-    public val CLUSTER_RADIUS: GeojsonSourceOptionField = GeojsonSourceOptionField(128u)
-    public val CLUSTER_MIN_POINTS: GeojsonSourceOptionField = GeojsonSourceOptionField(256u)
-    public val LINE_METRICS: GeojsonSourceOptionField = GeojsonSourceOptionField(512u)
-    public val CLUSTER: GeojsonSourceOptionField = GeojsonSourceOptionField(1024u)
-    public val SYNCHRONOUS_TILING: GeojsonSourceOptionField = GeojsonSourceOptionField(2048u)
+    public val BUFFER: GeojsonSourceOptionField = GeojsonSourceOptionField(32u)
+    public val CLUSTER_RADIUS: GeojsonSourceOptionField = GeojsonSourceOptionField(64u)
+    public val CLUSTER_MIN_POINTS: GeojsonSourceOptionField = GeojsonSourceOptionField(128u)
+    public val LINE_METRICS: GeojsonSourceOptionField = GeojsonSourceOptionField(256u)
+    public val CLUSTER: GeojsonSourceOptionField = GeojsonSourceOptionField(512u)
+    public val SYNCHRONOUS_TILING: GeojsonSourceOptionField = GeojsonSourceOptionField(1024u)
   }
 }
 
@@ -2312,7 +2311,7 @@ public data class FreeCameraOptions(
 )
 
 /**
- * Options for GeoJSON sources.
+ * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile size.
  *
  * See `mln_geojson_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2331,8 +2330,6 @@ public data class GeojsonSourceOptions(
    * the MapLibre Style Spec clusterProperties form. The UTF-8 bytes are borrowed for the call.
    */
   public val clusterProperties: ByteArray? = null,
-  /** Tile extent in pixels. Defaults to 512. */
-  public val tileSize: UInt? = null,
   /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
   public val buffer: UInt? = null,
   /** Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50. */
@@ -2353,7 +2350,6 @@ public data class GeojsonSourceOptions(
       tolerance,
       clusterMaxZoom,
       clusterProperties,
-      tileSize,
       buffer,
       clusterRadius,
       clusterMinPoints,

@@ -197,13 +197,12 @@ typedef enum MLN_BINDING(
   MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 1U << 2U,
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3U,
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 1U << 4U,
-  MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 1U << 5U,
-  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 6U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 7U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8U,
-  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10U,
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 11U,
+  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 5U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 6U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 7U,
+  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 8U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 9U,
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 10U,
 } mln_geojson_source_option_field;
 
 /** Field mask values for mln_custom_geometry_source_options. */
@@ -379,7 +378,8 @@ typedef struct mln_style_tile_source_options {
 } mln_style_tile_source_options;
 
 /**
- * Options for GeoJSON sources.
+ * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+ * size.
  *
  * MapLibre Native fixes these options when the source is created, so
  * mln_map_set_geojson_source_url() keeps the options the source was added
@@ -409,9 +409,6 @@ typedef struct mln_geojson_source_options {
   mln_buffer_view cluster_properties MLN_BINDING(
     "encoding=json;mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES"
   );
-  /** Tile extent in pixels. Defaults to 512. */
-  uint32_t tile_size
-    MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE");
   /** Tile buffer in pixels within [0, 512]. Defaults to 128. */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_BUFFER");

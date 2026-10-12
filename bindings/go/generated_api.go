@@ -305,7 +305,6 @@ const (
 	GeojsonSourceOptionFieldTolerance         GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
 	GeojsonSourceOptionFieldClusterMaxZoom    GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
 	GeojsonSourceOptionFieldClusterProperties GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES)
-	GeojsonSourceOptionFieldTileSize          GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
 	GeojsonSourceOptionFieldBuffer            GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_BUFFER)
 	GeojsonSourceOptionFieldClusterRadius     GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
 	GeojsonSourceOptionFieldClusterMinPoints  GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
@@ -2067,7 +2066,7 @@ func DefaultFreeCameraOptions() FreeCameraOptions {
 }
 
 // GeojsonSourceOptions corresponds to mln_geojson_source_options. Options for
-// GeoJSON sources.
+// GeoJSON sources, indexed and rendered at a fixed 512-pixel tile size.
 //
 // See mln_geojson_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -2084,8 +2083,6 @@ type GeojsonSourceOptions struct {
 	// whose members follow the MapLibre Style Spec clusterProperties form. The
 	// UTF-8 bytes are borrowed for the call.
 	ClusterProperties *[]byte
-	// Tile extent in pixels. Defaults to 512.
-	TileSize *uint32
 	// Tile buffer in pixels within [0, 512]. Defaults to 128.
 	Buffer *uint32
 	// Cluster radius in pixels within [0, 4095]. Defaults to 50.
@@ -2107,7 +2104,6 @@ func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOpt
 	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
 	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
 	result.ClusterProperties = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0, func() []byte { return bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size)) })
-	result.TileSize = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.Buffer = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
 	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
 	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint32 { return uint32(raw.cluster_min_points) })
@@ -2129,7 +2125,6 @@ func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena)
 		raw.cluster_properties = C.mln_buffer_view{data: arena.bytes((*input.ClusterProperties)), size: C.size_t(len((*input.ClusterProperties)))}
 		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
 	}
-	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, input.TileSize, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, input.ClusterRadius, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])

@@ -1113,7 +1113,6 @@ pub const GeojsonSourceOptionField = struct {
     tolerance: bool = false,
     cluster_max_zoom: bool = false,
     cluster_properties: bool = false,
-    tile_size: bool = false,
     buffer: bool = false,
     cluster_radius: bool = false,
     cluster_min_points: bool = false,
@@ -1121,7 +1120,7 @@ pub const GeojsonSourceOptionField = struct {
     cluster: bool = false,
     synchronous_tiling: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -1130,7 +1129,8 @@ pub const GeojsonSourceOptionField = struct {
     pub const unionWith = methods.unionWith;
 };
 
-/// Options for GeoJSON sources.
+/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+/// size.
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1140,7 +1140,6 @@ pub const GeojsonSourceOptions = struct {
     tolerance: ?f64 = null,
     cluster_max_zoom: ?f64 = null,
     cluster_properties: ?[]const u8 = null,
-    tile_size: ?u32 = null,
     buffer: ?u32 = null,
     cluster_radius: ?u32 = null,
     cluster_min_points: ?u32 = null,
@@ -1161,7 +1160,6 @@ pub const GeojsonSourceOptions = struct {
             raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
             raw.cluster_properties = marshal.view(item);
         }
-        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, self.tile_size);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, self.cluster_radius);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
@@ -1178,7 +1176,6 @@ pub const GeojsonSourceOptions = struct {
             .tolerance = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0) raw.tolerance else null,
             .cluster_max_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0) raw.cluster_max_zoom else null,
             .cluster_properties = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0) try marshal.copyView(allocator, raw.cluster_properties) else null,
-            .tile_size = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0) raw.tile_size else null,
             .buffer = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0) raw.buffer else null,
             .cluster_radius = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0) raw.cluster_radius else null,
             .cluster_min_points = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,

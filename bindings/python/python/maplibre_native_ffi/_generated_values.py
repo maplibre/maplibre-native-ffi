@@ -392,13 +392,12 @@ class GeojsonSourceOptionField(IntFlag):
     TOLERANCE = 4
     CLUSTER_MAX_ZOOM = 8
     CLUSTER_PROPERTIES = 16
-    TILE_SIZE = 32
-    BUFFER = 64
-    CLUSTER_RADIUS = 128
-    CLUSTER_MIN_POINTS = 256
-    LINE_METRICS = 512
-    CLUSTER = 1024
-    SYNCHRONOUS_TILING = 2048
+    BUFFER = 32
+    CLUSTER_RADIUS = 64
+    CLUSTER_MIN_POINTS = 128
+    LINE_METRICS = 256
+    CLUSTER = 512
+    SYNCHRONOUS_TILING = 1024
 
 
 class GesturePhase(UnknownIntEnum):
@@ -1662,7 +1661,8 @@ class FreeCameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class GeojsonSourceOptions:
-    """Options for GeoJSON sources.
+    """Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel
+    tile size.
 
     See `mln_geojson_source_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1673,7 +1673,6 @@ class GeojsonSourceOptions:
     tolerance: float | None = None
     cluster_max_zoom: float | None = None
     cluster_properties: bytes | None = None
-    tile_size: int | None = None
     buffer: int | None = None
     cluster_radius: int | None = None
     cluster_min_points: int | None = None
@@ -1689,7 +1688,6 @@ class GeojsonSourceOptions:
             tolerance=raw["tolerance"],
             cluster_max_zoom=raw["cluster_max_zoom"],
             cluster_properties=raw["cluster_properties"],
-            tile_size=raw["tile_size"],
             buffer=raw["buffer"],
             cluster_radius=raw["cluster_radius"],
             cluster_min_points=raw["cluster_min_points"],

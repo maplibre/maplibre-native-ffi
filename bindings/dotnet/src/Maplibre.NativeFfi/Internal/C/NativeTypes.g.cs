@@ -248,7 +248,6 @@ internal unsafe struct mln_geojson_source_options
     public double tolerance;
     public double cluster_max_zoom;
     public mln_buffer_view cluster_properties;
-    public uint tile_size;
     public uint buffer;
     public uint cluster_radius;
     public uint cluster_min_points;
@@ -1296,13 +1295,12 @@ internal enum mln_geojson_source_option_field : uint
     MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4,
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8,
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16,
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 32,
-    MLN_GEOJSON_SOURCE_OPTION_BUFFER = 64,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 128,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 256,
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 512,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1024,
-    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 2048,
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER = 32,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 64,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 128,
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 256,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 512,
+    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1024,
 }
 
 internal enum mln_gesture_phase : uint

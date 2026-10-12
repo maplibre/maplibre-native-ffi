@@ -947,10 +947,6 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
       arena,
     );
   }
-  if (value.tileSize != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
-    result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
-  }
   if (value.buffer != null) {
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
     result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
@@ -1005,9 +1001,6 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
   clusterProperties:
       (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES) != 0
       ? _copyBufferView(source.cluster_properties)
-      : null,
-  tileSize: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE) != 0
-      ? source.tile_size
       : null,
   buffer: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0
       ? source.buffer

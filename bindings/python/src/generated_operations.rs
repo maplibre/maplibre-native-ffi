@@ -630,14 +630,6 @@ fn generated_copy_mln_geojson_source_options(
         )?,
     )?;
     dict.set_item(
-        "tile_size",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0,
-            || generated_value(py, value.tile_size),
-        )?,
-    )?;
-    dict.set_item(
         "buffer",
         generated_optional(
             py,
@@ -3162,10 +3154,6 @@ fn generated_input_mln_geojson_source_options<'py>(
     if let Some(field) = generated_present(value, "cluster_properties")? {
         raw.cluster_properties = storage.buffer(field, false)?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-    }
-    if let Some(field) = generated_present(value, "tile_size")? {
-        raw.tile_size = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
     }
     if let Some(field) = generated_present(value, "buffer")? {
         raw.buffer = field.extract::<u32>()?;

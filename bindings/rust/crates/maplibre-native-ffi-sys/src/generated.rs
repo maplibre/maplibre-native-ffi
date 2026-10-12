@@ -90,13 +90,12 @@ pub const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM: mln_geojson_source_option_field = 
 pub const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE: mln_geojson_source_option_field = 4;
 pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM: mln_geojson_source_option_field = 8;
 pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES: mln_geojson_source_option_field = 16;
-pub const MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE: mln_geojson_source_option_field = 32;
-pub const MLN_GEOJSON_SOURCE_OPTION_BUFFER: mln_geojson_source_option_field = 64;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geojson_source_option_field = 128;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geojson_source_option_field = 256;
-pub const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS: mln_geojson_source_option_field = 512;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER: mln_geojson_source_option_field = 1024;
-pub const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geojson_source_option_field = 2048;
+pub const MLN_GEOJSON_SOURCE_OPTION_BUFFER: mln_geojson_source_option_field = 32;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geojson_source_option_field = 64;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geojson_source_option_field = 128;
+pub const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS: mln_geojson_source_option_field = 256;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER: mln_geojson_source_option_field = 512;
+pub const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geojson_source_option_field = 1024;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -670,7 +669,6 @@ pub struct mln_geojson_source_options {
     pub tolerance: f64,
     pub cluster_max_zoom: f64,
     pub cluster_properties: mln_buffer_view,
-    pub tile_size: u32,
     pub buffer: u32,
     pub cluster_radius: u32,
     pub cluster_min_points: u32,

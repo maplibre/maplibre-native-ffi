@@ -335,19 +335,19 @@ public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 8)
   public static let clusterProperties: GeojsonSourceOptionField =
     .init(rawValue: 16)
-  public static let tileSize: GeojsonSourceOptionField = .init(rawValue: 32)
-  public static let buffer: GeojsonSourceOptionField = .init(rawValue: 64)
+  public static let buffer: GeojsonSourceOptionField = .init(rawValue: 32)
   public static let clusterRadius: GeojsonSourceOptionField =
-    .init(rawValue: 128)
+    .init(rawValue: 64)
   public static let clusterMinPoints: GeojsonSourceOptionField =
-    .init(rawValue: 256)
-  public static let lineMetrics: GeojsonSourceOptionField = .init(rawValue: 512)
-  public static let cluster: GeojsonSourceOptionField = .init(rawValue: 1024)
+    .init(rawValue: 128)
+  public static let lineMetrics: GeojsonSourceOptionField = .init(rawValue: 256)
+  public static let cluster: GeojsonSourceOptionField = .init(rawValue: 512)
   public static let synchronousTiling: GeojsonSourceOptionField =
-    .init(rawValue: 2048)
+    .init(rawValue: 1024)
 }
 
-/// Options for GeoJSON sources.
+/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+/// size.
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -364,8 +364,6 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// whose members follow the MapLibre Style Spec clusterProperties form. The
   /// UTF-8 bytes are borrowed for the call.
   public var clusterProperties: Data?
-  /// Tile extent in pixels. Defaults to 512.
-  public var tileSize: UInt32?
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
   /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -388,7 +386,6 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
     tolerance: Double? = GeojsonSourceOptions.default.tolerance,
     clusterMaxZoom: Double? = GeojsonSourceOptions.default.clusterMaxZoom,
     clusterProperties: Data? = GeojsonSourceOptions.default.clusterProperties,
-    tileSize: UInt32? = GeojsonSourceOptions.default.tileSize,
     buffer: UInt32? = GeojsonSourceOptions.default.buffer,
     clusterRadius: UInt32? = GeojsonSourceOptions.default.clusterRadius,
     clusterMinPoints: UInt32? = GeojsonSourceOptions.default.clusterMinPoints,
@@ -401,7 +398,6 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
     self.tolerance = tolerance
     self.clusterMaxZoom = clusterMaxZoom
     self.clusterProperties = clusterProperties
-    self.tileSize = tileSize
     self.buffer = buffer
     self.clusterRadius = clusterRadius
     self.clusterMinPoints = clusterMinPoints
@@ -428,8 +424,6 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
         data: raw.cluster_properties.data,
         size: raw.cluster_properties.size
       ) : nil
-    tileSize = raw.fields & MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
-      .rawValue != 0 ? raw.tile_size : nil
     buffer = raw.fields & MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw
       .buffer : nil
     clusterRadius = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
@@ -470,10 +464,6 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
     if let item = clusterProperties {
       raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES.rawValue; raw
         .cluster_properties = arena.view(item)
-    }
-    if let item = tileSize {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE.rawValue; raw
-        .tile_size = item
     }
     if let item = buffer {
       raw.fields |= MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue; raw

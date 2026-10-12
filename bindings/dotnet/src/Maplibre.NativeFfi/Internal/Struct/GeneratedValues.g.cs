@@ -676,9 +676,6 @@ internal static unsafe class GeneratedValues
                     ? ValueStructs.CopyBufferView(value.cluster_properties)
                     : null
             ),
-            TileSize = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
-                ? value.tile_size
-                : null,
             Buffer = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_BUFFER) ? value.buffer : null,
             ClusterRadius = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
                 ? value.cluster_radius
@@ -730,11 +727,6 @@ internal static unsafe class GeneratedValues
             ref native.cluster_properties,
             MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
             present => scope.Buffer(present)
-        );
-        native.fields |= Put(
-            value.TileSize,
-            ref native.tile_size,
-            MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
         );
         native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEOJSON_SOURCE_OPTION_BUFFER);
         native.fields |= Put(

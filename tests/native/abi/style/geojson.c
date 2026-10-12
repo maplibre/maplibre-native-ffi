@@ -76,7 +76,7 @@ static void every_option(mln_geojson_source_options* options) {
     MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
     MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
@@ -87,7 +87,6 @@ static void every_option(mln_geojson_source_options* options) {
   options->cluster_max_zoom = 12.0;
   options->cluster_properties =
     MLN_BUFFER_LITERAL("{\"total\":[\"+\",[\"get\",\"weight\"]]}");
-  options->tile_size = 256;
   options->buffer = 64;
   options->cluster_radius = 40;
   options->cluster_min_points = 3;
@@ -137,10 +136,6 @@ static void cluster_zoom_out_of_range(mln_geojson_source_options* options) {
 static void fractional_cluster_zoom(mln_geojson_source_options* options) {
   every_option(options);
   options->cluster_max_zoom = 1.5;
-}
-static void empty_tiles(mln_geojson_source_options* options) {
-  every_option(options);
-  options->tile_size = 0;
 }
 static void oversized_buffer(mln_geojson_source_options* options) {
   every_option(options);
@@ -232,7 +227,6 @@ static const geojson_data_case geojson_data_cases[] = {
    0,
    fractional_cluster_zoom,
    {"cluster_max_zoom"}},
-  {"empty tiles", POINT_COLLECTION("a"), 0, empty_tiles, {"tile_size"}},
   {"oversized buffer", POINT_COLLECTION("a"), 0, oversized_buffer, {"buffer"}},
   {"oversized cluster radius",
    POINT_COLLECTION("a"),
@@ -616,15 +610,16 @@ static const char nearby_points[] =
   "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
   "\"coordinates\":[0.002,0.002]},\"properties\":{}}]}";
 
-// Renders the nearby points with `options` and waits until the source holds
+// Renders the points with `options` and waits until the source holds
 // `count` features, the first of which contains `text` when it is non-null.
-static void render_nearby_points(
-  const mln_geojson_source_options* options, size_t count, const char* text
+static void render_points(
+  const char* points, const mln_geojson_source_options* options, size_t count,
+  const char* text
 ) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  mln_geojson_source_data data = prepare(nearby_points, options);
+  mln_geojson_source_data data = prepare(points, options);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
   ));
@@ -659,7 +654,7 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
     MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM |
     MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
     MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
@@ -667,15 +662,32 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
   options.max_zoom = 20.0;
   options.tolerance = 0.5;
   options.cluster_max_zoom = 20.0;
-  options.tile_size = 256;
   options.buffer = 64;
   options.cluster_radius = 60;
   options.cluster_min_points = 2;
   options.line_metrics = true;
   options.cluster = true;
-  render_nearby_points(&options, 1, "\"point_count\":3");
+  render_points(nearby_points, &options, 1, "\"point_count\":3");
   options.cluster_min_points = 4;
-  render_nearby_points(&options, 3, NULL);
+  render_points(nearby_points, &options, 3, NULL);
+}
+
+static void geojson_clustering_uses_a_fixed_512_pixel_tile(void) {
+  // At zoom 0, 11.25 degrees spans 16 pixels of a 512-pixel world tile.
+  const char* points =
+    "{\"type\":\"FeatureCollection\",\"features\":["
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[0,0]},\"properties\":{}},"
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[11.25,0]},\"properties\":{}}]}";
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  options.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
+                   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+  options.cluster = true;
+  options.cluster_radius = 15;
+  render_points(points, &options, 2, NULL);
+  options.cluster_radius = 17;
+  render_points(points, &options, 1, "\"point_count\":2");
 }
 
 // A URL source loads its data through the runtime's resource provider when it
@@ -736,5 +748,6 @@ MLN_TEST_GROUP {
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);
+  RUN_TEST(geojson_clustering_uses_a_fixed_512_pixel_tile);
   RUN_TEST(a_url_source_loads_through_the_resource_provider);
 }

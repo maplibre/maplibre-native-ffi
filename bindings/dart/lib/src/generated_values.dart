@@ -272,13 +272,12 @@ final class GeojsonSourceOptionField extends _Flags<GeojsonSourceOptionField> {
   static const tolerance = GeojsonSourceOptionField.fromRawValue(4);
   static const clusterMaxZoom = GeojsonSourceOptionField.fromRawValue(8);
   static const clusterProperties = GeojsonSourceOptionField.fromRawValue(16);
-  static const tileSize = GeojsonSourceOptionField.fromRawValue(32);
-  static const buffer = GeojsonSourceOptionField.fromRawValue(64);
-  static const clusterRadius = GeojsonSourceOptionField.fromRawValue(128);
-  static const clusterMinPoints = GeojsonSourceOptionField.fromRawValue(256);
-  static const lineMetrics = GeojsonSourceOptionField.fromRawValue(512);
-  static const cluster = GeojsonSourceOptionField.fromRawValue(1024);
-  static const synchronousTiling = GeojsonSourceOptionField.fromRawValue(2048);
+  static const buffer = GeojsonSourceOptionField.fromRawValue(32);
+  static const clusterRadius = GeojsonSourceOptionField.fromRawValue(64);
+  static const clusterMinPoints = GeojsonSourceOptionField.fromRawValue(128);
+  static const lineMetrics = GeojsonSourceOptionField.fromRawValue(256);
+  static const cluster = GeojsonSourceOptionField.fromRawValue(512);
+  static const synchronousTiling = GeojsonSourceOptionField.fromRawValue(1024);
   @override
   GeojsonSourceOptionField _of(int rawValue) =>
       GeojsonSourceOptionField.fromRawValue(rawValue);
@@ -2334,7 +2333,8 @@ final class FreeCameraOptions extends _Value {
   List<Object?> get _members => [position, orientation];
 }
 
-/// Options for GeoJSON sources.
+/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
+/// size.
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2345,7 +2345,6 @@ final class GeojsonSourceOptions extends _Value {
     this.tolerance,
     this.clusterMaxZoom,
     Uint8List? clusterProperties,
-    this.tileSize,
     this.buffer,
     this.clusterRadius,
     this.clusterMinPoints,
@@ -2373,9 +2372,6 @@ final class GeojsonSourceOptions extends _Value {
   /// UTF-8 bytes are borrowed for the call.
   final Uint8List? clusterProperties;
 
-  /// Tile extent in pixels. Defaults to 512.
-  final int? tileSize;
-
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   final int? buffer;
 
@@ -2401,7 +2397,6 @@ final class GeojsonSourceOptions extends _Value {
     tolerance,
     clusterMaxZoom,
     clusterProperties,
-    tileSize,
     buffer,
     clusterRadius,
     clusterMinPoints,

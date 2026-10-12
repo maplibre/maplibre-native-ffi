@@ -66,7 +66,7 @@ void main() {
     expect(
       () => geojsonSourceDataCreate(
         jsonBytes(_featureCollection),
-        options: GeojsonSourceOptions(tileSize: 4294967296),
+        options: GeojsonSourceOptions(buffer: 4294967296),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
