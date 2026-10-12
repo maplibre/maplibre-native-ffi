@@ -195,16 +195,18 @@ ramp reads had changed. A write to an unrelated key in the same update therefore
 left an added layer with an empty ramp, and a changed layer with outdated
 colors. Native map pixel regressions cover both cases for all three layer types.
 
-`0040-destroy-thread-local-run-loop.patch` keeps the destructor of the run loop
-that `Scheduler::GetCurrent()` creates for a thread with no scheduler. The
-library compiles MapLibre Native without static destructors, so that nothing a
-MapLibre thread reads is destroyed while the process exits, and that option also
-drops thread-local destructors. The run loop is the MapLibre thread-local state
-that owns resources, so the patch marks it `[[clang::always_destroy]]` to free
-it when its thread ends. Vendored glslang's per-thread default pool allocator
-also loses its destructor; glslang compiles shaders in pools that `TShader` and
-`TProgram` own, so a thread leaks only what it allocated from the default pool
-outside them. Upstream: not applicable; it serves this build's compile options.
+`0040-destroy-thread-local-run-loop.patch` preserves thread-exit cleanup for the
+run loop that `Scheduler::GetCurrent()` creates for a thread with no scheduler.
+It applies `[[clang::always_destroy]]` when the compiler supports the attribute
+and leaves other compilers' normal destruction unchanged. This supports builds
+that disable static destructors, including this library's
+`-fno-c++-static-destructors` build. The option keeps state that MapLibre
+threads read alive during process exit, and also disables thread-local
+destructors. The run loop owns resources that its destructor frees when its
+thread ends. Vendored glslang's per-thread default pool allocator also loses its
+destructor; glslang compiles shaders in pools that `TShader` and `TProgram` own,
+so a thread leaks only what it allocated from the default pool outside them.
+Upstream: not yet proposed.
 
 `0041-cancel-camera-transitions-by-id.patch` adds an optional
 `AnimationOptions::transitionId` and a `cancelTransitions(uint64_t)` overload on
