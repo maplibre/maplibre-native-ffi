@@ -1203,7 +1203,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies the latest immutable state published by the map worker.
+    /// Copies the map's latest published snapshot.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_get_snapshot</c> in the <see
@@ -2331,7 +2331,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     /// <summary>
     /// Submits a global-state JSON value. JSON null restores the style default.
-    /// Input is copied before return.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_set_global_state_property</c> in the <see

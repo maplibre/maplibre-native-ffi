@@ -4,7 +4,7 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  /// Creates a map on the runtime worker.
+  /// Starts creation of a map on the runtime.
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

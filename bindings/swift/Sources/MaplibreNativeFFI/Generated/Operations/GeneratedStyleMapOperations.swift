@@ -889,7 +889,6 @@ public extension MapHandle {
   }
 
   /// Submits a global-state JSON value. JSON null restores the style default.
-  /// Input is copied before return.
   ///
   /// See `mln_map_set_global_state_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

@@ -3377,10 +3377,7 @@ public data class RuntimeEvent(
   public val type: RuntimeEventType,
   /** One of `mln_runtime_event_source_type`. */
   public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType(0u),
-  /**
-   * Source handle selected by source_type: an `mln_runtime` or an `mln_map`. Every handle type is
-   * uint64_t, so this needs no cast.
-   */
+  /** Source handle selected by source_type: an `mln_runtime` or an `mln_map`. */
   public val source: ULong = 0uL,
   /**
    * Map snapshot generation that the event reports, or zero when source_type is

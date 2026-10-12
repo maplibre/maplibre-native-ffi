@@ -118,7 +118,7 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Creates a runtime with a new core-owned worker.
+    /// Creates a runtime.
     /// </summary>
     /// <remarks>
     /// See <c>mln_runtime_create</c> in the <see
@@ -136,7 +136,7 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Creates a map on the runtime worker.
+    /// Starts creation of a map on the runtime.
     /// </summary>
     /// <remarks>
     /// See <c>mln_runtime_create_map</c> in the <see
@@ -376,7 +376,7 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Releases a runtime after synchronous child preflight.
+    /// Starts release of a runtime after checking its children.
     /// </summary>
     /// <remarks>
     /// See <c>mln_runtime_release</c> in the <see

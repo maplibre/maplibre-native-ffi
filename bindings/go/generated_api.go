@@ -3849,8 +3849,7 @@ type RuntimeEvent struct {
 	Type RuntimeEventType
 	// One of mln_runtime_event_source_type.
 	SourceType RuntimeEventSourceType
-	// Source handle selected by source_type: an mln_runtime or an mln_map. Every
-	// handle type is uint64_t, so this needs no cast.
+	// Source handle selected by source_type: an mln_runtime or an mln_map.
 	Source uint64
 	// Map snapshot generation that the event reports, or zero when source_type is
 	// MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
@@ -6726,7 +6725,7 @@ func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
 	}, completionOf(copyViewBytes))
 }
 
-// GetSnapshot copies the latest immutable state published by the map worker.
+// GetSnapshot copies the map's latest published snapshot.
 //
 // See mln_map_get_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -7298,7 +7297,7 @@ func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Fu
 }
 
 // SetGlobalStateProperty submits a global-state JSON value. JSON null restores
-// the style default. Input is copied before return.
+// the style default.
 //
 // See mln_map_set_global_state_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -8137,7 +8136,7 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], erro
 	}, completionUnit)
 }
 
-// RuntimeCreate creates a runtime with a new core-owned worker.
+// RuntimeCreate creates a runtime.
 //
 // See mln_runtime_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8152,7 +8151,7 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 	})
 }
 
-// CreateMap creates a map on the runtime worker.
+// CreateMap starts creation of a map on the runtime.
 //
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -8262,7 +8261,7 @@ func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Fu
 	}, completionListOf(copyOfflineRegionInfo))
 }
 
-// Close releases a runtime after synchronous child preflight.
+// Close starts release of a runtime after checking its children.
 //
 // See mln_runtime_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html

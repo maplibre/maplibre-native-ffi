@@ -1052,7 +1052,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies the latest immutable state published by the map worker.
+   * Copies the map's latest published snapshot.
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1890,8 +1890,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Submits a global-state JSON value. JSON null restores the style default. Input is copied before
-   * return.
+   * Submits a global-state JSON value. JSON null restores the style default.
    *
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

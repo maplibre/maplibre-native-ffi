@@ -850,7 +850,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.get_loaded_style_json()
 
     def get_snapshot(self) -> MapSnapshot:
-        """Copies the latest immutable state published by the map worker.
+        """Copies the map's latest published snapshot.
 
         See `mln_map_get_snapshot` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1298,7 +1298,7 @@ class _MapHandleOperations(GeneratedOperations):
         self, property_name: str, value: bytes
     ) -> Future[CommandCompletion]:
         """Submits a global-state JSON value. JSON null restores the style
-        default. Input is copied before return.
+        default.
 
         See `mln_map_set_global_state_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2067,7 +2067,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.clear_resource_transform()
 
     def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
-        """Creates a map on the runtime worker.
+        """Starts creation of a map on the runtime.
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2170,7 +2170,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def close(self) -> Future[None]:
-        """Releases a runtime after synchronous child preflight.
+        """Starts release of a runtime after checking its children.
 
         See `mln_runtime_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2433,7 +2433,7 @@ def rendered_query_geometry_point(point: ScreenPoint) -> RenderedQueryGeometry:
 
 
 def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
-    """Creates a runtime with a new core-owned worker.
+    """Creates a runtime.
 
     See `mln_runtime_create` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

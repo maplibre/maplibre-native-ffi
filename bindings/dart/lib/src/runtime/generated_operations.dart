@@ -3805,7 +3805,7 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
       return _readRenderedQueryGeometry(nativeResult);
     });
 
-/// Creates a runtime with a new core-owned worker.
+/// Creates a runtime.
 ///
 /// See `mln_runtime_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5207,7 +5207,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Copies the latest immutable state published by the map worker.
+  /// Copies the map's latest published snapshot.
   ///
   /// See `mln_map_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5871,7 +5871,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       );
 
   /// Submits a global-state JSON value. JSON null restores the style default.
-  /// Input is copied before return.
   ///
   /// See `mln_map_set_global_state_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -7231,7 +7230,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Creates a map on the runtime worker.
+  /// Starts creation of a map on the runtime.
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -7395,7 +7394,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Releases a runtime after synchronous child preflight.
+  /// Starts release of a runtime after checking its children.
   ///
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

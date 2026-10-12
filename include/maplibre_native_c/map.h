@@ -907,8 +907,8 @@ typedef struct mln_projected_meters {
 /**
  * MapLibre axonometric rendering options used for snapshots and commands.
  *
- * MapLibre Native names this native type ProjectionMode. It controls the live
- * map render transform, not the geographic coordinate model.
+ * These control the live map render transform. Geographic coordinates retain
+ * their coordinate model.
  */
 typedef struct mln_projection_mode {
   uint32_t size;
@@ -1029,7 +1029,7 @@ typedef struct mln_camera_query_result {
 MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Creates a map on the runtime worker.
+ * Starts creation of a map on the runtime.
  *
  * Input is copied before this function returns. The completion value points to
  * one mln_map handle when status is MLN_STATUS_OK.
@@ -1054,7 +1054,7 @@ MLN_API mln_status mln_runtime_create_map(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the latest immutable state published by the map worker.
+ * Copies the map's latest published snapshot.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1082,8 +1082,8 @@ MLN_API mln_status mln_map_get_snapshot(
  * resize to a different extent leaves the session waiting for an update that
  * the map never publishes. The completion reports terminal disposition and
  * the snapshot generation that the resize published. A resize that a later
- * one replaces before the worker runs it completes as superseded, including a
- * resize that an attach replaces. A resize to the map's current width and
+ * one replaces before it runs completes as superseded, including a resize
+ * that an attach replaces. A resize to the map's current width and
  * height changes nothing and publishes no render update.
  *
  * Returns:
@@ -1096,7 +1096,7 @@ MLN_API mln_status mln_map_get_snapshot(
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the size throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the size throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_resize(
@@ -1195,10 +1195,9 @@ MLN_API mln_status mln_map_end_command_group(
  * return. state must contain one UTF-8 JSON object and is validated before
  * return. The committed command requests a map repaint.
  *
- * Feature state belongs to the map. A render session pushes it into the
- * renderer on the next render update, including the first presented frame that
- * contains the source. mln_map_get_feature_state copies this map store, not
- * the last rendered frame.
+ * Feature state belongs to the map and applies to the next render update,
+ * including the first presented frame that contains the source.
+ * mln_map_get_feature_state() reads the map's state.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1288,9 +1287,7 @@ MLN_API mln_status mln_map_remove_feature_state(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_STATE when a still-image request was already pending
- *   when this one reached the map worker, or when the map was inside a command
- *   group, whose held update would leave the request bound to a stale update
- *   generation.
+ *   when this request ran, or when the map had an open command group.
  * - MLN_STATUS_CANCELLED when the map closes before the image is produced.
  * - MLN_STATUS_NATIVE_ERROR when rendering the image fails.
  */
@@ -1324,10 +1321,9 @@ MLN_API mln_status mln_map_release(
 /**
  * Consumes a map handle without observing its asynchronous retirement.
  *
- * For an eligible live handle, disposal admission and scheduling use storage
- * reserved at creation and require no allocation or new thread. Native
- * retirement releases callback state and resources on their required execution
- * contexts. Attached sessions retain the map until they detach or retire.
+ * Disposal of an eligible live handle allocates no memory and starts no thread.
+ * Retirement releases callback state and resources on their required threads.
+ * Attached sessions retain the map until they detach or retire.
  * A successful call consumes the handle before returning. A failed
  * call retains caller ownership.
  *
@@ -1394,7 +1390,7 @@ MLN_API mln_status mln_map_set_style_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the copy throws.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_loaded_style_json(
@@ -1414,7 +1410,7 @@ MLN_API mln_status mln_map_get_loaded_style_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the copy throws.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view")
 MLN_API mln_status mln_map_get_style_url(
@@ -1424,23 +1420,19 @@ MLN_API mln_status mln_map_get_style_url(
 /**
  * Selects which map-originated event types this map queues.
  *
- * MapLibre Native reports map state through the observer callbacks behind these
- * events, and this mask decides which of them become queued events. An event of
- * an unselected type is never built and never queued, so it reaches no batch
- * and raises no wake flag.
+ * An unselected event type reaches no event batch and raises no wake.
  *
- * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores
- * the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
+ * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
+ * in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
+ * MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
  * mln_map_get_snapshot() reports the last committed mask.
  *
  * A map that has not been narrowed selects every map-originated event type this
  * library reports, which covers types a caller's header may not declare. A new
  * mask applies to later events and keeps the events already queued.
  *
- * One unread render-update event covers every invalidation queued behind it,
- * compared against the queue tail. Leaving out a type that used to arrive
- * between two render updates makes those two updates adjacent, so they coalesce
- * into one.
+ * Adjacent unread render-update events for the same map coalesce into one.
+ * Suppressing an intervening event can therefore combine render updates.
  *
  * Select every event type the host reads. These types carry state a host
  * reaches no other way:

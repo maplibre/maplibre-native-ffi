@@ -146,7 +146,8 @@ typedef enum mln_runtime_event_type : uint32_t {
  * MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores the rest.
  * mln_runtime_set_event_mask() reads the bits in
  * MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and ignores the rest. Both entry
- * points therefore accept MLN_RUNTIME_EVENT_MASK_ALL, and a host that reads a
+ * points accept MLN_RUNTIME_EVENT_MASK_ALL and reject bits outside it. A host
+ * that reads a
  * mask, sets one bit, and writes it back keeps every other bit.
  */
 typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
@@ -416,9 +417,8 @@ typedef struct mln_runtime_options {
 /**
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
  *
- * This struct has no size field, because it is a member of
- * mln_runtime_event_payload. mln_event_batch_view.event_size covers the
- * whole event, including its payload.
+ * mln_event_batch_view.event_size covers the whole event, including these
+ * statistics.
  */
 typedef struct mln_rendering_stats {
   /** Frame CPU encoding time in seconds. */
@@ -538,7 +538,6 @@ typedef struct mln_runtime_event {
   uint32_t source_type MLN_BINDING("enum=mln_runtime_event_source_type");
   /**
    * Source handle selected by source_type: an mln_runtime or an mln_map.
-   * Every handle type is uint64_t, so this needs no cast.
    *
    * The value names one object for the life of the process, so a host may
    * compare it against a handle it holds even after that handle is released.
@@ -659,9 +658,8 @@ MLN_API mln_status mln_resource_transform_response_set_url(
  * - The callback must be thread-safe, return quickly, and must not call C API
  *   functions other than mln_resource_transform_response_set_url().
  * - url and out_response are borrowed for the callback duration.
- * - Use mln_resource_transform_response_set_url() to set a replacement URL from
- *   temporary host-language storage. The helper copies the URL into C
- *   API-managed storage for the current transform invocation.
+ * - Use mln_resource_transform_response_set_url() for a replacement URL whose
+ *   storage expires before the callback returns.
  * - A non-OK return status is treated as no rewrite and does not fail the
  *   resource request.
  * - The C API invokes release_user_data after the final callback returns.
@@ -885,8 +883,8 @@ typedef struct mln_resource_response {
  * Request handling follows these rules:
  *
  * - request and its pointed-to fields are borrowed for the callback duration.
- * - MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH lets native OnlineFileSource
- *   handle the request.
+ * - MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH uses the built-in network
+ *   loader.
  * - After returning PASS_THROUGH, the provider must not retain, complete, or
  *   release the handle.
  * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
@@ -1003,12 +1001,11 @@ typedef struct mln_resource_provider {
 MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Creates a runtime with a new core-owned worker.
+ * Creates a runtime.
  *
- * The calling thread blocks until worker initialization completes, so in the
- * browser it must be a Web Worker rather than the main thread, which cannot
- * block. The output must point to the null handle and receives ownership of the
- * runtime on success.
+ * The call blocks until initialization completes. In the browser, call from a
+ * Web Worker; the main thread cannot block. The output must point to the null
+ * handle and receives ownership of the runtime on success.
  *
  * Returns:
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
@@ -1016,7 +1013,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  *   small, options->event_mask holds unknown bits, the wake descriptor is
  *   invalid, or out_runtime is null or does not point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
- * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
+ * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
  */
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options,
@@ -1027,9 +1024,8 @@ MLN_API mln_status mln_runtime_create(
 /**
  * Registers or replaces a runtime-scoped network resource provider.
  *
- * It is invoked for requests that reach the C API network file source. Built-in
- * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
- * native MainResourceLoader before this extension point.
+ * The provider handles network requests. Built-in non-network schemes such as
+ * file, asset, mbtiles, and pmtiles bypass it.
  *
  * The provider sees every network request, including one the ambient cache
  * holds a fresh copy of. MapLibre delivers the cached copy first, then asks the
@@ -1048,9 +1044,8 @@ MLN_API mln_status mln_runtime_create(
  * until native runtime teardown finishes. Requests that the previous provider
  * already handled retain their request handles.
  *
- * Native OnlineFileSource claims every remaining scheme. A URL with an
- * unrecognized scheme, such as jar:file:, reaches this callback and completes
- * as an HTTP error when the provider passes it through.
+ * A URL with an unrecognized scheme, such as jar:file:, reaches this callback
+ * and completes as an HTTP error when the provider passes it through.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1213,10 +1208,9 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
 /**
  * Registers or updates a runtime-scoped URL transform for network resources.
  *
- * It is forwarded to MapLibre's OnlineFileSource, so it applies wherever native
- * OnlineFileSource applies transforms, including nested PMTiles network range
- * requests. It does not apply to file, asset, database, MBTiles, or registered
- * C API provider responses intercepted before OnlineFileSource.
+ * The transform applies to built-in network loading, including nested PMTiles
+ * network range requests. It does not apply to file, asset, database, MBTiles,
+ * or requests handled by a registered C API provider.
  *
  * The function copies the transform shape and accepts the change from any
  * thread. Execution is ordered with every other command for this runtime.
@@ -1389,7 +1383,7 @@ MLN_API mln_status mln_runtime_barrier(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases a runtime after synchronous child preflight.
+ * Starts release of a runtime after checking its children.
  *
  * The call rejects a runtime that has live or pending children and leaves it
  * open. A runtime's children are its maps, including a map whose creation was
@@ -1403,11 +1397,9 @@ MLN_API mln_status mln_runtime_barrier(
  *
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown, has finished and the runtime's threads and
- * resources are gone. It runs on the native thread that retires runtimes,
- * which other runtimes' teardown shares, so it MUST NOT block. This runtime's
- * retirement touches no library state after the callback returns; the thread
- * then goes on to retire other runtimes. A host that outlives its runtimes may
- * pass a discarding completion.
+ * resources are gone. The completion MUST NOT block. This runtime's retirement
+ * touches no library state after the callback returns. A host that outlives
+ * its runtimes may pass a discarding completion.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
@@ -1466,10 +1458,9 @@ MLN_API mln_status mln_runtime_release(
 /**
  * Consumes a runtime handle without observing its asynchronous retirement.
  *
- * For an eligible live handle, disposal admission and scheduling use storage
- * reserved at creation and require no allocation or new thread. Native
- * retirement releases callback state and resources on their required execution
- * contexts. A successful call consumes the handle before returning. A failed
+ * Disposal of an eligible live handle allocates no memory and starts no thread.
+ * Retirement releases callback state and resources on their required threads.
+ * A successful call consumes the handle before returning. A failed
  * call retains caller ownership. Retirement waits for live and pending children
  * and accepted work. Existing children retain their own cleanup obligations;
  * dispose or release them to let the runtime finish retiring.
@@ -1496,9 +1487,8 @@ MLN_API mln_status mln_runtime_dispose(
  * This queue operation may be called from any thread. Concurrent drains are
  * serialized and each event enters exactly one returned batch.
  *
- * The map and runtime subscription masks suppress unselected events before
- * their payloads, messages, queue records, and wakeups are produced. A runtime
- * whose release has begun no longer drains; events it already queued are
+ * Unselected events reach no batch and raise no wake. A runtime whose release
+ * has begun no longer drains; events it already queued are
  * discarded with the runtime.
  *
  * Returns:
@@ -1551,10 +1541,10 @@ MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
  * declare. A new mask applies to later events and keeps the events already
  * queued.
  *
- * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and
- * ignores the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every runtime-scoped
- * type. mln_runtime_get_event_mask() reports the value last
- * set, so a host reads it, changes one bit, and writes it back.
+ * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
+ * in MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and ignores map-originated bits.
+ * mln_runtime_get_event_mask() reports the value last set, so a host reads it,
+ * changes one bit, and writes it back.
  *
  * Changing this mask does not affect one-shot completion or result ownership.
  *

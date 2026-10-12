@@ -58,7 +58,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Creates a map on the runtime worker.
+   * Starts creation of a map on the runtime.
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -256,7 +256,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Releases a runtime after synchronous child preflight.
+   * Starts release of a runtime after checking its children.
    *
    * See `mln_runtime_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

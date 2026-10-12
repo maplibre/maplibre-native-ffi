@@ -469,7 +469,7 @@ pub fn rendered_query_geometry_point(point: ScreenPoint) -> Result<RenderedQuery
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Creates a runtime with a new core-owned worker.
+/// Creates a runtime.
 ///
 /// See `mln_runtime_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

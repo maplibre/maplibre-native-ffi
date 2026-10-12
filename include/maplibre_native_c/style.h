@@ -2,10 +2,11 @@
  * @file maplibre_native_c/style.h
  * Public C API declarations for style sources, layers, and images.
  *
- * Every mutation is a command. It validates and copies all input bytes, arrays,
- * option structs, and image pixels before returning. Parsing and application
- * run later on the map worker, in runtime order. Its completion reports
- * committed, superseded, failed, or cancelled disposition. Committed
+ * Every mutation is a command. It copies input bytes, arrays, option structs,
+ * and image pixels before returning and applies them in runtime submission
+ * order. Each function lists submission and completion failures separately.
+ * Its completion reports committed, superseded, failed, or cancelled
+ * disposition. Committed
  * completions carry the map snapshot generation they published, so a caller can
  * fence a later mln_map_get_snapshot() on it.
  *
@@ -44,7 +45,6 @@ extern "C" {
 
 /**
  * Submits a global-state JSON value. JSON null restores the style default.
- * Input is copied before return.
  *
  * Returns:
  * - MLN_STATUS_OK when accepted.
@@ -381,10 +381,8 @@ typedef struct mln_style_tile_source_options {
  * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
  * size.
  *
- * MapLibre Native fixes these options when the source is created, so
- * mln_map_set_geojson_source_url() keeps the options the source was added
- * with, and mln_map_set_geojson_source_data() requires data prepared with
- * matching options.
+ * These options are fixed for the source's lifetime. URL updates preserve
+ * them, and prepared data updates require matching options.
  */
 typedef struct mln_geojson_source_options {
   uint32_t size;
@@ -425,21 +423,18 @@ typedef struct mln_geojson_source_options {
    * Clusters point features. Defaults to false.
    *
    * Clustering applies to feature collections whose every feature carries point
-   * geometry. MapLibre Native clusters feature collections only, so
-   * mln_geojson_source_data_create() rejects a bare geometry or a single
-   * feature, along with a feature collection that mixes in other geometry. An
+   * geometry. mln_geojson_source_data_create() rejects a bare geometry, a
+   * single feature, or a feature collection that mixes in other geometry. An
    * empty feature collection stays accepted and carries nothing to cluster.
    */
   bool cluster MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER");
   /**
    * Slices requested tiles inline during the update pass. Defaults to false.
    *
-   * MapLibre Native normally slices tiles out of the prepared data index on the
-   * data's worker. When this is set, slicing runs inline on the update thread,
-   * so data installed through mln_map_set_geojson_source_data() never waits
-   * behind that worker. The sliced tiles are still laid out on a tile worker
-   * before a frame shows them.
-   * mln_map_set_geojson_source_synchronous_tiling() overrides this at runtime.
+   * Requested tiles are available to the update pass without waiting for
+   * asynchronous tiling. A rendered frame may still require asynchronous tile
+   * layout. mln_map_set_geojson_source_synchronous_tiling() overrides this at
+   * runtime.
    */
   bool synchronous_tiling
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING");
@@ -497,9 +492,8 @@ typedef struct mln_custom_geometry_source_options {
    * its callback state to each accepted command and frees that state here. Null
    * means the host needs no release.
    *
-   * This callback must not call the C API: style processing may invoke it
-   * inside MapLibre's dispatch. Free callback state and return. Schedule native
-   * owner cleanup after this callback returns.
+   * This callback must not call the C API. Free callback state and return.
+   * Schedule native owner cleanup after this callback returns.
    */
   mln_user_data_release release_user_data;
 } mln_custom_geometry_source_options MLN_BINDING(
@@ -532,9 +526,8 @@ typedef struct mln_custom_mvt_vector_source_options {
    * its callback state to each accepted command and frees that state here.
    * Null means the host needs no release.
    *
-   * This callback must not call the C API: style processing may invoke it
-   * inside MapLibre's dispatch. Free callback state and return. Schedule native
-   * owner cleanup after this callback returns.
+   * This callback must not call the C API. Free callback state and return.
+   * Schedule native owner cleanup after this callback returns.
    */
   mln_user_data_release release_user_data;
 } mln_custom_mvt_vector_source_options MLN_BINDING(
@@ -664,9 +657,8 @@ typedef struct mln_style_transition_options {
    * levels, while a still-mode map fades those patterns instantly instead.
    *
    * A still-mode map ignores this field and delay_ms for paint property
-   * transitions, and renders each still image at a fixed time point, so a
-   * property that takes its transition from these reaches its final value in
-   * the next still image whatever they hold.
+   * transitions. A property using these global options reaches its final value
+   * in the next still image.
    */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TRANSITION_OPTION_DURATION");
@@ -727,7 +719,7 @@ mln_style_transition_options_default(void) MLN_NOEXCEPT;
  *
  * source_id and source_json are borrowed for the call and copied before
  * return. source_json is the object that appears under sources[source_id] in a
- * style document. Parsing and application run on the map worker.
+ * style document.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -865,20 +857,16 @@ MLN_API mln_status mln_map_add_geojson_source_url(
 /**
  * Prepares GeoJSON source data for installation on a map.
  *
- * data and options are borrowed for the call. The UTF-8 GeoJSON bytes are
- * parsed and tiled (or clustered) into the index a GeoJSON source consumes,
- * which is the expensive part of a data update. options may be null for
- * defaults; the options are baked into the prepared data and must match the
- * options of every source the data is installed on.
+ * data and options are borrowed for the call. Preparation finishes before
+ * return. options may be null for defaults and must match the options of every
+ * source the data is installed on.
  *
  * When options enable clustering, the data must be a feature collection whose
  * every feature carries point geometry. Data that does not is rejected, and
  * the diagnostic names the constraint.
  *
- * This entry point is callable from any thread and touches no runtime or map,
- * so a host prepares data on a worker thread and installs it on the map owner
- * thread. The prepared data is immutable; create, read, and destroy may each
- * happen on different threads.
+ * The prepared data is immutable and independent of any map or runtime.
+ * Preparation, installation, and destruction may happen on different threads.
  *
  * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
  * handle the host releases with mln_geojson_source_data_destroy(). Installing
@@ -964,16 +952,12 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  *
  * source_id is borrowed for the call. data names a live handle from
  * mln_geojson_source_data_create(); the call borrows the handle and retains
- * the prepared index, which makes this a cheap install: the expensive parse
- * and tiling already happened when the data was prepared. Requested tiles are
- * still sliced out of the index on a worker unless synchronous tiling is on.
+ * prepared data before returning.
  *
  * The data must have been prepared with options equal to the options the
  * source was added with. Cluster aggregation expressions compare by parsed
  * equality, so equivalent cluster_properties JSON matches regardless of
- * formatting. A mismatch is rejected, because MapLibre Native fixes a source's
- * options at creation and data prepared under different options would tile
- * inconsistently with them.
+ * formatting. A mismatch is rejected.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1000,9 +984,7 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * source_id is borrowed for the call. While enabled is true, the source slices
  * requested tiles inline during the update pass, as if the source's options
  * had set synchronous_tiling; false restores the option the source was added
- * with. The override applies to update passes after the command commits. Hosts
- * enable it around high-frequency small updates, such as a tracked position,
- * so that an installed update does not wait for the data's worker.
+ * with. The override applies to update passes after the command commits.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1182,8 +1164,8 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * removed, the style is replaced, or the map is destroyed, and until any
  * in-flight callback invocation has returned. For URL loads, style replacement
  * occurs when the new style loads, not when the load request is accepted. For
- * inline JSON loads, style replacement completes before
- * mln_map_set_style_json() returns successfully.
+ * inline JSON loads, style replacement completes when
+ * mln_map_set_style_json() commits.
  *
  * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
  * concurrent with runtime and map calls. The style command functions in this
@@ -1222,7 +1204,7 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * Sets custom geometry source data for one canonical tile.
  *
  * source_id and the UTF-8 GeoJSON data are borrowed for the call and copied
- * before return. Parsing and application run on the map worker.
+ * before return.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1295,8 +1277,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * removed, the style is replaced, or the map is destroyed, and until any
  * in-flight callback invocation has returned. For URL loads, style replacement
  * occurs when the new style loads, not when the load request is accepted. For
- * inline JSON loads, style replacement completes before
- * mln_map_set_style_json() returns successfully.
+ * inline JSON loads, style replacement completes when
+ * mln_map_set_style_json() commits.
  *
  * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
  * concurrent with runtime and map calls. The style command functions in this
@@ -1730,9 +1712,7 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
 /**
  * Sets a location indicator layer location.
  *
- * coordinate uses normal C API latitude/longitude order. The underlying style
- * property is written as [latitude, longitude, altitude], matching the order
- * the renderer reads it back in.
+ * coordinate uses C API latitude/longitude order.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1826,12 +1806,6 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
 
 /**
  * Adds one style layer from a full style-spec layer JSON object.
- *
- * This is the insertion path for every style-spec layer type. The typed adders
- * above exist for reasons beyond construction: mln_map_add_hillshade_layer()
- * and mln_map_add_color_relief_layer() validate that the source is a raster DEM
- * source, and mln_map_add_location_indicator_layer() pairs with typed per-frame
- * setters that take coordinates in C API order.
  *
  * layer_json and before_layer_id are borrowed for the call. layer_json must
  * contain id and type members. Passing an empty before_layer_id appends the
@@ -1967,8 +1941,7 @@ MLN_API mln_status mln_map_get_style_layer_json(
 /**
  * Sets the style light from a style-spec light JSON object.
  *
- * light_json is borrowed for the call and copied before return. Parsing and
- * application run on the map worker.
+ * light_json is borrowed for the call.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1989,9 +1962,8 @@ MLN_API mln_status mln_map_set_style_light_json(
 /**
  * Sets one style light property using its MapLibre style-spec property name.
  *
- * property_name and value are borrowed for the call and copied before return.
- * value is a style-spec JSON value. Parsing and application into MapLibre
- * Native's typed light property storage run on the map worker.
+ * property_name and value are borrowed for the call. value is a style-spec JSON
+ * value.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -2036,10 +2008,9 @@ MLN_API mln_status mln_map_get_style_light_property(
 /**
  * Sets the style's global transition options.
  *
- * options is borrowed for the call and copied into MapLibre Native before
- * return. Omitted duration and delay fields clear the style-wide override, so
- * this call replaces the whole transition configuration rather than merging
- * into it.
+ * options is borrowed for the call and copied before return. When the command
+ * commits, omitted duration and delay fields clear the style-wide override.
+ * The command replaces the whole transition configuration.
  *
  * Loading a style replaces these options with the ones that style declares, so
  * a host that overrides them applies the override after the style loads.
@@ -2055,7 +2026,7 @@ MLN_API mln_status mln_map_get_style_light_property(
  * - MLN_STATUS_INVALID_ARGUMENT when options->fields contains unknown bits, or
  *   an enabled duration or delay is negative, non-finite, or out of the native
  *   duration range. A rejected command changes nothing.
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_transition_options(
@@ -2067,8 +2038,7 @@ MLN_API mln_status mln_map_set_style_transition_options(
  * Reads the style's global transition options.
  *
  * The completion borrows the last-known transition configuration. Duration
- * and delay report through their field-mask bits, because MapLibre
- * Native leaves either one unset until a style or a host sets it.
+ * and delay report through their field-mask bits and may be unset.
  *
  * A map that has loaded no style yet reports duration and delay unset. A style
  * carrying no "transition" member reports a 300 millisecond duration, while a
@@ -2094,10 +2064,8 @@ MLN_API mln_status mln_map_get_style_transition_options(
 /**
  * Sets one layer property using its MapLibre style-spec property name.
  *
- * layer_id, property_name, and value are borrowed for the call and copied
- * before return. value is a style-spec JSON value; expressions use style-spec
- * expression JSON arrays. Parsing and application into MapLibre Native's typed
- * style property storage run on the map worker.
+ * layer_id, property_name, and value are borrowed for the call. value is a
+ * style-spec JSON value; expressions use style-spec expression JSON arrays.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -2149,8 +2117,7 @@ MLN_API mln_status mln_map_get_style_layer_property(
  *
  * layer_id and filter are borrowed for the call and copied before return.
  * Passing null for filter clears the layer filter. Non-null filters use the
- * MapLibre style-spec filter JSON representation. Parsing and application into
- * MapLibre Native's typed filter expression storage run on the map worker.
+ * MapLibre style-spec filter JSON representation.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -2253,8 +2220,7 @@ MLN_API mln_status mln_map_set_style_layer_source_id(
 /**
  * Sets the lowest zoom at which one layer draws.
  *
- * Pass -INFINITY for no lower bound. MapLibre Native stores the zoom range as
- * single-precision floats, so this narrows the value.
+ * Pass -INFINITY for no lower bound. The value is rounded to single precision.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -2275,8 +2241,7 @@ MLN_API mln_status mln_map_set_style_layer_min_zoom(
 /**
  * Sets the highest zoom at which one layer draws.
  *
- * Pass INFINITY for no upper bound. MapLibre Native stores the zoom range as
- * single-precision floats, so this narrows the value.
+ * Pass INFINITY for no upper bound. The value is rounded to single precision.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.

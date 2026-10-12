@@ -17,7 +17,7 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="Source">
 /// Source handle selected by source_type: an <c>mln_runtime</c> or an
-/// <c>mln_map</c>. Every handle type is uint64_t, so this needs no cast.
+/// <c>mln_map</c>.
 /// </param>
 /// <param name="Generation">
 /// Map snapshot generation that the event reports, or zero when source_type is

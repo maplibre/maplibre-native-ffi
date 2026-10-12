@@ -104,7 +104,7 @@ public extension RuntimeHandle {
     } result: { RuntimeEventMask(rawValue: value0) }
   }
 
-  /// Releases a runtime after synchronous child preflight.
+  /// Starts release of a runtime after checking its children.
   ///
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

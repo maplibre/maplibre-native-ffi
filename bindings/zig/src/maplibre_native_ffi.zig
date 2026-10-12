@@ -6105,7 +6105,7 @@ pub fn mapGetLoadedStyleJson(allocator: std.mem.Allocator, map: Map, diagnostic:
     return call.submit("mln_map_get_loaded_style_json", .lease, map, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{});
 }
 
-/// Copies the latest immutable state published by the map worker.
+/// Copies the map's latest published snapshot.
 ///
 /// See `mln_map_get_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6542,7 +6542,6 @@ pub fn mapSetGeojsonSourceUrl(map: Map, source_id: []const u8, url: []const u8, 
 }
 
 /// Submits a global-state JSON value. JSON null restores the style default.
-/// Input is copied before return.
 ///
 /// See `mln_map_set_global_state_property` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -7274,7 +7273,7 @@ pub fn runtimeClearResourceTransform(runtime: Runtime, diagnostic: ?*diagnostics
     return call.submit("mln_runtime_clear_resource_transform", .lease, runtime, call.unit, null, diagnostic, .{});
 }
 
-/// Creates a runtime with a new core-owned worker.
+/// Creates a runtime.
 ///
 /// See `mln_runtime_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7282,7 +7281,7 @@ pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diag
     return call.invoke("mln_runtime_create", .none, {}, allocator, diagnostic, .{ options, call.adopt(Runtime, .none) });
 }
 
-/// Creates a map on the runtime worker.
+/// Starts creation of a map on the runtime.
 ///
 /// See `mln_runtime_create_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -7378,7 +7377,7 @@ pub fn runtimeOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedVal
     return call.direct("mln_runtime_options_default", .none, {}, OwnedValue(RuntimeOptions), allocator, .{});
 }
 
-/// Releases a runtime after synchronous child preflight.
+/// Starts release of a runtime after checking its children.
 ///
 /// See `mln_runtime_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

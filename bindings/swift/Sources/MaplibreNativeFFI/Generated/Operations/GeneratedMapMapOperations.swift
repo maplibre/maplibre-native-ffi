@@ -80,7 +80,7 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies the latest immutable state published by the map worker.
+  /// Copies the map's latest published snapshot.
   ///
   /// See `mln_map_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
