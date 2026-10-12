@@ -73,7 +73,6 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_android_init(
         void* jni_env,
-        void* jni_class,
         void* context,
         mln_diagnostic* out_diagnostic
     );

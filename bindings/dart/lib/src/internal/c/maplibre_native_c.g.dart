@@ -2522,17 +2522,9 @@ external int mln_adapter_routed_resource_provider_callback(
   int handle,
 );
 
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    Pointer<Void>,
-    Pointer<Void>,
-    Pointer<mln_diagnostic>,
-  )
->()
+@Native<Int32 Function(Pointer<Void>, Pointer<Void>, Pointer<mln_diagnostic>)>()
 external int mln_android_init(
   Pointer<Void> jni_env,
-  Pointer<Void> jni_class,
   Pointer<Void> context,
   Pointer<mln_diagnostic> out_diagnostic,
 );

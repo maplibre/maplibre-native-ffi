@@ -130,6 +130,27 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void android_initialization_requires_its_environment_and_context(void) {
+  int sentinel = 0;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  MLN_TEST_INVALID(mln_android_init(NULL, &sentinel, &diagnostic));
+  TEST_ASSERT_EQUAL_STRING(
+    "jni_env and context must not be null", diagnostic.message
+  );
+  MLN_TEST_INVALID(mln_android_init(&sentinel, NULL, &diagnostic));
+  TEST_ASSERT_EQUAL_STRING(
+    "jni_env and context must not be null", diagnostic.message
+  );
+#ifndef __ANDROID__
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED, mln_android_init(&sentinel, &sentinel, &diagnostic)
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "Android initialization is not supported", diagnostic.message
+  );
+#endif
+}
+
 // A binding compares the ABI version against the one it was generated for,
 // and the backend mask decides which render targets it offers. The mask must
 // name exactly the backend this preset built.
@@ -155,5 +176,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
   RUN_TEST(a_value_that_names_no_batch_is_rejected_without_effect);
   RUN_TEST(a_native_exception_becomes_native_error_with_its_text);
+  RUN_TEST(android_initialization_requires_its_environment_and_context);
   RUN_TEST(the_library_reports_its_abi_version_and_built_backend);
 }

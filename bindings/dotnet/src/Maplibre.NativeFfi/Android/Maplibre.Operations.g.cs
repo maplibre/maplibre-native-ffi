@@ -14,17 +14,12 @@ public static unsafe partial class Maplibre
     /// See <c>mln_android_init</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.
     /// </remarks>
-    public static void AndroidInit(
-        NativePointer jniEnv,
-        NativePointer jniClass,
-        NativePointer context
-    )
+    public static void AndroidInit(NativePointer jniEnv, NativePointer context)
     {
         using var call = Enter(null, "mln_android_init");
         Check(
             NativeMethods.mln_android_init(
                 (void*)jniEnv.Address,
-                (void*)jniClass.Address,
                 (void*)context.Address,
                 Diagnostic
             )

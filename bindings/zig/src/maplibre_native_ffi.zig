@@ -5540,8 +5540,8 @@ pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, 
 ///
 /// See `mln_android_init` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyopaque, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_android_init", .none, {}, null, diagnostic, .{ jni_env, jni_class, context });
+pub fn androidInit(jni_env: ?*anyopaque, context: ?*anyopaque, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_android_init", .none, {}, null, diagnostic, .{ jni_env, context });
 }
 
 /// Returns empty animation options initialized for this C API version.

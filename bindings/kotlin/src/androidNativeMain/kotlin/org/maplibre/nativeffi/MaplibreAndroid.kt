@@ -42,7 +42,7 @@ public object MaplibreAndroid {
   public fun initialize(jniEnvironment: AndroidJniEnvironment, context: AndroidContextReference) {
     ensureNativeLibrary()
     NativeDiagnostics.check { diagnostic ->
-      C.mln_android_init(jniEnvironment.address, 0L, context.address, diagnostic)
+      C.mln_android_init(jniEnvironment.address, context.address, diagnostic)
     }
   }
 }

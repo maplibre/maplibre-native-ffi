@@ -10,12 +10,11 @@ use super::*;
 /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
 pub unsafe fn android_init(
     jni_env: *mut std::ffi::c_void,
-    jni_class: *mut std::ffi::c_void,
     context: *mut std::ffi::c_void,
 ) -> Result<()> {
     let mut call = Call::global("mln_android_init")?;
     call.status(|_, out_diagnostic| unsafe {
-        sys::mln_android_init(jni_env, jni_class, context, out_diagnostic)
+        sys::mln_android_init(jni_env, context, out_diagnostic)
     })?;
     Ok(())
 }

@@ -1671,7 +1671,6 @@ unsafe extern "C" {
     pub fn mln_acquired_frame_view_end(scope: *mut std::ffi::c_void);
     pub fn mln_android_init(
         jni_env: *mut std::ffi::c_void,
-        jni_class: *mut std::ffi::c_void,
         context: *mut std::ffi::c_void,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

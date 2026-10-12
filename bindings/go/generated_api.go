@@ -5995,9 +5995,9 @@ func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 //
 // See mln_android_init in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-func AndroidInit(jniEnv uintptr, jniClass uintptr, context uintptr) error {
+func AndroidInit(jniEnv uintptr, context uintptr) error {
 	return bindingDo(bindingGlobal(C.binding_operation_mln_android_init), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(jniClass))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
+		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
 }
 

@@ -28,7 +28,7 @@ internal actual object C {
   private val mln_acquired_frame_view_end =
     Ffm.downcall("mln_acquired_frame_view_end", null, JAVA_LONG)
   private val mln_android_init =
-    Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_animation_options_default =
     Ffm.downcall("mln_animation_options_default", mln_animation_options)
   private val mln_bound_options_default =
@@ -1608,12 +1608,8 @@ internal actual object C {
     mln_acquired_frame_view_end.invoke(scope)
   }
 
-  actual fun mln_android_init(
-    jniEnv: Long,
-    jniClass: Long,
-    context: Long,
-    outDiagnostic: Long,
-  ): Int = mln_android_init.invokeExact(jniEnv, jniClass, context, outDiagnostic) as Int
+  actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
+    mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
 
   actual fun mln_animation_options_default(returned: Long) {
     mln_animation_options_default.invokeExact(Ffm.into(returned, mln_animation_options))

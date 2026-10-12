@@ -27,7 +27,7 @@ internal expect object C {
 
   fun mln_acquired_frame_view_end(scope: Long): Unit
 
-  fun mln_android_init(jniEnv: Long, jniClass: Long, context: Long, outDiagnostic: Long): Int
+  fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
   fun mln_animation_options_default(returned: Long): Unit
 

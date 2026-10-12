@@ -9500,21 +9500,17 @@ generated_owner!(
     |_, owner| GeneratedReadScope::new::<sys::mln_runtime, _>(Arc::clone(&owner.state))
 );
 #[pyfunction]
-#[pyo3(signature = (jni_env, jni_class, context))]
+#[pyo3(signature = (jni_env, context))]
 fn android_init(
     py: Python<'_>,
     jni_env: &Bound<'_, PyAny>,
-    jni_class: &Bound<'_, PyAny>,
     context: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py, "mln_android_init", 0)?;
     let jni_env_value = jni_env.clone().extract::<usize>()? as _;
-    let jni_class_value = jni_class.clone().extract::<usize>()? as _;
     let context_value = context.clone().extract::<usize>()? as _;
     unsafe {
-        call.status(|diagnostic| {
-            sys::mln_android_init(jni_env_value, jni_class_value, context_value, diagnostic)
-        })
+        call.status(|diagnostic| sys::mln_android_init(jni_env_value, context_value, diagnostic))
     }?;
     Ok(py.None())
 }

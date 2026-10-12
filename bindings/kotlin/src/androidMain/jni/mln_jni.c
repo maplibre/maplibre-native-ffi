@@ -214,8 +214,9 @@ static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jint index) {
 static jint mln_jni_android_init(
   JNIEnv* env, jclass type, jobject context, jlong diagnostic
 ) {
+  (void)type;
   return (jint)mln_android_init(
-    env, type, context, MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
+    env, context, MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
   );
 }
 

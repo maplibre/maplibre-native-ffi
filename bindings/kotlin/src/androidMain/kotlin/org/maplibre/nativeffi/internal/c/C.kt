@@ -68,12 +68,7 @@ internal actual object C {
   @JvmStatic actual external fun mln_acquired_frame_view_end(scope: Long): Unit
 
   @JvmStatic
-  actual external fun mln_android_init(
-    jniEnv: Long,
-    jniClass: Long,
-    context: Long,
-    outDiagnostic: Long,
-  ): Int
+  actual external fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_animation_options_default(returned: Long): Unit
 

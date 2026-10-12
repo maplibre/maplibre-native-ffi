@@ -10,13 +10,11 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
   static func androidInit(
     jniEnv bindingArg0: NativePointer,
-    jniClass bindingArg1: NativePointer,
-    context bindingArg2: NativePointer
+    context bindingArg1: NativePointer
   ) throws {
     try nativeInvoke("mln_android_init") { _, _, diagnostic in mln_android_init(
       bindingArg0.unsafeMutableRawPointer,
       bindingArg1.unsafeMutableRawPointer,
-      bindingArg2.unsafeMutableRawPointer,
       diagnostic
     ) }
   }

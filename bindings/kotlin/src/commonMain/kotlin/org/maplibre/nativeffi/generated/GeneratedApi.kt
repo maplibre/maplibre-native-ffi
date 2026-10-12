@@ -15,13 +15,9 @@ public object GeneratedApi {
    * See `mln_android_init` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
    */
-  public fun androidInit(
-    jniEnv: NativePointer,
-    jniClass: NativePointer,
-    context: NativePointer,
-  ): Unit =
+  public fun androidInit(jniEnv: NativePointer, context: NativePointer): Unit =
     nativeCall(null, null, "mln_android_init") {
-      check(C.mln_android_init(jniEnv.address, jniClass.address, context.address, diagnostic))
+      check(C.mln_android_init(jniEnv.address, context.address, diagnostic))
     }
 
   /**

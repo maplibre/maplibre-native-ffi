@@ -100,15 +100,9 @@ internal actual object C {
     )
   }
 
-  actual fun mln_android_init(
-    jniEnv: Long,
-    jniClass: Long,
-    context: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_android_init(
       jniEnv.toCPointer<CPointed>(),
-      jniClass.toCPointer<CPointed>(),
       context.toCPointer<CPointed>(),
       outDiagnostic.toCPointer(),
     )

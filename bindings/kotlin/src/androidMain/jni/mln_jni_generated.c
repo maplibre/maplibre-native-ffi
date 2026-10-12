@@ -100,12 +100,10 @@ static void mln_acquired_frame_view_end_jni(
 }
 
 static jint mln_android_init_jni(
-  JNIEnv* env, jclass type, jlong jni_env, jlong jni_class, jlong context,
-  jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong jni_env, jlong context, jlong out_diagnostic
 ) {
   return (jint)mln_android_init(
-    MLN_JNI_POINTER(void*, jni_env), MLN_JNI_POINTER(void*, jni_class),
-    MLN_JNI_POINTER(void*, context),
+    MLN_JNI_POINTER(void*, jni_env), MLN_JNI_POINTER(void*, context),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2640,7 +2638,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_view_begin_jni},
   {"mln_acquired_frame_view_end", "(J)V",
    (void*)mln_acquired_frame_view_end_jni},
-  {"mln_android_init", "(JJJJ)I", (void*)mln_android_init_jni},
+  {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_animation_options_default", "(J)V",
    (void*)mln_animation_options_default_jni},
   {"mln_bound_options_default", "(J)V", (void*)mln_bound_options_default_jni},

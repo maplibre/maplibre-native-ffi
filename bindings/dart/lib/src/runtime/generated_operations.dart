@@ -3323,16 +3323,11 @@ final _resultdouble = _CompletionValue(
 ///
 /// See `mln_android_init` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-void androidInit(
-  NativePointer jniEnv,
-  NativePointer jniClass,
-  NativePointer context,
-) {
+void androidInit(NativePointer jniEnv, NativePointer context) {
   ensureAbiVersion();
   return _check(
     raw.mln_android_init(
       Pointer<Void>.fromAddress(jniEnv.address).cast(),
-      Pointer<Void>.fromAddress(jniClass.address).cast(),
       Pointer<Void>.fromAddress(context.address).cast(),
       nativeDiagnostic,
     ),

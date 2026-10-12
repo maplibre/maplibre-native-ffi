@@ -2264,13 +2264,13 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
 
-def android_init(jni_env: int, jni_class: int, context: int) -> None:
+def android_init(jni_env: int, context: int) -> None:
     """Initializes Android platform services.
 
     See `mln_android_init` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
     """
-    return _native.android_init(jni_env, jni_class, context)
+    return _native.android_init(jni_env, context)
 
 
 def c_version() -> int:
