@@ -1,4 +1,3 @@
-// Frame demands and their results through the render fixture.
 
 #include <stdbool.h>
 #include <stddef.h>

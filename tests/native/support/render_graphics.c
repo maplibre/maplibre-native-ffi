@@ -1,6 +1,3 @@
-// Host graphics for the render fixtures on every native backend. The context,
-// and any borrowed texture or surface, come from tests/graphics, which the
-// binding suites load for the same purpose.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,7 +22,6 @@
 #define HOST_OPENGL 1
 #endif
 
-// How many more targets a case can make on one fixture's graphics object.
 #define EXTRA_TARGETS 2
 
 typedef struct host_state {
@@ -33,13 +29,11 @@ typedef struct host_state {
   // False when the graphics object belongs to another fixture.
   bool owns_graphics;
   mln_test_graphics_context context;
-  // The borrowed ring's textures, in slot order.
   mln_test_graphics_texture* textures[MLN_TEST_MAX_RING_DEPTH];
   size_t texture_count;
   mln_test_graphics_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
   mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
-  // Set by mln_test_render_fixture_keep_graphics_until_exit().
   bool keep_until_exit;
 } host_state;
 
@@ -282,7 +276,6 @@ static bool describe_ring(
 #endif
   out->textures = entries;
   out->texture_count = count;
-  // Physical and logical sizes agree at a scale factor of 1.
   out->extent = (mln_logical_extent){
     .width = info.width, .height = info.height, .scale_factor = 1.0
   };
@@ -317,7 +310,6 @@ static bool describe_surface(
   return true;
 }
 
-// The depth of the ring that attach_borrowed_texture() attaches.
 static size_t attach_ring_depth = 1;
 
 static bool attach_borrowed_texture(

@@ -1,5 +1,3 @@
-// WebGPU contexts for the render fixture: one device per thread, created the
-// way a browser host would.
 
 #include <emscripten/emscripten.h>
 #include <emscripten/eventloop.h>
@@ -26,10 +24,8 @@ typedef struct webgpu_state {
 // device requests are futures, and the suite runs on a worker where blocking on
 // them is legal.
 static bool await_future(WGPUInstance instance, WGPUFuture future) {
-  // Bounded so a browser without a WebGPU adapter fails the fixture rather
-  // than hanging until the runner's timeout; software device creation is well
-  // under a second. A non-zero timeout is legal only on an instance that asked
-  // for timed waits.
+  // A non-zero wait timeout requires timedWaitAnyEnable. Bound adapter creation
+  // so an unavailable adapter fails the fixture instead of hanging the runner.
   const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
   const WGPUWaitStatus status =
@@ -131,8 +127,6 @@ static bool create_webgpu_device(webgpu_state* state) {
   return true;
 }
 
-// Fills `out_context` with the thread's device, which outlives every fixture
-// on the thread, creating it on first use.
 static bool thread_context(mln_webgpu_context_descriptor* out_context) {
   if (!thread_webgpu_attempted) {
     thread_webgpu_attempted = true;
@@ -204,7 +198,6 @@ void mln_test_backend_destroy(void* state) { destroy_backend_state(state); }
 // RGBA8 pixels is 256 bytes, the row alignment of a texture-to-buffer copy.
 enum { ring_texture_size = 64 };
 
-// The depth of the ring that attach_borrowed_ring() attaches.
 static MLN_TEST_THREAD_LOCAL size_t attach_ring_depth = 1;
 
 static bool attach_borrowed_ring(

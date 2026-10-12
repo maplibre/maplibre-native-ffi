@@ -1,5 +1,3 @@
-// Unity glue for the native suites: the entry point, the case runner behind
-// RUN_TEST, and the per-case reclaim that keeps one failure from cascading.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -82,8 +80,6 @@ void mln_test_run_case(UnityTestFunction func, const char* name, int line) {
     return;
   }
 
-  // Unity's default runner, which defining RUN_TEST compiles out, plus the
-  // watchdog around the case.
   Unity.NumberOfTests++;
   UNITY_CLR_DETAILS();
   mln_test_watchdog_arm(Unity.TestFile, name);

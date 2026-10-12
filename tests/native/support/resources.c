@@ -1,4 +1,3 @@
-// Resource configuration commands and the scripted resource provider.
 
 #include <stdatomic.h>
 #include <stdbool.h>

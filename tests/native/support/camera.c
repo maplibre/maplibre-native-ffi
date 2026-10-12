@@ -1,4 +1,3 @@
-// The camera end-handler probe.
 
 #include <stdatomic.h>
 #include <stdbool.h>

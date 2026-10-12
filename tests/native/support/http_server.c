@@ -1,9 +1,5 @@
-// A scripted loopback HTTP/1.1 server; see http_server.h.
-//
-// One thread accepts connections and hands each to a thread of its own, which
-// reads one request head, logs it, answers from the route table, and closes
-// the connection. Stopping wakes the accept thread with a connection of its
-// own and shuts down every open connection, so no thread stays blocked.
+// Stopping wakes accept with a loopback connection and shuts down every open
+// connection, so joining the server leaves no thread blocked.
 
 #if defined(_WIN32)
 // Keeps windows.h from pulling in winsock.h, whose declarations winsock2.h
@@ -61,8 +57,6 @@ typedef struct logged_request {
 #if defined(_WIN32)
 typedef CRITICAL_SECTION server_mutex;
 typedef CONDITION_VARIABLE server_condition;
-// Windows names its condition wait after sleeping, which it is not: it blocks
-// until a broadcast.
 #define wait_on_condition SleepConditionVariableCS
 #else
 typedef pthread_mutex_t server_mutex;
@@ -189,7 +183,6 @@ static bool header_name_matches(
   return true;
 }
 
-// Copies the value of header `name` out of a request head.
 static bool find_header(
   const char* head, const char* name, char* out, size_t capacity
 ) {
@@ -224,7 +217,6 @@ static bool find_header(
   return false;
 }
 
-// Extracts the request target's path, without its query.
 static bool request_path(const char* head, char* out, size_t capacity) {
   const char* target = strchr(head, ' ');
   if (target == NULL) {

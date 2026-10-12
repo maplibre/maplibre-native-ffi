@@ -1,5 +1,3 @@
-// Stepped frames, copied feature queries, served resources, and copied list
-// reads for the style suites.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -16,9 +14,8 @@
 #include "unity.h"
 #include "wait.h"
 
-// Copies `view` into `out` null-terminated, and reports whether it fit. A view
-// that does not fit leaves `out` truncated. Completion callbacks can run off
-// the test thread, so callers record a miss and fail on the test thread.
+// Completion callbacks may run outside the test thread. Record truncation in
+// the callback and assert on the test thread.
 static bool copy_text(mln_buffer_view view, char* out, size_t capacity) {
   const bool fits = view.size < capacity;
   const size_t size = fits ? view.size : capacity - 1;
@@ -51,7 +48,6 @@ static bool frame_arrived(void* context) {
   mln_render_frame_batch_view view = {
     .size = sizeof(mln_render_frame_batch_view)
   };
-  // A failed read leaves the view empty.
   (void)mln_render_frame_batch_get(batch, &view, NULL);
   for (size_t index = 0; index < view.result_count; index += 1) {
     const mln_render_frame_result* result =

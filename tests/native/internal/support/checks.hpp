@@ -1,7 +1,5 @@
 #pragma once
 
-// Waits and checks for the internal suite's C++ cases.
-
 #include <atomic>
 
 #include "support/wait.h"
@@ -27,7 +25,6 @@ class BackgroundChecks {
     auto* expected = static_cast<const char*>(nullptr);
     first_.compare_exchange_strong(expected, failure);
   }
-  // The first failure, or null when every check held.
   [[nodiscard]] auto failure() const noexcept -> const char* {
     return first_.load();
   }

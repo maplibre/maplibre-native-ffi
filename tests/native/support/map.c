@@ -1,4 +1,3 @@
-// Still images through the render fixture.
 
 #include <stdbool.h>
 #include <stddef.h>

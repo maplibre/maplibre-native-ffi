@@ -1,5 +1,3 @@
-// The backend-neutral half of the render fixture: attaching, driving, and
-// tearing down an owned texture target, and tracking sessions for reclaim.
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -38,7 +36,6 @@ void mln_test_render_reserve_session(void) {
   tracked_session_capacity = capacity;
 }
 
-// Frees the record once it is empty, so a thread that exits holds nothing.
 static void release_empty_session_slots(void) {
   if (tracked_session_count == 0) {
     free(tracked_sessions);

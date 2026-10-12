@@ -1,4 +1,3 @@
-// Runtime and map fixtures, event draining, fixture files, and host threads.
 
 #if !defined(_WIN32)
 #define _POSIX_C_SOURCE 200809L
@@ -63,7 +62,6 @@ static void reserve_map_slot(void) {
   tracked_map_capacity = capacity;
 }
 
-// Frees the record once it is empty, so a thread that exits holds nothing.
 static void release_empty_map_slots(void) {
   if (tracked_map_count == 0) {
     free(tracked_maps);
@@ -494,7 +492,6 @@ size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
       const mln_runtime_event* event =
         (const mln_runtime_event*)((const char*)batch.events +
                                    (index * batch.event_size));
-      // Type 0 is not an event type, so it counts every event.
       if (type == 0 || event->type == type) {
         total += 1;
       }

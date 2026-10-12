@@ -1,5 +1,3 @@
-// WebGL contexts for the render fixture: one WebGL2 context per thread on a
-// private OffscreenCanvas, and the transferred-canvas surface fixture.
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -72,8 +70,6 @@ typedef struct webgl_state {
 static atomic_uint webgl_canvas_counter;
 static MLN_TEST_THREAD_LOCAL webgl_state thread_webgl_state;
 
-// The fixture creates a real WebGL2 context and hands it over, the way a
-// browser host would.
 static bool create_backend_state(void** out_state, void* out_context) {
   webgl_state* state = &thread_webgl_state;
   if (state->context > 0) {
@@ -98,13 +94,11 @@ static bool create_backend_state(void** out_state, void* out_context) {
 
   EmscriptenWebGLContextAttributes attributes;
   emscripten_webgl_init_context_attributes(&attributes);
-  // WebGL2 is the GLES 3.0 the OpenGL backend targets.
   attributes.majorVersion = 2;
   attributes.minorVersion = 0;
   attributes.depth = EM_TRUE;
   attributes.stencil = EM_TRUE;
   attributes.antialias = EM_FALSE;
-  // The suite renders into its own texture rather than presenting.
   attributes.preserveDrawingBuffer = EM_FALSE;
   // The context stays on the thread that created it, and nothing renders to
   // the page, so there is no swap to proxy.

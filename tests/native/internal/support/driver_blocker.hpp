@@ -1,7 +1,5 @@
 #pragma once
 
-// Occupies a render session's driver for as long as a case needs.
-
 #include <memory>
 
 #include "maplibre_native_c.h"
@@ -20,7 +18,6 @@ struct DriverBlocker {
   std::shared_ptr<mln_test_gate> gate = std::make_shared<mln_test_gate>();
   mln_test_completion completion{};
 
-  // Queues the operation and reports the submission status.
   auto submit(mln_render_session session) -> mln_status {
     mln_test_gate_init(gate.get());
     completion = mln_test_completion_default(0);

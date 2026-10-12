@@ -35,7 +35,6 @@ auto ok_without_allocations(Work work) -> bool {
 
 }  // namespace mln::native_tests
 
-// Asserts that `work` succeeds with this thread's allocations failing.
 #define MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS(work)                       \
   TEST_ASSERT_TRUE_MESSAGE(                                                \
     mln::native_tests::ok_without_allocations(work),                       \

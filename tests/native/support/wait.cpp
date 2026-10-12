@@ -17,8 +17,7 @@ namespace {
 
 constexpr auto default_wait_milliseconds = std::uint64_t{10000};
 
-// Re-check interval for state that changes without a pulse. Short enough that
-// such a wait costs little, long enough that a waiter does not spin.
+// Readiness that emits no pulse relies on periodic rechecks.
 constexpr auto recheck_interval = std::chrono::milliseconds{2};
 
 struct Pulse {
@@ -314,9 +313,8 @@ extern "C" void mln_test_completion_destroy(mln_test_completion* completion) {
   if (probe == nullptr) return;
   {
     auto lock = std::unique_lock{probe->mutex};
-    // Bounded so a completion the library never releases fails the test that
-    // submitted it instead of hanging the suite. The probe is deliberately
-    // leaked in that case: a late release would write through this pointer.
+    // A missing release must not hang the suite. Leak the probe on timeout
+    // because a late release can still write through this pointer.
     mln_test_watchdog_note("a completion's release");
     const auto released = probe->condition.wait_for(
       lock, remaining(mln_test_deadline_default()),
