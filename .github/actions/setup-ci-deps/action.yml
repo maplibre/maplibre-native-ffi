@@ -60,6 +60,16 @@ runs:
         New-Item -Path $reporting -Force | Out-Null
         Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
 
+    # macOS runners are virtual machines, and their paravirtual Metal driver
+    # crashes when two threads size a heap texture at once. MoltenVK sizes one
+    # in every vkCreateImage while it places images in heaps, so parallel tests
+    # crash there; see aether-lang-dev/aether#2287. Without heaps, MoltenVK
+    # never makes that call.
+    - name: Keep MoltenVK off the paravirtual driver's heap sizing
+      if: ${{ runner.os == 'macOS' }}
+      shell: bash
+      run: echo "MVK_CONFIG_USE_MTLHEAP=0" >> "$GITHUB_ENV"
+
     # Each job asks for the SDK its target builds with, and every other job installs
     # none. No Windows target cross-compiles. Android reuses the SDK the runner image
     # already points ANDROID_HOME at. Repository build tasks install missing Android
