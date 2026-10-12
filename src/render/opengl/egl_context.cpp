@@ -9,7 +9,7 @@
 namespace mln::core::opengl {
 
 EglSharedContext::EglSharedContext(
-  mln_egl_context_descriptor descriptor, mln_opengl_context_ownership ownership
+  mln_egl_context_descriptor descriptor, std::uint32_t ownership
 )
     : descriptor_(descriptor), ownership_(ownership) {}
 

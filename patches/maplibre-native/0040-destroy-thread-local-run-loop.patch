@@ -1,0 +1,17 @@
+diff --git a/src/mln/actor/scheduler.cpp b/src/mln/actor/scheduler.cpp
+index 6caba3b..e69ff4e 100644
+--- a/src/mln/actor/scheduler.cpp
++++ b/src/mln/actor/scheduler.cpp
+@@ -26,6 +26,12 @@ void Scheduler::SetCurrent(Scheduler* scheduler) {
+ 
+ Scheduler* Scheduler::GetCurrent(bool init) {
+     if (!localScheduler && init) {
++        // Preserve thread-exit cleanup when static destructors are disabled.
++#if defined(__has_cpp_attribute)
++#if __has_cpp_attribute(clang::always_destroy)
++        [[clang::always_destroy]]
++#endif
++#endif
+         static thread_local util::RunLoop runLoop;
+         SetCurrent(&runLoop);
+     }

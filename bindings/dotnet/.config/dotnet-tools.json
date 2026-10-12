@@ -8,13 +8,6 @@
         "sleet"
       ],
       "rollForward": false
-    },
-    "clangsharppinvokegenerator": {
-      "version": "21.1.8.4",
-      "commands": [
-        "ClangSharpPInvokeGenerator"
-      ],
-      "rollForward": false
     }
   }
 }

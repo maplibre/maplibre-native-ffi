@@ -75,6 +75,11 @@ val nativeLoaderLibraryPath =
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(composeMapJvmArgs)
+  // Reading the smoke switch through a provider makes it an input of the
+  // configuration cache, so a cached run never reuses another run's setting.
+  providers.environmentVariable("MLN_EXAMPLE_SMOKE").orNull?.let {
+    environment("MLN_EXAMPLE_SMOKE", it)
+  }
   if (!usePublishedKotlin) {
     systemProperty("org.lwjgl.librarypath", nativeHostLibraryPath)
     systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)

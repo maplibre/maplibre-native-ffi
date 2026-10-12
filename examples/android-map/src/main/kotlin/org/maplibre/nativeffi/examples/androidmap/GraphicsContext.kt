@@ -22,10 +22,11 @@ internal interface GraphicsContext : AutoCloseable {
 
   /**
    * Releases the host surface the platform is taking back, reporting whether this context outlived
-   * it. True leaves a session attached against it live until a surface returns; false means the
-   * caller closes the session and this context together.
+   * it. A context that outlives it runs [handOver] while the outgoing surface is still valid, so
+   * the session moves off it first, and stays live until a surface returns. False means the caller
+   * closes the session and this context together.
    */
-  fun releaseSurface(): Boolean
+  fun releaseSurface(handOver: () -> Unit): Boolean
 
   companion object {
     fun create(surface: Surface): GraphicsContext =

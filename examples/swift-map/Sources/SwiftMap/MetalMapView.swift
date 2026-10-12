@@ -2,25 +2,20 @@ import AppKit
 import MaplibreNativeFFI
 import QuartzCore
 
-/// The display-paced render loop. This view runs on the main thread and owns
-/// the window, input decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the runtime loop thread it starts, reached
-/// through ``Channels``.
+/// The map view. It runs on the main thread and owns the window's input
+/// decoding, the Metal objects, and the render loop, which owns the map and the
+/// render session.
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
   private let input = InputController()
+
   private let mode: RenderTargetMode
-  private let channels = Channels()
   private var graphics: MetalGraphicsContext?
-  private var renderTarget: MetalRenderTarget?
-  private var runtimeLoop: RuntimeLoopThread?
-  private var timer: Timer?
+  private var loop: RenderLoop?
+  private var startup: Task<Void, Never>?
+  private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
-  private var consecutiveRenderFailures = 0
-  private var didLogStartupStatus = false
-  private var isShutDown = false
-  private var setupError: Error?
   private var errorLabel: NSTextField?
 
   override var acceptsFirstResponder: Bool {
@@ -36,18 +31,9 @@ final class MetalMapView: NSView {
     do {
       graphics = try MetalGraphicsContext(layer: metalLayer)
     } catch {
-      setupError = error
+      showError(String(describing: error))
     }
     postsFrameChangedNotifications = true
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(shutdown),
-      name: AppDelegate.willTerminateMapViews,
-      object: nil
-    )
-    if let setupError {
-      showError(String(describing: setupError))
-    }
   }
 
   required init?(coder _: NSCoder) {
@@ -57,38 +43,32 @@ final class MetalMapView: NSView {
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     window?.makeFirstResponder(self)
-    startTimerIfNeeded()
     updateViewport()
   }
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
     if newWindow == nil {
-      shutdown()
+      Task { @MainActor in await shutdown() }
     }
   }
 
-  /// Closes the session before the runtime loop closes the map; a map with an
-  /// attached session cannot be destroyed.
-  @objc private func shutdown() {
-    guard !isShutDown else { return }
-    isShutDown = true
-    timer?.invalidate()
-    timer = nil
-    do {
-      try renderTarget?.close()
-    } catch {
-      print(error)
-    }
-    renderTarget = nil
-    if runtimeLoop != nil {
-      channels.requestShutdown()
-      if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
-        print("runtime loop did not finish before the shutdown deadline")
+  /// Closes the render loop once startup settles. The caller may await the
+  /// same teardown from more than one place.
+  func shutdown() async {
+    if shutdownTask == nil {
+      let startup = startup
+      shutdownTask = Task { @MainActor in
+        await startup?.value
+        do {
+          try await self.loop?.close()
+        } catch {
+          print(error)
+        }
+        self.loop = nil
       }
-      runtimeLoop = nil
     }
-    NotificationCenter.default.removeObserver(self)
+    await shutdownTask?.value
   }
 
   override func layout() {
@@ -102,164 +82,94 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDown(event, commands: channels))
+    if let mapState { input.mouseDown(event, mapState: mapState) }
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.rightMouseDown(event, commands: channels)
-    )
+    if let mapState { input.rightMouseDown(event, mapState: mapState) }
   }
 
   override func mouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseUp(event, commands: channels))
+    if let mapState { input.mouseUp(event, mapState: mapState) }
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.rightMouseUp(event, commands: channels))
+    if let mapState { input.rightMouseUp(event, mapState: mapState) }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    if let mapState { input.mouseDragged(event, mapState: mapState) }
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    if let mapState { input.mouseDragged(event, mapState: mapState) }
   }
 
   override func scrollWheel(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.scrollWheel(event, commands: channels, in: self)
-    )
+    if let mapState { input.scrollWheel(event, in: self, mapState: mapState) }
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    requestRenderIfCameraChanged(
-      input.keyDown(event, commands: channels, viewport: viewport)
-    )
+    if let mapState { input.keyDown(
+      event,
+      viewport: viewport,
+      mapState: mapState
+    ) }
   }
 
-  private func requestRenderIfCameraChanged(_ cameraChanged: Bool) {
-    if cameraChanged {
-      channels.setRenderRequest()
-    }
+  /// The map that input drives, once the loop is running.
+  private var mapState: MapState? {
+    shutdownTask == nil ? loop?.mapState : nil
   }
 
-  private func startTimerIfNeeded() {
-    guard timer == nil else { return }
-    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host
-    // loop.
-    timer = Timer
-      .scheduledTimer(withTimeInterval: 1.0 / 60.0,
-                      repeats: true)
-      { [weak self] _ in
-        Task { @MainActor in self?.tick() }
+  /// Starts the loop once a non-empty viewport is known, because the map takes
+  /// its initial extent from it.
+  private func startIfNeeded(viewport: Viewport) {
+    guard startup == nil, shutdownTask == nil, let graphics else { return }
+    startup = Task { @MainActor in
+      do {
+        let loop = try await RenderLoop.start(
+          mode: mode,
+          graphics: graphics,
+          viewport: viewport
+        )
+        loop.onFailure = { [weak self] in self?.fail(String(describing: $0)) }
+        self.loop = loop
+        logControls()
+        // The viewport can change while startup is in flight.
+        if let latest = currentViewport, latest != viewport, !latest.isEmpty {
+          loop.resize(latest)
+        }
+      } catch {
+        fail(String(describing: error))
       }
-    RunLoop.main.add(timer!, forMode: .common)
-  }
-
-  /// Starts the runtime loop once a non-empty viewport is known, because the
-  /// map takes its initial extent from it.
-  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
-    guard runtimeLoop == nil, !isShutDown else { return }
-    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
-    runtimeLoop = loop
-    loop.start()
+    }
   }
 
   private func updateViewport() {
-    guard !isShutDown, setupError == nil else { return }
-    guard let graphics else { return }
+    guard shutdownTask == nil, let graphics else { return }
     let viewport = readViewport()
-
     guard viewport != currentViewport else { return }
-    let label = currentViewport == nil ? "initial viewport" : "resized viewport"
-    viewport.log(label)
-    if viewport.isEmpty {
-      currentViewport = viewport
-      return
-    }
-
-    do {
-      graphics.resize(viewport)
-      try renderTarget?.resize(graphics: graphics, viewport: viewport)
-      currentViewport = viewport
-      channels.setRenderRequest()
-      startRuntimeLoopIfNeeded(viewport: viewport)
-    } catch {
-      // A failed resize leaves the render target detached, so stop the timer
-      // rather than render through a detached session.
-      print(error)
-      timer?.invalidate()
-      timer = nil
-      showError(String(describing: error))
-    }
-  }
-
-  /// Attaches the render session on this thread. Attach records the calling
-  /// thread as the session's owner, and every later session call runs here.
-  private func attachIfNeeded() {
-    guard renderTarget == nil,
-          let graphics,
-          let viewport = currentViewport,
-          !viewport.isEmpty,
-          let attachRef = channels.attachRef()
-    else { return }
-
-    do {
-      renderTarget = try MetalRenderTarget.attach(
-        mode: mode,
-        attachRef: attachRef,
-        graphics: graphics,
-        viewport: viewport
-      )
-      if !didLogStartupStatus {
-        logStartupStatus(mode: mode)
-        didLogStartupStatus = true
-      }
-      channels.setRenderRequest()
-    } catch {
-      fail(String(describing: error))
-    }
-  }
-
-  private func tick() {
-    guard !isShutDown else { return }
-    if let failureMessage = channels.failureMessage {
-      fail(failureMessage)
-      return
-    }
-    attachIfNeeded()
-    guard let renderTarget,
-          let viewport = currentViewport,
-          !viewport.isEmpty
-    else { return }
-
-    do {
-      // Consume first, so a request published during the render survives.
-      if channels.consumeRenderRequest() {
-        let completed = try renderTarget.renderUpdate()
-        if !completed {
-          channels.setRenderRequest()
-        }
-      }
-      try renderTarget.finishFrame()
-      consecutiveRenderFailures = 0
-    } catch {
-      print(error)
-      consecutiveRenderFailures += 1
-      if consecutiveRenderFailures >= 3 {
-        fail(String(describing: error))
-      }
+    viewport
+      .log(currentViewport == nil ? "initial viewport" : "resized viewport")
+    currentViewport = viewport
+    guard !viewport.isEmpty else { return }
+    graphics.resize(viewport)
+    if let loop {
+      loop.resize(viewport)
+    } else {
+      startIfNeeded(viewport: viewport)
     }
   }
 
   private func fail(_ message: String) {
     print(message)
     showError(message)
-    shutdown()
-    NSApp.terminate(nil)
+    Task { @MainActor in
+      await shutdown()
+      NSApp.terminate(nil)
+    }
   }
 
   private func readViewport() -> Viewport {

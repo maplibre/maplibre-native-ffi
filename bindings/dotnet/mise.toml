@@ -12,13 +12,9 @@ sources = [
 # from one `&&` line that `sh` and `cmd` each understand.
 run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
 
-[tasks.generate]
-run = "python scripts/generate-clangsharp.py"
-
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
-# DocFX lives in a separate tool manifest from ClangSharp: restoring both in one
-# manifest hits a .NET SDK bug that reports DocFX's commands as ClangSharp's.
+# DocFX has its own tool manifest, so only this task restores it.
 run = '''
 rm -rf build/docfx build/docfx-api
 mkdir -p build
@@ -37,17 +33,30 @@ extends = "ffi:preset"
 # GC.KeepAlive around a native call.
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet build \
     Maplibre.NativeFfi.slnx \
     -c Release \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''
 
 [tasks.test]
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 if [[ "$usage_preset" == linux-musl-* ]]; then
   exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
 fi
@@ -56,5 +65,6 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
     -c Release \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''

@@ -6,6 +6,9 @@ OUTPUT_DIRECTORY = doxygen/gen
 INPUT = ../include
 FILE_PATTERNS = *.h
 RECURSIVE = YES
+# Binding-internal headers that cmake/mln_ffi_install.cmake leaves out.
+EXCLUDE = ../include/maplibre_native_c/callback_adapter.h \
+          ../include/maplibre_native_c/callback_capture_generated.h
 
 GENERATE_HTML = YES
 HTML_OUTPUT = html
@@ -21,7 +24,8 @@ OPTIMIZE_OUTPUT_FOR_C = YES
 MACRO_EXPANSION = YES
 EXPAND_ONLY_PREDEF = YES
 PREDEFINED = MLN_API= \
-             MLN_NOEXCEPT=
+             MLN_NOEXCEPT= \
+             "MLN_BINDING(contract)="
 
 SHOW_INCLUDE_FILES = NO
 SOURCE_BROWSER = NO

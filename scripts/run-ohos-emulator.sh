@@ -7,6 +7,13 @@ if [[ $# -ne 1 ]]; then
 fi
 
 image_dir=$1
+connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
+host_address=${connect_key%:*}
+host_port=${connect_key##*:}
+if [[ -z "$host_address" || ! "$host_port" =~ ^[0-9]+$ ]]; then
+  echo "Invalid OpenHarmony emulator connect key: $connect_key" >&2
+  exit 2
+fi
 qemu_bin=${QEMU_BIN:-qemu-system-x86_64}
 for image in bzImage ramdisk.img updater.img system.img vendor.img userdata.img; do
   if [[ ! -f "$image_dir/$image" ]]; then
@@ -67,5 +74,5 @@ exec "$qemu_bin" \
   -append "ip=dhcp loglevel=4 console=ttyS0,115200 init=init root=/dev/ram0 rw ohos.boot.hardware=x86_general ohos.required_mount.system=/dev/block/vdb@/usr@ext4@ro,barrier=1@wait,required ohos.required_mount.vendor=/dev/block/vdc@/vendor@ext4@ro,barrier=1@wait,required ohos.required_mount.misc=/dev/block/vda@/misc@none@none=@wait,required" \
   "${acceleration[@]}" \
   "${cpu[@]}" \
-  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:55555-:55555 \
+  -netdev "user,id=net0,hostfwd=tcp:$host_address:$host_port-:55555" \
   -device virtio-net-pci,netdev=net0

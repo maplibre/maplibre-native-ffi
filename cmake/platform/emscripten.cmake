@@ -55,11 +55,11 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp)
 
   set(MLN_FFI_EMSCRIPTEN_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/emscripten/async_task.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/emscripten/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/emscripten/run_loop.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/emscripten/thread.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/emscripten/timer.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_EMSCRIPTEN_SOURCES})

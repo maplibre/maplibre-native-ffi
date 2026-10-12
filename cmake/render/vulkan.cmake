@@ -105,6 +105,7 @@ function(mln_ffi_configure_renderer target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_queue_access.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)

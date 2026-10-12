@@ -6,7 +6,6 @@ enum class AndroidTarget(
   val targetPlatform: String,
   val cmakeArchitecture: String,
   val ndkAbi: String,
-  val javaCppPlatform: String,
   val ndkTargetTriple: String,
   val taskSuffix: String,
 ) {
@@ -16,7 +15,6 @@ enum class AndroidTarget(
     targetPlatform = "android-arm",
     cmakeArchitecture = "arm",
     ndkAbi = "armeabi-v7a",
-    javaCppPlatform = "android-arm",
     ndkTargetTriple = "armv7a-linux-androideabi",
     taskSuffix = "Arm32",
   ),
@@ -26,7 +24,6 @@ enum class AndroidTarget(
     targetPlatform = "android-arm64",
     cmakeArchitecture = "arm64",
     ndkAbi = "arm64-v8a",
-    javaCppPlatform = "android-arm64",
     ndkTargetTriple = "aarch64-linux-android",
     taskSuffix = "Arm64",
   ),
@@ -36,12 +33,12 @@ enum class AndroidTarget(
     targetPlatform = "android-x64",
     cmakeArchitecture = "x64",
     ndkAbi = "x86_64",
-    javaCppPlatform = "android-x86_64",
     ndkTargetTriple = "x86_64-linux-android",
     taskSuffix = "X86_64",
   );
 
-  fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang++"
+  /** The NDK C compiler driver for this ABI at [apiLevel]. */
+  fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang"
 
   fun supportsBackend(backend: String): Boolean = backend == "opengl" || backend == "vulkan"
 

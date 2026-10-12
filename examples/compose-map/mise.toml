@@ -20,3 +20,29 @@ run = '''
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   :examples:compose-map:run
 '''
+
+[tasks.smoke]
+description = "Render one frame of an inline style, then exit."
+extends = "ffi:preset"
+dir = "../.."
+run = '''
+export MLN_EXAMPLE_SMOKE=1
+args=(
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install"
+  :examples:compose-map:run
+)
+if [[ "$(uname -s)" == Linux ]]; then
+  # Skiko refuses OpenGL on a renderer named llvmpipe and falls back to a
+  # software redrawer the map cannot share a texture with. Mesa's driconf
+  # override renames the renderer. Every Mesa driver honors it, so a hardware
+  # driver reports the same name during the smoke, which Skiko accepts, and
+  # other vendors' drivers ignore it.
+  export force_gl_renderer="${force_gl_renderer:-Mesa software rasterizer}"
+  # Compose draws only into a window on a display server. A Linux host without
+  # one runs the example on a virtual X server, where Mesa renders in software.
+  if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+    exec xvfb-run -a ./gradlew "${args[@]}"
+  fi
+fi
+exec ./gradlew "${args[@]}"
+'''

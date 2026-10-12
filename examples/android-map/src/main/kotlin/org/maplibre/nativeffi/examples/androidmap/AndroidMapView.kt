@@ -1,34 +1,42 @@
 package org.maplibre.nativeffi.examples.androidmap
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import org.maplibre.nativeffi.render.RenderResult
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.generated.Wake
 
 /**
- * The render loop.
+ * The map view. The UI thread owns the surface, touch input, viewport, graphics context, and render
+ * session.
  *
- * The UI thread owns the surface, touch input, the viewport, the graphics context, and the render
- * session it attaches. It touches the map only to attach, which native serves from any thread;
- * every other map call belongs to [MapRuntimeLoop].
- *
- * The platform destroys and recreates this view's surface across a rotation and a trip to the
- * background. A session survives that only while its graphics context does, so a context that goes
- * with its surface leaves the next frame attaching a cold session.
+ * Touch input becomes map commands. A map update schedules one frame demand on the next
+ * Choreographer frame. Native wakes post the work they announce to the UI thread: runtime events to
+ * drain, frame results to drain, and, for a caller driver, driver work to service.
  */
-internal class AndroidMapView(context: Context) :
-  SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
-  private val input = InputController(context, ::enqueueCameraCommand)
+internal class AndroidMapView(
+  context: Context,
+  private val styleJson: String? = null,
+  private val onRendered: () -> Unit = {},
+) : SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
+  private val handler = Handler(Looper.getMainLooper())
+  private val input = InputController(context) { mapState }
   private var graphics: GraphicsContext? = null
   private var renderTarget: SurfaceRenderTarget? = null
-  private var runtimeLoop: MapRuntimeLoop? = null
+  private var mapState: MapState? = null
   private var viewport: Viewport? = null
   private var viewVisible = false
   private var appForeground = false
   private var frameCallbackPosted = false
+
+  /** Set when the platform asked for a redraw, which renders even with no newer map update. */
+  private var redrawRequested = false
 
   /** Set when a frame threw, so the view stops scheduling against a broken target. */
   private var frameFailed = false
@@ -37,6 +45,10 @@ internal class AndroidMapView(context: Context) :
   private var contextRebuildSpent = false
   private var closed = false
   private val pendingDrawingFinished = ArrayDeque<Runnable>()
+
+  private val eventWake = UiWake { if (mapState?.drainRenderUpdates() == true) scheduleFrame() }
+  private val frameWake = UiWake(::drainFrameResults)
+  private val driverWake = UiWake { renderTarget?.serviceDriverWork() }
 
   init {
     holder.addCallback(this)
@@ -47,24 +59,30 @@ internal class AndroidMapView(context: Context) :
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     viewVisible = true
-    startLoopIfReady()
+    scheduleFrame()
   }
 
   override fun onDetachedFromWindow() {
     viewVisible = false
-    stopLoop()
+    stopFrames()
     detachSurface()
     super.onDetachedFromWindow()
   }
 
   fun enterForeground() {
     appForeground = true
-    startLoopIfReady()
+    scheduleFrame()
   }
 
+  /** Pauses demand, and waits until no frame renders after the app leaves the foreground. */
   fun enterBackground() {
     appForeground = false
-    stopLoop()
+    stopFrames()
+    try {
+      renderTarget?.barrier()
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "the background render barrier failed", error)
+    }
     finishPendingDrawing()
   }
 
@@ -81,14 +99,12 @@ internal class AndroidMapView(context: Context) :
   }
 
   override fun surfaceRedrawNeeded(holder: SurfaceHolder) {
-    runtimeLoop?.requestRepaint()
-    requestRender()
+    requestRedraw()
   }
 
   override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
     pendingDrawingFinished += drawingFinished
-    runtimeLoop?.requestRepaint()
-    requestRender()
+    requestRedraw()
     if (!canRenderFrame()) {
       finishPendingDrawing()
     }
@@ -98,48 +114,33 @@ internal class AndroidMapView(context: Context) :
 
   override fun doFrame(frameTimeNanos: Long) {
     frameCallbackPosted = false
-    val loop = runtimeLoop
-    if (loop != null) {
-      try {
-        val target = ensureRenderTarget(loop)
-        if (target != null && loop.renderRequest.consume()) {
-          when (target.renderUpdate()) {
-            RenderResult.RENDERED -> {
-              contextRebuildSpent = false
-              finishPendingDrawing()
-            }
-            RenderResult.TARGET_NOT_READY -> loop.renderRequest.set()
-            RenderResult.NO_UPDATE,
-            RenderResult.SIZE_PENDING -> Unit
-          }
-        }
-      } catch (error: RuntimeException) {
-        Log.e(TAG, "frame failed", error)
-        rebuildAfterFrameFailure()
-      }
-    }
-    startLoopIfReady()
-  }
-
-  fun requestRender() {
-    runtimeLoop?.renderRequest?.set()
-    startLoopIfReady()
+    if (!canRenderFrame()) return
+    val force = redrawRequested
+    redrawRequested = false
+    guarded { renderTarget?.requestFrame(force) }
   }
 
   override fun close() {
     if (closed) return
     closed = true
-    stopLoop()
-    // Close the session before the runtime loop closes the map: a map with an attached session
-    // cannot be destroyed.
+    stopFrames()
+    // Close the render session before closing the map and runtime.
     detachSurface()
-    runtimeLoop?.close()
-    runtimeLoop = null
+    mapState?.close()
+    mapState = null
   }
 
-  private fun enqueueCameraCommand(command: CameraCommand) {
-    runtimeLoop?.enqueue(command)
-    requestRender()
+  private fun drainFrameResults() {
+    val drained = renderTarget?.drainFrameResults() ?: return
+    if (drained.rendered) {
+      contextRebuildSpent = false
+      finishPendingDrawing()
+      onRendered()
+    }
+    // A target that was not ready does not cause a map-update event, so the next Choreographer
+    // frame retries. The result otherwise carries the map's own follow-up demand, so an ongoing
+    // transition needs no runtime event round trip.
+    if (drained.targetNotReady) requestRedraw() else if (drained.needsRepaint) scheduleFrame()
   }
 
   private fun surfaceAvailable(holder: SurfaceHolder) {
@@ -153,54 +154,116 @@ internal class AndroidMapView(context: Context) :
     }
     if (graphics?.setSurface(holder.surface) != true) {
       // A session outlives only the context it attached against, so replacing the context closes
-      // the session and the next frame attaches a cold one.
+      // the session and attaches a cold one.
       detachSurface()
       val nextGraphics = GraphicsContext.create(holder.surface)
       graphics = nextGraphics
-      Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
+      Log.i(TAG, "graphics context: ${nextGraphics.backendName}")
     }
-    // The runtime loop outlives surface changes, so loading continues while there is nothing to
-    // present to.
-    if (runtimeLoop == null) {
-      runtimeLoop = MapRuntimeLoop(nextViewport)
+    val state = mapState
+    if (state == null) {
+      mapState = MapState(nextViewport, eventWake.wake, styleJson)
+    } else if (renderTarget == null) {
+      // With no session attached the map is the only extent authority; a live session carries the
+      // extent through followSurface below.
+      state.resize(nextViewport)
     }
-    followSurface("surface available")
-    requestRender()
+    if (renderTarget == null) attachSurface() else followSurface("surface available")
+    requestRedraw()
   }
 
+  /**
+   * Moves a live session off the outgoing surface before this callback returns, since the surface
+   * is gone after that. A session still attaching against it closes instead.
+   */
   private fun surfaceLost() {
-    if (graphics?.releaseSurface() == true) {
-      // The context outlived the surface, so the session parks on it until a surface returns.
-      followSurface("surface released")
-    } else {
-      detachSurface()
-    }
+    val target = renderTarget
+    val parked =
+      target?.attached != false &&
+        try {
+          graphics?.releaseSurface {
+            // The context outlived the surface, so the session parks on the context's own surface
+            // until a surface returns.
+            followSurface("surface released")?.let { target?.await(it) }
+          } == true
+        } catch (error: RuntimeException) {
+          Log.w(TAG, "parking the render session failed; closing it", error)
+          false
+        }
+    if (!parked) detachSurface()
     finishPendingDrawing()
+  }
+
+  /** Starts attaching a session once a map, a context, and a non-empty viewport all exist. */
+  private fun attachSurface() {
+    val state = mapState ?: return
+    val currentGraphics = graphics ?: return
+    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
+    var target: SurfaceRenderTarget? = null
+    target =
+      SurfaceRenderTarget.attach(
+        state.map,
+        currentGraphics,
+        currentViewport,
+        frameWake.wake,
+        driverWake::post,
+      ) { error ->
+        handler.post { onAttached(target, error) }
+      }
+    renderTarget = target
+  }
+
+  private fun onAttached(target: SurfaceRenderTarget?, error: Throwable?) {
+    if (target == null || target !== renderTarget) return
+    if (error != null) {
+      Log.e(TAG, "attaching the render session failed", error)
+      detachSurface()
+      return
+    }
+    Log.i(TAG, "render target: native-surface")
+    Log.i(TAG, "render target status: renders directly to the host window surface")
+    Log.i(TAG, "render driver: ${target.driverLabel}")
+    // The viewport may have changed while the session attached.
+    if (target.viewport != viewport) followSurface("attached")
+    scheduleFrame()
   }
 
   /**
    * Points the live session at the surface its graphics context presents through now, and at the
-   * current viewport. A session yet to be attached takes both from [SurfaceRenderTarget.attach].
+   * current viewport, and returns the handover. A session still attaching takes both once it
+   * attaches.
    */
-  private fun followSurface(change: String) {
-    val currentGraphics = graphics ?: return
-    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
-    val target = renderTarget ?: return
+  private fun followSurface(change: String): Deferred<*>? {
+    val currentGraphics = graphics ?: return null
+    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
+    val target = renderTarget?.takeIf { it.attached } ?: return null
+    val state = mapState ?: return null
+    val handover =
+      target.follow(state, currentGraphics, currentViewport) { error ->
+        // A failed handover may leave the session naming a destroyed surface, so close it; the next
+        // surface attaches a new one.
+        handler.post {
+          Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
+          if (renderTarget === target) detachSurface()
+        }
+      }
+    Log.i(TAG, "$change: the live session follows it and keeps its renderer")
+    return handover
+  }
+
+  /** Runs one piece of UI-thread render work, rebuilding the context once if it throws. */
+  private inline fun guarded(action: () -> Unit) {
     try {
-      target.resize(currentGraphics, currentViewport)
+      action()
     } catch (error: RuntimeException) {
-      // A failed handover may leave the session naming a destroyed surface, so close it here; the
-      // next surface attaches a new one.
-      Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
-      detachSurface()
-      return
+      Log.e(TAG, "frame failed", error)
+      rebuildAfterFrameFailure()
     }
-    Log.i(TAG, "$change: the live session followed it and kept its renderer")
   }
 
   /**
    * Builds the graphics context again after a failed frame, once. A second failure with no good
-   * frame in between stops scheduling rather than reposting every vsync against a broken target.
+   * frame in between stops scheduling rather than demanding frames from a broken target.
    */
   private fun rebuildAfterFrameFailure() {
     detachSurface()
@@ -218,32 +281,31 @@ internal class AndroidMapView(context: Context) :
         frameFailed = true
         null
       }
+    attachSurface()
   }
 
   private fun detachSurface() {
-    renderTarget?.close()
+    // Reached from surfaceDestroyed and onDetachedFromWindow, where a throw would escape into the
+    // platform and leave the graphics context leaked.
+    try {
+      renderTarget?.close()
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "closing the render session failed", error)
+    }
     renderTarget = null
     graphics?.close()
     graphics = null
     finishPendingDrawing()
   }
 
-  /** Attaches a session against the published map, on this thread, which then owns it. */
-  private fun ensureRenderTarget(loop: MapRuntimeLoop): SurfaceRenderTarget? {
-    renderTarget?.let {
-      return it
-    }
-    val currentGraphics = graphics ?: return null
-    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
-    val map = loop.map ?: return null
-    val attached = SurfaceRenderTarget.attach(map, currentGraphics, currentViewport)
-    renderTarget = attached
-    loop.requestRepaint()
-    loop.renderRequest.set()
-    return attached
+  /** Schedules a redraw that renders even when the map has nothing newer. */
+  private fun requestRedraw() {
+    redrawRequested = true
+    scheduleFrame()
   }
 
-  private fun startLoopIfReady() {
+  /** Demands one frame on the next Choreographer frame, while the view can show it. */
+  private fun scheduleFrame() {
     if (frameCallbackPosted || !canRenderFrame()) {
       return
     }
@@ -257,9 +319,7 @@ internal class AndroidMapView(context: Context) :
       appForeground &&
       graphics?.hasSurface == true &&
       !frameFailed &&
-      runtimeLoop != null &&
-      // A loop whose setup failed never publishes a map.
-      runtimeLoop?.setupFailure == null
+      renderTarget?.attached == true
 
   private fun finishPendingDrawing() {
     while (pendingDrawingFinished.isNotEmpty()) {
@@ -267,11 +327,30 @@ internal class AndroidMapView(context: Context) :
     }
   }
 
-  private fun stopLoop() {
+  private fun stopFrames() {
     if (frameCallbackPosted) {
       Choreographer.getInstance().removeFrameCallback(this)
       frameCallbackPosted = false
     }
+  }
+
+  /**
+   * A native wake that runs [action] on the UI thread. It posts once however often the wake fires
+   * before the action runs, and the action drains or services everything that is ready.
+   */
+  private inner class UiWake(private val action: () -> Unit) {
+    private val posted = AtomicBoolean(false)
+
+    fun post() {
+      if (posted.compareAndSet(false, true)) {
+        handler.post {
+          posted.set(false)
+          if (!closed) guarded(action)
+        }
+      }
+    }
+
+    val wake = Wake { post() }
   }
 
   private companion object {

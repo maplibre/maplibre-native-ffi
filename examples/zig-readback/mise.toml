@@ -22,6 +22,28 @@ zig build \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
+[tasks.smoke]
+description = "Render and read back one still image of an inline style, then exit."
+extends = "ffi:preset"
+# MLN_EXAMPLE_SMOKE swaps the network style for an inline one, so the run needs
+# no network. The example renders offscreen and needs no display.
+run = '''
+mkdir -p zig-out
+MLN_EXAMPLE_SMOKE=1 zig build run \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback-smoke.ppm
+'''
+run_windows = '''
+mkdir -p zig-out
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MLN_EXAMPLE_SMOKE=1 zig build run \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback-smoke.ppm
+'''
+
 [tasks.run]
 extends = "ffi:preset"
 run = '''

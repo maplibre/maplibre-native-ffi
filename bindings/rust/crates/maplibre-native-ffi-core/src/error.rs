@@ -1,6 +1,5 @@
-use std::ffi::CStr;
 use std::fmt;
-use std::os::raw::c_char;
+use std::mem::MaybeUninit;
 
 use maplibre_native_ffi_sys as sys;
 
@@ -13,6 +12,11 @@ pub enum ErrorKind {
     InvalidState,
     WrongThread,
     Unsupported,
+    Cancelled,
+    Busy,
+    TargetLost,
+    NotReady,
+    NotFound,
     NativeError,
     AbiVersionMismatch,
     UnknownStatus,
@@ -32,10 +36,6 @@ impl Error {
             raw_status,
             diagnostic: diagnostic.into(),
         }
-    }
-
-    pub fn from_status(status: i32) -> Self {
-        Self::from_status_and_diagnostic(status, capture_thread_diagnostic())
     }
 
     pub fn from_status_and_diagnostic(status: i32, diagnostic: impl Into<String>) -> Self {
@@ -78,76 +78,162 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-pub fn check(status: i32) -> Result<()> {
+/// Calls a status-returning C function with a diagnostic for its final
+/// `out_diagnostic` parameter, and converts a failed status and that diagnostic
+/// into an error.
+pub fn check(call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status) -> Result<()> {
+    let mut diagnostic = MaybeUninit::<sys::mln_diagnostic>::uninit();
+    let raw = diagnostic.as_mut_ptr();
+    // SAFETY: raw points to storage for one mln_diagnostic. Native writes the
+    // message, so only the size and an empty message are initialized here;
+    // the empty message covers a call that fails without reaching native.
+    unsafe {
+        (&raw mut (*raw).size).write(std::mem::size_of::<sys::mln_diagnostic>() as u32);
+        (&raw mut (*raw).message).cast::<u8>().write(0);
+    }
+    let status = call(raw);
     if status == sys::MLN_STATUS_OK {
-        Ok(())
-    } else {
-        Err(Error::from_status(status))
+        return Ok(());
+    }
+    // SAFETY: the message is null-terminated, either by native or above.
+    Err(Error::from_status_and_diagnostic(status, unsafe {
+        diagnostic_message(raw)
+    }))
+}
+
+/// The status that reports `error` to native code.
+pub fn status_for_error(error: &Error) -> sys::mln_status {
+    if let Some(status) = error.raw_status() {
+        return status;
+    }
+    match error.kind() {
+        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
+        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
+        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
+        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
+        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
+        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
+        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
+        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
+        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
+            sys::MLN_STATUS_NATIVE_ERROR
+        }
     }
 }
 
-pub fn capture_thread_diagnostic() -> String {
-    // SAFETY: The returned thread-local string stays valid until the next
-    // diagnostic-writing C API call on this thread; this copies it immediately.
-    unsafe { copy_c_string_lossy(sys::mln_thread_last_error_message()) }
-}
-
-pub fn kind_for_status(status: i32) -> ErrorKind {
+fn kind_for_status(status: i32) -> ErrorKind {
     match status {
         sys::MLN_STATUS_INVALID_ARGUMENT => ErrorKind::InvalidArgument,
         sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,
         sys::MLN_STATUS_WRONG_THREAD => ErrorKind::WrongThread,
         sys::MLN_STATUS_UNSUPPORTED => ErrorKind::Unsupported,
+        sys::MLN_STATUS_CANCELLED => ErrorKind::Cancelled,
+        sys::MLN_STATUS_BUSY => ErrorKind::Busy,
+        sys::MLN_STATUS_TARGET_LOST => ErrorKind::TargetLost,
+        sys::MLN_STATUS_NOT_READY => ErrorKind::NotReady,
+        sys::MLN_STATUS_NOT_FOUND => ErrorKind::NotFound,
         sys::MLN_STATUS_NATIVE_ERROR => ErrorKind::NativeError,
         _ => ErrorKind::UnknownStatus,
     }
 }
 
-unsafe fn copy_c_string_lossy(ptr: *const c_char) -> String {
-    if ptr.is_null() {
-        return String::new();
-    }
+/// The capacity of a diagnostic's message, including its null byte, which the
+/// generated record declares.
+pub const DIAGNOSTIC_MESSAGE_CAPACITY: usize = {
+    // SAFETY: all zeroes is a valid diagnostic, and only its length is read.
+    let diagnostic: sys::mln_diagnostic = unsafe { std::mem::zeroed() };
+    diagnostic.message.len()
+};
 
-    // SAFETY: The caller promises that ptr is either null or points to a valid
-    // NUL-terminated C string for the duration of this call.
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+/// Copies a diagnostic's message, which is initialized through its null byte.
+unsafe fn diagnostic_message(diagnostic: *const sys::mln_diagnostic) -> String {
+    // SAFETY: the caller promises the diagnostic outlives this call.
+    let message = unsafe { &raw const (*diagnostic).message }.cast::<u8>();
+    let capacity = DIAGNOSTIC_MESSAGE_CAPACITY;
+    let mut length = 0;
+    // SAFETY: the caller promises a null byte within the message capacity, and
+    // every byte before it is initialized.
+    while length < capacity && unsafe { message.add(length).read() } != 0 {
+        length += 1;
+    }
+    // SAFETY: the first length bytes are initialized, as read above.
+    String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(message, length) }).into_owned()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    // Spec coverage: BND-021.
-    fn maps_unknown_status_without_losing_raw_status() {
-        let error = Error::from_status_and_diagnostic(-123_456, "future status");
+    /// Runs a call that fails with `status` after writing `message` into its
+    /// diagnostic, the way a native call reports a failure.
+    fn failing_call(status: sys::mln_status, message: &[u8]) -> Error {
+        check(|diagnostic| {
+            // SAFETY: check hands the call one diagnostic, and every message
+            // written here fits its capacity.
+            unsafe {
+                let out = (&raw mut (*diagnostic).message).cast::<u8>();
+                std::ptr::copy_nonoverlapping(message.as_ptr(), out, message.len());
+            }
+            status
+        })
+        .unwrap_err()
+    }
 
+    #[test]
+    fn a_failed_call_maps_its_status_and_keeps_an_unknown_code() {
+        let statuses = [
+            (sys::MLN_STATUS_INVALID_ARGUMENT, ErrorKind::InvalidArgument),
+            (sys::MLN_STATUS_INVALID_STATE, ErrorKind::InvalidState),
+            (sys::MLN_STATUS_WRONG_THREAD, ErrorKind::WrongThread),
+            (sys::MLN_STATUS_UNSUPPORTED, ErrorKind::Unsupported),
+            (sys::MLN_STATUS_CANCELLED, ErrorKind::Cancelled),
+            (sys::MLN_STATUS_BUSY, ErrorKind::Busy),
+            (sys::MLN_STATUS_TARGET_LOST, ErrorKind::TargetLost),
+            (sys::MLN_STATUS_NOT_READY, ErrorKind::NotReady),
+            (sys::MLN_STATUS_NOT_FOUND, ErrorKind::NotFound),
+            (sys::MLN_STATUS_NATIVE_ERROR, ErrorKind::NativeError),
+        ];
+        for (status, kind) in statuses {
+            let error = failing_call(status, b"failed\0");
+            assert_eq!(error.kind(), kind);
+            assert_eq!(error.raw_status(), Some(status));
+            assert_eq!(error.diagnostic(), "failed");
+        }
+
+        // A status this binding predates keeps its code rather than folding
+        // into a known one.
+        let error = failing_call(-123_456, b"future status\0");
         assert_eq!(error.kind(), ErrorKind::UnknownStatus);
         assert_eq!(error.raw_status(), Some(-123_456));
         assert_eq!(error.diagnostic(), "future status");
     }
 
     #[test]
+    fn a_diagnostic_is_bounded_by_its_capacity_and_empty_when_none_was_written() {
+        // A message that fills the buffer with no terminator ends at capacity.
+        let capacity = DIAGNOSTIC_MESSAGE_CAPACITY;
+        let error = failing_call(sys::MLN_STATUS_INVALID_STATE, &vec![b'x'; capacity]);
+        assert_eq!(error.diagnostic(), "x".repeat(capacity));
+
+        // Bytes that are not UTF-8 are replaced, not dropped.
+        let error = failing_call(sys::MLN_STATUS_INVALID_STATE, b"bad \xff byte\0");
+        assert_eq!(error.diagnostic(), "bad \u{fffd} byte");
+
+        // Each call starts from an empty message, so a call that fails without
+        // writing one carries none, not the previous call's.
+        let error = check(|_| sys::MLN_STATUS_INVALID_ARGUMENT).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.diagnostic(), "");
+    }
+
+    #[test]
     fn invalid_native_calls_capture_status_and_diagnostic() {
-        let error = check(unsafe { sys::mln_network_status_set(999_999) }).unwrap_err();
+        let error = check(|diagnostic| unsafe { sys::mln_network_set_status(999_999, diagnostic) })
+            .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
         assert!(error.diagnostic().contains("network status"));
-    }
-
-    #[test]
-    fn diagnostic_is_copied_before_later_c_calls_replace_it() {
-        let error = check(unsafe { sys::mln_network_status_set(999_999) }).unwrap_err();
-        let copied = error.diagnostic().to_owned();
-        let mut status = 0;
-
-        check(unsafe { sys::mln_network_status_get(&mut status) }).unwrap();
-        let current_diagnostic = capture_thread_diagnostic();
-
-        assert_eq!(error.diagnostic(), copied);
-        assert_ne!(current_diagnostic, copied);
     }
 }

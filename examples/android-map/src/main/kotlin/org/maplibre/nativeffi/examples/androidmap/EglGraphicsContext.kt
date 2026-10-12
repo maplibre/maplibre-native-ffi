@@ -7,9 +7,9 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.util.Log
 import android.view.Surface
-import org.maplibre.nativeffi.render.EglContextDescriptor
+import org.maplibre.nativeffi.generated.EglContextDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 
 /**
  * The EGL context. The display, the config, and the share context survive a window that is
@@ -35,13 +35,19 @@ private constructor(
   override val hasSurface: Boolean
     get() = windowSurface != EGL14.EGL_NO_SURFACE
 
-  val descriptor: OpenGLContextDescriptor
+  val descriptor: OpenglContextDescriptor
     get() =
-      EglContextDescriptor(
-        NativePointer.ofAddress(display.nativeHandle),
-        NativePointer.ofAddress(config.nativeHandle),
-        NativePointer.ofAddress(shareContext.nativeHandle),
-        NativePointer.NULL_POINTER,
+      OpenglContextDescriptor(
+        org.maplibre.nativeffi.generated.OpenglContextOwnership.SHARED,
+        org.maplibre.nativeffi.generated.OpenglContextDescriptorData.Egl(
+          EglContextDescriptor(
+            NativePointer.ofAddress(display.nativeHandle),
+            NativePointer.ofAddress(config.nativeHandle),
+            NativePointer.ofAddress(shareContext.nativeHandle),
+            org.maplibre.nativeffi.generated.OpenglClientApi.GLES,
+            NativePointer.NULL_POINTER,
+          )
+        ),
       )
 
   /** The EGL surface a session presents through: the host window, or the parking surface. */
@@ -65,7 +71,7 @@ private constructor(
     return true
   }
 
-  override fun releaseSurface(): Boolean {
+  override fun releaseSurface(handOver: () -> Unit): Boolean {
     if (!hasSurface) {
       return true
     }
@@ -73,8 +79,14 @@ private constructor(
       // Nowhere for a session to park, so this context cannot outlive the window.
       return false
     }
-    EGL14.eglDestroySurface(display, windowSurface)
+    // The session moves to the parking surface before the window surface goes.
+    val outgoing = windowSurface
     windowSurface = EGL14.EGL_NO_SURFACE
+    try {
+      handOver()
+    } finally {
+      EGL14.eglDestroySurface(display, outgoing)
+    }
     return true
   }
 
@@ -136,7 +148,8 @@ private constructor(
           EGL14.EGL_RENDERABLE_TYPE,
           EGL_OPENGL_ES3_BIT,
           EGL14.EGL_SURFACE_TYPE,
-          // One config has to serve both the window surface and the pbuffer parking surface.
+          // One config has to serve both the window surface and the pbuffer parking
+          // surface.
           EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT,
           EGL14.EGL_RED_SIZE,
           8,

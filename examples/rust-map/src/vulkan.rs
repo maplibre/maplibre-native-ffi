@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::ffi::{CStr, CString};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{NativePointer, VulkanHandle};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
@@ -14,8 +14,53 @@ pub struct VulkanContext {
     surface: vk::SurfaceKHR,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
+    /// The one queue that the host and the session both submit to.
     graphics_queue: vk::Queue,
+    /// Held around every call on `graphics_queue`. A session's core worker
+    /// submits from its own thread, and Vulkan requires the calls on one queue
+    /// to be externally synchronized, so the session takes it too.
+    queue_mutex: Arc<QueueMutex>,
     graphics_queue_family_index: u32,
+}
+
+/// A lock that one thread takes and gives back in separate calls, as the
+/// session's queue-lock callbacks do.
+#[derive(Default)]
+pub struct QueueMutex {
+    held: Mutex<bool>,
+    given_back: Condvar,
+}
+
+impl QueueMutex {
+    pub fn lock(&self) {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        while *held {
+            held = self
+                .given_back
+                .wait(held)
+                .unwrap_or_else(PoisonError::into_inner);
+        }
+        *held = true;
+    }
+
+    pub fn unlock(&self) {
+        *self.held.lock().unwrap_or_else(PoisonError::into_inner) = false;
+        self.given_back.notify_one();
+    }
+
+    /// Holds the lock until the guard drops.
+    pub fn hold(&self) -> QueueGuard<'_> {
+        self.lock();
+        QueueGuard(self)
+    }
+}
+
+pub struct QueueGuard<'a>(&'a QueueMutex);
+
+impl Drop for QueueGuard<'_> {
+    fn drop(&mut self) {
+        self.0.unlock();
+    }
 }
 
 pub struct BorrowedImage {
@@ -106,7 +151,7 @@ impl VulkanContext {
                 return Err(error.into());
             }
         };
-        // SAFETY: Queue index 0 exists because the device was created with one queue.
+        // SAFETY: The device was created with one queue in this family.
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, 0) };
 
         Ok(Self {
@@ -117,13 +162,20 @@ impl VulkanContext {
             physical_device,
             device,
             graphics_queue,
+            queue_mutex: Arc::default(),
             graphics_queue_family_index,
         })
     }
 
     pub fn wait_idle(&self) -> Result<(), vk::Result> {
-        // SAFETY: device is live while VulkanContext is live.
+        let _queue = self.queue_mutex.hold();
+        // SAFETY: device is live while VulkanContext is live, and its one queue
+        // is held.
         unsafe { self.device.device_wait_idle() }
+    }
+
+    pub fn queue_mutex(&self) -> &Arc<QueueMutex> {
+        &self.queue_mutex
     }
 
     pub fn instance(&self) -> &ash::Instance {
@@ -150,47 +202,34 @@ impl VulkanContext {
         self.graphics_queue
     }
 
-    pub fn instance_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan instance is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.instance.handle().as_raw() as usize) }
+    pub fn instance_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn physical_device_pointer(&self) -> NativePointer {
-        // SAFETY: The physical device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.physical_device.as_raw() as usize) }
+    pub fn physical_device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.physical_device.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn device_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.device.handle().as_raw() as usize) }
+    pub fn device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.device.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn graphics_queue_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan queue is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.graphics_queue.as_raw() as usize) }
+    pub fn graphics_queue_pointer(&self) -> *mut std::ffi::c_void {
+        (self.graphics_queue.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn get_instance_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash entry is live.
-        unsafe {
-            NativePointer::from_address(
-                self.entry.static_fn().get_instance_proc_addr as *const () as usize,
-            )
-        }
+    pub fn get_instance_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.entry.static_fn().get_instance_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
     }
 
-    pub fn get_device_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash instance is live.
-        unsafe {
-            NativePointer::from_address(
-                self.instance.fp_v1_0().get_device_proc_addr as *const () as usize,
-            )
-        }
+    pub fn get_device_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.fp_v1_0().get_device_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
     }
 
-    pub fn surface_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan surface is live for the render session lifetime.
-        unsafe { VulkanHandle::from_bits(self.surface.as_raw()) }
+    pub fn surface_handle(&self) -> u64 {
+        self.surface.as_raw()
     }
 
     pub fn graphics_queue_family_index(&self) -> u32 {
@@ -204,6 +243,12 @@ impl Drop for VulkanContext {
         // render target that borrowed them has closed or after process exit.
         unsafe {
             let _ = self.wait_idle();
+            // Objects that an abandoned session kept are children of the
+            // device and the surface, which then stay until the process
+            // exits, as does their instance.
+            if crate::render_target::graphics_kept() {
+                return;
+            }
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.instance.destroy_instance(None);
@@ -300,18 +345,12 @@ impl BorrowedImage {
         })
     }
 
-    pub fn view(&self) -> vk::ImageView {
-        self.view
+    pub fn image_handle(&self) -> u64 {
+        self.image.as_raw()
     }
 
-    pub fn image_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.image.as_raw()) }
-    }
-
-    pub fn view_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image view is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.view.as_raw()) }
+    pub fn view_handle(&self) -> u64 {
+        self.view.as_raw()
     }
 }
 

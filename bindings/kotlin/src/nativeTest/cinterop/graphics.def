@@ -1,0 +1,4 @@
+headers = mln_test_graphics.h
+headerFilter = mln_test_graphics.h
+package = org.maplibre.nativeffi.internal.graphics
+language = C

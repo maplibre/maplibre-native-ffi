@@ -547,7 +547,7 @@ index 9e08e3d9458a03f569037b1bcf5b3e80c38315c7..9410bbafa521669fef686d66c2ab3ecb
  
  TransitionOptions LineLayer::getLineWidthTransition() const {
 diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
-index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f77c39775 100644
+index 6c98d11..b89c32c 100644
 --- a/src/mln/style/layers/location_indicator_layer.cpp
 +++ b/src/mln/style/layers/location_indicator_layer.cpp
 @@ -133,6 +133,7 @@ void LocationIndicatorLayer::setAccuracyRadiusTransition(const TransitionOptions
@@ -582,31 +582,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getBearingTransition() const {
-@@ -241,6 +245,7 @@ void LocationIndicatorLayer::setBearingAccuracyTransition(const TransitionOption
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracy>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyTransition() const {
-@@ -268,6 +273,7 @@ void LocationIndicatorLayer::setBearingAccuracyColorTransition(const TransitionO
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracyColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyColorTransition() const {
-@@ -295,6 +301,7 @@ void LocationIndicatorLayer::setBearingAccuracyRadiusTransition(const Transition
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracyRadius>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyRadiusTransition() const {
-@@ -322,6 +329,7 @@ void LocationIndicatorLayer::setBearingImageSizeTransition(const TransitionOptio
+@@ -325,6 +329,7 @@ void LocationIndicatorLayer::setBearingImageSizeTransition(const TransitionOptio
      auto impl_ = mutableImpl();
      impl_->paint.template get<BearingImageSize>().options = options;
      baseImpl = std::move(impl_);
@@ -614,7 +590,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getBearingImageSizeTransition() const {
-@@ -349,6 +357,7 @@ void LocationIndicatorLayer::setImageTiltDisplacementTransition(const Transition
+@@ -352,6 +357,7 @@ void LocationIndicatorLayer::setImageTiltDisplacementTransition(const Transition
      auto impl_ = mutableImpl();
      impl_->paint.template get<ImageTiltDisplacement>().options = options;
      baseImpl = std::move(impl_);
@@ -622,7 +598,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getImageTiltDisplacementTransition() const {
-@@ -376,6 +385,7 @@ void LocationIndicatorLayer::setLocationTransition(const TransitionOptions& opti
+@@ -379,6 +385,7 @@ void LocationIndicatorLayer::setLocationTransition(const TransitionOptions& opti
      auto impl_ = mutableImpl();
      impl_->paint.template get<Location>().options = options;
      baseImpl = std::move(impl_);
@@ -630,7 +606,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getLocationTransition() const {
-@@ -403,6 +413,7 @@ void LocationIndicatorLayer::setPerspectiveCompensationTransition(const Transiti
+@@ -406,6 +413,7 @@ void LocationIndicatorLayer::setPerspectiveCompensationTransition(const Transiti
      auto impl_ = mutableImpl();
      impl_->paint.template get<PerspectiveCompensation>().options = options;
      baseImpl = std::move(impl_);
@@ -638,7 +614,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getPerspectiveCompensationTransition() const {
-@@ -430,6 +441,7 @@ void LocationIndicatorLayer::setShadowImageSizeTransition(const TransitionOption
+@@ -433,6 +441,7 @@ void LocationIndicatorLayer::setShadowImageSizeTransition(const TransitionOption
      auto impl_ = mutableImpl();
      impl_->paint.template get<ShadowImageSize>().options = options;
      baseImpl = std::move(impl_);
@@ -646,7 +622,7 @@ index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f
  }
  
  TransitionOptions LocationIndicatorLayer::getShadowImageSizeTransition() const {
-@@ -457,6 +469,7 @@ void LocationIndicatorLayer::setTopImageSizeTransition(const TransitionOptions&
+@@ -460,6 +469,7 @@ void LocationIndicatorLayer::setTopImageSizeTransition(const TransitionOptions&
      auto impl_ = mutableImpl();
      impl_->paint.template get<TopImageSize>().options = options;
      baseImpl = std::move(impl_);

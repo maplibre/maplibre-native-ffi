@@ -14,9 +14,8 @@ A rendered feature query finds features in the last frame at a screen position.
 Use it for hit testing. To read source features that no layer draws, use
 [Query a source](/maplibre-native-ffi/guides/query-a-source/).
 
-A rendered query belongs to the render session and runs on the session's owner
-thread. It reads the last frame that the session drew. A query before the first
-render update reports an invalid-state status.
+Run the query on a session that has rendered a frame. Continue caller-driver
+service until the query completes.
 
 The query uses the last frame that the session drew. Render after a camera move
 or style change when the result must match the new state. A query finds features
@@ -30,8 +29,7 @@ scale factor.
 The geometry states where to search. A point matches the exact position, and a
 box matches a rectangle around it. A hit test uses a box with a few logical
 pixels of tolerance around the position, because symbols and thin lines are
-small targets. Box corners come in any order, and MapLibre clips the box to the
-viewport.
+small targets.
 
 <Code code={region(querySnippet, "geometry")} lang="c" title="query-rendered-features.c" />
 
@@ -49,3 +47,6 @@ Each hit is a GeoJSON Feature plus optional source ID, source-layer ID, and
 feature state.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />
+
+The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines
+query options and result ownership.

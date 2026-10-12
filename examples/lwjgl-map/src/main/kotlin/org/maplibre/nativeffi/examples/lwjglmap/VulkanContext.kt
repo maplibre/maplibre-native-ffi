@@ -2,13 +2,16 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import java.util.LinkedHashSet
 import java.util.Locale
+import java.util.concurrent.Semaphore
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
+import org.lwjgl.glfw.GLFW.GLFW_FALSE
 import org.lwjgl.glfw.GLFW.GLFW_NO_API
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM_WAYLAND
 import org.lwjgl.glfw.GLFW.GLFW_RESIZABLE
 import org.lwjgl.glfw.GLFW.GLFW_TRUE
+import org.lwjgl.glfw.GLFW.GLFW_VISIBLE
 import org.lwjgl.glfw.GLFW.glfwCreateWindow
 import org.lwjgl.glfw.GLFW.glfwDefaultWindowHints
 import org.lwjgl.glfw.GLFW.glfwDestroyWindow
@@ -48,6 +51,7 @@ import org.lwjgl.vulkan.VK10.vkEnumerateInstanceExtensionProperties
 import org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices
 import org.lwjgl.vulkan.VK10.vkGetDeviceQueue
 import org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceQueueFamilyProperties
+import org.lwjgl.vulkan.VK10.vkQueueWaitIdle
 import org.lwjgl.vulkan.VkApplicationInfo
 import org.lwjgl.vulkan.VkDevice
 import org.lwjgl.vulkan.VkDeviceCreateInfo
@@ -58,19 +62,29 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 import org.lwjgl.vulkan.VkQueueFamilyProperties
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.QueueLock
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class VulkanContext private constructor(private val window: Long) : GraphicsContext {
   private var instance: VkInstance? = null
   private var surface = NULL
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
+  /** The one queue that the host and a core-worker session both submit to. */
   private var graphicsQueue: VkQueue? = null
   private var graphicsQueueFamilyIndex = 0
 
+  /**
+   * Held around every call on [graphicsQueue]. A core worker submits from its own thread, and
+   * Vulkan requires the calls on one queue to be externally synchronized, so the session takes it
+   * too. A semaphore has no owner thread, so the session's lock and unlock callbacks may run as
+   * separate upcalls.
+   */
+  private val queueMutex = Semaphore(1)
+
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.VULKAN
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.VULKAN
 
   fun instanceAddress(): Long = instance().address()
 
@@ -79,6 +93,20 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   fun deviceAddress(): Long = device().address()
 
   fun graphicsQueueAddress(): Long = graphicsQueue().address()
+
+  /** Runs [block], which calls Vulkan on [graphicsQueue], while holding the queue. */
+  fun <T> withQueue(block: () -> T): T {
+    queueMutex.acquireUninterruptibly()
+    try {
+      return block()
+    } finally {
+      queueMutex.release()
+    }
+  }
+
+  /** The session's lock on [graphicsQueue]. */
+  fun queueLock(): QueueLock =
+    QueueLock(lock = { queueMutex.acquireUninterruptibly() }, unlock = { queueMutex.release() })
 
   fun getInstanceProcAddrAddress(): Long {
     ensureVulkanFunctionProvider()
@@ -106,8 +134,9 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   fun graphicsQueue(): VkQueue =
     checkNotNull(graphicsQueue) { "Vulkan graphics queue is not initialized" }
 
-  fun waitIdle() {
-    device?.let { check(vkDeviceWaitIdle(it), "vkDeviceWaitIdle") }
+  /** Waits for every submission to the queue, the session's included. */
+  fun waitQueueIdle() {
+    graphicsQueue?.let { withQueue { check(vkQueueWaitIdle(it), "vkQueueWaitIdle") } }
   }
 
   private fun createInstance() {
@@ -237,17 +266,20 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device and the surface, which then
+    // stay until the process exits, as does their instance.
+    val destroy = !RenderTarget.graphicsKept
     device?.let {
-      vkDeviceWaitIdle(it)
-      vkDestroyDevice(it, null)
+      withQueue { vkDeviceWaitIdle(it) }
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     if (surface != NULL) {
-      vkDestroySurfaceKHR(instance(), surface, null)
+      if (destroy) vkDestroySurfaceKHR(instance(), surface, null)
       surface = NULL
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
     if (window != NULL) {
@@ -257,7 +289,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   }
 
   internal companion object {
-    fun create(title: String, width: Int, height: Int): VulkanContext {
+    fun create(title: String, width: Int, height: Int, visible: Boolean): VulkanContext {
       selectWaylandOnLinux()
       check(glfwInit()) { "GLFW initialization failed" }
       val window: Long
@@ -267,6 +299,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         glfwDefaultWindowHints()
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API)
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+        glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
         window = glfwCreateWindow(width, height, title, NULL, NULL)
         check(window != NULL) { "GLFW window creation failed" }
       } catch (error: RuntimeException) {

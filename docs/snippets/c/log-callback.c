@@ -42,7 +42,11 @@ static uint32_t forward_to_host(
 mln_status capture_logs(void) {
   // #region install
   // The process-global callback remains valid for every runtime's lifetime.
-  return mln_log_set_callback(forward_to_host, NULL);
+  const mln_log_handler handler = {
+    .size = sizeof(handler),
+    .callback = forward_to_host,
+  };
+  return mln_log_set_callback(&handler, NULL);
   // #endregion install
 }
 
@@ -51,6 +55,6 @@ mln_status make_every_record_synchronous(void) {
   // Errors are already synchronous by default. Clearing the other bits orders
   // every record against the call that produced it, at the cost of blocking
   // MapLibre's threads on the host logger.
-  return mln_log_set_async_severity_mask(0);
+  return mln_log_set_async_severity_mask(0, NULL);
   // #endregion async
 }

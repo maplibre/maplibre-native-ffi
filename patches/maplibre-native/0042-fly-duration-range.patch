@@ -1,0 +1,60 @@
+diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+--- a/src/mln/map/transform.cpp
++++ b/src/mln/map/transform.cpp
+@@ -319,7 +319,14 @@
+         if (animation.velocity) {
+             velocity = *animation.velocity / rho;
+         }
+-        duration = std::chrono::duration_cast<Duration>(std::chrono::duration<double>(S / velocity));
++        const double seconds = S / velocity;
++        // The upper bound is exclusive: rounding Duration::max() to double can
++        // produce one tick beyond its integer representation.
++        if (!std::isfinite(seconds) || seconds < 0 ||
++            seconds >= std::chrono::duration<double>(Duration::max()).count()) {
++            throw std::runtime_error("flyTo duration must fit the native duration range");
++        }
++        duration = std::chrono::duration_cast<Duration>(std::chrono::duration<double>(seconds));
+     }
+     const double startScale = state.getScale();
+     const EdgeInsets startEdgeInsets = state.getEdgeInsets();
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -8,6 +8,8 @@
+ #include <mln/util/quaternion.hpp>
+ 
+ #include <numbers>
++#include <limits>
++#include <stdexcept>
+ 
+ using namespace std::numbers;
+ using namespace mln;
+@@ -1568,3 +1570,28 @@
+     EXPECT_EQ(bearingFinished, 1u);
+     EXPECT_FALSE(transform.inTransition());
+ }
++
++TEST(Transform, FlyDurationRange) {
++    Transform transform;
++    transform.resize({512, 512});
++    const auto camera = CameraOptions().withZoom(1.0);
++    AnimationOptions animation;
++    for (const double velocity : {std::numeric_limits<double>::denorm_min(), 1e-12}) {
++        animation.velocity = velocity;
++        EXPECT_THROW(transform.flyTo(camera, animation), std::runtime_error);
++        EXPECT_DOUBLE_EQ(0.0, transform.getZoom());
++        EXPECT_FALSE(transform.inTransition());
++    }
++
++    animation.velocity = 1e-9;
++    transform.flyTo(camera, animation);
++    EXPECT_GT(transform.getLatestTransitionDuration(), Duration::zero());
++    EXPECT_TRUE(transform.inTransition());
++    transform.cancelTransitions();
++
++    animation.velocity = std::numeric_limits<double>::denorm_min();
++    animation.duration = Duration::zero();
++    transform.flyTo(camera, animation);
++    EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
++    EXPECT_FALSE(transform.inTransition());
++}

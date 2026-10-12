@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!--
+  Page shell for the native ABI suite, replacing Emscripten's default shell. It
+  posts Unity's exit status and collected output back to the runner serving
+  this page. An uncaught error or an abort posts too, so a crash fails the run
+  instead of hanging it until the timeout. The runner passes the suite's
+  arguments (a shard's filter) and the timeout scale in the query string.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>maplibre-native-c native ABI tests</title>
+  </head>
+  <body>
+    <canvas id="canvas" width="64" height="64"></canvas>
+    <script>
+    const lines = [];
+let reported = false;
+
+function report(status) {
+  if (reported) return;
+  reported = true;
+  void fetch("/__result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, output: lines.join("\n") }),
+  });
+}
+
+function record(text) {
+  lines.push(text);
+  console.log(text);
+}
+
+window.addEventListener("error", (event) => {
+  record(`uncaught error: ${event.message}`);
+  report(70);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  record(`unhandled rejection: ${event.reason}`);
+  report(70);
+});
+
+const query = new URLSearchParams(location.search);
+
+var Module = {
+  canvas: document.getElementById("canvas"),
+  arguments: query.getAll("arg"),
+  // The origin the runner serves this page and the HTTP test's style from, and
+  // the timeout scale. The suite reads both with getenv().
+  preRun: [
+    () => {
+      ENV.MLN_FFI_TEST_FIXTURE_ORIGIN = location.origin;
+      const scale = query.get("scale");
+      if (scale) ENV.MLN_TEST_TIMEOUT_SCALE = scale;
+    },
+  ],
+  print: record,
+  printErr: record,
+  onExit: (status) => report(status),
+  onAbort: (reason) => {
+    record(`aborted: ${reason}`);
+    report(70);
+  },
+};
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

@@ -1,6 +1,4 @@
-use maplibre_native_ffi::{
-    Error as MaplibreError, ErrorKind, MetalOwnedTextureFrameHandle, NativePointer,
-};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error as MaplibreError, ErrorKind};
 use objc2::ClassType;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
@@ -38,7 +36,6 @@ pub struct MetalBorrowedTexture {
 
 impl MetalContext {
     pub fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
-        let viewport = Viewport::from_window(window);
         let raw_window = window.window_handle()?.as_raw();
         let RawWindowHandle::AppKit(handle) = raw_window else {
             return Err("Metal requires an AppKit window handle".into());
@@ -57,7 +54,6 @@ impl MetalContext {
         unsafe {
             layer.setDevice(Some(&device));
             layer.setPixelFormat(MTLPixelFormat::BGRA8Unorm);
-            layer.setDrawableSize(drawable_size(viewport));
             view.setWantsLayer(true);
             view.setLayer(Some(layer.as_super()));
         }
@@ -70,12 +66,14 @@ impl MetalContext {
     }
 
     pub fn context_descriptor(&self) -> maplibre_native_ffi::MetalContextDescriptor {
-        maplibre_native_ffi::MetalContextDescriptor::new(self.device_pointer())
+        maplibre_native_ffi::MetalContextDescriptor {
+            device: self.device_pointer(),
+        }
     }
 
-    pub fn layer_pointer(&self) -> NativePointer {
+    pub fn layer_pointer(&self) -> *mut std::ffi::c_void {
         // SAFETY: The CAMetalLayer is retained by MetalContext for the session lifetime.
-        unsafe { NativePointer::from_address(Retained::as_ptr(&self.layer) as usize) }
+        Retained::as_ptr(&self.layer).cast_mut().cast()
     }
 
     pub fn resize(&self, viewport: Viewport) {
@@ -85,9 +83,9 @@ impl MetalContext {
 
     pub fn wait_idle(&self) {}
 
-    fn device_pointer(&self) -> NativePointer {
+    fn device_pointer(&self) -> *mut std::ffi::c_void {
         // SAFETY: The MTLDevice is retained by MetalContext for the session lifetime.
-        unsafe { NativePointer::from_address(Retained::as_ptr(&self.device) as usize) }
+        Retained::as_ptr(&self.device).cast_mut().cast()
     }
 }
 
@@ -110,25 +108,27 @@ impl MetalTextureCompositor {
 
     /// Samples the frame's texture into the layer's next drawable, and reports
     /// whether it presented.
-    pub fn draw(
-        &mut self,
-        frame: &MetalOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<bool> {
-        let metadata = frame.frame()?;
-        if metadata.width == 0 || metadata.height == 0 {
-            return Err(metal_error("owned Metal frame has an empty extent"));
-        }
-        // SAFETY: The frame keeps this texture pointer valid until frame release.
-        let texture = unsafe { frame.texture()?.as_ptr::<ProtocolObject<dyn MTLTexture>>() };
-        let texture = unsafe { texture.as_ref() }
-            .ok_or_else(|| metal_error("owned Metal frame has a null texture"))?;
-        self.draw_texture(texture)
+    pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
+        frame.get_metal_texture(|metadata| {
+            if metadata.width == 0 || metadata.height == 0 {
+                return Err(metal_error("Metal frame has an empty extent"));
+            }
+            // SAFETY: the native view scope keeps this Metal texture live through drawing.
+            let texture = unsafe {
+                metadata
+                    .texture
+                    .cast::<ProtocolObject<dyn MTLTexture>>()
+                    .as_ref()
+            }
+            .ok_or_else(|| metal_error("Metal frame has a null texture"))?;
+            self.draw_texture(texture)
+        })?
     }
 
     /// Samples texture into the layer's next drawable, and reports whether it
     /// presented. A minimized or occluded window has no drawable, so the frame
     /// is skipped rather than failed.
-    pub fn draw_texture(
+    fn draw_texture(
         &mut self,
         texture: &ProtocolObject<dyn MTLTexture>,
     ) -> maplibre_native_ffi::Result<bool> {
@@ -192,13 +192,9 @@ impl MetalBorrowedTexture {
         Ok(Self { texture })
     }
 
-    pub fn pointer(&self) -> NativePointer {
+    pub fn pointer(&self) -> *mut std::ffi::c_void {
         // SAFETY: The MTLTexture is retained by MetalBorrowedTexture for the session lifetime.
-        unsafe { NativePointer::from_address(Retained::as_ptr(&self.texture) as usize) }
-    }
-
-    pub fn texture(&self) -> &ProtocolObject<dyn MTLTexture> {
-        &self.texture
+        Retained::as_ptr(&self.texture).cast_mut().cast()
     }
 }
 

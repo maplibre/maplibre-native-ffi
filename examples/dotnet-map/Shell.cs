@@ -1,176 +1,124 @@
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
+using System.Diagnostics;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>App shell: toolkit lifetime, the two loops, and shutdown ordering.</summary>
+/// <summary>
+/// App shell. GLFW, the graphics context, and the render session stay on the main thread, which
+/// sleeps until input arrives or a native wake posts an empty event. Input becomes map commands, a
+/// map update becomes a frame demand, and the wakes have the thread drain events and frame results.
+/// </summary>
 internal static class Shell
 {
     public const int InitialWidth = 960;
     public const int InitialHeight = 640;
 
-    // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame loop.
-    private static readonly TimeSpan RenderLoopInterval = TimeSpan.FromMilliseconds(8);
+    private static readonly TimeSpan SmokeDeadline = TimeSpan.FromSeconds(60);
+
+    private static byte[] SmokeStyle =>
+        """
+            {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}
+            """u8.ToArray();
 
     /// <summary>
-    /// Backstop for the runtime loop's park; the render loop's wake source normally releases it.
+    /// Runs the example until its window closes. A smoke run instead renders an inline style in a
+    /// hidden window, so it needs no network, and tears down as a closed window would after the
+    /// first frame that reaches the window.
     /// </summary>
-    private static readonly TimeSpan ParkTimeout = TimeSpan.FromMilliseconds(100);
-
-    public static void Run(RenderTargetMode mode, RenderBackend backends)
+    /// <returns>False when a smoke run rendered no frame before its deadline.</returns>
+    public static bool Run(RenderTargetMode mode, RenderBackendFlag backends, bool smoke)
     {
-        // GLFW creates windows and polls events on the main thread only, so the main thread is the
-        // render loop and the runtime loop gets a thread of its own.
         using var graphics = GraphicsContext.Create(
             "dotnet-map",
             InitialWidth,
             InitialHeight,
-            backends
+            backends,
+            visible: !smoke
         );
-        var commands = new CommandQueue();
-        using var channel = new MapChannel();
-        var renderRequest = new RenderRequest();
-        var initialViewport = graphics.ReadViewport();
+        var events = new GlfwWake(graphics.Window.Glfw);
+        using var state = MapState.Create(
+            graphics.ReadViewport(),
+            events.Wake,
+            smoke ? SmokeStyle : null
+        );
+        using var input = new InputController(graphics.Window, state);
 
-        // A dedicated thread, because the native owner-thread checks are keyed on the OS thread;
-        // thread pools and async continuations do not guarantee that affinity.
-        var runtimeThread = new Thread(() =>
-            RuntimeLoop(initialViewport, commands, renderRequest, channel)
-        )
-        {
-            IsBackground = true,
-            Name = "maplibre-runtime-loop",
-        };
-        runtimeThread.Start();
-
-        try
-        {
-            RenderLoop(graphics, mode, commands, renderRequest, channel);
-        }
-        finally
-        {
-            // Only here: the render loop has closed its session by the time it returns, and a map
-            // with an attached session cannot be destroyed.
-            channel.RequestShutdown();
-            runtimeThread.Join();
-        }
-
-        channel.ThrowIfFailed();
-    }
-
-    /// <summary>
-    /// Owns the runtime and the map for their whole lifetime. It never touches the render session:
-    /// the render loop attaches its own against the map published here.
-    /// </summary>
-    private static void RuntimeLoop(
-        Viewport initialViewport,
-        CommandQueue commands,
-        RenderRequest renderRequest,
-        MapChannel channel
-    )
-    {
-        MapState? state = null;
-        WakeSource? wake = null;
-        try
-        {
-            state = MapState.Create(initialViewport);
-            wake = state.AcquireWakeSource();
-            channel.PublishMap(state.Map, wake);
-            commands.OnEnqueue = channel.WakeRuntimeLoop;
-
-            while (!channel.ShutdownRequested)
-            {
-                state.ApplyCommands(commands);
-                if (state.Step(ParkTimeout))
-                {
-                    renderRequest.Set();
-                }
-            }
-        }
-        catch (Exception error)
-        {
-            channel.Fail(error);
-        }
-        finally
-        {
-            // Wait even after a failure: the render loop closes its session before signalling
-            // shutdown, and the map cannot be destroyed until then.
-            channel.WaitForShutdown();
-            // Stop handing out the wake source before disposing it, or the channel signals a closed
-            // handle and throws over the original failure.
-            commands.OnEnqueue = null;
-            channel.ClearWake();
-            wake?.Dispose();
-            state?.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Owns the window, input decoding, the graphics context, and the render session it attaches.
-    /// </summary>
-    private static void RenderLoop(
-        IGraphicsContext graphics,
-        RenderTargetMode mode,
-        CommandQueue commands,
-        RenderRequest renderRequest,
-        MapChannel channel
-    )
-    {
-        var map = channel.WaitForMap();
         var viewport = graphics.ReadViewport();
-        IRenderTarget? target = null;
+        // The session detaches before the map and runtime are released.
+        var target = Attach(graphics, state.Map, mode);
+        // A session fixes its scale factor at attachment, so a scale change reattaches.
+        var attachedScale = viewport.ScaleFactor;
         try
         {
-            target = RenderTargetFactory.Attach(graphics, map, mode);
-            Console.WriteLine($"render target: {mode.CliName}");
-            Console.WriteLine($"render target status: {mode.Status}");
             InputController.PrintControls();
-            using var input = new InputController(graphics.Window, commands, renderRequest);
-
+            var smokeDeadline =
+                Stopwatch.GetTimestamp() + (long)(Stopwatch.Frequency * SmokeDeadline.TotalSeconds);
+            // Wakes may have arrived while the attachment waited, so the loop handles pending work
+            // before its first wait.
             while (!graphics.ShouldClose)
             {
-                channel.ThrowIfFailed();
-                graphics.PollEvents();
-
-                var currentViewport = graphics.ReadViewport();
-                if (currentViewport != viewport)
+                var current = graphics.ReadViewport();
+                if (current != viewport)
                 {
-                    viewport = currentViewport;
-                    if (!viewport.IsEmpty)
+                    viewport = current;
+                    if (!viewport.IsEmpty && viewport.ScaleFactor == attachedScale)
                     {
-                        graphics.Resize(viewport);
-                        // Every mode resizes against the live session; none needs a re-attach.
                         target.Resize(viewport);
-                        renderRequest.Set();
+                    }
+                    else if (!viewport.IsEmpty)
+                    {
+                        target.Dispose();
+                        target = Attach(graphics, state.Map, mode);
+                        attachedScale = viewport.ScaleFactor;
                     }
                 }
-
-                // Consume before rendering, so a request the runtime loop publishes during the
-                // render call is not discarded.
-                if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
+                if (events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
                 {
-                    // Nothing reached the screen; ask again rather than dropping the frame.
-                    renderRequest.Set();
+                    target.RequestFrame();
+                }
+                if (target.HandleWakes() && smoke)
+                {
+                    Console.WriteLine("smoke: rendered a frame");
+                    return true;
                 }
 
-                graphics.Window.WaitEventsTimeout(RenderLoopInterval.TotalSeconds);
+                if (smoke && Stopwatch.GetTimestamp() >= smokeDeadline)
+                {
+                    Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
+                    return false;
+                }
+                long? wakeAt = smoke
+                    ? Math.Min(smokeDeadline, target.RetryAt ?? long.MaxValue)
+                    : target.RetryAt;
+                if (wakeAt is { } due)
+                {
+                    var remaining = Math.Max(due - Stopwatch.GetTimestamp(), 0);
+                    graphics.Window.WaitEventsTimeout((double)remaining / Stopwatch.Frequency);
+                }
+                else
+                {
+                    graphics.Window.WaitEvents();
+                }
             }
+            return true;
         }
         finally
         {
-            // Close the session before the runtime loop destroys the map.
-            target?.Dispose();
+            target.Dispose();
         }
     }
 
-    private static bool Render(IGraphicsContext graphics, IRenderTarget target)
+    /// <summary>Attaches a session, logs its mode and driver, and demands its first frame.</summary>
+    private static RenderTarget Attach(
+        IGraphicsContext graphics,
+        MapHandle map,
+        RenderTargetMode mode
+    )
     {
-        if (graphics is not MetalContext)
-        {
-            return target.Render();
-        }
-
-        using var pool = MacObjectiveC.AutoreleasePool();
-        return target.Render();
+        var target = RenderTarget.Attach(graphics, map, mode);
+        Console.WriteLine($"render target: {mode.CliName}");
+        Console.WriteLine($"render target status: {mode.Status}");
+        Console.WriteLine($"render driver: {target.Driver.Label}");
+        target.RequestFrame();
+        return target;
     }
 }

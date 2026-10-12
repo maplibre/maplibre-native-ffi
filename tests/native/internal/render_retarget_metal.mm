@@ -1,0 +1,164 @@
+// A Metal surface retarget queued behind a busy driver keeps its replacement
+// layer alive until the driver runs it.
+
+#include <atomic>
+
+#import <Metal/Metal.h>
+#import <QuartzCore/CAMetalLayer.h>
+#import <objc/runtime.h>
+
+#include "internal/support/driver_blocker.hpp"
+#include "support/test_support.h"
+
+@interface MLNTestDeallocationProbe : NSObject
+
+@property(nonatomic, assign) std::atomic_bool* deallocated;
+
+@end
+
+@implementation MLNTestDeallocationProbe
+
+- (void)dealloc {
+  self.deallocated->store(true);
+}
+
+@end
+
+namespace {
+
+char deallocation_probe_key;
+
+// Settles a completion the caller submitted successfully.
+auto finish(mln_test_completion& completion) -> bool {
+  const auto status = mln_test_completion_finish(&completion);
+  mln_test_completion_destroy(&completion);
+  return status == MLN_STATUS_OK;
+}
+
+// Settles a completion a rejected submission left with the caller.
+void discard(mln_test_completion& completion) {
+  mln_test_completion_reject(&completion);
+  mln_test_completion_destroy(&completion);
+}
+
+// Detaches and destroys the session on every exit path, and reports the first
+// failure the caller saw, or its own.
+auto teardown(mln_render_session session, const char* failure) -> const char* {
+  auto detach = mln_test_completion_default(0);
+  if (
+    mln_render_session_detach(session, &detach.descriptor, nullptr) !=
+    MLN_STATUS_OK
+  ) {
+    discard(detach);
+    if (failure == nullptr) failure = "the session detach was rejected";
+  } else if (!finish(detach) && failure == nullptr) {
+    failure = "the session detach failed";
+  }
+  if (
+    mln_render_session_destroy(session, nullptr) != MLN_STATUS_OK &&
+    failure == nullptr
+  ) {
+    failure = "the session destroy was rejected";
+  }
+  return failure;
+}
+
+// Returns the step that failed, or null when the retarget kept the replacement
+// layer alive until the driver ran it.
+auto retarget_retains_submission(mln_map map) -> const char* {
+  @autoreleasepool {
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    CAMetalLayer* initial_layer = [[CAMetalLayer alloc] init];
+    if (device == nil || initial_layer == nil) {
+      return "this host has no Metal device or layer";
+    }
+
+    auto descriptor = mln_metal_surface_descriptor_default();
+    descriptor.context.device = (__bridge void*)device;
+    descriptor.layer = (__bridge void*)initial_layer;
+    auto options = mln_render_session_attach_options_default();
+    options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
+    mln_render_session session = MLN_HANDLE_NULL;
+    auto attach = mln_test_completion_default(0);
+    if (
+      mln_map_attach_metal_surface(
+        map, &descriptor, &options, &session, &attach.descriptor, nullptr
+      ) != MLN_STATUS_OK
+    ) {
+      discard(attach);
+      return "the Metal surface attach was rejected";
+    }
+    const char* failure =
+      finish(attach) ? nullptr : "the attach completion failed";
+    initial_layer = nil;
+
+    // Every later step runs behind one blocking driver operation, so the tail
+    // below has to release it and settle its completion on every path.
+    auto blocker = mln::native_tests::DriverBlocker{};
+    if (failure != nullptr || blocker.submit(session) != MLN_STATUS_OK) {
+      if (failure == nullptr) {
+        failure = "the blocking driver operation was rejected";
+      }
+      return teardown(session, failure);
+    }
+    if (!mln_test_gate_wait_entered(blocker.gate.get())) {
+      mln_test_gate_release(blocker.gate.get());
+      static_cast<void>(finish(blocker.completion));
+      return teardown(session, "the blocking driver operation never ran");
+    }
+
+    std::atomic_bool replacement_deallocated = false;
+    CAMetalLayer* replacement_layer = [[CAMetalLayer alloc] init];
+    __weak CAMetalLayer* weak_replacement_layer = replacement_layer;
+    auto* probe = [[MLNTestDeallocationProbe alloc] init];
+    probe.deallocated = &replacement_deallocated;
+    objc_setAssociatedObject(
+      replacement_layer, &deallocation_probe_key, probe,
+      OBJC_ASSOCIATION_RETAIN_NONATOMIC
+    );
+    probe = nil;
+    descriptor.layer = (__bridge void*)replacement_layer;
+    auto replacement = mln_test_completion_default(0);
+    const auto replacement_status = mln_render_session_set_metal_surface_target(
+      session, &descriptor, &replacement.descriptor, nullptr
+    );
+    replacement_layer = nil;
+    if (replacement_deallocated.load()) {
+      failure =
+        "the retarget released the replacement layer before the driver "
+        "ran it";
+    }
+
+    mln_test_gate_release(blocker.gate.get());
+    if (!finish(blocker.completion) && failure == nullptr) {
+      failure = "the blocking driver operation did not complete";
+    }
+    if (replacement_status != MLN_STATUS_OK) {
+      discard(replacement);
+      if (failure == nullptr) failure = "the Metal retarget was rejected";
+    } else if (!finish(replacement) && failure == nullptr) {
+      failure = "the retarget completion failed";
+    }
+
+    if (weak_replacement_layer != nil) {
+      objc_setAssociatedObject(
+        weak_replacement_layer, &deallocation_probe_key, nil,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC
+      );
+    }
+    return teardown(session, failure);
+  }
+}
+
+void metal_surface_retarget_retains_submission_inputs() {
+  auto runtime = mln_test_create_runtime();
+  auto map = mln_test_create_map(runtime);
+  const char* failure = retarget_retains_submission(map);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_NULL_MESSAGE(failure, failure);
+}
+
+}  // namespace
+
+MLN_TEST_GROUP { RUN_TEST(metal_surface_retarget_retains_submission_inputs); }

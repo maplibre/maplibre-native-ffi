@@ -1,11 +1,34 @@
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Status;
 
 namespace Maplibre.NativeFfi.Internal.Pointer;
 
-internal delegate mln_status StatusDestroy<T>(T handle)
+internal unsafe delegate mln_status StatusDestroy<T>(T handle, mln_diagnostic* diagnostic)
     where T : unmanaged, IMlnHandle;
+
+/// <summary>A binding object that owns one native handle.</summary>
+internal interface INativeOwner
+{
+    /// <summary>The roots of callbacks registered through this owner.</summary>
+    NativeCallbackOwner CallbackOwner { get; }
+}
+
+/// <summary>A binding object that owns one native handle of type <typeparamref name="T"/>.</summary>
+internal interface INativeOwner<T> : INativeOwner
+    where T : unmanaged, IMlnHandle
+{
+    NativeHandleState<T> State { get; }
+
+    NativeCallbackOwner INativeOwner.CallbackOwner => State.CallbackOwner;
+}
+
+/// <summary>A handle state that a call scope borrows for the duration of one call.</summary>
+internal interface INativeReader
+{
+    void EndRead();
+}
 
 /// <summary>
 /// Close-once ownership for one native handle.
@@ -14,19 +37,48 @@ internal delegate mln_status StatusDestroy<T>(T handle)
 /// The C API issues generational handles and rejects a released one, so this
 /// tracks ownership rather than identity. The null handle means closed.
 /// </remarks>
-internal sealed class NativeHandleState<T>
+internal sealed unsafe class NativeHandleState<T> : INativeReader
     where T : unmanaged, IMlnHandle
 {
     private readonly object gate = new();
     private readonly StatusDestroy<T> destroy;
+    private readonly StatusDestroy<T>? disposeAbandoned;
     private readonly string typeName;
-    private readonly ulong issued;
-    private T handle;
+    private readonly T handle;
+    private readonly object? retainedParent;
     private bool closed;
     private bool releaseInProgress;
-    private int activeUses;
+    private int readers;
+    private bool pendingDecision;
+    private bool pendingRelease;
+    private bool claimed;
+    private int activeClaims;
+    private NativeCallbackOwner? callbackOwner;
+    internal NativeCallbackOwner CallbackOwner
+    {
+        get
+        {
+            lock (gate)
+            {
+                if (callbackOwner is null)
+                {
+                    callbackOwner = new();
+                    if (closed)
+                        callbackOwner.Retire();
+                }
+                return callbackOwner;
+            }
+        }
+    }
 
-    internal NativeHandleState(T handle, StatusDestroy<T> destroy, string typeName)
+    internal NativeHandleState(
+        T handle,
+        StatusDestroy<T> destroy,
+        string typeName,
+        StatusDestroy<T>? disposeAbandoned = null,
+        bool pendingDecision = false,
+        object? retainedParent = null
+    )
     {
         if (handle.Value == 0)
         {
@@ -38,28 +90,61 @@ internal sealed class NativeHandleState<T>
             );
         }
 
+        this.pendingDecision = pendingDecision;
+        this.retainedParent = retainedParent;
         this.destroy = destroy;
+        this.disposeAbandoned = disposeAbandoned;
         this.typeName = typeName;
         this.handle = handle;
-        issued = handle.Value;
     }
 
     ~NativeHandleState()
     {
-        if (!closed)
+        try
         {
-            var current = issued;
-            NativeLeakReporter.Report(
-                new NativeLeakReport(
-                    NativeLeakReportKind.LeakedHandle,
-                    typeName,
-                    current,
-                    null,
-                    $"Leaked {typeName} native handle 0x{current:x}; call Close() before releasing the wrapper."
-                )
-            );
+            FinalizeOwner();
+        }
+        finally
+        {
+            GC.KeepAlive(retainedParent);
         }
     }
+
+    // Explicit close is the contract, so a collected open handle is always a host leak: the
+    // finalizer disposes it and reports it. The binding retires the handles it drops itself,
+    // such as a value that arrives after its wait is cancelled, explicitly and silently.
+    private void FinalizeOwner()
+    {
+        // A constructor that rejected the null handle leaves nothing to finalize.
+        if (handle.Value == 0 || pendingDecision || closed)
+            return;
+        callbackOwner?.Retire();
+        string? failure = null;
+        try
+        {
+            if (disposeAbandoned is null)
+                failure = "it has no native disposal";
+            else if (
+                disposeAbandoned(handle, null) is var status
+                && status != mln_status.MLN_STATUS_OK
+            )
+                failure = $"native disposal failed with {status}";
+            else
+                closed = true;
+        }
+        catch (Exception error)
+        {
+            // A finalizer reports failed retirement without unwinding.
+            failure = $"native disposal failed: {error.Message}";
+        }
+        NativeLeakReporter.Report(
+            failure is null
+                ? $"Leaked {typeName} native handle 0x{handle.Value:x}; it was disposed when collected. Close or dispose it explicitly."
+                : $"Leaked {typeName} native handle 0x{handle.Value:x}; {failure}, so it was not destroyed. Close or dispose it explicitly."
+        );
+    }
+
+    internal T IssuedHandle => handle;
 
     internal bool IsClosed
     {
@@ -90,7 +175,7 @@ internal sealed class NativeHandleState<T>
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is closing.",
+                $"{typeName} is closing",
                 null
             );
         }
@@ -100,7 +185,7 @@ internal sealed class NativeHandleState<T>
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is closed.",
+                $"{typeName} is closed",
                 null
             );
         }
@@ -108,50 +193,79 @@ internal sealed class NativeHandleState<T>
         return handle;
     }
 
-    /// <summary>
-    /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
-    /// </summary>
-    /// <remarks>
-    /// Handles the host may use and release from different threads go through this, so a release
-    /// that begins mid-call waits for the call to finish and a losing race reports this wrapper's
-    /// closed-handle error rather than the C API's rejection of a retired id. Owner-thread-only
-    /// handles get that ordering from the owner-thread rule and can read <see cref="Handle" />
-    /// directly. <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from
-    /// inside it on the same thread deadlocks.
-    /// </remarks>
-    internal TResult WithLive<TResult>(Func<T, TResult> use)
-    {
-        T live;
-        lock (gate)
-        {
-            live = HandleLocked();
-            activeUses++;
-        }
+    internal ReadScope Borrow() => new(this, BeginRead());
 
+    /// <summary>Enters <paramref name="operation"/> and borrows the handle for its native call.</summary>
+    internal ReadScope Read(object owner, string operation)
+    {
+        NativeCallbackGuard.EnsureAllowed(owner, operation);
+        return Borrow();
+    }
+
+    /// <summary>
+    /// Constructs the owner of a handle that native code just transferred, and
+    /// disposes the handle if construction fails.
+    /// </summary>
+    internal static TOwner Adopt<TOwner>(T handle, Func<TOwner> create, StatusDestroy<T> dispose)
+    {
         try
         {
-            return use(live);
+            return create();
         }
-        finally
+        catch
         {
-            lock (gate)
-            {
-                activeUses--;
-                Monitor.PulseAll(gate);
-            }
+            dispose(handle, null);
+            throw;
         }
     }
 
-    internal void WithLive(Action<T> use)
+    internal T BeginRead()
     {
-        WithLive<object?>(handle =>
+        lock (gate)
         {
-            use(handle);
-            return null;
-        });
+            var live = HandleLocked();
+            checked
+            {
+                readers++;
+            }
+            return live;
+        }
     }
 
-    internal void Close()
+    public void EndRead()
+    {
+        lock (gate)
+        {
+            readers--;
+        }
+    }
+
+    internal ref struct ReadScope
+    {
+        private NativeHandleState<T>? owner;
+        internal T Handle { get; }
+
+        internal ReadScope(NativeHandleState<T> owner, T handle)
+        {
+            this.owner = owner;
+            Handle = handle;
+        }
+
+        public void Dispose()
+        {
+            var retained = owner;
+            if (retained is null)
+                return;
+            owner = null;
+            retained.EndRead();
+        }
+    }
+
+    internal void Close() => Release(destroy);
+
+    internal void Retire() => Release(disposeAbandoned ?? destroy);
+
+    internal void Release(StatusDestroy<T> release)
     {
         T handle;
         lock (gate)
@@ -160,12 +274,19 @@ internal sealed class NativeHandleState<T>
             {
                 return;
             }
+            if (pendingDecision)
+            {
+                pendingRelease = true;
+                closed = true;
+                releaseInProgress = false;
+                return;
+            }
         }
-
+        mln_diagnostic diagnostic;
         mln_status status;
         try
         {
-            status = destroy(handle);
+            status = release(handle, NativeDiagnostic.Prepare(&diagnostic));
         }
         catch
         {
@@ -176,60 +297,71 @@ internal sealed class NativeHandleState<T>
         if (status != mln_status.MLN_STATUS_OK)
         {
             EndFailedRelease();
-            NativeStatus.Check(status);
+            NativeStatus.Check(status, &diagnostic);
         }
 
         EndSuccessfulRelease();
     }
 
-    internal bool TryClose()
+    internal ClaimScope BeginClaim()
     {
-        T handle;
         lock (gate)
         {
-            if (!BeginReleaseLocked(out handle))
+            _ = HandleLocked();
+            activeClaims++;
+            return new ClaimScope(this);
+        }
+    }
+
+    internal ref struct ClaimScope(NativeHandleState<T> owner)
+    {
+        private bool accepted;
+
+        internal void Accept() => accepted = true;
+
+        public void Dispose()
+        {
+            lock (owner.gate)
             {
-                return true;
+                owner.claimed |= accepted;
+                owner.activeClaims--;
             }
         }
+    }
 
-        var current = handle.Value;
-
-        mln_status status;
-        try
+    internal bool FinishDecision(bool accepted)
+    {
+        bool release;
+        lock (gate)
         {
-            status = destroy(handle);
+            if (!pendingDecision)
+                throw new InvalidOperationException("Decision was already returned.");
+            pendingDecision = false;
+            accepted |= claimed || activeClaims != 0 || pendingRelease;
+            release = accepted && pendingRelease;
+            if (!accepted)
+            {
+                closed = true;
+                GC.SuppressFinalize(this);
+            }
+            else if (release)
+                closed = false;
         }
-        catch
-        {
-            EndFailedRelease();
-            throw;
-        }
-
-        if (status != mln_status.MLN_STATUS_OK)
-        {
-            EndFailedRelease();
-            NativeLeakReporter.Report(
-                new NativeLeakReport(
-                    NativeLeakReportKind.DisposeFailed,
-                    typeName,
-                    current,
-                    status,
-                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() to observe the error and retry."
-                )
-            );
-            return false;
-        }
-
-        EndSuccessfulRelease();
-        return true;
+        if (release)
+            Close();
+        return accepted;
     }
 
     private bool BeginReleaseLocked(out T live)
     {
-        while (releaseInProgress)
+        if (releaseInProgress)
         {
-            Monitor.Wait(gate);
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is closing",
+                null
+            );
         }
 
         live = handle;
@@ -238,13 +370,17 @@ internal sealed class NativeHandleState<T>
             return false;
         }
 
-        releaseInProgress = true;
-
-        // Uses that already read the handle still hold it; wait for them before destroying it.
-        while (activeUses > 0)
+        if (readers != 0)
         {
-            Monitor.Wait(gate);
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is in use",
+                null
+            );
         }
+
+        releaseInProgress = true;
 
         return true;
     }
@@ -254,18 +390,19 @@ internal sealed class NativeHandleState<T>
         lock (gate)
         {
             releaseInProgress = false;
-            Monitor.PulseAll(gate);
         }
     }
 
     private void EndSuccessfulRelease()
     {
+        NativeCallbackOwner? owner;
         lock (gate)
         {
             closed = true;
             releaseInProgress = false;
+            owner = callbackOwner;
             GC.SuppressFinalize(this);
-            Monitor.PulseAll(gate);
         }
+        owner?.Retire();
     }
 }

@@ -11,107 +11,77 @@ import { region } from "../../../snippets";
 import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
 import offlineStorage from "../../../../snippets/c/offline-storage.c?raw";
 
-One database stores everything that a runtime caches. The cache path in the
-runtime options selects its location. Set a writable filesystem path to preserve
-resources across host runs; the default `:memory:` database lasts only for the
-runtime's lifetime.
+Set a writable cache path in the runtime options to keep resources across host
+runs. The default in-memory database lasts for the runtime's lifetime.
 
-Two storage classes share the database. The ambient cache contains fetched
-resources and evicts them to stay within a byte budget. An offline region
-contains every resource that a defined area needs and remains outside the
-ambient budget. Download a region when the host must draw a known area without
-a network.
+The ambient cache evicts fetched resources within a byte budget. Offline regions
+retain the resources needed for defined areas outside that budget. Download a
+region when the host must draw a known area without a network.
 
-Database operations are asynchronous. A start call validates its arguments,
-returns an operation ID, and queues the work. The runtime later queues one
-operation-completed event with the ID and result status while its subscription
-selects that type, as
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. This
-result is separate from the start call's status. Take the result value when an
-operation produces one. Take or discard every operation to release its runtime
-state.
+Database operations complete asynchronously. Copy borrowed results that the host
+keeps before their completion callback returns.
 
 ## Download a region
 
-A region definition names a style and an area. MapLibre resolves the definition
-into every tile, glyph, and sprite that the style needs across the zoom range,
-and stores them under one region ID.
+Define the style, area, and zoom range that the host needs.
 
 <Code code={region(offlineRegion, "define")} lang="c" title="offline-region.c" />
 
-The create call takes a tagged definition. A tile-pyramid definition covers a
-bounding box, and a geometry definition covers a GeoJSON shape.
+Choose a tile-pyramid definition for a bounding box or a geometry definition for
+a GeoJSON shape.
 
 <Code code={region(offlineRegion, "tag")} lang="c" title="offline-region.c" />
 
-Creation also takes opaque metadata bytes, and the database stores them with the
-region. A host records what the region holds there, such as a name or a version.
-MapLibre copies the definition, the style URL, and the metadata bytes before the
-call returns.
+Create the region with metadata such as a display name or version.
 
 <Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
 
-Taking the result produces a snapshot handle that contains the region record. A
-failed take leaves the operation live. Discard the operation after the host
-stops retrying.
+Read the region record from the completion.
 
 <Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
 
-The region ID is the part of the record that the remaining calls need.
+Keep the region ID for later operations.
 
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
-Mark the region as observed to receive progress and error events. Then set its
-download state to active. MapLibre fetches the resources while the host pumps
-the runtime.
+Enable observation for progress events, then activate the download.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 
-A status-changed event contains resource counts, tile counts, and stored bytes.
-A response-error event reports one failed resource while the remaining download
-continues. Drain both from the runtime that owns the region, as described in
-[Concepts](/maplibre-native-ffi/concepts/).
+Drain progress and error events from the runtime, as
+[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. Progress
+reports downloaded resources and stored bytes; a resource failure can occur while
+the rest of the download continues.
 
 <Code code={region(offlineRegion, "progress")} lang="c" title="offline-region.c" />
 
-Set the download state to inactive to pause. Set it to active to resume from the
-resources that MapLibre has stored.
+Set the download state to inactive to pause and active to resume.
 
-## Import downloaded regions
+## Import a downloaded database
 
-A host can download a MapLibre offline database that another runtime prepared,
-then merge its regions into the runtime database. Keep the downloaded file
-present and unchanged until the merge completes. The file may be read-only.
+Merge an offline database prepared by another runtime to import its regions.
+Keep the file present and unchanged until the merge completes. Both databases
+must use the same MapLibre offline schema. Load MBTiles through an `mbtiles://`
+source instead.
 
-The databases must use the same MapLibre offline schema version. MBTiles uses a
-different schema, so load an MBTiles file through an `mbtiles://` source
-instead.
+The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines region
+operations, merge results, and storage controls.
 
-The start call opens the downloaded database read-only. A missing or unreadable
-file fails immediately. The merge then copies the tiles and resources assigned
-to each region, combines duplicate region definitions, and leaves the downloaded
-file unchanged. Format, schema, and later filesystem errors arrive in the
-operation-completed event.
+## List and delete regions
 
-## Read what the database holds
-
-List the regions in the database to learn what an earlier run of the host
-stored, because region records outlive the runtime that wrote them. One list
-operation covers the whole database.
+List regions to read what earlier host runs stored.
 
 <Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
 
-Taking the result produces a list handle that the host owns. Destroy that handle
-after reading the entries.
+Copy the region records and metadata that the host keeps. In C, use the
+completion's stride to read the array.
 
 <Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
 
-Each entry carries the region ID, the definition that created the region, and
-the metadata that the host passed at creation.
+Each entry contains an ID, definition, and metadata.
 
 <Code code={region(offlineStorage, "entries")} lang="c" title="offline-storage.c" />
 
-Deleting a region removes its record and evicts the resources that no other
-region requires.
+Delete a region to remove its record and resources that no other region needs.
 
 <Code code={region(offlineStorage, "delete")} lang="c" title="offline-storage.c" />

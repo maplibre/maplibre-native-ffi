@@ -1,0 +1,192 @@
+import Foundation
+import MaplibreNativeFFI
+
+/// The render loop for one map and render target. Native wakes reach it on the
+/// main actor: a runtime event drain demands a frame for each map update, and
+/// a frame-result drain shows what rendered. The session renders on its own
+/// core worker. Input submits camera commands to `mapState` directly.
+@MainActor
+final class RenderLoop {
+  /// How long the loop waits before it retries a frame that did not reach the
+  /// layer, about one display refresh. No map-update event prompts that retry.
+  private static let frameRetry = Duration.milliseconds(16)
+
+  let mapState: MapState
+  private let graphics: MetalGraphicsContext
+  private let target: MetalRenderTarget
+  private var isClosed = false
+  /// The newest viewport that no resize has applied yet.
+  private var pendingViewport: Viewport?
+  /// Applies pending viewports while any remain.
+  private var resizing: Task<Void, Never>?
+  /// Runs after each frame that reached the layer.
+  var onPresented: (@MainActor () -> Void)?
+  /// Runs when the loop can no longer render.
+  var onFailure: (@MainActor (Error) -> Void)?
+
+  private init(
+    mapState: MapState,
+    graphics: MetalGraphicsContext,
+    target: MetalRenderTarget
+  ) {
+    self.mapState = mapState
+    self.graphics = graphics
+    self.target = target
+  }
+
+  /// Creates the map at `viewport`, loading `styleJSON` or the network style
+  /// when it is nil, and attaches the render target.
+  static func start(
+    mode: RenderTargetMode,
+    graphics: MetalGraphicsContext,
+    viewport: Viewport,
+    styleJSON: Data? = nil
+  ) async throws -> RenderLoop {
+    // The wakes exist before the loop does, so a relay forwards them.
+    let relay = WakeRelay()
+    let mapState = try await MapState(
+      viewport: viewport,
+      eventWake: relay.wake { $0.drainEvents() },
+      styleJSON: styleJSON
+    )
+    let target: MetalRenderTarget
+    do {
+      target = try await MetalRenderTarget.attach(
+        mode: mode,
+        map: mapState.map,
+        graphics: graphics,
+        viewport: viewport,
+        frameWake: relay.wake { $0.showFrameResults() }
+      )
+    } catch {
+      try? await mapState.close()
+      throw error
+    }
+    let loop = RenderLoop(
+      mapState: mapState,
+      graphics: graphics,
+      target: target
+    )
+    mapState.onFailure = { [weak loop] in loop?.fail($0) }
+    relay.loop = loop
+    logStartupStatus(mode: mode, driver: target.driver)
+    // Wakes that arrived before the relay knew the loop found nothing to
+    // forward to, so drain and demand once now.
+    loop.drainEvents()
+    loop.showFrameResults()
+    loop.requestFrame()
+    return loop
+  }
+
+  /// Follows a new viewport. A resize awaits several native steps, so one task
+  /// applies resizes one at a time, and it skips a viewport that a newer one
+  /// replaces before its turn.
+  func resize(_ viewport: Viewport) {
+    guard !isClosed else { return }
+    pendingViewport = viewport
+    guard resizing == nil else { return }
+    resizing = Task { [weak self] in await self?.applyPendingResizes() }
+  }
+
+  private func applyPendingResizes() async {
+    defer { resizing = nil }
+    while !isClosed, let viewport = pendingViewport {
+      pendingViewport = nil
+      do {
+        try await target.resize(
+          graphics: graphics,
+          viewport: viewport,
+          map: mapState.map
+        )
+      } catch {
+        fail(error)
+        return
+      }
+    }
+  }
+
+  /// Detaches the session, then releases the map and the runtime; a map with
+  /// an attached session cannot be released.
+  func close() async throws {
+    guard !isClosed else { return }
+    isClosed = true
+    defer { onPresented = nil }
+    // The session detaches only after the resize in progress, if any, ends.
+    await resizing?.value
+    do {
+      try await target.close()
+    } catch {
+      try? await mapState.close()
+      throw error
+    }
+    try await mapState.close()
+  }
+
+  private func drainEvents() {
+    guard !isClosed else { return }
+    do {
+      if try mapState.drainEvents() {
+        requestFrame()
+      }
+    } catch {
+      fail(error)
+    }
+  }
+
+  private func showFrameResults() {
+    guard !isClosed else { return }
+    do {
+      let results = try target.drainResults()
+      let presented = try results.rendered && target.present()
+      if presented {
+        onPresented?()
+      }
+      if results.targetNotReady || (results.rendered && !presented) {
+        // Neither a target that was not ready nor a frame that missed the
+        // layer causes a map-update event, so the retry waits about one display
+        // refresh. It forces the frame, because a frame that missed the layer
+        // consumed its update.
+        Task { @MainActor [weak self] in
+          try? await Task.sleep(for: Self.frameRetry)
+          self?.requestFrame(force: true)
+        }
+      } else if results.needsRepaint {
+        requestFrame()
+      }
+    } catch {
+      fail(error)
+    }
+  }
+
+  private func requestFrame(force: Bool = false) {
+    guard !isClosed else { return }
+    do {
+      try target.requestFrame(force: force)
+    } catch {
+      fail(error)
+    }
+  }
+
+  private func fail(_ error: Error) {
+    guard !isClosed else { return }
+    onFailure?(error)
+  }
+}
+
+/// Forwards native wakes to the loop once it exists. A wake only schedules the
+/// loop's work on the main actor and returns. The wakes keep the relay alive,
+/// and the relay holds the loop weakly, so no cycle forms.
+@MainActor
+private final class WakeRelay {
+  weak var loop: RenderLoop?
+
+  func wake(
+    _ work: @escaping @MainActor @Sendable (RenderLoop) -> Void
+  ) -> Wake {
+    Wake(callback: { [self] in
+      Task { @MainActor in
+        if let loop { work(loop) }
+      }
+    })
+  }
+}

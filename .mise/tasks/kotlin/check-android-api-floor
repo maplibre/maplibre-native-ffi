@@ -12,8 +12,8 @@ api-versions.xml``), walks the constant pool of every compiled ``androidMain``
 class, and reports each platform class, method, or field whose ``since`` level
 is above the floor.
 
-References the database does not describe -- Kotlin stdlib, JavaCPP, project
-code -- are left alone, so only the Android platform surface is judged.
+References the database does not describe -- Kotlin stdlib and project code --
+are left alone, so only the Android platform surface is judged.
 """
 
 import os
@@ -96,7 +96,13 @@ BACKPORTED_MEMBERS = frozenset(
 # The scanner reads the constant pool and does not follow control flow, so a
 # call genuinely guarded by `Build.VERSION.SDK_INT` is recorded here with the
 # reasoning rather than being silently tolerated.
-ALLOWED_ABOVE_FLOOR = frozenset()
+ALLOWED_ABOVE_FLOOR = frozenset(
+    {
+        # BindingKeepAlive uses this only when SDK_INT >= 28; API 24-27 use
+        # an AtomicReference publication and compare-and-set fence instead.
+        "java/lang/ref/Reference#reachabilityFence(Ljava/lang/Object;)V",
+    }
+)
 
 
 class ApiClass:
@@ -408,21 +414,13 @@ def main(argv):
 
     roots = [pathlib.Path(path) for path in argv[1:]]
     if not roots:
-        roots = [
-            root / "bindings/kotlin/build/classes/kotlin/android/main",
-            root
-            / "bindings/kotlin/build/intermediates/javac/androidMain"
-            / "compileAndroidMainJavaWithJavac/classes",
-        ]
-        # Both halves of androidMain must be present. Scanning only the Kotlin
-        # output would report success while the Java sources went unchecked.
+        roots = [root / "bindings/kotlin/build/classes/kotlin/android/main"]
         missing = [path for path in roots if not path.is_dir()]
         if missing:
             fail(
                 "no compiled androidMain classes at "
                 + ", ".join(str(path) for path in missing)
-                + "; run ./gradlew :bindings:kotlin:compileAndroidMain "
-                ":bindings:kotlin:compileAndroidMainJavaWithJavac first"
+                + "; run ./gradlew :bindings:kotlin:compileAndroidMain first"
             )
     roots = [path for path in roots if path.is_dir()]
     if not roots:

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <mutex>
 
-#import <Foundation/Foundation.h>
 #include <mln/interface/native_apple_interface.h>
 #include <mln/storage/http_file_source.hpp>
 #include <mln/storage/resource.hpp>
@@ -14,6 +13,8 @@
 #include <mln/util/client_options.hpp>
 #include <mln/util/http_header.hpp>
 #include <mln/util/version.hpp>
+
+#import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 
 #include "maplibre_native_c.h"
@@ -120,8 +121,6 @@ static char MLNTransformedHeaderNamesKey;
 
 namespace mln {
 
-// Data that is shared between the requesting thread and the thread running the
-// completion handler.
 class HTTPRequestShared {
  public:
   HTTPRequestShared(Response& response_, util::AsyncTask& async_)
@@ -455,8 +454,6 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
     __block NSURLSession* session = nil;
     __block BOOL invalidateSessionOnCompletion = NO;
 
-    // Use the delegate's session if there is one, otherwise use the one that
-    // was created when this class was constructed.
     MLNNativeNetworkManager* networkManager =
       MLNNativeNetworkManager.sharedManager;
     if (
@@ -613,14 +610,12 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
                 Error::Reason::NotFound, "HTTP status code 404"
               );
             } else if (responseCode == 429) {
-              // Get the standard header
               std::optional<std::string> retryAfter;
               NSString* retryAfterHeader = headers[@"Retry-After"];
               if (retryAfterHeader) {
                 retryAfter = std::string([retryAfterHeader UTF8String]);
               }
 
-              // Fallback mapbox specific header
               std::optional<std::string> xRateLimitReset;
               NSString* xReset = headers[@"x-rate-limit-reset"];
               if (xReset) {
@@ -647,7 +642,6 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
               (const char*)[data bytes], [data length]
             );
           } else {
-            // This should never happen.
             response.error = std::make_unique<Error>(
               Error::Reason::Other, "Response class is not NSHTTPURLResponse"
             );

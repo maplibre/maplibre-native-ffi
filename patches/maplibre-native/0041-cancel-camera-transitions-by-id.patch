@@ -1,0 +1,144 @@
+diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
+index a67ab2dddec5..c437052e42a9 100644
+--- a/include/mln/map/camera.hpp
++++ b/include/mln/map/camera.hpp
+@@ -131,6 +131,11 @@ struct AnimationOptions {
+         be animating when this callback runs. */
+     std::function<void()> transitionFinishFn;
+ 
++    /** Caller-chosen identity of the command, which
++        Map::cancelTransitions(uint64_t) matches. Several commands may share
++        one. */
++    std::optional<uint64_t> transitionId;
++
+     /** Creates an animation with no options specified. */
+     AnimationOptions() = default;
+ 
+diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
+index d5dca349dedb..19dd8288bc05 100644
+--- a/include/mln/map/map.hpp
++++ b/include/mln/map/map.hpp
+@@ -63,6 +63,9 @@ public:
+ 
+     // Transition
+     void cancelTransitions();
++    /// Cancels the commands whose AnimationOptions::transitionId equals
++    /// `transitionId`, and leaves the others running.
++    void cancelTransitions(uint64_t transitionId);
+     void setGestureInProgress(bool);
+     bool isGestureInProgress() const;
+     bool isRotating() const;
+diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+index ef034b4bd8b1..89a4b90737db 100644
+--- a/src/mln/map/map.cpp
++++ b/src/mln/map/map.cpp
+@@ -120,6 +120,11 @@ void Map::cancelTransitions() {
+     impl->onUpdate();
+ }
+ 
++void Map::cancelTransitions(uint64_t transitionId) {
++    impl->transform.cancelTransitions(transitionId);
++    impl->onUpdate();
++}
++
+ void Map::setGestureInProgress(bool inProgress) {
+     impl->transform.setGestureInProgress(inProgress);
+     impl->onUpdate();
+diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+index f091f2d5cf35..793b44a3f7ad 100644
+--- a/src/mln/map/transform.cpp
++++ b/src/mln/map/transform.cpp
+@@ -718,6 +718,18 @@ void Transform::cancelTransitions() {
+     finishTransitions(finished);
+ }
+ 
++void Transform::cancelTransitions(uint64_t transitionId) {
++    std::vector<std::shared_ptr<Transition>> finished;
++    std::erase_if(transitions, [&](const auto& transition) {
++        if (transition->animation.transitionId != transitionId) return false;
++        finished.push_back(transition);
++        return true;
++    });
++    if (finished.empty()) return;
++    updateMovementFlags();
++    finishTransitions(finished);
++}
++
+ void Transform::setGestureInProgress(bool inProgress) {
+     state.setGestureInProgress(inProgress);
+ }
+diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
+index 3107c308b74b..73ff1457b174 100644
+--- a/src/mln/map/transform.hpp
++++ b/src/mln/map/transform.hpp
+@@ -120,6 +120,9 @@ public:
+     TimePoint getLatestTransitionStart() const { return latestTransitionStart; }
+     Duration getLatestTransitionDuration() const { return latestTransitionDuration; }
+     void cancelTransitions();
++    // Cancels the commands whose AnimationOptions::transitionId equals
++    // `transitionId`, and leaves the others running.
++    void cancelTransitions(uint64_t transitionId);
+ 
+     // Gesture
+     void setGestureInProgress(bool);
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index 8547b69fcdf2..d018e7366bbd 100644
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -1515,3 +1515,56 @@ TEST(Transform, PartialCameraCommandsFinishTogetherForStillImage) {
+     transform.cancelTransitions();
+     EXPECT_EQ(observer.events, (std::vector<int>{1, 0, 2, 0}));
+ }
++
++TEST(Transform, CancelTransitionsByIdLeavesOthersRunning) {
++    struct Observer : TransformObserver {
++        unsigned changes = 0;
++        void onCameraDidChange(MapObserver::CameraChangeMode) override { ++changes; }
++    } observer;
++    Transform transform(observer);
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8));
++    unsigned zoomFinished = 0;
++    unsigned bearingFinished = 0;
++    AnimationOptions zoom(Seconds(4));
++    zoom.transitionId = 1;
++    zoom.transitionFinishFn = [&] {
++        ++zoomFinished;
++    };
++    AnimationOptions bearing(Seconds(4));
++    bearing.transitionId = 2;
++    bearing.transitionFinishFn = [&] {
++        ++bearingFinished;
++    };
++    transform.easeTo(CameraOptions().withZoom(12), zoom);
++    transform.easeTo(CameraOptions().withBearing(80), bearing);
++    const auto start = transform.getLatestTransitionStart();
++    transform.updateTransitions(start + Seconds(1));
++    const auto zoomAtCancel = transform.getZoom();
++    observer.changes = 0;
++
++    // Only the command with the identity finishes, once, and the other keeps
++    // animating.
++    transform.cancelTransitions(1);
++    EXPECT_EQ(zoomFinished, 1u);
++    EXPECT_EQ(bearingFinished, 0u);
++    EXPECT_EQ(observer.changes, 1u);
++    EXPECT_TRUE(transform.inTransition());
++    EXPECT_FALSE(transform.isScaling());
++    EXPECT_TRUE(transform.isRotating());
++
++    // An identity that no running command carries finishes nothing and
++    // reports no change.
++    transform.cancelTransitions(1);
++    transform.cancelTransitions(3);
++    EXPECT_EQ(zoomFinished, 1u);
++    EXPECT_EQ(observer.changes, 1u);
++    EXPECT_TRUE(transform.inTransition());
++
++    transform.updateTransitions(start + Seconds(4));
++    EXPECT_NEAR(transform.getZoom(), zoomAtCancel, 1e-5);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 80, 1e-5);
++    EXPECT_EQ(zoomFinished, 1u);
++    EXPECT_EQ(bearingFinished, 1u);
++    EXPECT_FALSE(transform.inTransition());
++}

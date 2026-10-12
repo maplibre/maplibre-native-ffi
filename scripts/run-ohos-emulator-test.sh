@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> <c++-library> [test-argument ...] -- <test-executable ...>" >&2
+  echo "usage: $0 <timeout-seconds> <native-library> <c++-library> [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
@@ -13,6 +13,13 @@ timeout_seconds=$1
 native_library=$2
 cxx_library=$3
 shift 3
+# Further shared libraries a test executable loads, such as a plugin, travel
+# beside the C API library.
+extra_libraries=()
+while [[ ${1:-} == --library ]]; do
+  extra_libraries+=("${2:?--library requires a shared library}")
+  shift 2
+done
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -27,11 +34,11 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-connect_key=127.0.0.1:55555
+connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
-for local_file in "$native_library" "$cxx_library" "${test_executables[@]}"; do
+for local_file in "$native_library" "$cxx_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
     echo "OpenHarmony emulator test input does not exist: $local_file" >&2
     exit 2
@@ -51,9 +58,12 @@ if ! hdc tconn "$connect_key" >/dev/null 2>&1 ||
   mise run //:ohos-emulator:boot
 fi
 
-hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir'"
+hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
 hdc -t "$connect_key" file send "$native_library" "$remote_dir/libmaplibre-native-c.so"
 hdc -t "$connect_key" file send "$cxx_library" "$remote_dir/libc++_shared.so"
+for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
+  hdc -t "$connect_key" file send "$library" "$remote_dir/$(basename "$library")"
+done
 
 fixture_environment=
 if [[ -n "$fixture_dir" ]]; then
@@ -65,12 +75,20 @@ if [[ -n "$fixture_dir" ]]; then
   done < <(find "$fixture_dir" -type f -print0)
   fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
 fi
+# The Oniro guest's virtio GPU does not expose a reliable accelerated EGL
+# screen under QEMU. Mesa's surfaceless llvmpipe path provides deterministic
+# offscreen rendering for the test executables.
+# Software rendering under QEMU is slow, so waits and the native hang watchdog
+# stretch by the timeout scale.
+graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk MLN_TEST_TIMEOUT_SCALE='${MLN_TEST_TIMEOUT_SCALE:-3}' "
 
 for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") in the OpenHarmony emulator."
   hdc -t "$connect_key" file send "$test_executable" "$remote_dir/test-executable"
 
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  # A test that asks for a temporary directory gets one under the test
+  # directory, as on Android, rather than relying on the guest's /tmp.
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${graphics_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

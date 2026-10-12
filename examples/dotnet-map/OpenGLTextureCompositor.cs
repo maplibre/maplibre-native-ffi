@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed class OpenGLTextureCompositor : ITextureCompositor
@@ -56,19 +54,17 @@ internal sealed class OpenGLTextureCompositor : ITextureCompositor
         this.viewport = viewport;
     }
 
-    public bool Draw(OpenGLOwnedTextureFrame frame)
+    public bool Draw(OpenglTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
-            throw new InvalidOperationException(
-                "MapLibre returned an empty OpenGL owned texture frame."
-            );
+            throw new InvalidOperationException("MapLibre returned an empty OpenGL texture frame.");
         }
 
         if (frame.Target != Texture2D)
         {
             throw new InvalidOperationException(
-                $"MapLibre owned texture target is {frame.Target}, expected GL_TEXTURE_2D."
+                $"MapLibre texture target is {frame.Target}, expected GL_TEXTURE_2D."
             );
         }
 
@@ -76,7 +72,7 @@ internal sealed class OpenGLTextureCompositor : ITextureCompositor
         return true;
     }
 
-    public void DrawTexture(uint texture)
+    private void DrawTexture(uint texture)
     {
         if (texture == 0)
         {

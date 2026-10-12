@@ -1,9 +1,9 @@
 [tools]
-"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux"] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
 # libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
-"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux"] }
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]
@@ -15,6 +15,19 @@ source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build "${swift_args[@]}"
+'''
+
+[tasks.smoke]
+description = "Render one frame headless in each render-target mode, then exit."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+# The smoke path in Sources/SwiftMap/Smoke.swift renders through a Metal layer
+# that no window shows, with an inline style, so it needs no display or
+# network.
+run = '''
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 ".build/$usage_preset/debug/swift-map" "$mode" || exit 1
+done
 '''
 
 [tasks.run]

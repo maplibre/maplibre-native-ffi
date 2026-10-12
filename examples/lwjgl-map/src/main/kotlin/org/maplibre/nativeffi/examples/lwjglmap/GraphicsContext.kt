@@ -1,13 +1,11 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal interface GraphicsContext : AutoCloseable {
   fun window(): Long
 
-  fun backend(): RenderBackend
-
-  fun resize(viewport: Viewport) {}
+  fun backend(): RenderBackendFlag
 
   override fun close()
 
@@ -17,16 +15,17 @@ internal interface GraphicsContext : AutoCloseable {
       title: String,
       width: Int,
       height: Int,
-      backends: Set<RenderBackend>,
+      backends: RenderBackendFlag,
+      visible: Boolean = true,
     ): GraphicsContext {
-      if (backends.contains(RenderBackend.METAL)) {
-        return MetalContext.create(title, width, height)
+      if (backends.contains(RenderBackendFlag.METAL)) {
+        return MetalContext.create(title, width, height, visible)
       }
-      if (backends.contains(RenderBackend.OPENGL)) {
-        return OpenGLContext.create(title, width, height)
+      if (backends.contains(RenderBackendFlag.OPENGL)) {
+        return OpenGLContext.create(title, width, height, visible)
       }
-      if (backends.contains(RenderBackend.VULKAN)) {
-        return VulkanContext.create(title, width, height)
+      if (backends.contains(RenderBackendFlag.VULKAN)) {
+        return VulkanContext.create(title, width, height, visible)
       }
       throw IllegalStateException(
         "The loaded MapLibre native library does not support a backend usable by lwjgl-map"

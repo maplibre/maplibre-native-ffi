@@ -22,6 +22,37 @@ zig build \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
+[tasks.smoke]
+description = "Render one frame in each render-target mode, then exit."
+extends = "ffi:preset"
+# MLN_EXAMPLE_SMOKE hides the window, swaps the network style for an inline
+# one, and makes each mode exit 0 after its first rendered frame. SDL still
+# needs a video driver, so a Linux runner without a display uses SDL's
+# offscreen driver, with Mesa's software renderer where it has no GPU.
+run = '''
+set -euo pipefail
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+  export SDL_VIDEO_DRIVER=offscreen
+fi
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 ./zig-out/bin/zig-map "$mode"
+done
+'''
+run_windows = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+zig build \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 ./zig-out/bin/zig-map.exe "$mode"
+done
+'''
+
 [tasks.run]
 extends = "ffi:example-run"
 run = '''

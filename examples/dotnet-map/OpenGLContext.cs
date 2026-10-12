@@ -1,5 +1,4 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 using DesktopGL = Silk.NET.OpenGL.GL;
 using Gles = Silk.NET.OpenGLES.GL;
@@ -23,7 +22,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         this.glesGl = glesGl;
     }
 
-    public RenderBackend Backend => RenderBackend.OpenGL;
+    public RenderBackendFlag Backend => RenderBackendFlag.Opengl;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -35,17 +34,17 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public bool IsGles => gles;
 
-    public static OpenGLContext Create(string title, int width, int height)
+    public static OpenGLContext Create(string title, int width, int height, bool visible)
     {
-        var providers = Maplibre.SupportedOpenGLContextProviders();
-        if (providers.HasFlag(OpenGLContextProvider.Egl))
+        var providers = Maplibre.OpenglSupportedContextProviderMask();
+        if (providers.HasFlag(OpenglContextProviderFlag.Egl))
         {
-            return CreateEgl(title, width, height);
+            return CreateEgl(title, width, height, visible);
         }
 
-        if (providers.HasFlag(OpenGLContextProvider.Wgl))
+        if (providers.HasFlag(OpenglContextProviderFlag.Wgl))
         {
-            return CreateWgl(title, width, height);
+            return CreateWgl(title, width, height, visible);
         }
 
         throw new InvalidOperationException(
@@ -53,29 +52,42 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         );
     }
 
-    public OpenGLContextDescriptor Descriptor(bool requirePbufferConfig)
+    public OpenglContextDescriptor Descriptor(bool requirePbufferConfig)
     {
         if (gles)
         {
-            return new EglContextDescriptor
-            {
-                Display = NativePointer.FromBorrowedAddress(GlfwNativeAccess.GetEglDisplay()),
-                Config = NativePointer.FromBorrowedAddress(EglConfig(requirePbufferConfig)),
-                ShareContext = NativePointer.FromBorrowedAddress(
-                    GlfwNativeAccess.GetEglContext(window.Handle)
-                ),
-                GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
-            };
+            return new OpenglContextDescriptor(
+                OpenglContextOwnership.Shared,
+                new OpenglContextDescriptor.DataValue.Egl(
+                    new EglContextDescriptor
+                    {
+                        Display = NativePointer.FromBorrowedAddress(
+                            GlfwNativeAccess.GetEglDisplay()
+                        ),
+                        Config = NativePointer.FromBorrowedAddress(EglConfig(requirePbufferConfig)),
+                        ClientApi = OpenglClientApi.Gles,
+                        ShareContext = NativePointer.FromBorrowedAddress(
+                            GlfwNativeAccess.GetEglContext(window.Handle)
+                        ),
+                        GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
+                    }
+                )
+            );
         }
 
-        return new WglContextDescriptor
-        {
-            DeviceContext = NativePointer.FromBorrowedAddress(deviceContext),
-            ShareContext = NativePointer.FromBorrowedAddress(
-                GlfwNativeAccess.GetWglContext(window.Handle)
-            ),
-            GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
-        };
+        return new OpenglContextDescriptor(
+            OpenglContextOwnership.Shared,
+            new OpenglContextDescriptor.DataValue.Wgl(
+                new WglContextDescriptor
+                {
+                    DeviceContext = NativePointer.FromBorrowedAddress(deviceContext),
+                    ShareContext = NativePointer.FromBorrowedAddress(
+                        GlfwNativeAccess.GetWglContext(window.Handle)
+                    ),
+                    GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
+                }
+            )
+        );
     }
 
     public NativePointer SurfacePointer() =>
@@ -84,14 +96,6 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         );
 
     public Viewport ReadViewport() => window.ReadViewport();
-
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-        MakeCurrent();
-    }
-
-    public void PollEvents() => window.PollEvents();
 
     public void FinishFrame()
     {
@@ -436,6 +440,18 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public uint GetError() => gles ? (uint)glesGl!.GetError() : (uint)desktopGl!.GetError();
 
+    public void FinishGpuWork()
+    {
+        if (gles)
+        {
+            glesGl!.Finish();
+        }
+        else
+        {
+            desktopGl!.Finish();
+        }
+    }
+
     public void Dispose()
     {
         if (closed)
@@ -464,9 +480,9 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         window.Dispose();
     }
 
-    private static OpenGLContext CreateEgl(string title, int width, int height)
+    private static OpenGLContext CreateEgl(string title, int width, int height, bool visible)
     {
-        if (!Maplibre.SupportedOpenGLContextProviders().HasFlag(OpenGLContextProvider.Egl))
+        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Egl))
         {
             throw new InvalidOperationException("Native library does not support EGL.");
         }
@@ -476,6 +492,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             title,
             width,
             height,
+            visible,
             glfw =>
             {
                 glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.OpenGLES);
@@ -493,12 +510,17 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             var display = GlfwNativeAccess.GetEglDisplay();
             var eglContext = GlfwNativeAccess.GetEglContext(window.Handle);
             var surface = GlfwNativeAccess.GetEglSurface(window.Handle);
-            if (display == 0 || eglContext == 0 || surface == 0)
+            // GLFW's null platform makes a surfaceless context for a hidden window, which the
+            // texture modes render with and native-surface mode cannot.
+            if (display == 0 || eglContext == 0 || (visible && surface == 0))
             {
                 throw new InvalidOperationException("GLFW did not expose EGL handles.");
             }
 
-            _ = EglNative.GetSurfaceConfig(display, surface);
+            if (surface != 0)
+            {
+                _ = EglNative.GetSurfaceConfig(display, surface);
+            }
             Console.WriteLine($"GLFW {window.Glfw.GetVersionString()}, OpenGL EGL/GLES");
             return context;
         }
@@ -513,9 +535,9 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         }
     }
 
-    private static OpenGLContext CreateWgl(string title, int width, int height)
+    private static OpenGLContext CreateWgl(string title, int width, int height, bool visible)
     {
-        if (!Maplibre.SupportedOpenGLContextProviders().HasFlag(OpenGLContextProvider.Wgl))
+        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Wgl))
         {
             throw new InvalidOperationException("Native library does not support WGL.");
         }
@@ -525,6 +547,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             title,
             width,
             height,
+            visible,
             glfw =>
             {
                 glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.OpenGL);
@@ -574,9 +597,8 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
     private nint EglConfig(bool requirePbufferConfig)
     {
         var display = GlfwNativeAccess.GetEglDisplay();
-        var surface = GlfwNativeAccess.GetEglSurface(window.Handle);
         return requirePbufferConfig
-            ? EglNative.GetTextureConfig(display, surface)
-            : EglNative.GetSurfaceConfig(display, surface);
+            ? EglNative.GetTextureConfig(display, GlfwNativeAccess.GetEglContext(window.Handle))
+            : EglNative.GetSurfaceConfig(display, GlfwNativeAccess.GetEglSurface(window.Handle));
     }
 }

@@ -53,17 +53,77 @@ export CARGO_ENCODED_RUSTFLAGS="$encoded"
 # Shared memory requires an atomics-enabled standard library.
 export RUSTC_BOOTSTRAP=1
 export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/scripts/run-browser-cargo-test.sh"
-cargo test \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target wasm32-unknown-emscripten \
-  -Zbuild-std=std,panic_abort \
-  -- --test-threads=1
+cargo_support_tests() {
+  cargo test \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    --target wasm32-unknown-emscripten \
+    -Zbuild-std=std,panic_abort \
+    -- --test-threads=1
+}
+
+cargo_binding_test() {
+  cargo test \
+    -p maplibre-native-ffi \
+    --features browser-fixtures \
+    --target wasm32-unknown-emscripten \
+    -Zbuild-std=std,panic_abort \
+    "$@"
+}
+
+# The unit tests hold no GPU context, so they share one page.
+cargo_binding_test --lib -- --test-threads=1
+
+# Chromium retains GPU and pthread resources longer than their native handles,
+# so every integration test gets a page of its own and cannot inherit a context
+# budget or worker-pool state from its predecessors. The browser build compiles
+# only the suite's browser module, and a test there that names a render backend
+# in its cfg compiles only for that backend. The names come from the source:
+# the first function after each `#[test]`, kept when its cfg matches.
+browser_tests="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/tests/suite/browser/mod.rs"
+render_backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
+  "$native_install_dir/share/maplibre-native-c/artifact.json")
+declared=$(grep -c $'^#\[test\]' "$browser_tests")
+enumerated=0
+test_names=()
+while IFS=' ' read -r backend test_name; do
+  enumerated=$((enumerated + 1))
+  if [[ "$backend" == any || "$backend" == "$render_backend" ]]; then
+    test_names+=("$test_name")
+  fi
+done < <(awk '
+  /^#\[cfg\(mln_render_backend = "/ {
+    backend = $0
+    sub(/^#\[cfg\(mln_render_backend = "/, "", backend)
+    sub(/".*/, "", backend)
+    next
+  }
+  /^#\[test\]/ { pending = 1; next }
+  pending && /^fn / {
+    name = $0
+    sub(/^fn /, "", name)
+    sub(/\(.*/, "", name)
+    print (backend == "" ? "any" : backend), name
+    pending = 0
+    backend = ""
+    next
+  }
+  !pending { backend = "" }
+' "$browser_tests")
+if [[ "$enumerated" -ne "$declared" || ${#test_names[@]} -eq 0 ]]; then
+  echo "enumerated $enumerated of $declared tests in $browser_tests for $render_backend" >&2
+  exit 1
+fi
+for test_name in "${test_names[@]}"; do
+  cargo_binding_test --test suite -- "browser::$test_name" --exact --test-threads=1
+done
+
+cargo_support_tests
 cargo clippy \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
+  --features maplibre-native-ffi/browser-fixtures \
   --target wasm32-unknown-emscripten \
   -Zbuild-std=std,panic_abort \
   --all-targets -- -D warnings

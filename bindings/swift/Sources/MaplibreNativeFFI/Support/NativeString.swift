@@ -10,11 +10,27 @@ struct NativeStringError: Error, Equatable {
 }
 
 enum NativeString {
-  static func copyUTF8(data: UnsafeRawPointer?, size: UInt) throws -> String {
-    try copyUTF8(data: data, size: Int(size))
+  static func copyData(data: UnsafeRawPointer?, size: Int) throws -> Data {
+    guard size >= 0
+    else { throw NativeStringError("negative native buffer size") }
+    guard size > 0 else { return Data() }
+    guard let data
+    else { throw NativeStringError("null native buffer with nonzero size") }
+    return Data(bytes: data, count: size)
   }
 
   static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
+    try copyCUTF8(
+      data: data?.assumingMemoryBound(to: CChar.self),
+      size: size
+    )
+  }
+
+  private static func copyCUTF8(data: UnsafePointer<CChar>?,
+                                size: Int) throws -> String
+  {
+    guard size >= 0
+    else { throw NativeStringError("negative native string size") }
     guard size > 0 else { return "" }
     guard let data else {
       throw NativeStringError(
@@ -22,7 +38,7 @@ enum NativeString {
       )
     }
     let bytes = UnsafeBufferPointer(
-      start: data.assumingMemoryBound(to: UInt8.self),
+      start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self),
       count: size
     )
     guard let text = String(bytes: bytes, encoding: .utf8) else {
@@ -31,41 +47,10 @@ enum NativeString {
     return text
   }
 
-  static func copyCString(_ data: UnsafePointer<CChar>?) -> String {
-    data.map { String(cString: $0) } ?? ""
-  }
-
-  static func withOptionalCString<Result>(
-    _ text: String?,
-    _ body: (UnsafePointer<CChar>?) throws -> Result
-  ) throws -> Result {
-    guard let text else {
-      return try body(nil)
+  static func copyCString(_ data: UnsafePointer<CChar>?) throws -> String {
+    guard let data, let value = String(validatingCString: data) else {
+      throw NativeStringError("native C string is null or invalid UTF-8")
     }
-    return try withCString(text, body)
-  }
-
-  static func withCString<Result>(
-    _ text: String,
-    _ body: (UnsafePointer<CChar>) throws -> Result
-  ) throws -> Result {
-    if text.utf8.contains(0) {
-      throw NativeStringError(
-        "C string inputs cannot contain embedded NUL bytes"
-      )
-    }
-    return try text.withCString(body)
-  }
-
-  static func withStringView<Result>(
-    _ text: String,
-    _ body: (mln_buffer_view) throws -> Result
-  ) throws -> Result {
-    let bytes = Array(text.utf8)
-    return try bytes.withUnsafeBufferPointer { buffer in
-      let pointer = buffer.baseAddress
-        .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) }
-      return try body(mln_buffer_view(data: pointer, size: buffer.count))
-    }
+    return value
   }
 }

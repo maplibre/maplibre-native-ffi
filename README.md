@@ -34,16 +34,15 @@ reference, and contributor notes.
 - [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
 - [Reference](https://maplibre.org/maplibre-native-ffi/reference/c/)
 - [Development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
-- [Binding specification](https://maplibre.org/maplibre-native-ffi/development/binding-specification/)
+- [Contributing](./CONTRIBUTING.md)
 
 ## Status
 
 The C API covers most of the MapLibre Native API surface. Advanced extension
 APIs, including custom layers and shader registry access, are not yet included.
 
-Platform support is still filling in -- see the
-[Overview](https://maplibre.org/maplibre-native-ffi/#status) page for full
-platform status.
+The [Overview](https://maplibre.org/maplibre-native-ffi/#status) lists supported
+platforms and backends.
 
 ## License
 

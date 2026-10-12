@@ -45,7 +45,6 @@ auto equals_ignoring_case(std::string_view left, std::string_view right)
   });
 }
 
-// Returns the RFC 3986 scheme of a URL, or nullopt when the URL carries none.
 auto url_scheme(std::string_view url) -> std::optional<std::string_view> {
   const auto separator = url.find(':');
   if (separator == std::string_view::npos || separator == 0) {

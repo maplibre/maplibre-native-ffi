@@ -22,16 +22,14 @@ offline regions, and resource transform.
 <Code code={region(loadStyle, "url")} lang="c" title="load-style.c" />
 
 Set style text when the host already has the document, such as a bundled base
-style or one composed at runtime. MapLibre parses and copies the text before the
-call returns.
+style or one composed at runtime.
 
 <Code code={region(loadStyle, "json")} lang="c" title="load-style.c" />
 
-Either call returns when the map accepts the request. Later pumps load the
-style, sources, glyphs, and first tiles. A style-loaded event reports that the
-style has parsed and its sources exist. A loading-failed event carries the
-failure text.
-[Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
+Wait for the style-loaded event before adding host sources and layers. Observe
+the command completion for failures and the event stream for later resource
+errors. [Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading
+the event stream.
 
 ## Load a local style
 
@@ -43,8 +41,8 @@ On Android, the asset path defaults to `/android_asset`. After
 `asset://style.json` and `file:///android_asset/style.json` read APK
 `assets/style.json`.
 
-For APK-bundled PMTiles sources, use `pmtiles://asset://map.pmtiles`. Add `pmtiles`
-to the app's `androidResources.noCompress` list for byte-range reads.
+For APK-bundled PMTiles sources, use `pmtiles://asset://map.pmtiles`. Add
+`pmtiles` to the app's `androidResources.noCompress` list for byte-range reads.
 
 ## Replay additions after a style load
 
@@ -57,3 +55,6 @@ after every later style load. A host that switches base maps keeps the changes
 that it needs to replay.
 
 Camera state survives a style load unchanged.
+
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines
+style commands and their completion outcomes.

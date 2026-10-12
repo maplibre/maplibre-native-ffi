@@ -23,7 +23,7 @@ public class MaplibreException : Exception
     /// <summary>The raw C status value, when the failure came from a C status.</summary>
     public int? RawStatus { get; }
 
-    /// <summary>The diagnostic copied immediately after the failing call.</summary>
+    /// <summary>The diagnostic message the failing call reported.</summary>
     public string Diagnostic { get; }
 
     private static string MessageFor(MaplibreStatus status, int? rawStatus, string diagnostic)

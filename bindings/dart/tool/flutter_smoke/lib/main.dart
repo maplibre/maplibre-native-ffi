@@ -5,7 +5,7 @@ void main() {
   runApp(
     Directionality(
       textDirection: TextDirection.ltr,
-      child: Center(child: Text('C ABI ${Maplibre.cVersion()}')),
+      child: Center(child: Text('C ABI ${cVersion()}')),
     ),
   );
 }

@@ -14,9 +14,14 @@ and custom integrations that need direct control of the map and render session.
 The MapLibre [Android](https://maplibre.org/maplibre-native/android/api/) and
 [iOS](https://maplibre.org/maplibre-native/ios/latest/documentation/maplibre/)
 SDKs provide a map view that owns a window, a frame loop, and gesture handling.
-This API provides the map and render session. The host creates the window and
-graphics context, pumps the runtime, and decides when to draw each frame. A
-texture render target supports image export and compositing into a host scene.
+This API provides map state and rendering. The host supplies the graphics
+resources, connects events to its UI, and requests frames at its own cadence.
+Texture targets support image export and compositing into a host scene.
+
+[Install a binding](/maplibre-native-ffi/install/), read the
+[concepts](/maplibre-native-ffi/concepts/), then
+[create a map](/maplibre-native-ffi/guides/create-a-map/). The guides continue
+through loading a style, attaching a target, and rendering frames.
 
 See the [examples](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples)
 in the repository for complete integration examples for each language binding.

@@ -4,16 +4,28 @@ set -euo pipefail
 
 preset=${1:?usage: test-python-android-device.sh <preset>}
 case "$preset" in
-  android-x64-egl)
+  android-arm64-egl)
+    abi=arm64-v8a
+    cibw_arch=arm64_v8a
     system_graphics_library=libGLESv3.so
-    test_requirements='pytest>=9,<10 pyopengl>=3.1.10,<4'
+    ;;
+  android-arm64-vulkan)
+    abi=arm64-v8a
+    cibw_arch=arm64_v8a
+    system_graphics_library=libvulkan.so
+    ;;
+  android-x64-egl)
+    abi=x86_64
+    cibw_arch=x86_64
+    system_graphics_library=libGLESv3.so
     ;;
   android-x64-vulkan)
+    abi=x86_64
+    cibw_arch=x86_64
     system_graphics_library=libvulkan.so
-    test_requirements='pytest>=9,<10'
     ;;
   *)
-    echo "The Python Android device suite tests Android x64 presets only, not $preset." >&2
+    echo "The Python Android device suite does not support $preset." >&2
     exit 2
     ;;
 esac
@@ -25,18 +37,18 @@ if [[ ! -d "$native_install_dir" ]]; then
 fi
 
 mise run //:android-sdk-packages
-# Rust and bindgen use the toolchain and API level of the native artifact.
-# Preserve these explicit paths when cibuildwheel selects its isolated SDK.
-# shellcheck source=scripts/rust-cross-env.sh
-source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$preset"
-if [[ "$preset" == android-x64-egl ]]; then
+if [[ -z "${ANDROID_SERIAL:-}" && "$preset" == android-x64-egl ]]; then
   # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
   # mimalloc initialization. API 26 rejects that syscall before Python can
   # load the wheel, so replace the Goldfish regression device with the default
   # emulator used by this binding's suite.
   mise run //:android-emulator:stop
 fi
-mise run //:android-emulator:boot x86_64
+if [[ -z "${ANDROID_SERIAL:-}" ]]; then
+  mise run //:android-emulator:boot "$abi"
+fi
+serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh")
+export ANDROID_SERIAL="$serial"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it
 # manages. Give it an isolated SDK view so later repository tasks retain the
@@ -56,21 +68,31 @@ for entry_name in build-tools cmake emulator licenses platform-tools platforms s
 done
 export ANDROID_HOME="$python_android_home"
 export ANDROID_SDK_ROOT="$python_android_home"
+# The wheel build runs in an isolated environment that resolves its tools from
+# PATH alone, so the pinned cmake goes on PATH by path rather than through mise.
+cmake_bin=$(mise which cmake)
+export PATH="${cmake_bin%/*}:$PATH"
 
-export CIBW_BUILD=cp314-android_x86_64
-export CIBW_ARCHS_ANDROID=x86_64
+export CIBW_BUILD="cp314-android_$cibw_arch"
+export CIBW_ARCHS_ANDROID="$cibw_arch"
 export CIBW_BUILD_FRONTEND='build[uv]'
 export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
-bindgen_args_variable="BINDGEN_EXTRA_CLANG_ARGS_${cargo_target//-/_}"
-export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=\"$native_install_dir\" $bindgen_args_variable='${!bindgen_args_variable}'"
+# The wheel build names the NDK compiler as CC, and a cross build still
+# compiles build scripts for the machine doing the build.
+host_cc=$(command -v cc)
+export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir HOST_CC=$host_cc"
 # The graphics loader comes from Android, so wheel repair leaves it external.
 export CIBW_REPAIR_WHEEL_COMMAND_ANDROID="auditwheel repair --exclude $system_graphics_library --ldpaths {ldpaths} -w {dest_dir} {wheel}"
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'
-export CIBW_TEST_REQUIRES_ANDROID="$test_requirements"
-export CIBW_TEST_RUNTIME='args: --connected emulator-5554'
-export CIBW_TEST_SOURCES_ANDROID=tests
+export CIBW_TEST_REQUIRES_ANDROID='pytest>=9,<10'
+export CIBW_TEST_RUNTIME="args: --connected $serial"
+# The render tests load tests/graphics from build/graphics beside the tests,
+# since the testbed carries only the test sources onto the device.
+export CIBW_TEST_SOURCES_ANDROID='tests build/graphics'
 
 cd "$MISE_MONOREPO_ROOT/bindings/python"
+mkdir -p build/graphics
+cp "$native_install_dir/lib/libmln_test_graphics.so" build/graphics/
 python_test_status=0
 uv run --project . --group android --no-sync \
   cibuildwheel --platform android \
@@ -80,5 +102,5 @@ if ((python_test_status == 0)); then
   exit 0
 fi
 
-"$shared_android_home/platform-tools/adb" -s emulator-5554 logcat -d -b crash >&2 || true
+"$shared_android_home/platform-tools/adb" -s "$serial" logcat -d -b crash >&2 || true
 exit "$python_test_status"

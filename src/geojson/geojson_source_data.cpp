@@ -25,6 +25,7 @@
 #include "geojson/geojson.hpp"
 #include "map/map.hpp"
 #include "style/style_value.hpp"
+#include "testing/sync_point.hpp"
 
 namespace {
 
@@ -140,6 +141,7 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
         if (!locked) {
           return features;
         }
+        mln::testing::hit(mln::testing::SyncPoint::GeoJsonTileSlice);
         const std::scoped_lock lock(*mutex);
         locked->getTile(
           id,
@@ -242,11 +244,6 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
   ) {
     result.cluster_properties = options->cluster_properties;
   }
-  if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
-  ) {
-    result.tile_size = options->tile_size;
-  }
   if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
     result.buffer = options->buffer;
   }
@@ -296,7 +293,7 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
     MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
@@ -307,9 +304,16 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
   }
 
   const auto effective = effective_geojson_source_options(options);
+  if (
+    !std::isfinite(effective.max_zoom) || effective.max_zoom < 0.0 ||
+    effective.max_zoom > 24.0 ||
+    std::floor(effective.max_zoom) != effective.max_zoom
+  ) {
+    set_thread_error("max_zoom must be an integer within [0, 24]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   for (const auto& [zoom, name] : {
          std::pair{effective.min_zoom, "min_zoom"},
-         std::pair{effective.max_zoom, "max_zoom"},
          std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
        }) {
     if (
@@ -329,16 +333,12 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     set_thread_error("tolerance must be finite and non-negative");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
-    set_thread_error("tile_size must be within [1, 65535]");
+  if (effective.buffer > 512U) {
+    set_thread_error("buffer must be at most 512");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.buffer > 65535U) {
-    set_thread_error("buffer must be at most 65535");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.cluster_radius > 65535U) {
-    set_thread_error("cluster_radius must be at most 65535");
+  if (effective.cluster_radius > 4095U) {
+    set_thread_error("cluster_radius must be at most 4095");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
@@ -362,7 +362,6 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   auto native = mln::style::GeoJSONOptions{};
   native.minzoom = static_cast<uint8_t>(options.min_zoom);
   native.maxzoom = static_cast<uint8_t>(options.max_zoom);
-  native.tileSize = static_cast<uint16_t>(options.tile_size);
   native.buffer = static_cast<uint16_t>(options.buffer);
   native.tolerance = options.tolerance;
   native.lineMetrics = options.line_metrics;
@@ -444,8 +443,7 @@ auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& right
 ) -> bool {
   return left.minzoom == right.minzoom && left.maxzoom == right.maxzoom &&
-         left.tileSize == right.tileSize && left.buffer == right.buffer &&
-         left.tolerance == right.tolerance &&
+         left.buffer == right.buffer && left.tolerance == right.tolerance &&
          left.lineMetrics == right.lineMetrics &&
          left.cluster == right.cluster &&
          left.clusterRadius == right.clusterRadius &&

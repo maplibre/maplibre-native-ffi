@@ -1,9 +1,11 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
+import org.lwjgl.glfw.GLFW.GLFW_FALSE
 import org.lwjgl.glfw.GLFW.GLFW_NO_API
 import org.lwjgl.glfw.GLFW.GLFW_RESIZABLE
 import org.lwjgl.glfw.GLFW.GLFW_TRUE
+import org.lwjgl.glfw.GLFW.GLFW_VISIBLE
 import org.lwjgl.glfw.GLFW.glfwCreateWindow
 import org.lwjgl.glfw.GLFW.glfwDefaultWindowHints
 import org.lwjgl.glfw.GLFW.glfwDestroyWindow
@@ -16,7 +18,7 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.MemoryUtil.memAddress
 import org.lwjgl.system.macosx.CoreFoundation
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class MetalContext
 private constructor(
@@ -29,7 +31,7 @@ private constructor(
 
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.METAL
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.METAL
 
   fun deviceAddress(): Long = device
 
@@ -148,7 +150,8 @@ private constructor(
 
   fun drawableTexture(drawable: Long): Long = MacObjectiveC.sendPointer(drawable, "texture")
 
-  override fun resize(viewport: Viewport) {
+  /** Sizes the layer's drawables for the compositor. A native surface session sizes them itself. */
+  fun resizeDrawable(viewport: Viewport) {
     resizeLayer(layer, viewport)
   }
 
@@ -183,7 +186,7 @@ private constructor(
     private const val MTL_TEXTURE_USAGE_SHADER_READ = 1
     private const val MTL_TEXTURE_USAGE_RENDER_TARGET = 4
 
-    fun create(title: String, width: Int, height: Int): MetalContext {
+    fun create(title: String, width: Int, height: Int, visible: Boolean): MetalContext {
       check(glfwInit()) { "GLFW initialization failed" }
       var window = NULL
       var retainedView = NULL
@@ -194,6 +197,7 @@ private constructor(
           glfwDefaultWindowHints()
           glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API)
           glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+          glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
           window = glfwCreateWindow(width, height, title, NULL, NULL)
           check(window != NULL) { "GLFW window creation failed" }
           val viewport = Viewport.read(window)

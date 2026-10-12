@@ -5,7 +5,7 @@ use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawConte
 use glutin::display::{AsRawDisplay, GetGlDisplay, RawDisplay};
 use glutin::surface::{AsRawSurface, RawSurface, Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native_ffi::{EglContextDescriptor, NativePointer, OpenGLContextDescriptor};
+use maplibre_native_ffi::{EglContextDescriptor, OpenglContextDescriptor};
 use winit::window::Window;
 
 pub struct OpenGLPlatformContext {
@@ -20,7 +20,7 @@ impl OpenGLPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenGLContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
         let RawDisplay::Egl(raw_display) = self.config.display().raw_display() else {
             return Err("glutin did not create an EGL display".into());
         };
@@ -30,21 +30,25 @@ impl OpenGLPlatformContext {
         let RawContext::Egl(raw_context) = context.raw_context() else {
             return Err("glutin did not create an EGL context".into());
         };
-        Ok(OpenGLContextDescriptor::Egl(EglContextDescriptor::new(
-            unsafe { NativePointer::from_ptr(raw_display.cast_mut()) },
-            unsafe { NativePointer::from_ptr(raw_config.cast_mut()) },
-            unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
-        )))
+        Ok(OpenglContextDescriptor {
+            data: maplibre_native_ffi::OpenglContextDescriptorData::Egl(EglContextDescriptor {
+                display: raw_display.cast_mut().cast::<std::ffi::c_void>(),
+                config: raw_config.cast_mut().cast::<std::ffi::c_void>(),
+                share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
+                ..Default::default()
+            }),
+            ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
+        })
     }
 
     pub fn surface_pointer(
         &self,
         surface: &Surface<WindowSurface>,
-    ) -> Result<NativePointer, Box<dyn Error>> {
+    ) -> Result<*mut std::ffi::c_void, Box<dyn Error>> {
         let RawSurface::Egl(raw_surface) = surface.raw_surface() else {
             return Err("glutin did not create an EGL surface".into());
         };
-        Ok(unsafe { NativePointer::from_ptr(raw_surface.cast_mut()) })
+        Ok(raw_surface.cast_mut().cast::<std::ffi::c_void>())
     }
 
     pub fn context_api_name(&self) -> &'static str {

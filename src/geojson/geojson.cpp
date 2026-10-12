@@ -3,8 +3,6 @@
 #include <string_view>
 #include <vector>
 
-#include <mapbox/geojson.hpp>
-#include <mapbox/geojson/rapidjson.hpp>
 #include <mln/style/conversion/geojson.hpp>
 #include <mln/style/conversion/stringify.hpp>
 #include <mln/style/conversion_impl.hpp>
@@ -14,6 +12,9 @@
 #include <mln/util/geojson.hpp>
 #include <mln/util/geometry.hpp>
 #include <mln/util/rapidjson.hpp>
+
+#include <mapbox/geojson.hpp>
+#include <mapbox/geojson/rapidjson.hpp>
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/stringbuffer.h>

@@ -27,8 +27,6 @@ internal class OpenGLBorrowedTexture(graphicsContext: GraphicsContext, viewport:
 
   fun texture(): Int = texture
 
-  fun target(): Int = TEXTURE_TARGET
-
   override fun close() {
     if (texture == 0) {
       return

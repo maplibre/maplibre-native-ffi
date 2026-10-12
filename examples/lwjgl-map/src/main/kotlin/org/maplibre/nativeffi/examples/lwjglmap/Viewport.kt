@@ -7,7 +7,7 @@ import org.lwjgl.glfw.GLFW.glfwGetWindowContentScale
 import org.lwjgl.glfw.GLFW.glfwGetWindowSize
 import org.lwjgl.system.MemoryStack
 
-internal class Viewport(
+internal data class Viewport(
   private val width: Int,
   private val height: Int,
   private val scaleFactor: Double,

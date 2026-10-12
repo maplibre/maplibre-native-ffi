@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const c = @import("../../c.zig").c;
+const maplibre = @import("maplibre_native_ffi");
+const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 const util = @import("util.zig");
 
@@ -10,7 +12,12 @@ pub const Context = struct {
     surface: c.VkSurfaceKHR,
     physical_device: c.VkPhysicalDevice,
     device: c.VkDevice,
+    /// The one queue that the host and the render session both submit to.
     queue: c.VkQueue,
+    /// Held around every call on `queue`. A core worker submits from its own
+    /// thread, and Vulkan requires the calls on one queue to be externally
+    /// synchronized, so the session takes it too, through its queue lock.
+    queue_mutex: *c.SDL_Mutex,
     queue_family_index: u32,
 
     pub fn init(allocator: std.mem.Allocator, window: *c.SDL_Window) !Context {
@@ -21,6 +28,7 @@ pub const Context = struct {
             .physical_device = null,
             .device = null,
             .queue = null,
+            .queue_mutex = c.SDL_CreateMutex() orelse return types.AppError.BackendSetupFailed,
             .queue_family_index = 0,
         };
         errdefer self.deinit();
@@ -37,16 +45,51 @@ pub const Context = struct {
         return self;
     }
 
+    /// Call only once the session that took the queue lock has been
+    /// destroyed.
     pub fn deinit(self: *Context) void {
-        if (self.device != null) c.vkDestroyDevice(self.device, null);
-        if (!util.isNullHandle(self.surface)) {
-            c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
+        // Objects that an abandoned session kept are children of the device
+        // and the surface, which then stay until the process exits, as does
+        // their instance.
+        if (!render_target.graphicsKept()) {
+            if (self.device != null) c.vkDestroyDevice(self.device, null);
+            if (!util.isNullHandle(self.surface)) {
+                c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
+            }
+            if (self.instance != null) c.vkDestroyInstance(self.instance, null);
         }
-        if (self.instance != null) c.vkDestroyInstance(self.instance, null);
+        c.SDL_DestroyMutex(self.queue_mutex);
     }
 
+    /// Holds the queue for one call on it.
+    pub fn lockQueue(self: *const Context) void {
+        c.SDL_LockMutex(self.queue_mutex);
+    }
+
+    pub fn unlockQueue(self: *const Context) void {
+        c.SDL_UnlockMutex(self.queue_mutex);
+    }
+
+    /// The session's lock on `queue`, which takes `queue_mutex`.
+    pub fn queueLock(self: *const Context) maplibre.QueueLock {
+        return .{ .context = self.queue_mutex, .lock = lockMutex, .unlock = unlockMutex };
+    }
+
+    fn lockMutex(mutex: ?*anyopaque) maplibre.Error!void {
+        c.SDL_LockMutex(@ptrCast(mutex));
+    }
+
+    fn unlockMutex(mutex: ?*anyopaque) maplibre.Error!void {
+        c.SDL_UnlockMutex(@ptrCast(mutex));
+    }
+
+    /// Waits for the device. Call only once the session submits nothing
+    /// more.
     pub fn waitIdle(self: *Context) void {
-        if (self.device != null) _ = c.vkDeviceWaitIdle(self.device);
+        if (self.device == null) return;
+        self.lockQueue();
+        defer self.unlockQueue();
+        _ = c.vkDeviceWaitIdle(self.device);
     }
 
     fn createInstance(self: *Context) !void {
@@ -170,7 +213,7 @@ pub const Context = struct {
     }
 
     fn createDevice(self: *Context) !void {
-        var priority: f32 = 1.0;
+        const priority: f32 = 1.0;
         const queue_info = c.VkDeviceQueueCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = null,

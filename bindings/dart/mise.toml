@@ -25,20 +25,6 @@ raw_args = true
 dir = "../.."
 run = "dart format"
 
-[tasks.ffigen]
-run = "dart --packages=.dart_tool/package_config.json tool/ffigen.dart"
-sources = [
-  "tool/ffigen.dart",
-  "hook/build.dart",
-  "lib/src/internal/c/native_asset.dart",
-  "pubspec.yaml",
-  "pubspec.lock",
-  "../../include/maplibre_native_c.h",
-  "../../include/maplibre_native_c/**/*.h",
-  "../../third_party/maplibre-native/include/mln/plugin/plugin_api.h",
-]
-outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
-
 [tasks.api]
 description = "Generate Dart API reference HTML with dart doc."
 run = '''
@@ -140,9 +126,9 @@ dart test
 [tasks."test:download"]
 description = "Test the build hook against a downloaded native snapshot archive."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-# Runs one file rather than the suite, because the rest holds native handles
-# across isolate boundaries. Removing the pointer forces the download; it goes
-# back afterwards so a local prefix survives this task.
+# Runs one file rather than the suite, because what this task checks is the
+# acquisition path rather than binding behavior. Removing the pointer forces the
+# download; it goes back afterwards so a local prefix survives this task.
 run = '''
 pointer=.dart_tool/maplibre_native_install_dir
 saved="$(mktemp)"

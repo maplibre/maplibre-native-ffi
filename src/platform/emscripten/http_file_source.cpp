@@ -16,10 +16,6 @@
 #include <utility>
 #include <vector>
 
-#include <emscripten.h>
-#include <emscripten/fetch.h>
-#include <emscripten/proxying.h>
-#include <emscripten/threading.h>
 #include <mln/storage/http_file_source.hpp>
 #include <mln/storage/resource.hpp>
 #include <mln/storage/resource_options.hpp>
@@ -31,6 +27,11 @@
 #include <mln/util/http_header.hpp>
 #include <mln/util/string.hpp>
 #include <mln/util/util.hpp>
+
+#include <emscripten.h>
+#include <emscripten/fetch.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
 #include <pthread.h>
 
 #include "../offline_url.hpp"
@@ -64,8 +65,6 @@ struct Header {
   std::string value;
 };
 
-// Request headers in the order emscripten_fetch wants them, before they are
-// flattened into its null-terminated name/value array.
 using RequestHeaders = std::vector<std::pair<std::string, std::string>>;
 
 auto responseHeaders(emscripten_fetch_t* fetch) -> std::vector<Header> {
@@ -355,9 +354,7 @@ class FetchRequestState
   void cancel();
 
  private:
-  // Who owns the fetch handle, and therefore who closes it.
   enum class Transport : std::uint8_t {
-    // No handle outstanding.
     None,
     // A fetch is in flight and its terminal callback closes the handle. Set
     // before emscripten_fetch() so the handle has an owner even before the
@@ -645,8 +642,8 @@ void FetchRequestState::cancel() {
     }
     canceled_ = true;
     // Dropping the task also removes any delivery it already queued from the
-    // run loop, so a response cannot sit in the wasm heap awaiting a pump that
-    // will never come.
+    // run loop, so a response cannot remain in the wasm heap after
+    // cancellation.
     callback_ = nullptr;
     delivery = std::move(delivery_);
     if (transport_ == Transport::Callback) {

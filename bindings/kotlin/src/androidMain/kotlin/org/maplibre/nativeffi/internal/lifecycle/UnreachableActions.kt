@@ -62,10 +62,14 @@ internal class UnreachableActions private constructor(threadName: String) {
   private class Registration(
     referent: Any,
     queue: ReferenceQueue<Any>,
-    private val action: Runnable,
+    private var action: Runnable?,
   ) : PhantomReference<Any>(referent, queue) {
     fun run() {
-      action.run()
+      // Older Android releases leave phantom referents set after enqueueing.
+      clear()
+      val task = action ?: return
+      action = null
+      task.run()
     }
   }
 

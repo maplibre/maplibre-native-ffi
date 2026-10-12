@@ -4,7 +4,7 @@ use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawContext, Version};
 use glutin::surface::{Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native_ffi::{NativePointer, OpenGLContextDescriptor, WglContextDescriptor};
+use maplibre_native_ffi::{OpenglContextDescriptor, WglContextDescriptor};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
@@ -28,21 +28,25 @@ impl OpenGLPlatformContext {
     pub fn descriptor(
         &self,
         context: &PossiblyCurrentContext,
-    ) -> Result<OpenGLContextDescriptor, Box<dyn Error>> {
+    ) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
         let RawContext::Wgl(raw_context) = context.raw_context() else {
             return Err("glutin did not create a WGL context".into());
         };
-        Ok(OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
-            unsafe { NativePointer::from_ptr(self.hdc) },
-            unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
-        )))
+        Ok(OpenglContextDescriptor {
+            data: maplibre_native_ffi::OpenglContextDescriptorData::Wgl(WglContextDescriptor {
+                device_context: self.hdc.cast::<std::ffi::c_void>(),
+                share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
+                ..Default::default()
+            }),
+            ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
+        })
     }
 
     pub fn surface_pointer(
         &self,
         _surface: &Surface<WindowSurface>,
-    ) -> Result<NativePointer, Box<dyn Error>> {
-        Ok(unsafe { NativePointer::from_ptr(self.hdc) })
+    ) -> Result<*mut std::ffi::c_void, Box<dyn Error>> {
+        Ok(self.hdc.cast::<std::ffi::c_void>())
     }
 
     pub fn context_api_name(&self) -> &'static str {

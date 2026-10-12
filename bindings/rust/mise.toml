@@ -31,9 +31,9 @@ arg "[profile]" default="dev" {
 '''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
-# The preset selects the runner: Android and OpenHarmony x64 presets push to an
-# emulator, Emscripten presets run as a page in headless Chromium, and host
-# presets run in process.
+# The preset selects the runner: Android presets and OpenHarmony x64 presets
+# push to an emulator, Emscripten presets run as a page in headless Chromium,
+# and host presets run in process.
 run = '''
 case "$usage_preset" in
   android-* | ohos-*)
@@ -43,7 +43,7 @@ case "$usage_preset" in
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
     ;;
   ios-*)
-    echo "The Rust binding has no iOS target; test a host, Android x64, OpenHarmony x64, or Emscripten preset." >&2
+    echo "The Rust binding has no iOS target; test a host, Android, OpenHarmony x64, or Emscripten preset." >&2
     exit 2
     ;;
 esac
@@ -73,11 +73,12 @@ if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
 fi
 export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+# Tests run in parallel: the ones that change process-global state serialize
+# on a lock of their own.
 cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  -- --test-threads=1
+  -p maplibre-native-ffi
 # Clippy is profile-independent. Every other host preset runs it against the
 # dev graph, so the release variant avoids compiling that graph a second time.
 if [[ "$usage_profile" == "dev" ]]; then
@@ -103,8 +104,7 @@ fi
 cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  -- --test-threads=1
+  -p maplibre-native-ffi
 if [[ "$usage_profile" == "dev" ]]; then
   cargo clippy \
     -p maplibre-native-ffi-sys \

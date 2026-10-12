@@ -1,4 +1,4 @@
-// The Vulkan render target: a shared instance/device/queue bridged to the C API
+// The Vulkan render target: a shared instance and device bridged to the C API
 // through the Vulkan context descriptor, plus a fullscreen-triangle compositor
 // over a window swapchain.
 
@@ -24,7 +24,6 @@ static mln_vulkan_context_descriptor vulkan_context_descriptor(
   const vulkan_context* context
 ) {
   return (mln_vulkan_context_descriptor){
-    .size = sizeof(mln_vulkan_context_descriptor),
     .instance = context->instance,
     .physical_device = context->physical_device,
     .device = context->device,
@@ -46,6 +45,7 @@ typedef struct vulkan_compositor {
   bool swapchain_stale;
 } vulkan_compositor;
 
+/// Releases the compositor once the session detached, so nothing else submits.
 static void vulkan_compositor_deinit(vulkan_compositor* compositor) {
   vulkan_context_wait_idle(&compositor->context);
   vulkan_commands_deinit(&compositor->commands, compositor->context.device);
@@ -106,7 +106,10 @@ static void vulkan_compositor_resize(
 static app_error vulkan_compositor_recreate_swapchain(
   vulkan_compositor* compositor
 ) {
-  vulkan_context_wait_idle(&compositor->context);
+  SDL_LockMutex(compositor->context.queue_mutex);
+  const VkResult idle = vkQueueWaitIdle(compositor->context.queue);
+  SDL_UnlockMutex(compositor->context.queue_mutex);
+  MAP_TRY(expect_vk(idle));
   // Create the replacement naming the retired swapchain as oldSwapchain before
   // destroying it: on MoltenVK, destroying first leaves presents that succeed
   // but reach no drawable the window shows.
@@ -190,9 +193,12 @@ static app_error vulkan_compositor_present_image_view(
     &compositor->commands, &compositor->swapchain, &compositor->pipeline,
     image_index
   ));
-  MAP_TRY(vulkan_commands_submit(
+  SDL_LockMutex(compositor->context.queue_mutex);
+  const app_error submitted = vulkan_commands_submit(
     &compositor->commands, compositor->context.queue, image_index
-  ));
+  );
+  SDL_UnlockMutex(compositor->context.queue_mutex);
+  MAP_TRY(submitted);
 
   const VkPresentInfoKHR present_info = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -202,8 +208,10 @@ static app_error vulkan_compositor_present_image_view(
     .pSwapchains = &compositor->swapchain.handle,
     .pImageIndices = &image_index,
   };
+  SDL_LockMutex(compositor->context.queue_mutex);
   const VkResult present =
     vkQueuePresentKHR(compositor->context.queue, &present_info);
+  SDL_UnlockMutex(compositor->context.queue_mutex);
   if (present == VK_ERROR_OUT_OF_DATE_KHR) {
     // Nothing reached the screen, but the sampling pass was submitted; wait it
     // out before the caller releases its frame.
@@ -327,18 +335,48 @@ static app_error borrowed_image_init(
   return error;
 }
 
+/// The images of a borrowed ring, one per slot.
+typedef struct vulkan_ring {
+  borrowed_image images[RING_DEPTH];
+} vulkan_ring;
+
+static void vulkan_ring_deinit(vulkan_ring* ring, VkDevice device) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    borrowed_image_deinit(&ring->images[index], device);
+  }
+}
+
+static app_error vulkan_ring_init(
+  vulkan_ring* ring, const vulkan_context* context, viewport current_viewport
+) {
+  *ring = (vulkan_ring){};
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    const app_error error =
+      borrowed_image_init(&ring->images[index], context, current_viewport);
+    if (error != APP_OK) {
+      vulkan_ring_deinit(ring, context->device);
+      return error;
+    }
+  }
+  return APP_OK;
+}
+
 struct render_target {
   render_target_mode mode;
   render_session session;
   union {
     struct {
       vulkan_compositor compositor;
-      mln_vulkan_owned_texture_frame pending_frame;
-      bool has_pending_frame;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
     } owned;
     struct {
       vulkan_compositor compositor;
-      borrowed_image image;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
+      /// The ring the session renders into.
+      vulkan_ring ring;
+      texture_replacements replacements;
     } borrowed;
     struct {
       vulkan_context context;
@@ -359,6 +397,10 @@ SDL_WindowFlags render_target_window_flags(void) { return SDL_WINDOW_VULKAN; }
 void* render_target_frame_scope_open(void) { return nullptr; }
 
 void render_target_frame_scope_close(void* scope) { (void)scope; }
+
+render_session* render_target_session(render_target* target) {
+  return &target->session;
+}
 
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,
@@ -382,8 +424,8 @@ app_error render_target_init(
         &target->as.borrowed.compositor, window, current_viewport
       );
       if (error == APP_OK) {
-        error = borrowed_image_init(
-          &target->as.borrowed.image, &target->as.borrowed.compositor.context,
+        error = vulkan_ring_init(
+          &target->as.borrowed.ring, &target->as.borrowed.compositor.context,
           current_viewport
         );
         if (error != APP_OK) {
@@ -403,22 +445,17 @@ app_error render_target_init(
   return APP_OK;
 }
 
-static void release_pending_frame(render_target* target) {
-  if (!target->as.owned.has_pending_frame) {
-    return;
-  }
-  const mln_status status = mln_vulkan_owned_texture_release_frame(
-    target->session.handle, &target->as.owned.pending_frame
-  );
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Vulkan texture release failed", status);
-  }
-  target->as.owned.has_pending_frame = false;
-}
-
-static mln_vulkan_borrowed_texture_descriptor borrowed_image_descriptor(
-  render_target* target, viewport current_viewport
+/// Describes ring, whose entries the caller provides storage for.
+static mln_vulkan_borrowed_texture_descriptor borrowed_ring_descriptor(
+  render_target* target, const vulkan_ring* ring, viewport current_viewport,
+  mln_vulkan_borrowed_texture entries[RING_DEPTH]
 ) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    entries[index] = (mln_vulkan_borrowed_texture){
+      .image = vulkan_image_to_abi(ring->images[index].image),
+      .image_view = vulkan_image_view_to_abi(ring->images[index].view),
+    };
+  }
   mln_vulkan_borrowed_texture_descriptor descriptor =
     mln_vulkan_borrowed_texture_descriptor_default();
   descriptor.extent = render_target_extent(current_viewport);
@@ -426,19 +463,40 @@ static mln_vulkan_borrowed_texture_descriptor borrowed_image_descriptor(
   descriptor.physical_height = current_viewport.physical_height;
   descriptor.context =
     vulkan_context_descriptor(&target->as.borrowed.compositor.context);
-  descriptor.image = vulkan_image_to_abi(target->as.borrowed.image.image);
-  descriptor.image_view =
-    vulkan_image_view_to_abi(target->as.borrowed.image.view);
+  descriptor.textures = entries;
+  descriptor.texture_count = RING_DEPTH;
   descriptor.format = borrowed_image_format;
   descriptor.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
   descriptor.final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   return descriptor;
 }
 
+static const vulkan_context* target_context(const render_target* target) {
+  switch (target->mode) {
+    case RENDER_TARGET_MODE_OWNED_TEXTURE:
+      return &target->as.owned.compositor.context;
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      return &target->as.borrowed.compositor.context;
+    case RENDER_TARGET_MODE_NATIVE_SURFACE:
+      return &target->as.surface.context;
+  }
+  return nullptr;
+}
+
 app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
+  awaited_completion attached;
+  mln_completion completion;
+  MAP_TRY(awaited_completion_init(&attached, &completion));
+  // The core worker submits to the host's queue, so it takes the host's queue
+  // lock around each call on it.
+  mln_render_session_attach_options options =
+    render_session_attach_options(target->mode, MLN_RENDER_DRIVER_CORE_WORKER);
+  options.queue_lock = vulkan_context_queue_lock(target_context(target));
   mln_render_session session = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
       mln_vulkan_owned_texture_descriptor descriptor =
@@ -446,28 +504,21 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.owned.compositor.context);
-      const mln_status status =
-        mln_vulkan_owned_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_map_attach_vulkan_owned_texture(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      mln_vulkan_borrowed_texture entries[RING_DEPTH];
       const mln_vulkan_borrowed_texture_descriptor descriptor =
-        borrowed_image_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_vulkan_borrowed_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan borrowed texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+        borrowed_ring_descriptor(
+          target, &target->as.borrowed.ring, current_viewport, entries
+        );
+      status = mln_map_attach_vulkan_borrowed_texture(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       mln_vulkan_surface_descriptor descriptor =
@@ -477,86 +528,105 @@ app_error render_target_attach(
         vulkan_context_descriptor(&target->as.surface.context);
       descriptor.surface =
         vulkan_surface_to_abi(target->as.surface.context.surface);
-      const mln_status status =
-        mln_vulkan_surface_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan surface attach failed", status);
-        return APP_ERROR_SURFACE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
-      return APP_OK;
+      status = mln_map_attach_vulkan_surface(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
+  return render_session_finish_attach(
+    &target->session, session, map, &options, target->mode, &attached, status,
+    &diagnostic
+  );
+}
+
+static void destroy_retired(vulkan_ring* retired, VkDevice device) {
+  vulkan_ring_deinit(retired, device);
+  free(retired);
 }
 
 void render_target_deinit(render_target* target) {
   if (target == nullptr) {
     return;
   }
+  // The compositor waited for its reads of each frame, so the session may
+  // detach, and once it has, nothing else submits.
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      vulkan_context_wait_idle(&target->as.owned.compositor.context);
-      release_pending_frame(target);
+      render_session_release_frame(&target->as.owned.held);
       render_session_close(&target->session);
       vulkan_compositor_deinit(&target->as.owned.compositor);
       break;
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      vulkan_compositor* compositor = &target->as.borrowed.compositor;
+      render_session_release_frame(&target->as.borrowed.held);
       render_session_close(&target->session);
-      borrowed_image_deinit(
-        &target->as.borrowed.image,
-        target->as.borrowed.compositor.context.device
-      );
-      vulkan_compositor_deinit(&target->as.borrowed.compositor);
+      while (true) {
+        vulkan_ring* retired = nullptr;
+        texture_replacements_take_any(
+          &target->as.borrowed.replacements, (void**)&retired
+        );
+        if (retired == nullptr) break;
+        destroy_retired(retired, compositor->context.device);
+      }
+      vulkan_ring_deinit(&target->as.borrowed.ring, compositor->context.device);
+      vulkan_compositor_deinit(compositor);
       break;
+    }
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      vulkan_context_wait_idle(&target->as.surface.context);
       render_session_close(&target->session);
+      vulkan_context_wait_idle(&target->as.surface.context);
       vulkan_context_deinit(&target->as.surface.context);
       break;
   }
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode: allocates an image at
-/// the new size and hands it to the live session, which stays attached.
+/// Follows a resized window in borrowed-texture mode: allocates a ring at the
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
+/// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
-  if (target->session.kind != RENDER_SESSION_TEXTURE) {
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
+  vulkan_compositor* compositor = &target->as.borrowed.compositor;
+  vulkan_compositor_resize(compositor, current_viewport);
+  render_session_release_frame(&target->as.borrowed.held);
+  vulkan_ring* retired = malloc(sizeof(vulkan_ring));
+  if (retired == nullptr) return APP_ERROR_RESIZE_FAILED;
+  vulkan_ring replacement;
+  const app_error error =
+    vulkan_ring_init(&replacement, &compositor->context, current_viewport);
+  if (error != APP_OK) {
+    free(retired);
+    return error;
   }
-  vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
-  vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport);
-
-  borrowed_image previous = target->as.borrowed.image;
-  borrowed_image replacement;
-  MAP_TRY(borrowed_image_init(
-    &replacement, &target->as.borrowed.compositor.context, current_viewport
-  ));
-  target->as.borrowed.image = replacement;
-  const mln_vulkan_borrowed_texture_descriptor descriptor =
-    borrowed_image_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_vulkan_borrowed_texture_set_target(target->session.handle, &descriptor);
-  if (status != MLN_STATUS_OK) {
-    // The session may have taken the replacement before failing, so detach
-    // before either image is released.
-    mln_render_session_detach(target->session.handle);
-    diagnostics_log_status("Vulkan borrowed texture set target failed", status);
-    target->as.borrowed.image = previous;
-    borrowed_image_deinit(
-      &replacement, target->as.borrowed.compositor.context.device
+  *retired = target->as.borrowed.ring;
+  mln_completion completion;
+  texture_replacement* entry = texture_replacement_begin(retired, &completion);
+  mln_status status = MLN_STATUS_INVALID_STATE;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  if (entry != nullptr) {
+    mln_vulkan_borrowed_texture entries[RING_DEPTH];
+    const mln_vulkan_borrowed_texture_descriptor descriptor =
+      borrowed_ring_descriptor(target, &replacement, current_viewport, entries);
+    status = mln_render_session_set_vulkan_borrowed_texture_target(
+      target->session.handle, &descriptor, &completion, &diagnostic
     );
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
+    texture_replacements_queue(
+      &target->as.borrowed.replacements, entry, status
+    );
   }
-  // Released only once the session has taken the replacement.
-  borrowed_image_deinit(
-    &previous, target->as.borrowed.compositor.context.device
-  );
-  return APP_OK;
+  if (status != MLN_STATUS_OK) {
+    vulkan_ring_deinit(&replacement, compositor->context.device);
+    free(retired);
+    diagnostics_log_status(
+      "Vulkan borrowed texture set target failed", status, &diagnostic
+    );
+    return APP_ERROR_RESIZE_FAILED;
+  }
+  target->as.borrowed.ring = replacement;
+  return render_session_resize_map(&target->session, current_viewport);
 }
 
 app_error render_target_resize(
@@ -564,9 +634,9 @@ app_error render_target_resize(
 ) {
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      vulkan_context_wait_idle(&target->as.owned.compositor.context);
-      release_pending_frame(target);
       vulkan_compositor_resize(&target->as.owned.compositor, current_viewport);
+      // A session resizes only while the host holds none of its frames.
+      render_session_release_frame(&target->as.owned.held);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
@@ -576,93 +646,81 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_finish_frame(render_target* target) {
-  switch (target->mode) {
-    case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      if (!target->as.owned.has_pending_frame) {
-        return APP_OK;
-      }
-      MAP_TRY(vulkan_compositor_wait_for_frame(&target->as.owned.compositor));
-      release_pending_frame(target);
-      return APP_OK;
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      return vulkan_compositor_wait_for_frame(&target->as.borrowed.compositor);
-    case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      return APP_OK;
+/// Destroys each ring that a completed replacement retired. The session
+/// stopped rendering into it when the replacement completed, and the
+/// compositor waited for its own reads before the held frame was released.
+app_error render_target_retire_replaced(render_target* target) {
+  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) return APP_OK;
+  vulkan_compositor* compositor = &target->as.borrowed.compositor;
+  while (true) {
+    vulkan_ring* retired = nullptr;
+    MAP_TRY(texture_replacements_take_completed(
+      &target->as.borrowed.replacements, &target->session, (void**)&retired
+    ));
+    if (retired == nullptr) return APP_OK;
+    destroy_retired(retired, compositor->context.device);
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-static app_error render_update_owned(
-  render_target* target, bool* out_completed
+/// Samples image_view into the window and waits for the sampling pass, so the
+/// caller may hand the image back to the session.
+static app_error present_image_view(
+  vulkan_compositor* compositor, VkImageView image_view, bool* out_presented
 ) {
-  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  MAP_TRY(render_session_render_update(&target->session, &result));
-  if (result != MLN_RENDER_RESULT_RENDERED) {
-    *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-    return APP_OK;
-  }
+  MAP_TRY(
+    vulkan_compositor_present_image_view(compositor, image_view, out_presented)
+  );
+  return vulkan_compositor_wait_for_frame(compositor);
+}
 
-  mln_vulkan_owned_texture_frame frame = {.size = sizeof(frame)};
-  const mln_status status =
-    mln_vulkan_owned_texture_acquire_frame(target->session.handle, &frame);
-  if (status == MLN_STATUS_INVALID_STATE) {
+/// Acquires the newest frame into *held and samples its image into the
+/// window. Both texture modes hand their frames over this way.
+static app_error present_acquired(
+  render_target* target, vulkan_compositor* compositor,
+  mln_acquired_frame* held, bool* out_presented
+) {
+  bool acquired = false;
+  MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
+  if (!acquired) {
+    // The window keeps the frame it already shows.
+    *out_presented = true;
     return APP_OK;
   }
+  MAP_TRY(render_session_require_cpu_complete_producer(
+    *held, "Vulkan texture acquire failed"
+  ));
+  mln_vulkan_texture_frame frame = {.size = sizeof(frame)};
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_acquired_frame_get_vulkan_texture(*held, &frame, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Vulkan texture acquire failed", status);
+    diagnostics_log_status("Vulkan texture access failed", status, &diagnostic);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-
-  bool presented = false;
-  const app_error error = vulkan_compositor_present_image_view(
-    &target->as.owned.compositor, vulkan_image_view_from_abi(frame.image_view),
-    &presented
+  return present_image_view(
+    compositor, vulkan_image_view_from_abi(frame.image_view), out_presented
   );
-  if (error != APP_OK || !presented) {
-    const mln_status release_status =
-      mln_vulkan_owned_texture_release_frame(target->session.handle, &frame);
-    if (release_status != MLN_STATUS_OK) {
-      diagnostics_log_status("Vulkan texture release failed", release_status);
-    }
-    return error;
-  }
-
-  // The frame stays acquired until the compositor's fence proves the sampling
-  // pass finished; finish_frame releases it.
-  target->as.owned.pending_frame = frame;
-  target->as.owned.has_pending_frame = true;
-  *out_completed = true;
-  return APP_OK;
 }
 
-app_error render_target_render_update(
+app_error render_target_present(
   render_target* target, [[maybe_unused]] viewport current_viewport,
-  bool* out_completed
+  bool* out_presented
 ) {
-  *out_completed = false;
+  *out_presented = false;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return render_update_owned(target, out_completed);
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      if (result != MLN_RENDER_RESULT_RENDERED) {
-        *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-        return APP_OK;
-      }
-      MAP_TRY(vulkan_compositor_present_image_view(
-        &target->as.borrowed.compositor, target->as.borrowed.image.view,
-        out_completed
-      ));
+      return present_acquired(
+        target, &target->as.owned.compositor, &target->as.owned.held,
+        out_presented
+      );
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      return present_acquired(
+        target, &target->as.borrowed.compositor, &target->as.borrowed.held,
+        out_presented
+      );
+    case RENDER_TARGET_MODE_NATIVE_SURFACE:
+      *out_presented = true;
       return APP_OK;
-    }
-    case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-      return APP_OK;
-    }
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }

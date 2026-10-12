@@ -10,40 +10,26 @@ const char* app_error_name(app_error error) {
       return "runtime create failed";
     case APP_ERROR_MAP_CREATE_FAILED:
       return "map create failed";
-    case APP_ERROR_TEXTURE_ATTACH_FAILED:
-      return "texture attach failed";
+    case APP_ERROR_ATTACH_FAILED:
+      return "render target attach failed";
     case APP_ERROR_STYLE_LOAD_FAILED:
       return "style load failed";
-    case APP_ERROR_CAMERA_JUMP_FAILED:
-      return "camera jump failed";
     case APP_ERROR_CAMERA_COMMAND_FAILED:
       return "camera command failed";
-    case APP_ERROR_TEXTURE_RESIZE_FAILED:
-      return "texture resize failed";
-    case APP_ERROR_TEXTURE_RENDER_FAILED:
-      return "texture render failed";
-    case APP_ERROR_SURFACE_ATTACH_FAILED:
-      return "surface attach failed";
-    case APP_ERROR_SURFACE_RESIZE_FAILED:
-      return "surface resize failed";
-    case APP_ERROR_SURFACE_RENDER_FAILED:
-      return "surface render failed";
+    case APP_ERROR_RESIZE_FAILED:
+      return "render target resize failed";
+    case APP_ERROR_RENDER_FAILED:
+      return "render failed";
     case APP_ERROR_BACKEND_SETUP_FAILED:
       return "backend setup failed";
     case APP_ERROR_BACKEND_DRAW_FAILED:
       return "backend draw failed";
     case APP_ERROR_RENDER_BACKEND_MISMATCH:
       return "render backend mismatch";
-    case APP_ERROR_WAKE_SOURCE_FAILED:
-      return "wake source acquire failed";
-    case APP_ERROR_RUNTIME_PUMP_FAILED:
-      return "runtime pump failed";
-    case APP_ERROR_EVENT_MASK_FAILED:
-      return "event mask select failed";
     case APP_ERROR_EVENT_DRAIN_FAILED:
       return "event drain failed";
-    case APP_ERROR_THREAD_SPAWN_FAILED:
-      return "thread spawn failed";
+    case APP_ERROR_SMOKE_FRAME_TIMED_OUT:
+      return "no frame rendered within the smoke timeout";
   }
   return "unknown error";
 }

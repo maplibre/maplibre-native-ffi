@@ -67,6 +67,10 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.MemoryUtil.memAddress
 
+/**
+ * Lends the session a ring of OpenGL ES textures imported from Skiko Metal textures through ANGLE,
+ * and draws the Metal textures.
+ */
 internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-mac-opengl-renderer")
@@ -77,22 +81,11 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       rendererDispatcher.close()
       throw error
     }
-  private var metalTexture = NativeHandle(0)
-  private var metalDevice = NativeHandle(0)
-  private var pixelFormat = 0L
-  private var importedTexture: MacAngleImportedTexture? = null
+  private val ring = MacMetalTextureRing()
+
+  // One import per texture of the ring, in slot order.
+  private var importedTextures: List<MacAngleImportedTexture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
-
-  // Read on the Compose thread while the renderer thread writes them.
-  @Volatile private var generation = 0L
-  @Volatile private var renderedGeneration = 0L
-
-  // The Metal texture a frame last landed in, kept alive until one lands in its replacement. Skiko
-  // allocates a new texture for every resize and the map needs a frame or two to fill it, so this
-  // is what the consumer draws in between.
-  private var retiredTexture = NativeHandle(0)
-  private var retiredPixelFormat = 0L
-  @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
@@ -112,12 +105,11 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   }
 
   private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
-    if (extent == currentExtent && importedTexture != null) {
+    if (extent == currentExtent && importedTextures.isNotEmpty()) {
       return
     }
-    recreateTexture(extent, skikoDevice)
+    recreateTextures(extent, skikoDevice)
     currentExtent = extent
-    generation += 1
   }
 
   override fun acquireFrame(
@@ -127,22 +119,22 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   ): NativeSurfaceFrame {
     // Resized here so the Skiko device is resolved on this thread: resolving it reaches the event
     // dispatch thread, and asking from the renderer thread would leave each waiting on the other.
-    if (importedTexture == null || extent != currentExtent) {
+    if (importedTextures.isEmpty() || extent != currentExtent) {
       resize(extent)
     }
     return rendererDispatcher.run {
+      check(importedTextures.isNotEmpty()) { "ANGLE texture is not initialized" }
       NativeSurfaceFrameLease(
         frameId = frameId,
         extent = extent,
-        target = target(generation),
+        target = MacAngleImportedTexture.ringTarget(importedTextures, ring.generation),
         presentationTimeNanos = presentationTimeNanos,
       )
     }
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    renderedGeneration = frame.target.generation
-    rendererDispatcher.run { egl.waitIdle() }
+    ring.markRendered(frame.target.generation)
   }
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
@@ -150,38 +142,13 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture: NativeHandle
-    val format: Long
-    when (target.generation) {
-      generation -> {
-        texture = metalTexture
-        format = pixelFormat
-      }
-      retiredGeneration -> {
-        texture = retiredTexture
-        format = retiredPixelFormat
-      }
-      else -> return false
-    }
-    if (texture.address == 0L) {
-      return false
-    }
-    return SkikoHost.drawMetalTexture(
-      scope,
-      MetalTextureTarget(
-        texture = texture,
-        device = metalDevice,
-        pixelFormat = format,
-        origin = TextureOrigin.BOTTOM_LEFT,
-        extent = target.extent,
-        generation = target.generation,
-      ),
-    )
+    val drawable = ring.drawable(target, TextureOrigin.BOTTOM_LEFT) ?: return false
+    return SkikoHost.drawMetalTexture(scope, drawable)
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
     rendererDispatcher.run {
-      releaseRetiredOnceReplaced()
+      ring.releaseRetiredOnceReplaced()
       MacMetalBridgeNative.runInAutoreleasePool(action)
     }
 
@@ -190,7 +157,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   override fun close() {
     try {
       rendererDispatcher.run {
-        disposeTexture()
+        disposeTextures()
         egl.close()
       }
     } finally {
@@ -198,114 +165,40 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(importedTexture) { "ANGLE texture is not initialized" }.target(generation)
-
-  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
+  private fun recreateTextures(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
     if (extent.isEmpty) {
-      disposeTexture()
+      disposeTextures()
       return
     }
-
-    val oldTexture = metalTexture
-    val oldPixelFormat = pixelFormat
     // Resolved by the caller: asking Skiko from the renderer thread waits on the event dispatch
     // thread, which is already waiting on this one.
     val requiredMetalDevice =
       checkNotNull(skikoDevice) { "The Skiko Metal device is resolved before this hop" }
-    // Only the device that allocated a texture can take it back, so a Skiko device change
-    // allocates rather than reusing.
-    val reusableTexture =
-      if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
-    val newTextureAddress =
-      MacMetalBridgeNative.createMetalTexture(
-        metalDevice = requiredMetalDevice.ptr,
-        oldTexture = reusableTexture,
-        width = extent.physicalWidth,
-        height = extent.physicalHeight,
-      )
-    val newTexture = NativeHandle(newTextureAddress)
-    if (newTexture == oldTexture && importedTexture != null) {
-      return
-    }
-
-    importedTexture?.close()
-    importedTexture = null
-    if (newTexture != oldTexture) {
-      retire(
-        oldTexture,
-        oldPixelFormat,
-        deviceChanged = metalDevice.address != requiredMetalDevice.ptr,
-      )
-    }
-    metalTexture = newTexture
-    metalDevice = NativeHandle(requiredMetalDevice.ptr)
-    pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
+    closeImports()
+    ring.allocate(extent, requiredMetalDevice)
     try {
-      importedTexture = egl.createImportedTexture(newTexture, extent)
+      val imported = mutableListOf<MacAngleImportedTexture>()
+      try {
+        ring.textures.forEach { imported += egl.createImportedTexture(it, extent) }
+      } catch (error: RuntimeException) {
+        imported.forEach(MacAngleImportedTexture::close)
+        throw error
+      }
+      importedTextures = imported
     } catch (error: RuntimeException) {
-      disposeTexture()
+      disposeTextures()
       throw error
     }
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement is still empty. A
-  // texture from a device Skiko has replaced cannot be drawn on the new one.
-  private fun retire(outgoing: NativeHandle, outgoingPixelFormat: Long, deviceChanged: Boolean) {
-    if (outgoing.address == 0L) {
-      return
-    }
-    if (deviceChanged) {
-      // Both belong to the device Skiko replaced.
-      releaseMetalTexture(outgoing)
-      releaseMetalTexture(retiredTexture)
-      retiredTexture = NativeHandle(0)
-      retiredPixelFormat = 0
-      retiredGeneration = 0
-      return
-    }
-    if (renderedGeneration != generation) {
-      // This one never held a frame, so whatever is already retired stays.
-      releaseMetalTexture(outgoing)
-      return
-    }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = outgoing
-    retiredPixelFormat = outgoingPixelFormat
-    retiredGeneration = generation
+  private fun closeImports() {
+    importedTextures.forEach(MacAngleImportedTexture::close)
+    importedTextures = emptyList()
   }
 
-  // Released a frame after the replacement rendered, so the consumer's last recorded frame from
-  // the retired texture has been flushed.
-  private fun releaseRetiredOnceReplaced() {
-    if (retiredTexture.address == 0L || renderedGeneration != generation) {
-      return
-    }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
-    retiredPixelFormat = 0
-    retiredGeneration = 0
-  }
-
-  private fun disposeTexture() {
-    importedTexture?.close()
-    importedTexture = null
-    releaseMetalTexture(metalTexture)
-    metalTexture = NativeHandle(0)
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
-    retiredPixelFormat = 0
-    retiredGeneration = 0
-    metalDevice = NativeHandle(0)
-    pixelFormat = 0
-  }
-
-  private fun releaseMetalTexture(texture: NativeHandle) {
-    if (texture.address == 0L) {
-      return
-    }
-    SkikoHost.forgetMetalTexture(texture)
-    MacMetalBridgeNative.disposeMetalTexture(texture.address)
+  private fun disposeTextures() {
+    closeImports()
+    ring.dispose()
   }
 }
 
@@ -344,7 +237,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
       ?: run { glesCapabilities = GLES.createCapabilities() }
   }
 
-  fun waitIdle() {
+  private fun waitIdle() {
     if (shareContext == EGL_NO_CONTEXT) {
       return
     }
@@ -547,17 +440,6 @@ private constructor(
   private var image = NULL
   private var texture = 0
 
-  fun target(generation: Long): OpenGlTextureTarget =
-    OpenGlTextureTarget(
-      context = context.handles,
-      textureName = texture,
-      textureTarget = GL_TEXTURE_2D,
-      format = GL_BGRA8_EXT,
-      contextProvider = OpenGlContextProvider { context.makeCurrent() },
-      extent = extent,
-      generation = generation,
-    )
-
   private fun create() {
     context.makeCurrent()
     image = context.createMetalImage(metalTexture)
@@ -587,6 +469,21 @@ private constructor(
   }
 
   companion object {
+    /** The target of a ring of imported textures, one per slot in slot order. */
+    fun ringTarget(ring: List<MacAngleImportedTexture>, generation: Long): OpenGlTextureTarget {
+      val front = ring.first()
+      return OpenGlTextureTarget(
+        context = front.context.handles,
+        textureName = front.texture,
+        textureTarget = GL_TEXTURE_2D,
+        format = GL_BGRA8_EXT,
+        contextProvider = OpenGlContextProvider { front.context.makeCurrent() },
+        extent = front.extent,
+        generation = generation,
+        ring = ring.map { it.texture },
+      )
+    }
+
     fun create(
       context: MacAngleEglContext,
       metalTexture: NativeHandle,

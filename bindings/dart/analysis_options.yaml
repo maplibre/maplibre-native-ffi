@@ -2,7 +2,6 @@ include: package:lints/recommended.yaml
 
 analyzer:
   exclude:
-    - lib/src/internal/c/*.g.dart
     - tool/flutter_smoke/**
   language:
     strict-casts: true

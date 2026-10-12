@@ -15,22 +15,18 @@ feature's data, allowing one rule to style every feature. A property value
 belongs to the loaded style. Set it again after every later style load, as
 [Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
-Style properties use style-spec JSON values. A constant is a scalar, and an
-expression is an array whose first element names the operator. The remaining
-elements are its arguments. The C API accepts the complete UTF-8 JSON value as
-one buffer view.
+Style properties use style-spec JSON values. An expression is an array whose
+first element names the operator and whose remaining elements are its arguments.
 
 <Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
 
 `["get", "mag"]` reads the feature property named `mag`, and `["linear"]`
-names the interpolation curve. The snippet embeds both in the complete
-expression.
+selects linear interpolation.
 
 <Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
 
-The stop pairs scale a circle from 4 pixels at magnitude 1 to 24 pixels at
-magnitude 6. A buffer view carries the expression without rebuilding its nodes at
-the C boundary.
+Interpolate the circle radius from 4 pixels at magnitude 1 to 24 pixels at
+magnitude 6.
 
 <Code code={region(styleByData, "property")} lang="c" title="style-by-data.c" />
 
@@ -39,15 +35,14 @@ one that the style specification defines for that layer's type.
 
 <Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
-A filter is a boolean expression that selects the source features to draw. It
-uses the same value representation as a style property. An empty filter clears
-the layer's filter. The snippet passes the complete filter expression.
+Set a filter to select which source features the layer draws. It uses the same
+JSON representation as a style property.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
 The host owns the byte storage. MapLibre parses or copies a property value or
 filter before the call returns.
 
-Both calls run on the map's owner thread and apply to the live style
-immediately. A host that pumps the runtime and renders on update draws the new
-appearance in its next frame.
+Render the next map update to show the new appearance. The
+[style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines property
+and filter commands.

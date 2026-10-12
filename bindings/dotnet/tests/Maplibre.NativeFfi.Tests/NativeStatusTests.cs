@@ -1,6 +1,5 @@
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Loader;
 using Maplibre.NativeFfi.Internal.Status;
 using Xunit;
 
@@ -8,7 +7,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class NativeStatusTests
 {
-    [BindingSpecTest("BND-020")]
     [Theory]
     [InlineData(
         (int)mln_status.MLN_STATUS_INVALID_ARGUMENT,
@@ -35,17 +33,34 @@ public sealed class NativeStatusTests
         MaplibreStatus.NativeError,
         typeof(NativeErrorException)
     )]
+    [InlineData((int)mln_status.MLN_STATUS_BUSY, MaplibreStatus.Busy, typeof(MaplibreException))]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_TARGET_LOST,
+        MaplibreStatus.TargetLost,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_READY,
+        MaplibreStatus.NotReady,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_FOUND,
+        MaplibreStatus.NotFound,
+        typeof(MaplibreException)
+    )]
+    // A status this binding predates keeps its raw value.
+    [InlineData(-12_345, MaplibreStatus.Unknown, typeof(MaplibreException))]
     public void NativeStatusesMapToPublicExceptionCategories(
         int rawStatus,
         MaplibreStatus expectedStatus,
         Type expectedExceptionType
     )
     {
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() =>
-            "mapped diagnostic"
+        var error = Assert.Throws(
+            expectedExceptionType,
+            () => NativeStatus.Check(rawStatus, "mapped diagnostic")
         );
-
-        var error = Assert.Throws(expectedExceptionType, () => NativeStatus.Check(rawStatus));
         var maplibreError = Assert.IsAssignableFrom<MaplibreException>(error);
 
         Assert.Equal(expectedStatus, maplibreError.Status);
@@ -53,50 +68,15 @@ public sealed class NativeStatusTests
         Assert.Equal("mapped diagnostic", maplibreError.Diagnostic);
     }
 
-    [BindingSpecTest("BND-020", "BND-022")]
     [Fact]
-    public void NativeInvalidStatusMapsToExceptionWithCopiedDiagnostic()
+    public void ANativeFailureRaisesItsStatusWithTheCallDiagnostic()
     {
-        NativeLibraryLoader.EnsureLoaded();
-
         var error = Assert.Throws<InvalidArgumentException>(() =>
-            NativeStatus.Check(NativeMethods.mln_network_status_set(999_999))
+            Maplibre.NetworkSetStatus((NetworkStatus)999_999)
         );
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
         Assert.Equal((int)mln_status.MLN_STATUS_INVALID_ARGUMENT, error.RawStatus);
         Assert.Contains("network status", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [BindingSpecTest("BND-021")]
-    [Fact]
-    public void UnknownNativeStatusPreservesRawStatus()
-    {
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() => "future status");
-
-        var error = Assert.Throws<MaplibreException>(() => NativeStatus.Check(-12_345));
-
-        Assert.Equal(MaplibreStatus.Unknown, error.Status);
-        Assert.Equal(-12_345, error.RawStatus);
-        Assert.Equal("future status", error.Diagnostic);
-    }
-
-    [BindingSpecTest("BND-022")]
-    [Fact]
-    public void DiagnosticIsCopiedBeforeLaterFailureChangesThreadLocalMessage()
-    {
-        var nextDiagnostic = "first diagnostic";
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() => nextDiagnostic);
-
-        var first = Assert.Throws<NativeErrorException>(() =>
-            NativeStatus.Check(mln_status.MLN_STATUS_NATIVE_ERROR)
-        );
-
-        nextDiagnostic = "second diagnostic";
-        Assert.Throws<UnsupportedFeatureException>(() =>
-            NativeStatus.Check(mln_status.MLN_STATUS_UNSUPPORTED)
-        );
-
-        Assert.Equal("first diagnostic", first.Diagnostic);
     }
 }

@@ -1,935 +1,298 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Resource;
-using Maplibre.NativeFfi.Runtime;
+using Maplibre.NativeFfi.Internal.Memory;
+using Maplibre.NativeFfi.Internal.Pointer;
+using Maplibre.NativeFfi.Internal.Struct;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-#pragma warning disable xUnit1031, xUnit1051
-
-public sealed unsafe class ResourceProviderTests
+public sealed class ResourceProviderTests
 {
-    private const string StyleUrl = "https://example.test/style.json";
-    private const string StyleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}";
-
-    [Fact]
-    public void ResourceProviderCopiesRequestAndReturnsDecision()
-    {
-        ResourceRequest? copiedRequest = null;
-        using var state = new ResourceProviderState(
-            (request, handle) =>
-            {
-                copiedRequest = request;
-                Assert.False(handle.IsClosed);
-                return ResourceProviderDecision.PassThrough;
-            }
-        );
-
-        var requestedUrl = Encoding.UTF8.GetBytes("maplibre://tiles/2/1/1.pbf\0");
-        var resolvedUrl = Encoding.UTF8.GetBytes("https://example.test/tile\0");
-        var etag = Encoding.UTF8.GetBytes("etag-1\0");
-        var priorData = new byte[] { 1, 2, 3 };
-        fixed (byte* requestedUrlPointer = requestedUrl)
-        fixed (byte* resolvedUrlPointer = resolvedUrl)
-        fixed (byte* etagPointer = etag)
-        fixed (byte* priorDataPointer = priorData)
-        {
-            var request = new mln_resource_request
-            {
-                requested_url = (sbyte*)requestedUrlPointer,
-                resolved_url = (sbyte*)resolvedUrlPointer,
-                kind = (uint)ResourceKind.Tile,
-                loading_method = (uint)ResourceLoadingMethod.NetworkOnly,
-                priority = (uint)ResourcePriority.Low,
-                usage = (uint)ResourceUsage.Offline,
-                storage_policy = (uint)ResourceStoragePolicy.Volatile,
-                has_range = 1,
-                range_start = 10,
-                range_end = 20,
-                has_prior_modified = 1,
-                prior_modified_unix_ms = 1234,
-                has_prior_expires = 1,
-                prior_expires_unix_ms = 5678,
-                prior_etag = (sbyte*)etagPointer,
-                prior_data = priorDataPointer,
-                prior_data_size = (nuint)priorData.Length,
-            };
-
-            var decision = state.HandleForTest(&request);
-
-            Assert.Equal((uint)ResourceProviderDecision.PassThrough, decision);
-        }
-
-        Assert.NotNull(copiedRequest);
-        Assert.Equal(ResourceKind.Tile, copiedRequest.Kind);
-        Assert.Equal("maplibre://tiles/2/1/1.pbf", copiedRequest.RequestedUrl);
-        Assert.Equal("https://example.test/tile", copiedRequest.ResolvedUrl);
-        Assert.Equal(ResourceLoadingMethod.NetworkOnly, copiedRequest.LoadingMethod);
-        Assert.Equal(ResourcePriority.Low, copiedRequest.Priority);
-        Assert.Equal(ResourceUsage.Offline, copiedRequest.Usage);
-        Assert.Equal(ResourceStoragePolicy.Volatile, copiedRequest.StoragePolicy);
-        Assert.Equal(new ByteRange(10, 20), copiedRequest.Range);
-        Assert.Equal(10u, copiedRequest.Range?.Start);
-        Assert.Equal(20u, copiedRequest.Range?.End);
-        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1234), copiedRequest.PriorModified);
-        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(5678), copiedRequest.PriorExpires);
-        Assert.Equal("etag-1", copiedRequest.PriorEtag);
-        Assert.Equal(3u, copiedRequest.PriorDataSize);
-        Assert.Equal([1, 2, 3], copiedRequest.PriorData);
-    }
-
-    [BindingSpecTest("BND-069", "BND-141")]
-    [Fact]
-    public void ResourceRequestSnapshotsPriorDataAndReturnsCopies()
-    {
-        var source = new byte[] { 1, 2, 3 };
-        var request = new ResourceRequest(
-            ResourceKind.Tile,
-            "https://example.test/tile",
-            "https://example.test/tile",
-            ResourceLoadingMethod.All,
-            ResourcePriority.Regular,
-            ResourceUsage.Online,
-            ResourceStoragePolicy.Permanent,
-            null,
-            null,
-            null,
-            null,
-            (ulong)source.Length,
-            source
-        );
-        source[0] = 9;
-
-        var first = request.PriorData;
-        Assert.Equal([1, 2, 3], first);
-        first![0] = 8;
-        Assert.Equal([1, 2, 3], request.PriorData);
-    }
-
-    [BindingSpecTest("BND-142", "BND-147", "BND-151")]
-    [Fact]
-    public void PassThroughFinalizationClosesRequestHandleBeforeNativeRelease()
-    {
-        var handle = new ResourceRequestHandle(SyntheticHandles.ResourceRequest(1234));
-
-        var decision = handle.FinishProviderDecision(ResourceProviderDecision.PassThrough);
-
-        Assert.Equal((uint)ResourceProviderDecision.PassThrough, decision);
-        Assert.True(handle.IsClosed);
-        var completeError = Assert.Throws<InvalidStateException>(() =>
-            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
-        );
-        Assert.Equal(MaplibreStatus.InvalidState, completeError.Status);
-        var cancelledError = Assert.Throws<InvalidStateException>(() => handle.IsCancelled());
-        Assert.Equal(MaplibreStatus.InvalidState, cancelledError.Status);
-        handle.Close();
-    }
-
-    [BindingSpecTest("BND-121")]
-    [Fact]
-    public void UnknownProviderDecisionReturnsErrorDecisionPath()
-    {
-        var handle = new ResourceRequestHandle(SyntheticHandles.ResourceRequest(1234));
-
-        var decision = handle.FinishProviderDecision((ResourceProviderDecision)999);
-
-        Assert.Equal(uint.MaxValue, decision);
-        Assert.True(handle.IsClosed);
-    }
-
-    [BindingSpecTest("BND-146", "BND-152")]
-    [Fact]
-    public void CompletionThatReachesNativeIsTerminalWhenNativeReturnsError()
-    {
-        var completeCalls = 0;
-        var releaseCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            (_, _) =>
-            {
-                completeCalls++;
-                return mln_status.MLN_STATUS_INVALID_STATE;
-            },
-            (_, cancelled) =>
-            {
-                *cancelled = false;
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => releaseCalls++
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-
-        var error = Assert.Throws<InvalidStateException>(() =>
-            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.True(handle.IsClosed);
-        Assert.Equal(1, completeCalls);
-        Assert.Equal(1, releaseCalls);
-        var secondError = Assert.Throws<InvalidStateException>(() =>
-            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
-        );
-        Assert.Null(secondError.RawStatus);
-        Assert.Equal(1, completeCalls);
-        Assert.Equal(1, releaseCalls);
-    }
-
-    [BindingSpecTest("BND-145", "BND-153")]
-    [Fact]
-    public void CloseWaitsForInFlightCompletionBeforeNativeRelease()
-    {
-        using var completionStarted = new ManualResetEventSlim(false);
-        using var allowCompletion = new ManualResetEventSlim(false);
-        var completeCalls = 0;
-        var releaseCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            (_, _) =>
-            {
-                completeCalls++;
-                completionStarted.Set();
-                Assert.True(allowCompletion.Wait(TimeSpan.FromSeconds(5)));
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, cancelled) =>
-            {
-                *cancelled = false;
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => releaseCalls++
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-
-        var complete = Task.Run(() =>
-            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
-        );
-        Assert.True(completionStarted.Wait(TimeSpan.FromSeconds(5)));
-
-        var close = Task.Run(handle.Close);
-        Assert.False(close.Wait(TimeSpan.FromMilliseconds(50)));
-        Assert.Equal(0, Volatile.Read(ref releaseCalls));
-
-        allowCompletion.Set();
-        complete.GetAwaiter().GetResult();
-        close.GetAwaiter().GetResult();
-
-        Assert.True(handle.IsClosed);
-        Assert.Equal(1, completeCalls);
-        Assert.Equal(1, releaseCalls);
-    }
-
-    [BindingSpecTest("BND-153")]
-    [Fact]
-    public void CloseWaitsForInFlightCancellationCheckBeforeNativeRelease()
-    {
-        using var cancellationStarted = new ManualResetEventSlim(false);
-        using var allowCancellation = new ManualResetEventSlim(false);
-        var cancelCalls = 0;
-        var releaseCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            (_, _) => mln_status.MLN_STATUS_OK,
-            (_, cancelled) =>
-            {
-                cancelCalls++;
-                cancellationStarted.Set();
-                Assert.True(allowCancellation.Wait(TimeSpan.FromSeconds(5)));
-                *cancelled = false;
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => releaseCalls++
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-
-        var isCancelled = Task.Run(handle.IsCancelled);
-        Assert.True(cancellationStarted.Wait(TimeSpan.FromSeconds(5)));
-
-        var close = Task.Run(handle.Close);
-        Assert.False(close.Wait(TimeSpan.FromMilliseconds(50)));
-        Assert.Equal(0, Volatile.Read(ref releaseCalls));
-
-        allowCancellation.Set();
-        Assert.False(isCancelled.GetAwaiter().GetResult());
-        close.GetAwaiter().GetResult();
-
-        Assert.True(handle.IsClosed);
-        Assert.Equal(1, cancelCalls);
-        Assert.Equal(1, releaseCalls);
-    }
-
-    [BindingSpecTest("BND-121")]
-    [Fact]
-    public void ResourceProviderExceptionReturnsUnknownDecision()
-    {
-        using var state = new ResourceProviderState(
-            (_, _) => throw new InvalidOperationException("boom")
-        );
-        var url = Encoding.UTF8.GetBytes("https://example.test/style.json\0");
-        fixed (byte* urlPointer = url)
-        {
-            var request = new mln_resource_request
-            {
-                requested_url = (sbyte*)urlPointer,
-                resolved_url = (sbyte*)urlPointer,
-            };
-            Assert.Equal(uint.MaxValue, state.HandleForTest(&request));
-        }
-    }
-
-    [BindingSpecTest("BND-123")]
-    [Fact]
-    public void ResourceProviderStateDisposeIsIdempotent()
-    {
-        var state = new ResourceProviderState((_, _) => ResourceProviderDecision.PassThrough);
-
-        state.Dispose();
-        state.Dispose();
-    }
-
-    [BindingSpecTest("BND-122")]
-    [Fact]
-    public void ResourceProviderInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
-    {
-        var failInstall = false;
-        ResourceProviderState? failedReplacement = null;
-        using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, provider) =>
-            {
-                if (!failInstall)
-                {
-                    return mln_status.MLN_STATUS_OK;
-                }
-
-                failedReplacement = (ResourceProviderState?)
-                    GCHandle.FromIntPtr((nint)provider->user_data).Target;
-                return mln_status.MLN_STATUS_INVALID_STATE;
-            },
-            (_, _) => mln_status.MLN_STATUS_OK
-        );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
-        var previous = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
-
-        failInstall = true;
-        Assert.Throws<InvalidStateException>(() =>
-            runtime.SetResourceProvider((_, _) => ResourceProviderDecision.Handle)
-        );
-
-        Assert.Same(previous, runtime.ResourceProviderStateForTest);
-        Assert.True(previous.IsHandleAllocatedForTest);
-        Assert.NotNull(failedReplacement);
-        Assert.False(failedReplacement.IsHandleAllocatedForTest);
-    }
-
-    // Each transition also releases the rooted state of the provider it retires,
-    // which the C call guarantees is unreachable once it returns.
-    [BindingSpecTest("BND-142")]
-    [Fact]
-    public void ResourceProviderIsConsultedUntilClearedWhileMapIsLive()
-    {
-        var firstCalls = 0;
-        var secondCalls = 0;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        runtime.SetResourceProvider(
-            (_, _) =>
-            {
-                Interlocked.Increment(ref firstCalls);
-                return ResourceProviderDecision.PassThrough;
-            }
-        );
-        var first = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
-        LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
-        Assert.True(Volatile.Read(ref firstCalls) > 0);
-
-        runtime.SetResourceProvider(
-            (_, _) =>
-            {
-                Interlocked.Increment(ref secondCalls);
-                return ResourceProviderDecision.PassThrough;
-            }
-        );
-        var second = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
-        Assert.NotSame(first, second);
-        Assert.False(first.IsHandleAllocatedForTest);
-        var firstCallsAfterReplace = Volatile.Read(ref firstCalls);
-        LoadProbeStyle(runtime, map, "jar:file:/packaged/second.json");
-        Assert.True(Volatile.Read(ref secondCalls) > 0);
-        Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
-
-        runtime.ClearResourceProvider();
-
-        Assert.Null(runtime.ResourceProviderStateForTest);
-        Assert.False(second.IsHandleAllocatedForTest);
-        var secondCallsAfterClear = Volatile.Read(ref secondCalls);
-        LoadProbeStyle(runtime, map, "jar:file:/packaged/third.json");
-        Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
-        Assert.Equal(secondCallsAfterClear, Volatile.Read(ref secondCalls));
-    }
-
-    [BindingSpecTest("BND-155")]
-    [Fact]
-    public void ResourceProviderSeesSchemeAliasAndItsResolvedUrl()
-    {
-        const string AliasUrl = "maplibre://maps/style";
-        string? resolvedUrl = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (request, handle) =>
-            {
-                if (request.RequestedUrl != AliasUrl)
-                {
-                    return ResourceProviderDecision.PassThrough;
-                }
-
-                resolvedUrl = request.ResolvedUrl;
-                handle.Complete(StyleResponse());
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(AliasUrl);
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
-
-        Assert.Equal("https://demotiles.maplibre.org/style.json", resolvedUrl);
-    }
-
-    [BindingSpecTest("BND-101", "BND-143", "BND-150")]
-    [Fact]
-    public void InlineHandledResourceProviderCompletionLoadsStyleAndClosesRequest()
-    {
-        ResourceRequestHandle? handled = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (request, handle) =>
-            {
-                Assert.Equal(StyleUrl, request.RequestedUrl);
-                handled = handle;
-                handle.Complete(StyleResponse());
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
-            runtime,
-            map,
-            RuntimeEventType.MapStyleLoaded
-        );
-
-        Assert.Same(map, runtimeEvent.MapSource);
-        Assert.NotNull(handled);
-        Assert.True(handled.IsClosed);
-    }
-
-    [BindingSpecTest("BND-101", "BND-144")]
-    [Fact]
-    public void LaterHandledResourceProviderCompletionLoadsStyle()
-    {
-        using var providerCalled = new ManualResetEventSlim(false);
-        ResourceRequestHandle? handled = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (request, handle) =>
-            {
-                Assert.Equal(StyleUrl, request.RequestedUrl);
-                handled = handle;
-                providerCalled.Set();
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
-        Assert.NotNull(handled);
-        handled.Complete(StyleResponse());
-
-        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
-            runtime,
-            map,
-            RuntimeEventType.MapStyleLoaded
-        );
-
-        Assert.Same(map, runtimeEvent.MapSource);
-        Assert.True(handled.IsClosed);
-    }
-
-    [BindingSpecTest("BND-148")]
-    [Fact]
-    public void CancelledResourceRequestReportsCancellationBeforeLateCompletionStatus()
-    {
-        using var providerCalled = new ManualResetEventSlim(false);
-        ResourceRequestHandle? handled = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (_, handle) =>
-            {
-                handled = handle;
-                providerCalled.Set();
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
-        Assert.NotNull(handled);
-
-        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(StyleJson));
-        DriveRuntimeUntilCancelled(runtime, handled);
-
-        var error = Assert.Throws<InvalidStateException>(() => handled.Complete(StyleResponse()));
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.NotNull(error.RawStatus);
-        Assert.True(handled.IsClosed);
-    }
-
-    [BindingSpecTest("BND-149")]
-    [Fact]
-    public void ResourceProviderErrorResponseProducesCopiedLoadingFailureEvent()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (_, handle) =>
-            {
-                handle.Complete(
-                    new ResourceResponse(ResourceResponseStatus.Error)
-                    {
-                        ErrorReason = ResourceErrorReason.NotFound,
-                        ErrorMessage = "style missing",
-                    }
-                );
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
-            runtime,
-            map,
-            RuntimeEventType.MapLoadingFailed
-        );
-
-        Assert.Same(map, runtimeEvent.MapSource);
-        Assert.Contains("style", runtimeEvent.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void CancelCallbackRunsOnceAndMayCloseTheDiscardedRequest()
-    {
-        using var providerCalled = new ManualResetEventSlim(false);
-        var cancelCalls = 0;
-        ResourceRequestHandle? handled = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (_, handle) =>
-            {
-                handled = handle;
-                providerCalled.Set();
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
-        Assert.NotNull(handled);
-        var request = handled;
-        request.SetCancelCallback(() =>
-        {
-            Interlocked.Increment(ref cancelCalls);
-            request.Close();
-        });
-
-        // Destroying the map discards the style request the provider never
-        // completed, which is the cancellation the callback reports.
-        map.Dispose();
-        DriveRuntimeUntil(runtime, () => Volatile.Read(ref cancelCalls) > 0);
-        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
-
-        Assert.Equal(1, Volatile.Read(ref cancelCalls));
-        Assert.True(request.IsClosed);
-        Assert.False(request.HasCancelCallbackForTest);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void CancelCallbackIsNotInvokedForACompletedRequest()
-    {
-        var cancelCalls = 0;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (_, handle) =>
-            {
-                handle.SetCancelCallback(() => Interlocked.Increment(ref cancelCalls));
-                handle.Complete(StyleResponse());
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
-        map.Dispose();
-        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
-
-        Assert.Equal(0, Volatile.Read(ref cancelCalls));
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void RegisteringOnAnAlreadyCancelledRequestRunsTheCallbackBeforeReturning()
-    {
-        using var providerCalled = new ManualResetEventSlim(false);
-        var callbackThread = 0;
-        var cancelCalls = 0;
-        ResourceRequestHandle? handled = null;
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
-            (_, handle) =>
-            {
-                handled = handle;
-                providerCalled.Set();
-                return ResourceProviderDecision.Handle;
-            }
-        );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
-        Assert.NotNull(handled);
-        map.SetStyleJson(Encoding.UTF8.GetBytes(StyleJson));
-        DriveRuntimeUntilCancelled(runtime, handled);
-
-        handled.SetCancelCallback(() =>
-        {
-            cancelCalls++;
-            callbackThread = Environment.CurrentManagedThreadId;
-        });
-
-        Assert.Equal(1, cancelCalls);
-        Assert.Equal(Environment.CurrentManagedThreadId, callbackThread);
-        Assert.False(handled.HasCancelCallbackForTest);
-        handled.Close();
-        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
-        Assert.Equal(1, cancelCalls);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void RequestAcceptsOneCancelCallbackAndRejectsRegistrationOnceClosed()
-    {
-        var setCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            null,
-            null,
-            static _ => { },
-            (_, _, _, _) =>
-            {
-                setCalls++;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-
-        handle.SetCancelCallback(static () => { });
-        var second = Assert.Throws<InvalidStateException>(() =>
-            handle.SetCancelCallback(static () => { })
-        );
-        Assert.Equal(MaplibreStatus.InvalidState, second.Status);
-        Assert.Null(second.RawStatus);
-        Assert.True(handle.HasCancelCallbackForTest);
-
-        handle.Close();
-
-        var closed = Assert.Throws<InvalidStateException>(() =>
-            handle.SetCancelCallback(static () => { })
-        );
-        Assert.Equal(MaplibreStatus.InvalidState, closed.Status);
-        Assert.Null(closed.RawStatus);
-        Assert.Equal(1, setCalls);
-        Assert.False(handle.HasCancelCallbackForTest);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void FailedNativeRegistrationLeavesTheRequestWithoutACancelCallback()
-    {
-        nint userData = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            null,
-            null,
-            static _ => { },
-            (_, _, data, _) =>
-            {
-                userData = (nint)data;
-                return mln_status.MLN_STATUS_INVALID_ARGUMENT;
-            }
-        );
-
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            handle.SetCancelCallback(static () => { })
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-        Assert.False(handle.HasCancelCallbackForTest);
-        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void CancelCallbackContainsHostExceptionAndRunsAtMostOnce()
-    {
-        nint nativeCallback = 0;
-        nint userData = 0;
-        var releaseCalls = 0;
-        var cancelCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            null,
-            null,
-            _ => releaseCalls++,
-            (_, callback, data, _) =>
-            {
-                nativeCallback = (nint)callback;
-                userData = (nint)data;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-
-        handle.SetCancelCallback(() =>
-        {
-            cancelCalls++;
-            throw new InvalidOperationException("boom");
-        });
-        Assert.Equal((nint)ResourceRequestCancelRegistry.NativeCallback, nativeCallback);
-        Assert.True(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
-
-        Dispatch(nativeCallback, userData);
-        Dispatch(nativeCallback, userData);
-
-        Assert.Equal(1, cancelCalls);
-        Assert.False(handle.HasCancelCallbackForTest);
-        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
-        handle.Close();
-        Assert.Equal(1, releaseCalls);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void CancelCallbackClosesTheRequestWhileAnotherThreadWaitsInRelease()
-    {
-        using var callbackStarted = new ManualResetEventSlim(false);
-        using var releaseStarted = new ManualResetEventSlim(false);
-        using var callbackFinished = new ManualResetEventSlim(false);
-        nint userData = 0;
-        var cancelCalls = 0;
-        var releaseCalls = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            null,
-            null,
-            _ =>
-            {
-                // Stands in for a native release that waits for the cancel
-                // callback running on a MapLibre thread.
-                Interlocked.Increment(ref releaseCalls);
-                releaseStarted.Set();
-                Assert.True(callbackFinished.Wait(TimeSpan.FromSeconds(5)));
-            },
-            (_, _, data, _) =>
-            {
-                userData = (nint)data;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-        handle.SetCancelCallback(() =>
-        {
-            Interlocked.Increment(ref cancelCalls);
-            callbackStarted.Set();
-            Assert.True(releaseStarted.Wait(TimeSpan.FromSeconds(5)));
-            handle.Close();
-            Assert.True(handle.IsClosed);
-        });
-
-        var cancel = Task.Run(() =>
-        {
-            try
-            {
-                handle.DispatchCancel(userData);
-            }
-            finally
-            {
-                callbackFinished.Set();
-            }
-        });
-        Assert.True(callbackStarted.Wait(TimeSpan.FromSeconds(5)));
-        var close = Task.Run(handle.Close);
-
-        Assert.True(cancel.Wait(TimeSpan.FromSeconds(5)));
-        close.GetAwaiter().GetResult();
-        Assert.Equal(1, Volatile.Read(ref cancelCalls));
-        Assert.Equal(1, Volatile.Read(ref releaseCalls));
-        Assert.False(handle.HasCancelCallbackForTest);
-    }
-
-    [BindingSpecTest("BND-198")]
-    [Fact]
-    public void CancelCallbackRegistrationDoesNotKeepTheRequestHandleReachable()
-    {
-        var releaseCalls = 0;
-        var cancelCalls = 0;
-        var (weak, token) = CreateUnreferencedRequestWithCancelCallback(
-            () => Interlocked.Increment(ref releaseCalls),
-            () => Interlocked.Increment(ref cancelCalls)
-        );
-
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        Assert.False(weak.TryGetTarget(out _));
-        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(token));
-        Assert.Equal(1, Volatile.Read(ref releaseCalls));
-        ResourceRequestCancelRegistry.DispatchForTest(token);
-        Assert.Equal(0, Volatile.Read(ref cancelCalls));
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (
-        WeakReference<ResourceRequestHandle> Weak,
-        nint Token
-    ) CreateUnreferencedRequestWithCancelCallback(Action onRelease, Action onCancel)
-    {
-        nint token = 0;
-        var handle = new ResourceRequestHandle(
-            SyntheticHandles.ResourceRequest(1234),
-            null,
-            null,
-            _ => onRelease(),
-            (_, _, data, _) =>
-            {
-                token = (nint)data;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        Assert.Equal(
-            (uint)ResourceProviderDecision.Handle,
-            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
-        );
-        handle.SetCancelCallback(onCancel);
-        return (new WeakReference<ResourceRequestHandle>(handle), token);
-    }
-
-    private static void Dispatch(nint callback, nint userData) =>
-        ((delegate* unmanaged[Cdecl]<void*, void>)callback)((void*)userData);
-
-    // Requests a style whose scheme no file source serves, so the loading
-    // failure that follows proves the request reached the network file source.
-    private static void LoadProbeStyle(RuntimeHandle runtime, MapHandle map, string styleUrl)
-    {
-        // Drain earlier events so this probe observes its own failure.
-        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
-
-        map.SetStyleUrl(styleUrl);
-        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
-            runtime,
-            map,
-            RuntimeEventType.MapLoadingFailed
-        );
-
-        Assert.Contains("\"jar\"", runtimeEvent.Message, StringComparison.Ordinal);
-    }
+    private const string StyleUrl = "provider-test://é/style.json";
 
     private static ResourceResponse StyleResponse() =>
-        new(ResourceResponseStatus.Ok) { Bytes = Encoding.UTF8.GetBytes(StyleJson) };
+        new() { Status = ResourceResponseStatus.Ok, Bytes = NativeFixture.EmptyStyle };
 
-    private static void DriveRuntimeUntil(RuntimeHandle runtime, Func<bool> condition)
+    // The admission policy forbids runtime calls inside the callback and allows answering the
+    // request, which claims the handle even though the callback then passes the request on.
+    [Fact]
+    public async Task AProviderMayAnswerButNotReenterTheRuntime()
     {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.Zero);
-            if (condition())
-            {
-                return;
-            }
+        NativeFixture? owner = null;
+        ResourceRequestHandle? retained = null;
+        string? requested = null;
+        Exception? reentry = null;
+        Exception? waitReentry = null;
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider(
+                (request, handle) =>
+                {
+                    requested = request.RequestedUrl;
+                    retained = handle;
+                    reentry = Record.Exception(() =>
+                    {
+                        _ = owner!.Runtime.BarrierAsync(TestWaits.Token);
+                    });
+                    waitReentry = Record.Exception(handle.WaitUntilRetired);
+                    handle.Complete(StyleResponse());
+                    return ResourceProviderDecision.PassThrough;
+                }
+            )
+        );
+        owner = fixture;
 
-            Thread.Sleep(1);
-        }
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
 
-        Assert.True(condition());
+        Assert.Equal(StyleUrl, requested);
+        Assert.IsType<InvalidOperationException>(reentry);
+        Assert.IsType<InvalidOperationException>(waitReentry);
+        Assert.NotNull(retained);
+        using (retained)
+            Assert.False(retained.IsClosed);
+        Assert.True(retained.IsClosed);
     }
 
-    private static void DriveRuntimeUntil(RuntimeHandle runtime, ManualResetEventSlim signal)
+    [Fact]
+    public async Task AProviderCanAnswerLaterThroughItsDecisionHandle()
     {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.Zero);
-            if (signal.IsSet)
-            {
-                return;
-            }
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
-            Thread.Sleep(1);
-        }
+        // A response the binding cannot convert leaves the request open for another answer.
+        Assert.Throws<ArgumentException>(() =>
+            handle.Complete(
+                new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
+            )
+        );
+        Assert.False(handle.IsClosed);
+        handle.Complete(StyleResponse());
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
 
-        Assert.True(signal.IsSet);
+        Assert.False(handle.IsClosed);
+        handle.Close();
+        handle.WaitUntilRetired();
     }
 
-    private static void DriveRuntimeUntilCancelled(
-        RuntimeHandle runtime,
-        ResourceRequestHandle handle
+    // A provider's exception is contained: native receives a pass-through, and the exception goes
+    // to the CallbackException handlers.
+    [Fact]
+    public unsafe void AProviderExceptionIsContainedAndPassesTheRequestThrough()
+    {
+        ResourceRequest? copied = null;
+        ResourceRequestHandle? escaped = null;
+        var thrown = new FormatException("Host callback failed.");
+        var reports = new List<CallbackExceptionEventArgs>();
+        Exception? reentry = null;
+        // Other tests' callbacks may throw concurrently, so only this exception counts.
+        EventHandler<CallbackExceptionEventArgs> record = (_, report) =>
+        {
+            if (!ReferenceEquals(report.Exception, thrown))
+                return;
+            lock (reports)
+                reports.Add(report);
+            // The handler runs on the provider's stack, where the binding refuses every native
+            // call.
+            reentry = Record.Exception(() => Maplibre.NetworkGetStatus());
+        };
+        using var scope = new NativeCallScope();
+        var native = GeneratedValues.NativeResourceProvider(
+            new ResourceProvider(
+                (request, handle) =>
+                {
+                    copied = request;
+                    escaped = handle;
+                    throw thrown;
+                }
+            ),
+            scope
+        );
+        var bytes = scope.Buffer([1, 2, 3]);
+        var request = new mln_resource_request
+        {
+            size = (uint)sizeof(mln_resource_request),
+            fields = mln_resource_request_field.MLN_RESOURCE_REQUEST_RANGE,
+            requested_url = scope.CString(StyleUrl),
+            resolved_url = scope.CString("provider-test://resolved/é"),
+            range = new mln_resource_range { start = 0, end = 7 },
+            prior_data = (byte*)bytes.data,
+            prior_data_size = bytes.size,
+        };
+
+        Maplibre.CallbackException += record;
+        try
+        {
+            Assert.Equal(
+                (uint)ResourceProviderDecision.PassThrough,
+                native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
+            );
+        }
+        finally
+        {
+            Maplibre.CallbackException -= record;
+        }
+
+        var report = Assert.Single(reports);
+        Assert.Equal("mln_resource_provider_callback", report.Callback);
+        Assert.IsType<InvalidOperationException>(reentry);
+        // The request is copied before the callback runs, so native reusing its memory afterwards
+        // leaves the copy intact.
+        ((byte*)bytes.data)[0] = 99;
+        Assert.NotNull(copied);
+        Assert.Equal(StyleUrl, copied.RequestedUrl);
+        Assert.Equal(new ResourceRange(0, 7), copied.Range);
+        Assert.Equal([1, 2, 3], copied.PriorData);
+        Assert.NotNull(escaped);
+        Assert.True(escaped.IsClosed);
+    }
+
+    [Fact]
+    public async Task ACancelRegistrationIsReleasedWithItsRequest()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        var calls = 0;
+
+        var (cancelled, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+        Assert.False(cancelled);
+        handle.Complete(StyleResponse());
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+        Assert.True(Gc.IsAlive(captured));
+
+        handle.Close();
+        Assert.False(Gc.IsAlive(captured));
+        Assert.Equal(0, calls);
+    }
+
+    // The registration reports that the request is already cancelled, so native stores nothing
+    // and the binding frees the callback at once.
+    [Fact]
+    public async Task ARegistrationOnACancelledRequestIsNotRooted()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        await fixture.Map.CloseAsync();
+        Assert.True(handle.IsCancelled());
+        var calls = 0;
+
+        var (cancelled, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+
+        Assert.True(cancelled);
+        Assert.False(Gc.IsAlive(captured));
+        handle.Close();
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task PassingThroughDisarmsAnEscapedRequest()
+    {
+        ResourceRequestHandle? escaped = null;
+        var calls = 0;
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider(
+                (_, handle) =>
+                {
+                    escaped = handle;
+                    handle.SetCancelCallback(
+                        new ResourceRequestCancelHandler(() => Interlocked.Increment(ref calls))
+                    );
+                    return ResourceProviderDecision.PassThrough;
+                }
+            )
+        );
+
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+
+        Assert.NotNull(escaped);
+        Assert.True(escaped.IsClosed);
+        Assert.Equal(0, calls);
+        Assert.Throws<InvalidStateException>(() => escaped.IsCancelled());
+    }
+
+    [Fact]
+    public unsafe void DecisionStatePreservesAcceptedAndInFlightCompletionButRollsBackRejection()
+    {
+        var released = 0;
+        NativeHandleState<MlnResourceRequest> Create() =>
+            new(
+                SyntheticHandles.ResourceRequest(1),
+                (_, _) =>
+                {
+                    released++;
+                    return mln_status.MLN_STATUS_OK;
+                },
+                "Request",
+                pendingDecision: true
+            );
+        var rejected = Create();
+        using (rejected.BeginClaim()) { }
+        Assert.False(rejected.FinishDecision(false));
+        Assert.True(rejected.IsClosed);
+        Assert.Equal(0, released);
+        var accepted = Create();
+        using (var claim = accepted.BeginClaim())
+            claim.Accept();
+        Assert.True(accepted.FinishDecision(false));
+        accepted.Close();
+        Assert.Equal(1, released);
+        var inFlight = Create();
+        using (inFlight.BeginClaim())
+            Assert.True(inFlight.FinishDecision(false));
+        inFlight.Close();
+        Assert.Equal(2, released);
+        var explicitlyClosed = Create();
+        explicitlyClosed.Close();
+        explicitlyClosed.Close();
+        Assert.True(explicitlyClosed.FinishDecision(false));
+        Assert.True(explicitlyClosed.IsClosed);
+        Assert.Equal(3, released);
+    }
+
+    /// <summary>A provider that keeps each request to answer later.</summary>
+    private static ResourceProvider Holding(TaskCompletionSource<ResourceRequestHandle> received) =>
+        new(
+            (_, handle) =>
+            {
+                received.TrySetResult(handle);
+                return ResourceProviderDecision.Handle;
+            }
+        );
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
+        ResourceRequestHandle handle,
+        Action onCancel
     )
     {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.Zero);
-            if (handle.IsCancelled())
+        var captured = new object();
+        var cancelled = handle.SetCancelCallback(
+            new ResourceRequestCancelHandler(() =>
             {
-                return;
-            }
-
-            Thread.Sleep(1);
-        }
-
-        Assert.True(handle.IsCancelled());
+                GC.KeepAlive(captured);
+                onCancel();
+            })
+        );
+        return (cancelled, new WeakReference(captured));
     }
 }
-
-#pragma warning restore xUnit1031, xUnit1051

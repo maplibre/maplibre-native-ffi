@@ -1,12 +1,15 @@
 import java.time.Duration
+import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
+import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
@@ -38,17 +41,14 @@ val androidTargets =
       .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
     androidBackend,
   )
-val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
-val generatedJavaCppSources =
-  layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
 val minifyAndroidDeviceTests =
   providers.gradleProperty("maplibre.android.testMinify").map(String::toBoolean).getOrElse(false)
 val androidConsumerKeepRules =
-  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro")
+  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-jni.pro")
 
 kotlin {
   androidNativeArm32()
@@ -62,6 +62,17 @@ kotlin {
   linuxX64()
   macosArm64()
 
+  // jvmAndroidMain holds the code the JVM and Android share through java.lang.ref and
+  // java.util.concurrent.
+  applyDefaultHierarchyTemplate {
+    common {
+      group("jvmAndroid") {
+        withJvm()
+        withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+      }
+    }
+  }
+
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
 
   compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
@@ -73,7 +84,6 @@ kotlin {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
-    withJava()
     // Device-test APK assets are collected only when Android resource processing
     // is enabled. The published AAR has no res/ or assets/ of its own.
     androidResources {
@@ -88,8 +98,8 @@ kotlin {
 
     optimization {
       // CI enables minification while building the device-test artifact. Reuse
-      // the published consumer rules so JavaCPP is optimized exactly as it is
-      // in a shrinking Android application.
+      // the published consumer rules so the JNI shim's natives and upcalls are
+      // kept exactly as they are in a shrinking Android application.
       minify = minifyAndroidDeviceTests
       keepRules.file(androidConsumerKeepRules)
       testKeepRules.file(androidConsumerKeepRules)
@@ -148,24 +158,85 @@ kotlin {
       }
     }
 
-    if (name == "linuxX64" || name == "linuxArm64") {
-      val eglLibDir =
-        if (name == "linuxX64") "/usr/lib/x86_64-linux-gnu" else "/usr/lib/aarch64-linux-gnu"
-      binaries.all { linkerOpts("-L$eglLibDir") }
-      compilations.getByName("test") {
-        cinterops {
-          create("egl") {
-            defFile(project.file("src/linuxTest/cinterop/egl.def"))
-            includeDirs(project.file("src/linuxTest/cinterop"))
-            compilerOpts("-I${project.file("src/linuxTest/cinterop")}")
-          }
+    // Every native test compiles against tests/graphics through cinterop. A target whose tests
+    // run links graphics.c, compiled here for that target; Android Kotlin/Native tests only
+    // compile, so their binaries never link it.
+    val fixture = rootProject.file("tests/graphics")
+    compilations.getByName("test") {
+      cinterops.create("testGraphics") {
+        defFile(project.file("src/nativeTest/cinterop/graphics.def"))
+        includeDirs(fixture.resolve("include"))
+      }
+    }
+    val graphicsCompiler =
+      when (name) {
+        "linuxX64" -> listOf("clang", "--target=x86_64-linux-gnu")
+        "linuxArm64" -> listOf("clang", "--target=aarch64-linux-gnu")
+        "macosArm64" ->
+          listOf("xcrun", "--sdk", "macosx", "clang", "-target", "arm64-apple-macos11.0")
+        "iosArm64" ->
+          listOf("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios14.0")
+        "iosSimulatorArm64" ->
+          listOf(
+            "xcrun",
+            "--sdk",
+            "iphonesimulator",
+            "clang",
+            "-target",
+            "arm64-apple-ios14.0-simulator",
+          )
+        "tvosArm64" ->
+          listOf("xcrun", "--sdk", "appletvos", "clang", "-target", "arm64-apple-tvos14.0")
+        "tvosSimulatorArm64" ->
+          listOf(
+            "xcrun",
+            "--sdk",
+            "appletvsimulator",
+            "clang",
+            "-target",
+            "arm64-apple-tvos14.0-simulator",
+          )
+        else -> null
+      }
+    if (graphicsCompiler != null) {
+      val linksDl = name.startsWith("linux")
+      val vulkanHeaders =
+        rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
+      val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
+      val compileGraphics =
+        tasks.register<Exec>("compileTestGraphics${name.replaceFirstChar { it.uppercase() }}") {
+          inputs.dir(fixture)
+          inputs.dir(vulkanHeaders)
+          outputs.file(objectFile)
+          doFirst { objectFile.get().asFile.parentFile.mkdirs() }
+          commandLine(
+            graphicsCompiler +
+              listOf(
+                "-std=c11",
+                "-fPIC",
+                "-c",
+                "-I${fixture.resolve("include")}",
+                "-I$vulkanHeaders",
+                fixture.resolve("graphics.c").absolutePath,
+                "-o",
+                objectFile.get().asFile.absolutePath,
+              )
+          )
         }
+      binaries.withType<TestExecutable>().configureEach {
+        linkTaskProvider.configure {
+          dependsOn(compileGraphics)
+          inputs.file(objectFile)
+        }
+        linkerOpts(objectFile.get().asFile.absolutePath)
+        if (linksDl) linkerOpts("-ldl")
       }
     }
   }
 
   sourceSets {
-    androidMain { dependencies { implementation(libs.javacpp) } }
+    // Deferred is part of the public binding surface.
+    commonMain.dependencies { api(libs.coroutines) }
 
     named("androidDeviceTest") {
       dependencies {
@@ -227,41 +298,30 @@ canonicalizeKmpRootMetadata(
     ),
 )
 
-configurations.register("javaCppTool") {
-  isCanBeConsumed = false
-  isCanBeResolved = true
-}
-
-val lwjglNative = hostPlatform.lwjglNativeClassifier
-
-dependencies {
-  add("javaCppTool", libs.javacpp)
-  "jvmTestImplementation"(platform(libs.lwjgl.bom))
-  "jvmTestImplementation"(libs.lwjgl)
-  "jvmTestImplementation"(libs.lwjgl.egl)
-  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
-}
-
-apply(from = "gradle/jextract-jvm.gradle.kts")
-
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory
 
 extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] = packagedAndroidBindingLibs
 
-apply(from = "gradle/javacpp-android.gradle.kts")
+apply(from = "gradle/jni-android.gradle.kts")
 
-tasks.named<KotlinJvmCompile>("compileKotlinJvm") { source(checkedInJextractSources) }
+apply(from = "gradle/graphics-tests.gradle.kts")
 
 androidComponents {
   onVariants { variant ->
-    // Android KMP does not currently expose a task-provider-backed generated Java source hook.
-    // Keep the explicit task dependencies below in sync with this static source directory.
-    variant.sources.java?.addStaticSourceDirectory(
-      generatedJavaCppSources.get().asFile.absolutePath
-    )
-    // The JavaCPP bridge is private to this binding, so it ships in this AAR
-    // rather than in the shared runtime AARs.
+    variant.deviceTests.values.forEach { test ->
+      androidTargets.forEach { target ->
+        test.sources.jniLibs?.addStaticSourceDirectory(
+          layout.buildDirectory
+            .dir("generated/jniLibs/graphicsTest/${target.cargoTarget}")
+            .get()
+            .asFile
+            .absolutePath
+        )
+      }
+    }
+    // The JNI shim is private to this binding, so it ships in this AAR rather
+    // than in the shared runtime AARs.
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
         packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
@@ -271,13 +331,7 @@ androidComponents {
 }
 
 tasks.configureEach {
-  when (name) {
-    "androidSourcesJar",
-    "compileAndroidMainJavaWithJavac",
-    "compileAndroidMain",
-    "extractAndroidMainAnnotations" -> dependsOn("generateAndroidJavaCppBindings")
-    "mergeAndroidMainJniLibFolders" -> dependsOn("packageAndroidBindingLibraries")
-  }
+  if (name == "mergeAndroidMainJniLibFolders") dependsOn("packageAndroidBindingLibraries")
 }
 
 val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
@@ -288,9 +342,15 @@ class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
 }
 
 tasks.named<Test>("jvmTest") {
+  // Each test bounds its own waits; this catches a hang no test-level timeout can interrupt.
+  timeout.set(Duration.ofMinutes(5))
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   jvmArgumentProviders.add(TestClasspathArguments(classpath))
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
+  systemProperty(
+    "org.maplibre.nativeffi.test.graphics.library",
+    maplibreNativeC.testGraphicsLibraryPath.absolutePath,
+  )
   systemProperty(
     "org.maplibre.nativeffi.library.dirs",
     maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
@@ -302,12 +362,22 @@ tasks.named<Test>("jvmTest") {
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
+  testLogging { exceptionFormat = TestExceptionFormat.FULL }
+}
+
+// A coverage run needs the tests to execute, because Gradle does not track the
+// native profiles they write. An up-to-date or cached result would write none.
+if (providers.environmentVariable("LLVM_PROFILE_FILE").isPresent) {
+  tasks.withType<AbstractTestTask>().configureEach {
+    doNotTrackState("A coverage run records native profiles on every run")
+  }
 }
 
 tasks.withType<KotlinNativeTest>().configureEach {
   timeout.set(Duration.ofMinutes(5))
   testLogging {
     events(TestLogEvent.STARTED, TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
+    exceptionFormat = TestExceptionFormat.FULL
   }
 }
 
@@ -322,7 +392,7 @@ val checkAndroidApiFloor =
   tasks.register<Exec>("checkAndroidApiFloor") {
     group = "verification"
     description = "Verifies androidMain bytecode stays on the android-minSdk floor."
-    dependsOn("compileAndroidMain", "compileAndroidMainJavaWithJavac")
+    dependsOn("compileAndroidMain")
     workingDir = rootProject.layout.projectDirectory.asFile
     commandLine(
       rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile

@@ -55,8 +55,8 @@ func currentViewport(window *sdl.Window) viewport {
 	}
 }
 
-func (v viewport) extent() maplibre.RenderTargetExtent {
-	return maplibre.RenderTargetExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
+func (v viewport) extent() maplibre.LogicalExtent {
+	return maplibre.LogicalExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
 }
 
 func (v viewport) empty() bool {

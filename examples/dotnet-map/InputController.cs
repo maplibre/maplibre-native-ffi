@@ -1,14 +1,9 @@
-using Maplibre.NativeFfi.Camera;
-using Maplibre.NativeFfi.Geo;
 using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>Decodes host input into camera commands.</summary>
-/// <remarks>
-/// This runs on the render loop, which does not own the map, so it only queues commands for the
-/// runtime loop. GLFW reports pointer positions in the map's logical coordinates already.
-/// </remarks>
+/// <summary>Decodes host input into map camera commands.</summary>
+/// <remarks>GLFW reports pointer positions in the map's logical coordinates already.</remarks>
 internal sealed unsafe class InputController : IDisposable
 {
     private const double DragRotateFactor = 0.5;
@@ -17,12 +12,11 @@ internal sealed unsafe class InputController : IDisposable
     private const double KeyboardZoom = 1.25;
     private const double KeyboardBearing = 10.0;
     private const double KeyboardPitch = 5.0;
-    private static readonly AnimationOptions KeyboardAnimation = new() { Duration = 160 };
-    private static readonly AnimationOptions ResetAnimation = new() { Duration = 220 };
+    private static readonly AnimationOptions KeyboardAnimation = new() { DurationMs = 160 };
+    private static readonly AnimationOptions ResetAnimation = new() { DurationMs = 220 };
 
     private readonly GlfwWindow window;
-    private readonly CommandQueue commands;
-    private readonly RenderRequest renderRequest;
+    private readonly MapState state;
     private readonly GlfwCallbacks.CursorPosCallback cursorCallback;
     private readonly GlfwCallbacks.MouseButtonCallback mouseButtonCallback;
     private readonly GlfwCallbacks.ScrollCallback scrollCallback;
@@ -36,12 +30,11 @@ internal sealed unsafe class InputController : IDisposable
     private double cursorY;
     private bool closed;
 
-    public InputController(GlfwWindow window, CommandQueue commands, RenderRequest renderRequest)
+    public InputController(GlfwWindow window, MapState state)
     {
         ArgumentNullException.ThrowIfNull(window);
         this.window = window;
-        this.commands = commands;
-        this.renderRequest = renderRequest;
+        this.state = state;
         cursorCallback = OnCursor;
         mouseButtonCallback = OnMouseButton;
         scrollCallback = OnScroll;
@@ -94,14 +87,11 @@ internal sealed unsafe class InputController : IDisposable
         lastY = y;
         if (rightDown || (leftDown && ctrlDown))
         {
-            commands.Push(new AdjustBearingCommand(dx * DragRotateFactor, null));
-            commands.Push(new AdjustPitchCommand(-dy * DragPitchFactor, null));
-            renderRequest.Set();
+            state.AdjustOrientation(bearing: dx * DragRotateFactor, pitch: dy * DragPitchFactor);
         }
         else if (leftDown)
         {
-            commands.Push(new MoveByCommand(dx, dy, null));
-            renderRequest.Set();
+            state.MoveBy(dx, dy);
         }
     }
 
@@ -136,14 +126,13 @@ internal sealed unsafe class InputController : IDisposable
             lastX = cursorX;
             lastY = cursorY;
 
-            // Queued ahead of the drag's own commands, so the transition stops before the first
-            // delta lands.
-            commands.Push(new CancelTransitionsCommand());
+            // Stop the transition before applying the drag's first delta.
+            state.CancelTransitions();
         }
 
         if (Dragging != wasDragging)
         {
-            commands.Push(new SetGestureInProgressCommand(Dragging));
+            state.SetGestureInProgress(Dragging);
         }
     }
 
@@ -154,8 +143,7 @@ internal sealed unsafe class InputController : IDisposable
         _ = handle;
         _ = xOffset;
         var scale = Math.Pow(2.0, yOffset * 0.25);
-        commands.Push(new ScaleByCommand(scale, new ScreenPoint(cursorX, cursorY), null));
-        renderRequest.Set();
+        state.ScaleBy(scale, new ScreenPoint(cursorX, cursorY));
     }
 
     private void OnKey(
@@ -174,55 +162,46 @@ internal sealed unsafe class InputController : IDisposable
             return;
         }
 
-        var changed = true;
         switch (key)
         {
             case Keys.Left:
             case Keys.A:
-                commands.Push(new MoveByCommand(KeyboardPan, 0.0, KeyboardAnimation));
+                state.MoveBy(KeyboardPan, 0.0, KeyboardAnimation);
                 break;
             case Keys.Right:
             case Keys.D:
-                commands.Push(new MoveByCommand(-KeyboardPan, 0.0, KeyboardAnimation));
+                state.MoveBy(-KeyboardPan, 0.0, KeyboardAnimation);
                 break;
             case Keys.Up:
             case Keys.W:
-                commands.Push(new MoveByCommand(0.0, KeyboardPan, KeyboardAnimation));
+                state.MoveBy(0.0, KeyboardPan, KeyboardAnimation);
                 break;
             case Keys.Down:
             case Keys.S:
-                commands.Push(new MoveByCommand(0.0, -KeyboardPan, KeyboardAnimation));
+                state.MoveBy(0.0, -KeyboardPan, KeyboardAnimation);
                 break;
             case Keys.Equal:
             case Keys.KeypadEqual:
-                commands.Push(new ScaleByCommand(KeyboardZoom, null, KeyboardAnimation));
+                state.ScaleBy(KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Minus:
-                commands.Push(new ScaleByCommand(1.0 / KeyboardZoom, null, KeyboardAnimation));
+                state.ScaleBy(1.0 / KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Q:
-                commands.Push(new AdjustBearingCommand(-KeyboardBearing, KeyboardAnimation));
+                state.AdjustOrientation(bearing: -KeyboardBearing, animation: KeyboardAnimation);
                 break;
             case Keys.E:
-                commands.Push(new AdjustBearingCommand(KeyboardBearing, KeyboardAnimation));
+                state.AdjustOrientation(bearing: KeyboardBearing, animation: KeyboardAnimation);
                 break;
             case Keys.RightBracket:
-                commands.Push(new AdjustPitchCommand(KeyboardPitch, KeyboardAnimation));
+                state.AdjustOrientation(pitch: KeyboardPitch, animation: KeyboardAnimation);
                 break;
             case Keys.LeftBracket:
-                commands.Push(new AdjustPitchCommand(-KeyboardPitch, KeyboardAnimation));
+                state.AdjustOrientation(pitch: -KeyboardPitch, animation: KeyboardAnimation);
                 break;
             case Keys.Number0:
-                commands.Push(new ResetOrientationCommand(ResetAnimation));
+                state.ResetOrientation(ResetAnimation);
                 break;
-            default:
-                changed = false;
-                break;
-        }
-
-        if (changed)
-        {
-            renderRequest.Set();
         }
     }
 }

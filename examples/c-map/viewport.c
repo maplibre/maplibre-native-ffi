@@ -46,6 +46,16 @@ viewport viewport_get(SDL_Window* window) {
   };
 }
 
+bool viewport_equal(viewport left, viewport right) {
+  return left.logical_width == right.logical_width &&
+         left.logical_height == right.logical_height &&
+         left.window_width == right.window_width &&
+         left.window_height == right.window_height &&
+         left.physical_width == right.physical_width &&
+         left.physical_height == right.physical_height &&
+         left.scale_factor == right.scale_factor;
+}
+
 void viewport_log(const char* label, viewport value) {
   printf(
     "%s: logical=%ux%u physical=%ux%u scale=%.2f\n", label, value.logical_width,

@@ -60,3 +60,14 @@ if [[ "$usage_prebuilt" == "true" ]]; then
 fi
 ./gradlew "${gradle_args[@]}" :examples:android-map:runDebug
 '''
+
+[tasks.smoke]
+description = "Install the debug build on the Android emulator, render one frame, and exit."
+usage = '''
+arg "[preset]" default="android-arm64-egl" {
+  choices "android-arm64-egl" "android-arm64-vulkan" "android-x64-egl" "android-x64-vulkan"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'examples/android-map/scripts/smoke.sh "$usage_preset"'

@@ -23,7 +23,6 @@
     // each tool update into a hygiene failure.
     "**/.config/dotnet-tools.json",
     "src/platform/rust/about.hbs",
-    "bindings/kotlin/src/jvmMain/generated/**",
     "gradlew",
     "gradlew.bat",
     "**/*.g.cs",
@@ -43,7 +42,7 @@
     "IncludeBlocks": "Regroup",
     "IncludeCategories": [
       { "Regex": "^<[a-zA-Z0-9_]+>$", "Priority": -100 },
-      { "Regex": "^<mbgl/.*>$", "Priority": -60 },
+      { "Regex": "^<mln/.*>$", "Priority": -60 },
       { "Regex": "^<.*>$", "Priority": -50 },
       { "Regex": ".*", "Priority": 1 },
     ],
@@ -53,10 +52,6 @@
       {
         "command": "bash .mise/bin/dprint-ktfmt --google-style - --stdin-name={{file_path}}",
         "exts": ["kt", "kts"],
-      },
-      {
-        "command": "bash .mise/bin/dprint-java - --assume-filename {{file_path}}",
-        "exts": ["java"],
       },
       {
         "command": "bash .mise/bin/dprint-csharpier {{file_path}}",

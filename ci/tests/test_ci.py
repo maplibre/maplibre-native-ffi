@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -25,9 +26,15 @@ from ci.coverage import (
 )
 from ci.generate_workflow import ROOT, caller, serialize, suite, workflows
 from ci.plan import plan
+from ci.retry import INFRASTRUCTURE_STEPS, retryable
 from ci.retry import main as retry_main
-from ci.retry import retryable
-from ci.workflow import load_configuration, preset_sets
+from ci.workflow import (
+    XVFB_RUN,
+    load_configuration,
+    platform,
+    preset_sets,
+    target_rows,
+)
 
 ENV = {
     "GITHUB_REPOSITORY": "maplibre/maplibre-native-ffi",
@@ -121,6 +128,21 @@ class CoverageTest(unittest.TestCase):
         self.assertTrue(
             {f"target-{target}" for target in preset_sets(presets)[0]} <= set(jobs)
         )
+
+    def test_presets_that_opt_out_of_ci_name_no_target(self):
+        local = {"vendor": {"maplibre-native-ffi": {"ci": False}}}
+        presets = {
+            "configurePresets": [{"name": "host"}, {"name": "host-local", **local}],
+            "buildPresets": [
+                {"name": "host", "configurePreset": "host"},
+                {"name": "host-local", "configurePreset": "host-local"},
+            ],
+            "testPresets": [
+                {"name": "host", "configurePreset": "host"},
+                {"name": "host-local", "configurePreset": "host-local"},
+            ],
+        }
+        self.assertEqual(preset_sets(presets), (["host"], {"host"}, {"host"}, set()))
 
     def test_extended_reuse_requires_identical_complete_scope(self):
         for old_scope, labels, expected in (
@@ -375,6 +397,99 @@ class WorkflowTest(unittest.TestCase):
         self.assertFalse(full["kotlin-maven"]["with"]["publish"])
         self.assertEqual(self.workflows["ci.yml"]["name"], "CI")
 
+    def test_window_commands_get_a_display_on_linux_and_keep_their_caches(self):
+        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
+        for preset, row in rows.items():
+            commands = row["native_commands"] + row.get("consumer_commands", [])
+            with self.subTest(preset=preset):
+                wrapped = [c for c in commands if c.startswith(XVFB_RUN)]
+                self.assertEqual(bool(wrapped), platform(preset) == "linux-gnu")
+        linux = rows["linux-gnu-x64-egl"]
+        self.assertIn(
+            f"{XVFB_RUN} mise run //examples/zig-map:smoke linux-gnu-x64-egl",
+            linux["consumer_commands"],
+        )
+        # The wrapped Zig and Gradle examples still count toward their caches.
+        self.assertTrue(linux["zig"])
+        self.assertTrue(linux["gradle"])
+
+    def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
+        source = copy.deepcopy(self.source)
+        source["suites"].append(
+            {
+                "platforms": ["windows"],
+                "commands": [
+                    {"task": "//examples/c-map:check"},
+                    {"task": "//examples/c-map:smoke"},
+                ],
+                "environments": [
+                    {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
+                ],
+            }
+        )
+        jobs = suite(source, self.presets, "extended")["jobs"]
+        environments = {
+            (name, step["run"]): step.get("env", {})
+            for name, job in jobs.items()
+            for step in job.get("steps", [])
+            if "STEP_PROBE" in step.get("env", {})
+            or (
+                name.startswith("target-windows-")
+                and "//examples/c-map:" in step.get("run", "")
+            )
+        }
+        # The packaged target's consumer environment still applies.
+        probed = {"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}
+        plain = {"MISE_TASK_SKIP": "//:build"}
+        self.assertEqual(
+            environments,
+            {
+                (f"target-{preset}", f"mise run //examples/c-map:{task} {preset}"): (
+                    probed if preset == "windows-x64-wgl" else plain
+                )
+                for preset in (
+                    "windows-x64-wgl",
+                    "windows-x64-vulkan",
+                    "windows-arm64-wgl",
+                    "windows-arm64-vulkan",
+                )
+                for task in ("check", "smoke")
+            },
+        )
+
+    def test_every_android_emulator_target_smoke_runs_the_map_example(self):
+        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
+        for preset in ("android-x64-egl", "android-x64-vulkan"):
+            row = rows[preset]
+            with self.subTest(preset=preset):
+                self.assertIn(
+                    f"mise run //examples/android-map:smoke {preset}",
+                    row["native_commands"] + row.get("consumer_commands", []),
+                )
+
+    def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
+        for group in GROUPS:
+            for name, job in self.workflows[f"_ci-{group}.yml"]["jobs"].items():
+                if not name.startswith("target-"):
+                    continue
+                with self.subTest(job=name):
+                    steps = job["steps"]
+                    ids = [step.get("id") for step in steps]
+                    suites = [i for i in ids if i and i.startswith("suite-")]
+                    self.assertTrue(suites)
+                    for step in steps[ids.index("build") + 1 :]:
+                        if step.get("id") in {"archive", "install", *suites}:
+                            self.assertTrue(
+                                step["if"].startswith("${{ !cancelled() && "),
+                                step,
+                            )
+                    gate = steps[-1]
+                    self.assertEqual(gate["name"], "Fail if any suite failed")
+                    self.assertEqual(
+                        re.findall(r"steps\.(suite-\d+)\.outcome", gate["if"]),
+                        suites,
+                    )
+
     def test_events_keep_baseline_stable_and_main_runs_independent(self):
         baseline = caller("baseline")["on"]["pull_request"]["types"]
         self.assertEqual(set(baseline), {"opened", "synchronize", "reopened"})
@@ -486,7 +601,11 @@ class RetryTest(unittest.TestCase):
     def test_api_failures_retry_with_backoff_and_recheck_run_attempt(self):
         jobs = {
             "jobs": [
-                {"name": "plan", "conclusion": "failure"},
+                {
+                    "name": "plan",
+                    "conclusion": "failure",
+                    "steps": [{"name": "Plan coverage", "conclusion": "failure"}],
+                },
                 {"name": "ci-required", "conclusion": "failure"},
             ]
         }
@@ -537,24 +656,79 @@ class RetryTest(unittest.TestCase):
             self.assertEqual(get.call_count, 4)
             self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
 
-    def test_one_primary_failure_retries_with_both_aggregates(self):
-        jobs = [
-            {"name": "coverage / target / linux-gnu-x64-egl", "conclusion": "failure"},
+    def test_only_infrastructure_step_failures_retry(self):
+        def job(name, *failed):
+            return {
+                "name": name,
+                "conclusion": "failure",
+                "steps": [
+                    {"name": "Set up job", "conclusion": "success"},
+                    *({"name": step, "conclusion": "failure"} for step in failed),
+                ],
+            }
+
+        aggregates = [
             {"name": "coverage / verified (sha)", "conclusion": "failure"},
             {"name": "ci-required", "conclusion": "failure"},
             {"name": "coverage / Kotlin Maven / verify", "conclusion": "skipped"},
         ]
-        self.assertTrue(retryable(jobs))
-        self.assertFalse(retryable(jobs[1:]))
-        self.assertFalse(retryable(jobs + [{"name": "other", "conclusion": "failure"}]))
+        target = "coverage / target / android-x64-egl"
+        for failed in (
+            ["Set up CI dependencies"],
+            ["Boot Android emulator"],
+            ["Resolve Swift packages"],
+            ["Post Set up CI dependencies"],
+        ):
+            with self.subTest(failed=failed):
+                self.assertTrue(retryable([job(target, *failed), *aggregates]))
+        suite = "Run mise run //bindings/kotlin:test android-x64-egl"
+        for jobs in (
+            [job(target, suite)],
+            [job(target, suite, "Fail if any suite failed")],
+            [job(target, "Boot Android emulator", suite)],
+            # A job that failed without a failed step timed out, possibly in a
+            # hung test.
+            [job(target)],
+            [job(target, "Boot Android emulator"), job("coverage / hygiene", suite)],
+        ):
+            with self.subTest(jobs=jobs):
+                self.assertFalse(retryable([*jobs, *aggregates]))
+        self.assertTrue(
+            retryable(
+                [
+                    job(target, "Boot Android emulator"),
+                    job("coverage / target / ohos-x64-egl", "Set up CI dependencies"),
+                    *aggregates,
+                ]
+            )
+        )
+        self.assertFalse(retryable(aggregates))
+        self.assertFalse(retryable([job(target, "Set up CI dependencies")]))
         self.assertFalse(
-            retryable(jobs + [{"name": "other", "conclusion": "cancelled"}])
+            retryable(
+                [
+                    job(target, "Set up CI dependencies"),
+                    *aggregates,
+                    {"name": "other", "conclusion": "cancelled"},
+                ]
+            )
         )
         self.assertTrue(
             retryable(
                 [
-                    {"name": "plan", "conclusion": "failure"},
-                    {"name": "ci-required (ready)", "conclusion": "failure"},
+                    job("plan", "Plan coverage"),
+                    job("ci-required (ready)", "Check coverage result"),
                 ]
             )
         )
+
+    def test_generated_workflows_name_every_infrastructure_step(self):
+        source, presets = load_configuration(ROOT)
+        names = {
+            step.get("name")
+            for document in workflows(source, presets).values()
+            for job in document["jobs"].values()
+            for step in job.get("steps", [])
+        }
+        # GitHub names its own setup and teardown steps.
+        self.assertEqual(INFRASTRUCTURE_STEPS - names, {"Set up job", "Complete job"})

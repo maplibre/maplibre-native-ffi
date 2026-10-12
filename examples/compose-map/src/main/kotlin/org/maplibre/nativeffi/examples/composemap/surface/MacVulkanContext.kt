@@ -258,13 +258,16 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device, which then stays until the
+    // process exits, as does its instance.
+    val destroy = !VulkanDeviceRetention.keepUntilExit
     device?.let {
       vkDeviceWaitIdle(it)
-      vkDestroyDevice(it, null)
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
   }
@@ -294,18 +297,8 @@ private constructor(
   private var image = NULL
   private var view = NULL
 
-  fun target(generation: Long): VulkanImageTarget =
-    VulkanImageTarget(
-      context = context.handles,
-      image = NativeHandle(image),
-      imageView = NativeHandle(view),
-      format = VK_FORMAT_B8G8R8A8_UNORM,
-      initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      queueFamilyIndex = context.handles.graphicsQueueFamilyIndex,
-      extent = extent,
-      generation = generation,
-    )
+  val slot: VulkanImageSlot
+    get() = VulkanImageSlot(NativeHandle(image), NativeHandle(view))
 
   private fun create() {
     MemoryStack.stackPush().use { stack ->
@@ -370,6 +363,23 @@ private constructor(
   }
 
   companion object {
+    /** The target of a ring of imported textures, one per slot in slot order. */
+    fun ringTarget(ring: List<MacVulkanImportedTexture>, generation: Long): VulkanImageTarget {
+      val front = ring.first()
+      return VulkanImageTarget(
+        context = front.context.handles,
+        image = front.slot.image,
+        imageView = front.slot.imageView,
+        format = VK_FORMAT_B8G8R8A8_UNORM,
+        initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        queueFamilyIndex = front.context.handles.graphicsQueueFamilyIndex,
+        extent = front.extent,
+        generation = generation,
+        ring = ring.map { it.slot },
+      )
+    }
+
     fun create(
       context: MacVulkanContext,
       metalTexture: NativeHandle,

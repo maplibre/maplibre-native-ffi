@@ -7,9 +7,9 @@ import { Aside } from "@astrojs/starlight/components";
 
 export const SnapshotOnly = () => (
   <Aside type="caution" title="Snapshot only">
-    This binding has no tagged release yet, and a snapshot floats with `main`, so
-    package names, coordinates, and the C ABI change between snapshots. Releases
-    begin when there is a known use case, so file a GitHub issue to request one.
+    This binding has no tagged release yet. Snapshots follow `main`, and package
+    coordinates and the C ABI may change. File a GitHub issue to request a tagged
+    release.
   </Aside>
 );
 
@@ -37,11 +37,9 @@ On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
 your executable, because a prefix carries no loader path there. Linux and macOS
 builds record an rpath into the prefix that they built against.
 
-Linux prefixes include the shared library, a complete static archive, and its
-companion platform archive. The archives can be linked into a static musl
-executable, but EGL and Vulkan still load system graphics drivers at run time.
-A fully static executable can therefore use non-rendering APIs, but rendering
-needs a dynamic loader and compatible driver libraries.
+Linux packages include shared and static libraries. Rendering still needs a
+dynamic loader and compatible system graphics drivers, even when the host links
+the library statically.
 
 Export `PKG_CONFIG_PATH` to build against the prefix:
 

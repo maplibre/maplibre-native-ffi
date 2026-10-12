@@ -1,6 +1,6 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
 # $1. Maps musl, Android, and OpenHarmony presets to their Cargo target. Exports
-# the cross-compilation environment (bindgen, CC/CXX, linker) from the Zig and
+# the cross-compilation environment (CC/CXX, linker) from the Zig and
 # Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty
 # for host presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
@@ -68,6 +68,9 @@ case "$1" in
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
+      return 2
+    fi
     descriptor="$MISE_MONOREPO_ROOT/build/$1/install/share/maplibre-native-c/artifact.json"
     zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
     if [[ ! "$zig_target" =~ ^((aarch64|x86_64|arm)-linux-android)\.([0-9]+)$ ]]; then
@@ -75,22 +78,11 @@ case "$1" in
       return 2
     fi
     android_api=${BASH_REMATCH[3]}
-    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
-    ndk_host_prebuilts=()
-    while IFS= read -r ndk_host_prebuilt; do
-      ndk_host_prebuilts+=("$ndk_host_prebuilt")
-    done < <(find "$ndk_prebuilt_root" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort)
-    if (( ${#ndk_host_prebuilts[@]} != 1 )); then
-      echo "The pinned Android NDK must contain one host prebuilt under $ndk_prebuilt_root." >&2
-      return 2
-    fi
-    ndk_prebuilt=${ndk_host_prebuilts[0]}
     compiler_target="$cargo_target"
     if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
       compiler_target=armv7a-linux-androideabi
     fi
     target_env="${cargo_target//-/_}"
-    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=${compiler_target}${android_api} --sysroot=\"$ndk_prebuilt/sysroot\""
     export "CC_$target_env=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang"
     export "CXX_$target_env=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang++"
     # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
@@ -103,7 +95,6 @@ case "$1" in
     sysroot="$OHOS_SDK_NATIVE/sysroot"
     target_flags="--target=$compiler_target --sysroot=$sysroot"
     target_env="${cargo_target//-/_}"
-    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
     export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"

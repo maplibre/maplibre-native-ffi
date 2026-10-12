@@ -21,13 +21,13 @@ logger as well. Forward records while validating a new host logger.
 
 <Code code={region(logCallback, "callback")} lang="c" title="log-callback.c" />
 
-One callback serves the whole process rather than one runtime, and MapLibre
-stores it by reference. Install it before the first runtime exists to catch
-setup records, and keep it valid until you replace or clear it.
+One callback serves the whole process. Install it before creating a runtime to
+catch setup records. Keep its user data alive until the handler retires; use its
+release callback to reclaim that state.
 
 <Code code={region(logCallback, "install")} lang="c" title="log-callback.c" />
 
-## The callback runs on MapLibre's threads
+## Receive records safely
 
 MapLibre invokes the callback on the thread that produced the record, including
 worker and network threads. The callback can run while MapLibre holds logging
@@ -37,7 +37,7 @@ Make the callback thread-safe and return quickly. Do not call a MapLibre functio
 from the callback; the call can deadlock. Copy and queue the record before
 returning when the host needs more processing.
 
-## Synchronous and asynchronous records
+## Choose delivery timing
 
 Errors reach the callback synchronously. Informational and warning records may
 arrive after the work that produced them. Asynchronous delivery keeps MapLibre
@@ -48,3 +48,6 @@ such as in a log assertion. Production hosts usually keep the default because
 synchronous delivery blocks MapLibre threads on the host logger.
 
 <Code code={region(logCallback, "async")} lang="c" title="log-callback.c" />
+
+The [logging reference](/maplibre-native-ffi/reference/c/logging_8h.html) defines
+handler retirement and delivery options.
