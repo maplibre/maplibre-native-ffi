@@ -311,23 +311,21 @@ extern "C" auto mln_test_discard_completion(void) -> mln_completion {
 extern "C" void mln_test_completion_destroy(mln_test_completion* completion) {
   auto* probe = state(completion);
   if (probe == nullptr) return;
+  auto released = false;
   {
     auto lock = std::unique_lock{probe->mutex};
-    // A missing release must not hang the suite. Leak the probe on timeout
-    // because a late release can still write through this pointer.
     mln_test_watchdog_note("a completion's release");
-    const auto released = probe->condition.wait_for(
+    released = probe->condition.wait_for(
       lock, remaining(mln_test_deadline_default()),
       [probe]() { return probe->released; }
     );
     mln_test_watchdog_note(nullptr);
-    if (!released) {
-      *completion = {};
-      return;
-    }
   }
-  delete probe;
   *completion = {};
+  // A late release can still write through the probe, so a missing release
+  // leaks it. The failure unwinds with longjmp, so no destructor may be live.
+  if (!released) TEST_FAIL_MESSAGE("native never released a completion");
+  delete probe;
 }
 
 extern "C" void mln_test_completion_reject(mln_test_completion* completion) {
