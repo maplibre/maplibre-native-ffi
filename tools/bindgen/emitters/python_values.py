@@ -93,7 +93,6 @@ class Values:
         self.inputs: dict[str, ValuePlan] = {}
         self.outputs: set[str] = set()
         self.defaults: set[str] = set()
-        # Handle types whose generated disposer an operation calls.
         self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
         self.item_buffers = {}
@@ -379,7 +378,6 @@ class Values:
                 return f"{{ let buffer = {converted}; {count} buffer.data.cast() }}"
             return converted
         if plan.kind == "record":
-            # A record with a native default converts None to that default.
             return f"generated_input_{plan.native}(&{expr}, storage)?"
         if plan.kind == "reference" and plan.element:
             inner = self.input(plan.element, expr, scope=scope)
@@ -464,7 +462,6 @@ class Values:
                 len(statements) == 1
                 and len(re.findall(r"\bfield\b", statements[0])) == 1
             ):
-                # A field read once reads its attribute in place.
                 lines[-1] = re.sub(
                     r"\bfield\b", f'value.getattr("{member}")?', statements[0]
                 )

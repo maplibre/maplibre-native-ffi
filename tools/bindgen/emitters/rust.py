@@ -157,7 +157,6 @@ def checked_call(
     return f"{runtime}::check(|diagnostic| unsafe {{ {call} }})"
 
 
-# Locals that a generated operation defines besides its parameters.
 LOCALS = {"call", "parent", "callback", "value", "future", "sys", "convert"}
 
 
@@ -206,7 +205,6 @@ def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
     public = f"Option<{public}>" if result.nullable else public
     if copied == "unsafe { from_native(value) }?":
         return public, f"completion::{rule}::<{raw}, _>"
-    # A value that its Rust type alone cannot copy converts element by element.
     copy = {
         "value": "copy_value",
         "optional": "optional_value",
@@ -311,8 +309,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         "event_batch",
     }:
         raise Unsupported(f"execution {execution} requires another ownership skeleton")
-    # The closure that makes the C call names the receiver after its C
-    # parameter, and passes a pointer receiver by address.
     if receiver:
         target = local_name(function.parameters[0].name)
         pointer_receiver = bool(function.parameters[0].type.pointee)
@@ -577,7 +573,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
                 raise Unsupported(f"{function.name}: status return has no diagnostic")
             ending = [f"call.status({closure} {native})?;", f"Ok({output})"]
             if plan.absence:
-                # The parent joins only an output that native published.
                 if parent_line:
                     prelude.remove(parent_line)
                 ending = [
@@ -605,7 +600,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         else:
             public = completed
             ending = [expression]
-    # The one owner that takes the parent moves it rather than cloning it.
     text = "\n".join(ending)
     if text.count("parent.clone()") == 1:
         ending = [line.replace("parent.clone()", "parent") for line in ending]
@@ -621,7 +615,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         ending.append("Ok(callback(&value))")
         signature.append(f"callback: impl FnOnce(&{public}) -> R")
         generic, public = "<R>", "R"
-    # Status and run calls borrow the call, and submissions consume it.
     mutable = "mut " if uses_call or not plan.completion else ""
     if consuming:
         if not receiver:
@@ -751,7 +744,6 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
 
     sys_declarations = rust_sys.declarations(bound)
     files[rust_sys.PATH] = sys_declarations.render()
-    # An operation calls its C function through the -sys declaration.
     for name, reason in sys_declarations.unsupported.items():
         if name in generated:
             generated.remove(name)

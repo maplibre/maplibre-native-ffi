@@ -213,9 +213,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         if claim
         else ""
     )
-    # A handle operation calls its receiver's NativeReceiver helpers. A
-    # callback-scoped response names itself as the owner its call acts on, and
-    # a global call has neither.
     target = f'"{function.name}"{access}'
     if plan.scoped_receiver:
         target = f'owner: self, "{function.name}"'
@@ -253,7 +250,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         result_type = returned.native if returned else "void"
         nullable = bool(returned and returned.nullable)
         empty_optional = bool(returned and returned.optional == "empty")
-        # An array's elements carry its text encoding.
         encoding = (
             (returned.element.encoding if shape == "array" else returned.encoding)
             if returned
@@ -261,7 +257,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         )
         start = "Start"
         conversion = ""
-        # A result that one initializer copies from its single native value.
         copying = None
         if execution == "command":
             if shape != "none" or result_type != "void":
@@ -312,7 +307,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 value_types.add(plan.result)
                 result = value_types.public(plan.result)
                 conversion = f"{'try ' if dynamic(plan.result) else ''}{result}(raw: try NativeCompletion.value(result, as: {result_type}.self))"
-                # A copied record's initializer also takes the record's bytes.
                 copying = (
                     f"{{ try {result}(raw: $0) }}"
                     if dynamic(plan.result)
@@ -401,7 +395,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 if owned.parent_parameter and owned.parent_parameter == plan.receiver:
                     parent = ", parent: self"
                 elif owned.parent_parameter:
-                    # A parent passed as another argument is that handle.
                     position = next(
                         i
                         for i, p in enumerate(params)
@@ -500,7 +493,6 @@ def lower(
         try:
             chunk, extended = operation(plan, value_types)
             if extended:
-                # Operations on one type share one extension per file.
                 chunk = (extended, chunk)
             receiver = next(
                 (item.value for item in plan.inputs if item.name == plan.receiver), None

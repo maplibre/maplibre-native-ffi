@@ -145,7 +145,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             local in KEYWORDS["dart"]
             or local in LOCALS - {"value"}
             or local.startswith("native")
-            # The generated library imports the C declarations as `raw`.
             or local == "raw"
         ):
             local += "Value"
@@ -480,7 +479,6 @@ def lower(api: Api | BoundApi):
             methods[owner].append(body)
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
-                # The receiver roots the ports of the callbacks it registers.
                 port_owners.add(owner)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"

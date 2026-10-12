@@ -19,7 +19,6 @@ from .zig import (
 )
 from .zig_dynamic_values import dynamic
 
-# Names that a generated operation body refers to besides its parameters.
 RESERVED = {
     "allocator",
     "diagnostic",
@@ -89,7 +88,6 @@ def parent_of(plan, owner):
         return ".none"
     if parent == plan.receiver:
         return ".receiver"
-    # Arguments are the parameters after the receiver, without the completion.
     arguments = [
         p.name
         for p in plan.function.parameters
@@ -115,7 +113,6 @@ def copier(plan, values):
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)
     if result.kind == "array":
-        # call.slice steps by the completion's value_size.
         if result.item_buffer:
             raise failure(
                 plan.function, "array results with an item buffer need a record copy"

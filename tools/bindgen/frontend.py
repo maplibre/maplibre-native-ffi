@@ -107,7 +107,6 @@ class Extractor:
         self.include_directory = include_directory.resolve()
         self.errors: list[str] = []
         self.records: dict[str, Record] = {}
-        # Each header's source, forward and reversed.
         self.sources: dict[str, tuple[bytes, bytes]] = {}
 
     def location(self, cursor: cindex.Cursor) -> Location:

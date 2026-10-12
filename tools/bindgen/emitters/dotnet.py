@@ -36,7 +36,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
     function = plan.function
     execution = plan.execution
     result = plan.result
-    # An array result's elements carry the value attributes.
     value = result.element if result and result.kind == "array" else result
     if execution == "query" and (result is None or result.ownership != "borrowed"):
         return "query requires borrowed result storage"
@@ -136,8 +135,6 @@ def owner_name(handle: HandlePlan | str) -> str:
     return pascal(stem) + "Handle"
 
 
-# Every generated public type shares the binding's root namespace, as each
-# other binding exposes one flat module. Files stay grouped by their header.
 NAMESPACE = "Maplibre.NativeFfi"
 
 
@@ -159,8 +156,6 @@ HEADER = (
     "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
 )
 
-# Operations and converters import the members of the helpers they call
-# themselves, which keeps short names such as Check out of handwritten files.
 OPERATION_HELPERS = (
     "using static Maplibre.NativeFfi.Internal.NativeCall;\n"
     "using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n\n"
@@ -211,7 +206,6 @@ def completion_query(
     if result is None:
         return "Task", "Run", ""
     shape = "array" if result.kind == "array" else "value"
-    # An array result's elements carry the value attributes.
     value = result.element if shape == "array" else result
     native = value.native
     nullable = result.nullable
@@ -238,7 +232,6 @@ def completion_query(
         scalar = PRIMITIVES[native]
         return scalar, f"Query<{scalar}, {scalar}>", "static value => value"
     if value.kind == "record":
-        # Validate the whole record before emitting the operation.
         record = values.record(native)
         values.decoder(record)
         records.add(native)
@@ -419,7 +412,6 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
             args.append(f"checked(({PRIMITIVES[type_name(parameter.type)]}){size})")
             continue
-        # The raw C type maps to its C# ABI carrier; the plan decides the rest.
         ctype = type_name(parameter.type)
         value_plan = input_plans.get(parameter.name)
         output = outputs_by_name.get(parameter.name)
@@ -651,8 +643,6 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
     prologue = entry + prologue + claim
     arguments = ", ".join(args)
-    # A free function that creates one owner is that owner's static factory,
-    # named without the owner's prefix.
     prefix = bound.handles[factory].prefix + "_" if factory else None
     name = pascal(
         function.name.removeprefix(prefix)
@@ -804,7 +794,6 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         else:
             result_type, result = "void", None
         if plan.absence:
-            # Only an owned handle has an executed absence probe.
             raise Unsupported("absence requires an owned handle output")
         body = prologue + [checked_call(function, arguments)]
         if scoped:
@@ -888,7 +877,6 @@ def emit(api: Api | BoundApi) -> Emission:
         methods[owner].append(doc(bound, function.name, "    ") + emitted)
         records[owner].update(used_records)
         supported.append(function.name)
-        # An owner without a declaration of its own lives with its first operation.
         owner_headers.setdefault(owner, function.location.path)
     files = {}
     files.update(dotnet_native.generate(bound))
@@ -999,20 +987,14 @@ def emit(api: Api | BoundApi) -> Emission:
         set().union(*records.values()) if records else set()
     )
     values = Values(bound)
-    # Every public enum is a public type, as in the other bindings, whether or
-    # not a generated signature names it.
     enum_names = set()
     for value in bound.public_values.values():
         if value.kind == "enum":
             try:
                 values.supported(value)
             except Unsupported:
-                # The operations that use the enum report it unsupported.
                 continue
             enum_names.add(value.native)
-    # A handle owner's file sits with its release, a callback response scope's
-    # with its record, and an owner without a declaration with its first
-    # operation.
     declared_owners = {
         owner_name(handle): api.functions_by_name[handle.release].location.path
         for handle in bound.handles.values()
@@ -1025,7 +1007,6 @@ def emit(api: Api | BoundApi) -> Emission:
         owner: directory_for(declared_owners.get(owner, owner_headers[owner]))
         for owner in methods
     }
-    # Every generated file shares one set of imports.
     files["GlobalUsings.g.cs"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"
         + "global using Maplibre.NativeFfi.Internal;\n"
@@ -1033,7 +1014,6 @@ def emit(api: Api | BoundApi) -> Emission:
             f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
             for namespace in ("C", "Callback", "Memory", "Pointer", "Struct")
         )
-        # Generated values name presence bits without their enum.
         + "".join(
             f"global using static Maplibre.NativeFfi.Internal.C.{enum};\n"
             for enum in sorted(

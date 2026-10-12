@@ -89,8 +89,6 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         plan = bound.operations_by_name[function.name]
         receiver = receiver_value(plan).native if plan.receiver else None
         groups.setdefault(receiver, []).append(plan)
-    # Every generated owner extends its operations class, even when no
-    # operation names it as a receiver.
     for owner in generated_owners(bound):
         groups.setdefault(owner, [])
     outputs = {}

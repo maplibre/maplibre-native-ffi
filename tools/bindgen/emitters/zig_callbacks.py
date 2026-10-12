@@ -82,7 +82,6 @@ def parts(values, value):
         policy = plan.reentry_policy
         owner = "0"
         if policy and policy.owner_parameter is None:
-            # The receiver that registered the callback, which the roots record.
             owner = "state.owner"
         elif policy:
             parameter = next(
@@ -118,7 +117,6 @@ def parts(values, value):
             )
             decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
             action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
-        # Decode errors are contained at the C callback boundary.
         body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} "
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "

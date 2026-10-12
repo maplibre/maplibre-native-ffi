@@ -84,7 +84,6 @@ class Declarations:
         if ctype.kind in {"char_u", "uchar"}:
             return "byte"
         if "(*)" in ctype.canonical or ctype.canonical.endswith("*"):
-            # A function pointer that a header outside this API declares.
             return "void*"
         raise ValueError(f"{ctype.spelling}: no C# representation")
 
@@ -148,7 +147,6 @@ class Declarations:
             f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.field_type(field)} {identifier(field.name)};\n"
             for field in record.fields
         )
-        # A fixed-size array field sits inline as an InlineArray of its length.
         arrays = "".join(
             f"\n    [System.Runtime.CompilerServices.InlineArray({array.length})]\n"
             f"    public struct {pascal(field.name)}Array\n    {{\n"

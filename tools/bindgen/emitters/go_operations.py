@@ -213,7 +213,6 @@ def operation(plan, values):
         adoptions.append(f"arena.accept({first}.bindingOwner)")
     for registration in plan.registrations:
         if registration.accepted_unless:
-            # Native kept nothing from a declined registration.
             declined = next(
                 local
                 for p, _, local in outputs
@@ -256,7 +255,6 @@ def operation(plan, values):
                 parent = parent_of(plan.completion.result_owner)
                 convert = f"completionOf(func(raw C.{result.native}) {completion_type} {{ return adopt{values.owner(result.native)}(uint64(raw), {parent}) }})"
             elif result.kind == "array":
-                # completionListOf steps by the completion's value_size.
                 if result.item_buffer:
                     values.fail(result, "array result needs a copy adapter")
                 helper = (
@@ -352,7 +350,6 @@ def operation(plan, values):
     else:
         check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
         if plan.absence:
-            # A handle is absent as nil; a value becomes a pointer that is.
             if outputs[0][1].kind != "handle":
                 returned = "*" + returned
                 adoptions.append(f"value := {converted}")

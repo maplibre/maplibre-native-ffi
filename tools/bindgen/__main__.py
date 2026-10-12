@@ -18,7 +18,6 @@ from .schema import validate
 from .semantic import support_relation
 
 ROOT = Path(__file__).resolve().parents[2]
-# The coverage report also lists every output, so the next run finds stale ones.
 COVERAGE = "bindings/generated-coverage.json"
 
 

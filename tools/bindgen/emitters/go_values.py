@@ -417,7 +417,6 @@ class Values:
                 lines = []
                 for member, v, f in members:
                     if v and v.registration:
-                        # A copy leaves a registration unset.
                         continue
                     if v is None:
                         lines.append(

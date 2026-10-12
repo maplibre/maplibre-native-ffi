@@ -16,7 +16,6 @@ from tools.bindgen.semantic import BoundApi
 
 PATH = "bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart"
 
-# C scalar spellings and their `dart:ffi` native types.
 NATIVE = {
     "bool": "Bool",
     "_Bool": "Bool",
@@ -101,7 +100,6 @@ class Declarations:
         if ctype.canonical in NATIVE:
             return NATIVE[ctype.canonical]
         if "(*)" in ctype.canonical or ctype.canonical.endswith("*"):
-            # A function pointer that a header outside this API declares.
             return "Pointer<Void>"
         raise ValueError(f"{ctype.spelling}: no dart:ffi representation")
 
@@ -137,7 +135,6 @@ class Declarations:
                 break
             ctype = self.typedefs[ctype.declaration].type
         if ctype.kind == "array" and ctype.element is not None:
-            # A fixed-size array sits inline in its record.
             if ctype.length is None:
                 raise ValueError(f"{ctype.spelling}: a flexible array has no layout")
             element = self.native(ctype.element, field=True)

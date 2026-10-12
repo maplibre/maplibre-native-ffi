@@ -24,7 +24,6 @@ class LayoutError(ValueError):
     pass
 
 
-# A primitive's name, its byte size per data model, and its Kotlin carrier.
 @dataclass(frozen=True)
 class Primitive:
     name: str

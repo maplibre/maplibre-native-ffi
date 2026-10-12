@@ -83,7 +83,6 @@ JVALUE = {
     "Double": "d",
 }
 
-# Kotlin/Native: from a carrier to the cinterop parameter, and back.
 TO_CINTEROP = {
     "bool": "",
     "i8": "",
@@ -141,7 +140,6 @@ class Parameter:
     c_name: str
     ctype: CType
     kind: object
-    # The trailing address a record result that C returns by value goes to.
     returned: bool = False
 
     @property
@@ -214,8 +212,6 @@ class NativeShims:
     def kotlin_parameters(self, signature):
         return ", ".join(f"{p.name}: {p.carrier}" for p in signature.parameters)
 
-    # Common.
-
     def common(self):
         lines = [
             f"  fun {s.function}({self.kotlin_parameters(s)}): {s.carrier}"
@@ -263,8 +259,6 @@ class NativeShims:
             + "\n\n".join(objects)
             + "\n"
         )
-
-    # JVM.
 
     def ffm_layout(self, kind):
         """The FFM layout expression of a C type inside a record."""
@@ -376,8 +370,6 @@ class NativeShims:
             + "\n}\n",
         }
 
-    # Kotlin/Native.
-
     def opaque(self, ctype):
         """Whether a pointer type points to void, which cinterop imports as COpaquePointer."""
         pointee = ctype.pointee
@@ -486,8 +478,6 @@ class NativeShims:
             + "\n".join(stubs)
             + "\n}\n",
         }
-
-    # Android.
 
     def android(self):
         externals = [

@@ -144,10 +144,8 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     }
 )
 ENUM_KEYS = frozenset({"kind"})
-# Function keys that describe a returned value rather than the call.
 VALUE_KEYS = COMMON_KEYS | frozenset({"kind", "length", "enum"})
 
-# The roles that `kind` names at each declaration site.
 KINDS = {
     "function": frozenset({"native_pointer"}),
     "parameter": frozenset({"context", "native_pointer"}),
@@ -169,7 +167,6 @@ KINDS = {
 }
 
 
-# Integer ranges of the scalar results a deferred callback can answer with.
 INTEGER_RANGES = {
     "_Bool": (0, 1),
     "bool": (0, 1),
@@ -193,7 +190,6 @@ DEFAULT_RANGES = {
 }
 INTEGER_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)")
 DECIMAL_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)\.[0-9]+")
-# The conventional `default` of each control role that has one.
 CONTROL_DEFAULTS = {"size": "sizeof", "reserved": "0"}
 
 
@@ -214,7 +210,6 @@ def has_diagnostic(function: Function) -> bool:
 # The name is the convention's only signal, since other structs begin with an
 # unrelated uint32_t member.
 STRUCT_SIZE_FIELD = "size"
-# Pointers whose kind already says that the generator never reads through them.
 OPAQUE_POINTER_KINDS = frozenset({"context", "native_pointer", "erased"})
 TEXT_POINTEE_KINDS = frozenset({"char_s", "char_u"})
 
@@ -1451,8 +1446,6 @@ def defaulted_records(api: Api) -> set[str]:
         for field in record.fields:
             if "mask" in field.metadata or is_buffer_view(field.type):
                 continue
-            # An array, a union, or a union's integer tag resolves to no
-            # struct, so the loop skips it.
             pending.append(conventions.resolve(field.type).declaration or "")
     return found
 
@@ -1531,8 +1524,6 @@ def field_default_errors(api: Api) -> list[str]:
     return errors
 
 
-# Keys whose values name other declarations, by the kind of declaration named.
-# A list value separates its names with commas.
 FUNCTION_REFERENCES = {
     "function": (),
     "typedef": (

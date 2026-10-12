@@ -20,7 +20,6 @@ class Unsupported(ValueError):
     pass
 
 
-# Public Kotlin type and accessor suffix for each portable scalar carrier.
 SCALARS = {
     "bool": ("Boolean", "Bool"),
     "_Bool": ("Boolean", "Bool"),
@@ -48,7 +47,6 @@ SCALARS = {
     "long": ("Long", "I64"),
 }
 
-# The conversion from a public scalar type to its native-call carrier.
 CARRIER = {
     "Boolean": "",
     "Double": "",
@@ -167,9 +165,7 @@ class Values:
         self.attachments = {}
         self.writers = {}
         self.readers = {}
-        # The C functions that codecs call, which the native shims declare.
         self.functions = {}
-        # Upcall sites by name, which kotlin_callbacks.sites fills on first use.
         self.sites = None
 
     def default_call(self, value):
@@ -177,8 +173,6 @@ class Values:
         function = self.bound.source.functions_by_name[value.default]
         self.functions[function.name] = function
         return f"C.{function.name}(target)"
-
-    # Public types.
 
     def needs_registration(self, value):
         return bool(
@@ -505,8 +499,6 @@ class Values:
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 
-    # Layout facts.
-
     def storage(self, ctype):
         """Allocate one value of a C type with that type's size and alignment."""
         return (
@@ -551,8 +543,6 @@ class Values:
         """The accessor suffix and public type of a scalar or enum's storage."""
         typ, suffix = self.scalar(value)
         return suffix, typ
-
-    # Writing.
 
     def write_scalar(self, value, address, expression):
         suffix, _typ = self.accessor(value)
@@ -801,8 +791,6 @@ class Values:
             for key, number in value.enum_values
             if key == symbol
         )
-
-    # Reading.
 
     def read(self, record):
         """Name the reader of [record], emitting it once."""

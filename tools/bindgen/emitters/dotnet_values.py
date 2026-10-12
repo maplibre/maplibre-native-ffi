@@ -85,7 +85,6 @@ class Values:
         self.api = self.bound.source
         self.plans: dict[str, ValuePlan] = {}
         self.enum_names: set[str] = set()
-        # The mask enums whose members generated values name unqualified.
         self.mask_enums: set[str] = set()
         self.item_buffers = {
             field.value.element.native: field.value.item_buffer
@@ -97,7 +96,6 @@ class Values:
     def record(self, name: str) -> ValuePlan:
         try:
             plan = self.bound.values[name]
-            # A record typedef's underlying CType names its struct declaration.
             self.supported(plan)
         except (ModelError, KeyError) as error:
             raise Unsupported(f"{name}: no resolved record value: {error}") from error
@@ -1186,8 +1184,6 @@ class Values:
                 + "\n".join(properties)
                 + "\n}\n"
             )
-        # A positional record documents each property as a parameter, in the
-        # comment that the record's own summary begins.
         params = "".join(
             docs.xml_param(self.bound.doc(f"{plan.native}.{field.name}"), name)
             for name, field in self.members(plan)

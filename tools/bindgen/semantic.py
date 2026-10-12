@@ -48,8 +48,6 @@ class HandlePlan:
     finalize: tuple[str, ...] = ()
     view_begin: str | None = None
     view_end: str | None = None
-    # The name that the handle's operations begin with: its `prefix=` metadata,
-    # or the handle's own name.
     prefix: str = ""
     # Whether the handle is a root whose release is a lifecycle operation that
     # reports retirement through its completion, so a host can wait for it.
@@ -93,7 +91,6 @@ class MaskFlag:
     mask: str
     name: str
     value: int
-    # The flag's public member name: the constant without its enum's prefix.
     member: str = ""
 
 
@@ -201,8 +198,6 @@ class FieldPlan:
     name: str
     value: ValuePlan
     presence: Presence | None = None
-    # A control role's conventional value: `sizeof` for a size, `0` for
-    # reserved space.
     default: str | None = None
     # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
     # a binding writes or derives rather than a member a host sets or reads.
@@ -247,7 +242,6 @@ class CallbackPlan:
     # The C result an adapter may return at once for a host that receives a
     # copy of the call later.
     deferred: str | None = None
-    # Whether the callback returns the status enum.
     status: bool = False
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
@@ -278,8 +272,6 @@ class BorrowedViewPlan:
     output: ParameterPlan
     begin: str
     end: str
-    # The accessor's name without its verb: the operation member without a
-    # leading `get_`, so a scoped accessor reads as `with_<stem>`.
     stem: str
 
 
@@ -316,7 +308,6 @@ class AbsencePlan:
     error, and adopts or copies the output only on success.
     """
 
-    # The status enumerator, and its value.
     status: str
     value: int
     output: ParameterPlan
@@ -338,11 +329,7 @@ class OperationPlan:
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
     receiver_access: str = "live"
-    # Whether the function returns the status enum, which a binding checks
-    # rather than returns.
     status: bool = False
-    # The operation's language-neutral member name, which every binding only
-    # case-converts and escapes; see `Binder.member`.
     member: str = ""
     absence: AbsencePlan | None = None
 
@@ -578,7 +565,6 @@ class Binder:
                 if typedef.metadata.get("parent", "none") == "none"
                 else typedef.metadata["parent"],
                 typedef.metadata.get("dispose"),
-                # A release that cannot fail consumes its handle every time.
                 "always"
                 if api.functions_by_name[typedef.metadata["release"]].return_type.kind
                 == "void"
@@ -1212,7 +1198,6 @@ class Binder:
             raise ModelError(
                 [f"{context}: consumption requires a managed handle receiver"]
             )
-        # A callback response's operations take the response record first.
         scoped_receiver = next(
             (
                 parameter.name
@@ -1454,7 +1439,6 @@ class Binder:
             )
             for parameter in typedef.parameters
         )
-        # Native passes the arguments that a callback does not write.
         self.returned |= self.copied(
             tuple(p for p in parameters if p.direction != "out"), None, context
         )

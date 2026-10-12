@@ -42,8 +42,6 @@ def failure(decl: Function | Record, reason: str) -> ModelError:
     return ModelError([f"{decl.location}: Zig: {decl.name}: {reason}"])
 
 
-# A public function whose native call reports a diagnostic takes an optional
-# Diagnostic last, and any error it returns records its details there.
 DIAGNOSTIC_PARAMETER = "diagnostic: ?*diagnostics.Diagnostic"
 DIAGNOSTIC_PREAMBLE = [
     "status.begin(diagnostic);",
@@ -167,8 +165,6 @@ pub const OwnedValue = marshal.OwnedValue;
             doc(bound, handle.native)
             + f'pub const {public} = owner.Handle("{handle.native}", "{public}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
         )
-    # The generated surface is the package root, next to the runtime types it
-    # exposes, so the package needs no file of re-exports.
     docs = (
         "//! Header-generated API. Release owners explicitly or call deinit.\n"
         "//! OwnedValue snapshots and futures retain their allocator until deinit.\n"

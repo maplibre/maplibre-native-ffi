@@ -10,7 +10,6 @@ class Values:
     def __init__(self, bound: BoundApi):
         self.bound = bound
         self.used: dict[str, ValuePlan] = {}
-        # The conversions each record needs: "in" to native, "out" from it.
         self.directions: dict[str, set[str]] = {}
         self.item_buffers = {}
 
@@ -107,7 +106,6 @@ class Values:
             self.used[value.native] = value
         if value.kind in {"record", "union"}:
             wanted = {"in", "out"} if direction == "both" else {direction}
-            # A native default converts from native for the Default impl.
             if value.default:
                 wanted.add("out")
             known = self.directions.setdefault(value.native, set())

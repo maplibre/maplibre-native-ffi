@@ -391,7 +391,6 @@ def immediate(plan, values, native):
         setup.append("val raw = " + native.call(plan.function, arguments))
         decoded = result_value(result, values).replace("{raw}", "raw")
     elif plan.absence:
-        # Only an owned handle has an executed absence probe.
         raise Unsupported("absence requires an owned handle output")
     else:
         setup.append(native.checked(plan.function, arguments))

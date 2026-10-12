@@ -2,7 +2,6 @@
 
 from .names import camel, pascal, type_name
 
-# Words that no Dart declaration can use as a name.
 DART_RESERVED = {
     "assert",
     "break",
@@ -39,7 +38,6 @@ DART_RESERVED = {
     "with",
 }
 
-# Dart built-in and contextual identifiers, which some declarations cannot use.
 DART_BUILTIN = {
     "Function",
     "abstract",
@@ -77,8 +75,6 @@ DART_BUILTIN = {
     "yield",
 }
 
-# Reserved words of .NET and Dart. Each emitter escapes, renames, or rejects a
-# public name that matches one.
 KEYWORDS = {
     "dotnet": {
         "abstract",

@@ -17,7 +17,6 @@ from ..semantic import BoundApi
 
 PATH = "crates/maplibre-native-ffi-sys/src/generated.rs"
 
-# Rust spellings of the C scalars, by typedef or builtin kind.
 SCALARS = {
     "int8_t": "i8",
     "uint8_t": "u8",

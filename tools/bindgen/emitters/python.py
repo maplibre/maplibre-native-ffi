@@ -38,9 +38,7 @@ SCALARS = {
     "int64_t": ("i64", "int"),
     "size_t": ("usize", "int"),
 }
-# Public owner class names by native handle type.
 OWNERS: dict[str, str] = {}
-# Runtime adapter exports, which no owner disposes through.
 RUNTIME_EXPORTS: set[str] = set()
 
 
@@ -528,7 +526,6 @@ def operation(
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         if decision and plan.name == decision.handle.release:
             body = [line for line in setup if "let storage =" not in line] + [
-                # Native release retires the cancel registration and its root.
                 "        unsafe { call.run(|| self.state.close()) };",
                 "        Ok(py.None())",
             ]
@@ -605,7 +602,6 @@ def operation(
                         f"_adopt_value({expression}, {result_owner!r}, {parent})"
                     )
             else:
-                # Only an owned handle has an executed absence probe.
                 if absence:
                     raise unsupported(
                         function, "absence requires an owned handle output"
@@ -646,7 +642,6 @@ def operation(
                 function, "multiple owners require an explicit callback owner"
             )
         if plan.completion and not outputs:
-            # Submission validates acceptance before transferring native roots.
             index = next(i for i, line in enumerate(body) if f"{helper}(" in line)
             body[index] = (
                 body[index].replace(
@@ -766,7 +761,6 @@ def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
     )
     exit_release = "None"
     if handle.observable_root_release:
-        # Interpreter shutdown starts this release and waits for its completion.
         exit_release = f"Some(generated_exit_release_{native})"
         call = native_call(
             bound.source.functions_by_name[handle.release],
@@ -915,7 +909,6 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if support and isinstance(support.support, DisposeSupport):
             errors.pop(handle.dispose, None)
         disposer = bound.source.functions_by_name[handle.dispose]
-        # Finalization reports only whether disposal succeeded.
         call = f"unsafe {{ {native_call(disposer, ['handle'], diagnostic='std::ptr::null_mut()')} }}"
         if ctype(disposer.return_type) == "void":
             call += "; sys::MLN_STATUS_OK"

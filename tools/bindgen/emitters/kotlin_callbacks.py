@@ -21,12 +21,10 @@ class Site:
     """A C function pointer that calls one `Upcalls` method."""
 
     name: str
-    # (Kotlin name, C type, carrier) per parameter, then the C result type.
     parameters: tuple[tuple[str, CType, str], ...]
     result: CType
     result_carrier: str
     body: str
-    # The carrier literal native receives when the upcall cannot run.
     failure: str = "0"
 
 
@@ -120,9 +118,6 @@ def check_decode(value):
             )
     elif value.response:
         raise Unsupported("a callback response is valid only during its callback")
-
-
-# Upcall sites.
 
 
 VOID_POINTER = CType(
@@ -252,7 +247,6 @@ def callback_site(site_name, callback_value, member, root_type, values):
     callback = values.bound.callbacks[callback_value.native]
     owner = None
     if callback.reentry_policy and callback.reentry_policy.owner_parameter is None:
-        # The root records the receiver that registered the callback.
         owner = "{ it.owner }"
     elif callback.reentry_policy and callback.reentry_policy.owner_parameter:
         owner = "{ " + identifier(callback.reentry_policy.owner_parameter) + " }"
@@ -364,9 +358,6 @@ def upcalls(values):
     )
 
 
-# Registration descriptors.
-
-
 def put_function(value, values):
     """Write a callback registration descriptor, rooting its value until native releases it."""
     public_name = name(value.native)
@@ -456,9 +447,6 @@ def read_function(value, values):
     )
 
 
-# Operations that a callback transaction shapes.
-
-
 def operation(plan, values, native):
     from .kotlin_operations import (
         call_arguments,
@@ -505,7 +493,6 @@ def operation(plan, values, native):
                 f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
             )
         scoped = parameter_name(plan.scoped_receiver)
-        # nativeRespond has checked the scope and passes the response as the call's handle.
         index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
         arguments[index] = "handle"
         return (

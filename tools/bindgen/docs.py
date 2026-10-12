@@ -21,7 +21,6 @@ from .model import Api
 
 REFERENCE = "https://maplibre.org/maplibre-native-ffi/reference/c/"
 
-# Generated comment lines stay within this width, including indentation.
 WIDTH = 80
 
 _SECTION = re.compile(r"^[A-Z][A-Za-z ]*:$")
@@ -86,7 +85,6 @@ class Doc:
 
     symbol: str
     summary: str
-    # The reference page, or empty for a member, whose owner carries the link.
     url: str = ""
 
 

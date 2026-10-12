@@ -28,9 +28,7 @@ class CompletionResultPlan:
     # The C spelling of one delivered value, or of one element of an array, or
     # None when the function delivers only a status.
     type: str | None = None
-    # Whether the completion delivers `value_count` values rather than one.
     array: bool = False
-    # Whether a successful completion may deliver no value.
     nullable: bool = False
 
 

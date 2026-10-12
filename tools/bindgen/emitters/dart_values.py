@@ -74,7 +74,6 @@ def identifier(native: str) -> str:
 class Values:
     def __init__(self, bound: BoundApi):
         self.bound = bound
-        # The owners whose generated operations root callback ports.
         self.port_owners: set[str] = set()
         self.used: dict[str, ValuePlan] = {
             name: value
@@ -82,7 +81,6 @@ class Values:
             if value.kind == "enum"
         }
 
-        # The completion descriptors that queries name, by descriptor name.
         self.results: dict[str, str] = {}
 
     def scalar(self, value):
@@ -1064,7 +1062,6 @@ class Values:
 
     def render(self):
         declarations, conversions = [], []
-        # The first declaration that each value renders carries its comment.
         documented = []
         for value in list(self.used.values()):
             documented.append((len(declarations), value.native))
@@ -1141,7 +1138,6 @@ class Values:
                 f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
                 for name, flag in flags
             )
-            # A record whose field order is its meaning constructs positionally.
             positional = value.ordered
             args, initializers = [], []
             for name, typ, field in members:
@@ -1232,7 +1228,6 @@ class Values:
                     ]
                 elif field.value.kind == "array":
                     child = field.value.element
-                    # A null list leaves the zeroed pointer and count.
                     items = expression + "!" if field.value.nullable else expression
                     lines = [
                         f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",

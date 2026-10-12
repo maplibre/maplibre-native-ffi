@@ -57,7 +57,6 @@ def encode(values, value, source):
     ):
         converted = encode(values, replace(value, nullable=False, optional=None), "$0")
         fallback = " ?? mln_buffer_view()" if value.buffer_form == "view" else ""
-        # Arena arrays and counted pointer buffers are already optional.
         method = (
             "flatMap"
             if value.kind == "array"
@@ -173,7 +172,6 @@ def decode(values, value, source, context="raw"):
         if info:
             copier = "copyUTF8" if info.encoding == "utf8" else "copyData"
             extra = f", {identifier(camel(info.field))}: NativeInputArena.{copier}Slice(data: {context}.{identifier(info.data)}, size: {context}.{identifier(info.size)}, offset: item.{identifier(info.offset)}, length: item.{identifier(info.length)})"
-        # Only a dynamic record keeps the raw bytes an unknown variant forwards.
         item = (
             f"item, bytes in try {values.public(value.element)}(raw: item, recordBytes: bytes{extra})"
             if dynamic(value.element) or extra
