@@ -420,6 +420,45 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   detach_keeping_the_ring(runtime, map, &fixture);
 }
 
+static void frame_release_checks_ownership_before_consumer_sync(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture, mln_test_empty_style_json);
+  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 170);
+  const mln_acquired_frame owned = frame;
+  void* scope = NULL;
+  MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scope, NULL));
+  mln_gpu_sync unsupported = mln_gpu_sync_default();
+  unsupported.kind = 999;
+  MLN_TEST_STATUS(
+    MLN_STATUS_BUSY, mln_acquired_frame_release(&frame, &unsupported, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(owned, frame);
+  mln_acquired_frame_view_end(scope);
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED,
+    mln_acquired_frame_release(&frame, &unsupported, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(owned, frame);
+  mln_render_frame_result result = {.size = sizeof(result)};
+  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
+  TEST_ASSERT_EQUAL_UINT64(170, result.token);
+  mln_test_render_release_frame(&frame);
+
+  mln_test_completion detached = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_render_session_detach(fixture.session, &detached.descriptor, NULL)
+  );
+  mln_acquired_frame stale = owned;
+  MLN_TEST_INVALID_STATE(
+    mln_acquired_frame_release(&stale, &unsupported, NULL)
+  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detached));
+  mln_test_completion_destroy(&detached);
+  detach(runtime, map, &fixture);
+}
+
 // Each scope holds the frame: an explicit release reports busy, and leaves
 // the caller the handle, until every scope has ended.
 static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
@@ -771,6 +810,7 @@ MLN_TEST_GROUP {
   RUN_TEST(only_the_sessions_backend_describes_its_frame_texture);
   RUN_TEST(accessors_and_release_reject_a_broken_frame_or_record);
   RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
+  RUN_TEST(frame_release_checks_ownership_before_consumer_sync);
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);
   RUN_TEST(a_fully_quarantined_ring_takes_no_more_demands);

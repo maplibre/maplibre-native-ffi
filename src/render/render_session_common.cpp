@@ -3471,10 +3471,18 @@ auto acquired_frame_release(
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(*frame);
   if (live == nullptr) return recorded_handle_fault_status();
-  // Reject an unsupported sync before consuming the handle: the host keeps
-  // frame ownership, and a slot never returns to the ring without its wait.
   {
     const auto lock = std::scoped_lock{live->session->control_mutex};
+    if (live->active_views) {
+      set_thread_error("acquired frame has active borrowed views");
+      return MLN_STATUS_BUSY;
+    }
+    if (!live->valid.load()) {
+      set_thread_error("acquired frame was already released");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    // A valid frame keeps detach from destroying the backend. Reject an
+    // unsupported sync before consuming the handle, so the host keeps it.
     if (
       live->session->texture.backend &&
       !live->session->texture.backend->supports_consumer_sync(
@@ -3483,13 +3491,6 @@ auto acquired_frame_release(
     ) {
       set_thread_error("render backend does not support this gpu sync kind");
       return MLN_STATUS_UNSUPPORTED;
-    }
-  }
-  {
-    const auto lock = std::scoped_lock{live->session->control_mutex};
-    if (live->active_views) {
-      set_thread_error("acquired frame has active borrowed views");
-      return MLN_STATUS_BUSY;
     }
     auto claimed = true;
     if (!live->valid.compare_exchange_strong(claimed, false)) {
