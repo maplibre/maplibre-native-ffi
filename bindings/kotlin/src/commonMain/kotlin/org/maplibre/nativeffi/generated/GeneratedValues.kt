@@ -2332,9 +2332,9 @@ public data class GeojsonSourceOptions(
   public val clusterProperties: ByteArray? = null,
   /** Tile extent in pixels. Defaults to 512. */
   public val tileSize: UInt? = null,
-  /** Tile buffer in pixels. Defaults to 128. */
+  /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
   public val buffer: UInt? = null,
-  /** Cluster radius in pixels. Defaults to 50. */
+  /** Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50. */
   public val clusterRadius: UInt? = null,
   /** Points required to form a cluster. Defaults to 2. */
   public val clusterMinPoints: UInt? = null,

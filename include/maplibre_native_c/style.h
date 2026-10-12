@@ -412,10 +412,10 @@ typedef struct mln_geojson_source_options {
   /** Tile extent in pixels. Defaults to 512. */
   uint32_t tile_size
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE");
-  /** Tile buffer in pixels. Defaults to 128. */
+  /** Tile buffer in pixels within [0, 512]. Defaults to 128. */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_BUFFER");
-  /** Cluster radius in pixels. Defaults to 50. */
+  /** Cluster radius in pixels within [0, 4095]. Defaults to 50. */
   uint32_t cluster_radius
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS");
   /** Points required to form a cluster. Defaults to 2. */

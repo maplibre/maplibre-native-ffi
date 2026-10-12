@@ -342,12 +342,12 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     set_thread_error("tile_size must be within [1, 65535]");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.buffer > 65535U) {
-    set_thread_error("buffer must be at most 65535");
+  if (effective.buffer > 512U) {
+    set_thread_error("buffer must be at most 512");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.cluster_radius > 65535U) {
-    set_thread_error("cluster_radius must be at most 65535");
+  if (effective.cluster_radius > 4095U) {
+    set_thread_error("cluster_radius must be at most 4095");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (

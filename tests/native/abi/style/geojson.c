@@ -339,6 +339,43 @@ static void geojson_max_zoom_respects_the_tiling_limit(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
 }
 
+static void geojson_pixel_options_respect_the_scaled_limits(void) {
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  options.fields = MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+  options.buffer = 512;
+  mln_geojson_source_data_destroy(
+    prepare(POINT_COLLECTION("buffer"), &options)
+  );
+
+  options.buffer = 513;
+  mln_geojson_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(POINT_COLLECTION("buffer")), &options, &data,
+    MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_EQUAL_STRING("buffer must be at most 512", mln_test_last_error());
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
+
+  options = mln_geojson_source_options_default();
+  options.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+                   MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  options.cluster = true;
+  options.cluster_radius = 4095;
+  mln_geojson_source_data_destroy(
+    prepare(POINT_COLLECTION("radius"), &options)
+  );
+
+  options.cluster_radius = 4096;
+  MLN_TEST_INVALID(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(POINT_COLLECTION("radius")), &options, &data,
+    MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_EQUAL_STRING(
+    "cluster_radius must be at most 4095", mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
+}
+
 // Data prepared with every field installs on a source, and a URL source takes
 // the same options. A URL source checks the same fields: the numeric ones when
 // the call submits, and the cluster properties in the command, which parses
@@ -694,6 +731,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
 MLN_TEST_GROUP {
   RUN_TEST(geojson_data_preparation_validates_documents_and_options);
   RUN_TEST(geojson_max_zoom_respects_the_tiling_limit);
+  RUN_TEST(geojson_pixel_options_respect_the_scaled_limits);
   RUN_TEST(geojson_sources_take_and_validate_their_options);
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);

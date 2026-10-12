@@ -2374,10 +2374,10 @@ final class GeojsonSourceOptions extends _Value {
   /// Tile extent in pixels. Defaults to 512.
   final int? tileSize;
 
-  /// Tile buffer in pixels. Defaults to 128.
+  /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   final int? buffer;
 
-  /// Cluster radius in pixels. Defaults to 50.
+  /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
   final int? clusterRadius;
 
   /// Points required to form a cluster. Defaults to 2.

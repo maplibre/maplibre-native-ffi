@@ -366,9 +366,9 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   public var clusterProperties: Data?
   /// Tile extent in pixels. Defaults to 512.
   public var tileSize: UInt32?
-  /// Tile buffer in pixels. Defaults to 128.
+  /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
-  /// Cluster radius in pixels. Defaults to 50.
+  /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
   public var clusterRadius: UInt32?
   /// Points required to form a cluster. Defaults to 2.
   public var clusterMinPoints: UInt32?

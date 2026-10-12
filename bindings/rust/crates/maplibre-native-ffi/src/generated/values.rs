@@ -1370,9 +1370,9 @@ pub struct GeojsonSourceOptions {
     pub cluster_properties: Option<Vec<u8>>,
     /// Tile extent in pixels. Defaults to 512.
     pub tile_size: Option<u32>,
-    /// Tile buffer in pixels. Defaults to 128.
+    /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     pub buffer: Option<u32>,
-    /// Cluster radius in pixels. Defaults to 50.
+    /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
     pub cluster_radius: Option<u32>,
     /// Points required to form a cluster. Defaults to 2.
     pub cluster_min_points: Option<u32>,

@@ -2084,9 +2084,9 @@ type GeojsonSourceOptions struct {
 	ClusterProperties *[]byte
 	// Tile extent in pixels. Defaults to 512.
 	TileSize *uint32
-	// Tile buffer in pixels. Defaults to 128.
+	// Tile buffer in pixels within [0, 512]. Defaults to 128.
 	Buffer *uint32
-	// Cluster radius in pixels. Defaults to 50.
+	// Cluster radius in pixels within [0, 4095]. Defaults to 50.
 	ClusterRadius *uint32
 	// Points required to form a cluster. Defaults to 2.
 	ClusterMinPoints *uint32
