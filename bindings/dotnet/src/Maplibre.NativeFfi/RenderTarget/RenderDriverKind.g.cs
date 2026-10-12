@@ -11,14 +11,14 @@ namespace Maplibre.NativeFfi;
 public enum RenderDriverKind : uint
 {
     /// <summary>
-    /// Native code owns a serial worker that initializes, drives, and tears
-    /// down transferable graphics state.
+    /// Native code initializes, services, and tears down transferable graphics
+    /// state on a library-owned thread.
     /// </summary>
     CoreWorker = 1,
 
     /// <summary>
-    /// The host explicitly calls the narrow driver API from the thread or realm
-    /// where its graphics context is current.
+    /// The host services driver work on the thread or realm where its graphics
+    /// context is current.
     /// </summary>
     CallerGraphicsThread = 2,
 }

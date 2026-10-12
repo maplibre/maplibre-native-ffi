@@ -15,7 +15,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Irreversibly closes control and mailboxes and disposes of the session's graphics objects.
+   * Irreversibly ends session work and disposes of its graphics objects.
    *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -242,8 +242,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Starts a source-feature query against the session's latest driver state. The completion borrows
-   * value_count `mln_queried_feature` values, value_size bytes apart, valid only for the callback.
+   * Starts a source-feature query against the session's latest driver state.
    *
    * See `mln_render_session_query_source_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -306,8 +305,9 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Requests a frame without waiting. Every accepted demand produces one terminal result record. A
-   * core worker wakes itself; a caller driver publishes its driver-work endpoint.
+   * Requests a frame without waiting. Every accepted demand produces one terminal result record.
+   * Caller-driver sessions require service on the graphics thread. Core-worker sessions need no
+   * host service.
    *
    * See `mln_render_session_request_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

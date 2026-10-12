@@ -2793,11 +2793,11 @@ pub const RenderBackendFlag = struct {
 /// See `mln_render_driver_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderDriverKind = enum(u32) {
-    /// The host explicitly calls the narrow driver API from the thread or realm
-    /// where its graphics context is current.
+    /// The host services driver work on the thread or realm where its graphics
+    /// context is current.
     caller_graphics_thread = 2,
-    /// Native code owns a serial worker that initializes, drives, and tears
-    /// down transferable graphics state.
+    /// Native code initializes, services, and tears down transferable graphics
+    /// state on a library-owned thread.
     core_worker = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
@@ -5164,9 +5164,8 @@ pub const WebglContextDescriptor = struct {
 /// See `mln_webgl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebglContextKind = enum(u32) {
-    /// Create a WebGL 2 context on a native worker whose pthread creation
-    /// claims canvas_selector through Emscripten's transferred-canvases
-    /// attribute.
+    /// Transfer the canvas named by canvas_selector to a native worker and
+    /// create a WebGL 2 context there.
     transferred_canvas = 1,
     /// Use a host-created context on its current browser agent.
     existing = 0,
@@ -6894,8 +6893,7 @@ pub fn renderFrameBatchRelease(batch: RenderFrameBatch) status.Error!void {
     return call.direct("mln_render_frame_batch_release", .close, batch, void, null, .{});
 }
 
-/// Irreversibly closes control and mailboxes and disposes of the session's
-/// graphics objects.
+/// Irreversibly ends session work and disposes of its graphics objects.
 ///
 /// See `mln_render_session_abandon` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -7029,9 +7027,7 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
     return call.submit("mln_render_session_query_rendered_features", .lease, session, call.slice(QueriedFeature, c.mln_queried_feature), allocator, diagnostic, .{ geometry, options });
 }
 
-/// Starts a source-feature query against the session's latest driver state. The
-/// completion borrows value_count `mln_queried_feature` values, value_size
-/// bytes apart, valid only for the callback.
+/// Starts a source-feature query against the session's latest driver state.
 ///
 /// See `mln_render_session_query_source_features` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -7057,8 +7053,8 @@ pub fn renderSessionReduceMemoryUse(session: RenderSession, diagnostic: ?*diagno
 }
 
 /// Requests a frame without waiting. Every accepted demand produces one
-/// terminal result record. A core worker wakes itself; a caller driver
-/// publishes its driver-work endpoint.
+/// terminal result record. Caller-driver sessions require service on the
+/// graphics thread. Core-worker sessions need no host service.
 ///
 /// See `mln_render_session_request_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

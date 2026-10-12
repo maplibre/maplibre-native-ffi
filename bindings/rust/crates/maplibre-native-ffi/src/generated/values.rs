@@ -3649,11 +3649,11 @@ native_enum! {
 /// See `mln_render_driver_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum RenderDriverKind: u32 {
-    /// Native code owns a serial worker that initializes, drives, and tears
-    /// down transferable graphics state.
+    /// Native code initializes, services, and tears down transferable graphics
+    /// state on a library-owned thread.
     CoreWorker = 1,
-    /// The host explicitly calls the narrow driver API from the thread or realm
-    /// where its graphics context is current.
+    /// The host services driver work on the thread or realm where its graphics
+    /// context is current.
     CallerGraphicsThread = 2,
 } Unknown
 }
@@ -6589,9 +6589,8 @@ native_enum! {
 pub enum WebglContextKind: u32 {
     /// Use a host-created context on its current browser agent.
     Existing = 0,
-    /// Create a WebGL 2 context on a native worker whose pthread creation
-    /// claims canvas_selector through Emscripten's transferred-canvases
-    /// attribute.
+    /// Transfer the canvas named by canvas_selector to a native worker and
+    /// create a WebGL 2 context there.
     TransferredCanvas = 1,
 } Unknown
 }

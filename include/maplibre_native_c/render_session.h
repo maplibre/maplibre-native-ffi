@@ -275,11 +275,8 @@ MLN_API mln_status mln_render_session_get_snapshot(
 
 /**
  * Requests a frame without waiting. Every accepted demand produces one terminal
- * result record. A core worker wakes itself; a caller driver publishes its
- * driver-work endpoint.
- *
- * A demand that does not carry MLN_FRAME_DEMAND_PRESENT still renders; a
- * presenting target keeps whatever it presented last.
+ * result record. Caller-driver sessions require service on the graphics thread.
+ * Core-worker sessions need no host service.
  *
  * Returns:
  * - MLN_STATUS_OK when the demand is accepted.
@@ -476,11 +473,10 @@ MLN_API void mln_acquired_frame_view_end(
  * renders at the new extent.
  *
  * scale_factor must equal the session's current value, set at attachment or by
- * the latest target replacement, because the renderer bakes its pixel ratio
- * into compiled shaders. To change it, replace a surface or borrowed texture
- * through the backend's set_target function, or detach and attach again. The
- * map keeps the scale factor it was created with and takes only the new width
- * and height.
+ * the latest target replacement. To change it, replace a surface or borrowed
+ * texture through the backend's set_target function, or detach and attach
+ * again. The map keeps the scale factor it was created with and takes only the
+ * new width and height.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize is accepted.
@@ -626,8 +622,8 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * Starts normal graphics-owner teardown and map detachment.
  *
  * Outstanding acquired frames fail preflight with MLN_STATUS_INVALID_STATE and
- * leave the session attached. Once accepted, earlier mailbox operations reach
- * a terminal result before graphics resources are destroyed.
+ * leave the session attached. Once accepted, earlier driver work reaches a
+ * terminal result before graphics resources are destroyed.
  *
  * When a disposed frame or a failed release quarantined a slot of a
  * session-owned texture ring, the host's GPU may still read that slot's
@@ -660,15 +656,13 @@ MLN_API mln_status mln_render_session_detach(
 ) MLN_NOEXCEPT;
 
 /**
- * Irreversibly closes control and mailboxes and disposes of the session's
- * graphics objects.
+ * Irreversibly ends session work and disposes of its graphics objects.
  *
- * A core worker can still be inside the driver call that published a frame
- * result or completion the host already observed. The call waits for that
- * driver call to end, and the worker starts no other. A caller-graphics-thread
- * driver call belongs to the host, so abandon during one returns
- * MLN_STATUS_BUSY instead, as does abandon from inside any of the session's
- * driver calls, such as from a completion that the core worker delivers.
+ * For a core-worker session, the call waits for in-flight driver work to end
+ * and prevents later graphics calls. For a caller-graphics-thread session,
+ * abandon during in-flight driver work returns MLN_STATUS_BUSY. Calling from
+ * inside any of the session's driver calls, including a completion, also
+ * returns MLN_STATUS_BUSY.
  *
  * Before returning, the call waits for the map's in-flight tile work and then
  * disposes of the session's graphics objects. It destroys Vulkan and Metal
@@ -734,15 +728,13 @@ MLN_API mln_status mln_render_session_destroy(
 /**
  * Consumes a session and schedules its retirement and destruction.
  *
- * Admission uses storage and a cleanup worker reserved during attachment.
- * Queued driver work completes with MLN_STATUS_TARGET_LOST. A core-worker
- * session that is attached and has no acquired frame detaches on its worker
- * after the in-flight call, which frees its graphics resources. Every other
- * session is abandoned on the cleanup worker once its in-flight driver work and
- * its scopes from mln_acquired_frame_view_begin() end, which disposes of its
- * graphics resources as mln_render_session_abandon() does. A session that
- * waits for those does not delay other sessions' retirement. Either way,
- * retirement releases the map attachment. The host keeps its graphics objects
+ * Disposal admission allocates no memory and starts no thread. Queued driver
+ * work completes with MLN_STATUS_TARGET_LOST. An attached core-worker session
+ * with no acquired frame detaches after in-flight driver work ends. Every
+ * other session is abandoned after in-flight driver work and scopes from
+ * mln_acquired_frame_view_begin() end, following mln_render_session_abandon().
+ * A session waiting for those does not delay other sessions' retirement.
+ * Retirement releases the map attachment. The host keeps its graphics objects
  * alive until the session's wake release callbacks run. Disposal reports
  * nothing about what it keeps, so a Vulkan host keeps its VkDevice and
  * VkSurfaceKHR, and their VkInstance, until the process exits. The exception

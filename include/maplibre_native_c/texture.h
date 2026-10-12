@@ -59,9 +59,7 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * or until abandon returns. The textures are distinct and share one device
    * and one pixel format. Each texture's pixel dimensions equal physical_width
    * and physical_height, and each allows render-target usage and is
-   * single-sample, because the session builds single-sample depth and stencil
-   * attachments to match. The session reads all of this from the textures and
-   * rejects a mismatch.
+   * single-sample. A mismatch is rejected.
    */
   const mln_metal_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
@@ -156,10 +154,8 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * usable on context.graphics_queue's family without an ownership transfer
    * (VK_SHARING_MODE_EXCLUSIVE on that family, or CONCURRENT).
    *
-   * A VkImage exposes no queryable extent, so the caller guarantees that each
-   * image's dimensions equal physical_width and physical_height: the session
-   * builds a framebuffer at that size, and Vulkan leaves a framebuffer larger
-   * than its attachment undefined.
+   * The caller must guarantee that each image's dimensions equal physical_width
+   * and physical_height. The session does not validate those dimensions.
    */
   const mln_vulkan_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
@@ -277,11 +273,9 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * must stay valid: until set_target replaces them, until detach completes,
    * or until abandon returns. The textures are distinct.
    *
-   * Querying texture dimensions needs glGetTexLevelParameteriv, absent before
-   * OpenGL ES 3.1, so the caller guarantees that each texture's level-0
-   * dimensions equal physical_width and physical_height: the session renders
-   * through a framebuffer at that size, and a smaller texture clips or garbles
-   * output.
+   * The caller must guarantee that each texture's level-0 dimensions equal
+   * physical_width and physical_height. The session does not validate those
+   * dimensions.
    */
   const mln_opengl_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
@@ -414,9 +408,7 @@ typedef struct mln_opengl_texture_frame {
    * Borrowed OpenGL texture object name. Valid until frame release.
    *
    * The session's context wrote the texture. A host that samples it from
-   * another context of the share group binds it again after acquisition,
-   * because OpenGL makes another context's completed writes visible only
-   * through a new bind.
+   * another context of the share group must bind it again after acquisition.
    */
   uint32_t texture;
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
@@ -509,12 +501,6 @@ mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
  * The common options select driver placement and requested ring depth. The
  * descriptor and options are copied before return.
  *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
- *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
@@ -554,12 +540,6 @@ MLN_API mln_status mln_map_attach_metal_owned_texture(
  * driver placement; their requested ring depth is ignored. The descriptor, its
  * textures array, and the options are copied before return.
  *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
- *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
@@ -595,12 +575,6 @@ MLN_API mln_status mln_map_attach_metal_borrowed_texture(
  *
  * The common options select driver placement and requested ring depth. The
  * descriptor and options are copied before return.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
@@ -642,12 +616,6 @@ MLN_API mln_status mln_map_attach_vulkan_owned_texture(
  * demands on a core worker acquires its frame first. The common options select
  * driver placement; their requested ring depth is ignored. The descriptor, its
  * textures array, and the options are copied before return.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
@@ -691,12 +659,6 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  * detach. In particular, it keeps an EGLDisplay initialized while its session
  * is live.
  *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
- *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
@@ -738,12 +700,6 @@ MLN_API mln_status mln_map_attach_opengl_owned_texture(
  * ignored. The descriptor, its textures array, and the options are copied
  * before return.
  *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
- *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
@@ -777,12 +733,6 @@ MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
  * Starts attachment of a session-owned WebGPU texture ring.
  *
  * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
@@ -824,12 +774,6 @@ MLN_API mln_status mln_map_attach_webgpu_owned_texture(
  * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and the requested ring depth of the
  * common options is ignored. The descriptor, its textures array, and the
  * options are copied before return.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.

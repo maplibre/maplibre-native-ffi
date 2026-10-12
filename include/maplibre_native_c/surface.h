@@ -115,17 +115,9 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 /**
  * Starts attachment of a Metal surface target.
  *
- * The descriptor and options are copied before return. The completion runs
- * only after the selected driver initializes the target. A core-worker driver
- * retains the Metal layer and device on its worker. A caller driver performs
- * initialization when the host services driver work with the Metal context
- * usable on that thread.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
+ * The descriptor and options are copied and the Metal layer and device are
+ * retained before return. The completion reports target initialization. A
+ * caller driver requires service on a thread where the Metal context is usable.
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
@@ -159,12 +151,6 @@ MLN_API mln_status mln_map_attach_metal_surface(
  *
  * The descriptor and options are copied before return. The completion runs only
  * after the selected driver creates the swapchain.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
@@ -202,12 +188,6 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
  * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. A transferred WebGL canvas requires
  * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent.
  *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
- *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
@@ -239,14 +219,8 @@ MLN_API mln_status mln_map_attach_opengl_surface(
 /**
  * Starts attachment of a WebGPU surface target.
  *
- * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD because
- * WebGPU objects remain in their creating agent.
- *
- * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
- * ATTACHING session there and transfers it to the caller. A non-OK return
- * leaves *out_session unchanged and never invokes the completion. A failed
- * completion still requires mln_render_session_detach() or
- * mln_render_session_abandon() before mln_render_session_destroy().
+ * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD in the
+ * agent that created the WebGPU objects.
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.

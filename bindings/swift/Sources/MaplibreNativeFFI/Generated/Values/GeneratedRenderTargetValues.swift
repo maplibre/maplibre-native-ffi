@@ -396,11 +396,11 @@ public struct RenderDriverKind: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  /// Native code owns a serial worker that initializes, drives, and tears down
-  /// transferable graphics state.
+  /// Native code initializes, services, and tears down transferable graphics
+  /// state on a library-owned thread.
   public static let coreWorker: RenderDriverKind = .init(rawValue: 1)
-  /// The host explicitly calls the narrow driver API from the thread or realm
-  /// where its graphics context is current.
+  /// The host services driver work on the thread or realm where its graphics
+  /// context is current.
   public static let callerGraphicsThread: RenderDriverKind = .init(rawValue: 2)
 }
 
@@ -683,8 +683,8 @@ public struct WebglContextKind: RawRepresentable, NativeOpenValue, Equatable,
 
   /// Use a host-created context on its current browser agent.
   public static let existing: WebglContextKind = .init(rawValue: 0)
-  /// Create a WebGL 2 context on a native worker whose pthread creation claims
-  /// canvas_selector through Emscripten's transferred-canvases attribute.
+  /// Transfer the canvas named by canvas_selector to a native worker and create
+  /// a WebGL 2 context there.
   public static let transferredCanvas: WebglContextKind = .init(rawValue: 1)
 }
 

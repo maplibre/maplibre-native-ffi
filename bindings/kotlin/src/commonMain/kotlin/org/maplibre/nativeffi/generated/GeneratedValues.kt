@@ -822,13 +822,12 @@ public data class RenderBackendFlag(public val rawValue: UInt) {
 public data class RenderDriverKind(public val rawValue: UInt) {
   public companion object {
     /**
-     * Native code owns a serial worker that initializes, drives, and tears down transferable
-     * graphics state.
+     * Native code initializes, services, and tears down transferable graphics state on a
+     * library-owned thread.
      */
     public val CORE_WORKER: RenderDriverKind = RenderDriverKind(1u)
     /**
-     * The host explicitly calls the narrow driver API from the thread or realm where its graphics
-     * context is current.
+     * The host services driver work on the thread or realm where its graphics context is current.
      */
     public val CALLER_GRAPHICS_THREAD: RenderDriverKind = RenderDriverKind(2u)
   }
@@ -1540,8 +1539,8 @@ public data class WebglContextKind(public val rawValue: UInt) {
     /** Use a host-created context on its current browser agent. */
     public val EXISTING: WebglContextKind = WebglContextKind(0u)
     /**
-     * Create a WebGL 2 context on a native worker whose pthread creation claims canvas_selector
-     * through Emscripten's transferred-canvases attribute.
+     * Transfer the canvas named by canvas_selector to a native worker and create a WebGL 2 context
+     * there.
      */
     public val TRANSFERRED_CANVAS: WebglContextKind = WebglContextKind(1u)
   }

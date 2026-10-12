@@ -70,8 +70,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Irreversibly closes control and mailboxes and disposes of the session's
-    /// graphics objects.
+    /// Irreversibly ends session work and disposes of its graphics objects.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_abandon</c> in the <see
@@ -352,8 +351,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Starts a source-feature query against the session's latest driver state.
-    /// The completion borrows value_count <c>mln_queried_feature</c> values,
-    /// value_size bytes apart, valid only for the callback.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_query_source_features</c> in the <see
@@ -422,8 +419,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Requests a frame without waiting. Every accepted demand produces one
-    /// terminal result record. A core worker wakes itself; a caller driver
-    /// publishes its driver-work endpoint.
+    /// terminal result record. Caller-driver sessions require service on the
+    /// graphics thread. Core-worker sessions need no host service.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_request_frame</c> in the <see

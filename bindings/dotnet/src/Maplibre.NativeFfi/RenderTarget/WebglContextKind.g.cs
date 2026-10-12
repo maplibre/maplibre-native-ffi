@@ -16,9 +16,8 @@ public enum WebglContextKind : uint
     Existing = 0,
 
     /// <summary>
-    /// Create a WebGL 2 context on a native worker whose pthread creation
-    /// claims canvas_selector through Emscripten's transferred-canvases
-    /// attribute.
+    /// Transfer the canvas named by canvas_selector to a native worker and
+    /// create a WebGL 2 context there.
     /// </summary>
     TransferredCanvas = 1,
 }

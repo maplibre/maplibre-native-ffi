@@ -31,13 +31,13 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 /** Execution placement for one render session. */
 typedef enum mln_render_driver_kind : uint32_t {
   /**
-   * Native code owns a serial worker that initializes, drives, and tears down
-   * transferable graphics state.
+   * Native code initializes, services, and tears down transferable graphics
+   * state on a library-owned thread.
    */
   MLN_RENDER_DRIVER_CORE_WORKER = 1U,
   /**
-   * The host explicitly calls the narrow driver API from the thread or realm
-   * where its graphics context is current.
+   * The host services driver work on the thread or realm where its graphics
+   * context is current.
    */
   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2U,
 } mln_render_driver_kind;
@@ -64,27 +64,19 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * by a successful attach.
  *
  * Vulkan requires the host to synchronize every call that uses a queue. A
- * Vulkan session's driver submits to the context's graphics_queue on its own
- * thread, so a host that also uses that queue passes a lock here. Native code
- * calls lock and then unlock on the driver thread around each submission and
- * presentation on the queue, including the empty submission that waits for
- * the queue to drain. Abandon also takes it on the thread that abandons, which
- * is the cleanup worker when mln_render_session_dispose() abandons the
- * session, around the drains that its teardown submits. Native code holds the
- * lock only for that call, never across a wait. The host takes the same lock
- * around its own calls on the queue.
+ * Vulkan session submits to the context's graphics_queue. A host that also
+ * uses that queue must pass a lock here and take the same lock around its own
+ * queue calls. The callbacks may run on the graphics thread or the thread that
+ * abandons the session. Each queue submission or presentation holds the lock
+ * only for that call, never across a wait.
  *
  * Both callbacks are null to disable the lock, or both are set. A disabled
  * lock must not carry release_user_data. A session without a lock assumes that
  * the host leaves the queue alone while the session is attached.
  *
- * The callbacks must not call the C API. The host never holds the lock while
- * it calls the C API, or while it waits on a thread that does, because the
- * call may need the lock to finish: a caller-graphics-thread driver takes it
- * inside driver service, abandon takes it to drain the queue, and abandon and
- * teardown wait for a core worker that may be waiting for it. Sessions
- * that share a queue each take their own lock, so give them all a lock on the
- * same host mutex.
+ * The callbacks must not call the C API. The host must not hold the lock while
+ * calling the C API or waiting on a thread that does. Sessions sharing a queue
+ * must use the same host mutex.
  *
  * Native code calls release_user_data once, after the session can no longer
  * invoke the callbacks.
@@ -106,10 +98,13 @@ typedef struct mln_queue_lock {
 /**
  * Common attachment policy copied before an attach call returns.
  *
- * A successful backend attach-start call publishes a session in ATTACHING
- * state and accepts its completion together. Hosts may service caller-driver
- * work through that session before attachment completes. A failed completion
- * still requires normal detach or abandonment before session destruction.
+ * Every backend attachment call requires *out_session to be MLN_HANDLE_NULL
+ * on entry. MLN_STATUS_OK transfers an ATTACHING session to the caller and
+ * accepts its completion. A non-OK return leaves *out_session unchanged and
+ * invokes no completion. Hosts may service caller-driver work before
+ * attachment completes. A failed completion still requires
+ * mln_render_session_detach() or mln_render_session_abandon() before
+ * mln_render_session_destroy().
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
@@ -197,9 +192,7 @@ typedef struct mln_gpu_sync {
    * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>`
    * pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
    *
-   * A fixed-width carrier keeps a Vulkan non-dispatchable handle intact on
-   * 32-bit targets, where it is wider than a pointer. Zero when kind is
-   * MLN_GPU_SYNC_CPU_COMPLETE.
+   * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE.
    */
   uint64_t object;
   uint64_t value;
@@ -279,10 +272,8 @@ typedef enum mln_opengl_context_platform : uint32_t {
  * context joins the host share group named by the descriptor, so a host may
  * hand the session a texture and sample it from its own context.
  *
- * A dedicated session owns its driver thread's context. It makes its context
- * current once, keeps it current between renders, and joins no share group. A
- * core worker can own transferable private graphics state. A host thread can
- * own a surface context, such as an Android SurfaceView context.
+ * A dedicated session keeps its context current between renders and joins no
+ * share group.
  */
 typedef enum mln_opengl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
@@ -347,8 +338,8 @@ typedef enum mln_webgl_context_kind : uint32_t {
   /** Use a host-created context on its current browser agent. */
   MLN_WEBGL_CONTEXT_EXISTING = 0U,
   /**
-   * Create a WebGL 2 context on a native worker whose pthread creation claims
-   * canvas_selector through Emscripten's transferred-canvases attribute.
+   * Transfer the canvas named by canvas_selector to a native worker and create
+   * a WebGL 2 context there.
    */
   MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1U,
 } mln_webgl_context_kind;

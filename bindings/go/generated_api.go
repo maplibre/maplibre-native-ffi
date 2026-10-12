@@ -670,11 +670,11 @@ func (value RenderBackendFlag) Has(flags RenderBackendFlag) bool { return value&
 type RenderDriverKind uint32
 
 const (
-	// Native code owns a serial worker that initializes, drives, and tears down
-	// transferable graphics state.
+	// Native code initializes, services, and tears down transferable graphics state
+	// on a library-owned thread.
 	RenderDriverKindCoreWorker RenderDriverKind = RenderDriverKind(C.MLN_RENDER_DRIVER_CORE_WORKER)
-	// The host explicitly calls the narrow driver API from the thread or realm
-	// where its graphics context is current.
+	// The host services driver work on the thread or realm where its graphics
+	// context is current.
 	RenderDriverKindCallerGraphicsThread RenderDriverKind = RenderDriverKind(C.MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
 )
 
@@ -1281,8 +1281,8 @@ type WebglContextKind uint32
 const (
 	// Use a host-created context on its current browser agent.
 	WebglContextKindExisting WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_EXISTING)
-	// Create a WebGL 2 context on a native worker whose pthread creation claims
-	// canvas_selector through Emscripten's transferred-canvases attribute.
+	// Transfer the canvas named by canvas_selector to a native worker and create a
+	// WebGL 2 context there.
 	WebglContextKindTransferredCanvas WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
 )
 
@@ -7658,8 +7658,7 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 	return err
 }
 
-// Abandon irreversibly closes control and mailboxes and disposes of the
-// session's graphics objects.
+// Abandon irreversibly ends session work and disposes of its graphics objects.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7829,8 +7828,7 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 }
 
 // QuerySourceFeatures starts a source-feature query against the session's
-// latest driver state. The completion borrows value_count mln_queried_feature
-// values, value_size bytes apart, valid only for the callback.
+// latest driver state.
 //
 // See mln_render_session_query_source_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
@@ -7862,8 +7860,8 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 }
 
 // RequestFrame requests a frame without waiting. Every accepted demand produces
-// one terminal result record. A core worker wakes itself; a caller driver
-// publishes its driver-work endpoint.
+// one terminal result record. Caller-driver sessions require service on the
+// graphics thread. Core-worker sessions need no host service.
 //
 // See mln_render_session_request_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

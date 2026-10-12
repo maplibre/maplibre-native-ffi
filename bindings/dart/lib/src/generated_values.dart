@@ -620,12 +620,12 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
 final class RenderDriverKind extends _Enum {
   const RenderDriverKind.fromRawValue(super.rawValue);
 
-  /// Native code owns a serial worker that initializes, drives, and tears down
-  /// transferable graphics state.
+  /// Native code initializes, services, and tears down transferable graphics
+  /// state on a library-owned thread.
   static const coreWorker = RenderDriverKind.fromRawValue(1);
 
-  /// The host explicitly calls the narrow driver API from the thread or realm
-  /// where its graphics context is current.
+  /// The host services driver work on the thread or realm where its graphics
+  /// context is current.
   static const callerGraphicsThread = RenderDriverKind.fromRawValue(2);
 }
 
@@ -1216,8 +1216,8 @@ final class WebglContextKind extends _Enum {
   /// Use a host-created context on its current browser agent.
   static const existing = WebglContextKind.fromRawValue(0);
 
-  /// Create a WebGL 2 context on a native worker whose pthread creation claims
-  /// canvas_selector through Emscripten's transferred-canvases attribute.
+  /// Transfer the canvas named by canvas_selector to a native worker and create
+  /// a WebGL 2 context there.
   static const transferredCanvas = WebglContextKind.fromRawValue(1);
 }
 
