@@ -9,6 +9,10 @@ import Foundation
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed EGLDisplay. Required and kept initialized through teardown.
+  /// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
+  /// process, so a shared display must stay initialized until every session
+  /// using it has detached or been destroyed. The host must not call
+  /// eglTerminate per session.
   public var display: NativePointer
   /// Borrowed EGLConfig used to create the session context. Required. OpenGL
   /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.

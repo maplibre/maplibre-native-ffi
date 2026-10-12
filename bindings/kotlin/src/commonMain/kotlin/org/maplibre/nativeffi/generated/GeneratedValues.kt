@@ -2559,7 +2559,12 @@ public data class WglContextDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class EglContextDescriptor(
-  /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
+  /**
+   * Borrowed EGLDisplay. Required and kept initialized through teardown.
+   * eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole process, so a shared
+   * display must stay initialized until every session using it has detached or been destroyed. The
+   * host must not call eglTerminate per session.
+   */
   public val display: NativePointer,
   /**
    * Borrowed EGLConfig used to create the session context. Required. OpenGL texture targets require

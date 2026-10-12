@@ -1622,7 +1622,12 @@ class EglContextDescriptor:
     """
 
     display: int
-    """Borrowed EGLDisplay. Required and kept initialized through teardown."""
+    """Borrowed EGLDisplay. Required and kept initialized through teardown.
+    eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
+    process, so a shared display must stay initialized until every session
+    using it has detached or been destroyed. The host must not call
+    eglTerminate per session.
+    """
 
     config: int
     """Borrowed EGLConfig used to create the session context. Required. OpenGL

@@ -308,7 +308,13 @@ typedef struct mln_wgl_context_descriptor {
 
 /** EGL context fields shared by OpenGL render targets. */
 typedef struct mln_egl_context_descriptor {
-  /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
+  /**
+   * Borrowed EGLDisplay. Required and kept initialized through teardown.
+   * eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
+   * process, so a shared display must stay initialized until every session
+   * using it has detached or been destroyed. The host must not call
+   * eglTerminate per session.
+   */
   void* display;
   /**
    * Borrowed EGLConfig used to create the session context. Required.

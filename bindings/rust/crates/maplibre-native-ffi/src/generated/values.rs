@@ -1046,6 +1046,10 @@ impl FromNative<sys::mln_edge_insets> for EdgeInsets {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EglContextDescriptor {
     /// Borrowed EGLDisplay. Required and kept initialized through teardown.
+    /// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the
+    /// whole process, so a shared display must stay initialized until every
+    /// session using it has detached or been destroyed. The host must not call
+    /// eglTerminate per session.
     pub display: *mut std::ffi::c_void,
     /// Borrowed EGLConfig used to create the session context. Required. OpenGL
     /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.

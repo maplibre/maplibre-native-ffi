@@ -11,6 +11,10 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Display">
 /// Borrowed EGLDisplay. Required and kept initialized through teardown.
+/// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
+/// process, so a shared display must stay initialized until every session using
+/// it has detached or been destroyed. The host must not call eglTerminate per
+/// session.
 /// </param>
 /// <param name="Config">
 /// Borrowed EGLConfig used to create the session context. Required. OpenGL

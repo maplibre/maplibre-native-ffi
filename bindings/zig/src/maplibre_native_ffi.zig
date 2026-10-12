@@ -884,6 +884,10 @@ pub const EdgeInsets = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const EglContextDescriptor = struct {
     /// Borrowed EGLDisplay. Required and kept initialized through teardown.
+    /// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the
+    /// whole process, so a shared display must stay initialized until every
+    /// session using it has detached or been destroyed. The host must not call
+    /// eglTerminate per session.
     display: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Borrowed EGLConfig used to create the session context. Required. OpenGL
     /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
