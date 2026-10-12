@@ -140,6 +140,9 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  * info and warning records may be asynchronous, while error records remain
  * synchronous.
  *
+ * A severity outside the mask invokes the log callback synchronously on the
+ * thread that emits the record, before the logging call returns.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.

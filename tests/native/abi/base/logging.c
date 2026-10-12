@@ -205,12 +205,23 @@ typedef struct dump_probe {
   dump_record records[DUMP_RECORD_COUNT];
   atomic_int count;
   atomic_int unexpected;
-  // How many records had arrived when the command's completion ran, and on
-  // which thread it ran.
+  const void* command_thread;
+  atomic_bool command_thread_recorded;
+  // How many records had arrived when the command's completion ran.
   atomic_int count_at_completion;
-  const void* completion_thread;
   atomic_bool completed;
 } dump_probe;
+
+// A camera command's transition-end handler runs on the runtime worker even
+// when its completion is delivered inline on the submitting thread.
+static void record_command_thread(
+  void* user_data, const mln_camera_transition_end* end
+) {
+  dump_probe* probe = user_data;
+  (void)end;
+  probe->command_thread = &thread_marker;
+  mln_test_flag_set(&probe->command_thread_recorded);
+}
 
 static bool is_dump_record(const char* message) {
   return strcmp(message, dump_separator) == 0 ||
@@ -251,7 +262,6 @@ static void record_dump_completion(
   dump_probe* probe = user_data;
   (void)result;
   atomic_store(&probe->count_at_completion, atomic_load(&probe->count));
-  probe->completion_thread = &thread_marker;
   mln_test_flag_set(&probe->completed);
 }
 
@@ -264,6 +274,7 @@ static void dump_debug_logs(dump_probe* probe) {
   memset(probe, 0, sizeof(*probe));
   atomic_init(&probe->count, 0);
   atomic_init(&probe->unexpected, 0);
+  atomic_init(&probe->command_thread_recorded, false);
   atomic_init(&probe->count_at_completion, -1);
   atomic_init(&probe->completed, false);
   const mln_log_handler handler = log_handler(record_dump, probe, NULL);
@@ -272,6 +283,17 @@ static void dump_debug_logs(dump_probe* probe) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
+  // An empty camera command identifies the worker shared by this map's
+  // commands without changing its camera or relying on a completion's thread.
+  mln_camera_update update = mln_camera_update_default();
+  update.animation.end_handler = (mln_camera_transition_handler){
+    .callback = record_command_thread,
+    .user_data = probe,
+  };
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->command_thread_recorded));
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = record_dump_completion,
@@ -312,7 +334,7 @@ LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
     DUMP_RECORD_COUNT, atomic_load(&probe.count_at_completion)
   );
   for (size_t index = 0; index < DUMP_RECORD_COUNT; index += 1) {
-    TEST_ASSERT_EQUAL_PTR(probe.completion_thread, probe.records[index].thread);
+    TEST_ASSERT_EQUAL_PTR(probe.command_thread, probe.records[index].thread);
   }
 }
 
@@ -325,7 +347,7 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   static dump_probe probe;
   dump_debug_logs(&probe);
   const void* log_thread = probe.records[0].thread;
-  TEST_ASSERT_NOT_EQUAL(probe.completion_thread, log_thread);
+  TEST_ASSERT_NOT_EQUAL(probe.command_thread, log_thread);
   TEST_ASSERT_NOT_EQUAL(&thread_marker, log_thread);
   for (size_t index = 1; index < DUMP_RECORD_COUNT; index += 1) {
     TEST_ASSERT_EQUAL_PTR(log_thread, probe.records[index].thread);
