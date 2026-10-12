@@ -6,9 +6,14 @@ sidebar:
 ---
 
 This page covers machine setup and the parts of the workflow that span the
-repository. The root `AGENTS.md` lists the everyday commands and the project's
-rules, and each area keeps its own README: `tools/bindgen`, `tests/native`,
-`tests/graphics`, and `examples`.
+repository.
+[AGENTS.md](https://github.com/maplibre/maplibre-native-ffi/blob/main/AGENTS.md)
+lists everyday commands and project rules. Area READMEs cover the
+[binding generator](https://github.com/maplibre/maplibre-native-ffi/blob/main/tools/bindgen/README.md),
+[native tests](https://github.com/maplibre/maplibre-native-ffi/blob/main/tests/native/README.md),
+[graphics fixtures](https://github.com/maplibre/maplibre-native-ffi/blob/main/tests/graphics/README.md),
+and
+[examples](https://github.com/maplibre/maplibre-native-ffi/blob/main/examples/README.md).
 
 ## Set up
 

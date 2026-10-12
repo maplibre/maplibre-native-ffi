@@ -5,9 +5,9 @@ one host toolkit. `zig-readback` renders one still image headless and reads it
 back. Examples carry no tests of their own: the `smoke` task is their only
 self-check, and CI runs it on every target whose backend the runner can render.
 
-The examples share the contract below, so that CI and maintainers can treat them
-alike. [Concepts](../docs/src/content/docs/concepts.md) describes the execution
-model that they follow.
+The examples share tasks, render-target modes, and smoke output for CI.
+[Concepts](../docs/src/content/docs/concepts.md) describes the execution model
+that they follow.
 
 ## Tasks
 
@@ -71,8 +71,8 @@ pointer gestures; keep them in step when one changes.
 
 These rules hold in every example, and the code alone does not show why:
 
-- A wake runs on a native thread. It only schedules a drain or a driver service
-  on the host loop, and returns.
+- A wake can run on a native or submitting thread. It schedules a drain or
+  driver service on the host loop and returns without blocking.
 - After a frame result of no-update or size-pending, the host waits for the next
   map-update event. The map publishes one when it has something new, including
   after a resize.
@@ -96,12 +96,13 @@ These rules hold in every example, and the code alone does not show why:
   renders into the other texture while the compositor samples the held one.
   `compose-map` hands each frame to its bridge, which draws it after the render
   call returns, so it releases a frame no earlier than the next render call.
-- A borrowed-texture resize releases the held frame, because a replacement is
-  refused while the host holds a frame, then replaces the ring and also resizes
-  the map, because a target replacement leaves the map's extent unchanged. The
-  outgoing ring stays alive until the replacement completes, and the host then
-  demands a forced frame: the replacement publishes no map update.
-- A session fixes its scale factor at attachment, so a scale change reattaches.
+- A borrowed-texture resize releases the held frame and replaces the ring.
+  Replacement also resizes the map. Keep the outgoing ring alive until the
+  replacement completes, then request a frame at the new size.
+- A resize retains the session's scale factor. A target replacement or a new
+  attachment can change it; the map retains its creation scale factor. The
+  [session reference](../include/maplibre_native_c/render_session.h) states the
+  resize contract.
 - The process never exits while a session can still make graphics calls: it
   detaches, or abandons the session when detach fails. When an abandon keeps
   graphics objects until the process exits, a Vulkan example keeps its device,

@@ -240,6 +240,11 @@ the schema reports the name that does not resolve.
 
 ## Document a declaration
 
+Headers state caller contracts, and generated API pages present them. The
+[documentation site](../../docs/src/content/docs/index.mdx) introduces concepts
+and task paths. Link guides to the relevant reference page instead of repeating
+status lists, ordering rules, or detailed ownership contracts.
+
 Each generated declaration carries the first paragraph of its header comment and
 a link to its header's page in the C API reference. The paragraph ends at a
 blank line, a list item, or a heading such as `Returns:`, so write a first
