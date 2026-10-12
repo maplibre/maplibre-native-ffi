@@ -621,30 +621,29 @@ static void an_animated_delta_reports_its_end_once(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An animated delta starts from the camera that the running transition has
-// reached and replaces its transition. With no frame between them, the second
-// scale starts where the first did, so the camera ends one scale away from
-// the start, and the replaced command completes at once.
+// An animated delta replaces the running transition from its current camera,
+// and the replaced command completes at once. Applying the first delta can
+// advance it before any frame renders, so an ordered read supplies the second
+// scale's starting zoom. No frame demand advances it between the commands.
 static void an_animated_delta_replaces_the_running_one(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  const double start_zoom = query_camera(map).zoom;
-
   mln_test_transition_end replaced;
   mln_test_transition_end_init(&replaced);
   mln_camera_delta first =
-    animated_delta(MLN_CAMERA_DELTA_SCALE, 20.0, &replaced);
+    animated_delta(MLN_CAMERA_DELTA_SCALE, 60000.0, &replaced);
   first.scale = 4.0;
   mln_test_transition_end replacing;
   mln_test_transition_end_init(&replacing);
   mln_camera_delta second =
     animated_delta(MLN_CAMERA_DELTA_SCALE, 20.0, &replacing);
   second.scale = 4.0;
-  const mln_completion discard = mln_test_discard_completion();
-  MLN_TEST_OK(mln_map_apply_camera_delta(map, &first, &discard, NULL));
+  apply_delta(map, &first);
+  const double replacement_zoom = query_camera(map).zoom;
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&replaced.calls));
   apply_delta(map, &second);
   assert_ended(&replaced, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "replaced");
 
@@ -654,7 +653,9 @@ static void an_animated_delta_replaces_the_running_one(void) {
   );
   // An animated scale ends within rounding of its target, which varies by
   // platform.
-  TEST_ASSERT_DOUBLE_WITHIN(1e-4, start_zoom + 2.0, query_camera(map).zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-4, replacement_zoom + 2.0, query_camera(map).zoom
+  );
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
