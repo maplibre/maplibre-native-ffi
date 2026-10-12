@@ -5,12 +5,9 @@
  *
  * MapLibre callback contracts are synchronous: logging and resource providers
  * return an immediate decision, and borrowed request payloads expire when the
- * callback returns. This layer answers on behalf of hosts that cannot. It
- * copies borrowed payloads into native-owned records the host releases
- * explicitly, applies native-owned routing rules when a decision is needed
- * immediately, and hands records to the host through void listener functions,
- * so host user code runs on its own execution context rather than on MapLibre
- * worker, network, logging, or render threads.
+ * callback returns. Adapter listeners receive owned copies of those payloads
+ * and must release each record explicitly. Routing rules supply immediate
+ * decisions. Listeners schedule host user code on its own execution context.
  *
  * This header is not installed and carries no compatibility promise. Bindings
  * may resolve its exported functions from the shipped library.

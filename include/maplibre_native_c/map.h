@@ -1044,8 +1044,7 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the map fails to construct on the runtime
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when map creation fails.
  */
 MLN_BINDING("execution=lifecycle;result=mln_map")
 MLN_API mln_status mln_runtime_create_map(
@@ -1365,11 +1364,14 @@ MLN_API mln_status mln_map_set_style_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, json is invalid
- *   or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, json.data is
+ *   null, json.size is zero, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
  *   closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when style parsing or application fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_json(

@@ -115,9 +115,10 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 /**
  * Starts attachment of a Metal surface target.
  *
- * The descriptor and options are copied and the Metal layer and device are
- * retained before return. The completion reports target initialization. A
- * caller driver requires service on a thread where the Metal context is usable.
+ * The descriptor and options are copied before return. An accepted attachment
+ * retains the Metal layer and device before return. The completion reports
+ * target initialization. A caller driver requires service on a thread where
+ * the Metal context is usable.
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.

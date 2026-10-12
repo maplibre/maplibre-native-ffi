@@ -1173,8 +1173,8 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline.
  * Releasing a handled request that is neither completed nor cancelled fails it
  * with an MLN_RESOURCE_ERROR_REASON_OTHER error, so MapLibre never waits on a
- * request its provider dropped. That failure reaches the map later, on the
- * runtime's worker. A request handle is not a child of its runtime, whether the
+ * request its provider dropped. That failure reaches the map asynchronously.
+ * A request handle is not a child of its runtime, whether the
  * provider still holds it or its failure is still queued, so it never makes
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
  * Passing
@@ -1403,9 +1403,8 @@ MLN_API mln_status mln_runtime_barrier(
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
- * graphics calls have ended as described below. Native threads keep running
- * until the operating system ends the process: nothing at exit stops them or
- * waits for them, and the library destroys nothing that they use. Once exit
+ * graphics calls have ended as described below. Native work may continue until
+ * the operating system ends the process. Once exit
  * begins, native code dispatches no further callback that the host registered
  * through this API, release callbacks included. A callback that native code
  * dispatched before exit began may still start or be running after it. A
@@ -1430,11 +1429,8 @@ MLN_API mln_status mln_runtime_barrier(
  * after the library's exit handler. Releasing each runtime and waiting for its
  * release completion stops its callbacks.
  *
- * A render session's driver calls use the host's graphics driver, and some
- * drivers, such as MoltenVK, the Vulkan loader, and Mesa, tear down their own
- * state in exit handlers and static destructors that run before the library's
- * exit handler. So before the process calls exit() or returns from main, the
- * host MUST end the graphics calls of every render session it attached. To end
+ * Before the process calls exit() or returns from main, the host MUST end the
+ * graphics calls of every render session it attached. To end
  * them, abandon the session, or detach it and wait for the detach completion.
  * A host that drives a session on its own graphics thread stops driver service
  * first. Abandon returns once the session's in-flight driver call has ended,

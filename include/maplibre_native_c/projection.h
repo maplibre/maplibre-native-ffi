@@ -30,8 +30,8 @@ extern "C" {
  * frame the session drew. Hit-testing against what is on screen uses the
  * session's projection.
  *
- * Projection calls are synchronous and safe to call concurrently. A projection
- * never observes map changes made after its creation.
+ * Projection calls are synchronous and serialized with each other. A
+ * projection never observes map changes made after its creation.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

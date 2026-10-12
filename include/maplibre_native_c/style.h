@@ -2,13 +2,13 @@
  * @file maplibre_native_c/style.h
  * Public C API declarations for style sources, layers, and images.
  *
- * Every mutation is a command. It copies input bytes, arrays, option structs,
- * and image pixels before returning and applies them in runtime submission
- * order. Each function lists submission and completion failures separately.
- * Its completion reports committed, superseded, failed, or cancelled
- * disposition. Committed
- * completions carry the map snapshot generation they published, so a caller can
- * fence a later mln_map_get_snapshot() on it.
+ * Every map mutation is a command. It copies input bytes, arrays, option
+ * structs, and image pixels before returning and applies them in runtime
+ * submission order. Each function lists submission and completion failures
+ * separately. Its completion reports committed, superseded, failed, or
+ * cancelled disposition. Committed completions carry the map snapshot
+ * generation they published, so a caller can fence a later
+ * mln_map_get_snapshot() on it.
  *
  * Every query is ordered. It copies its inputs before returning and observes
  * all commands accepted earlier by the runtime. Its completion borrows the
@@ -857,9 +857,9 @@ MLN_API mln_status mln_map_add_geojson_source_url(
 /**
  * Prepares GeoJSON source data for installation on a map.
  *
- * data and options are borrowed for the call. Preparation finishes before
- * return. options may be null for defaults and must match the options of every
- * source the data is installed on.
+ * data contains UTF-8 GeoJSON. data and options are borrowed for the call.
+ * Preparation finishes before return. options may be null for defaults and
+ * must match the options of every source the data is installed on.
  *
  * When options enable clustering, the data must be a feature collection whose
  * every feature carries point geometry. Data that does not is rejected, and
@@ -1190,8 +1190,7 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
- *   runs release_user_data once, because the accepted command already
- *   referenced user_data.
+ *   runs release_user_data once.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_geometry_source(
@@ -1306,8 +1305,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
- *   runs release_user_data once, because the accepted command already
- *   referenced user_data.
+ *   runs release_user_data once.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_mvt_vector_source(
