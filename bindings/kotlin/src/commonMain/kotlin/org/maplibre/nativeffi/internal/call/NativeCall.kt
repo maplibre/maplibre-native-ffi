@@ -319,7 +319,10 @@ internal fun nativeRetire(
     CallbackAdmission.checkOperation(name)
     state.retireHandle { handle ->
       CallbackAdmission.check(handle, name)
-      CompletionBridge.unit { completion -> NativeCall(handle, completion).use { it.body() } }
+      // Native roots the conversion until it releases the completion, including terminal callbacks.
+      CompletionBridge.submit({ bindingKeepAlive(owner) }) { completion ->
+        NativeCall(handle, completion).use { it.body() }
+      }
     }
   } finally {
     bindingKeepAlive(owner)
