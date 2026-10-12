@@ -1,11 +1,5 @@
 #define MLN_BUILDING_C
 
-// Adapts synchronous MapLibre callback contracts to hosts that can only receive
-// callbacks asynchronously through void listener functions.
-//
-// Deferred callbacks answer on MapLibre threads and hand copied calls to a
-// listener or a Dart port; hosts run them on their own execution contexts.
-
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -195,8 +189,8 @@ void deliver_completion(
   static_cast<void>(state.dart_port->post(state.dart_port->port, &message));
 }
 
-// A deferred callback context. Registrations guarantee that release follows
-// the final call, so the state stays immutable while calls read it.
+// Registrations release this context after the final call, so calls need no
+// lock.
 struct AdapterDeferredState {
   std::uint32_t callback = 0;
   mln_adapter_deferred_call_listener listener = nullptr;
@@ -266,8 +260,6 @@ auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
          rule_kind == request_kind;
 }
 
-// Returns how many pattern characters the element at `index` spans, or zero
-// when it does not match `candidate`.
 auto literal_span(std::string_view pattern, std::size_t index, char candidate)
   -> std::size_t {
   const auto element = pattern[index];
@@ -280,11 +272,8 @@ auto literal_span(std::string_view pattern, std::size_t index, char candidate)
   return element == candidate ? 1 : 0;
 }
 
-// Matches one glob pattern against a candidate URL, in the language
-// callback_adapter.h documents. A '*' run stops at a '/' unless the pattern
-// spelled '**'. Matching is iterative and allocation-free so that a host
-// pattern cannot overflow the MapLibre thread this runs on; the worst case
-// costs the product of the two lengths.
+// Matching stays iterative and allocation-free to bound stack use on MapLibre
+// threads. The worst case costs the product of the two lengths.
 auto glob_matches(std::string_view pattern, std::string_view candidate)
   -> bool {
   auto pattern_index = std::size_t{0};
@@ -371,8 +360,6 @@ static_assert(
   "a resource route selects glob matching with the shared flag bit"
 );
 
-// A null url, an absent candidate, or a flag bit outside known_flags matches
-// nothing rather than everything.
 auto url_matches(
   std::uint32_t flags, std::uint32_t known_flags, const char* url,
   const char* candidate
@@ -950,8 +937,6 @@ extern "C" MLN_API auto mln_adapter_routed_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
-  // Each route decides which URL it compares, so route matching handles an
-  // absent URL.
   if (user_data == nullptr || request == nullptr || handle == MLN_HANDLE_NULL) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }

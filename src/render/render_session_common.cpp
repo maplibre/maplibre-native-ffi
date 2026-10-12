@@ -3230,8 +3230,6 @@ auto render_session_drain_frame_results(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
-  // An empty queue is a normal poll, so it neither allocates a batch nor sets
-  // a diagnostic.
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->frame_results.empty()) {
@@ -3833,7 +3831,6 @@ auto render_session_barrier_start(
 
 namespace {
 
-// The completion of the C function that requests maintenance.
 auto maintenance_completion(RenderSessionMaintenance maintenance)
   -> ValuelessCompletion {
   switch (maintenance) {
@@ -4025,7 +4022,6 @@ struct AbandonedObjects {
   auto operator=(AbandonedObjects&&) -> AbandonedObjects& = delete;
   ~AbandonedObjects() { static_cast<void>(keep()); }
 
-  // Keeps every object until the process exits, and returns how many it kept.
   auto keep() noexcept -> uint32_t {
     auto kept = uint32_t{0};
     if (renderer.release() != nullptr) ++kept;

@@ -124,7 +124,6 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       cleanup();
       return;
     } catch (...) {  // NOLINT(bugprone-empty-catch)
-      // Fall through to the drawable the context was created from.
     }
     fallback_drawable_ = true;
     try {

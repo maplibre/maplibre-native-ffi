@@ -121,8 +121,6 @@ static char MLNTransformedHeaderNamesKey;
 
 namespace mln {
 
-// Data that is shared between the requesting thread and the thread running the
-// completion handler.
 class HTTPRequestShared {
  public:
   HTTPRequestShared(Response& response_, util::AsyncTask& async_)
@@ -456,8 +454,6 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
     __block NSURLSession* session = nil;
     __block BOOL invalidateSessionOnCompletion = NO;
 
-    // Use the delegate's session if there is one, otherwise use the one that
-    // was created when this class was constructed.
     MLNNativeNetworkManager* networkManager =
       MLNNativeNetworkManager.sharedManager;
     if (
@@ -614,14 +610,12 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
                 Error::Reason::NotFound, "HTTP status code 404"
               );
             } else if (responseCode == 429) {
-              // Get the standard header
               std::optional<std::string> retryAfter;
               NSString* retryAfterHeader = headers[@"Retry-After"];
               if (retryAfterHeader) {
                 retryAfter = std::string([retryAfterHeader UTF8String]);
               }
 
-              // Fallback mapbox specific header
               std::optional<std::string> xRateLimitReset;
               NSString* xReset = headers[@"x-rate-limit-reset"];
               if (xReset) {
@@ -648,7 +642,6 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
               (const char*)[data bytes], [data length]
             );
           } else {
-            // This should never happen.
             response.error = std::make_unique<Error>(
               Error::Reason::Other, "Response class is not NSHTTPURLResponse"
             );

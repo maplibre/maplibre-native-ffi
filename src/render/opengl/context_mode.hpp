@@ -1,8 +1,5 @@
 #pragma once
 
-// The context mode every OpenGL session runs its renderer in, whether it draws
-// into a surface or a texture.
-
 #include <mln/gfx/renderer_backend.hpp>
 
 namespace mln::core::opengl {

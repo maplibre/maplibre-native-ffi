@@ -153,7 +153,6 @@ class CallbackSourceRegistry final {
     -> CallbackSourceRegistry& = delete;
   auto operator=(CallbackSourceRegistry&&) -> CallbackSourceRegistry& = delete;
 
-  // A source with no release callback is not tracked.
   auto add(
     const std::string& source_id, CallbackSourceKind kind,
     CallbackSourceRelease release, void* user_data
@@ -768,7 +767,6 @@ class HeadlessObserver final : public mln::MapObserver {
     return mln::core::event_selected(event_state_->mask, type);
   }
 
-  // Queues an event that reports a change in map state.
   auto queue_fresh(
     uint32_t type, int32_t code = 0, std::string_view message = {}
   ) noexcept -> void {
@@ -779,8 +777,6 @@ class HeadlessObserver final : public mln::MapObserver {
     );
   }
 
-  // Queues an event that changes no published state, with the generation
-  // that the map published last.
   auto queue_current(
     uint32_t type, int32_t code = 0, std::string_view message = {},
     uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
@@ -1208,8 +1204,6 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // Validated here as well as in the setter, so a mask this library cannot
-  // honour is rejected wherever it arrives.
   constexpr auto known_mask_bits =
     static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
   if ((options->event_mask & ~known_mask_bits) != 0U) {
@@ -1329,7 +1323,6 @@ auto validate_camera_fields(const mln_camera_options* camera) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Validates a camera that a caller passes by pointer.
 auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   if (camera == nullptr) {
     mln::core::set_thread_error("camera must not be null");
@@ -1973,7 +1966,6 @@ struct CommandTransitions {
   std::shared_ptr<mln::core::MapEventState> event_state;
   std::shared_ptr<mln::core::CameraTransitionEnd> end;
   std::optional<uint64_t> transition_id;
-  // The command's transitions that have not finished yet.
   uint32_t remaining = 0;
   bool cancelled = false;
 
@@ -2023,8 +2015,6 @@ struct CommandTransitionFinish {
   auto operator()() const -> void { command->finish(); }
 };
 
-// Copies an enabled end handler from a camera command's animation, or returns
-// null for a disabled one.
 auto camera_transition_end(const mln_animation_options& animation)
   -> std::shared_ptr<mln::core::CameraTransitionEnd> {
   if (animation.end_handler.callback == nullptr) return nullptr;
@@ -2033,8 +2023,6 @@ auto camera_transition_end(const mln_animation_options& animation)
   );
 }
 
-// Submits a camera command that carries `end`, and leaves the handler with the
-// caller unless the command is accepted.
 template <typename Submit>
 auto submit_with_transition_end(
   const std::shared_ptr<mln::core::CameraTransitionEnd>& end, Submit submit
@@ -2536,7 +2524,7 @@ auto complete_after_held_events(
       );
       return;
     } catch (...) {
-      // Completes below, ahead of the held events.
+      // Allocation failure still owes exactly one completion.
     }
   }
   operation->complete(status, std::move(message), std::move(result));
@@ -3036,8 +3024,6 @@ auto start_style_operation(
 
 namespace {
 
-// What a geometry read fills: one value of Function's result, or a vector of
-// them for an array result.
 template <auto Function>
 using GeometryValue = std::conditional_t<
   CompletionValue<Function>::array,
@@ -3048,8 +3034,6 @@ template <auto Function>
 using GeometryWork =
   std::function<mln_status(MapObject&, GeometryValue<Function>&)>;
 
-// Runs a geometry read on the map's runtime worker and completes with
-// Function's result.
 template <auto Function>
 auto start_geometry_operation(
   mln_map map, GeometryWork<Function> work, const mln_completion* completion
@@ -3149,7 +3133,6 @@ auto create_map(
   auto runtime_state = lease_runtime(runtime);
   if (runtime_state == nullptr) return recorded_handle_fault_status();
   auto* live_runtime = runtime_state.get();
-  // Reserves the shared teardown worker before this map creates its own pool.
   static_cast<void>(map_teardown_lane());
 
   const auto retain_status = retain_runtime_map(runtime);
@@ -4015,7 +3998,6 @@ auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Reads text on the map's runtime worker and completes with Function's result.
 template <auto Function>
 auto start_map_string_operation(
   mln_map map, const mln_completion* completion,
@@ -4242,8 +4224,6 @@ auto apply_gesture_phase_before(MapObject& live, uint32_t phase) -> void {
   }
 }
 
-// CANCEL ends the transitions still running after the camera write, and END
-// and CANCEL then clear the gesture.
 auto apply_gesture_phase_after(MapObject& live, uint32_t phase) -> void {
   if (phase == MLN_GESTURE_PHASE_CANCEL) {
     const auto cancellation = TransitionCancellationScope{

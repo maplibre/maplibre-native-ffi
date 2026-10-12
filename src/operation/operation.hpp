@@ -52,8 +52,6 @@ auto create_completion_operation(
   CompletionOperation& out
 ) -> mln_status;
 
-// Pairs an operation with the completion of a function that delivers no value,
-// so the completion reports the operation's status alone.
 auto create_completion_operation(
   const mln_completion* descriptor, ValuelessCompletion valueless,
   CompletionOperation& out

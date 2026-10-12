@@ -33,12 +33,10 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   class VulkanTextureRenderableResource;
 
  public:
-  // `queue_lock` is the host's lock on the graphics queue, or null.
   VulkanTextureBackend(
     const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
   );
-  // Renders slot i into the target's textures[i].
   VulkanTextureBackend(
     const VulkanBorrowedTarget& target, mln::Size size,
     std::shared_ptr<const QueueLock> queue_lock
@@ -56,14 +54,10 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Follows a new physical size. Each ring slot keeps its image until the slot
   // is selected again, which rebuilds it at the new size.
   void set_ring_size(mln::Size new_size);
-  // Whether replacement images can use the render pass already built.
   [[nodiscard]] auto matches_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) const -> bool;
-  // Renders slot i into the target's textures[i] from here on. The caller has
-  // already established that the images match the live render passes.
   void set_borrowed_target(const VulkanBorrowedTarget& target);
-  // The layout a rendered image is left in, which an acquired frame reports.
   [[nodiscard]] auto frame_layout() const -> VkImageLayout;
   [[nodiscard]] auto context_descriptor() const
     -> const mln_vulkan_context_descriptor& {
@@ -75,9 +69,7 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   void deactivate() override;
 
   void prepareRenderResources();
-  // The image of the slot this backend is rendering into.
   auto frame_resources() -> VulkanTextureFrameResources;
-  // Renders into `slot` from the next prepareRenderResources() on.
   auto select_slot(std::size_t slot) -> bool;
 
  protected:

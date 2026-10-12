@@ -12,7 +12,6 @@ namespace mln::core::opengl {
 
 class EglSharedContext final {
  public:
-  // ownership holds one mln_opengl_context_ownership value.
   EglSharedContext(
     mln_egl_context_descriptor descriptor, std::uint32_t ownership
   );

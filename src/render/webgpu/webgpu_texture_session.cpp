@@ -40,8 +40,7 @@ constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
 // readback stages the padded rows and unpacks them.
 constexpr uint32_t readback_row_alignment = 256;
 constexpr uint32_t readback_bytes_per_pixel = 4;
-// Five seconds of yielding, orders of magnitude more than a map that is going
-// to complete needs.
+// A stalled device must release the readback wait even if no callback arrives.
 constexpr uint32_t readback_yield_milliseconds = 1;
 constexpr uint32_t readback_yield_attempts = 5000;
 
@@ -156,7 +155,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     }
   }
 
-  // Renders slot i into the target's textures[i].
   WebGPUTextureBackend(const WebGPUBorrowedTarget& target, mln::Size size)
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::gfx::HeadlessBackend(size),
@@ -304,8 +302,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
   }
 
-  // Renders slot i into the target's textures[i] from here on. The caller has
-  // already established that they match this session's context and format.
   void set_borrowed_target(const WebGPUBorrowedTarget& target) {
     // Reference the replacements before releasing the outgoing textures, so a
     // descriptor naming a texture this session already holds cannot drop its
@@ -332,7 +328,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
-  // One texture of the ring and its view, or empty.
   struct ColorSlot {
     WGPUTexture texture = nullptr;
     WGPUTextureView view = nullptr;
@@ -589,8 +584,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     color_texture_size_ = {0, 0};
   }
 
-  // References each of the target's textures for its slot, and selects slot
-  // zero.
   void take_borrowed_textures(const WebGPUBorrowedTarget& target) {
     const auto size = mln::Size{
       target.descriptor.physical_width, target.descriptor.physical_height
@@ -612,8 +605,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     slots_.front() = {};
   }
 
-  // Drops the session's references to the textures of `slots`, destroying
-  // only the ones the session made.
   void release_slots(std::vector<ColorSlot>& slots) {
     for (auto& slot : slots) {
       if (slot.view != nullptr) wgpuTextureViewRelease(slot.view);
@@ -843,8 +834,6 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
   }
 
-  // Presents through a different host surface from here on. The caller has
-  // already established that it matches this session's device and format.
   void set_surface(const mln_webgpu_surface_descriptor& descriptor) {
     auto* const replacement = static_cast<WGPUSurface>(descriptor.surface);
     // Reference the replacement before releasing the outgoing one, so a
@@ -972,7 +961,6 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     depth_stencil_size_ = {0, 0};
   }
 
-  // Releases the frame's texture without presenting it.
   void releaseFrame() {
     if (color_view_ != nullptr) {
       wgpuTextureViewRelease(color_view_);

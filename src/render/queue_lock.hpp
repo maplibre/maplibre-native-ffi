@@ -19,7 +19,6 @@ class QueueLock final {
   auto operator=(QueueLock&&) -> QueueLock& = delete;
   ~QueueLock();
 
-  // Whether the host passed callbacks. A disabled lock locks nothing.
   [[nodiscard]] auto enabled() const noexcept -> bool {
     return descriptor_.lock != nullptr;
   }
@@ -41,7 +40,6 @@ class QueueLock final {
   bool accepted_ = false;
 };
 
-// Holds a queue lock, if there is one, for one call on the queue.
 class QueueLockGuard final {
  public:
   explicit QueueLockGuard(const QueueLock* lock) noexcept
@@ -60,13 +58,10 @@ class QueueLockGuard final {
   [[nodiscard]] auto refused() const noexcept -> bool { return refused_; }
 
  private:
-  // The lock this guard took, or null.
   const QueueLock* lock_;
   bool refused_;
 };
 
-// Checks the descriptor's shape. A backend decides whether it supports an
-// enabled lock.
 auto validate_queue_lock(const mln_queue_lock* lock) -> mln_status;
 
 }  // namespace mln::core

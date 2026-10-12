@@ -138,7 +138,6 @@ auto deliver_style_result(
                            const StyleSourceRecord& source,
                            const std::vector<mln_buffer_view>& tile_urls
                          ) -> mln_style_source_info {
-      // A member whose bit is absent stays zero, as the record leaves it.
       auto info = source.info;
       info.id = view(source.id);
       if ((info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
@@ -210,7 +209,6 @@ auto start_style_operation(
   const mln_completion* completion
 ) -> mln_status;
 
-// Runs work on the map's runtime worker and completes with Function's result.
 template <auto Function>
 auto start_style_operation(
   mln_map map, StyleWork work, const mln_completion* completion
@@ -440,8 +438,6 @@ auto map_get_style_layer(
 auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
-// Writes the layer's style JSON, or sets out_found false when the style has no
-// such layer.
 auto map_get_style_layer_json(
   MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
   bool& out_found
@@ -456,8 +452,6 @@ auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
-// Writes the property's JSON, or sets out_found false when the property is
-// unset.
 auto map_get_style_light_property(
   MapObject& live, mln_buffer_view property_name, std::string& out_value,
   bool& out_found
@@ -472,8 +466,6 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status;
-// Writes the property's JSON, or sets out_found false when the property is
-// unset.
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   std::string& out_value, bool& out_found
@@ -481,8 +473,6 @@ auto map_get_layer_property(
 auto map_set_layer_filter(
   MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status;
-// Writes the filter's JSON, or sets out_found false when the layer has no
-// filter.
 auto map_get_layer_filter(
   MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
   bool& out_found
@@ -652,7 +642,6 @@ auto validate_free_camera_options_input(const mln_free_camera_options* options)
 auto map_set_projection_mode(
   mln_map map, const mln_projection_mode* mode, const mln_completion* completion
 ) -> mln_status;
-// Validates that a map handle is non-null and live.
 auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status;
 auto map_scale_factor(mln_map map) -> double;
 // Whether the map publishes render updates of its own. A static or tile map

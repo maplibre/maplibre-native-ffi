@@ -44,7 +44,6 @@ auto validate_borrowed_texture(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  // Non-null, because the shared validator rejects a null texture.
   const auto textures =
     metal_textures({descriptor->textures, descriptor->texture_count});
   for (auto* metal_texture : textures) {
@@ -112,7 +111,6 @@ class MetalTextureSessionBackend final
 
   auto set_metal_borrowed_target(const mln::core::MetalBorrowedTarget& target)
     -> mln_status override {
-    // The submission checked that the textures share one device and format.
     auto textures = metal_textures(target.textures);
     if (!backend_.has_device(textures.front()->device())) {
       mln::core::set_thread_error(

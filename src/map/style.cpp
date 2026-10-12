@@ -1530,7 +1530,6 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
 
 namespace {
 
-// Builds the one record that both the get and the list queries deliver.
 auto style_source_record(const mln::style::Source& source)
   -> StyleSourceRecord {
   auto record = StyleSourceRecord{};
@@ -2308,7 +2307,6 @@ auto style_image_info(const StyleImageRecord& record) noexcept
   const auto& image = *record.image;
   const auto& pixels = image.getImage();
   const auto& content = image.getContent();
-  // A member whose bit is absent is zero.
   const auto text_fit = [](const std::optional<mln::style::TextFit>& value) {
     return value ? from_native_text_fit(*value) : 0U;
   };
@@ -2786,7 +2784,6 @@ auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
 
 namespace {
 
-// Builds the one record that both the get and the list queries deliver.
 auto style_layer_record(const mln::style::Layer& layer) -> StyleLayerRecord {
   return {
     .id = layer.getID(),

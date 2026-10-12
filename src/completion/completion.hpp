@@ -49,14 +49,11 @@ auto deliver_failure(
   const std::string& diagnostic
 ) noexcept -> void;
 
-// Resolves completion with a failure, as deliver_failure delivers one.
 auto complete_failure(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic = {}
 ) noexcept -> void;
 
-// Resolves a command's completion. Commands deliver no value, which the
-// header schema enforces, so a committed command reports success here.
 auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
   mln_status status, std::uint64_t generation = 0, std::string diagnostic = {}

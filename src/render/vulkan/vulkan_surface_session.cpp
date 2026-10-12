@@ -221,7 +221,6 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
         return;
       }
 
-      // Submit without presenting, then rebuild so the next frame can acquire.
       auto& context = backend.getContext<mln::vulkan::Context>();
       const auto& dispatcher = backend.getDispatcher();
       auto& command_buffer = context.getCommandBuffer();
@@ -368,7 +367,6 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     }
   }
 
-  // Whether a replacement surface can use what this session already compiled.
   [[nodiscard]] auto matches_surface(
     const mln_vulkan_surface_descriptor& descriptor
   ) const -> bool {
@@ -651,7 +649,6 @@ auto vulkan_surface_set_target_start(
   return enqueue_surface_retarget(
     session, copied.extent,
     [copied](mln_render_session_object& live) {
-      // set_vulkan_target() runs the handle checks itself.
       return live.surface.backend->set_vulkan_target(copied);
     },
     completion,

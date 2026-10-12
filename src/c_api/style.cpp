@@ -149,8 +149,6 @@ struct OwnedCallbackSourceOptions {
   }
 };
 
-// Checks that a view's bytes are readable: a null pointer is valid only with
-// size 0. The diagnostic names the view.
 auto valid_view(mln_buffer_view view, const char* name) -> bool {
   if (view.data == nullptr && view.size != 0) {
     mln::core::set_thread_error((std::string{name} + " is invalid").c_str());
@@ -172,7 +170,6 @@ auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
   return valid_view(view, name);
 }
 
-// Checks a tile URL list: at least one entry, each naming at least one byte.
 auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
   if (tile_count == 0) {
     mln::core::set_thread_error("tile_count must be greater than 0");
@@ -190,10 +187,8 @@ auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
   return true;
 }
 
-// Adds one callback-backed source. An accepted command hands user_data to the
-// shared state, which releases it once the last reference drops unless the core
-// call adopted the callbacks into the style. A rejected submission never
-// referenced user_data, so the caller keeps it.
+// A rejected submission leaves user_data with the caller. An accepted command
+// releases it with the last shared reference unless the style adopts it.
 template <typename Options>
 auto add_callback_source(
   mln_map map, mln_buffer_view source_id, const Options* options,

@@ -35,7 +35,6 @@ class WorkerThread {
   ~WorkerThread();
 
   [[nodiscard]] auto joinable() const noexcept -> bool;
-  // Whether the calling thread is this worker.
   [[nodiscard]] auto is_current() const noexcept -> bool;
   auto join() -> void;
   auto detach() -> void;

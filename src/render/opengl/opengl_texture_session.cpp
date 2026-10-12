@@ -204,7 +204,6 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         context_(descriptor.context),
         ring_(ring_depth) {}
 
-  // Renders slot i into the target's textures[i].
   OpenGLTextureBackend(const OpenGLBorrowedTarget& target, mln::Size size)
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::HeadlessBackend(size),
@@ -290,8 +289,6 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
-  // Renders slot i into the target's textures[i] from here on, keeping the
-  // session's context and everything the renderer built in it.
   void set_borrowed_textures(const OpenGLBorrowedTarget& target) {
     borrowed_textures_ = borrowed_texture_names(target);
     // setSize() drops the selected renderable unconditionally, and the reset

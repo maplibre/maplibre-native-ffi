@@ -94,7 +94,6 @@ struct MapEventState {
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_map map = MLN_HANDLE_NULL;
   std::weak_ptr<MapObject> owner;
-  // Generation of the snapshot that the map published last.
   uint64_t published_generation = 0;
   // Open map transactions. A transaction holds the events that the map raises
   // until it publishes, and transactions never nest.
@@ -310,7 +309,6 @@ struct EventBatchObject {
 
 struct RuntimeObject {
   mln_runtime self = MLN_HANDLE_NULL;
-  // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
   ControlState control;
   RetirementTask disposal_task;
@@ -474,7 +472,6 @@ auto submit_runtime_operation(
   std::function<void()> function, bool child_retirement = false
 ) -> mln_status;
 
-// The continuously running run loop owned by this runtime's executor.
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;
 
 // Reads the options from the runtime object rather than its handle, so work
@@ -505,8 +502,6 @@ auto push_runtime_map_event_payload(
   uint32_t payload_type, const mln_runtime_event_payload& payload,
   int32_t code = 0, std::string message = {}
 ) -> void;
-// Appends events under one queue lock, all with one generation. Moves each
-// message out and leaves the vector for its owner to clear.
 auto push_runtime_map_events(
   mln_runtime runtime, mln_map map, uint64_t generation,
   std::vector<HeldMapEvent>& events

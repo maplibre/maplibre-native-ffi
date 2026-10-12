@@ -148,11 +148,8 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
 
 namespace {
 
-// Checks the textures array that every borrowed descriptor carries: present,
-// nonempty, each entry naming a texture, and no texture named twice. Two slots
-// that share a texture would let the session render into a texture whose frame
-// the host holds. `key` maps an entry to the handle that identifies it, which
-// is zero or null for an entry that names nothing.
+// Two ring slots must never share a texture: rendering into one would overwrite
+// a frame that the host holds from the other.
 template <typename Texture, typename Key>
 auto validate_borrowed_textures(
   const Texture* textures, size_t count, Key key, const char* null_message
@@ -548,8 +545,6 @@ auto texture_read_premultiplied_rgba8(
     .byte_length = byte_length
   };
 
-  // A null buffer with zero capacity is a size probe: out_info already carries
-  // the required byte length, so report it and succeed.
   if (out_data == nullptr && out_data_capacity == 0) {
     return MLN_STATUS_OK;
   }

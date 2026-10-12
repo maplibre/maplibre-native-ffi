@@ -19,7 +19,6 @@
 
 namespace mln::core {
 
-// Owns one continuously running MapLibre run loop and its native thread.
 class RuntimeExecutor {
  public:
   RuntimeExecutor() = default;

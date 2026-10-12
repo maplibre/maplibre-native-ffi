@@ -35,7 +35,6 @@ namespace mln::core {
 // and static destructors have already run while native threads still could.
 auto watch_process_exit() noexcept -> void;
 
-// Whether the process has begun to exit.
 [[nodiscard]] auto process_exiting() noexcept -> bool;
 
 }  // namespace mln::core

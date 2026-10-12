@@ -66,13 +66,9 @@ inline constexpr auto handle_max_index =
   return handle & handle_max_generation;
 }
 
-// Why a handle did not resolve.
 enum class HandleFault : std::uint8_t {
-  // The null handle.
   Null,
-  // A value whose kind bits name no handle type.
   NotAHandle,
-  // A handle of another type.
   WrongKind,
   // A value of the right type that this process never issued.
   Unknown,
@@ -90,7 +86,6 @@ enum class HandleFault : std::uint8_t {
                                      : MLN_STATUS_INVALID_ARGUMENT;
 }
 
-// Returns the C typedef name for a kind, or nullptr for an unregistered kind.
 [[nodiscard]] auto handle_kind_name(std::uint8_t kind) noexcept -> const char*;
 
 // Records the thread-local diagnostic and status for a handle that failed to
@@ -106,30 +101,19 @@ auto report_handle_fault(
 // fails, so the status matches the diagnostic that failure recorded.
 [[nodiscard]] auto recorded_handle_fault_status() noexcept -> mln_status;
 
-// `issued` reports whether the table issued this handle's value at some point.
 [[nodiscard]] auto classify_handle_fault(
   HandleKind expected, std::uint64_t handle, bool issued
 ) noexcept -> HandleFault;
 
-// Declared once per handle object type, next to that type's definition.
-//
-//   template <> struct HandleTraits<MapObject> {
-//     static constexpr HandleKind kind = HandleKind::Map;
-//     static constexpr bool leasable = false;
-//   };
 template <typename Object>
 struct HandleTraits;
 
-// Thrown when a kind's index space is full.
 class HandleTableExhausted final : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
 };
 
-// A per-kind slot table mapping generational ids to owned objects.
-//
-// Locking contract: no entry point holds two handle-table mutexes at once.
-// There is no ordering rule between tables.
+// Handle-table mutexes have no ordering rule; hold at most one at a time.
 template <typename Object>
 class HandleTable {
  public:
@@ -170,12 +154,8 @@ class HandleTable {
     return encode_handle(Traits::kind, index, 1);
   }
 
-  // Borrows the object a handle names, or returns nullptr after recording the
-  // thread-local diagnostic and status.
-  //
-  // The returned pointer outlives this call's lock, so the caller must be on a
-  // thread that cannot concurrently retire the handle. A foreign thread holds
-  // mutex() and uses resolve_locked(), or uses lease().
+  // The returned pointer outlives the lock. The caller must prevent concurrent
+  // retirement or use resolve_locked() under mutex(), or lease().
   [[nodiscard]] auto resolve(std::uint64_t handle) const -> Object* {
     const std::scoped_lock lock(mutex_);
     return resolve_locked(handle);
@@ -216,7 +196,6 @@ class HandleTable {
     return lease_locked(handle);
   }
 
-  // The same lease for a caller that already holds mutex().
   [[nodiscard]] auto lease_locked(std::uint64_t handle) const
     -> std::shared_ptr<Object>
     requires(Traits::leasable)

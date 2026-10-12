@@ -11,13 +11,8 @@
 
 namespace mln::core {
 
-// The result that a completion function delivers, as its header declares it.
-// tools/bindgen specializes it for each completion function that is not a
-// command, and a function with no entry has no completion result to deliver.
-// `has_value` reports whether the header names a `result=`; when it does,
-// `type` is that C type, `array` reports `shape=array`, and `nullable` reports
-// `nullable=true`. Commands deliver no value by schema and complete through
-// complete_command instead.
+// The generated table defines result types and shapes from header annotations.
+// Commands have no table entry and complete through complete_command.
 template <auto Function>
 struct CompletionResult;
 
@@ -26,15 +21,11 @@ struct CompletionResult;
 template <auto Function>
 class CompletionValue;
 
-// The type-erased success behind CompletionValue and ValuelessCompletion,
-// which alone may call it.
 class ErasedCompletionValue final {
   template <auto Function>
   friend class CompletionValue;
   friend class ValuelessCompletion;
 
-  // size is the byte stride of one element, which the completion reports as
-  // value_size whenever value is not null.
   static auto deliver(
     const mln_completion& descriptor, const void* value, std::size_t count,
     std::uint32_t size
@@ -87,7 +78,6 @@ class CompletionValue final {
     ErasedCompletionValue::deliver(descriptor, nullptr, 0, 0);
   }
 
-  // Resolves completion with a value that points into no storage of its own.
   static auto complete(
     const std::shared_ptr<Completion>& completion, Type value
   ) noexcept -> void

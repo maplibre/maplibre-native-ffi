@@ -65,8 +65,6 @@ struct Header {
   std::string value;
 };
 
-// Request headers in the order emscripten_fetch wants them, before they are
-// flattened into its null-terminated name/value array.
 using RequestHeaders = std::vector<std::pair<std::string, std::string>>;
 
 auto responseHeaders(emscripten_fetch_t* fetch) -> std::vector<Header> {
@@ -356,9 +354,7 @@ class FetchRequestState
   void cancel();
 
  private:
-  // Who owns the fetch handle, and therefore who closes it.
   enum class Transport : std::uint8_t {
-    // No handle outstanding.
     None,
     // A fetch is in flight and its terminal callback closes the handle. Set
     // before emscripten_fetch() so the handle has an owner even before the

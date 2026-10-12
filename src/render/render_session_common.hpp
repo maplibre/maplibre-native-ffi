@@ -52,7 +52,6 @@ namespace mln::core {
 enum class RenderSessionKind : uint8_t { Surface, Texture };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
-// Which renderer cache a maintenance submission releases.
 enum class RenderSessionMaintenance : uint8_t {
   ReduceMemoryUse,
   ClearData,
@@ -331,11 +330,9 @@ class RenderSessionScheduler final : public mln::Scheduler {
     }
   }
 
-  // Runs queued work on the calling graphics thread. Loops until the queue is
-  // empty, because a task may enqueue more.
+  // Drain to empty: a running task may enqueue more graphics work.
   auto drain() -> void;
 
-  // Drops queued work without running it, for detach.
   auto discard() -> void;
 
   // Wakes the render owner when work makes an idle queue nonempty. Cleared
@@ -396,7 +393,6 @@ struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
 
-// The most slots a texture ring holds, owned or borrowed.
 inline constexpr std::size_t max_texture_ring_depth = 3;
 
 struct RenderTextureSlot {
@@ -743,7 +739,6 @@ struct mln_render_session_object
   // work item: whatever can make them renderable moves them back to the front
   // of `demands` and queues one.
   std::deque<mln::core::PendingFrameDemand> update_waiting_demands;
-  // Barrier epochs of the demands currently running on the driver.
   std::vector<uint64_t> active_demand_epochs;
   std::deque<mln::core::PendingBarrier> barriers;
   std::deque<mln::core::RenderDriverWork> waiting_update_work;
@@ -900,7 +895,6 @@ auto validate_opengl_context(
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
   -> mln_status;
 
-// Whether two Vulkan context descriptors name the same device and queue.
 auto vulkan_context_matches(
   const mln_vulkan_context_descriptor& lhs,
   const mln_vulkan_context_descriptor& rhs
@@ -988,7 +982,6 @@ auto validate_render_session_retarget(
   mln_render_session_object*& out_session
 ) -> mln_status;
 
-// Hands a validated descriptor to the session's backend.
 using RenderTargetReplacer =
   std::function<mln_status(mln_render_session_object&)>;
 
@@ -1079,8 +1072,6 @@ auto render_session_query_feature_extensions(
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
   std::string& out_result
 ) -> mln_status;
-// The checks render_session_query_feature_extensions() makes of its inputs,
-// for a submission to make before it queues the query.
 auto validate_feature_extension_query(
   mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments
@@ -1176,8 +1167,6 @@ inline auto attach_ring_depth(const mln_render_session_attach_options* options)
   );
 }
 
-// Rejects an attachment whose requested driver is not the one this target can
-// run on.
 inline auto require_render_driver(
   const mln_render_session_attach_options* options,
   mln_render_driver_kind expected, const char* message

@@ -765,8 +765,6 @@ auto validate_runtime_options(const mln_runtime_options* options)
     mln::core::set_thread_error("mln_runtime_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // Validated here as well as in the setter, so a mask this library cannot
-  // honour is rejected wherever it arrives.
   constexpr auto known_mask_bits =
     static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
   if ((options->event_mask & ~known_mask_bits) != 0U) {
@@ -1138,7 +1136,6 @@ auto execute_resource_configuration_command(
   }
 }
 
-// Submits the configuration change of Function, which delivers no value.
 template <auto Function, typename Mutation>
 auto submit_resource_configuration_command(
   const std::shared_ptr<RuntimeObject>& runtime,
@@ -1549,19 +1546,15 @@ auto clear_http_header_transform(
 
 namespace {
 
-// Presents one offline operation's successful native result to its completion.
 using OfflinePresent =
   void (*)(const std::shared_ptr<Completion>& completion, std::any result);
 
-// Presents the success of Function, which delivers no value.
 template <auto Function>
 auto present_nothing(const std::shared_ptr<Completion>& completion, std::any)
   -> void {
   valueless_completion<Function>().complete(completion);
 }
 
-// Presents the regions that Function delivers: an OfflineRegionData, an
-// optional one when the result is nullable, or a vector of them for an array.
 template <auto Function>
 auto present_regions(
   const std::shared_ptr<Completion>& completion, std::any result
@@ -1621,7 +1614,6 @@ auto present_region_status(
   );
 }
 
-// Adapts one offline operation's native result to its completion.
 auto offline_operation_result_callback(
   const std::shared_ptr<Completion>& completion, OfflinePresent present
 ) -> OperationObject::ResultCallback {
@@ -2614,8 +2606,6 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   }
   auto control_lease = ControlLease{&live->control};
   auto queue = live->event_queue;
-  // An empty queue is a normal poll, so it neither allocates a batch nor sets
-  // a diagnostic.
   {
     const std::scoped_lock lock(queue->mutex);
     if (queue->pending.events.empty()) return MLN_STATUS_NOT_READY;
