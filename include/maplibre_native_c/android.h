@@ -21,10 +21,10 @@ extern "C" {
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `context` must be
  * an Android `android.content.Context` object. Any Context subtype may be
- * passed. The implementation retains that Context's AssetManager when
- * initialization succeeds, so pass an Activity or the application Context to
- * read the app APK. TLS verification still resolves the process application
- * context. All pointers are borrowed for the duration of the call.
+ * passed. Successful initialization retains that Context's AssetManager for
+ * APK asset access. Pass an Activity or the application Context to read the
+ * app APK. TLS verification uses the process application context. All pointers
+ * are borrowed for the duration of the call.
  *
  * May be called from any thread that is attached to the JVM.
  *

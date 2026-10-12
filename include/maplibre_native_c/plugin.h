@@ -2,19 +2,10 @@
  * @file plugin.h
  * Layer plugin registration.
  *
- * MapLibre Native's plugin API lets native code register style layer types
- * that the renderer draws itself: a plugin declares paint properties and
- * per-backend shaders, lays out tile features into vertex data on tile
- * workers, and fills uniform blocks on the render thread. This library builds
- * that support into its core and exports the registration entry point,
- * mln_plugin_register_v1(). The contract is upstream's plugin header, which
- * installs next to this library's headers as mln/plugin/plugin_api.h.
- *
- * This header stays outside maplibre_native_c.h on purpose. Plugin authoring
- * is a separate contract from the map API: upstream versions its structs
- * independently, its callbacks run on tile workers and the render thread for
- * the rest of the process, and plugin authoring uses native code. Language
- * bindings expose the registration function for plugin integrations.
+ * Native plugins register style layer types through mln_plugin_register_v1().
+ * The plugin contract is declared in mln/plugin/plugin_api.h, installed next
+ * to this library's headers and versioned independently of the map API.
+ * Include this header separately from maplibre_native_c.h.
  *
  * A plugin integration calls its own registration entry point with the
  * function returned by mln_plugin_get_register_function_v1(). The plugin
@@ -27,10 +18,9 @@
  * The plugin must be built against the same MapLibre Native revision as the
  * library; upstream does not yet promise ABI stability for this API.
  *
- * Plugin code runs on tile workers and the render thread as part of native
- * work, so the library's exit gate for host callbacks does not cover it: it
- * may run while the process exits, after host exit handlers and static
- * destructors have run. A plugin must not use state that those destroy.
+ * Plugin callbacks run on native tile workers and the render thread and may
+ * run during process exit, after host exit handlers and static destructors.
+ * A plugin must not use state that those destroy.
  *
  * The plugin API declares shaders for the OpenGL, Vulkan, and Metal backends.
  * A WebGPU build registers plugins but has no shader path for their layers.
@@ -50,11 +40,7 @@ extern "C" {
 /**
  * Returns the process-wide mln_plugin_register_v1 entry point; never null.
  *
- * The accessor exists for consumers that cannot take a C function's address,
- * such as managed-language bindings over this library. Such a consumer obtains
- * the register function here and passes it to the entry point of a plugin
- * shared library, which registers its layer types through the pointer. See
- * the file-top comment for the loading pattern.
+ * The returned function follows the registration contract in this header.
  */
 MLN_BINDING("kind=native_pointer;ownership=borrowed;lifetime=process")
 MLN_API mln_plugin_register_function_v1

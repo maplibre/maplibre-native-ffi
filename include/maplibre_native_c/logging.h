@@ -102,13 +102,9 @@ typedef struct mln_log_handler {
  * is replaced or cleared. A rejected call leaves the current handler in place
  * and invokes no release. mln_log_clear_callback() clears the handler.
  *
- * The callback is a low-level native callback:
- *
- * - MapLibre may invoke it from logging or worker threads selected by the async
- *   severity mask.
- * - MapLibre may invoke it while holding internal logging locks.
- * - The callback must be thread-safe, return quickly, and must not call this C
- *   API or MapLibre Native APIs.
+ * The callback may run on any thread, according to the async severity mask. It
+ * must be thread-safe, return promptly, and must not call this C API or
+ * MapLibre Native APIs.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

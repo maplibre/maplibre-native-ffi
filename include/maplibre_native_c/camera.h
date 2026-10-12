@@ -67,7 +67,7 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mask throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the mask throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_debug_options(
@@ -88,8 +88,7 @@ MLN_API mln_status mln_map_set_debug_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the visibility throws on the map
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the visibility throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
@@ -107,7 +106,7 @@ MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the dump throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the dump throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_dump_debug_logs(
@@ -127,8 +126,7 @@ MLN_API mln_status mln_map_dump_debug_logs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_viewport_options(
@@ -149,8 +147,7 @@ MLN_API mln_status mln_map_set_viewport_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_tile_options(
@@ -186,7 +183,7 @@ MLN_API mln_status mln_map_set_tile_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the camera write throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_update_camera(
@@ -218,7 +215,7 @@ MLN_API mln_status mln_map_update_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the camera write throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(
@@ -241,7 +238,7 @@ MLN_API mln_status mln_map_apply_camera_delta(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the cancellation throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_transitions(
@@ -266,7 +263,7 @@ MLN_API mln_status mln_map_cancel_transitions(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the cancellation throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_camera_transition(
@@ -288,7 +285,7 @@ MLN_API mln_status mln_map_cancel_camera_transition(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when reading the camera throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when reading the camera throws.
  */
 MLN_BINDING("execution=query;result=mln_camera_query_result")
 MLN_API mln_status mln_map_get_camera(
@@ -311,7 +308,7 @@ MLN_API mln_status mln_map_get_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the fit throws.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
@@ -336,7 +333,7 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the fit throws.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
@@ -362,7 +359,7 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the fit throws.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
@@ -388,7 +385,7 @@ MLN_API mln_status mln_map_camera_for_geometry(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the projection throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
@@ -415,7 +412,7 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the projection throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
@@ -437,8 +434,7 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the constraints throws on the map
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the constraints throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_bounds(
@@ -460,8 +456,7 @@ MLN_API mln_status mln_map_set_bounds(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
- *   worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_free_camera_options(
@@ -484,7 +479,7 @@ MLN_API mln_status mln_map_set_free_camera_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mode throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when applying the mode throws.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_projection_mode(
@@ -495,11 +490,8 @@ MLN_API mln_status mln_map_set_projection_mode(
 /**
  * Starts an ordered conversion from a geographic coordinate to a screen point.
  *
- * Each conversion queues one map query. Hot paths such as per-pointer-move
- * conversion use a standalone projection, whose conversions are synchronous.
- * A host recreates that projection, which is cheap and synchronous, when the
- * snapshot's extent, viewport options, bounds, or projection mode changes. The
- * completion borrows one mln_screen_point.
+ * The completion borrows one mln_screen_point. Standalone projections provide
+ * synchronous conversions; see mln_map_create_projection().
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -509,7 +501,7 @@ MLN_API mln_status mln_map_set_projection_mode(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_screen_point")
 MLN_API mln_status mln_map_pixel_for_lat_lng(
@@ -520,12 +512,9 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
 /**
  * Starts an ordered conversion from a screen point to a geographic coordinate.
  *
- * The output longitude is wrapped to -180 to 180. Each conversion queues one
- * map query. Hot paths such as per-pointer-move conversion use a standalone
- * projection, whose conversions are synchronous. A host recreates that
- * projection, which is cheap and synchronous, when the snapshot's extent,
- * viewport options, bounds, or projection mode changes. The completion borrows
- * one mln_lat_lng.
+ * The output longitude is wrapped to -180 to 180. The completion borrows one
+ * mln_lat_lng. Standalone projections provide synchronous conversions; see
+ * mln_map_create_projection().
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -535,7 +524,7 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng")
 MLN_API mln_status mln_map_lat_lng_for_pixel(
@@ -558,7 +547,7 @@ MLN_API mln_status mln_map_lat_lng_for_pixel(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng")
 MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
@@ -580,7 +569,7 @@ MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_screen_point;shape=array")
 MLN_API mln_status mln_map_pixels_for_lat_lngs(
@@ -605,7 +594,7 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_lat_lngs_for_pixels(
@@ -630,7 +619,7 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
+ * - MLN_STATUS_NATIVE_ERROR when the conversion throws.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
@@ -643,7 +632,7 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
  * Starts an ordered query of meters per logical pixel at a latitude and the
  * current map zoom. The completion borrows one double.
  *
- * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ * The scale uses MapLibre Native's zoom and latitude clamps.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.

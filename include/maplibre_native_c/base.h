@@ -2,11 +2,9 @@
  * @file maplibre_native_c/base.h
  * Public C API declarations for base ABI types, status values, and handles.
  *
- * Handles are opaque 64-bit generational ids.
- *
- * Each id packs the handle's type, a slot index, and a reuse generation, so a
- * released handle stays distinguishable from every later handle. A handle is
- * released once the call that ends it, such as a release, close, destroy, or
+ * Handles are opaque 64-bit ids. Each handle remains distinguishable from
+ * every later handle after release. A handle is released once the call that
+ * ends it, such as a release, close, destroy, or
  * dispose, accepts it. Passing a released handle reports
  * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
  * handle, a handle of another type, or a value this library never issued,
@@ -14,8 +12,8 @@
  * its diagnostic names the case. Handle values are safe to copy, compare,
  * hash, and move between threads, and carry no ownership on their own.
  *
- * The bit layout is internal. Hosts pass handles back as issued rather than
- * decoding or synthesizing them.
+ * Hosts must pass handles back as issued, without decoding or synthesizing
+ * them.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_BASE_H
@@ -111,9 +109,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
 /**
  * The null handle, for every handle type.
  *
- * A live handle always carries a nonzero kind tag, so this value names no
- * object of any type. Status-returning functions reject it. Void release
- * functions accept it as a no-op. Output handle parameters that create or
+ * This value names no object of any type. Status-returning functions reject
+ * it. Void release functions accept it as a no-op. Output handle parameters
+ * that create or
  * acquire ownership require `*out_handle` to equal it on entry.
  */
 #define MLN_HANDLE_NULL ((uint64_t)0)

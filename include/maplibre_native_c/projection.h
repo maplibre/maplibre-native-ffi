@@ -24,17 +24,14 @@ extern "C" {
  * axonometric mode. A projection created after a command's completion
  * therefore observes that command. The caller owns the returned handle, which
  * stays usable after the map and runtime close. out_projection must point to
- * the null handle. This function never reads mutable MapLibre state and may be
- * called from any thread.
+ * the null handle. This function may be called from any thread.
  *
- * This projection copies the map's latest published snapshot, while
  * mln_render_session_create_projection() copies the transform of the last
  * frame the session drew. Hit-testing against what is on screen uses the
  * session's projection.
  *
- * Every later projection call is synchronous, runs on the calling thread, and
- * is internally serialized. A projection never observes map changes made after
- * its creation.
+ * Projection calls are synchronous and safe to call concurrently. A projection
+ * never observes map changes made after its creation.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -215,7 +212,7 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
  * Reads the ground distance covered by one logical map pixel at a latitude for
  * the helper camera zoom.
  *
- * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ * The scale uses MapLibre Native's zoom and latitude clamps.
  * This function may be called from any thread.
  *
  * Returns:

@@ -80,9 +80,8 @@ typedef void (*mln_completion_callback)(
  * release callback runs after the completion returns. A non-OK submission
  * invokes neither callback and leaves user_data owned by the caller.
  *
- * The completion may run on the thread that finishes the work or inline on the
- * submitting thread when the work finishes before the submission is accepted.
- * Its thread can differ from the thread that ran the command. It may call
+ * The completion thread is unspecified and may be the submitting thread. It
+ * can differ from the thread that ran the command. The completion may call
  * any-thread C APIs, but must return promptly and must not wait for runtime or
  * graphics-driver work that can only progress on its current thread.
  */

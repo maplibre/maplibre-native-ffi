@@ -12,10 +12,8 @@
  * so host user code runs on its own execution context rather than on MapLibre
  * worker, network, logging, or render threads.
  *
- * This header is not installed and carries no compatibility promise. The Dart
- * binding and the native tests read it from the source tree, and its symbols
- * stay exported because Dart and the Python extension resolve them from the
- * shipped library.
+ * This header is not installed and carries no compatibility promise. Bindings
+ * may resolve its exported functions from the shipped library.
  *
  * This header targets C23.
  */
@@ -529,11 +527,9 @@ MLN_API void mln_adapter_owner_token_destroy(
 /**
  * Disposes the token's native owner and releases the token on any thread.
  *
- * A render session is disposed as mln_render_session_dispose() disposes it,
- * except that retirement always quarantines its graphics resources and never
- * detaches it. An isolate's shutdown runs this finalizer while the process
- * exits, when nothing waits for the session's wake releases, so retirement
- * makes no graphics call after the one in flight.
+ * A render session's retirement keeps its graphics resources until process
+ * exit and makes no graphics call after the one in flight. Other behavior
+ * follows mln_render_session_dispose().
  */
 MLN_API void mln_adapter_owner_finalize(
   void* token MLN_BINDING("kind=context")
@@ -543,12 +539,10 @@ MLN_API void mln_adapter_owner_finalize(
  * Abandons a render session during a host runtime's shutdown, keeping its
  * graphics objects.
  *
- * Does what mln_render_session_abandon() does, including the wait for a core
- * worker's in-flight driver call, except that it makes no graphics call: it
- * keeps every graphics object of the session until the process exits, as
- * mln_adapter_owner_finalize() does. A shutdown hook that ends a session's
- * graphics calls before the process exits uses this, because the host's own
- * shutdown may already have destroyed the graphics objects behind the session.
+ * Follows mln_render_session_abandon(), including its wait for an in-flight
+ * core-worker driver call, but makes no graphics call and keeps every graphics
+ * object until process exit. The host may call this after its runtime's
+ * shutdown has destroyed the graphics objects behind the session.
  *
  * Returns the statuses that mln_render_session_abandon() returns.
  */
@@ -559,7 +553,7 @@ MLN_API mln_status mln_adapter_render_session_abandon_at_exit(
 ) MLN_NOEXCEPT;
 
 /**
- * The mln_resource_transform_callback implementation for rewrite rules.
+ * The mln_resource_transform_callback for rewrite rules.
  *
  * The user_data pointer is an mln_adapter_resource_rewrite_rules table. The
  * first matching rule replaces the URL, and a request that matches no rule
@@ -581,7 +575,7 @@ MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
 ) MLN_NOEXCEPT;
 
 /**
- * The mln_http_header_transform_callback implementation for native rules.
+ * The mln_http_header_transform_callback for native rules.
  *
  * The first rule whose kind and transformed URL match supplies all its headers.
  * A request with no matching rule proceeds unchanged.
@@ -621,7 +615,7 @@ MLN_API mln_status mln_adapter_http_header_validate(
 ) MLN_NOEXCEPT;
 
 /**
- * The mln_resource_provider_callback implementation for provider rules.
+ * The mln_resource_provider_callback for provider rules.
  *
  * The user_data pointer is an mln_adapter_resource_provider_rules table. A
  * matching request is completed inline with the rule's response and reports
@@ -637,7 +631,7 @@ MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
 ) MLN_NOEXCEPT;
 
 /**
- * The mln_resource_provider_callback implementation for routed providers.
+ * The mln_resource_provider_callback for routed providers.
  *
  * user_data points to an mln_adapter_routed_resource_provider. A request that
  * matches one route reaches the provider's callback, and this function returns
