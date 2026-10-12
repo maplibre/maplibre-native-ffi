@@ -13,6 +13,10 @@ public sealed record ResourceResponse
 {
     public ResourceResponseStatus Status { get; set; }
     public ResourceErrorReason ErrorReason { get; set; }
+
+    /// <summary>
+    /// Response bytes. May be null only when byte_count is 0.
+    /// </summary>
     public byte[] Bytes
     {
         get => BytesStorage.ToArray();

@@ -32,6 +32,9 @@ namespace Maplibre.NativeFfi;
 /// <param name="Payload">
 /// Typed payload selected by payload_type.
 /// </param>
+/// <param name="Message">
+/// Copied text, owned by the caller.
+/// </param>
 public readonly partial record struct RuntimeEvent(
     RuntimeEventType Type,
     RuntimeEventSourceType SourceType,

@@ -506,7 +506,11 @@ class Values:
                         if key == field.presence.variant
                     )
                     python.append(
-                        f"@dataclass(frozen=True, slots=True)\nclass {variant_name}:\n    value: {self.type(field.value)}\n    _tag = {tag}\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls({self.facade_copy(field.value, 'raw')})\n"
+                        f"@dataclass(frozen=True, slots=True)\nclass {variant_name}:\n"
+                        + docs.docstring(
+                            self.api.doc(f"{union.native}.{field.name}"), "    "
+                        )
+                        + f"    value: {self.type(field.value)}\n    _tag = {tag}\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls({self.facade_copy(field.value, 'raw')})\n"
                     )
         for name, plan in sorted(self.enums.items()):
             prefix = (
@@ -577,7 +581,10 @@ class Values:
                 )
             else:
                 default = ""
-            fields.append(f"    {member}: {public_type}{default}")
+            fields.append(
+                f"    {member}: {public_type}{default}\n"
+                + docs.docstring(self.api.doc(f"{name}.{field.name}"), "    ")
+            )
             if value.registration:
                 # Native never returns callbacks, so a copy leaves them unset.
                 unset = "None" if optional(value) else public_name(value.native) + "()"
@@ -592,7 +599,10 @@ class Values:
                 f"{member}={self.facade_copy(value, f'raw[{member!r}]')}"
             )
         if arena := self.item_buffers.get(name):
-            fields.append(f"    {arena.field}: str")
+            fields.append(
+                f"    {arena.field}: str\n"
+                + docs.docstring(self.api.doc(f"{name}.{arena.field}"), "    ")
+            )
             public_copies.append(f"{arena.field}=raw[{arena.field!r}]")
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"

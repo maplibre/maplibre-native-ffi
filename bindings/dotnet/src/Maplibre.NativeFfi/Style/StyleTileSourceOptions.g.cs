@@ -13,6 +13,10 @@ public sealed record StyleTileSourceOptions
 {
     public double? MinZoom { get; set; }
     public double? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Copied text, owned by the caller.
+    /// </summary>
     public string? Attribution { get; set; }
 
     /// <summary>

@@ -2109,7 +2109,9 @@ public data class AnimationOptions(
 )
 
 /**
- * Geographic coordinate in degrees used by map and projection APIs.
+ * Geographic coordinate in degrees used by map and projection APIs. Copied result, owned by the
+ * caller. Copied result, owned by the caller. Copied result, owned by the caller. Copied result,
+ * owned by the caller. Copied result, owned by the caller.
  *
  * See `mln_lat_lng` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2122,7 +2124,8 @@ public data class LatLng(
 )
 
 /**
- * Geographic bounds in degrees.
+ * Geographic bounds in degrees. Copied result, owned by the caller. Copied result, owned by the
+ * caller.
  *
  * See `mln_lat_lng_bounds` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2155,7 +2158,8 @@ public data class BoundOptions(
 )
 
 /**
- * Screen-space point in logical map pixels.
+ * Screen-space point in logical map pixels. Copied result, owned by the caller. Copied result,
+ * owned by the caller.
  *
  * See `mln_screen_point` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2209,7 +2213,8 @@ public data class CameraFitOptions(
 )
 
 /**
- * Camera fields used by snapshots and camera updates.
+ * Camera fields used by snapshots and camera updates. Copied result, owned by the caller. Copied
+ * result, owned by the caller. Copied result, owned by the caller.
  *
  * See `mln_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2326,7 +2331,7 @@ public data class GeojsonSourceOptions(
   public val clusterMaxZoom: Double? = null,
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
-   * the MapLibre Style Spec clusterProperties form. The UTF-8 bytes are borrowed for the call.
+   * the MapLibre Style Spec clusterProperties form. Copied text, owned by the caller.
    */
   public val clusterProperties: ByteArray? = null,
   /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
@@ -2478,7 +2483,9 @@ public data class MetalBorrowedTextureDescriptor(
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
-  /** The ring's textures, one per slot, in slot order. Required. */
+  /**
+   * The ring's textures, one per slot, in slot order. Required. Copied value, owned by the caller.
+   */
   public val textures: List<MetalBorrowedTexture> = emptyList(),
 )
 
@@ -2587,7 +2594,7 @@ public data class WebglContextDescriptor(
   public val context: Int = 0,
   /**
    * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML canvas must still be
-   * transferable when attachment starts.
+   * transferable when attachment starts. Copied text, owned by the caller.
    */
   public val canvasSelector: String = "",
 )
@@ -2664,7 +2671,9 @@ public data class OpenglBorrowedTextureDescriptor(
    * the same share group.
    */
   public val context: OpenglContextDescriptor,
-  /** The ring's textures, one per slot, in slot order. Required. */
+  /**
+   * The ring's textures, one per slot, in slot order. Required. Copied value, owned by the caller.
+   */
   public val textures: List<OpenglBorrowedTexture> = emptyList(),
   /** OpenGL texture target of every texture. Must be GL_TEXTURE_2D. */
   public val target: UInt = 0u,
@@ -2722,7 +2731,10 @@ public data class PremultipliedRgba8Image(
   public val height: UInt = 0u,
   /** Bytes per image row. Must be at least width &#42; 4. */
   public val stride: UInt = 0u,
-  /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
+  /**
+   * Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied bytes, owned by the
+   * caller.
+   */
   public val pixels: ByteArray = byteArrayOf(),
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(width, height, stride, pixels)
@@ -2782,9 +2794,15 @@ public data class RenderSessionAttachOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedFeatureQueryOptions(
-  /** Optional style layer IDs. When absent, all rendered layers are queried. */
+  /**
+   * Optional style layer IDs. When absent, all rendered layers are queried. Copied value, owned by
+   * the caller.
+   */
   public val layerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  /**
+   * Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. Copied text, owned by
+   * the caller.
+   */
   public val filter: ByteArray? = null,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(layerIds, filter)
@@ -2815,7 +2833,7 @@ public data class ScreenBox(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class ScreenLineString(
-  /** Points. Null only when point_count is 0. */
+  /** Points. Null only when point_count is 0. Copied value, owned by the caller. */
   public val points: List<ScreenPoint> = emptyList()
 )
 
@@ -2860,10 +2878,10 @@ public data class RenderedQueryGeometry(public val data: RenderedQueryGeometryDa
 public data class RuntimeOptions(
   /**
    * Directory root for asset:// URLs. Copied during runtime creation. Null or empty selects
-   * `/android_asset` on Android and `.` elsewhere.
+   * `/android_asset` on Android and `.` elsewhere. Copied text, owned by the caller.
    */
   public val assetPath: String? = null,
-  /** Cache database path. Copied during runtime creation. */
+  /** Cache database path. Copied during runtime creation. Copied text, owned by the caller. */
   public val cachePath: String? = null,
   /**
    * Runtime-scoped event types this runtime queues, as a bitwise OR of `mln_runtime_event_mask`
@@ -2881,9 +2899,15 @@ public data class RuntimeOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class SourceFeatureQueryOptions(
-  /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. */
+  /**
+   * Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. Copied value, owned
+   * by the caller.
+   */
   public val sourceLayerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  /**
+   * Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. Copied text, owned by
+   * the caller.
+   */
   public val filter: ByteArray? = null,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(sourceLayerIds, filter)
@@ -2924,13 +2948,13 @@ public data class ImageContent(
  */
 public data class StyleImageOptions(
   /**
-   * Horizontally stretchable intervals. Borrowed for the call and copied before return. May be null
-   * only when stretch_x_count is 0.
+   * Horizontally stretchable intervals. May be null only when stretch_x_count is 0. Copied value,
+   * owned by the caller.
    */
   public val stretchX: List<ImageStretch>? = null,
   /**
-   * Vertically stretchable intervals. Borrowed for the call and copied before return. May be null
-   * only when stretch_y_count is 0.
+   * Vertically stretchable intervals. May be null only when stretch_y_count is
+   * 0. Copied value, owned by the caller.
    */
   public val stretchY: List<ImageStretch>? = null,
   /** Content box used when icon-text-fit applies. */
@@ -2954,6 +2978,7 @@ public data class StyleImageOptions(
 public data class StyleTileSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
+  /** Copied text, owned by the caller. */
   public val attribution: String? = null,
   /** One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`. */
   public val scheme: StyleTileScheme? = null,
@@ -2967,7 +2992,7 @@ public data class StyleTileSourceOptions(
 )
 
 /**
- * Global style transition options.
+ * Global style transition options. Copied result, owned by the caller.
  *
  * See `mln_style_transition_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3049,7 +3074,9 @@ public data class VulkanBorrowedTextureDescriptor(
   public val physicalHeight: UInt = 256u,
   /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor,
-  /** The ring's images, one per slot, in slot order. Required. */
+  /**
+   * The ring's images, one per slot, in slot order. Required. Copied value, owned by the caller.
+   */
   public val textures: List<VulkanBorrowedTexture> = emptyList(),
   /** Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid. */
   public val format: UInt = 0u,
@@ -3155,7 +3182,9 @@ public data class WebgpuBorrowedTextureDescriptor(
    * that device's default queue.
    */
   public val context: WebgpuContextDescriptor,
-  /** The ring's textures, one per slot, in slot order. Required. */
+  /**
+   * The ring's textures, one per slot, in slot order. Required. Copied value, owned by the caller.
+   */
   public val textures: List<WebgpuBorrowedTexture> = emptyList(),
   /** Backend-native WGPUTextureFormat value of every texture. Undefined is invalid. */
   public val format: UInt = 0u,
@@ -3276,7 +3305,7 @@ public data class RuntimeEventTileAction(
 )
 
 /**
- * Offline region status snapshot.
+ * Offline region status snapshot. Copied result, owned by the caller.
  *
  * See `mln_offline_region_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3391,6 +3420,7 @@ public data class RuntimeEvent(
   public val code: Int = 0,
   /** Typed payload selected by payload_type. */
   public val payload: RuntimeEventPayload,
+  /** Copied text, owned by the caller. */
   public val message: String = "",
 )
 
@@ -3401,12 +3431,12 @@ public data class RuntimeEvent(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class EventBatchView(
-  /** Borrowed array of event_count events in queue order. */
+  /** Copied value, owned by the caller. */
   public val events: List<RuntimeEvent> = emptyList()
 )
 
 /**
- * Camera result borrowed for an ordered camera-query completion.
+ * Copied result, owned by the caller.
  *
  * See `mln_camera_query_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3466,7 +3496,7 @@ public data class MapSnapshot(
 )
 
 /**
- * One complete runtime style image, borrowed for a completion callback.
+ * Copied result, owned by the caller.
  *
  * See `mln_style_image_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3476,11 +3506,14 @@ public data class StyleImageInfo(
   public val width: UInt = 0u,
   /** Image height in pixels. */
   public val height: UInt = 0u,
-  /** Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. */
+  /**
+   * Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. Copied
+   * bytes, owned by the caller.
+   */
   public val pixels: ByteArray = byteArrayOf(),
-  /** Horizontally stretchable intervals. */
+  /** Horizontally stretchable intervals. Copied value, owned by the caller. */
   public val stretchX: List<ImageStretch> = emptyList(),
-  /** Vertically stretchable intervals. */
+  /** Vertically stretchable intervals. Copied value, owned by the caller. */
   public val stretchY: List<ImageStretch> = emptyList(),
   /** Content box, when the image sets one. */
   public val content: ImageContent? = null,
@@ -3515,19 +3548,19 @@ public data class StyleImageInfo(
 }
 
 /**
- * One style layer, borrowed for a completion callback.
+ * Copied result, owned by the caller. Copied result, owned by the caller.
  *
  * See `mln_style_layer_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleLayerInfo(
-  /** Layer ID. */
+  /** Layer ID. Copied text, owned by the caller. */
   public val id: String = "",
-  /** The style-spec layer type string. */
+  /** The style-spec layer type string. Copied text, owned by the caller. */
   public val type: String = "",
-  /** Source ID. Empty for a layer type that takes no source. */
+  /** Source ID. Empty for a layer type that takes no source. Copied text, owned by the caller. */
   public val sourceId: String? = null,
-  /** Source-layer ID. Empty when the layer sets none. */
+  /** Source-layer ID. Empty when the layer sets none. Copied text, owned by the caller. */
   public val sourceLayer: String? = null,
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   public val minZoom: Double = 0.0,
@@ -3544,7 +3577,7 @@ public data class StyleLayerInfo(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceTileInfo(
-  /** Tile URL templates in TileJSON order. */
+  /** Tile URL templates in TileJSON order. Copied value, owned by the caller. */
   public val tileUrls: List<String> = emptyList(),
   /** Lowest zoom level the TileJSON provides tiles for. */
   public val minZoom: Double = 0.0,
@@ -3555,21 +3588,24 @@ public data class StyleSourceTileInfo(
 )
 
 /**
- * Complete metadata of one style source, borrowed for a completion callback.
+ * Copied result, owned by the caller. Copied result, owned by the caller.
  *
  * See `mln_style_source_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceInfo(
-  /** Source ID. */
+  /** Source ID. Copied text, owned by the caller. */
   public val id: String = "",
   /** One of `mln_style_source_type`. */
   public val type: StyleSourceType = StyleSourceType(0u),
   /** Whether the source is marked volatile. */
   public val isVolatile: Boolean = false,
-  /** Attribution string, when the source sets one. It may be empty. */
+  /**
+   * Attribution string, when the source sets one. It may be empty. Copied text, owned by the
+   * caller.
+   */
   public val attribution: String? = null,
-  /** URL that the source loads from, when it has one. */
+  /** URL that the source loads from, when it has one. Copied text, owned by the caller. */
   public val url: String? = null,
   /** Inline TileJSON metadata, when the source was defined with it. */
   public val tilejson: StyleSourceTileInfo? = null,
@@ -3590,7 +3626,7 @@ public data class StyleSourceInfo(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderFrameBatchView(
-  /** Borrowed array of result_count terminal frame results in completion order. */
+  /** Copied value, owned by the caller. */
   public val results: List<RenderFrameResult> = emptyList()
 )
 
@@ -3647,15 +3683,19 @@ public data class RenderSessionSnapshot(
 )
 
 /**
- * One query hit borrowed for a completion callback.
+ * Copied result, owned by the caller. Copied result, owned by the caller.
  *
  * See `mln_queried_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class QueriedFeature(
+  /** Copied text, owned by the caller. */
   public val feature: ByteArray = byteArrayOf(),
+  /** Copied text, owned by the caller. */
   public val sourceId: String? = null,
+  /** Copied text, owned by the caller. */
   public val sourceLayerId: String? = null,
+  /** Copied text, owned by the caller. */
   public val state: ByteArray? = null,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(feature, sourceId, sourceLayerId, state)
@@ -3685,13 +3725,13 @@ public data class TextureImageInfo(
 )
 
 /**
- * Texture readback borrowed for a completion callback.
+ * Copied result, owned by the caller.
  *
  * See `mln_texture_readback_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class TextureReadbackResult(
-  /** Borrowed pixel bytes, valid only during the callback. */
+  /** Copied bytes, owned by the caller. */
   public val data: ByteArray = byteArrayOf(),
   public val info: TextureImageInfo = TextureImageInfo(),
 ) {
@@ -3749,7 +3789,7 @@ public data class ResourceResponse(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class OfflineTilePyramidRegionDefinition(
-  /** Style URL. Copied during region creation. */
+  /** Style URL. Copied during region creation. Copied text, owned by the caller. */
   public val styleUrl: String = "",
   public val bounds: LatLngBounds = LatLngBounds(),
   public val minZoom: Double = 0.0,
@@ -3769,9 +3809,9 @@ public data class OfflineTilePyramidRegionDefinition(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class OfflineGeometryRegionDefinition(
-  /** Style URL. Copied during region creation. */
+  /** Style URL. Copied during region creation. Copied text, owned by the caller. */
   public val styleUrl: String = "",
-  /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
+  /** UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller. */
   public val geometry: ByteArray = byteArrayOf(),
   public val minZoom: Double = 0.0,
   /**
@@ -3826,7 +3866,9 @@ public sealed interface OfflineRegionDefinitionData {
 public data class OfflineRegionDefinition(public val data: OfflineRegionDefinitionData)
 
 /**
- * Region data delivered by an offline completion.
+ * Region data delivered by an offline completion. Copied result, owned by the caller. Copied
+ * result, owned by the caller. Copied result, owned by the caller. Copied result, owned by the
+ * caller. Copied result, owned by the caller.
  *
  * See `mln_offline_region_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3834,7 +3876,7 @@ public data class OfflineRegionDefinition(public val data: OfflineRegionDefiniti
 public data class OfflineRegionInfo(
   public val id: Long = 0L,
   public val definition: OfflineRegionDefinition,
-  /** Metadata bytes. */
+  /** Metadata bytes. Copied bytes, owned by the caller. */
   public val metadata: ByteArray = byteArrayOf(),
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(id, definition, metadata)
@@ -3860,11 +3902,14 @@ public data class ResourceRange(
 )
 
 public data class ResourceRequest(
-  /** URL entering the network layer, before tile server normalization. */
+  /**
+   * URL entering the network layer, before tile server normalization. Copied text, owned by the
+   * caller.
+   */
   public val requestedUrl: String? = null,
   /**
    * URL to fetch, after resource-kind normalization against the runtime's tile server options and
-   * API key.
+   * API key. Copied text, owned by the caller.
    */
   public val resolvedUrl: String? = null,
   public val kind: ResourceKind = ResourceKind(0u),
@@ -3875,7 +3920,9 @@ public data class ResourceRequest(
   public val range: ResourceRange? = null,
   public val priorModifiedUnixMs: Long? = null,
   public val priorExpiresUnixMs: Long? = null,
+  /** Copied text, owned by the caller. */
   public val priorEtag: String? = null,
+  /** Copied bytes, owned by the caller. */
   public val priorData: ByteArray = byteArrayOf(),
 ) {
   private fun contentFields(): Array<Any?> =

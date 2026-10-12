@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels. Copied result, owned by the
+/// caller. Copied result, owned by the caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_screen_point</c> in the <see

@@ -3,7 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Region data delivered by an offline completion.
+/// Region data delivered by an offline completion. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_offline_region_info</c> in the <see
@@ -20,6 +23,10 @@ public readonly record struct OfflineRegionInfo
 
     public long Id { get; init; }
     public OfflineRegionDefinition Definition { get; init; }
+
+    /// <summary>
+    /// Metadata bytes. Copied bytes, owned by the caller.
+    /// </summary>
     public byte[] Metadata
     {
         get => MetadataStorage.ToArray();

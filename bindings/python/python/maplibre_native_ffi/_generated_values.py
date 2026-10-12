@@ -1177,13 +1177,31 @@ class AnimationOptions:
     """
 
     duration_ms: float | None = None
+    """Duration in milliseconds. Must be finite and non-negative. Values that
+    would overflow MapLibre Native's internal duration are invalid.
+    """
+
     velocity: float | None = None
+    """Average fly velocity in screenfuls per second. Must be positive and
+    finite; defaults to 1.2 when omitted. A flight whose derived duration
+    exceeds Native's nanosecond duration range fails its completion with
+    `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+    """
+
     min_zoom: float | None = None
+    """Peak zoom for flyTo transitions."""
+
     easing: UnitBezier | None = None
+
     transition_id: int | None = None
+    """Caller-chosen identity of the command that these options animate, which
+    `mln_map_cancel_camera_transition()` matches.
+    """
+
     end_handler: CameraTransitionHandler = field(
         default_factory=lambda: CameraTransitionHandler()
     )
+    """Reports the end of the command's transitions. Disabled by default."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1212,10 +1230,16 @@ class BoundOptions:
     """
 
     bounds: LatLngBounds | None = None
+    """Read when fields contains `MLN_BOUND_OPTION_BOUNDS`."""
+
     min_zoom: float | None = None
+
     max_zoom: float | None = None
+
     min_pitch: float | None = None
+
     max_pitch: float | None = None
+
     unbounded: bool = False
 
     @classmethod
@@ -1245,12 +1269,25 @@ class CameraDelta:
     """
 
     animation: AnimationOptions
+
     gesture_phase: GesturePhase
+
     offset: ScreenPoint | None = None
+    """Pan in logical map pixels; the content moves by this offset."""
+
     scale: float | None = None
+    """Positive zoom factor; 2 zooms in one level."""
+
     bearing: float | None = None
+    """Degrees added to the bearing."""
+
     pitch: float | None = None
+    """Degrees added to the pitch; positive tilts further from straight down."""
+
     anchor: ScreenPoint | None = None
+    """Screen point in logical map pixels that scale, bearing, and pitch keep
+    fixed.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -1280,7 +1317,9 @@ class CameraFitOptions:
     """
 
     padding: EdgeInsets | None = None
+
     bearing: float | None = None
+
     pitch: float | None = None
 
     @classmethod
@@ -1300,20 +1339,31 @@ class CameraFitOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraOptions:
-    """Camera fields used by snapshots and camera updates.
+    """Camera fields used by snapshots and camera updates. Copied result, owned
+    by the caller. Copied result, owned by the caller. Copied result, owned
+    by the caller.
 
     See `mln_camera_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     center: LatLng | None = None
+
     center_altitude: float | None = None
+
     padding: EdgeInsets | None = None
+
     anchor: ScreenPoint | None = None
+    """Optional screen-space focal point in logical map pixels."""
+
     zoom: float | None = None
+
     bearing: float | None = None
+
     pitch: float | None = None
+
     roll: float | None = None
+
     field_of_view: float | None = None
 
     @classmethod
@@ -1339,13 +1389,14 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraQueryResult:
-    """Camera result borrowed for an ordered camera-query completion.
+    """Copied result, owned by the caller.
 
     See `mln_camera_query_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     generation: int
+
     camera: CameraOptions
 
     @classmethod
@@ -1365,7 +1416,14 @@ class CameraTransitionEnd:
     """
 
     outcome: CameraTransitionOutcome
+    """One of `mln_camera_transition_outcome`."""
+
     generation: int
+    """Generation of the published snapshot that shows the camera where the
+    transitions left it. The map events of the change that ended them carry
+    this generation and are queued before the callback runs. Zero for
+    `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -1401,8 +1459,11 @@ class CameraUpdate:
     """
 
     mode: CameraUpdateMode
+
     camera: CameraOptions
+
     animation: AnimationOptions
+
     gesture_phase: GesturePhase
 
     @classmethod
@@ -1431,7 +1492,9 @@ class CanonicalTileId:
     """
 
     z: int
+
     x: int
+
     y: int
 
     @classmethod
@@ -1450,11 +1513,17 @@ class CustomGeometrySourceOptions:
     fetch_tile: Callable[[CanonicalTileId], None] | None = None
     cancel_tile: Callable[[CanonicalTileId], None] | None = None
     min_zoom: float | None = None
+
     max_zoom: float | None = None
+
     tolerance: float | None = None
+
     tile_size: int | None = None
+
     buffer: int | None = None
+
     clip: bool | None = None
+
     wrap: bool | None = None
 
     @classmethod
@@ -1497,6 +1566,7 @@ class CustomMvtVectorSourceOptions:
     fetch_tile: Callable[[CanonicalTileId], None] | None = None
     cancel_tile: Callable[[CanonicalTileId], None] | None = None
     min_zoom: float | None = None
+
     max_zoom: float | None = None
 
     @classmethod
@@ -1529,8 +1599,11 @@ class EdgeInsets:
     """
 
     top: float
+
     left: float
+
     bottom: float
+
     right: float
 
     @classmethod
@@ -1549,10 +1622,28 @@ class EglContextDescriptor:
     """
 
     display: int
+    """Borrowed EGLDisplay. Required and kept initialized through teardown."""
+
     config: int
+    """Borrowed EGLConfig used to create the session context. Required. OpenGL
+    texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
+    """
+
     share_context: int
+    """Borrowed EGLContext whose share group the session context joins. Required
+    under shared ownership, where the session also takes its client API from
+    this context. A dedicated session joins no share group, so it must be
+    null there and names client_api instead.
+    """
+
     client_api: OpenglClientApi
+    """Client API the session creates its context for. Required under dedicated
+    ownership. A shared session queries share_context for it, so this is
+    ignored there.
+    """
+
     get_proc_address: int
+    """Optional eglGetProcAddress-compatible function for the host loader."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1574,6 +1665,7 @@ class EventBatchView:
     """
 
     events: tuple[RuntimeEvent, ...]
+    """Copied value, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1591,9 +1683,16 @@ class FeatureStateSelector:
     """
 
     source_id: str
+    """Source ID. Required and borrowed for the duration of the call."""
+
     source_layer_id: str | None = None
+    """Optional source layer ID. Required for vector-source disambiguation."""
+
     feature_id: str | None = None
+    """Optional feature ID string. Required by set/get and optional for remove."""
+
     state_key: str | None = None
+    """Optional state key. Used only by remove and requires feature_id."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1614,9 +1713,22 @@ class FrameDemand:
     """
 
     flags: FrameDemandFlag
+    """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
+    `MLN_FRAME_DEMAND_IF_NEEDED`.
+    """
+
     token: int
+    """Host identity returned with the terminal frame result."""
+
     coalescing_boundary: int
+    """Demands coalesce only when this value and their flags match."""
+
     timeout_ns: int
+    """Positive time allowed before driver work begins, in nanoseconds; zero has
+    no limit. A demand that waits, for a free texture slot or for a map
+    update, is checked against its timeout when it runs again; a wait has no
+    timer of its own.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -1643,6 +1755,7 @@ class FreeCameraOptions:
     """
 
     position: Vec3 | None = None
+
     orientation: Quaternion | None = None
 
     @classmethod
@@ -1669,16 +1782,40 @@ class GeojsonSourceOptions:
     """
 
     min_zoom: float | None = None
+    """Minimum tiling zoom. Defaults to 0."""
+
     max_zoom: float | None = None
+    """Maximum tiling zoom, an integer within \\[0, 24\\]. Defaults to 18."""
+
     tolerance: float | None = None
+    """Douglas-Peucker simplification tolerance. Defaults to 0.375."""
+
     cluster_max_zoom: float | None = None
+    """Highest zoom that clusters points. Defaults to 17."""
+
     cluster_properties: bytes | None = None
+    """Cluster aggregation expressions keyed by property name, as a JSON object
+    whose members follow the MapLibre Style Spec clusterProperties form.
+    Copied text, owned by the caller.
+    """
+
     buffer: int | None = None
+    """Tile buffer in pixels within \\[0, 512\\]. Defaults to 128."""
+
     cluster_radius: int | None = None
+    """Cluster radius in pixels within \\[0, 4095\\]. Defaults to 50."""
+
     cluster_min_points: int | None = None
+    """Points required to form a cluster. Defaults to 2."""
+
     line_metrics: bool | None = None
+    """Adds line distance metrics to line features. Defaults to false."""
+
     cluster: bool | None = None
+    """Clusters point features. Defaults to false."""
+
     synchronous_tiling: bool | None = None
+    """Slices requested tiles inline during the update pass. Defaults to false."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1712,7 +1849,14 @@ class GpuSync:
     """
 
     kind: GpuSyncKind
+    """One `mln_gpu_sync_kind` value."""
+
     object: int
+    """Bit pattern of the backend object that kind names: the
+    `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
+    or the WebGPU token.
+    """
+
     value: int
 
     @classmethod
@@ -1753,8 +1897,11 @@ class ImageContent:
     """
 
     left: float
+
     top: float
+
     right: float
+
     bottom: float
 
     @classmethod
@@ -1773,6 +1920,7 @@ class ImageStretch:
     """
 
     from_: float
+
     to: float
 
     @classmethod
@@ -1782,14 +1930,22 @@ class ImageStretch:
 
 @dataclass(frozen=True, slots=True)
 class LatLng:
-    """Geographic coordinate in degrees used by map and projection APIs.
+    """Geographic coordinate in degrees used by map and projection APIs. Copied
+    result, owned by the caller. Copied result, owned by the caller. Copied
+    result, owned by the caller. Copied result, owned by the caller. Copied
+    result, owned by the caller.
 
     See `mln_lat_lng` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     latitude: float
+    """Latitude in degrees. Input latitude must be finite and within \\[-90,
+    90\\].
+    """
+
     longitude: float
+    """Longitude in degrees. Input longitude must be finite."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1798,13 +1954,15 @@ class LatLng:
 
 @dataclass(frozen=True, slots=True)
 class LatLngBounds:
-    """Geographic bounds in degrees.
+    """Geographic bounds in degrees. Copied result, owned by the caller. Copied
+    result, owned by the caller.
 
     See `mln_lat_lng_bounds` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     southwest: LatLng
+
     northeast: LatLng
 
     @classmethod
@@ -1840,8 +1998,13 @@ class LogicalExtent:
     """
 
     width: int
+    """Width in UI pixels. Defaults to 256."""
+
     height: int
+    """Height in UI pixels. Defaults to 256."""
+
     scale_factor: float
+    """Device pixels per UI pixel. Defaults to 1.0."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1859,9 +2022,23 @@ class MapOptions:
     """
 
     initial_extent: LogicalExtent
+    """Initial logical extent. Width and height must be nonzero, and
+    scale_factor must be finite and positive. scale_factor is fixed for the
+    map's lifetime.
+    """
+
     map_mode: MapMode
+    """One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`."""
+
     fast_pfor_enabled: bool
+    """Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+    encodings. Defaults to false.
+    """
+
     event_mask: RuntimeEventMask
+    """Map-originated event types this map queues, as a bitwise OR of
+    `mln_runtime_event_mask` values.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -1888,19 +2065,41 @@ class MapSnapshot:
     """
 
     debug_options: MapDebugOption
+    """Debug overlay mask of `mln_map_debug_option` values."""
+
     generation: int
+
     camera: CameraOptions
+
     logical_extent: LogicalExtent
+
     projection_mode: ProjectionMode
+
     viewport: MapViewportOptions
+
     fully_loaded: bool
+    """True once every requested style and tile resource finished loading."""
+
     rendering_stats_view_enabled: bool
+
     repaint_demand: bool
+
     gesture_in_progress: bool
+    """True while the map is inside a gesture."""
+
     event_mask: RuntimeEventMask
+
     latest_render_update_generation: int
+    """Generation of the latest render update the map published. A rendered
+    frame at or past it draws map state that includes every command this
+    snapshot observes, though animations and resource loads finish in later
+    frames.
+    """
+
     tile: MapTileOptions
+
     bounds: BoundOptions
+
     free_camera: FreeCameraOptions
 
     @classmethod
@@ -1933,11 +2132,18 @@ class MapTileOptions:
     """
 
     prefetch_zoom_delta: int | None = None
+    """Native uint8_t prefetch zoom delta."""
+
     lod_min_radius: float | None = None
+
     lod_scale: float | None = None
+
     lod_pitch_threshold: float | None = None
+
     lod_zoom_shift: float | None = None
+
     lod_mode: TileLodMode | None = None
+    """One of `mln_tile_lod_mode`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1966,8 +2172,14 @@ class MapViewportOptions:
     """
 
     north_orientation: NorthOrientation | None = None
+    """One of `mln_north_orientation`."""
+
     constrain_mode: ConstrainMode | None = None
+    """One of `mln_constrain_mode`."""
+
     viewport_mode: ViewportMode | None = None
+    """One of `mln_viewport_mode`."""
+
     frustum_offset: EdgeInsets | None = None
 
     @classmethod
@@ -1995,6 +2207,7 @@ class MetalBorrowedTexture:
     """
 
     texture: int
+    """Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2010,9 +2223,26 @@ class MetalBorrowedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. The map viewport uses width and height and the
+    renderer uses scale_factor; the physical size is stated separately below.
+    A scale_factor that differs from the map's is accepted and logged as a
+    warning.
+    """
+
     physical_width: int
+    """Physical texture width in device pixels. Must be positive. Defaults to
+    256.
+    """
+
     physical_height: int
+    """Physical texture height in device pixels. Must be positive. Defaults to
+    256.
+    """
+
     textures: tuple[MetalBorrowedTexture, ...]
+    """The ring's textures, one per slot, in slot order. Required. Copied value,
+    owned by the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2041,6 +2271,7 @@ class MetalContextDescriptor:
     """
 
     device: int
+    """`id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2056,7 +2287,12 @@ class MetalOwnedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: MetalContextDescriptor
+    """Metal backend context. device is required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2081,8 +2317,15 @@ class MetalSurfaceDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical surface extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: MetalContextDescriptor
+    """Metal backend context. device is optional for Metal surfaces."""
+
     layer: int
+    """`CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2108,14 +2351,33 @@ class MetalTextureFrame:
     """
 
     generation: int
+    """Session generation that produced this frame."""
+
     width: int
+    """Physical Metal texture width in device pixels."""
+
     height: int
+    """Physical Metal texture height in device pixels."""
+
     scale_factor: float
+    """UI-to-device pixel scale used for this frame."""
+
     frame_id: int
+    """Opaque frame identity used to reject stale releases."""
+
     slot: int
+    """Ring slot that holds this frame. For a borrowed target, the index of its
+    texture in the descriptor's textures array.
+    """
+
     texture: int
+    """Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release."""
+
     device: int
+    """Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release."""
+
     pixel_format: int
+    """Backend-native pixel format value. Metal uses MTLPixelFormat."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2141,10 +2403,22 @@ class OfflineGeometryRegionDefinition:
     """
 
     style_url: str
+    """Style URL. Copied during region creation. Copied text, owned by the
+    caller.
+    """
+
     geometry: bytes
+    """UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller."""
+
     min_zoom: float
+
     max_zoom: float
+    """Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
+    each tile source use its own maximum zoom.
+    """
+
     pixel_ratio: float
+
     include_ideographs: bool
 
     @classmethod
@@ -2189,15 +2463,21 @@ class OfflineRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionInfo:
-    """Region data delivered by an offline completion.
+    """Region data delivered by an offline completion. Copied result, owned by
+    the caller. Copied result, owned by the caller. Copied result, owned by
+    the caller. Copied result, owned by the caller. Copied result, owned by
+    the caller.
 
     See `mln_offline_region_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     id: int
+
     definition: OfflineRegionDefinition
+
     metadata: bytes
+    """Metadata bytes. Copied bytes, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2210,20 +2490,29 @@ class OfflineRegionInfo:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionStatus:
-    """Offline region status snapshot.
+    """Offline region status snapshot. Copied result, owned by the caller.
 
     See `mln_offline_region_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
     download_state: OfflineRegionDownloadState
+    """One of `mln_offline_region_download_state`."""
+
     completed_resource_count: int
+
     completed_resource_size: int
+
     completed_tile_count: int
+
     required_tile_count: int
+
     completed_tile_size: int
+
     required_resource_count: int
+
     required_resource_count_is_precise: bool
+
     complete: bool
 
     @classmethod
@@ -2252,10 +2541,21 @@ class OfflineTilePyramidRegionDefinition:
     """
 
     style_url: str
+    """Style URL. Copied during region creation. Copied text, owned by the
+    caller.
+    """
+
     bounds: LatLngBounds
+
     min_zoom: float
+
     max_zoom: float
+    """Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
+    each tile source use its own maximum zoom.
+    """
+
     pixel_ratio: float
+
     include_ideographs: bool
 
     @classmethod
@@ -2279,6 +2579,7 @@ class OpenglBorrowedTexture:
     """
 
     texture: int
+    """Borrowed OpenGL texture object name. Required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2294,11 +2595,34 @@ class OpenglBorrowedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. The map viewport uses width and height and the
+    renderer uses scale_factor; the physical size is stated separately below.
+    A scale_factor that differs from the map's is accepted and logged as a
+    warning.
+    """
+
     physical_width: int
+    """Physical texture width in device pixels. Must be positive. Defaults to
+    256.
+    """
+
     physical_height: int
+    """Physical texture height in device pixels. Must be positive. Defaults to
+    256.
+    """
+
     context: OpenglContextDescriptor
+    """Borrowed OpenGL context provider data. The textures must belong to this
+    context or a context in the same share group.
+    """
+
     textures: tuple[OpenglBorrowedTexture, ...]
+    """The ring's textures, one per slot, in slot order. Required. Copied value,
+    owned by the caller.
+    """
+
     target: int
+    """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2329,6 +2653,11 @@ class OpenglContextDescriptor:
     """
 
     ownership: OpenglContextOwnership
+    """Whether the session shares its driver thread and graphics objects with
+    the host. A private EGL owned texture and a transferred WebGL canvas are
+    dedicated to their core worker.
+    """
+
     data: (
         OpenglContextDescriptorWglVariant
         | OpenglContextDescriptorEglVariant
@@ -2361,7 +2690,15 @@ class OpenglOwnedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: OpenglContextDescriptor
+    """Borrowed OpenGL context provider data. Shared ownership creates a context
+    whose texture frames the host can acquire. Dedicated EGL or transferred
+    WebGL ownership creates a private core-worker context for CPU readback.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2386,8 +2723,18 @@ class OpenglSurfaceDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical surface extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: OpenglContextDescriptor
+    """Borrowed OpenGL context provider data."""
+
     surface: int
+    """Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
+    EGL, both required. Null for WebGL, whose context carries its canvas
+    binding.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2413,16 +2760,41 @@ class OpenglTextureFrame:
     """
 
     generation: int
+    """Session generation that produced this frame."""
+
     width: int
+    """Physical OpenGL texture width in device pixels."""
+
     height: int
+    """Physical OpenGL texture height in device pixels."""
+
     scale_factor: float
+    """UI-to-device pixel scale used for this frame."""
+
     frame_id: int
+    """Opaque frame identity used to reject stale releases."""
+
     slot: int
+    """Ring slot that holds this frame. For a borrowed target, the index of its
+    texture in the descriptor's textures array.
+    """
+
     texture: int
+    """Borrowed OpenGL texture object name. Valid until frame release."""
+
     target: int
+    """OpenGL texture target. GL_TEXTURE_2D is the expected target."""
+
     internal_format: int
+    """OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+    whose format the host chose.
+    """
+
     format: int
+    """OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture."""
+
     type: int
+    """OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2450,9 +2822,16 @@ class PremultipliedRgba8Image:
     """
 
     width: int
+
     height: int
+
     stride: int
+    """Bytes per image row. Must be at least width \\* 4."""
+
     pixels: bytes
+    """Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+    Copied bytes, owned by the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2479,7 +2858,10 @@ class ProjectedMeters:
     """
 
     northing: float
+    """Distance measured northward from the equator, in meters."""
+
     easting: float
+    """Distance measured eastward from the prime meridian, in meters."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2495,8 +2877,13 @@ class ProjectionMode:
     """
 
     axonometric: bool | None = None
+    """Enables a non-perspective axonometric render transform."""
+
     x_skew: float | None = None
+    """Native x-skew factor used by the axonometric transform."""
+
     y_skew: float | None = None
+    """Native y-skew factor used by the axonometric transform."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2520,8 +2907,11 @@ class Quaternion:
     """
 
     x: float
+
     y: float
+
     z: float
+
     w: float
 
     @classmethod
@@ -2531,16 +2921,23 @@ class Quaternion:
 
 @dataclass(frozen=True, slots=True)
 class QueriedFeature:
-    """One query hit borrowed for a completion callback.
+    """Copied result, owned by the caller. Copied result, owned by the caller.
 
     See `mln_queried_feature` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
     feature: bytes
+    """Copied text, owned by the caller."""
+
     source_id: str | None = None
+    """Copied text, owned by the caller."""
+
     source_layer_id: str | None = None
+    """Copied text, owned by the caller."""
+
     state: bytes | None = None
+    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2578,7 +2975,10 @@ class QueueLock:
 @dataclass(frozen=True, slots=True)
 class RenderAbandonResult:
     disposition: RenderAbandonDisposition
+    """One `mln_render_abandon_disposition` value."""
+
     quarantined_resource_count: int
+    """Backend resource groups intentionally retained until process exit."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2597,6 +2997,7 @@ class RenderFrameBatchView:
     """
 
     results: tuple[RenderFrameResult, ...]
+    """Copied value, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2617,11 +3018,36 @@ class RenderFrameResult:
     """
 
     disposition: RenderResult
+    """One `mln_render_result` value."""
+
     token: int
+
     map_update_generation: int
+    """Generation of the map render update the demand evaluated. When
+    disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
+    compare it with `mln_map_snapshot.latest_render_update_generation` to
+    find the first frame that includes a command.
+    """
+
     extent_generation: int
+
     frame_generation: int
+    """Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`."""
+
     needs_repaint: bool
+    """Whether the map asked for another frame while it rendered this one, as
+    during an ongoing paint transition. Set only when disposition is
+    `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
+    the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`
+    carries in its needs_repaint field, delivered with the frame result so a
+    host can re-arm its frame loop without the runtime event round trip. A
+    camera transition does not set it by itself: the map publishes a new
+    update after each of the transition's frames instead, which a
+    render-if-needed demand renders. A demand with
+    `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each transition update without
+    a runtime-event round trip; the host re-arms the demand as each result
+    arrives.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2644,10 +3070,28 @@ class RenderSessionAttachOptions:
     """
 
     driver: RenderDriverKind
+    """One `mln_render_driver_kind` value. Defaults to
+    `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+    """
+
     requested_texture_ring_depth: int
+    """Requested slot count of a session-owned texture ring, from one to three.
+    Private targets grant one slot regardless of this value. A borrowed
+    texture ring's depth is its texture count, so borrowed and other targets
+    ignore this value. Defaults to 1.
+    """
+
     frame_wake: Wake = field(default_factory=lambda: Wake())
+    """Wakes the receiver when the frame-result queue becomes nonempty."""
+
     driver_work_wake: Wake = field(default_factory=lambda: Wake())
+    """Wakes the graphics receiver when caller-driver work is available."""
+
     queue_lock: QueueLock = field(default_factory=lambda: QueueLock())
+    """Host lock on the graphics queue, disabled by default. Only Vulkan targets
+    accept an enabled lock; other backends fail the attach with
+    `MLN_STATUS_UNSUPPORTED`.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2675,8 +3119,15 @@ class RenderSessionCapabilities:
     """
 
     driver: RenderDriverKind
+    """One `mln_render_driver_kind` value."""
+
     texture_ring_depth: int
+    """Granted texture ring depth: the slot count of a session-owned ring, or
+    the texture count of a borrowed one. Zero for a surface.
+    """
+
     flags: RenderSessionCapabilityFlag
+    """A bitwise OR of `mln_render_session_capability_flag` values."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2696,18 +3147,35 @@ class RenderSessionSnapshot:
     """
 
     state: RenderSessionState
+    """One `mln_render_session_state` value."""
+
     driver: RenderDriverKind
+    """One `mln_render_driver_kind` value."""
+
     latest_result: RenderResult
+    """Most recent terminal `mln_render_result` value."""
+
     extent: LogicalExtent
+    """Logical extent, including a resize the driver has not applied yet."""
+
     generation: int
+
     map_update_generation: int
+
     rendered_update_generation: int
+
     extent_generation: int
+
     frame_generation: int
+
     latest_demand_token: int
+
     pending_demand_count: int
+
     acquired_frame_count: int
+
     target_ready: bool
+
     pending_changes: bool
 
     @classmethod
@@ -2739,7 +3207,14 @@ class RenderedFeatureQueryOptions:
     """
 
     layer_ids: tuple[str, ...] | None = None
+    """Optional style layer IDs. When absent, all rendered layers are queried.
+    Copied value, owned by the caller.
+    """
+
     filter: bytes | None = None
+    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    Copied text, owned by the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2797,10 +3272,19 @@ class RenderingStats:
     """
 
     encoding_time: float
+    """Frame CPU encoding time in seconds."""
+
     rendering_time: float
+    """Frame CPU rendering time in seconds."""
+
     frame_count: int
+    """Number of frames rendered by the native renderer."""
+
     draw_call_count: int
+    """Draw calls executed during the most recent frame."""
+
     total_draw_call_count: int
+    """Total draw calls executed by the native renderer."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2838,7 +3322,10 @@ class ResourceRange:
     """
 
     start: int
+    """First byte offset of the requested range."""
+
     end: int
+    """Last byte offset of the requested range, inclusive."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2848,17 +3335,36 @@ class ResourceRange:
 @dataclass(frozen=True, slots=True)
 class ResourceRequest:
     kind: ResourceKind
+
     loading_method: ResourceLoadingMethod
+
     priority: ResourcePriority
+
     usage: ResourceUsage
+
     storage_policy: ResourceStoragePolicy
+
     prior_data: bytes
+    """Copied bytes, owned by the caller."""
+
     requested_url: str | None = None
+    """URL entering the network layer, before tile server normalization. Copied
+    text, owned by the caller.
+    """
+
     resolved_url: str | None = None
+    """URL to fetch, after resource-kind normalization against the runtime's
+    tile server options and API key. Copied text, owned by the caller.
+    """
+
     range: ResourceRange | None = None
+
     prior_modified_unix_ms: int | None = None
+
     prior_expires_unix_ms: int | None = None
+
     prior_etag: str | None = None
+    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2898,13 +3404,22 @@ class ResourceResponse:
     """
 
     status: ResourceResponseStatus
+
     error_reason: ResourceErrorReason
+
     bytes: bytes
+    """Response bytes. May be null only when byte_count is 0."""
+
     must_revalidate: bool
+
     error_message: str | None = None
+
     modified_unix_ms: int | None = None
+
     expires_unix_ms: int | None = None
+
     etag: str | None = None
+
     retry_after_unix_ms: int | None = None
 
     @classmethod
@@ -2947,10 +3462,26 @@ class RuntimeEvent:
     """
 
     type: RuntimeEventType
+    """One of `mln_runtime_event_type`."""
+
     source_type: RuntimeEventSourceType
+    """One of `mln_runtime_event_source_type`."""
+
     source: int
+    """Source handle selected by source_type: an `mln_runtime` or an `mln_map`."""
+
     generation: int
+    """Map snapshot generation that the event reports, or zero when source_type
+    is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+    """
+
     code: int
+    """Secondary event detail whose meaning type selects. Depending on type it
+    carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
+    error ordinal, or 0. See `mln_runtime_event_type` for the per-type
+    meaning.
+    """
+
     payload: (
         RuntimeEventRenderFrameVariant
         | RuntimeEventRenderMapVariant
@@ -2961,7 +3492,10 @@ class RuntimeEvent:
         | UnknownVariant
         | None
     )
+    """Typed payload selected by payload_type."""
+
     message: str
+    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2996,7 +3530,9 @@ class RuntimeEventOfflineRegionResponseError:
     """
 
     region_id: int
+
     reason: ResourceErrorReason
+    """One of `mln_resource_error_reason`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3014,6 +3550,7 @@ class RuntimeEventOfflineRegionStatus:
     """
 
     region_id: int
+
     status: OfflineRegionStatus
 
     @classmethod
@@ -3033,6 +3570,7 @@ class RuntimeEventOfflineRegionTileCountLimit:
     """
 
     region_id: int
+
     limit: int
 
     @classmethod
@@ -3049,8 +3587,14 @@ class RuntimeEventRenderFrame:
     """
 
     mode: RenderMode
+    """One of `mln_render_mode`."""
+
     needs_repaint: bool
+    """Whether MapLibre needs another frame after this one."""
+
     placement_changed: bool
+    """Whether symbol placement changed during this frame."""
+
     stats: RenderingStats
 
     @classmethod
@@ -3072,6 +3616,7 @@ class RuntimeEventRenderMap:
     """
 
     mode: RenderMode
+    """One of `mln_render_mode`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3087,6 +3632,8 @@ class RuntimeEventTileAction:
     """
 
     operation: TileOperation
+    """One of `mln_tile_operation`."""
+
     tile_id: TileId
 
     @classmethod
@@ -3106,9 +3653,23 @@ class RuntimeOptions:
     """
 
     event_mask: RuntimeEventMask
+    """Runtime-scoped event types this runtime queues, as a bitwise OR of
+    `mln_runtime_event_mask` values.
+    """
+
     asset_path: str | None = None
+    """Directory root for asset:// URLs. Copied during runtime creation. Null or
+    empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
+    owned by the caller.
+    """
+
     cache_path: str | None = None
+    """Cache database path. Copied during runtime creation. Copied text, owned
+    by the caller.
+    """
+
     event_wake: Wake = field(default_factory=lambda: Wake())
+    """Wakes the receiver when the runtime event queue becomes nonempty."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3135,6 +3696,7 @@ class ScreenBox:
     """
 
     min: ScreenPoint
+
     max: ScreenPoint
 
     @classmethod
@@ -3154,6 +3716,9 @@ class ScreenLineString:
     """
 
     points: tuple[ScreenPoint, ...]
+    """Points. Null only when point_count is 0. Copied value, owned by the
+    caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3164,13 +3729,15 @@ class ScreenLineString:
 
 @dataclass(frozen=True, slots=True)
 class ScreenPoint:
-    """Screen-space point in logical map pixels.
+    """Screen-space point in logical map pixels. Copied result, owned by the
+    caller. Copied result, owned by the caller.
 
     See `mln_screen_point` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
     x: float
+
     y: float
 
     @classmethod
@@ -3187,7 +3754,14 @@ class SourceFeatureQueryOptions:
     """
 
     source_layer_ids: tuple[str, ...] | None = None
+    """Optional source-layer IDs. Required by vector sources; ignored by
+    GeoJSON. Copied value, owned by the caller.
+    """
+
     filter: bytes | None = None
+    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    Copied text, owned by the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3207,22 +3781,43 @@ class SourceFeatureQueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageInfo:
-    """One complete runtime style image, borrowed for a completion callback.
+    """Copied result, owned by the caller.
 
     See `mln_style_image_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     width: int
+    """Image width in pixels."""
+
     height: int
+    """Image height in pixels."""
+
     pixels: bytes
+    """Premultiplied RGBA8 pixels in tightly packed rows of width \\* 4 bytes,
+    top row first. Copied bytes, owned by the caller.
+    """
+
     stretch_x: tuple[ImageStretch, ...]
+    """Horizontally stretchable intervals. Copied value, owned by the caller."""
+
     stretch_y: tuple[ImageStretch, ...]
+    """Vertically stretchable intervals. Copied value, owned by the caller."""
+
     pixel_ratio: float
+    """Sprite pixel ratio."""
+
     sdf: bool
+    """Whether the image is a signed distance field icon."""
+
     content: ImageContent | None = None
+    """Content box, when the image sets one."""
+
     text_fit_width: StyleImageTextFit | None = None
+    """How the image fits text horizontally, when it sets this."""
+
     text_fit_height: StyleImageTextFit | None = None
+    """How the image fits text vertically, when it sets this."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3253,12 +3848,29 @@ class StyleImageOptions:
     """
 
     stretch_x: tuple[ImageStretch, ...] | None = None
+    """Horizontally stretchable intervals. May be null only when stretch_x_count
+    is 0. Copied value, owned by the caller.
+    """
+
     stretch_y: tuple[ImageStretch, ...] | None = None
+    """Vertically stretchable intervals. May be null only when stretch_y_count
+    is 0. Copied value, owned by the caller.
+    """
+
     content: ImageContent | None = None
+    """Content box used when icon-text-fit applies."""
+
     text_fit_width: StyleImageTextFit | None = None
+    """One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK."""
+
     text_fit_height: StyleImageTextFit | None = None
+    """One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK."""
+
     pixel_ratio: float | None = None
+    """Sprite pixel ratio. Defaults to 1."""
+
     sdf: bool | None = None
+    """Whether the image is a signed distance field icon. Defaults to false."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3285,19 +3897,36 @@ class StyleImageOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerInfo:
-    """One style layer, borrowed for a completion callback.
+    """Copied result, owned by the caller. Copied result, owned by the caller.
 
     See `mln_style_layer_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
+    """Layer ID. Copied text, owned by the caller."""
+
     type: str
+    """The style-spec layer type string. Copied text, owned by the caller."""
+
     min_zoom: float
+    """Lowest zoom at which the layer draws; -INFINITY with no lower bound."""
+
     max_zoom: float
+    """Highest zoom at which the layer draws; INFINITY with no upper bound."""
+
     visibility: StyleLayerVisibility
+    """One of `mln_style_layer_visibility`."""
+
     source_id: str | None = None
+    """Source ID. Empty for a layer type that takes no source. Copied text,
+    owned by the caller.
+    """
+
     source_layer: str | None = None
+    """Source-layer ID. Empty when the layer sets none. Copied text, owned by
+    the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3314,23 +3943,45 @@ class StyleLayerInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
-    """Complete metadata of one style source, borrowed for a completion
-    callback.
+    """Copied result, owned by the caller. Copied result, owned by the caller.
 
     See `mln_style_source_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
+    """Source ID. Copied text, owned by the caller."""
+
     type: StyleSourceType
+    """One of `mln_style_source_type`."""
+
     is_volatile: bool
+    """Whether the source is marked volatile."""
+
     attribution: str | None = None
+    """Attribution string, when the source sets one. It may be empty. Copied
+    text, owned by the caller.
+    """
+
     url: str | None = None
+    """URL that the source loads from, when it has one. Copied text, owned by
+    the caller.
+    """
+
     tilejson: StyleSourceTileInfo | None = None
+    """Inline TileJSON metadata, when the source was defined with it."""
+
     bounds: LatLngBounds | None = None
+    """Geographic bounds, when inline TileJSON sets them."""
+
     tile_size: int | None = None
+    """Tile size in pixels, for a tile source."""
+
     vector_encoding: StyleVectorTileEncoding | None = None
+    """Vector tile encoding, for a vector source."""
+
     raster_encoding: StyleRasterDemEncoding | None = None
+    """DEM raster encoding, when inline TileJSON sets one."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3357,9 +4008,16 @@ class StyleSourceTileInfo:
     """
 
     tile_urls: tuple[str, ...]
+    """Tile URL templates in TileJSON order. Copied value, owned by the caller."""
+
     min_zoom: float
+    """Lowest zoom level the TileJSON provides tiles for."""
+
     max_zoom: float
+    """Highest zoom level the TileJSON provides tiles for."""
+
     scheme: StyleTileScheme
+    """One of `mln_style_tile_scheme`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3380,13 +4038,25 @@ class StyleTileSourceOptions:
     """
 
     min_zoom: float | None = None
+
     max_zoom: float | None = None
+
     attribution: str | None = None
+    """Copied text, owned by the caller."""
+
     scheme: StyleTileScheme | None = None
+    """One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`."""
+
     bounds: LatLngBounds | None = None
+
     tile_size: int | None = None
+    """Raster tile size in pixels. Defaults to 512."""
+
     vector_encoding: StyleVectorTileEncoding | None = None
+    """One of `mln_style_vector_tile_encoding`. Defaults to MVT."""
+
     raster_encoding: StyleRasterDemEncoding | None = None
+    """One of `mln_style_raster_dem_encoding`. Defaults to Mapbox."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3410,15 +4080,25 @@ class StyleTileSourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleTransitionOptions:
-    """Global style transition options.
+    """Global style transition options. Copied result, owned by the caller.
 
     See `mln_style_transition_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     duration_ms: float | None = None
+    """Transition duration in milliseconds. Must be finite and non-negative.
+    Values that would overflow MapLibre Native's internal duration are
+    invalid.
+    """
+
     delay_ms: float | None = None
+    """Transition delay in milliseconds. Must be finite and non-negative. Values
+    that would overflow MapLibre Native's internal duration are invalid.
+    """
+
     enable_placement_transitions: bool | None = None
+    """Whether symbol placement changes cross-fade."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3444,9 +4124,16 @@ class TextureImageInfo:
     """
 
     width: int
+    """Physical image width in device pixels."""
+
     height: int
+    """Physical image height in device pixels."""
+
     stride: int
+    """Bytes per image row."""
+
     byte_length: int
+    """Required output buffer byte length."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3460,13 +4147,15 @@ class TextureImageInfo:
 
 @dataclass(frozen=True, slots=True)
 class TextureReadbackResult:
-    """Texture readback borrowed for a completion callback.
+    """Copied result, owned by the caller.
 
     See `mln_texture_readback_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     data: bytes
+    """Copied bytes, owned by the caller."""
+
     info: TextureImageInfo
 
     @classmethod
@@ -3483,9 +4172,13 @@ class TileId:
     """
 
     overscaled_z: int
+
     wrap: int
+
     canonical_z: int
+
     canonical_x: int
+
     canonical_y: int
 
     @classmethod
@@ -3508,8 +4201,11 @@ class UnitBezier:
     """
 
     x1: float
+
     y1: float
+
     x2: float
+
     y2: float
 
     @classmethod
@@ -3526,7 +4222,9 @@ class Vec3:
     """
 
     x: float
+
     y: float
+
     z: float
 
     @classmethod
@@ -3543,7 +4241,12 @@ class VulkanBorrowedTexture:
     """
 
     image: int
+    """Borrowed VkImage. Required."""
+
     image_view: int
+    """Borrowed VkImageView for image. Required. The view must be a 2D color
+    view that matches image and the descriptor's format.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3559,13 +4262,40 @@ class VulkanBorrowedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. The map viewport uses width and height and the
+    renderer uses scale_factor; the physical size is stated separately below.
+    A scale_factor that differs from the map's is accepted and logged as a
+    warning.
+    """
+
     physical_width: int
+    """Physical image width in device pixels. Must be positive. Defaults to 256."""
+
     physical_height: int
+    """Physical image height in device pixels. Must be positive. Defaults to
+    256.
+    """
+
     context: VulkanContextDescriptor
+    """Borrowed Vulkan context. All handles are required."""
+
     textures: tuple[VulkanBorrowedTexture, ...]
+    """The ring's images, one per slot, in slot order. Required. Copied value,
+    owned by the caller.
+    """
+
     format: int
+    """Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+    invalid.
+    """
+
     initial_layout: int
+    """Backend-native VkImageLayout value expected at render-pass begin."""
+
     final_layout: int
+    """Backend-native VkImageLayout value left after rendering succeeds.
+    Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3598,12 +4328,28 @@ class VulkanContextDescriptor:
     """
 
     instance: int
+    """Borrowed VkInstance. Required."""
+
     physical_device: int
+    """Borrowed VkPhysicalDevice. Required."""
+
     device: int
+    """Borrowed VkDevice. Required."""
+
     graphics_queue: int
+    """Borrowed graphics VkQueue. Required. The session's driver submits to it
+    from its own thread, so a host that uses the same queue passes
+    `mln_render_session_attach_options.queue_lock` at attach.
+    """
+
     graphics_queue_family_index: int
+    """Queue family index for graphics_queue. Must support graphics commands."""
+
     get_instance_proc_addr: int
+    """PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles."""
+
     get_device_proc_addr: int
+    """PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3627,7 +4373,12 @@ class VulkanOwnedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: VulkanContextDescriptor
+    """Borrowed Vulkan context. All handles are required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3652,8 +4403,18 @@ class VulkanSurfaceDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical surface extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: VulkanContextDescriptor
+    """Borrowed Vulkan context. All handles are required. The device must
+    support VK_KHR_swapchain, and the queue family must support graphics and
+    presentation to this descriptor's surface.
+    """
+
     surface: int
+    """Borrowed VkSurfaceKHR bit pattern. Required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3679,16 +4440,42 @@ class VulkanTextureFrame:
     """
 
     generation: int
+    """Session generation that produced this frame."""
+
     width: int
+    """Physical Vulkan image width in device pixels."""
+
     height: int
+    """Physical Vulkan image height in device pixels."""
+
     scale_factor: float
+    """UI-to-device pixel scale used for this frame."""
+
     frame_id: int
+    """Opaque frame identity used to reject stale releases."""
+
     slot: int
+    """Ring slot that holds this frame. For a borrowed target, the index of its
+    image in the descriptor's textures array.
+    """
+
     image: int
+    """Borrowed VkImage bit pattern. Valid until frame release."""
+
     image_view: int
+    """Borrowed VkImageView bit pattern. Valid until frame release."""
+
     device: int
+    """Borrowed VkDevice. Valid until frame release."""
+
     format: int
+    """Backend-native VkFormat value."""
+
     layout: int
+    """Backend-native VkImageLayout value that the image is in:
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and
+    the descriptor's final_layout for a borrowed one.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3734,8 +4521,16 @@ class WebglContextDescriptor:
     """
 
     kind: WebglContextKind
+    """One `mln_webgl_context_kind` value."""
+
     context: int
+    """Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive."""
+
     canvas_selector: str
+    """Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
+    canvas must still be transferable when attachment starts. Copied text,
+    owned by the caller.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3755,7 +4550,12 @@ class WebgpuBorrowedTexture:
     """
 
     texture: int
+    """Borrowed WGPUTexture. Required."""
+
     texture_view: int
+    """Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+    color view compatible with texture and the descriptor's format.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3771,11 +4571,32 @@ class WebgpuBorrowedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. The map viewport uses width and height and the
+    renderer uses scale_factor; the physical size is stated separately below.
+    A scale_factor that differs from the map's is accepted and logged as a
+    warning.
+    """
+
     physical_width: int
+    """Physical texture width in device pixels. Defaults to 256."""
+
     physical_height: int
+    """Physical texture height in device pixels. Defaults to 256."""
+
     context: WebgpuContextDescriptor
+    """Borrowed WebGPU context. device is required. Rendering is submitted
+    through context.queue or that device's default queue.
+    """
+
     textures: tuple[WebgpuBorrowedTexture, ...]
+    """The ring's textures, one per slot, in slot order. Required. Copied value,
+    owned by the caller.
+    """
+
     format: int
+    """Backend-native WGPUTextureFormat value of every texture. Undefined is
+    invalid.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3806,8 +4627,15 @@ class WebgpuContextDescriptor:
     """
 
     instance: int
+    """Borrowed WGPUInstance. Optional for texture targets."""
+
     device: int
+    """Borrowed WGPUDevice. Required."""
+
     queue: int
+    """Borrowed WGPUQueue. Optional; null uses the device default queue. A
+    non-null queue must belong to device.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3823,7 +4651,12 @@ class WebgpuOwnedTextureDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical texture extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: WebgpuContextDescriptor
+    """Borrowed WebGPU context. device is required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3848,9 +4681,23 @@ class WebgpuSurfaceDescriptor:
     """
 
     extent: LogicalExtent
+    """Logical surface extent. A scale_factor that differs from the map's is
+    accepted and logged as a warning.
+    """
+
     context: WebgpuContextDescriptor
+    """Borrowed WebGPU context. device is required."""
+
     surface: int
+    """Borrowed WGPUSurface. Required, and must stay alive for the session. The
+    session configures it for this device and extent, and unconfigures it
+    when the session ends.
+    """
+
     format: int
+    """WGPUTextureFormat to configure the surface with. Required. A browser host
+    takes it from navigator.gpu.getPreferredCanvasFormat().
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3877,15 +4724,36 @@ class WebgpuTextureFrame:
     """
 
     generation: int
+    """Session generation that produced this frame."""
+
     width: int
+    """Physical WebGPU texture width in device pixels."""
+
     height: int
+    """Physical WebGPU texture height in device pixels."""
+
     scale_factor: float
+    """UI-to-device pixel scale used for this frame."""
+
     frame_id: int
+    """Opaque frame identity used to reject stale releases."""
+
     slot: int
+    """Ring slot that holds this frame. For a borrowed target, the index of its
+    texture in the descriptor's textures array.
+    """
+
     texture: int
+    """Borrowed WGPUTexture. Valid until frame release."""
+
     texture_view: int
+    """Borrowed WGPUTextureView. Valid until frame release."""
+
     device: int
+    """Borrowed WGPUDevice. Valid until frame release."""
+
     format: int
+    """Backend-native WGPUTextureFormat value."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3912,8 +4780,16 @@ class WglContextDescriptor:
     """
 
     device_context: int
+    """Borrowed HDC used to create the session context. Required."""
+
     share_context: int
+    """Borrowed HGLRC whose share group the session context joins. Required
+    under shared ownership. A dedicated session joins no share group, so it
+    must be null there.
+    """
+
     get_proc_address: int
+    """Optional wglGetProcAddress-compatible function for the host loader."""
 
     @classmethod
     def _from_native(cls, raw):

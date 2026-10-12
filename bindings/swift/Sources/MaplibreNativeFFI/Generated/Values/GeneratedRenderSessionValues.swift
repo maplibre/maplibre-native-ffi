@@ -141,7 +141,7 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
 /// See `mln_render_frame_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderFrameBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of result_count terminal frame results in completion order.
+  /// Copied value, owned by the caller.
   public var results: [RenderFrameResult]
   public static var `default`: Self {
     Self()

@@ -3,23 +3,25 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One style layer, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_layer_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Id">
-/// Layer ID.
+/// Layer ID. Copied text, owned by the caller.
 /// </param>
 /// <param name="Type">
-/// The style-spec layer type string.
+/// The style-spec layer type string. Copied text, owned by the caller.
 /// </param>
 /// <param name="SourceId">
-/// Source ID. Empty for a layer type that takes no source.
+/// Source ID. Empty for a layer type that takes no source. Copied text, owned
+/// by the caller.
 /// </param>
 /// <param name="SourceLayer">
-/// Source-layer ID. Empty when the layer sets none.
+/// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
+/// caller.
 /// </param>
 /// <param name="MinZoom">
 /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.

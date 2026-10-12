@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Offline region status snapshot.
+/// Offline region status snapshot. Copied result, owned by the caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_offline_region_status</c> in the <see

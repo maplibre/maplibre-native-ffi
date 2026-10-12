@@ -16,6 +16,10 @@ public readonly record struct ScreenLineString
         this.Points = Points;
     }
 
+    /// <summary>
+    /// Points. Null only when point_count is 0. Copied value, owned by the
+    /// caller.
+    /// </summary>
     public ScreenPoint[] Points
     {
         get => PointsStorage.ToArray();

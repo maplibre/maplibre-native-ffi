@@ -16,6 +16,9 @@ public readonly record struct EventBatchView
         this.Events = Events;
     }
 
+    /// <summary>
+    /// Copied value, owned by the caller.
+    /// </summary>
     public RuntimeEvent[] Events
     {
         get => EventsStorage.ToArray();

@@ -914,7 +914,8 @@ class Values:
             variant = public + pascal(arm.name)
             typ = self.public(arm.value)
             declarations.append(
-                f"  const factory {public}.{name}({typ} value) = {variant};"
+                doc(self.bound, f"{union.value.native}.{arm.name}", "  ")
+                + f"  const factory {public}.{name}({typ} value) = {variant};"
             )
             children.append(
                 f"final class {variant} extends {public} {{\n  const {variant}(this.value) : super._();\n  final {typ} value;\n  @override bool operator ==(Object other) => other is {variant} && other.value == value;\n  @override int get hashCode => value.hashCode;\n}}"
@@ -966,7 +967,10 @@ class Values:
                 if default
                 else f"required this.{name}"
             )
-            fields.append(f"  final {typ} {name};")
+            fields.append(
+                doc(self.bound, f"{value.native}.{field.name}", "  ")
+                + f"  final {typ} {name};"
+            )
             writes.append(
                 f"  result.ref.{field.name} = {self.native(field.value, 'value.' + name)};"
             )
@@ -987,7 +991,10 @@ class Values:
         )
         if item_buffer:
             arguments.append(f"this.{item_buffer.field} = ''")
-            fields.append(f"  final String {item_buffer.field};")
+            fields.append(
+                doc(self.bound, f"{value.native}.{item_buffer.field}", "  ")
+                + f"  final String {item_buffer.field};"
+            )
             reads.append(f"    {item_buffer.field}: {item_buffer.field},")
         arguments.append(f"required this.{identifier(union.name)}")
         fields.append(f"  final {payload} {identifier(union.name)};")
@@ -1002,7 +1009,8 @@ class Values:
             variant = payload + pascal(arm.name)
             typ = self.public(arm.value)
             declarations.append(
-                f"final class {variant} extends {payload} {{\n  const {variant}(this.value) : super._();\n  final {typ} value;\n}}"
+                doc(self.bound, f"{union.value.native}.{arm.name}")
+                + f"final class {variant} extends {payload} {{\n  const {variant}(this.value) : super._();\n  final {typ} value;\n}}"
             )
             tag = next(
                 item.value

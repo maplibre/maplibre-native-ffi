@@ -371,7 +371,9 @@ pub struct CameraOptionField: u32 {
 }
 }
 
-/// Camera fields used by snapshots and camera updates.
+/// Camera fields used by snapshots and camera updates. Copied result, owned by
+/// the caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -461,7 +463,7 @@ impl FromNative<sys::mln_camera_options> for CameraOptions {
     }
 }
 
-/// Camera result borrowed for an ordered camera-query completion.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1106,7 +1108,7 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EventBatchView {
-    /// Borrowed array of event_count events in queue order.
+    /// Copied value, owned by the caller.
     pub events: Vec<RuntimeEvent>,
 }
 impl FromNative<sys::mln_event_batch_view> for EventBatchView {
@@ -1367,8 +1369,8 @@ pub struct GeojsonSourceOptions {
     /// Highest zoom that clusters points. Defaults to 17.
     pub cluster_max_zoom: Option<f64>,
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form. The
-    /// UTF-8 bytes are borrowed for the call.
+    /// whose members follow the MapLibre Style Spec clusterProperties form.
+    /// Copied text, owned by the caller.
     pub cluster_properties: Option<Vec<u8>>,
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     pub buffer: Option<u32>,
@@ -1759,7 +1761,10 @@ impl FromNative<sys::mln_image_stretch> for ImageStretch {
     }
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs.
+/// Geographic coordinate in degrees used by map and projection APIs. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1796,7 +1801,8 @@ impl FromNative<sys::mln_lat_lng> for LatLng {
     }
 }
 
-/// Geographic bounds in degrees.
+/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2407,7 +2413,8 @@ pub struct MetalBorrowedTextureDescriptor {
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_height: u32,
-    /// The ring's textures, one per slot, in slot order. Required.
+    /// The ring's textures, one per slot, in slot order. Required. Copied
+    /// value, owned by the caller.
     pub textures: Vec<MetalBorrowedTexture>,
 }
 impl Default for MetalBorrowedTextureDescriptor {
@@ -2656,9 +2663,10 @@ pub enum NorthOrientation: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineGeometryRegionDefinition {
-    /// Style URL. Copied during region creation.
+    /// Style URL. Copied during region creation. Copied text, owned by the
+    /// caller.
     pub style_url: String,
-    /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+    /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
     pub geometry: Vec<u8>,
     pub min_zoom: f64,
     /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
@@ -2787,7 +2795,10 @@ pub enum OfflineRegionDownloadState: u32 {
 } Unknown
 }
 
-/// Region data delivered by an offline completion.
+/// Region data delivered by an offline completion. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2795,7 +2806,7 @@ pub enum OfflineRegionDownloadState: u32 {
 pub struct OfflineRegionInfo {
     pub id: i64,
     pub definition: OfflineRegionDefinition,
-    /// Metadata bytes.
+    /// Metadata bytes. Copied bytes, owned by the caller.
     pub metadata: Vec<u8>,
 }
 impl FromNative<sys::mln_offline_region_info> for OfflineRegionInfo {
@@ -2808,7 +2819,7 @@ impl FromNative<sys::mln_offline_region_info> for OfflineRegionInfo {
     }
 }
 
-/// Offline region status snapshot.
+/// Offline region status snapshot. Copied result, owned by the caller.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2872,7 +2883,8 @@ impl FromNative<sys::mln_offline_region_status> for OfflineRegionStatus {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineTilePyramidRegionDefinition {
-    /// Style URL. Copied during region creation.
+    /// Style URL. Copied during region creation. Copied text, owned by the
+    /// caller.
     pub style_url: String,
     pub bounds: LatLngBounds,
     pub min_zoom: f64,
@@ -2964,7 +2976,8 @@ pub struct OpenglBorrowedTextureDescriptor {
     /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
     pub context: OpenglContextDescriptor,
-    /// The ring's textures, one per slot, in slot order. Required.
+    /// The ring's textures, one per slot, in slot order. Required. Copied
+    /// value, owned by the caller.
     pub textures: Vec<OpenglBorrowedTexture>,
     /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
     pub target: u32,
@@ -3311,6 +3324,7 @@ pub struct PremultipliedRgba8Image {
     /// Bytes per image row. Must be at least width \* 4.
     pub stride: u32,
     /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+    /// Copied bytes, owned by the caller.
     pub pixels: Vec<u8>,
 }
 impl Default for PremultipliedRgba8Image {
@@ -3473,15 +3487,19 @@ impl FromNative<sys::mln_quaternion> for Quaternion {
     }
 }
 
-/// One query hit borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_queried_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct QueriedFeature {
+    /// Copied text, owned by the caller.
     pub feature: Vec<u8>,
+    /// Copied text, owned by the caller.
     pub source_id: Option<String>,
+    /// Copied text, owned by the caller.
     pub source_layer_id: Option<String>,
+    /// Copied text, owned by the caller.
     pub state: Option<Vec<u8>>,
 }
 impl FromNative<sys::mln_queried_feature> for QueriedFeature {
@@ -3664,8 +3682,7 @@ pub enum RenderDriverKind: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RenderFrameBatchView {
-    /// Borrowed array of result_count terminal frame results in completion
-    /// order.
+    /// Copied value, owned by the caller.
     pub results: Vec<RenderFrameResult>,
 }
 impl FromNative<sys::mln_render_frame_batch_view> for RenderFrameBatchView {
@@ -4000,8 +4017,10 @@ pub struct RenderedFeatureQueryOptionField: u32 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RenderedFeatureQueryOptions {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
+    /// Copied value, owned by the caller.
     pub layer_ids: Option<Vec<String>>,
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    /// Copied text, owned by the caller.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for RenderedFeatureQueryOptions {
@@ -4363,10 +4382,11 @@ impl FromNative<sys::mln_resource_range> for ResourceRange {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequest {
-    /// URL entering the network layer, before tile server normalization.
+    /// URL entering the network layer, before tile server normalization. Copied
+    /// text, owned by the caller.
     pub requested_url: Option<String>,
     /// URL to fetch, after resource-kind normalization against the runtime's
-    /// tile server options and API key.
+    /// tile server options and API key. Copied text, owned by the caller.
     pub resolved_url: Option<String>,
     pub kind: ResourceKind,
     pub loading_method: ResourceLoadingMethod,
@@ -4376,7 +4396,9 @@ pub struct ResourceRequest {
     pub range: Option<ResourceRange>,
     pub prior_modified_unix_ms: Option<i64>,
     pub prior_expires_unix_ms: Option<i64>,
+    /// Copied text, owned by the caller.
     pub prior_etag: Option<String>,
+    /// Copied bytes, owned by the caller.
     pub prior_data: Vec<u8>,
 }
 impl FromNative<sys::mln_resource_request> for ResourceRequest {
@@ -4730,6 +4752,7 @@ pub enum ResourceUsage: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RuntimeEvent {
+    /// Copied text, owned by the caller.
     pub message: String,
     /// One of `mln_runtime_event_type`.
     pub r#type: RuntimeEventType,
@@ -5082,9 +5105,11 @@ pub enum RuntimeEventType: u32 {
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
     /// Directory root for asset:// URLs. Copied during runtime creation. Null
-    /// or empty selects `/android_asset` on Android and `.` elsewhere.
+    /// or empty selects `/android_asset` on Android and `.` elsewhere. Copied
+    /// text, owned by the caller.
     pub asset_path: Option<String>,
-    /// Cache database path. Copied during runtime creation.
+    /// Cache database path. Copied during runtime creation. Copied text, owned
+    /// by the caller.
     pub cache_path: Option<String>,
     /// Runtime-scoped event types this runtime queues, as a bitwise OR of
     /// `mln_runtime_event_mask` values.
@@ -5156,7 +5181,8 @@ impl FromNative<sys::mln_screen_box> for ScreenBox {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ScreenLineString {
-    /// Points. Null only when point_count is 0.
+    /// Points. Null only when point_count is 0. Copied value, owned by the
+    /// caller.
     pub points: Vec<ScreenPoint>,
 }
 impl ToNative<sys::mln_screen_line_string> for ScreenLineString {
@@ -5175,7 +5201,8 @@ impl FromNative<sys::mln_screen_line_string> for ScreenLineString {
     }
 }
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels. Copied result, owned by the
+/// caller. Copied result, owned by the caller.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5221,9 +5248,10 @@ pub struct SourceFeatureQueryOptionField: u32 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceFeatureQueryOptions {
     /// Optional source-layer IDs. Required by vector sources; ignored by
-    /// GeoJSON.
+    /// GeoJSON. Copied value, owned by the caller.
     pub source_layer_ids: Option<Vec<String>>,
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    /// Copied text, owned by the caller.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for SourceFeatureQueryOptions {
@@ -5306,7 +5334,7 @@ pub enum Status: i32 {
 } Unknown
 }
 
-/// One complete runtime style image, borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -5317,11 +5345,11 @@ pub struct StyleImageInfo {
     /// Image height in pixels.
     pub height: u32,
     /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes,
-    /// top row first.
+    /// top row first. Copied bytes, owned by the caller.
     pub pixels: Vec<u8>,
-    /// Horizontally stretchable intervals.
+    /// Horizontally stretchable intervals. Copied value, owned by the caller.
     pub stretch_x: Vec<ImageStretch>,
-    /// Vertically stretchable intervals.
+    /// Vertically stretchable intervals. Copied value, owned by the caller.
     pub stretch_y: Vec<ImageStretch>,
     /// Content box, when the image sets one.
     pub content: Option<ImageContent>,
@@ -5402,11 +5430,11 @@ pub struct StyleImageOptionField: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StyleImageOptions {
-    /// Horizontally stretchable intervals. Borrowed for the call and copied
-    /// before return. May be null only when stretch_x_count is 0.
+    /// Horizontally stretchable intervals. May be null only when
+    /// stretch_x_count is 0. Copied value, owned by the caller.
     pub stretch_x: Option<Vec<ImageStretch>>,
-    /// Vertically stretchable intervals. Borrowed for the call and copied
-    /// before return. May be null only when stretch_y_count is 0.
+    /// Vertically stretchable intervals. May be null only when stretch_y_count
+    /// is 0. Copied value, owned by the caller.
     pub stretch_y: Option<Vec<ImageStretch>>,
     /// Content box used when icon-text-fit applies.
     pub content: Option<ImageContent>,
@@ -5514,19 +5542,21 @@ pub enum StyleImageTextFit: u32 {
 } Unknown
 }
 
-/// One style layer, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerInfo {
-    /// Layer ID.
+    /// Layer ID. Copied text, owned by the caller.
     pub id: String,
-    /// The style-spec layer type string.
+    /// The style-spec layer type string. Copied text, owned by the caller.
     pub r#type: String,
-    /// Source ID. Empty for a layer type that takes no source.
+    /// Source ID. Empty for a layer type that takes no source. Copied text,
+    /// owned by the caller.
     pub source_id: Option<String>,
-    /// Source-layer ID. Empty when the layer sets none.
+    /// Source-layer ID. Empty when the layer sets none. Copied text, owned by
+    /// the caller.
     pub source_layer: Option<String>,
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     pub min_zoom: f64,
@@ -5571,21 +5601,23 @@ pub enum StyleRasterDemEncoding: u32 {
 } Unknown
 }
 
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceInfo {
-    /// Source ID.
+    /// Source ID. Copied text, owned by the caller.
     pub id: String,
     /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
-    /// Attribution string, when the source sets one. It may be empty.
+    /// Attribution string, when the source sets one. It may be empty. Copied
+    /// text, owned by the caller.
     pub attribution: Option<String>,
-    /// URL that the source loads from, when it has one.
+    /// URL that the source loads from, when it has one. Copied text, owned by
+    /// the caller.
     pub url: Option<String>,
     /// Inline TileJSON metadata, when the source was defined with it.
     pub tilejson: Option<StyleSourceTileInfo>,
@@ -5671,7 +5703,7 @@ pub struct StyleSourceInfoField: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceTileInfo {
-    /// Tile URL templates in TileJSON order.
+    /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
     pub tile_urls: Vec<String>,
     /// Lowest zoom level the TileJSON provides tiles for.
     pub min_zoom: f64,
@@ -5746,6 +5778,7 @@ pub struct StyleTileSourceOptionField: u32 {
 pub struct StyleTileSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
+    /// Copied text, owned by the caller.
     pub attribution: Option<String>,
     /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
     pub scheme: Option<StyleTileScheme>,
@@ -5863,7 +5896,7 @@ pub struct StyleTransitionOptionField: u32 {
 }
 }
 
-/// Global style transition options.
+/// Global style transition options. Copied result, owned by the caller.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -5968,13 +6001,13 @@ impl FromNative<sys::mln_texture_image_info> for TextureImageInfo {
     }
 }
 
-/// Texture readback borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TextureReadbackResult {
-    /// Borrowed pixel bytes, valid only during the callback.
+    /// Copied bytes, owned by the caller.
     pub data: Vec<u8>,
     pub info: TextureImageInfo,
 }
@@ -6192,7 +6225,8 @@ pub struct VulkanBorrowedTextureDescriptor {
     pub physical_height: u32,
     /// Borrowed Vulkan context. All handles are required.
     pub context: VulkanContextDescriptor,
-    /// The ring's images, one per slot, in slot order. Required.
+    /// The ring's images, one per slot, in slot order. Required. Copied value,
+    /// owned by the caller.
     pub textures: Vec<VulkanBorrowedTexture>,
     /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
     /// invalid.
@@ -6559,7 +6593,8 @@ pub struct WebglContextDescriptor {
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     pub context: i32,
     /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-    /// canvas must still be transferable when attachment starts.
+    /// canvas must still be transferable when attachment starts. Copied text,
+    /// owned by the caller.
     pub canvas_selector: String,
 }
 impl ToNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
@@ -6650,7 +6685,8 @@ pub struct WebgpuBorrowedTextureDescriptor {
     /// Borrowed WebGPU context. device is required. Rendering is submitted
     /// through context.queue or that device's default queue.
     pub context: WebgpuContextDescriptor,
-    /// The ring's textures, one per slot, in slot order. Required.
+    /// The ring's textures, one per slot, in slot order. Required. Copied
+    /// value, owned by the caller.
     pub textures: Vec<WebgpuBorrowedTexture>,
     /// Backend-native WGPUTextureFormat value of every texture. Undefined is
     /// invalid.

@@ -88,6 +88,22 @@ class Doc:
     url: str = ""
 
 
+def copied(doc: Doc | None, symbol: str, noun: str) -> Doc:
+    """Describe binding storage while retaining the value's other contracts."""
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", doc.summary) if doc else []
+    description = " ".join(
+        sentence
+        for sentence in sentences
+        if not re.search(
+            r"\bborrow(?:ed|s|ing)?\b|\bvalid (?:only )?(?:until|during|for)\b",
+            sentence,
+            re.IGNORECASE,
+        )
+    )
+    ownership = f"Copied {noun}, owned by the caller."
+    return Doc(symbol, f"{description} {ownership}".strip(), doc.url if doc else "")
+
+
 def index(api: Api) -> dict[str, Doc]:
     """The documentation of each documented public declaration.
 

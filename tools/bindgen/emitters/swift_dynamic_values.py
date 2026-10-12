@@ -254,7 +254,10 @@ def declaration(values, value):
         local = identifier(camel(item.field))
         typ_ = "String" if item.encoding == "utf8" else "Data"
         empty = '""' if item.encoding == "utf8" else "Data()"
-        fields.append(f"  public var {local}: {typ_}")
+        fields.append(
+            doc(values.bound, f"{value.native}.{item.field}", "  ")
+            + f"  public var {local}: {typ_}"
+        )
         args.append(f"{local}: {typ_} = {empty}")
         init.append(f"    self.{local} = {local}")
         decode_lines.append(f"    self.{local} = {local}")

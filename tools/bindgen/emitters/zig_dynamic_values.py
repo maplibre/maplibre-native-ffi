@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from .rust_dynamic_values import dynamic
-from .zig import identifier
+from .zig import doc, identifier
 from .zig_values import field_default
 
 
@@ -151,7 +151,10 @@ def declaration(values, value):
         }
     item_buffer = values.item_buffers.get(value.native)
     if item_buffer:
-        fields.append(f"    {identifier(item_buffer.field)}: []const u8 = &.{{}},")
+        fields.append(
+            doc(values.bound, f"{value.native}.{item_buffer.field}", "    ")
+            + f"    {identifier(item_buffer.field)}: []const u8 = &.{{}},"
+        )
         captures.append(f"            .{identifier(item_buffer.field)} = &.{{}},")
     for field in value.fields:
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
@@ -189,7 +192,10 @@ def declaration(values, value):
             continue
         if field.value.kind == "union":
             union = field.value
-            fields.append(f"    {local}: {values.public(union)} = .{{ .unknown = 0 }},")
+            fields.append(
+                doc(values.bound, f"{value.native}.{field.name}", "    ")
+                + f"    {local}: {values.public(union)} = .{{ .unknown = 0 }},"
+            )
             captures.append(f"            .{local} = {decode(values, union, raw)},")
             cases = " ".join(
                 f".{identifier(member.name)} => |item| {{ raw.{identifier(union.tag)} = c.{member.presence.variant}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}; }},"
@@ -211,7 +217,8 @@ def declaration(values, value):
             else field_default(values, field)
         )
         fields.append(
-            f"    {local}: {'?' if optional else ''}{public_type} = {default},"
+            doc(values.bound, f"{value.native}.{field.name}", "    ")
+            + f"    {local}: {'?' if optional else ''}{public_type} = {default},"
         )
         copied = decode(values, field.value, raw)
         if optional:

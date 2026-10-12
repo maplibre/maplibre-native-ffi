@@ -371,7 +371,44 @@ class BoundApi:
     @functools.cached_property
     def docs(self) -> dict[str, docs.Doc]:
         """The documentation of each documented public declaration, by C name."""
-        return docs.index(self.source)
+        index = docs.index(self.source)
+        for native in self.returned:
+            value = self.values[native]
+            for member in value.fields:
+                copied = member.value
+                if copied.item_buffer and copied.element:
+                    symbol = f"{copied.element.native}.{copied.item_buffer.field}"
+                    index[symbol] = docs.copied(
+                        index.get(symbol),
+                        symbol,
+                        "bytes" if copied.item_buffer.encoding == "bytes" else "text",
+                    )
+                if not member.public or not (
+                    copied.kind == "buffer"
+                    or copied.kind in {"array", "reference"}
+                    and copied.ownership == "borrowed"
+                ):
+                    continue
+                noun = (
+                    "bytes"
+                    if copied.kind == "buffer" and copied.encoding == "bytes"
+                    else "text"
+                    if copied.kind == "buffer"
+                    else "value"
+                )
+                symbol = f"{native}.{member.name}"
+                index[symbol] = docs.copied(index.get(symbol), symbol, noun)
+        for operation in self.operations:
+            result = operation.result
+            if result and result.ownership == "borrowed":
+                value = result.element or result
+                if value.kind in {"record", "union"} and value.native in index:
+                    index[value.native] = docs.copied(
+                        index[value.native],
+                        value.native,
+                        "result",
+                    )
+        return index
 
     def doc(self, native: str) -> docs.Doc | None:
         """The documentation of a declaration, or `record.field` member."""

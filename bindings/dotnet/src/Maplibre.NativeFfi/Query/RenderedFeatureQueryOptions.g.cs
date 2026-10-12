@@ -11,12 +11,21 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record RenderedFeatureQueryOptions
 {
+    /// <summary>
+    /// Optional style layer IDs. When absent, all rendered layers are queried.
+    /// Copied value, owned by the caller.
+    /// </summary>
     public string[]? LayerIds
     {
         get => LayerIdsStorage?.ToArray();
         set => LayerIdsStorage = ValueArray.CopyOptional(value);
     }
     internal ValueArray<string>? LayerIdsStorage { get; set; }
+
+    /// <summary>
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    /// Copied text, owned by the caller.
+    /// </summary>
     public byte[]? Filter
     {
         get => FilterStorage?.ToArray();

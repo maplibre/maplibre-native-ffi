@@ -12,9 +12,11 @@ namespace Maplibre.NativeFfi;
 /// <param name="AssetPath">
 /// Directory root for asset:// URLs. Copied during runtime creation. Null or
 /// empty selects <c>/android_asset</c> on Android and <c>.</c> elsewhere.
+/// Copied text, owned by the caller.
 /// </param>
 /// <param name="CachePath">
-/// Cache database path. Copied during runtime creation.
+/// Cache database path. Copied during runtime creation. Copied text, owned by
+/// the caller.
 /// </param>
 /// <param name="EventMask">
 /// Runtime-scoped event types this runtime queues, as a bitwise OR of

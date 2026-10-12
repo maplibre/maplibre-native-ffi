@@ -27,9 +27,30 @@ public readonly record struct MetalBorrowedTextureDescriptor
         this.Textures = Textures;
     }
 
+    /// <summary>
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    /// </summary>
     public LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Physical texture width in device pixels. Must be positive. Defaults to
+    /// 256.
+    /// </summary>
     public uint PhysicalWidth { get; init; }
+
+    /// <summary>
+    /// Physical texture height in device pixels. Must be positive. Defaults to
+    /// 256.
+    /// </summary>
     public uint PhysicalHeight { get; init; }
+
+    /// <summary>
+    /// The ring's textures, one per slot, in slot order. Required. Copied
+    /// value, owned by the caller.
+    /// </summary>
     public MetalBorrowedTexture[] Textures
     {
         get => TexturesStorage.ToArray();

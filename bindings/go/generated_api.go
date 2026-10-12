@@ -1588,7 +1588,8 @@ func DefaultCameraFitOptions() CameraFitOptions {
 }
 
 // CameraOptions corresponds to mln_camera_options. Camera fields used by
-// snapshots and camera updates.
+// snapshots and camera updates. Copied result, owned by the caller. Copied
+// result, owned by the caller. Copied result, owned by the caller.
 //
 // See mln_camera_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -1637,8 +1638,8 @@ func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_
 
 func DefaultCameraOptions() CameraOptions { return copyCameraOptions(C.mln_camera_options_default()) }
 
-// CameraQueryResult corresponds to mln_camera_query_result. Camera result
-// borrowed for an ordered camera-query completion.
+// CameraQueryResult corresponds to mln_camera_query_result. Copied result,
+// owned by the caller.
 //
 // See mln_camera_query_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -1939,7 +1940,7 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 // See mln_event_batch_view in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type EventBatchView struct {
-	// Borrowed array of event_count events in queue order.
+	// Copied value, owned by the caller.
 	Events []RuntimeEvent
 }
 
@@ -2080,8 +2081,8 @@ type GeojsonSourceOptions struct {
 	// Highest zoom that clusters points. Defaults to 17.
 	ClusterMaxZoom *float64
 	// Cluster aggregation expressions keyed by property name, as a JSON object
-	// whose members follow the MapLibre Style Spec clusterProperties form. The
-	// UTF-8 bytes are borrowed for the call.
+	// whose members follow the MapLibre Style Spec clusterProperties form. Copied
+	// text, owned by the caller.
 	ClusterProperties *[]byte
 	// Tile buffer in pixels within [0, 512]. Defaults to 128.
 	Buffer *uint32
@@ -2255,7 +2256,9 @@ func nativeImageStretch(input ImageStretch, arena *bindingArena) C.mln_image_str
 }
 
 // LatLng corresponds to mln_lat_lng. Geographic coordinate in degrees used by
-// map and projection APIs.
+// map and projection APIs. Copied result, owned by the caller. Copied result,
+// owned by the caller. Copied result, owned by the caller. Copied result, owned
+// by the caller. Copied result, owned by the caller.
 //
 // See mln_lat_lng in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2281,6 +2284,7 @@ func nativeLatLng(input LatLng, arena *bindingArena) C.mln_lat_lng {
 }
 
 // LatLngBounds corresponds to mln_lat_lng_bounds. Geographic bounds in degrees.
+// Copied result, owned by the caller. Copied result, owned by the caller.
 //
 // See mln_lat_lng_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2562,7 +2566,8 @@ type MetalBorrowedTextureDescriptor struct {
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Must be positive. Defaults to 256.
 	PhysicalHeight uint32
-	// The ring's textures, one per slot, in slot order. Required.
+	// The ring's textures, one per slot, in slot order. Required. Copied value,
+	// owned by the caller.
 	Textures []MetalBorrowedTexture
 }
 
@@ -2742,9 +2747,9 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 // See mln_offline_geometry_region_definition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type OfflineGeometryRegionDefinition struct {
-	// Style URL. Copied during region creation.
+	// Style URL. Copied during region creation. Copied text, owned by the caller.
 	StyleUrl string
-	// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+	// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
 	Geometry []byte
 	MinZoom  float64
 	// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
@@ -2816,14 +2821,16 @@ func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *binding
 }
 
 // OfflineRegionInfo corresponds to mln_offline_region_info. Region data
-// delivered by an offline completion.
+// delivered by an offline completion. Copied result, owned by the caller.
+// Copied result, owned by the caller. Copied result, owned by the caller.
+// Copied result, owned by the caller. Copied result, owned by the caller.
 //
 // See mln_offline_region_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type OfflineRegionInfo struct {
 	Id         int64
 	Definition OfflineRegionDefinition
-	// Metadata bytes.
+	// Metadata bytes. Copied bytes, owned by the caller.
 	Metadata []byte
 }
 
@@ -2836,7 +2843,7 @@ func copyOfflineRegionInfo(raw C.mln_offline_region_info) OfflineRegionInfo {
 }
 
 // OfflineRegionStatus corresponds to mln_offline_region_status. Offline region
-// status snapshot.
+// status snapshot. Copied result, owned by the caller.
 //
 // See mln_offline_region_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -2874,7 +2881,7 @@ func copyOfflineRegionStatus(raw C.mln_offline_region_status) OfflineRegionStatu
 // See mln_offline_tile_pyramid_region_definition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type OfflineTilePyramidRegionDefinition struct {
-	// Style URL. Copied during region creation.
+	// Style URL. Copied during region creation. Copied text, owned by the caller.
 	StyleUrl string
 	Bounds   LatLngBounds
 	MinZoom  float64
@@ -2947,7 +2954,8 @@ type OpenglBorrowedTextureDescriptor struct {
 	// Borrowed OpenGL context provider data. The textures must belong to this
 	// context or a context in the same share group.
 	Context OpenglContextDescriptor
-	// The ring's textures, one per slot, in slot order. Required.
+	// The ring's textures, one per slot, in slot order. Required. Copied value,
+	// owned by the caller.
 	Textures []OpenglBorrowedTexture
 	// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
 	Target uint32
@@ -3175,7 +3183,8 @@ type PremultipliedRgba8Image struct {
 	Height uint32
 	// Bytes per image row. Must be at least width * 4.
 	Stride uint32
-	// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+	// Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied
+	// bytes, owned by the caller.
 	Pixels []byte
 }
 
@@ -3295,16 +3304,20 @@ func nativeQuaternion(input Quaternion, arena *bindingArena) C.mln_quaternion {
 	return raw
 }
 
-// QueriedFeature corresponds to mln_queried_feature. One query hit borrowed for
-// a completion callback.
+// QueriedFeature corresponds to mln_queried_feature. Copied result, owned by
+// the caller. Copied result, owned by the caller.
 //
 // See mln_queried_feature in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type QueriedFeature struct {
-	Feature       []byte
-	SourceId      *string
+	// Copied text, owned by the caller.
+	Feature []byte
+	// Copied text, owned by the caller.
+	SourceId *string
+	// Copied text, owned by the caller.
 	SourceLayerId *string
-	State         *[]byte
+	// Copied text, owned by the caller.
+	State *[]byte
 }
 
 func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
@@ -3361,7 +3374,7 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 // See mln_render_frame_batch_view in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderFrameBatchView struct {
-	// Borrowed array of result_count terminal frame results in completion order.
+	// Copied value, owned by the caller.
 	Results []RenderFrameResult
 }
 
@@ -3543,8 +3556,10 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type RenderedFeatureQueryOptions struct {
 	// Optional style layer IDs. When absent, all rendered layers are queried.
+	// Copied value, owned by the caller.
 	LayerIds []string
 	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+	// Copied text, owned by the caller.
 	Filter *[]byte
 }
 
@@ -3699,10 +3714,11 @@ func copyResourceRange(raw C.mln_resource_range) ResourceRange {
 }
 
 type ResourceRequest struct {
-	// URL entering the network layer, before tile server normalization.
+	// URL entering the network layer, before tile server normalization. Copied
+	// text, owned by the caller.
 	RequestedUrl *string
 	// URL to fetch, after resource-kind normalization against the runtime's tile
-	// server options and API key.
+	// server options and API key. Copied text, owned by the caller.
 	ResolvedUrl         *string
 	Kind                ResourceKind
 	LoadingMethod       ResourceLoadingMethod
@@ -3712,8 +3728,10 @@ type ResourceRequest struct {
 	Range               *ResourceRange
 	PriorModifiedUnixMs *int64
 	PriorExpiresUnixMs  *int64
-	PriorEtag           *string
-	PriorData           []byte
+	// Copied text, owned by the caller.
+	PriorEtag *string
+	// Copied bytes, owned by the caller.
+	PriorData []byte
 }
 
 func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
@@ -3860,6 +3878,7 @@ type RuntimeEvent struct {
 	Code int32
 	// Typed payload selected by payload_type.
 	Payload RuntimeEventPayload
+	// Copied text, owned by the caller.
 	Message string
 }
 
@@ -4012,9 +4031,11 @@ func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEven
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeOptions struct {
 	// Directory root for asset:// URLs. Copied during runtime creation. Null or
-	// empty selects /android_asset on Android and . elsewhere.
+	// empty selects /android_asset on Android and . elsewhere. Copied text, owned
+	// by the caller.
 	AssetPath *string
-	// Cache database path. Copied during runtime creation.
+	// Cache database path. Copied during runtime creation. Copied text, owned by
+	// the caller.
 	CachePath *string
 	// Runtime-scoped event types this runtime queues, as a bitwise OR of
 	// mln_runtime_event_mask values.
@@ -4091,7 +4112,7 @@ func nativeScreenBox(input ScreenBox, arena *bindingArena) C.mln_screen_box {
 // See mln_screen_line_string in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type ScreenLineString struct {
-	// Points. Null only when point_count is 0.
+	// Points. Null only when point_count is 0. Copied value, owned by the caller.
 	Points []ScreenPoint
 }
 
@@ -4123,7 +4144,8 @@ func nativeScreenLineString(input ScreenLineString, arena *bindingArena) C.mln_s
 }
 
 // ScreenPoint corresponds to mln_screen_point. Screen-space point in logical
-// map pixels.
+// map pixels. Copied result, owned by the caller. Copied result, owned by the
+// caller.
 //
 // See mln_screen_point in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -4153,8 +4175,10 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type SourceFeatureQueryOptions struct {
 	// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+	// Copied value, owned by the caller.
 	SourceLayerIds []string
 	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+	// Copied text, owned by the caller.
 	Filter *[]byte
 }
 
@@ -4201,8 +4225,8 @@ func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
 	return copySourceFeatureQueryOptions(C.mln_source_feature_query_options_default())
 }
 
-// StyleImageInfo corresponds to mln_style_image_info. One complete runtime
-// style image, borrowed for a completion callback.
+// StyleImageInfo corresponds to mln_style_image_info. Copied result, owned by
+// the caller.
 //
 // See mln_style_image_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -4212,11 +4236,11 @@ type StyleImageInfo struct {
 	// Image height in pixels.
 	Height uint32
 	// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top row
-	// first.
+	// first. Copied bytes, owned by the caller.
 	Pixels []byte
-	// Horizontally stretchable intervals.
+	// Horizontally stretchable intervals. Copied value, owned by the caller.
 	StretchX []ImageStretch
-	// Vertically stretchable intervals.
+	// Vertically stretchable intervals. Copied value, owned by the caller.
 	StretchY []ImageStretch
 	// Content box, when the image sets one.
 	Content *ImageContent
@@ -4267,11 +4291,11 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 // See mln_style_image_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleImageOptions struct {
-	// Horizontally stretchable intervals. Borrowed for the call and copied before
-	// return. May be null only when stretch_x_count is 0.
+	// Horizontally stretchable intervals. May be null only when stretch_x_count is
+	// 0. Copied value, owned by the caller.
 	StretchX []ImageStretch
-	// Vertically stretchable intervals. Borrowed for the call and copied before
-	// return. May be null only when stretch_y_count is 0.
+	// Vertically stretchable intervals. May be null only when stretch_y_count is 0.
+	// Copied value, owned by the caller.
 	StretchY []ImageStretch
 	// Content box used when icon-text-fit applies.
 	Content *ImageContent
@@ -4355,19 +4379,21 @@ func DefaultStyleImageOptions() StyleImageOptions {
 	return copyStyleImageOptions(C.mln_style_image_options_default())
 }
 
-// StyleLayerInfo corresponds to mln_style_layer_info. One style layer, borrowed
-// for a completion callback.
+// StyleLayerInfo corresponds to mln_style_layer_info. Copied result, owned by
+// the caller. Copied result, owned by the caller.
 //
 // See mln_style_layer_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleLayerInfo struct {
-	// Layer ID.
+	// Layer ID. Copied text, owned by the caller.
 	Id string
-	// The style-spec layer type string.
+	// The style-spec layer type string. Copied text, owned by the caller.
 	Type string
-	// Source ID. Empty for a layer type that takes no source.
+	// Source ID. Empty for a layer type that takes no source. Copied text, owned by
+	// the caller.
 	SourceId *string
-	// Source-layer ID. Empty when the layer sets none.
+	// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
+	// caller.
 	SourceLayer *string
 	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
 	MinZoom float64
@@ -4401,21 +4427,23 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 	return result
 }
 
-// StyleSourceInfo corresponds to mln_style_source_info. Complete metadata of
-// one style source, borrowed for a completion callback.
+// StyleSourceInfo corresponds to mln_style_source_info. Copied result, owned by
+// the caller. Copied result, owned by the caller.
 //
 // See mln_style_source_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
-	// Source ID.
+	// Source ID. Copied text, owned by the caller.
 	Id string
 	// One of mln_style_source_type.
 	Type StyleSourceType
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution string, when the source sets one. It may be empty.
+	// Attribution string, when the source sets one. It may be empty. Copied text,
+	// owned by the caller.
 	Attribution *string
-	// URL that the source loads from, when it has one.
+	// URL that the source loads from, when it has one. Copied text, owned by the
+	// caller.
 	Url *string
 	// Inline TileJSON metadata, when the source was defined with it.
 	Tilejson *StyleSourceTileInfo
@@ -4450,7 +4478,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 // See mln_style_source_tile_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceTileInfo struct {
-	// Tile URL templates in TileJSON order.
+	// Tile URL templates in TileJSON order. Copied value, owned by the caller.
 	TileUrls []string
 	// Lowest zoom level the TileJSON provides tiles for.
 	MinZoom float64
@@ -4483,8 +4511,9 @@ func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileIn
 // See mln_style_tile_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleTileSourceOptions struct {
-	MinZoom     *float64
-	MaxZoom     *float64
+	MinZoom *float64
+	MaxZoom *float64
+	// Copied text, owned by the caller.
 	Attribution *string
 	// One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ.
 	Scheme *StyleTileScheme
@@ -4533,7 +4562,7 @@ func DefaultStyleTileSourceOptions() StyleTileSourceOptions {
 }
 
 // StyleTransitionOptions corresponds to mln_style_transition_options. Global
-// style transition options.
+// style transition options. Copied result, owned by the caller.
 //
 // See mln_style_transition_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -4595,13 +4624,13 @@ func copyTextureImageInfo(raw C.mln_texture_image_info) TextureImageInfo {
 	return result
 }
 
-// TextureReadbackResult corresponds to mln_texture_readback_result. Texture
-// readback borrowed for a completion callback.
+// TextureReadbackResult corresponds to mln_texture_readback_result. Copied
+// result, owned by the caller.
 //
 // See mln_texture_readback_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type TextureReadbackResult struct {
-	// Borrowed pixel bytes, valid only during the callback.
+	// Copied bytes, owned by the caller.
 	Data []byte
 	Info TextureImageInfo
 }
@@ -4737,7 +4766,8 @@ type VulkanBorrowedTextureDescriptor struct {
 	PhysicalHeight uint32
 	// Borrowed Vulkan context. All handles are required.
 	Context VulkanContextDescriptor
-	// The ring's images, one per slot, in slot order. Required.
+	// The ring's images, one per slot, in slot order. Required. Copied value, owned
+	// by the caller.
 	Textures []VulkanBorrowedTexture
 	// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid.
 	Format uint32
@@ -4993,7 +5023,8 @@ type WebglContextDescriptor struct {
 	// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
 	Context int32
 	// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-	// canvas must still be transferable when attachment starts.
+	// canvas must still be transferable when attachment starts. Copied text, owned
+	// by the caller.
 	CanvasSelector string
 }
 
@@ -5058,7 +5089,8 @@ type WebgpuBorrowedTextureDescriptor struct {
 	// Borrowed WebGPU context. device is required. Rendering is submitted through
 	// context.queue or that device's default queue.
 	Context WebgpuContextDescriptor
-	// The ring's textures, one per slot, in slot order. Required.
+	// The ring's textures, one per slot, in slot order. Required. Copied value,
+	// owned by the caller.
 	Textures []WebgpuBorrowedTexture
 	// Backend-native WGPUTextureFormat value of every texture. Undefined is
 	// invalid.

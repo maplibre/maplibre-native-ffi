@@ -400,7 +400,9 @@ public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let fov: CameraOptionField = .init(rawValue: 256)
 }
 
-/// Camera fields used by snapshots and camera updates.
+/// Camera fields used by snapshots and camera updates. Copied result, owned by
+/// the caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -497,7 +499,7 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Camera result borrowed for an ordered camera-query completion.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -940,7 +942,10 @@ public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
   public static let cancel: GesturePhase = .init(rawValue: 4)
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs.
+/// Geographic coordinate in degrees used by map and projection APIs. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -974,7 +979,8 @@ public struct LatLng: Equatable, Hashable, Sendable {
   }
 }
 
-/// Geographic bounds in degrees.
+/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1450,9 +1456,10 @@ public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_offline_geometry_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
-  /// Style URL. Copied during region creation.
+  /// Style URL. Copied during region creation. Copied text, owned by the
+  /// caller.
   public var styleUrl: String
-  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+  /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
   public var geometry: Data
   public var minZoom: Double
   /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
@@ -1595,14 +1602,17 @@ public enum OfflineRegionDefinitionData: Equatable, Hashable, Sendable {
   }
 }
 
-/// Region data delivered by an offline completion.
+/// Region data delivered by an offline completion. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
   public var id: Int64
   public var definition: OfflineRegionDefinition
-  /// Metadata bytes.
+  /// Metadata bytes. Copied bytes, owned by the caller.
   public var metadata: Data
   public static var `default`: Self {
     Self()
@@ -1648,7 +1658,8 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
 public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   Sendable
 {
-  /// Style URL. Copied during region creation.
+  /// Style URL. Copied during region creation. Copied text, owned by the
+  /// caller.
   public var styleUrl: String
   public var bounds: LatLngBounds
   public var minZoom: Double
@@ -1847,7 +1858,8 @@ public struct Quaternion: Equatable, Hashable, Sendable {
   }
 }
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels. Copied result, owned by the
+/// caller. Copied result, owned by the caller.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

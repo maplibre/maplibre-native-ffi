@@ -11,22 +11,51 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record StyleImageOptions
 {
+    /// <summary>
+    /// Horizontally stretchable intervals. May be null only when
+    /// stretch_x_count is 0. Copied value, owned by the caller.
+    /// </summary>
     public ImageStretch[]? StretchX
     {
         get => StretchXStorage?.ToArray();
         set => StretchXStorage = ValueArray.CopyOptional(value);
     }
     internal ValueArray<ImageStretch>? StretchXStorage { get; set; }
+
+    /// <summary>
+    /// Vertically stretchable intervals. May be null only when stretch_y_count
+    /// is 0. Copied value, owned by the caller.
+    /// </summary>
     public ImageStretch[]? StretchY
     {
         get => StretchYStorage?.ToArray();
         set => StretchYStorage = ValueArray.CopyOptional(value);
     }
     internal ValueArray<ImageStretch>? StretchYStorage { get; set; }
+
+    /// <summary>
+    /// Content box used when icon-text-fit applies.
+    /// </summary>
     public ImageContent? Content { get; set; }
+
+    /// <summary>
+    /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
+    /// </summary>
     public StyleImageTextFit? TextFitWidth { get; set; }
+
+    /// <summary>
+    /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
+    /// </summary>
     public StyleImageTextFit? TextFitHeight { get; set; }
+
+    /// <summary>
+    /// Sprite pixel ratio. Defaults to 1.
+    /// </summary>
     public float? PixelRatio { get; set; }
+
+    /// <summary>
+    /// Whether the image is a signed distance field icon. Defaults to false.
+    /// </summary>
     public bool? Sdf { get; set; }
     public static StyleImageOptions Default
     {

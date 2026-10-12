@@ -369,7 +369,8 @@ class Values:
             for f in value.fields:
                 wrapper = typename + name(f.name) + "Variant"
                 chunks.append(
-                    f"type {wrapper} struct {{ Value {self.type(f.value)} }}\nfunc ({wrapper}) bindingTag() uint32 {{ return uint32(C.{f.presence.variant}) }}"
+                    doc(self.api, f"{native}.{f.name}", wrapper)
+                    + f"type {wrapper} struct {{ Value {self.type(f.value)} }}\nfunc ({wrapper}) bindingTag() uint32 {{ return uint32(C.{f.presence.variant}) }}"
                 )
         for native, value in sorted(self.records.items()):
             typename = public(native)
@@ -402,7 +403,10 @@ class Values:
                         + f"{name(member)} {signature(self, callback)}"
                     )
             if arena := self.arenas.get(native):
-                fields.append(f"{name(arena.field)} string")
+                fields.append(
+                    doc(self.api, f"{native}.{arena.field}", None)
+                    + f"{name(arena.field)} string"
+                )
             body = (
                 "\n" + "\n".join(fields) + "\n"
                 if any("//" in field for field in fields)

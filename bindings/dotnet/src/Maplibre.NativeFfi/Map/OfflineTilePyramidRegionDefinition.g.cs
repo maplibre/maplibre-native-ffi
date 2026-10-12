@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="StyleUrl">
-/// Style URL. Copied during region creation.
+/// Style URL. Copied during region creation. Copied text, owned by the caller.
 /// </param>
 /// <param name="MaxZoom">
 /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets

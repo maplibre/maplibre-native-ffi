@@ -31,16 +31,45 @@ public readonly record struct WebgpuBorrowedTextureDescriptor
         this.Format = Format;
     }
 
+    /// <summary>
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    /// </summary>
     public LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Physical texture width in device pixels. Defaults to 256.
+    /// </summary>
     public uint PhysicalWidth { get; init; }
+
+    /// <summary>
+    /// Physical texture height in device pixels. Defaults to 256.
+    /// </summary>
     public uint PhysicalHeight { get; init; }
+
+    /// <summary>
+    /// Borrowed WebGPU context. device is required. Rendering is submitted
+    /// through context.queue or that device's default queue.
+    /// </summary>
     public WebgpuContextDescriptor Context { get; init; }
+
+    /// <summary>
+    /// The ring's textures, one per slot, in slot order. Required. Copied
+    /// value, owned by the caller.
+    /// </summary>
     public WebgpuBorrowedTexture[] Textures
     {
         get => TexturesStorage.ToArray();
         init => TexturesStorage = ValueArray.Copy(value);
     }
     internal ValueArray<WebgpuBorrowedTexture> TexturesStorage { get; init; }
+
+    /// <summary>
+    /// Backend-native WGPUTextureFormat value of every texture. Undefined is
+    /// invalid.
+    /// </summary>
     public uint Format { get; init; }
     public static WebgpuBorrowedTextureDescriptor Default
     {

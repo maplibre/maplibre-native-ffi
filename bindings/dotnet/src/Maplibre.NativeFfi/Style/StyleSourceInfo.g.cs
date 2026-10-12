@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_info</c> in the <see
@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleSourceInfo
 {
     /// <summary>
-    /// Source ID.
+    /// Source ID. Copied text, owned by the caller.
     /// </summary>
     public required string Id { get; set; }
 
@@ -27,12 +27,14 @@ public sealed record StyleSourceInfo
     public bool IsVolatile { get; set; }
 
     /// <summary>
-    /// Attribution string, when the source sets one. It may be empty.
+    /// Attribution string, when the source sets one. It may be empty. Copied
+    /// text, owned by the caller.
     /// </summary>
     public string? Attribution { get; set; }
 
     /// <summary>
-    /// URL that the source loads from, when it has one.
+    /// URL that the source loads from, when it has one. Copied text, owned by
+    /// the caller.
     /// </summary>
     public string? Url { get; set; }
 

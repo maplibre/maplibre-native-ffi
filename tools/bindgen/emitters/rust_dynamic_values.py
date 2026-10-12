@@ -186,7 +186,10 @@ def declaration(values, value):
         copies.append(f"{local}: raw.{mask} & sys::{flag.name} != 0,")
     item_buffer = values.item_buffers.get(value.native)
     if item_buffer:
-        fields.append(f"    pub {identifier(item_buffer.field)}: String,")
+        fields.append(
+            doc(values.bound, f"{value.native}.{item_buffer.field}", "    ")
+            + f"    pub {identifier(item_buffer.field)}: String,"
+        )
         copies.append(f"{identifier(item_buffer.field)}: String::new(),")
     for field in value.fields:
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:

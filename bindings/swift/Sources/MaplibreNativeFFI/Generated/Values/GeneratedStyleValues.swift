@@ -361,8 +361,8 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Highest zoom that clusters points. Defaults to 17.
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form. The
-  /// UTF-8 bytes are borrowed for the call.
+  /// whose members follow the MapLibre Style Spec clusterProperties form.
+  /// Copied text, owned by the caller.
   public var clusterProperties: Data?
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
@@ -593,7 +593,8 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// Bytes per image row. Must be at least width \* 4.
   public var stride: UInt32
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied
+  /// bytes, owned by the caller.
   public var pixels: Data
   public static var `default`: Self {
     try! Self(raw: mln_premultiplied_rgba8_image_default())
@@ -638,7 +639,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   }
 }
 
-/// One complete runtime style image, borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -648,11 +649,11 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   /// Image height in pixels.
   public var height: UInt32
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
-  /// row first.
+  /// row first. Copied bytes, owned by the caller.
   public var pixels: Data
-  /// Horizontally stretchable intervals.
+  /// Horizontally stretchable intervals. Copied value, owned by the caller.
   public var stretchX: [ImageStretch]
-  /// Vertically stretchable intervals.
+  /// Vertically stretchable intervals. Copied value, owned by the caller.
   public var stretchY: [ImageStretch]
   /// Content box, when the image sets one.
   public var content: ImageContent?
@@ -794,11 +795,11 @@ public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_style_image_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
-  /// Horizontally stretchable intervals. Borrowed for the call and copied
-  /// before return. May be null only when stretch_x_count is 0.
+  /// Horizontally stretchable intervals. May be null only when stretch_x_count
+  /// is 0. Copied value, owned by the caller.
   public var stretchX: [ImageStretch]?
-  /// Vertically stretchable intervals. Borrowed for the call and copied before
-  /// return. May be null only when stretch_y_count is 0.
+  /// Vertically stretchable intervals. May be null only when stretch_y_count is
+  /// 0. Copied value, owned by the caller.
   public var stretchY: [ImageStretch]?
   /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
@@ -911,18 +912,20 @@ public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
 }
 
-/// One style layer, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerInfo: Equatable, Hashable, Sendable {
-  /// Layer ID.
+  /// Layer ID. Copied text, owned by the caller.
   public var id: String
-  /// The style-spec layer type string.
+  /// The style-spec layer type string. Copied text, owned by the caller.
   public var type: String
-  /// Source ID. Empty for a layer type that takes no source.
+  /// Source ID. Empty for a layer type that takes no source. Copied text, owned
+  /// by the caller.
   public var sourceId: String?
-  /// Source-layer ID. Empty when the layer sets none.
+  /// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
+  /// caller.
   public var sourceLayer: String?
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
   public var minZoom: Double
@@ -1017,20 +1020,22 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
   public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
 }
 
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
-  /// Source ID.
+  /// Source ID. Copied text, owned by the caller.
   public var id: String
   /// One of `mln_style_source_type`.
   public var type: StyleSourceType
   /// Whether the source is marked volatile.
   public var isVolatile: Bool
-  /// Attribution string, when the source sets one. It may be empty.
+  /// Attribution string, when the source sets one. It may be empty. Copied
+  /// text, owned by the caller.
   public var attribution: String?
-  /// URL that the source loads from, when it has one.
+  /// URL that the source loads from, when it has one. Copied text, owned by the
+  /// caller.
   public var url: String?
   /// Inline TileJSON metadata, when the source was defined with it.
   public var tilejson: StyleSourceTileInfo?
@@ -1172,7 +1177,7 @@ public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
-  /// Tile URL templates in TileJSON order.
+  /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
   public var tileUrls: [String]
   /// Lowest zoom level the TileJSON provides tiles for.
   public var minZoom: Double
@@ -1293,6 +1298,7 @@ public struct StyleTileSourceOptionField: OptionSet, NativeOpenValue, Equatable,
 public struct StyleTileSourceOptions: Equatable, Hashable, Sendable {
   public var minZoom: Double?
   public var maxZoom: Double?
+  /// Copied text, owned by the caller.
   public var attribution: String?
   /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
   public var scheme: StyleTileScheme?
@@ -1416,7 +1422,7 @@ public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 4)
 }
 
-/// Global style transition options.
+/// Global style transition options. Copied result, owned by the caller.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

@@ -40,7 +40,7 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct EventBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of event_count events in queue order.
+  /// Copied value, owned by the caller.
   public var events: [RuntimeEvent]
   public static var `default`: Self {
     Self()
@@ -189,7 +189,7 @@ public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
   public static let active: OfflineRegionDownloadState = .init(rawValue: 1)
 }
 
-/// Offline region status snapshot.
+/// Offline region status snapshot. Copied result, owned by the caller.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -506,10 +506,11 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
 }
 
 public struct ResourceRequest: Equatable, Hashable, Sendable {
-  /// URL entering the network layer, before tile server normalization.
+  /// URL entering the network layer, before tile server normalization. Copied
+  /// text, owned by the caller.
   public var requestedUrl: String?
   /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key.
+  /// server options and API key. Copied text, owned by the caller.
   public var resolvedUrl: String?
   public var kind: ResourceKind
   public var loadingMethod: ResourceLoadingMethod
@@ -519,7 +520,9 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   public var range: ResourceRange?
   public var priorModifiedUnixMs: Int64?
   public var priorExpiresUnixMs: Int64?
+  /// Copied text, owned by the caller.
   public var priorEtag: String?
+  /// Copied bytes, owned by the caller.
   public var priorData: Data
   public static var `default`: Self {
     Self()
@@ -925,6 +928,7 @@ public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
+  /// Copied text, owned by the caller.
   public var message: String
   /// One of `mln_runtime_event_type`.
   public var type: RuntimeEventType
@@ -1392,9 +1396,11 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Sendable {
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
-  /// empty selects `/android_asset` on Android and `.` elsewhere.
+  /// empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
+  /// owned by the caller.
   public var assetPath: String?
-  /// Cache database path. Copied during runtime creation.
+  /// Cache database path. Copied during runtime creation. Copied text, owned by
+  /// the caller.
   public var cachePath: String?
   /// Runtime-scoped event types this runtime queues, as a bitwise OR of
   /// `mln_runtime_event_mask` values.

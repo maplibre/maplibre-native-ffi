@@ -24,13 +24,28 @@ public readonly record struct StyleSourceTileInfo
         this.Scheme = Scheme;
     }
 
+    /// <summary>
+    /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
+    /// </summary>
     public string[] TileUrls
     {
         get => TileUrlsStorage.ToArray();
         init => TileUrlsStorage = ValueArray.Copy(value);
     }
     internal ValueArray<string> TileUrlsStorage { get; init; }
+
+    /// <summary>
+    /// Lowest zoom level the TileJSON provides tiles for.
+    /// </summary>
     public double MinZoom { get; init; }
+
+    /// <summary>
+    /// Highest zoom level the TileJSON provides tiles for.
+    /// </summary>
     public double MaxZoom { get; init; }
+
+    /// <summary>
+    /// One of <c>mln_style_tile_scheme</c>.
+    /// </summary>
     public StyleTileScheme Scheme { get; init; }
 }

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One query hit borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 /// </summary>
 /// <remarks>
 /// See <c>mln_queried_feature</c> in the <see
@@ -11,14 +11,29 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record QueriedFeature
 {
+    /// <summary>
+    /// Copied text, owned by the caller.
+    /// </summary>
     public byte[] Feature
     {
         get => FeatureStorage.ToArray();
         set => FeatureStorage = ValueArray.Copy(value);
     }
     internal ValueArray<byte> FeatureStorage { get; set; }
+
+    /// <summary>
+    /// Copied text, owned by the caller.
+    /// </summary>
     public string? SourceId { get; set; }
+
+    /// <summary>
+    /// Copied text, owned by the caller.
+    /// </summary>
     public string? SourceLayerId { get; set; }
+
+    /// <summary>
+    /// Copied text, owned by the caller.
+    /// </summary>
     public byte[]? State
     {
         get => StateStorage?.ToArray();

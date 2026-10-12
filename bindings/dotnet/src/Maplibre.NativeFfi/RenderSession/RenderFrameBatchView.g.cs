@@ -16,6 +16,9 @@ public readonly record struct RenderFrameBatchView
         this.Results = Results;
     }
 
+    /// <summary>
+    /// Copied value, owned by the caller.
+    /// </summary>
     public RenderFrameResult[] Results
     {
         get => ResultsStorage.ToArray();

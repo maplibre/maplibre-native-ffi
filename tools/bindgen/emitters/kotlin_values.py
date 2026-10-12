@@ -443,7 +443,8 @@ class Values:
                     )
                 )
                 args.append(
-                    f"  public val {identifier(arena.field)}: "
+                    doc(self.bound, f"{value.native}.{arena.field}", "  ")
+                    + f"  public val {identifier(arena.field)}: "
                     + (
                         'String = ""'
                         if arena.encoding == "utf8"

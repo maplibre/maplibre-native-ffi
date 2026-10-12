@@ -1662,7 +1662,10 @@ final class AnimationOptions extends _Value {
   ];
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs.
+/// Geographic coordinate in degrees used by map and projection APIs. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1679,7 +1682,8 @@ final class LatLng extends _Value {
   List<Object?> get _members => [latitude, longitude];
 }
 
-/// Geographic bounds in degrees.
+/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
+/// result, owned by the caller.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1733,7 +1737,8 @@ final class BoundOptions extends _Value {
   ];
 }
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels. Copied result, owned by the
+/// caller. Copied result, owned by the caller.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1825,7 +1830,9 @@ final class CameraFitOptions extends _Value {
   List<Object?> get _members => [padding, bearing, pitch];
 }
 
-/// Camera fields used by snapshots and camera updates.
+/// Camera fields used by snapshots and camera updates. Copied result, owned by
+/// the caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2077,7 +2084,7 @@ final class RuntimeEventTileAction extends _Value {
   List<Object?> get _members => [operation, tileId];
 }
 
-/// Offline region status snapshot.
+/// Offline region status snapshot. Copied result, owned by the caller.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2185,13 +2192,35 @@ final class RuntimeEvent {
     this.message = '',
     required this.payload,
   });
+
+  /// One of `mln_runtime_event_type`.
   final RuntimeEventType type;
+
+  /// One of `mln_runtime_event_source_type`.
   final RuntimeEventSourceType sourceType;
+
+  /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
   final BigInt source;
+
+  /// Map snapshot generation that the event reports, or zero when source_type
+  /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
   final BigInt generation;
+
+  /// Secondary event detail whose meaning type selects. Depending on type it
+  /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
+  /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
+  /// meaning.
   final int code;
+
+  /// Byte offset of this event's message inside
+  /// `mln_event_batch_view.messages`. Zero when message_size is 0.
   final BigInt messageOffset;
+
+  /// Number of message bytes, excluding the trailing null terminator that
+  /// follows them in the arena. Zero when this event carries no message.
   final int messageSize;
+
+  /// Copied text, owned by the caller.
   final String message;
   final RuntimeEventPayload payload;
 }
@@ -2252,7 +2281,7 @@ final class EventBatchView extends _Value {
   EventBatchView({required List<RuntimeEvent> events})
     : events = List.unmodifiable(events);
 
-  /// Borrowed array of event_count events in queue order.
+  /// Copied value, owned by the caller.
   final List<RuntimeEvent> events;
 
   @override
@@ -2368,8 +2397,8 @@ final class GeojsonSourceOptions extends _Value {
   final double? clusterMaxZoom;
 
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form. The
-  /// UTF-8 bytes are borrowed for the call.
+  /// whose members follow the MapLibre Style Spec clusterProperties form.
+  /// Copied text, owned by the caller.
   final Uint8List? clusterProperties;
 
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
@@ -2481,7 +2510,8 @@ final class PremultipliedRgba8Image extends _Value {
   /// Bytes per image row. Must be at least width \* 4.
   final int stride;
 
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
+  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied
+  /// bytes, owned by the caller.
   final Uint8List pixels;
 
   @override
@@ -2505,6 +2535,8 @@ final class StyleTileSourceOptions extends _Value {
   });
   final double? minZoom;
   final double? maxZoom;
+
+  /// Copied text, owned by the caller.
   final String? attribution;
 
   /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
@@ -2573,7 +2605,8 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   final List<MetalBorrowedTexture> textures;
 
   @override
@@ -2787,7 +2820,8 @@ final class WebglContextDescriptor extends _Value {
   final int context;
 
   /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-  /// canvas must still be transferable when attachment starts.
+  /// canvas must still be transferable when attachment starts. Copied text,
+  /// owned by the caller.
   final String canvasSelector;
 
   @override
@@ -2803,6 +2837,10 @@ final class OpenglContextDescriptor {
     this.ownership = const OpenglContextOwnership.fromRawValue(0),
     required this.data,
   });
+
+  /// Whether the session shares its driver thread and graphics objects with the
+  /// host. A private EGL owned texture and a transferred WebGL canvas are
+  /// dedicated to their core worker.
   final OpenglContextOwnership ownership;
   final OpenglContextDescriptorData data;
 }
@@ -2882,7 +2920,8 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// context or a context in the same share group.
   final OpenglContextDescriptor context;
 
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   final List<OpenglBorrowedTexture> textures;
 
   /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
@@ -3048,7 +3087,8 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
 
-  /// The ring's images, one per slot, in slot order. Required.
+  /// The ring's images, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   final List<VulkanBorrowedTexture> textures;
 
   /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
@@ -3199,7 +3239,8 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
   /// through context.queue or that device's default queue.
   final WebgpuContextDescriptor context;
 
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   final List<WebgpuBorrowedTexture> textures;
 
   /// Backend-native WGPUTextureFormat value of every texture. Undefined is
@@ -3270,7 +3311,7 @@ final class WebgpuSurfaceDescriptor extends _Value {
   List<Object?> get _members => [extent, context, surface, format];
 }
 
-/// Camera result borrowed for an ordered camera-query completion.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3501,7 +3542,7 @@ final class ImageContent extends _Value {
   List<Object?> get _members => [left, top, right, bottom];
 }
 
-/// One complete runtime style image, borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3530,13 +3571,13 @@ final class StyleImageInfo extends _Value {
   final int height;
 
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
-  /// row first.
+  /// row first. Copied bytes, owned by the caller.
   final Uint8List pixels;
 
-  /// Horizontally stretchable intervals.
+  /// Horizontally stretchable intervals. Copied value, owned by the caller.
   final List<ImageStretch> stretchX;
 
-  /// Vertically stretchable intervals.
+  /// Vertically stretchable intervals. Copied value, owned by the caller.
   final List<ImageStretch> stretchY;
 
   /// Content box, when the image sets one.
@@ -3569,7 +3610,7 @@ final class StyleImageInfo extends _Value {
   ];
 }
 
-/// One style layer, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3584,16 +3625,18 @@ final class StyleLayerInfo extends _Value {
     this.visibility = const StyleLayerVisibility.fromRawValue(0),
   });
 
-  /// Layer ID.
+  /// Layer ID. Copied text, owned by the caller.
   final String id;
 
-  /// The style-spec layer type string.
+  /// The style-spec layer type string. Copied text, owned by the caller.
   final String type;
 
-  /// Source ID. Empty for a layer type that takes no source.
+  /// Source ID. Empty for a layer type that takes no source. Copied text, owned
+  /// by the caller.
   final String? sourceId;
 
-  /// Source-layer ID. Empty when the layer sets none.
+  /// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
+  /// caller.
   final String? sourceLayer;
 
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
@@ -3629,7 +3672,7 @@ final class StyleSourceTileInfo extends _Value {
     this.scheme = const StyleTileScheme.fromRawValue(0),
   }) : tileUrls = List.unmodifiable(tileUrls);
 
-  /// Tile URL templates in TileJSON order.
+  /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
   final List<String> tileUrls;
 
   /// Lowest zoom level the TileJSON provides tiles for.
@@ -3645,7 +3688,7 @@ final class StyleSourceTileInfo extends _Value {
   List<Object?> get _members => [tileUrls, minZoom, maxZoom, scheme];
 }
 
-/// Complete metadata of one style source, borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3663,7 +3706,7 @@ final class StyleSourceInfo extends _Value {
     this.rasterEncoding,
   });
 
-  /// Source ID.
+  /// Source ID. Copied text, owned by the caller.
   final String id;
 
   /// One of `mln_style_source_type`.
@@ -3672,10 +3715,12 @@ final class StyleSourceInfo extends _Value {
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution string, when the source sets one. It may be empty.
+  /// Attribution string, when the source sets one. It may be empty. Copied
+  /// text, owned by the caller.
   final String? attribution;
 
-  /// URL that the source loads from, when it has one.
+  /// URL that the source loads from, when it has one. Copied text, owned by the
+  /// caller.
   final String? url;
 
   /// Inline TileJSON metadata, when the source was defined with it.
@@ -3708,7 +3753,7 @@ final class StyleSourceInfo extends _Value {
   ];
 }
 
-/// Global style transition options.
+/// Global style transition options. Copied result, owned by the caller.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3791,12 +3836,12 @@ final class StyleImageOptions extends _Value {
   }) : stretchX = stretchX == null ? null : List.unmodifiable(stretchX),
        stretchY = stretchY == null ? null : List.unmodifiable(stretchY);
 
-  /// Horizontally stretchable intervals. Borrowed for the call and copied
-  /// before return. May be null only when stretch_x_count is 0.
+  /// Horizontally stretchable intervals. May be null only when stretch_x_count
+  /// is 0. Copied value, owned by the caller.
   final List<ImageStretch>? stretchX;
 
-  /// Vertically stretchable intervals. Borrowed for the call and copied before
-  /// return. May be null only when stretch_y_count is 0.
+  /// Vertically stretchable intervals. May be null only when stretch_y_count is
+  /// 0. Copied value, owned by the caller.
   final List<ImageStretch>? stretchY;
 
   /// Content box used when icon-text-fit applies.
@@ -3834,7 +3879,7 @@ final class RenderFrameBatchView extends _Value {
   RenderFrameBatchView({required List<RenderFrameResult> results})
     : results = List.unmodifiable(results);
 
-  /// Borrowed array of result_count terminal frame results in completion order.
+  /// Copied value, owned by the caller.
   final List<RenderFrameResult> results;
 
   @override
@@ -3969,7 +4014,8 @@ final class ScreenLineString extends _Value {
   ScreenLineString({required List<ScreenPoint> points})
     : points = List.unmodifiable(points);
 
-  /// Points. Null only when point_count is 0.
+  /// Points. Null only when point_count is 0. Copied value, owned by the
+  /// caller.
   final List<ScreenPoint> points;
 
   @override
@@ -4032,16 +4078,18 @@ final class RenderedFeatureQueryOptions extends _Value {
           : Uint8List.fromList(filter).asUnmodifiableView();
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
+  /// Copied value, owned by the caller.
   final List<String>? layerIds;
 
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+  /// Copied text, owned by the caller.
   final Uint8List? filter;
 
   @override
   List<Object?> get _members => [layerIds, filter];
 }
 
-/// One query hit borrowed for a completion callback.
+/// Copied result, owned by the caller. Copied result, owned by the caller.
 ///
 /// See `mln_queried_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -4057,9 +4105,17 @@ final class QueriedFeature extends _Value {
        state = state == null
            ? null
            : Uint8List.fromList(state).asUnmodifiableView();
+
+  /// Copied text, owned by the caller.
   final Uint8List feature;
+
+  /// Copied text, owned by the caller.
   final String? sourceId;
+
+  /// Copied text, owned by the caller.
   final String? sourceLayerId;
+
+  /// Copied text, owned by the caller.
   final Uint8List? state;
 
   @override
@@ -4080,9 +4136,11 @@ final class SourceFeatureQueryOptions extends _Value {
           : Uint8List.fromList(filter).asUnmodifiableView();
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+  /// Copied value, owned by the caller.
   final List<String>? sourceLayerIds;
 
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+  /// Copied text, owned by the caller.
   final Uint8List? filter;
 
   @override
@@ -4117,7 +4175,7 @@ final class TextureImageInfo extends _Value {
   List<Object?> get _members => [width, height, stride, byteLength];
 }
 
-/// Texture readback borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4125,7 +4183,7 @@ final class TextureReadbackResult extends _Value {
   TextureReadbackResult({Uint8List? data, this.info = const TextureImageInfo()})
     : data = Uint8List.fromList(data ?? const <int>[]).asUnmodifiableView();
 
-  /// Borrowed pixel bytes, valid only during the callback.
+  /// Copied bytes, owned by the caller.
   final Uint8List data;
   final TextureImageInfo info;
 
@@ -4203,10 +4261,12 @@ final class RuntimeOptions extends _Value {
   });
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
-  /// empty selects `/android_asset` on Android and `.` elsewhere.
+  /// empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
+  /// owned by the caller.
   final String? assetPath;
 
-  /// Cache database path. Copied during runtime creation.
+  /// Cache database path. Copied during runtime creation. Copied text, owned by
+  /// the caller.
   final String? cachePath;
 
   /// Runtime-scoped event types this runtime queues, as a bitwise OR of
@@ -4234,7 +4294,8 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
     this.includeIdeographs = false,
   });
 
-  /// Style URL. Copied during region creation.
+  /// Style URL. Copied during region creation. Copied text, owned by the
+  /// caller.
   final String styleUrl;
   final LatLngBounds bounds;
   final double minZoom;
@@ -4272,10 +4333,11 @@ final class OfflineGeometryRegionDefinition extends _Value {
          geometry ?? const <int>[],
        ).asUnmodifiableView();
 
-  /// Style URL. Copied during region creation.
+  /// Style URL. Copied during region creation. Copied text, owned by the
+  /// caller.
   final String styleUrl;
 
-  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
+  /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
   final Uint8List geometry;
   final double minZoom;
 
@@ -4330,7 +4392,10 @@ final class OfflineRegionDefinitionGeometry extends OfflineRegionDefinition {
   int get hashCode => value.hashCode;
 }
 
-/// Region data delivered by an offline completion.
+/// Region data delivered by an offline completion. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller. Copied result, owned by the caller. Copied result, owned by the
+/// caller.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4345,7 +4410,7 @@ final class OfflineRegionInfo extends _Value {
   final int id;
   final OfflineRegionDefinition definition;
 
-  /// Metadata bytes.
+  /// Metadata bytes. Copied bytes, owned by the caller.
   final Uint8List metadata;
 
   @override
@@ -4500,11 +4565,12 @@ final class ResourceRequest extends _Value {
          priorData ?? const <int>[],
        ).asUnmodifiableView();
 
-  /// URL entering the network layer, before tile server normalization.
+  /// URL entering the network layer, before tile server normalization. Copied
+  /// text, owned by the caller.
   final String? requestedUrl;
 
   /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key.
+  /// server options and API key. Copied text, owned by the caller.
   final String? resolvedUrl;
   final ResourceKind kind;
   final ResourceLoadingMethod loadingMethod;
@@ -4514,7 +4580,11 @@ final class ResourceRequest extends _Value {
   final ResourceRange? range;
   final int? priorModifiedUnixMs;
   final int? priorExpiresUnixMs;
+
+  /// Copied text, owned by the caller.
   final String? priorEtag;
+
+  /// Copied bytes, owned by the caller.
   final Uint8List priorData;
 
   @override

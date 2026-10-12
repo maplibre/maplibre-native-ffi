@@ -21,6 +21,57 @@ class SemanticTests(unittest.TestCase):
     def parse(self, source):
         return parse(source)
 
+    def test_copied_result_docs_follow_storage_ownership(self):
+        source = """
+typedef struct child {
+  /** Borrowed UTF-8 name, valid only during the callback. */
+  const char *name;
+} child;
+/** Borrowed result for a completion callback. */
+typedef struct snapshot {
+  /** Borrowed pixel bytes, valid only during the callback. */
+  mln_buffer_view pixels BIND("encoding=bytes");
+  /** UTF-8 title. */
+  mln_buffer_view title;
+  const child *children BIND("length=count");
+  unsigned long count;
+  const child *selected;
+  /** Borrowed graphics object, valid until frame release. */
+  void *object;
+} snapshot;
+typedef struct input { /** Borrowed for the call. */ const char *name; } input;
+BIND("execution=query;result=snapshot")
+mln_status read(const input *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+"""
+        api = self.parse(source)
+        model = bind(api, require_complete=True)
+        self.assertEqual(
+            model.doc("snapshot").summary, "Copied result, owned by the caller."
+        )
+        for symbol, noun in (
+            ("snapshot.pixels", "bytes"),
+            ("snapshot.children", "value"),
+            ("snapshot.selected", "value"),
+            ("child.name", "text"),
+        ):
+            with self.subTest(symbol=symbol):
+                self.assertEqual(
+                    model.doc(symbol).summary, f"Copied {noun}, owned by the caller."
+                )
+        self.assertEqual(
+            model.doc("snapshot.object").summary,
+            "Borrowed graphics object, valid until frame release.",
+        )
+        self.assertEqual(model.doc("input.name").summary, "Borrowed for the call.")
+        self.assertEqual(
+            model.doc("snapshot.title").summary,
+            "UTF-8 title. Copied text, owned by the caller.",
+        )
+        self.assertEqual(
+            api.records_by_name["snapshot"].fields[0].documentation,
+            "/** Borrowed pixel bytes, valid only during the callback. */",
+        )
+
     def test_scalar_carriers_preserve_portable_typedefs_across_host_abis(self):
         for underlying in ("long", "long long"):
             with self.subTest(underlying=underlying):
@@ -532,6 +583,9 @@ mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnos
         self.assertEqual(
             (value.item_buffer.field, value.item_buffer.data, value.item_buffer.offset),
             ("message", "bytes", "offset"),
+        )
+        self.assertEqual(
+            api.doc("item.message").summary, "Copied text, owned by the caller."
         )
         with self.assertRaisesRegex(ModelError, "stride requires"):
             bind(

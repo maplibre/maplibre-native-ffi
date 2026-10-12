@@ -48,7 +48,8 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Physical texture height in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalHeight: UInt32
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   public var textures: [MetalBorrowedTexture]
   public static var `default`: Self {
     try! Self(raw: mln_metal_borrowed_texture_descriptor_default())
@@ -258,7 +259,8 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
   public var context: OpenglContextDescriptor
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   public var textures: [OpenglBorrowedTexture]
   /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   public var target: UInt32
@@ -498,12 +500,12 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Texture readback borrowed for a completion callback.
+/// Copied result, owned by the caller.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureReadbackResult: Equatable, Hashable, Sendable {
-  /// Borrowed pixel bytes, valid only during the callback.
+  /// Copied bytes, owned by the caller.
   public var data: Data
   public var info: TextureImageInfo
   public static var `default`: Self {
@@ -584,7 +586,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalHeight: UInt32
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
-  /// The ring's images, one per slot, in slot order. Required.
+  /// The ring's images, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   public var textures: [VulkanBorrowedTexture]
   /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
   /// invalid.
@@ -844,7 +847,8 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed WebGPU context. device is required. Rendering is submitted
   /// through context.queue or that device's default queue.
   public var context: WebgpuContextDescriptor
-  /// The ring's textures, one per slot, in slot order. Required.
+  /// The ring's textures, one per slot, in slot order. Required. Copied value,
+  /// owned by the caller.
   public var textures: [WebgpuBorrowedTexture]
   /// Backend-native WGPUTextureFormat value of every texture. Undefined is
   /// invalid.

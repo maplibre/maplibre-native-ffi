@@ -958,7 +958,8 @@ class Values:
                 copy = "ValueArray.CopyOptional" if optional else "ValueArray.Copy"
                 properties.extend(
                     [
-                        f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); {accessor} => {member}Storage = {copy}(value); }}",
+                        self.member_doc(plan, field)
+                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); {accessor} => {member}Storage = {copy}(value); }}",
                         f"    internal {storage} {member}Storage {{ get; {accessor}; }}",
                     ]
                 )
@@ -971,12 +972,15 @@ class Values:
                 else ""
             )
             properties.append(
-                self.initialized(
-                    f"    public {required}{type_} {member} {{ get; {accessor}; }}",
-                    field,
+                self.member_doc(plan, field)
+                + (
+                    self.initialized(
+                        f"    public {required}{type_} {member} {{ get; {accessor}; }}",
+                        field,
+                    )
+                    if masked
+                    else f"    public {required}{type_} {member} {{ get; {accessor}; }}"
                 )
-                if masked
-                else f"    public {required}{type_} {member} {{ get; {accessor}; }}"
             )
         declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
         if not masked:
@@ -1004,7 +1008,10 @@ class Values:
             return (
                 f"public abstract record {name}\n{{\n    private {name}() {{ }}\n"
                 + "".join(
-                    f"    public sealed record {pascal(field.name)}({self.public_type(field.value)} Value) : {name};\n"
+                    docs.xml_param(
+                        self.bound.doc(f"{union.native}.{field.name}"), "Value", "    "
+                    )
+                    + f"    public sealed record {pascal(field.name)}({self.public_type(field.value)} Value) : {name};\n"
                     for field in self.fields(plan)[0].value.fields
                 )
                 + (
@@ -1033,7 +1040,12 @@ class Values:
             unions.append(
                 f"    public abstract record {name}Value\n    {{\n        private {name}Value() {{ }}\n"
                 + "".join(
-                    f"        public sealed record {pascal(variant.name)}({self.public_type(variant.value)} Value) : {name}Value;\n"
+                    docs.xml_param(
+                        self.bound.doc(f"{union.native}.{variant.name}"),
+                        "Value",
+                        "        ",
+                    )
+                    + f"        public sealed record {pascal(variant.name)}({self.public_type(variant.value)} Value) : {name}Value;\n"
                     for variant in union.fields
                 )
                 + (

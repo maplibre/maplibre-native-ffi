@@ -11,12 +11,21 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record SourceFeatureQueryOptions
 {
+    /// <summary>
+    /// Optional source-layer IDs. Required by vector sources; ignored by
+    /// GeoJSON. Copied value, owned by the caller.
+    /// </summary>
     public string[]? SourceLayerIds
     {
         get => SourceLayerIdsStorage?.ToArray();
         set => SourceLayerIdsStorage = ValueArray.CopyOptional(value);
     }
     internal ValueArray<string>? SourceLayerIdsStorage { get; set; }
+
+    /// <summary>
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    /// Copied text, owned by the caller.
+    /// </summary>
     public byte[]? Filter
     {
         get => FilterStorage?.ToArray();

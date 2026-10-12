@@ -28,7 +28,15 @@ public readonly record struct OfflineGeometryRegionDefinition
         this.IncludeIdeographs = IncludeIdeographs;
     }
 
+    /// <summary>
+    /// Style URL. Copied during region creation. Copied text, owned by the
+    /// caller.
+    /// </summary>
     public string StyleUrl { get; init; }
+
+    /// <summary>
+    /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
+    /// </summary>
     public byte[] Geometry
     {
         get => GeometryStorage.ToArray();
@@ -36,6 +44,11 @@ public readonly record struct OfflineGeometryRegionDefinition
     }
     internal ValueArray<byte> GeometryStorage { get; init; }
     public double MinZoom { get; init; }
+
+    /// <summary>
+    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
+    /// lets each tile source use its own maximum zoom.
+    /// </summary>
     public double MaxZoom { get; init; }
     public float PixelRatio { get; init; }
     public bool IncludeIdeographs { get; init; }
