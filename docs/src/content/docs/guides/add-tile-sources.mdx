@@ -53,10 +53,9 @@ Set only the options that the server requires.
 
 <Code code={region(templatesSnippet, "options")} lang="c" title="tile-source-templates.c" />
 
-Bounds limit requests to the area that the server covers, and the zoom range
-limits them to the available levels. The source retains the attribution string
-for later reads. The default XYZ scheme numbers rows from the north; use TMS for
-a server that numbers rows from the south.
+Set bounds and zoom levels to match the server's coverage. Preserve its
+attribution. The default XYZ scheme numbers rows from the north; use TMS when
+the server numbers them from the south.
 
 <Code code={region(templatesSnippet, "bounds")} lang="c" title="tile-source-templates.c" />
 
@@ -81,3 +80,6 @@ A hillshade layer requires a raster-DEM source. The dedicated hillshade-layer
 call adds it without a JSON layer object.
 
 <Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />
+
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines
+tile source options and supported encodings.

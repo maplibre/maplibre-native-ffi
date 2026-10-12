@@ -21,43 +21,33 @@ the same source ID, preserving the layers that draw it.
 <Code code={region(liveUpdates, "add")} lang="c" title="geojson-live-updates.c" />
 
 For each change, the host serializes its collection as one UTF-8 GeoJSON
-FeatureCollection. The snippet writes each position as a point feature into a
-caller-provided buffer.
+FeatureCollection.
 
 <Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
 
-An update has two steps. Preparation parses the bytes and tiles them into the
-index that the source consumes, which is the expensive part of the update, and
-it runs on any thread with no map in hand. Prepare the data with the same
-options that the source was added with; an install with different options
-reports an invalid-argument status.
+Prepare the new collection with the source's creation options. Preparation
+parses and indexes the data, so use a host worker thread for large datasets.
 
 <Code code={region(liveUpdates, "prepare")} lang="c" title="geojson-live-updates.c" />
 
-The install is a command that swaps the prepared index into the source, which
-is cheap at any data size. Destroy the prepared handle after the install, or
-keep it to install the same data on other matching sources.
-MapLibre copies what it keeps, so the serialization buffer is free for reuse
-once preparation returns.
+Install the prepared data on the source, then destroy the prepared handle when
+the host has finished using it. Reuse the serialization buffer after preparation
+returns.
 
 <Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
 
-A host with a worker thread prepares there and installs from any thread, so a
-large dataset never blocks the thread that publishes it. When a feed delivers
-faster than the display refreshes, collect the messages that arrive between
-frames and publish once per frame.
+When a feed delivers faster than the display refreshes, collect changes and
+publish once per frame.
 
-## Synchronous tiling
+## Choose when tiles are sliced
 
 MapLibre slices the tiles that the viewport requests out of the installed index
 on a worker thread. New features appear in a later frame, and the install call
 does not extend the current frame. Use this default for most feeds.
 
-Set the synchronous-tiling option when an update must not wait behind the
-worker's slicing, such as a simulation that advances with rendering. Slicing
-then runs inline in the render update, so a large dataset can delay the update
-that publishes the new tiles. A worker still lays out the sliced tiles before a
-frame shows them.
+Use synchronous tiling for small updates that must avoid the worker's slicing
+queue, such as a simulation. It can delay render updates for large datasets, and
+tile layout still runs on a worker.
 
 The option chosen when adding the source is the baseline, and a runtime
 override raises it temporarily. Enable the override around a burst of
@@ -65,3 +55,6 @@ high-frequency small updates, such as a tracked position, and disable it to
 restore the source's own option.
 
 <Code code={region(liveUpdates, "synchronous-tiling")} lang="c" title="geojson-live-updates.c" />
+
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) covers
+prepared-data ownership and tiling options.

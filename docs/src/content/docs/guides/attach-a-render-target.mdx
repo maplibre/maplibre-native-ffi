@@ -10,131 +10,88 @@ import { region } from "../../../snippets";
 
 import renderTarget from "../../../../snippets/c/render-target.c?raw";
 
-A render session draws one map into one render target. A map has at most one
-live render session. Its style, sources, layers, and camera remain after the
-session detaches.
+A render session draws one map into one target. Choose a native surface for a
+window or view, an owned texture target for offscreen rendering, or a borrowed
+texture target for compositing into host textures. Map state remains available
+after the session detaches.
 
-## Choose a target and driver
+## Choose graphics execution
 
-A native surface draws and presents each frame to a window or view. A
-session-owned texture draws into a ring that the session allocates. A borrowed
-texture draws into a ring of textures that the host allocates. [Render a static
-image](/maplibre-native-ffi/guides/render-a-static-image/) covers texture
-readback.
+A core-worker driver runs graphics work on a native thread. A
+caller-graphics-thread driver requires service on the host's graphics thread.
+Metal and Vulkan support either driver. WebGPU requires the caller driver.
 
-Execution placement is a separate choice. A core-worker driver owns a native
-serial graphics worker and requires transferable graphics state. A
-caller-graphics-thread driver stores work until the host services it where the
-graphics context is usable. The
-[render session concepts](/maplibre-native-ffi/concepts/#render-session) table
-gives the driver that each target kind accepts.
+### OpenGL targets
 
-The common attach options select the driver and request an owned-texture ring
-depth from one to three. They also carry direct wake callbacks for frame-result
-readiness and caller-driver work. A host may omit either wake and poll instead.
+Existing EGL, WGL, and WebGL contexts use the caller driver. A private EGL owned
+texture target uses a core worker and supports CPU readback. A transferred
+`OffscreenCanvas` also uses a core worker. The
+[target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
+states each context's ownership rules.
 
-Each backend attach function copies its descriptor and options, returns a render
-session in the attaching state, and accepts a one-shot completion. A caller
-driver must service ready driver work before attachment can complete. Await the
-completion before using the attached session for ordinary work.
+### Shared Vulkan queues
 
-### Share a Vulkan queue
+Pass a queue lock when the host and session submit to the same Vulkan queue.
+Both take the same lock around queue calls. Release it before calling the C API
+so that driver work can acquire it.
 
-A Vulkan session submits to the graphics queue in its context descriptor, from
-its driver's thread. Vulkan requires the host to synchronize every call on a
-queue, so a host that also submits to that queue passes a queue lock in the
-attach options. The session takes the lock around each of its calls on the
-queue, and the host takes the same lock around its own. The host releases the
-lock before it calls the C API, because the driver may need the lock to finish
-that call. With the lock, one queue serves both the host and a core-worker
-session, even on a device whose graphics family has a single queue.
+## Attach the target
 
-## Attach to a target
+Provide the graphics context and extent in the backend descriptor. Install wakes
+to schedule frame-result drains and caller-driver service. Wake callbacks must
+return without blocking. Keep the host's graphics resources alive until teardown
+finishes.
 
-This snippet uses OpenGL through EGL and therefore selects the caller driver.
-The descriptor contains the logical extent, graphics context, and presentation
-surface.
+Attachment returns a session and completes asynchronously. Service a caller
+driver while attachment is pending, and await completion before using the
+attached session.
+
+An OpenGL native surface through EGL uses the caller driver:
 
 <Code code={region(renderTarget, "surface")} lang="c" title="render-target.c" />
 
-A session-owned texture descriptor contains an extent and context. Capability
-negotiation reports the granted ring depth and whether acquisition, readback,
-consumer synchronization, and presentation are available.
+An owned texture target allocates its own textures. Inspect the session's
+capabilities to choose acquisition or CPU readback.
 
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
-A borrowed texture descriptor also states its physical device-pixel size, which
-must match the host's textures, including on graphics APIs that cannot query
-them. It names one texture per ring slot, up to three, and the attach call
-copies that array. Both texture kinds hand frames over the same way: the host acquires a rendered
-frame before it samples the frame's texture and releases it afterward, and the
-session never renders into a texture whose frame is acquired. With two textures,
-the host holds the newest frame while the session renders the next one into the
-other.
+A borrowed texture target names the host's textures and their physical size.
+Acquire a frame before reading its texture and release it with consumer
+synchronization afterward. A ring of two textures lets the session render while
+the host reads the previous frame.
 
 <Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
 
-## Replace, detach, or abandon
+The [surface reference](/maplibre-native-ffi/reference/c/surface_8h.html) and
+[texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) cover
+backend descriptors and capabilities.
 
-Resize and target replacement are ordered asynchronous calls. They may start
-from any thread. A caller driver applies them when the host next services ready
-work on the graphics thread. Resize assigns a new extent generation; later frame
-demands capture that generation.
+## Resize and release
 
-The map takes its width and height from the render target. Attaching, resizing,
-and replacing the target each resize the map, so the host sizes an attached map
-only through its render session.
+Resize an attached map through its session so that the map and target stay at
+the same logical size. Keep the session's current scale factor when resizing.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
-A borrowed texture gets its size from the host allocation, so resizing it
-reports an unsupported status. Release every acquired frame, allocate a ring of
-as many textures at the new size, and replace the target with a new descriptor.
-A frame rendered before the replacement can no longer be acquired, and the host
-keeps the outgoing textures until the replacement completes. A host can replace a native surface the same
-way after recreating a window or view allocation; Android rotation and Flutter
-surface lifecycle changes use this path. Both paths preserve the session's
-rendering resources, including loaded tiles, and leave map-owned feature state
-unchanged.
+For borrowed textures, release acquired frames, allocate a new ring, and replace
+the target. Keep the outgoing textures until replacement completes. Replace a
+native surface similarly when the host recreates its window or view.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-A session's shaders use a fixed pixel ratio, so a resize must name the scale
-factor the session already has, from its attachment or its latest target
-replacement; any other value reports an invalid-argument status. To change it,
-replace a surface or borrowed texture with a descriptor at the new scale factor,
-or detach the session and attach a new one. Map-owned feature state survives either path, and
-the next render update pushes it into the renderer.
+A target replacement can change the session's scale factor; the map retains its
+creation scale factor. Keep them equal for a consistent display density.
 
-Normal detach completes asynchronously. The selected driver destroys graphics
-resources on its graphics thread and detaches the map. Continue servicing a
-caller driver until the completion runs, then destroy the detached session
-handle from any thread. A session-owned texture ring is the exception when a
-frame was disposed instead of released with consumer synchronization: the host's
-GPU may still read that frame's texture, so detach keeps the ring allocated
-until the process exits. Once detach completes, the host may destroy its
-graphics objects, except the Vulkan device behind a kept ring, which stays until
-the process exits.
+For normal shutdown, release acquired frames with their consumer synchronization,
+detach the session, and continue caller-driver service until detach completes.
+Then destroy the session and the host graphics resources.
 
-Abandon is the failure path for a host that can no longer service graphics
-work. It closes control and mailboxes, invalidates graphics accessors, and
-detaches the map without a driver call. On a core-worker session it first waits
-for the worker's current driver call to end, since that call can outlive the
-frame result or completion it published. It returns busy while a borrowed view
-scope is active, while a caller driver's service call is in flight, or when
-called from inside one of the session's own driver calls.
-
-Abandon then destroys the session's Vulkan and Metal objects on the calling
-thread, after a Vulkan session waits for the work it submitted to its queue.
-OpenGL and WebGPU objects belong to their graphics thread, so abandon keeps them
-until the process exits. It also keeps a session-owned texture ring while the
-host holds a frame of it, or after the host disposed of a frame without
-consumer synchronization. The result reports the count of kept resources. To
-let abandon destroy a session-owned ring, release acquired frames with consumer
-synchronization first. Releasing an acquired frame after abandon remains
-CPU-only and consumes the frame handle. Once abandon returns, the host may
-destroy its graphics objects, except the Vulkan device and surface behind a kept
-Vulkan object, which stay until the process exits. Destroy the abandoned session
-afterward.
+Abandon handles a target whose graphics work can no longer be serviced. Stop
+caller-driver service first. Abandon may keep graphics resources until process
+exit; inspect its result before destroying the host resources that they depend
+on. The [session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
+defines those retention rules.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />
+
+Continue with [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/).

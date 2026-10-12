@@ -13,111 +13,72 @@ import transformSnippet from "../../../../snippets/c/resource-transform.c?raw";
 import headerSnippet from "../../../../snippets/c/http-header-transform.c?raw";
 import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 
-Three extension points intercept resource requests. A resource transform
-rewrites a URL before the network request. An HTTP header transform adds headers
-to the request that follows. A resource provider supplies the response bytes.
-Register each one with an any-thread runtime command.
+Choose a resource transform to rewrite URLs, an HTTP header transform to add
+headers, or a resource provider to supply response bytes from host storage.
+Register each callback on the runtime.
 
-MapLibre can invoke any of these callbacks concurrently on network and worker
-threads. Protect every value that a callback reads and return quickly because
-the resource request waits. A transform callback sets a replacement URL. A
-header transform callback sets header names and values. A provider callback
-operates only on the request handle that it received.
+Callbacks can run concurrently on native threads. Protect shared state and
+return quickly. Keep registered callback state reachable until native code
+releases it. Release host locks that callbacks acquire before closing the runtime.
 
-## Rewrite a URL with a transform
+## Rewrite a URL
 
-Rewrite a URL to add a credential or signature, or to select another host. The
-transform runs for every network resource, including nested PMTiles range
-requests. File, asset, MBTiles, and cache-database resources bypass it.
-
-Compare the URL against your own host before you attach a credential, because a
-style names glyphs, sprites, and tiles on origins that you do not control.
+Use a transform to sign a URL or select another host. Check the destination
+before adding credentials: styles can request tiles, sprites, and glyphs from
+origins that the host does not control.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Build the replacement URL in host storage, then set it on the response. Returning
-a non-OK status preserves the original request.
+Build and set the replacement URL.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Registering a transform replaces the previous transform in runtime submission
-order.
+Register the transform before loading resources that need it.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
-## Add headers to a request
+## Add HTTP headers
 
-Add a header to carry a bearer token or another credential that belongs in the
-request rather than in the URL. A header transform runs after URL transformation
-and immediately before the HTTP client sends the request. It reaches online and
-offline requests, including nested PMTiles range requests. Cache hits, non-HTTP
-schemes, and requests that a provider answered bypass it.
-
-Compare the transformed URL against your own origin before you return a
-credential, because the callback runs for every network resource.
+Use a header transform for credentials that belong in headers. It runs after URL
+transformation, so check the transformed origin before returning credentials.
 
 <Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
 
-Set each name and value on the response. Returning a non-OK status discards the
-headers from that invocation and sends the request unchanged.
+Set the header names and values.
 
 <Code code={region(headerSnippet, "set")} lang="c" title="http-header-transform.c" />
 
-Submit the transform command on the runtime, and submit the corresponding clear
-command to stop adding headers. Both commands work while maps are live, so a
-host installs a refreshed credential without recreating the runtime.
+Register the transform, and clear or replace it when credentials change.
 
 <Code code={region(headerSnippet, "install")} lang="c" title="http-header-transform.c" />
 
-A redirect that keeps the scheme, host, and effective port carries the headers
-to its destination. A redirect that changes any of the three removes every
-header that the transform added, and it invokes no transform for the
-destination. Registration returns an unsupported status on OpenHarmony and in
-the browser, whose HTTP clients cannot make that distinction. Serve those
-requests with a provider instead, as the next section shows.
+### Platform support
 
-## Serve the bytes with a provider
+Header transforms are unavailable on OpenHarmony and in the browser. Use a
+provider there. The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
+covers redirect handling and the request paths that bypass transforms.
 
-Use a provider for host-managed storage, such as an application archive or a
-custom URL scheme. MapLibre routes unrecognized schemes to the network layer,
-where the provider runs before the online file source. A provider response
-bypasses the transform.
+## Supply response bytes
 
-Match the requests that the host serves, and pass every other request to
-MapLibre's network stack. Fetch the resolved URL after tile-server normalization
-and API-key insertion. The cache uses the requested URL as the logical identity.
+Use a provider for host-managed storage or a custom URL scheme. Match requests
+that the host serves, and pass the others to MapLibre's network stack.
 
 <Code code={region(providerSnippet, "match")} lang="c" title="resource-provider.c" />
 
-A provider with the bytes available completes the request inside the callback,
-releases the handle, and reports that it handled the request.
+When bytes are already available, complete and release the request in the
+callback.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
-Registering a provider replaces any previous one. Handles that the previous
-provider took stay valid. Complete and release each of them as usual.
+Register the provider before loading its resources.
 
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
-A provider with an I/O pool reports the same decision and retains the handle.
-Complete the request from any thread when the bytes arrive. Release each handle
-exactly once, after completion or cancellation.
-
-MapLibre cancels a request when the map stops wanting the resource, for example
-after a style change or map teardown. Check for cancellation before expensive
-work, or register a cancel callback to abort an in-flight fetch. A request takes
-one callback. It runs once, for a request the provider has not completed, on the
-MapLibre thread that discards the request: the runtime's native scheduler thread
-when a map or runtime command discards it, and a MapLibre worker thread
-otherwise. The callback may complete or release the same handle. A request that
-MapLibre cancelled before the registration reports that to the registering call
-instead, and the callback never runs.
+For asynchronous I/O, retain the request handle, complete it when the bytes
+arrive, and release it after completion or cancellation. A cancelled request no
+longer needs a response; use a cancel callback to stop an in-flight fetch.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 
-## Keep callback state reachable
-
-The runtime owns callback state after accepting a registration. It releases the
-state after replacement, clear, or runtime teardown retires every in-flight
-callback. Release any host lock that a callback also acquires before starting
-close; holding that lock can deadlock teardown.
+The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) defines
+request ownership, cancellation, callback reentry, and registration retirement.

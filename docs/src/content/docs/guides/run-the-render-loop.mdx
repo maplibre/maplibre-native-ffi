@@ -10,97 +10,58 @@ import { region } from "../../../snippets";
 
 import frameLoopSnippet from "../../../../snippets/c/frame-loop.c?raw";
 
-MapLibre Native advances runtime and map work on its native scheduler. A render
-session advances through either a native graphics worker or a narrow service
-call on the host graphics thread. Unlike the MapLibre Android and iOS SDKs, this
-API has no map view that drives a frame loop, so the host decides when to demand
-frames. The snippets on this page come from one turn of a display-paced host
-loop over a caller-driver session.
+The host decides when to request frames, using its display cadence or another
+scheduler. A core-worker session runs graphics work on its native worker. A
+caller-driver session also needs service on the host graphics thread.
 
-## Submit frame demand
+## Request frames
 
-Submit a nonblocking frame demand from any thread. It carries a host token, an
-optional timeout, flags, and a coalescing boundary. Matching demands may
-coalesce before work starts, but every accepted demand produces one terminal
-result record. A positive timeout starts when native code accepts the demand;
-when it expires before work begins, the demand terminates as deadline missed.
-The timeout does not supply cadence.
+Request a frame with a host token to identify its result. Every accepted demand
+produces a terminal result, even when demands coalesce. A timeout limits how long
+a demand may wait to start; the host supplies the cadence.
 
-A core-worker session wakes its serial graphics worker. A caller-driver session
-invokes its driver-work wake callback. Map updates use the same paths, so
-progress does not depend on runtime-event drains or display callbacks.
-
-The host may submit demand from a display source, after an earlier result, or
-from another scheduler. A demand captures the current extent generation. Its
-result identifies the token and the map-update, extent, and frame generations
-that the driver used.
-
-A host that renders on demand derives that demand from runtime events: an
-update-available event, or a frame-finished event whose repaint flag is set.
-Alternatively, keep one demand armed with the if-needed and wait-for-update
-flags, and re-arm it as each result arrives. The driver then renders each map
-update, including each step of a camera transition, without a runtime-event
-round trip. The flag does not pace, so pace the re-arm to the display. A
-waiting demand's result can arrive after the results of later demands.
+For rendering on demand, request after an update-available event or a
+frame-finished event with the repaint flag. Alternatively, keep an if-needed
+demand armed with wait-for-update and re-arm it as results arrive. Pace requests
+to the display during animations.
 
 <Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
 
-While a frame is pending, each loop turn submits one demand with the if-needed
-and present flags and a fresh host token. A demand that clears the present flag
-still renders, and a presenting target keeps whatever it presented last.
+Use the present flag for a target that presents to a window or view.
 
 <Code code={region(frameLoopSnippet, "render")} lang="c" title="frame-loop.c" />
 
 ## Service a caller driver
 
-When the driver-work callback wakes the host, schedule the driver-service call
-on the thread or realm where the target's graphics context is usable. The first
-successful call fixes that graphics-thread identity. The callback can run on a
-MapLibre Native thread that holds a lock that driver service needs, so the
-callback posts the service and returns without waiting for the graphics thread. Service calls run one at a
-time, and a work limit of zero drains the mailbox in one call. Continue service
-while presentation callbacks are paused, because attach, resize, queries,
-readback, barriers, and detach also use the mailbox.
+The driver-work wake schedules service on the thread where the graphics context
+is usable. The wake must return without blocking or waiting for that thread.
+Service calls run one at a time on the same graphics thread.
+
+Continue service while presentation is paused: attachment, queries, readback,
+resize, and detach also need graphics work. A core-worker session needs no host
+service.
 
 <Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
-A core-worker session rejects the service call because its native worker already
-owns execution. The
-[render session concepts](/maplibre-native-ffi/concepts/#render-session) table
-gives the driver that each target kind accepts.
+If the graphics thread cannot run again,
+[abandon the target](/maplibre-native-ffi/guides/attach-a-render-target/#resize-and-release).
 
-If the graphics thread cannot run again, abandon the target, because operations
-that wait on unserviced work stay pending.
+## Drain results
 
-## Drain results and present
+The frame wake schedules a drain on the host loop. Drain until the queue is empty,
+read each batch, and release it. In C, use the view's stride to read its records.
+Copy any values that must outlive the batch.
 
-Frame readiness is level-triggered. Drain an owned frame-result batch from any
-thread after the frame wake runs. Each batch remains stable until release. Keep
-draining until the queue is empty, which the drain reports with a not-ready
-status and no batch. A binding returns its language's empty value instead of an
-error. In C, read a batch through one borrowed view and step through its results
-by the stride that the view reports.
-
-A rendered result means that a frame was presented or became available for
-acquisition or readback. No update and size pending wait for a newer map update,
-which the map publishes on its own. Target not ready consumes nothing and does
-not cause a map update, so it waits for host target readiness or a paced retry.
-Superseded means that a newer demand replaced this demand within the same
-coalescing boundary. Deadline missed means that work did not begin within the
-positive timeout. These outcomes have different retry conditions, so preserve
-them in host pacing.
+Preserve each result's outcome when scheduling the next frame. No-update and
+size-pending results wait for a map update. A target-not-ready result waits for
+host readiness or a paced retry. The
+[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
+explains all outcomes and their retry conditions.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 
-Texture acquisition, from an owned or a borrowed ring, is nonblocking and
-leases the oldest rendered slot that is not already acquired. Read the texture
-after its producer sync. A CPU-complete producer sync needs no wait or fence
-from the host. On OpenGL, a host that samples the texture from another context
-of the share group binds it again after acquisition. Release the acquired handle with consumer-completion sync when
-host GPU work reads the texture. CPU-complete sync is valid only when that work
-completed before release, or on WebGPU was submitted to the device's queue
-before release. The session retires the slot through its selected driver before
-reusing it.
-
-Use a session barrier when later work must wait for every preceding render item
-to become terminal. A barrier orders work; it does not request a frame.
+For texture targets, acquire a frame and wait for its producer synchronization
+before reading the texture. Release it with consumer synchronization after host
+GPU reads. The [texture reference](/maplibre-native-ffi/reference/c/texture_8h.html)
+states the backend rules. [Render a static
+image](/maplibre-native-ffi/guides/render-a-static-image/) shows CPU readback.

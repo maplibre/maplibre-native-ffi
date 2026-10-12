@@ -10,56 +10,40 @@ import { region } from "../../../snippets";
 
 import createMap from "../../../../snippets/c/create-map.c?raw";
 
-A map belongs to a runtime. Runtime creation starts the native scheduler thread,
-and any host thread can submit later runtime or map work. One runtime serves any
-number of maps and holds their shared scheduler, event queue, network stack, and
-cache database.
+A map belongs to a runtime. One runtime serves multiple maps and shares their
+scheduler, event queue, network services, and cache database. Any host thread can
+submit runtime and map work.
 
-Pass an event wake in the runtime options when the host wants a prompt signal
-that runtime events are ready to drain. The callback only schedules work on the
-host receiver; the receiver drains and copies the complete queued batch.
+Pass an event wake to schedule a drain on the host loop. The wake must return
+without blocking or waiting for the receiver.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-Runtime creation returns its handle after the scheduler thread is ready, so the
-creating thread blocks until then. A browser host therefore creates the runtime
-on a Web Worker, and creation on the browser main thread returns a wrong-thread
-status. Map creation is ordered runtime work. Its one-shot completion
-reports the map handle, or a terminal error, exactly once.
+Runtime creation waits for its scheduler thread to become ready. A browser host
+creates the runtime on a Web Worker. Map creation completes asynchronously and
+returns the map handle through its completion.
 
 ## Choose the initial map state
 
-Map options include the initial logical extent, map mode, and FastPFOR decoding.
-The extent contains width, height, and scale factor. It initializes camera and
-projection state before a render target exists, so a standalone projection that
-a host creates right after map creation already converts at that extent.
+Set the logical width, height, and display scale factor. Keep that scale factor
+for the map's lifetime; it controls resource selection as well as rendering.
 
-The scale factor is fixed for the map's life. It selects sprites, glyphs, raster
-tiles, and pixel-ratio-dependent renderer state, so a resize that names a
-different scale factor reports an invalid-argument status. Create a new map when
-the display density changes. After creation, resize is the only command that
-changes width and height.
-
-A continuous map redraws as data arrives and the camera moves. Use this mode for
-an on-screen map. A static map produces one image per request, and a tile map
-produces one image for a single tile.
+Use continuous mode for an interactive map, static mode for one image per
+request, and tile mode for an image of a single tile.
 
 <Code code={region(createMap, "map")} lang="c" title="create-map.c" />
 
-FastPFOR decoding applies to every MapLibre Tiles source that the map loads.
-Enable it at creation when your tile sets use that encoding.
+Enable FastPFOR decoding when your MapLibre Tiles sources use that encoding.
 
 ## Release in order
 
-Release the map before releasing the runtime. A runtime release preflight
-reports invalid state and leaves the handle open while a live child or pending
-child creation prevents release. Successful map and runtime release consumes
-the public handle immediately; native teardown continues in submission order,
-and the runtime release completion reports when all of it, including released
-maps' teardown, has finished. Wait for that completion before tearing down
-state that the runtime's callbacks use; a process may exit without waiting. A
-standalone projection is created synchronously from the map's latest published
-snapshot and owns its copy of that state, so it stays usable after the map and
-runtime are released.
+Detach and destroy any render session, then release the map and the runtime.
+Wait for the runtime release completion before destroying state that its
+callbacks use.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />
+
+The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) and
+[map reference](/maplibre-native-ffi/reference/c/map_8h.html) define creation and
+release contracts. Continue with [Load a
+style](/maplibre-native-ffi/guides/load-a-style/).
