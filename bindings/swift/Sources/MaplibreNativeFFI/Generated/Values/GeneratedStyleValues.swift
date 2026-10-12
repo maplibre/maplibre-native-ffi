@@ -354,7 +354,7 @@ public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
 public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Minimum tiling zoom. Defaults to 0.
   public var minZoom: Double?
-  /// Maximum tiling zoom. Defaults to 18.
+  /// Maximum tiling zoom, an integer within \[0, 24\]. Defaults to 18.
   public var maxZoom: Double?
   /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
   public var tolerance: Double?

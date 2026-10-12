@@ -319,6 +319,26 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
   mln_geojson_source_data_destroy(prepare(EMPTY_COLLECTION, &options));
 }
 
+static void geojson_max_zoom_respects_the_tiling_limit(void) {
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  options.fields = MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+  options.max_zoom = 24.0;
+  mln_geojson_source_data_destroy(
+    prepare(POINT_COLLECTION("boundary"), &options)
+  );
+
+  options.max_zoom = 25.0;
+  mln_geojson_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(POINT_COLLECTION("boundary")), &options, &data,
+    MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_EQUAL_STRING(
+    "max_zoom must be an integer within [0, 24]", mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
+}
+
 // Data prepared with every field installs on a source, and a URL source takes
 // the same options. A URL source checks the same fields: the numeric ones when
 // the call submits, and the cluster properties in the command, which parses
@@ -673,6 +693,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(geojson_data_preparation_validates_documents_and_options);
+  RUN_TEST(geojson_max_zoom_respects_the_tiling_limit);
   RUN_TEST(geojson_sources_take_and_validate_their_options);
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);

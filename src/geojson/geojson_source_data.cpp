@@ -309,9 +309,16 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
   }
 
   const auto effective = effective_geojson_source_options(options);
+  if (
+    !std::isfinite(effective.max_zoom) || effective.max_zoom < 0.0 ||
+    effective.max_zoom > 24.0 ||
+    std::floor(effective.max_zoom) != effective.max_zoom
+  ) {
+    set_thread_error("max_zoom must be an integer within [0, 24]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   for (const auto& [zoom, name] : {
          std::pair{effective.min_zoom, "min_zoom"},
-         std::pair{effective.max_zoom, "max_zoom"},
          std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
        }) {
     if (

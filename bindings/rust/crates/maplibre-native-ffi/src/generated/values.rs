@@ -1358,7 +1358,7 @@ pub struct GeojsonSourceOptionField: u32 {
 pub struct GeojsonSourceOptions {
     /// Minimum tiling zoom. Defaults to 0.
     pub min_zoom: Option<f64>,
-    /// Maximum tiling zoom. Defaults to 18.
+    /// Maximum tiling zoom, an integer within \[0, 24\]. Defaults to 18.
     pub max_zoom: Option<f64>,
     /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
     pub tolerance: Option<f64>,

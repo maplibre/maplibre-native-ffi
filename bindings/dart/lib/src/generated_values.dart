@@ -2357,7 +2357,7 @@ final class GeojsonSourceOptions extends _Value {
   /// Minimum tiling zoom. Defaults to 0.
   final double? minZoom;
 
-  /// Maximum tiling zoom. Defaults to 18.
+  /// Maximum tiling zoom, an integer within \[0, 24\]. Defaults to 18.
   final double? maxZoom;
 
   /// Douglas-Peucker simplification tolerance. Defaults to 0.375.

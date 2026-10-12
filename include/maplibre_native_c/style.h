@@ -392,7 +392,7 @@ typedef struct mln_geojson_source_options {
   /** Minimum tiling zoom. Defaults to 0. */
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM");
-  /** Maximum tiling zoom. Defaults to 18. */
+  /** Maximum tiling zoom, an integer within [0, 24]. Defaults to 18. */
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM");
   /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */

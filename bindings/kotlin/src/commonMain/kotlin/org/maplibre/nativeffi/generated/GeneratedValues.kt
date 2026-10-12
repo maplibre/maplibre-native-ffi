@@ -2319,7 +2319,7 @@ public data class FreeCameraOptions(
 public data class GeojsonSourceOptions(
   /** Minimum tiling zoom. Defaults to 0. */
   public val minZoom: Double? = null,
-  /** Maximum tiling zoom. Defaults to 18. */
+  /** Maximum tiling zoom, an integer within &#91;0, 24&#93;. Defaults to 18. */
   public val maxZoom: Double? = null,
   /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */
   public val tolerance: Double? = null,
