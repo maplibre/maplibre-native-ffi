@@ -1297,6 +1297,50 @@ static void camera_calls_reject_what_they_cannot_express(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void flights_reject_unrepresentable_derived_durations(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 512);
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 1.0;
+  update.animation.fields = MLN_ANIMATION_OPTION_VELOCITY;
+  const double velocities[] = {nextafter(0.0, 1.0), 1e-12};
+  for (size_t index = 0; index < sizeof(velocities) / sizeof(*velocities);
+       ++index) {
+    update.animation.velocity = velocities[index];
+    mln_test_completion command = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_map_update_camera(map, &update, &command.descriptor, NULL));
+    MLN_TEST_STATUS(
+      MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&command)
+    );
+    TEST_ASSERT_EQUAL_STRING(
+      "flyTo duration must fit the native duration range",
+      mln_test_completion_diagnostic(&command)
+    );
+    mln_test_completion_destroy(&command);
+    TEST_ASSERT_EQUAL_DOUBLE(0.0, query_camera(map).camera.zoom);
+  }
+
+  update.animation.velocity = 1e-9;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+  );
+
+  update.animation.fields |= MLN_ANIMATION_OPTION_DURATION;
+  update.animation.duration_ms = 0.0;
+  update.animation.velocity = nextafter(0.0, 1.0);
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(1.0, query_camera(map).camera.zoom);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Bounds constrain later camera commands: zoom and pitch limits clamp a jump
 // that asks for more, and world bounds stop a jump that unbounded wraps. The
 // unbounded state is distinct from world bounds, which the
@@ -1394,6 +1438,7 @@ static void camera_constraints_and_free_camera_reach_later_commands(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(camera_calls_reject_what_they_cannot_express);
+  RUN_TEST(flights_reject_unrepresentable_derived_durations);
   RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
   RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
   RUN_TEST(queued_immediate_deltas_compose_exactly);

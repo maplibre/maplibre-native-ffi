@@ -34,7 +34,9 @@ pub struct AnimationOptions {
     /// would overflow MapLibre Native's internal duration are invalid.
     pub duration_ms: Option<f64>,
     /// Average fly velocity in screenfuls per second. Must be positive and
-    /// defaults to 1.2 when omitted.
+    /// finite; defaults to 1.2 when omitted. A flight whose derived duration
+    /// exceeds Native's nanosecond duration range fails its completion with
+    /// `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
     pub velocity: Option<f64>,
     /// Peak zoom for flyTo transitions.
     pub min_zoom: Option<f64>,

@@ -31,7 +31,9 @@ public struct AnimationOptions: Sendable {
   /// would overflow MapLibre Native's internal duration are invalid.
   public var durationMs: Double?
   /// Average fly velocity in screenfuls per second. Must be positive and
-  /// defaults to 1.2 when omitted.
+  /// finite; defaults to 1.2 when omitted. A flight whose derived duration
+  /// exceeds Native's nanosecond duration range fails its completion with
+  /// `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
   public var velocity: Double?
   /// Peak zoom for flyTo transitions.
   public var minZoom: Double?

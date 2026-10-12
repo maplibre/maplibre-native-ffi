@@ -216,6 +216,16 @@ needs and this build turns off. The patch includes a Transform regression for a
 matching cancellation, a cancellation that matches nothing, and the command that
 keeps running. Upstream: not yet proposed; it depends on 0015.
 
+`0042-fly-duration-range.patch` rejects a flight whose derived duration cannot
+fit Native's duration before converting seconds to integer ticks. The bound uses
+an exclusive maximum because the floating-point representation of the maximum
+integer duration rounds upward. Padding can make the flight's visible span
+degenerate, so camera zoom limits alone cannot bound every flight's path length.
+The Transform regression covers tiny velocities, a representable flight, and an
+explicit duration that overrides velocity. The C regression in
+`tests/native/abi/map/camera.c` checks the completion status and diagnostic.
+Upstream: not yet proposed.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy

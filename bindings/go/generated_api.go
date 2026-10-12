@@ -1418,8 +1418,10 @@ type AnimationOptions struct {
 	// Duration in milliseconds. Must be finite and non-negative. Values that would
 	// overflow MapLibre Native's internal duration are invalid.
 	DurationMs *float64
-	// Average fly velocity in screenfuls per second. Must be positive and defaults
-	// to 1.2 when omitted.
+	// Average fly velocity in screenfuls per second. Must be positive and finite;
+	// defaults to 1.2 when omitted. A flight whose derived duration exceeds
+	// Native's nanosecond duration range fails its completion with
+	// MLN_STATUS_NATIVE_ERROR. An explicit duration overrides velocity.
 	Velocity *float64
 	// Peak zoom for flyTo transitions.
 	MinZoom *float64
