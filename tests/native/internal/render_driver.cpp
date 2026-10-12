@@ -75,6 +75,97 @@ auto request_frame(const Fixture& fixture, const mln_frame_demand& demand)
   );
 }
 
+struct OrderedBarrier {
+  SyncPointScope* points;
+  mln_render_session session;
+  std::atomic_bool maintenance_done{false};
+  std::atomic_bool barrier_done{false};
+  bool demand_held = false;
+  bool maintenance_first = false;
+  mln_status maintenance_submission = MLN_STATUS_NATIVE_ERROR;
+  mln_status barrier_submission = MLN_STATUS_NATIVE_ERROR;
+  mln_status maintenance_status = MLN_STATUS_NATIVE_ERROR;
+  mln_status barrier_status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void record_maintenance(void* context, const mln_completion_result* result) {
+  auto& order = *static_cast<OrderedBarrier*>(context);
+  order.maintenance_status = static_cast<mln_status>(result->status);
+  order.maintenance_done.store(true);
+}
+
+void record_barrier(void* context, const mln_completion_result* result) {
+  auto& order = *static_cast<OrderedBarrier*>(context);
+  order.maintenance_first = order.maintenance_done.load();
+  order.barrier_status = static_cast<mln_status>(result->status);
+  order.barrier_done.store(true);
+  mln_test_pulse();
+}
+
+void submit_behind_the_held_demand(void* context) {
+  auto& order = *static_cast<OrderedBarrier*>(context);
+  order.demand_held =
+    order.points->wait_for_hits(SyncPoint::RenderFrameResultPublished, 1);
+  const auto maintenance = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = record_maintenance,
+    .user_data = &order,
+    .release_user_data = nullptr,
+  };
+  const auto barrier = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = record_barrier,
+    .user_data = &order,
+    .release_user_data = nullptr,
+  };
+  order.maintenance_submission =
+    mln_render_session_reduce_memory_use(order.session, &maintenance, nullptr);
+  order.barrier_submission =
+    mln_render_session_barrier(order.session, &barrier, nullptr);
+  order.points->release(SyncPoint::RenderFrameResultPublished);
+}
+
+// Publication precedes the demand's terminal result. Holding that interval
+// lets maintenance and a barrier queue before the demand finishes; no public
+// signal holds the driver there.
+void a_barrier_waits_for_an_ordered_operation_after_a_running_demand() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto order =
+    OrderedBarrier{.points = &points, .session = fixture.render.session};
+  points.hold(SyncPoint::RenderFrameResultPublished);
+  auto* submitting =
+    mln_test_thread_start(submit_behind_the_held_demand, &order);
+  mln_test_render_request_forced(&fixture.render, 160);
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture.render,
+    [](void* context) {
+      return static_cast<OrderedBarrier*>(context)->barrier_done.load();
+    },
+    &order, mln_test_deadline_default(), "the ordered barrier to complete"
+  ));
+  mln_test_thread_join(submitting);
+  TEST_ASSERT_TRUE(order.demand_held);
+  MLN_TEST_OK(order.maintenance_submission);
+  MLN_TEST_OK(order.barrier_submission);
+  const auto batch = wait_for_results(fixture, 1);
+  TEST_ASSERT_EQUAL_UINT64(160, batch_result(batch, 0).token);
+  mln_render_frame_batch_release(batch);
+  // A later barrier also fences the maintenance callback before teardown.
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture.render,
+    mln_render_session_barrier(
+      fixture.render.session, &completion.descriptor, nullptr
+    )
+  );
+  MLN_TEST_OK(order.maintenance_status);
+  MLN_TEST_OK(order.barrier_status);
+  const auto maintenance_first = order.maintenance_first;
+  destroy_fixture(fixture);
+  TEST_ASSERT_TRUE(maintenance_first);
+}
+
 // Demands that queue behind a busy driver coalesce within a boundary: the
 // older one is superseded, and a demand with a new boundary stays separate.
 void demand_coalescing_preserves_boundaries_and_generations() {
@@ -955,6 +1046,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
 }  // namespace
 
 MLN_TEST_GROUP {
+  RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(demand_coalescing_preserves_boundaries_and_generations);
   RUN_TEST(a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy);
   RUN_TEST(

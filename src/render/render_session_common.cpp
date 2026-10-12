@@ -2625,7 +2625,7 @@ auto take_settled_barriers_locked(mln_render_session_object& session)
     oldest = std::min(oldest, session.demands.front().barrier_epoch);
   }
   auto settled = std::vector<std::shared_ptr<OperationObject>>{};
-  while (!session.barriers.empty() &&
+  while (!session.barriers.empty() && session.barriers.front().arrived &&
          session.barriers.front().epoch <= oldest) {
     settled.push_back(std::move(session.barriers.front().operation));
     session.barriers.pop_front();
@@ -2633,10 +2633,21 @@ auto take_settled_barriers_locked(mln_render_session_object& session)
   return settled;
 }
 
-auto settle_barriers(mln_render_session_object& session) noexcept -> void {
+auto settle_barriers(
+  mln_render_session_object& session,
+  std::optional<std::uint64_t> arrived_epoch = std::nullopt
+) noexcept -> void {
   auto settled = std::vector<std::shared_ptr<OperationObject>>{};
   {
     const auto lock = std::scoped_lock{session.control_mutex};
+    if (arrived_epoch) {
+      for (auto& barrier : session.barriers) {
+        if (barrier.epoch == *arrived_epoch) {
+          barrier.arrived = true;
+          break;
+        }
+      }
+    }
     settled = take_settled_barriers_locked(session);
   }
   for (const auto& operation : settled) {
@@ -3811,7 +3822,9 @@ auto render_session_barrier_start(
     // The barrier itself lives in `barriers` until it settles, so abandonment
     // completes it from there rather than through this work item.
     push_driver_work_locked(
-      *live, RenderDriverWork{[live]() { settle_barriers(*live); }, {}}, wakes
+      *live,
+      RenderDriverWork{[live, epoch]() { settle_barriers(*live, epoch); }, {}},
+      wakes
     );
   }
   return MLN_STATUS_OK;

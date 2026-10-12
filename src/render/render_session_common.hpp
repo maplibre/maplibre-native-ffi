@@ -664,12 +664,12 @@ struct PendingFrameDemand {
   std::uint64_t barrier_epoch;
 };
 
-// An accepted barrier waiting for the demands that preceded it. Demands carry
-// the barrier epoch current when they were accepted, so a barrier completes
-// once no demand with a lower epoch is still outstanding.
+// A barrier waits for its driver work item and every earlier demand. Demands
+// carry the barrier epoch current when they were accepted.
 struct PendingBarrier {
   std::shared_ptr<OperationObject> operation;
   std::uint64_t epoch;
+  bool arrived = false;
 };
 }  // namespace mln::core
 
