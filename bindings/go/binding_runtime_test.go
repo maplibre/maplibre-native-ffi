@@ -106,10 +106,14 @@ func TestNativeLayoutsAreChecked(t *testing.T) {
 // The binding's own exports run on native threads, so a panic inside one is
 // recovered rather than aborting the process.
 func TestExportsRecoverFromPanics(t *testing.T) {
+	panics := capturePanicLogs(t)
 	stale, free := staleCallbackCellForTest()
 	defer free()
 	if owner := mlnGoCallbackOwner(stale); owner != 0 {
 		t.Fatalf("mlnGoCallbackOwner(stale) = %d, want 0", owner)
 	}
 	mlnGoCallbackRelease(stale)
+	if got := receive(t, panics, "the release's panic log"); got != (callbackPanic{"mlnGoCallbackRelease", "runtime/cgo: misuse of an invalid Handle", true}) {
+		t.Fatalf("release panic log = %+v", got)
+	}
 }

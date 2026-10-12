@@ -453,7 +453,11 @@ func bindingReportCallbackPanic(callback string, failure any) {
 
 //export mlnGoCallbackRelease
 func mlnGoCallbackRelease(pointer unsafe.Pointer) {
-	defer func() { _ = recover() }()
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mlnGoCallbackRelease", failure)
+		}
+	}()
 	if ticket := bindingTicket(pointer); ticket != nil {
 		ticket.release()
 	} else if pointer != nil {
