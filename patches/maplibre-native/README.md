@@ -68,8 +68,9 @@ at commit `0b5d2502bb39aa2098c585ae29684956d9e1ffd6`.
 `0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
 with an angular half-width, a radius in logical pixels, and a color that fades
 toward the outer edge. The paint properties support zoom expressions and
-transitions. The patch includes the upstream conversion test and three render
-fixtures with their binary reference images. It carries the closed
+transitions; their transition setters publish layer changes. The patch includes
+the upstream conversion test and three render fixtures with their binary
+reference images. It carries the closed
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
 at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`, until a location indicator
 plugin can replace the core layer.
@@ -91,8 +92,9 @@ legacy annotation source hid both, because it joined every style. Upstream:
 `0024-render-update-publication.patch` publishes render updates after image and
 source removal, source insertion, tile-selection changes, and transition
 changes. Generated layer transition setters also refresh the style's immutable
-layer collection. Native regressions cover collection changes, transition
-options, and tile-selection updates. Upstream:
+layer collection. The bearing-accuracy setters belong to 0021. Native
+regressions cover collection changes, transition options, and tile-selection
+updates. Upstream:
 [maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676),
 [maplibre-native#4677](https://github.com/maplibre/maplibre-native/pull/4677),
 and
@@ -228,9 +230,9 @@ Upstream: not yet proposed.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
-publication patch includes the transition setters for our bearing-accuracy
-properties, and the query-filter patch preserves the preceding camera-zoom fix.
-Tests reuse includes from earlier patches.
+bearing-accuracy patch includes its transition setters, and the query-filter
+patch preserves the preceding camera-zoom fix. Tests reuse includes from earlier
+patches.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
