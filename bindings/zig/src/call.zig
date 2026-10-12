@@ -1,27 +1,5 @@
-//! The steps that every generated operation shares.
-//!
-//! A generated operation names its native function, says how it reaches its
-//! receiver, and lists the binding value for each remaining native parameter.
-//! The functions here do the rest, in one place: callback admission, the
-//! receiver's lease, close, or completion, an arena for encoded inputs, the
-//! callback roots that inputs retain, the native call and its status, and the
-//! decoding of outputs and completion results while the receiver is still held.
-//!
-//! Each argument is encoded by its binding type and the native parameter type,
-//! both known at compile time, so a mismatch fails to compile:
-//!
-//! - a value of the parameter's type passes unchanged;
-//! - an integer narrows to the parameter's integer type, or fails the call with
-//!   `error.InvalidArgument` when it does not fit;
-//! - bytes become a buffer view, or a pointer to their first byte;
-//! - a generated value converts itself with `toNative`;
-//! - a value passed to a const pointer parameter is stored in the arena, and a
-//!   slice is converted item by item into the arena unless its items already
-//!   have the native type;
-//! - null becomes a null pointer or an empty buffer view;
-//! - a handle is leased for the call;
-//! - `cString`, `out`, `sizedOut`, and `adopt` mark the parameters that need a
-//!   NUL-terminated copy or receive an output.
+//! Keep the receiver and argument leases live until borrowed outputs are copied.
+//! Encoded inputs and callback roots remain live until the native call settles.
 
 const std = @import("std");
 
@@ -36,16 +14,12 @@ const status = @import("status.zig");
 const Diagnostic = diagnostics.Diagnostic;
 const Error = status.Error;
 
-/// How an operation reaches its receiver, the first native parameter.
 pub const Access = enum {
-    /// The operation has no receiver.
     none,
-    /// The call leases the receiver.
     lease,
     /// The call leases the receiver and holds off its close, because its
     /// outputs borrow from it until they are copied.
     borrow,
-    /// The call passes the receiver's native id without a lease.
     issued,
     /// The receiver is a response that is valid only inside its callback.
     scoped,
@@ -62,7 +36,6 @@ pub const Parent = union(enum) { none, receiver, argument: usize };
 
 const CString = struct { bytes: []const u8 };
 
-/// Passes `bytes` as a NUL-terminated copy.
 pub fn cString(bytes: []const u8) CString {
     return .{ .bytes = bytes };
 }
@@ -75,7 +48,6 @@ fn Output(comptime T: type, comptime sized: bool, comptime parent: Parent) type 
     };
 }
 
-/// Receives an output parameter, decoded to `T`.
 pub fn out(comptime T: type) Output(T, false, .none) {
     return .{};
 }
@@ -90,7 +62,6 @@ pub fn adopt(comptime T: type, comptime parent: Parent) Output(T, false, parent)
     return .{};
 }
 
-/// The number of items in a slice, or zero for null.
 pub fn len(items: anytype) usize {
     return switch (@typeInfo(@TypeOf(items))) {
         .optional => if (items) |present| present.len else 0,
@@ -114,8 +85,6 @@ fn argumentFields(comptime Args: type) []const std.builtin.Type.StructField {
     return @typeInfo(Args).@"struct".fields;
 }
 
-/// The value an operation returns for its outputs: nothing, the one output, or
-/// a tuple of them in parameter order.
 fn Outputs(comptime Args: type) type {
     var types: []const type = &.{};
     for (argumentFields(Args)) |field| {
@@ -128,7 +97,6 @@ fn Outputs(comptime Args: type) type {
     };
 }
 
-/// Per argument: the lease of a handle argument, or the storage of an output.
 fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type) type {
     const fields = argumentFields(Args);
     var types: [fields.len]type = undefined;
@@ -149,7 +117,6 @@ fn Native(comptime function: anytype, comptime count: usize) type {
     return std.meta.Tuple(&types);
 }
 
-/// The receiver as the call holds it.
 fn Receiver(comptime access: Access, comptime T: type) type {
     return struct {
         const Self = @This();
@@ -180,7 +147,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
             };
         }
 
-        /// Takes hold of the receiver, or returns null for a closed one.
         fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
             return .{ .state = switch (access) {
                 .none => {},
@@ -244,8 +210,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
     };
 }
 
-/// One operation in flight: its receiver, input arena, roots, and the leases
-/// and output storage of its arguments.
 fn Operation(comptime name: []const u8, comptime access: Access, comptime ReceiverType: type, comptime Allocator: type, comptime Args: type) type {
     const function = @field(c, name);
     const offset: usize = if (access == .none) 0 else 1;
@@ -256,8 +220,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         const NativeArgs = Native(function, offset + fields.len);
 
         receiver: Hold,
-        /// Where a lifecycle error of the receiver or an input handle is
-        /// recorded.
         diagnostic: ?*Diagnostic,
         arena: if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator else void,
         roots: callback.Roots = .{},
@@ -268,8 +230,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         /// clear it without touching the id the close commits.
         closing: u64 = 0,
 
-        /// Admits the call and takes hold of the receiver, or returns null for
-        /// a receiver that is already closed.
         fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!?Self {
             try Hold.admit(name, receiver);
             const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
@@ -300,7 +260,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             return self.arena.allocator();
         }
 
-        /// Encodes the receiver and every argument into native arguments.
         fn arguments(self: *Self, args: Args) Error!NativeArgs {
             var native: NativeArgs = undefined;
             if (access == .close and @typeInfo(Param(function, 0)) == .pointer) {
@@ -414,7 +373,6 @@ fn outputIndices(comptime Args: type) []const usize {
     return indices;
 }
 
-/// The result of a call whose receiver was already closed: nothing to do.
 fn closed(comptime T: type) Error!T {
     if (T == void) return;
     if (T == completion.Future(void)) return completion.completed(void, {});
@@ -423,7 +381,6 @@ fn closed(comptime T: type) Error!T {
     unreachable;
 }
 
-/// Calls a status-returning native function and returns its decoded outputs.
 pub fn invoke(
     comptime name: []const u8,
     comptime access: Access,
@@ -497,8 +454,6 @@ pub fn invokeDeclinable(
     return declined;
 }
 
-/// Calls a native function that returns its result rather than a status, and
-/// decodes the result to `T`.
 pub fn direct(
     comptime name: []const u8,
     comptime access: Access,
@@ -524,7 +479,6 @@ pub fn direct(
     return marshal.decode(T, raw, .{ .allocator = if (@TypeOf(allocator) == std.mem.Allocator) allocator else null });
 }
 
-/// A future and the outputs that native wrote when it accepted the work.
 pub fn Started(comptime Value: type, comptime Args: type) type {
     return struct { outputs: Outputs(Args), ready: completion.Future(Value) };
 }
@@ -542,8 +496,6 @@ const CopyContext = struct {
     }
 };
 
-/// Starts native work that reports through a completion, and returns its
-/// future along with any outputs. `Copy` is one of the result copiers below.
 pub fn submit(
     comptime name: []const u8,
     comptime access: Access,
@@ -583,10 +535,8 @@ pub fn submit(
     return .{ .outputs = try op.outputs(allocator), .ready = ready };
 }
 
-// Completion result copiers. Each names the future's value type and copies it
-// out of the completion result before native reuses the result's storage.
+// Copy completion values before native reuses their storage.
 
-/// A command's disposition, generation, and status.
 pub const command = struct {
     pub const Value = completion.CommandCompletion;
     pub fn copy(result: *const c.mln_completion_result, _: marshal.Decode) Error!Value {
@@ -594,7 +544,6 @@ pub const command = struct {
     }
 };
 
-/// Work that completes without a value.
 pub const unit = struct {
     pub const Value = void;
     pub fn copy(result: *const c.mln_completion_result, _: marshal.Decode) Error!Value {
@@ -602,7 +551,6 @@ pub const unit = struct {
     }
 };
 
-/// One native value of type `Raw`, decoded to `T`.
 pub fn value(comptime T: type, comptime Raw: type) type {
     return struct {
         pub const Value = T;
@@ -612,7 +560,6 @@ pub fn value(comptime T: type, comptime Raw: type) type {
     };
 }
 
-/// A native handle of type `Raw`, adopted as `T` under `parent`.
 pub fn handle(comptime T: type, comptime Raw: type, comptime parent: Parent) type {
     return struct {
         pub const Value = T;
@@ -623,7 +570,6 @@ pub fn handle(comptime T: type, comptime Raw: type, comptime parent: Parent) typ
     };
 }
 
-/// A copier's value, or null when native completes with a null payload.
 pub fn orNull(comptime Copy: type) type {
     return struct {
         pub const Value = ?Copy.Value;
@@ -648,11 +594,9 @@ pub fn orEmpty(comptime Copy: type, comptime Raw: type) type {
     };
 }
 
-/// An array of native `Raw` items, copied as `Item`s into an arena of its own.
 pub fn slice(comptime Item: type, comptime Raw: type) type {
     return struct {
         pub const Value = marshal.OwnedValue([]const Item);
-        /// Copies each element, stepping by the completion's value_size.
         pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
             const items: ?[*]const Raw = @ptrCast(@alignCast(result.value));
             const count = result.value_count;

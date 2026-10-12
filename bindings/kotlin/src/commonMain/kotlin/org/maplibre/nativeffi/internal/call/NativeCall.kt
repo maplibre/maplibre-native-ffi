@@ -22,25 +22,16 @@ import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
-/**
- * One C call's native storage and contracts, which a generated operation's body runs in.
- *
- * The body allocates its inputs in this arena, passes [handle], [completion], and [diagnostic] to
- * the C function, and wraps a returned status in [check]. Callback registrations made while
- * preparing inputs stay rooted only if the call accepts them.
- */
+/** Callback registrations remain rooted only if the native call accepts them. */
 internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeArena() {
   private var scope: CallbackRegistrationScope? = null
 
-  /** This thread's diagnostic, sized for the call that reads it next. */
   val diagnostic: Long
     get() = NativeDiagnostics.buffer()
 
-  /** The registrations this call's inputs hand to native. */
   val registrations: CallbackRegistrationScope
     get() = scope ?: CallbackRegistrationScope().also { scope = it }
 
-  /** Throws the mapped exception, with this thread's diagnostic, unless [status] is OK. */
   fun check(status: Int) {
     Status.check(status) { NativeDiagnostics.message(NativeDiagnostics.buffer()) }
   }
@@ -55,7 +46,6 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     return true
   }
 
-  /** Roots the registrations native accepted in [owner]. */
   fun accept(owner: CallbackOwner) {
     scope?.accept(owner)
   }
@@ -142,19 +132,14 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
   }
 }
 
-/** How an operation reaches its receiver's handle. */
 internal enum class Access {
-  /** Checks that the owner still holds the handle. */
   LIVE,
 
   /** Holds off a concurrent release while the call copies borrowed outputs. */
   READ,
-
-  /** Passes the handle whatever the owner's state. */
   ISSUED,
 }
 
-/** Checks admission for [name] on [state]'s handle, then runs [block] with it. */
 private fun <T> receive(
   owner: Any?,
   state: OwnerState?,
@@ -182,7 +167,6 @@ private fun <T> receive(
   }
 }
 
-/** Runs the C operation [name] on [state]'s handle, or on none for a free function. */
 internal fun <T> nativeCall(
   owner: Any?,
   state: OwnerState?,
@@ -191,7 +175,6 @@ internal fun <T> nativeCall(
   body: NativeCall.() -> T,
 ): T = receive(owner, state, name, access) { handle -> NativeCall(handle).use { it.body() } }
 
-/** Submits a C operation that reports through a completion, decoding its result with [decode]. */
 internal fun <T> nativeSubmit(
   owner: Any?,
   state: OwnerState?,
@@ -204,7 +187,6 @@ internal fun <T> nativeSubmit(
     CompletionBridge.submit(decode) { completion -> run(handle, completion, callbacks, body) }
   }
 
-/** Submits a C operation whose completion carries no value. */
 internal fun nativeUnit(
   owner: Any?,
   state: OwnerState?,
@@ -298,7 +280,6 @@ internal fun <T> nativeRespond(
   return NativeCall(address).use { it.body() }
 }
 
-/** Runs [state]'s synchronous release, the C operation [name]. */
 internal fun nativeClose(owner: Any, state: OwnerState, name: String, body: NativeCall.() -> Unit) {
   try {
     CallbackAdmission.checkOperation(name)
@@ -308,7 +289,6 @@ internal fun nativeClose(owner: Any, state: OwnerState, name: String, body: Nati
   }
 }
 
-/** Runs [state]'s asynchronous release, the C operation [name]. */
 internal fun nativeRetire(
   owner: Any,
   state: HandleStateCore,

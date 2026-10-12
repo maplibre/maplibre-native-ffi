@@ -44,9 +44,7 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     /// The release that interpreter shutdown starts and waits for, for a
     /// root handle whose release reports retirement through a completion.
     exit_release: Option<ExitReleaseFn<T>>,
-    /// The native type name, which a leak report carries.
     type_name: &'static str,
-    /// The public type name, which a lifecycle error names.
     owner_name: &'static str,
 }
 
@@ -135,7 +133,6 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
         self.id.map(|id| T::from_raw(id.get()))
     }
 
-    /// The live handle, or the lifecycle error for a closing or closed owner.
     fn require_live(&self) -> PyResult<T> {
         if self.closing {
             return Err(self.lifecycle_error("is closing"));
@@ -144,8 +141,6 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
             .ok_or_else(|| self.lifecycle_error("is closed"))
     }
 
-    /// The binding-raised error for an owner that is closed, closing, or in
-    /// use, which carries no native status.
     fn lifecycle_error(&self, state: &str) -> PyErr {
         invalid_state_error(format!("{} {state}", self.owner_name))
     }
@@ -190,7 +185,6 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
 /// The longest interpreter shutdown waits for its runtimes to retire.
 const EXIT_RETIREMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Starts a root handle's release, which reports retirement to `completion`.
 type ExitReleaseFn<T> = unsafe extern "C" fn(T, *const sys::mln_completion) -> sys::mln_status;
 
 /// An owner that interpreter shutdown retires. The interpreter finalizes before
@@ -198,9 +192,7 @@ type ExitReleaseFn<T> = unsafe extern "C" fn(T, *const sys::mln_completion) -> s
 /// first, and releasing each root owner and waiting for its completion stops
 /// them.
 trait ExitOwner: Send + Sync {
-    /// Whether shutdown releases this owner and waits for its retirement.
     fn releases_at_exit(&self) -> bool;
-    /// Starts the release of a handle that `take_at_exit` returned.
     fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status;
     /// Takes the handle from an idle owner, so neither close nor finalization
     /// reaches it again. An owner in a read or close on another thread stays.

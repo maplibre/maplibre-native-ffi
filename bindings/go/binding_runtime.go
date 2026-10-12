@@ -19,8 +19,6 @@ import (
 	"weak"
 )
 
-// bindingCABIVersion is the C ABI contract version that this binding's
-// generated code was written against.
 const bindingCABIVersion = 0
 
 // A native library with another C ABI version would misread every struct this
@@ -79,7 +77,6 @@ type bindingArena struct {
 	identity uint64
 }
 
-// lease holds a handle argument until the arena closes, and returns its raw id.
 func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
 	if owner == nil {
 		arena.fail("nil input handle")
@@ -172,7 +169,6 @@ func (arena *bindingArena) array(count int, size uintptr) unsafe.Pointer {
 	return arena.allocate(uintptr(count) * size)
 }
 
-// bindingCount checks narrowing to the declared C count type before allocation.
 func bindingCount[T ~int8 | ~int16 | ~int32 | ~int64 | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int | ~uint](count int) T {
 	result := T(count)
 	if count < 0 || result < 0 || uint64(result) != uint64(count) {
@@ -229,8 +225,7 @@ func bindingArenaString(pointer unsafe.Pointer, size, offset, count uint64) stri
 }
 
 type bindingState struct {
-	mu sync.Mutex
-	// typeName is the public handle type that lifecycle errors name.
+	mu             sync.Mutex
 	typeName       string
 	raw            uint64
 	issued         uint64
@@ -392,7 +387,6 @@ func bindingHandleCell(handle cgo.Handle) unsafe.Pointer {
 	return cell
 }
 
-// bindingHandleOf reads the handle that a cell from bindingHandleCell holds.
 func bindingHandleOf(cell unsafe.Pointer) cgo.Handle {
 	return cgo.Handle(uintptr(C.binding_handle_value(cell)))
 }

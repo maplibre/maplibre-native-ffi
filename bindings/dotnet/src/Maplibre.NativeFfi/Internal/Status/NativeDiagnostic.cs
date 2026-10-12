@@ -19,7 +19,6 @@ internal static unsafe class NativeDiagnostic
     [ThreadStatic]
     private static mln_diagnostic[]? current;
 
-    /// <summary>The calling thread's diagnostic, prepared for one call.</summary>
     internal static mln_diagnostic* Current
     {
         get
@@ -29,14 +28,12 @@ internal static unsafe class NativeDiagnostic
         }
     }
 
-    /// <summary>Sets the size of an uninitialized diagnostic and returns it for the call.</summary>
     internal static mln_diagnostic* Prepare(mln_diagnostic* diagnostic)
     {
         diagnostic->size = (uint)sizeof(mln_diagnostic);
         return diagnostic;
     }
 
-    /// <summary>Copies the message a returned call wrote to its diagnostic.</summary>
     internal static string Message(mln_diagnostic* diagnostic)
     {
         ReadOnlySpan<sbyte> message = diagnostic->message;

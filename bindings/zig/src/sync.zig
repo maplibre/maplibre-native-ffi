@@ -11,12 +11,10 @@ const std = @import("std");
 pub const Latch = struct {
     gate: std.Io.Mutex = .{ .state = .init(.locked_once) },
 
-    /// Releases every waiter. Runs at most once per latch.
     pub fn set(self: *Latch) void {
         std.Io.Threaded.mutexUnlock(&self.gate);
     }
 
-    /// Blocks the calling thread until `set` runs.
     pub fn wait(self: *Latch) void {
         std.Io.Threaded.mutexLock(&self.gate);
         std.Io.Threaded.mutexUnlock(&self.gate);

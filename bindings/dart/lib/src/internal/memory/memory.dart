@@ -7,21 +7,16 @@ import 'package:ffi/ffi.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../status/status.dart';
 
-/// Runs [body] with native allocations that are released when [body] returns.
 T withNativeArena<T>(T Function(Arena arena) body) => using(body);
 
-/// Native UTF-8 string storage for a null-terminated C string argument.
 final class NativeUtf8CString {
   const NativeUtf8CString(this.pointer, this.byteLength);
 
-  /// Null-terminated UTF-8 storage.
   final Pointer<Utf8> pointer;
 
-  /// UTF-8 byte length excluding the trailing NUL byte.
   final int byteLength;
 }
 
-/// Encodes [value] as a null-terminated UTF-8 string for one native call.
 NativeUtf8CString nativeUtf8CString(String value, Allocator allocator) {
   if (value.contains('\u0000')) {
     throwInvalidArgument(
@@ -37,18 +32,14 @@ NativeUtf8CString nativeUtf8CString(String value, Allocator allocator) {
   return NativeUtf8CString(data.cast<Utf8>(), bytes.length);
 }
 
-/// Native UTF-8 storage for an explicit-length C string view argument.
 final class NativeStringView {
   const NativeStringView(this.value, this.byteLength);
 
-  /// Native string view struct.
   final raw.mln_buffer_view value;
 
-  /// UTF-8 byte length in [value].
   final int byteLength;
 }
 
-/// Encodes [value] as an explicit-length byte view for one native call.
 raw.mln_buffer_view nativeBufferView(Uint8List value, Allocator allocator) {
   final data = allocator<Uint8>(value.isEmpty ? 1 : value.length);
   if (value.isNotEmpty) data.asTypedList(value.length).setAll(0, value);
@@ -58,7 +49,6 @@ raw.mln_buffer_view nativeBufferView(Uint8List value, Allocator allocator) {
   return view.ref;
 }
 
-/// Encodes [value] as an explicit-length UTF-8 string view for one native call.
 NativeStringView nativeStringView(String value, Allocator allocator) {
   final bytes = utf8.encode(value);
   final data = allocator<Uint8>(bytes.isEmpty ? 1 : bytes.length);

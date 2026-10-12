@@ -11,26 +11,17 @@ import (
 	"unsafe"
 )
 
-// The steps that every generated operation shares. A generated operation
-// names its target, which says how it reaches its receiver, and passes a
-// closure that makes the native call with each argument converted in place.
-// The functions here admit the call, hold the receiver, provide the input
-// arena, check the native status, settle a close or a completion, move the
-// callback roots that inputs registered to their owner, and convert the
-// results while the receiver is still held.
+// Borrowed outputs must be copied while the receiver is held. Input storage
+// and callback roots remain live until the native call settles.
 
-// bindingAccess says how an operation reaches its receiver.
 type bindingAccess uint8
 
 const (
-	// The operation has no receiver.
 	bindingGlobalAccess bindingAccess = iota
-	// The call leases the receiver.
 	bindingLiveAccess
 	// The call leases the receiver and holds off its close, because the
 	// results borrow from it until they are copied.
 	bindingReadAccess
-	// The call passes the receiver's issued id without a lease.
 	bindingIssuedAccess
 	// Native consumes the receiver when the call succeeds.
 	bindingCloseAccess
@@ -43,8 +34,6 @@ const (
 	bindingScopedAccess
 )
 
-// bindingTarget is an operation's receiver, how the call reaches it, and the
-// operation's identity for callback admission.
 type bindingTarget struct {
 	owner     *bindingOwner
 	access    bindingAccess
@@ -167,14 +156,11 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	return value
 }
 
-// bindingDo runs a status-returning native call.
 func bindingDo(target bindingTarget, call func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32) error {
 	_, err := bindingGet(target, call, func(*bindingArena) struct{} { return struct{}{} })
 	return err
 }
 
-// bindingGet runs a status-returning native call and converts its outputs
-// with result while the receiver is held.
 func bindingGet[T any](target bindingTarget, call func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32, result func(arena *bindingArena) T) (T, error) {
 	return bindingCall(func() T {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) T {
@@ -208,20 +194,14 @@ func bindingGetUnless[T any](target bindingTarget, absent int32, call func(arena
 	})
 }
 
-// bindingDirect runs a native call that returns its result rather than a
-// status, and returns what call converts it to.
 func bindingDirect[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T) (T, error) {
 	return bindingCall(func() T { return bindingRun(target, call, nil) })
 }
 
-// bindingStart starts native work that reports through a completion and
-// returns its future, which convert fills from the completion result.
 func bindingStart[T any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
 	return bindingStartWith(target, start, convert, func(_ *bindingArena, future *Future[T]) *Future[T] { return future })
 }
 
-// bindingStartWith starts native work like bindingStart, and converts the
-// outputs native wrote when it accepted the work with result.
 func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), result func(arena *bindingArena, future *Future[T]) R) (R, error) {
 	return bindingCall(func() R {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) R {
@@ -270,10 +250,6 @@ func bindingWithView[V any](target bindingTarget, use func(V) error, begin func(
 	return err
 }
 
-// Input conversions. Each converts one binding value to the native value a
-// parameter takes, in storage that lasts until the call returns.
-
-// bindingView borrows text or bytes as a native buffer view.
 func bindingView[T ~string | ~[]byte](value T, arena *bindingArena) C.mln_buffer_view {
 	return C.mln_buffer_view{data: arena.bytes([]byte(value)), size: C.size_t(len(value))}
 }
@@ -291,8 +267,6 @@ func bindingNullableView[T ~string | ~[]byte](value *T, arena *bindingArena) C.m
 	return view
 }
 
-// bindingOptionalView borrows optional text or bytes, which native reads as
-// absent when empty.
 func bindingOptionalView[T ~string | ~[]byte](value *T, arena *bindingArena) C.mln_buffer_view {
 	if value == nil {
 		return C.mln_buffer_view{}
@@ -300,7 +274,6 @@ func bindingOptionalView[T ~string | ~[]byte](value *T, arena *bindingArena) C.m
 	return bindingView(*value, arena)
 }
 
-// bindingOptionalCString copies optional text with a terminating NUL.
 func bindingOptionalCString(value *string, arena *bindingArena) *C.char {
 	if value == nil {
 		return nil
@@ -308,10 +281,8 @@ func bindingOptionalCString(value *string, arena *bindingArena) *C.char {
 	return arena.cstring(*value)
 }
 
-// Completion result conversions. Each returns a converter that copies a
-// completion's value before native reuses the result's storage.
+// Copy completion values before native reuses their storage.
 
-// completionOf converts the completion's one native value with copy.
 func completionOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (T, error) {
 	return func(result *C.mln_completion_result) (T, error) {
 		raw, err := completionValue[N](result)
@@ -323,7 +294,6 @@ func completionOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (T, e
 	}
 }
 
-// completionNullable converts like convert, or returns nil for a null value.
 func completionNullable[T any](convert func(*C.mln_completion_result) (T, error)) func(*C.mln_completion_result) (*T, error) {
 	return func(result *C.mln_completion_result) (*T, error) {
 		if result.value == nil {
@@ -337,7 +307,6 @@ func completionNullable[T any](convert func(*C.mln_completion_result) (T, error)
 	}
 }
 
-// completionListOf converts each item of the completion's native array.
 func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) ([]T, error) {
 	return func(result *C.mln_completion_result) ([]T, error) {
 		if result.value_count == 0 {
@@ -354,8 +323,6 @@ func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (
 	}
 }
 
-// completionNullableListOf converts like completionListOf, or returns a nil
-// slice for a null array.
 func completionNullableListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) ([]T, error) {
 	convert := completionListOf(copy)
 	return func(result *C.mln_completion_result) ([]T, error) {
@@ -366,13 +333,10 @@ func completionNullableListOf[N, T any](copy func(N) T) func(*C.mln_completion_r
 	}
 }
 
-// copyViewText and copyViewBytes copy the contents of a native buffer view.
 func copyViewText(raw C.mln_buffer_view) string { return bindingString(raw.data, uint64(raw.size)) }
 
 func copyViewBytes(raw C.mln_buffer_view) []byte { return bindingBytes(raw.data, uint64(raw.size)) }
 
-// copyOptionalViewText and copyOptionalViewBytes copy a native buffer view
-// that is absent when empty.
 func copyOptionalViewText(raw C.mln_buffer_view) *string {
 	if raw.size == 0 {
 		return nil

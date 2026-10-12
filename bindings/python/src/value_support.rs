@@ -71,7 +71,7 @@ unsafe fn generated_slice<'a, T>(data: *const T, count: impl TryInto<usize>) -> 
     Ok(unsafe { std::slice::from_raw_parts(data, count) })
 }
 
-/// Copies each element of a completion's array, value_size bytes apart.
+/// Native array elements lie value_size bytes apart, which may exceed sizeof(T).
 fn generated_completion_values<T: Copy>(
     result: &sys::mln_completion_result,
 ) -> PyResult<impl Iterator<Item = T>> {
@@ -288,7 +288,6 @@ impl GeneratedCallbackRootOwner {
         Self(Arc::new(Mutex::new(callbacks)))
     }
 
-    /// Lets an owner visit the callbacks for garbage collection.
     fn downgrade(&self) -> std::sync::Weak<GeneratedCallbackRoot> {
         Arc::downgrade(&self.0)
     }
@@ -554,14 +553,12 @@ unsafe fn generated_arena_string<P>(
         .map_err(|_| native_error("native message is not UTF-8"))
 }
 
-/// A native count or size as a Rust length.
 fn generated_count(count: impl TryInto<usize>) -> PyResult<usize> {
     count
         .try_into()
         .map_err(|_| native_error("native count exceeds the address space"))
 }
 
-/// A view of `count` units that a pointer and a separate length describe.
 fn generated_view<P>(data: *const P, count: impl TryInto<usize>) -> PyResult<sys::mln_buffer_view> {
     Ok(sys::mln_buffer_view {
         data: data.cast(),
@@ -569,7 +566,6 @@ fn generated_view<P>(data: *const P, count: impl TryInto<usize>) -> PyResult<sys
     })
 }
 
-/// A Python length as a native count field.
 fn generated_length<C: TryFrom<usize>>(length: usize) -> PyResult<C> {
     C::try_from(length)
         .map_err(|_| pyo3::exceptions::PyOverflowError::new_err("length exceeds native count"))

@@ -30,9 +30,7 @@ const _createOwnerToken = raw.mln_adapter_owner_token_create;
 
 const _destroyOwnerToken = raw.mln_adapter_owner_token_destroy;
 
-/// Close-once state for an owned native handle.
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
-  /// Creates state for a live native handle.
   NativeHandleState(this._handle, this.typeName) {
     if (_handle.isNull) {
       throwInvalidArgument('$typeName handle must not be the null handle');
@@ -55,16 +53,12 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   final Object _finalizerDetachToken = Object();
   Pointer<Void>? _ownerToken;
 
-  /// Native handle type name used in diagnostics.
   final String typeName;
 
-  /// Whether this binding object has released its native handle.
   bool get isClosed => _closed;
 
-  /// The issued handle ID.
   int get handleId => _handle.raw;
 
-  /// Returns the live handle, or throws when it is closed or closing.
   H get handle {
     if (_closing) {
       throwInvalidState('$typeName is closing');
@@ -118,7 +112,6 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     return _closeFuture = completion;
   }
 
-  /// Marks a live handle as closing, or returns false for a closed one.
   bool _beginClose() {
     if (_closed) return false;
     if (_closing) throwInvalidState('$typeName is closing');

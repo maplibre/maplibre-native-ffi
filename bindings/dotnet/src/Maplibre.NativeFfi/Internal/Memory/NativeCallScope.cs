@@ -70,7 +70,6 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         return pointer;
     }
 
-    /// <summary>Zeroed storage for one value that native code writes during the call.</summary>
     internal T* Out<T>()
         where T : unmanaged => Value(default(T));
 

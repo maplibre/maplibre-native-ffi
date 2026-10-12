@@ -2,11 +2,7 @@ package org.maplibre.nativeffi.internal.memory
 
 import org.maplibre.nativeffi.internal.status.Status
 
-/**
- * Native memory for the inputs of one C call, freed together when the call returns.
- *
- * Small allocations share zeroed blocks; a larger one gets a block of its own.
- */
+/** Pointers allocated here expire when the C call returns. */
 internal open class NativeArena : AutoCloseable {
   private val blocks = ArrayList<Long>(2)
   private var cursor = 0L
@@ -29,7 +25,6 @@ internal open class NativeArena : AutoCloseable {
     return block
   }
 
-  /** Allocates a record whose leading `uint32_t size` field holds its [size]. */
   fun sized(size: Int, alignment: Int): Long =
     allocate(size, alignment).also { writeU32(it, size.toUInt()) }
 
@@ -47,7 +42,6 @@ internal open class NativeArena : AutoCloseable {
     return bytes(value.encodeToByteArray() + byteArrayOf(0))
   }
 
-  /** Writes an `mln_buffer_view` of [value] at [address]; null leaves the view empty and null. */
   fun putView(address: Long, value: ByteArray?) {
     if (value == null) return
     writeAddress(address, bytes(value))
@@ -56,13 +50,11 @@ internal open class NativeArena : AutoCloseable {
 
   fun putView(address: Long, value: String?) = putView(address, value?.encodeToByteArray())
 
-  /** Allocates an `mln_buffer_view` of [value] and returns its address. */
   fun view(value: ByteArray?): Long =
     allocate(2 * NativeMemory.addressSize, NativeMemory.addressSize).also { putView(it, value) }
 
   fun view(value: String?): Long = view(value?.encodeToByteArray())
 
-  /** Writes [items] as a C array of [size]-byte elements and returns its address. */
   inline fun <T> array(items: List<T>, size: Int, alignment: Int, write: (Long, T) -> Unit): Long {
     // Two Int factors cannot overflow a Long product.
     val result = allocate(maxOf(items.size, 1).toLong() * size, alignment)

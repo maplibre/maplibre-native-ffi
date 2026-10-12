@@ -16,7 +16,6 @@ internal sealed unsafe partial class NativeCallScope
     private readonly INativeOwner? owner;
     private List<INativeReader>? readers;
 
-    /// <summary>Enters <paramref name="operation"/> on behalf of its receiver, or of no receiver.</summary>
     internal NativeCallScope(INativeOwner? owner, string operation)
     {
         NativeCall.Enter(owner, operation).Dispose();
@@ -65,13 +64,11 @@ internal sealed unsafe partial class NativeCallScope
         return Terminated(text);
     }
 
-    /// <summary>Submits an ordered command.</summary>
     internal Task<CommandCompletion> Command(
         CompletionSubmit submit,
         CancellationToken cancellationToken
     ) => Accepted(NativeCompletion.SubmitCommand(submit, cancellationToken));
 
-    /// <summary>Submits an operation that completes without a value.</summary>
     internal Task Run(CompletionSubmit submit, CancellationToken cancellationToken) =>
         Accepted(NativeCompletion.Submit(submit, static _ => true, cancellationToken));
 
@@ -93,7 +90,6 @@ internal sealed unsafe partial class NativeCallScope
             )
         );
 
-    /// <summary>Submits an operation whose completion carries zero or one reference value.</summary>
     internal Task<T?> QueryOptional<TNative, T>(
         CompletionSubmit submit,
         Func<TNative, T?> copy,
@@ -110,7 +106,6 @@ internal sealed unsafe partial class NativeCallScope
             )
         );
 
-    /// <summary>Submits an operation whose completion carries zero or one value-type value.</summary>
     internal Task<T?> QueryOptionalValue<TNative, T>(
         CompletionSubmit submit,
         Func<TNative, T> copy,
@@ -129,7 +124,6 @@ internal sealed unsafe partial class NativeCallScope
             )
         );
 
-    /// <summary>Submits an operation whose completion carries an array.</summary>
     internal Task<T[]> QueryArray<TNative, T>(
         CompletionSubmit submit,
         Func<TNative, T> copy,
@@ -140,7 +134,6 @@ internal sealed unsafe partial class NativeCallScope
             NativeCompletion.Submit(submit, result => CopyValues(result, copy), cancellationToken)
         );
 
-    /// <summary>Submits an operation whose completion carries an array or a null array.</summary>
     internal Task<T[]?> QueryOptionalArray<TNative, T>(
         CompletionSubmit submit,
         Func<TNative, T> copy,
@@ -155,10 +148,6 @@ internal sealed unsafe partial class NativeCallScope
             )
         );
 
-    /// <summary>
-    /// Submits an attachment whose owner exists at once, then adopts the
-    /// handle that native code wrote together with the attachment's completion.
-    /// </summary>
     internal TOwner Attach<TRaw, TOwner>(OutputSubmit<TRaw> submit, Func<TRaw, Task, TOwner> adopt)
         where TRaw : unmanaged
         where TOwner : INativeOwner
@@ -200,7 +189,6 @@ internal sealed unsafe partial class NativeCallScope
     }
 }
 
-/// <summary>Calls a C function that writes one output and takes a completion.</summary>
 internal unsafe delegate mln_status OutputSubmit<T>(
     T* output,
     mln_completion* completion,

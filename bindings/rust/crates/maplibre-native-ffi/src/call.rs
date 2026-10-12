@@ -1,11 +1,5 @@
-//! One native call: its admission, its temporary input storage, and the C call
-//! that it makes.
-//!
-//! A generated operation admits a call through its owner or [`Call::global`],
-//! converts each argument through the call, and makes the C call with the
-//! method that matches its execution: [`Call::status`] for an immediate
-//! status, [`Call::run`] for a value or no result, [`Call::command`] for an
-//! ordered command, and [`Call::complete`] for any other completion.
+//! Keep the receiver and input storage live through the native call. Copy
+//! borrowed outputs before the receiver lease or view scope ends.
 
 use std::ffi::c_void;
 
@@ -17,7 +11,6 @@ use crate::completion::{self, CommandCompletion, NativeFuture};
 use crate::convert::{self, InputArena, ToNative};
 use crate::handle::NativeRead;
 
-/// An admitted call on receiver `H`, or on no receiver for `()`.
 pub(crate) struct Call<'a, H: NativeHandle> {
     native: H,
     // Held through the native call, and dropped in this order: a view scope
@@ -29,7 +22,6 @@ pub(crate) struct Call<'a, H: NativeHandle> {
 }
 
 impl Call<'static, ()> {
-    /// Admits a call that has no receiver.
     pub(crate) fn global(operation: &'static str) -> Result<Self> {
         maplibre_core::callback::check(operation, 0)?;
         Ok(Self::new((), None))
@@ -46,17 +38,14 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         }
     }
 
-    /// Converts one argument; the result borrows `value` and this call.
     pub(crate) fn input<N, T: ToNative<N> + ?Sized>(&mut self, value: &T) -> Result<N> {
         value.to_native(&mut self.arena)
     }
 
-    /// Converts a slice into a C array that this call owns.
     pub(crate) fn array<N: 'static, T: ToNative<N>>(&mut self, values: &[T]) -> Result<*const N> {
         convert::array(values, &mut self.arena)
     }
 
-    /// Converts one value into a C pointer that this call owns.
     pub(crate) fn reference<N: 'static, T: ToNative<N> + ?Sized>(
         &mut self,
         value: &T,
@@ -64,7 +53,6 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         convert::reference(value, &mut self.arena)
     }
 
-    /// Converts an optional value into a C pointer, or a null pointer.
     pub(crate) fn optional_reference<N: 'static, T: ToNative<N> + ?Sized>(
         &mut self,
         value: Option<&T>,
@@ -105,15 +93,12 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         Ok(present)
     }
 
-    /// Makes a call that returns a value or nothing, which, as for `status`,
-    /// keeps the call open.
     pub(crate) fn run<R>(&mut self, call: impl FnOnce(H) -> R) -> R {
         let result = call(self.native);
         self.arena.accept_registrations();
         result
     }
 
-    /// Ends an ordered command, whose completion reports its own disposition.
     pub(crate) fn command(
         mut self,
         submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
@@ -126,7 +111,6 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         Ok(future)
     }
 
-    /// Ends an operation whose completion `convert` copies.
     pub(crate) fn complete<T: Send + 'static>(
         mut self,
         submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,

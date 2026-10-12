@@ -38,8 +38,6 @@ type Future[T any] struct {
 	state *futureState[T]
 }
 
-// completedFuture returns a future that already carries value, for work the
-// binding satisfied without a native submission.
 func completedFuture[T any](value T) *Future[T] {
 	state := &futureState[T]{ready: make(chan struct{}), completed: true}
 	state.result = futureResult[T]{value: value}
@@ -89,9 +87,7 @@ type completionReceiver interface {
 }
 
 type completionBridge[T any] struct {
-	state *futureState[T]
-	// deliversStatus reports whether a non-OK terminal status belongs in the
-	// converted value rather than in the future's error.
+	state          *futureState[T]
 	deliversStatus bool
 	convert        func(*C.mln_completion_result) (T, error)
 }
@@ -182,8 +178,8 @@ func completionValue[T any](result *C.mln_completion_result) (T, error) {
 	return *(*T)(result.value), nil
 }
 
-// completionItem returns element index of the completion's native array, which
-// native lays out with a stride of value_size bytes.
+// Native array elements lie value_size bytes apart, which may exceed the
+// element size in this binding.
 func completionItem[T any](result *C.mln_completion_result, index int) *T {
 	var item T
 	return (*T)(bindingElement(result.value, index, uint64(result.value_size), unsafe.Sizeof(item), unsafe.Alignof(item)))

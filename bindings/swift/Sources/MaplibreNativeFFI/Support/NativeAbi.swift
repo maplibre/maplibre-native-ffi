@@ -1,7 +1,5 @@
 internal import CMaplibreNativeC
 
-/// The C ABI contract version that this binding's generated code was written
-/// against.
 let expectedCAbiVersion: UInt32 = 0
 
 /// The loaded library's C ABI version check.
@@ -11,7 +9,6 @@ let expectedCAbiVersion: UInt32 = 0
 /// a different build can replace it at run time, so the binding checks the
 /// version that the loaded library reports.
 enum NativeAbi {
-  /// The loaded library's mismatch, computed once, on first use.
   private static let loadedMismatch = mismatch(actual: mln_c_version())
 
   /// Throws when the loaded library has another C ABI version.
@@ -25,8 +22,6 @@ enum NativeAbi {
     if let loadedMismatch { throw loadedMismatch }
   }
 
-  /// Returns the error for a library that reports `actual`, or nil when it
-  /// matches this binding.
   static func mismatch(actual: UInt32) -> MaplibreError? {
     if actual == expectedCAbiVersion { return nil }
     return MaplibreError(

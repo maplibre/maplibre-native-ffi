@@ -49,7 +49,6 @@ final class NativeInputArena {
     self.declined = self.declined || declined
   }
 
-  /// Transfers every callback this arena registered to native ownership.
   func accept() {
     callbacks.removeAll()
   }

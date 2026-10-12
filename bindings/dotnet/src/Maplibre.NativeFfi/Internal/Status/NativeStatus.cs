@@ -5,9 +5,6 @@ namespace Maplibre.NativeFfi.Internal.Status;
 
 internal static unsafe class NativeStatus
 {
-    /// <summary>
-    /// Throws for a failed status, with the message the call wrote to diagnostic.
-    /// </summary>
     internal static void Check(mln_status status, mln_diagnostic* diagnostic)
     {
         if (status != mln_status.MLN_STATUS_OK)

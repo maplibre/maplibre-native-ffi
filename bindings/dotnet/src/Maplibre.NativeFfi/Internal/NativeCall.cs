@@ -5,9 +5,6 @@ using Maplibre.NativeFfi.Internal.Status;
 
 namespace Maplibre.NativeFfi.Internal;
 
-/// <summary>
-/// The steps every generated synchronous operation takes around its C call.
-/// </summary>
 internal static unsafe class NativeCall
 {
     /// <summary>
@@ -23,10 +20,8 @@ internal static unsafe class NativeCall
         return new Entry(owner);
     }
 
-    /// <summary>The diagnostic to pass a status-returning C call from this thread.</summary>
     internal static mln_diagnostic* Diagnostic => NativeDiagnostic.Current;
 
-    /// <summary>Throws for a failed status with the message the call wrote to <see cref="Diagnostic"/>.</summary>
     internal static void Check(mln_status status)
     {
         if (status != mln_status.MLN_STATUS_OK)

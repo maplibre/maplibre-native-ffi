@@ -1,17 +1,9 @@
 internal import CMaplibreNativeC
 import Foundation
 
-// The steps that every generated operation shares.
-//
-// A generated operation names its native function and passes a closure that
-// makes the call with each argument converted in place. These functions admit
-// the call inside any enclosing callback, hold the receiver, provide an input
-// arena whose storage lasts until the call returns, check the status, hand
-// callback registrations to native when it accepts them, and convert the
-// result while the receiver is still held. Each reports failures as
-// ``MaplibreError``.
+// Copy borrowed outputs while the receiver is held. Input storage and callback
+// registrations stay live until the native call settles.
 
-/// A public handle whose generated operations run through the steps below.
 protocol NativeReceiver: AnyObject {
   associatedtype Native: NativeHandle
   var handle: NativeHandleBox<Native> { get }
@@ -25,11 +17,9 @@ extension NativeReceiver {
   }
 }
 
-/// How an operation reaches its receiver.
 enum NativeAccess {
   /// The call borrows the receiver, which holds off its close.
   case live
-  /// The call passes the receiver's issued id without borrowing it.
   case issued
   /// The call borrows the receiver and claims its pending decision, which the
   /// call accepts when it succeeds.
@@ -44,7 +34,6 @@ typealias NativeStatusCall = (
   UnsafeMutablePointer<mln_diagnostic>
 ) throws -> mln_status
 
-/// A native call that starts work reporting through a completion.
 typealias NativeStartCall = (
   UInt64,
   NativeInputArena,
@@ -75,8 +64,6 @@ extension NativeReceiver {
     return value
   }
 
-  /// Calls a status-returning function and returns `result`, which reads the
-  /// call's outputs while the receiver is held.
   func nativeInvoke<T>(
     _ operation: String,
     _ access: NativeAccess = .live,
@@ -117,7 +104,6 @@ extension NativeReceiver {
     }) { present ? try result() : nil }
   }
 
-  /// Starts work and awaits the value `convert` copies from its completion.
   func nativeStart<T: Sendable>(
     _ operation: String,
     _ access: NativeAccess = .live,
@@ -133,8 +119,6 @@ extension NativeReceiver {
     }
   }
 
-  /// Starts work and awaits its completion's one native value, which `copy`
-  /// converts.
   func nativeStart<Raw, T: Sendable>(
     _ operation: String,
     _ access: NativeAccess = .live,
@@ -146,7 +130,6 @@ extension NativeReceiver {
     }, call)
   }
 
-  /// Starts work and awaits its completion.
   func nativeUnit(
     _ operation: String,
     _ access: NativeAccess = .live,
@@ -206,8 +189,6 @@ extension NativeReceiver {
     }
   }
 
-  /// Closes the receiver once with a status-returning native call. A later
-  /// close does nothing.
   func nativeClose(
     _ operation: String,
     _ call: @escaping (UInt64, UnsafeMutablePointer<mln_diagnostic>)
@@ -219,7 +200,6 @@ extension NativeReceiver {
     }
   }
 
-  /// Closes the receiver once with a native call that cannot fail.
   func nativeClose(
     _ operation: String,
     _ call: @escaping (UInt64) -> Void
@@ -228,7 +208,6 @@ extension NativeReceiver {
     try mapNativeFailure { try handle.closeOnce { live in call(live.raw) } }
   }
 
-  /// Starts closing the receiver, or returns nil when it is already closed.
   func nativeStartClose(
     _ operation: String,
     _ call: @escaping (
@@ -293,9 +272,6 @@ private func withNative<T>(
   return try body(arena)
 }
 
-/// Calls a status-returning function without a handle receiver and returns
-/// `result`. `owner` is the callback-scoped response the call acts on, or nil
-/// for a global call.
 func nativeInvoke<T>(
   owner: AnyObject? = nil,
   _ operation: String,
@@ -336,8 +312,6 @@ func nativeInvoke<T>(
   }) { present ? try result() : nil }
 }
 
-/// Starts global work and awaits the value `convert` copies from its
-/// completion.
 func nativeStart<T: Sendable>(
   _ operation: String,
   convert: @escaping (UnsafePointer<mln_completion_result>) throws -> T,
@@ -352,8 +326,6 @@ func nativeStart<T: Sendable>(
   }
 }
 
-/// Starts global work and awaits its completion's one native value, which
-/// `copy` converts.
 func nativeStart<Raw, T: Sendable>(
   _ operation: String,
   copying copy: @escaping (Raw) throws -> T,
@@ -364,12 +336,10 @@ func nativeStart<Raw, T: Sendable>(
   }, call)
 }
 
-/// Starts global work and awaits its completion.
 func nativeUnit(_ operation: String, _ call: NativeStartCall) async throws {
   try await nativeStart(operation, convert: { _ in () }, call)
 }
 
-/// Starts a global command and awaits its disposition.
 @discardableResult
 func nativeCommand(
   _ operation: String,
@@ -384,7 +354,6 @@ func nativeCommand(
   }
 }
 
-/// Calls a global function that returns its result rather than a status.
 func nativeDirect<T>(
   _ operation: String,
   _ call: (NativeInputArena) throws -> T

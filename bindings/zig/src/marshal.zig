@@ -24,13 +24,10 @@ pub fn OwnedValue(comptime T: type) type {
     };
 }
 
-/// Whether `T` is an `OwnedValue`.
 pub fn isOwned(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "Value") and T == OwnedValue(T.Value);
 }
 
-/// Returns the type of a callback field's function, for an optional C function
-/// pointer type.
 pub fn CallbackFunction(comptime T: type) type {
     return @typeInfo(@typeInfo(T).optional.child).pointer.child;
 }
@@ -43,41 +40,33 @@ pub fn CallbackResult(comptime T: type) type {
     return @typeInfo(CallbackFunction(T)).@"fn".return_type.?;
 }
 
-/// Copies `bytes` with a terminating NUL, rejecting an embedded one.
 pub fn cString(allocator: std.mem.Allocator, bytes: []const u8) status.Error![*:0]const u8 {
     if (std.mem.indexOfScalar(u8, bytes, 0) != null) return error.InvalidString;
     return (try allocator.dupeZ(u8, bytes)).ptr;
 }
 
-/// Copies `value` into `allocator` and returns its address.
 pub fn store(allocator: std.mem.Allocator, value: anytype) status.Error!*const @TypeOf(value) {
     const pointer = try allocator.create(@TypeOf(value));
     pointer.* = value;
     return pointer;
 }
 
-/// Borrows `bytes` as a native buffer view.
 pub fn view(bytes: []const u8) c.mln_buffer_view {
     return .{ .data = bytes.ptr, .size = bytes.len };
 }
 
-/// Reads `count` native items, rejecting a null pointer or a count that does
-/// not fit the address space.
 pub fn nativeSlice(comptime T: type, pointer: ?[*]const T, count: usize) status.Error![]const T {
     if (count == 0) return &.{};
     if (count > std.math.maxInt(isize) / @max(1, @sizeOf(T))) return error.NativeError;
     return (pointer orelse return error.NativeError)[0..count];
 }
 
-/// Reads item `index` of a native array whose items are `stride` bytes apart.
 pub fn stridedAt(comptime T: type, pointer: ?[*]const T, count: usize, stride: usize, index: usize) status.Error!T {
     if (stride < @sizeOf(T) or count > std.math.maxInt(isize) / stride or index >= count) return error.NativeError;
     const bytes: [*]const u8 = @ptrCast(pointer orelse return error.NativeError);
     return @as(*align(1) const T, @ptrCast(bytes + index * stride)).*;
 }
 
-/// Copies the text at `raw_offset` and `raw_length` inside a native arena of
-/// `size` bytes, rejecting a range outside it.
 pub fn copyArenaString(allocator: std.mem.Allocator, pointer: ?[*]const u8, size: usize, raw_offset: anytype, raw_length: anytype) status.Error![]const u8 {
     const offset = std.math.cast(usize, raw_offset) orelse return error.NativeError;
     const length = std.math.cast(usize, raw_length) orelse return error.NativeError;
@@ -87,16 +76,12 @@ pub fn copyArenaString(allocator: std.mem.Allocator, pointer: ?[*]const u8, size
     return allocator.dupe(u8, bytes[offset..][0..length]);
 }
 
-/// Copies the bytes a native buffer view borrows.
 pub fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Error![]const u8 {
     if (raw.size == 0) return &.{};
     if (raw.size > std.math.maxInt(isize)) return error.NativeError;
     return allocator.dupe(u8, @as([*]const u8, @ptrCast(raw.data orelse return error.NativeError))[0..raw.size]);
 }
 
-/// Converts a binding value that needs no allocator to the native value of
-/// type `Target`: a generated value converts itself, and any other value
-/// passes unchanged.
 pub fn nativeOf(comptime Target: type, value: anytype) Target {
     const Value = @TypeOf(value);
     if (Value == Target) return value;
@@ -107,9 +92,6 @@ pub fn nativeOf(comptime Target: type, value: anytype) Target {
     return value;
 }
 
-/// Writes an optional value into a presence-masked native field. A present
-/// value is converted into `field` and adds `bit` to `presence`. A null value
-/// leaves both unchanged.
 pub fn present(presence: anytype, comptime bit: anytype, field: anytype, value: anytype) void {
     const item = value orelse return;
     presence.* |= bit;
@@ -168,8 +150,6 @@ pub fn FlagMethods(comptime T: type) type {
     };
 }
 
-/// What decoding a native value may need: an allocator for copied storage and
-/// the owner that an adopted handle retains.
 pub const Decode = struct {
     allocator: ?std.mem.Allocator = null,
     parent: ?owner.Anchor = null,
@@ -179,7 +159,6 @@ pub const Decode = struct {
     }
 };
 
-/// Whether decoding to `T` copies into an allocator.
 pub fn decodeAllocates(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .optional => |optional| decodeAllocates(optional.child),
@@ -187,7 +166,6 @@ pub fn decodeAllocates(comptime T: type) bool {
     };
 }
 
-/// Whether decoding to `T` adopts a native handle.
 pub fn decodeAdopts(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .optional => |optional| decodeAdopts(optional.child),
@@ -196,9 +174,6 @@ pub fn decodeAdopts(comptime T: type) bool {
     };
 }
 
-/// Converts a native value to the binding value `T`. An `OwnedValue` copies
-/// into an arena of its own, a handle adopts the native handle under
-/// `context.parent`, and a generated type converts itself.
 pub fn decode(comptime T: type, raw: anytype, context: Decode) status.Error!T {
     const Raw = @TypeOf(raw);
     if (T == Raw) return raw;

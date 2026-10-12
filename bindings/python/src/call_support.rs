@@ -132,19 +132,15 @@ impl<'py> GeneratedCall<'py> {
     }
 }
 
-/// The reservation that a consuming call holds on an owner's handle.
 type GeneratedOwnerReservation<'a, O> = GeneratedHandleReservation<
     'a,
     <O as GeneratedOwner>::Native,
     NativeHandleState<<O as GeneratedOwner>::Native>,
 >;
 
-/// A Python owner class whose handle `NativeHandleState` tracks.
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
-    /// The C type name, for diagnostics.
     const NATIVE: &'static str;
-    /// The public type name, which a lifecycle error names.
     const OWNER_NAME: &'static str;
     /// Disposes a handle that no close consumed, for a handle type with a
     /// disposal.
@@ -159,7 +155,6 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.shared().lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    /// The handle that callback reentry policies name, or 0 once closed.
     fn admission(&self) -> u64 {
         self.state()
             .live_handle()
@@ -167,17 +162,15 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
             .unwrap_or(0)
     }
 
-    /// The live handle that another owner's call takes as an argument.
     fn input(&self) -> PyResult<Self::Native> {
         self.state().require_live()
     }
 
-    /// The live handle for a call that borrows none of its storage.
     fn live(&self) -> PyResult<Self::Native> {
         self.state().require_live()
     }
 
-    /// Holds off close while a call's results borrow the handle's storage.
+    /// Hold off close until borrowed result storage has been copied.
     fn read(
         &self,
     ) -> PyResult<GeneratedReadReservation<'_, Self::Native, NativeHandleState<Self::Native>>> {
@@ -215,8 +208,6 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     }
 }
 
-/// Declares the Python class `$name` that owns one `$native` handle, and its
-/// members that every owner shares.
 macro_rules! generated_owner {
     ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $read_scope:expr) => {
         #[pyclass(name = $name)]
@@ -309,7 +300,6 @@ fn generated_report_unraisable(py: Python<'_>, error: PyErr) {
     error.write_unraisable(py, None);
 }
 
-/// Converts a scalar, enum, or pointer value into a Python object.
 fn generated_value<'py, T: IntoPyObject<'py>>(py: Python<'py>, value: T) -> PyResult<Py<PyAny>> {
     let value = value.into_pyobject(py).map_err(Into::into)?;
     Ok(pyo3::BoundObject::unbind(pyo3::BoundObject::into_any(
@@ -317,7 +307,6 @@ fn generated_value<'py, T: IntoPyObject<'py>>(py: Python<'py>, value: T) -> PyRe
     )))
 }
 
-/// Copies an optional value: `None` unless `present`.
 fn generated_optional(
     py: Python<'_>,
     present: bool,
@@ -326,7 +315,6 @@ fn generated_optional(
     if present { copy() } else { Ok(py.None()) }
 }
 
-/// Copies a UTF-8 view into a Python string.
 fn generated_text(py: Python<'_>, view: sys::mln_buffer_view) -> PyResult<Py<PyAny>> {
     generated_value(py, copied_string_view(view)?)
 }
@@ -366,7 +354,6 @@ unsafe fn generated_c_string(
     generated_value(py, text)
 }
 
-/// Copies each item into a Python list.
 fn generated_list<T>(
     py: Python<'_>,
     items: impl IntoIterator<Item = T>,
@@ -379,7 +366,6 @@ fn generated_list<T>(
     Ok(list.into_any().unbind())
 }
 
-/// One arm of a tagged union: its variant name and payload.
 fn generated_variant(py: Python<'_>, kind: &str, value: Py<PyAny>) -> PyResult<Py<PyAny>> {
     let variant = PyDict::new(py);
     variant.set_item("kind", kind)?;
@@ -398,7 +384,6 @@ fn generated_unknown_variant<'py>(
     Ok(variant.into_any().unbind())
 }
 
-/// The attribute `name` of a Python value, or `None` when it holds `None`.
 fn generated_present<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
@@ -407,7 +392,6 @@ fn generated_present<'py>(
     Ok((!field.is_none()).then_some(field))
 }
 
-/// Converts each item of a Python iterable.
 fn generated_items<'py, T>(
     values: &Bound<'py, PyAny>,
     mut convert: impl FnMut(Bound<'py, PyAny>) -> PyResult<T>,
@@ -415,7 +399,6 @@ fn generated_items<'py, T>(
     values.try_iter()?.map(|item| convert(item?)).collect()
 }
 
-/// Converts a Python value that may be `None`.
 fn generated_maybe<'py, T>(
     value: &Bound<'py, PyAny>,
     convert: impl FnOnce(Bound<'py, PyAny>) -> PyResult<T>,
@@ -427,7 +410,6 @@ fn generated_maybe<'py, T>(
     }
 }
 
-/// A pointer to an optional converted value, or null when it is absent.
 fn generated_pointer<T>(value: &Option<T>) -> *const T {
     value.as_ref().map_or(std::ptr::null(), |value| value)
 }
