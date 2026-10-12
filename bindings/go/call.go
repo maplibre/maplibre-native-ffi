@@ -246,6 +246,8 @@ func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingA
 // scope that end closes; get fills the value, and view wraps it with the
 // binding scope that expires when use returns.
 func bindingWithView[V any](target bindingTarget, use func(V) error, begin func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32, end func(token unsafe.Pointer), get func(raw uint64, diagnostic *C.mln_diagnostic) int32, view func(scope *bindingScope) V) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	_, err := bindingCall(func() struct{} {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) struct{} {
 			if use == nil {

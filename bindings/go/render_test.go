@@ -4,6 +4,7 @@ package maplibre
 
 import (
 	"errors"
+	"fmt"
 	stdruntime "runtime"
 	"testing"
 	"time"
@@ -272,5 +273,41 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	}
 	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("view of a closed frame = %v, want ErrInvalidState", err)
+	}
+}
+
+func TestFrameViewSurvivesYielding(t *testing.T) {
+	r := newRenderFixture(t)
+	r.attach(t)
+	r.renderFrame(t)
+	frame, err := r.session.AcquireFrame()
+	if err != nil || frame == nil {
+		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
+	}
+	defer func() {
+		if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
+			t.Errorf("frame close: %v", err)
+		}
+	}()
+
+	// The fixture pins its graphics goroutine; the view runs on a fresh goroutine.
+	finished := make(chan error, 1)
+	go func() {
+		finished <- withFrameView(frame, func(view frameView) error {
+			for range 1000 {
+				stdruntime.Gosched()
+				width, err := view.Width()
+				if err != nil {
+					return err
+				}
+				if width != 32 {
+					return fmt.Errorf("view width = %d, want 32", width)
+				}
+			}
+			return nil
+		})
+	}()
+	if err := <-finished; err != nil {
+		t.Fatalf("view after yielding: %v", err)
 	}
 }
