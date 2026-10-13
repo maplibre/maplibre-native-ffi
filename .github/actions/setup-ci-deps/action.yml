@@ -400,6 +400,8 @@ runs:
     - name: Install project toolchains (Unix)
       if: runner.os != 'Windows'
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: MISE_NO_HOOKS=1 mise install --monorepo
 
     # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
@@ -410,6 +412,8 @@ runs:
     - name: Install project toolchains (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         $env:MISE_NO_HOOKS = "1"
         foreach ($attempt in 1..2) {
