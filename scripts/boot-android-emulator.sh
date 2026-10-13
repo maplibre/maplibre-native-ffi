@@ -71,7 +71,19 @@ if ((${#missing[@]})); then
   # take a SIGPIPE when sdkmanager stops reading, and that becomes the
   # pipeline's status.
   accepts="$(printf 'y\n%.0s' "${missing[@]}")"
-  "$sdkmanager" --sdk_root="$sdk_root" --install "${missing[@]}" <<<"$accepts"
+  for attempt in 1 2 3; do
+    if "$sdkmanager" --sdk_root="$sdk_root" --install "${missing[@]}" <<<"$accepts"; then
+      break
+    else
+      install_status=$?
+    fi
+    if ((attempt == 3)); then
+      echo "Android SDK package installation failed after $attempt attempts." >&2
+      exit "$install_status"
+    fi
+    echo "Android SDK package installation failed (attempt $attempt/3); retrying." >&2
+    sleep "$((attempt * 5))"
+  done
 fi
 
 mkdir -p "$ANDROID_AVD_HOME" "$state_dir"
