@@ -138,7 +138,7 @@ jobs:
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-package-linux-gnu-x64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
@@ -224,7 +224,7 @@ jobs:
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
