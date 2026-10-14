@@ -13,6 +13,6 @@ members = ["bindings/python"]
 [dependency-groups]
 dev = [
   "ruamel-yaml==0.19.1",
-  "ruff==0.16.10",
-  "ty==0.0.84",
+  "ruff==0.17.0",
+  "ty==0.0.86",
 ]
