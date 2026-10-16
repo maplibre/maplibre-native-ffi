@@ -1,15 +1,8 @@
 # MapLibre Native patches
 
 `.mise/bin/sync-submodules` applies these to the `third_party/maplibre-native`
-worktree after checking out the pinned commit. The submodule keeps tracking
-upstream, so the pin stays honest and each patch is a change we are carrying
-only until it lands there.
-
-`0002-windows-local-file-urls.patch` removes the URI-only leading slash from
-canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
-APIs. This lets the local file source load percent-encoded `file:///C:/...`
-resources whose paths contain spaces or non-ASCII characters. Upstream:
-[maplibre-native#4572](https://github.com/maplibre/maplibre-native/pull/4572).
+worktree after checking out the pinned commit. The submodule tracks upstream.
+The patches below describe the changes that we carry and their upstream status.
 
 `0003-run-loop-budget.patch` adds `RunLoop::runOnce(Duration budget)`, which
 stops dequeuing tasks once the budget has elapsed. At least one task runs, the
@@ -102,16 +95,23 @@ style load whose parse added no layer published no update to the renderer. The
 legacy annotation source hid both, because it joined every style. Upstream:
 [maplibre-native#4674](https://github.com/maplibre/maplibre-native/pull/4674).
 
-`0024-render-update-publication.patch` publishes render updates after image and
-source removal, source insertion, tile-selection changes, and transition
-changes. Generated layer transition setters also refresh the style's immutable
-layer collection. Native regressions cover collection changes, transition
-options, and tile-selection updates. Upstream:
-[maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676),
-[maplibre-native#4677](https://github.com/maplibre/maplibre-native/pull/4677),
-and
-[maplibre-native#4678](https://github.com/maplibre/maplibre-native/pull/4678).
+`0024-source-image-publication.patch` publishes render updates after source
+insertion, successful source removal, and image removal. Native regressions
+check that the renderer receives the changed collections. Upstream:
+[maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676).
 See [issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
+
+`0040-tile-selection-publication.patch` publishes render updates when the
+prefetch zoom delta or a tile LOD option changes. The Native regression checks
+that all six setters publish new values and preserve the snapshot when a value
+stays the same. Upstream:
+[maplibre-native#4678](https://github.com/maplibre/maplibre-native/pull/4678).
+
+`0041-bearing-accuracy-transition-publication.patch` refreshes the style's
+immutable layer collection after changing transition options for bearing
+accuracy, its color, or its radius. It depends on
+`0021-location-indicator-bearing-accuracy.patch` and remains local with those
+properties until a location indicator plugin replaces them.
 
 `0025-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
 timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
@@ -151,19 +151,6 @@ icons on existing tiles. Native pixel regressions cover late registration with
 synchronous and asynchronous GeoJSON, with and without text. Upstream:
 [maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
-`0031-custom-geometry-query-before-data.patch` returns an empty source query
-while a custom geometry tile awaits its first data. The Native tile regression
-queries before delivery and after parsing. Upstream:
-[maplibre-native#4718](https://github.com/maplibre/maplibre-native/pull/4718).
-
-`0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
-advances the frame count when a render pass begins, matching Metal and Vulkan
-cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
-and Vulkan. A Native map regression checks frame progression and draw counts
-before and after hiding a layer; the Rust browser regression also covers the
-binding’s statistics. Upstream:
-[maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
-
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
 page boundary and updates dedicated OpenGL uniform buffers without reading an
 absent CPU copy. The regression reads back allocations and repeated updates at
@@ -184,18 +171,11 @@ defaults. See
 Upstream:
 [maplibre-native#4744](https://github.com/maplibre/maplibre-native/pull/4744).
 
-`0037-platform-locale-expression-errors.patch` converts C++ failures from
-platform number formatters and collators into expression evaluation errors.
-Collator comparison helpers allow exceptions to reach the evaluator. A failed
-layer filter excludes the feature, and a failed property expression uses its
-default value. This lets Android JNI failures follow Native's expression error
-handling instead of terminating the process. Upstream:
-[maplibre-native#4745](https://github.com/maplibre/maplibre-native/pull/4745).
-
 `0038-apple-locale-expressions.patch` applies explicit fraction limits to
 Foundation decimal and currency formatters while retaining omitted defaults.
 Apple locale expressions reject malformed UTF-8 as expression errors and
-preserve embedded null characters during string conversion.
+preserve embedded null characters during string conversion. Failures use
+Native's `LocaleException` so that expression evaluation reports an error.
 
 `0039-color-ramp-global-state.patch` builds line gradient, heatmap color, and
 color relief ramps during layer evaluation, using the global state of the
@@ -207,9 +187,8 @@ colors. Native map pixel regressions cover both cases for all three layer types.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
-publication patch includes the transition setters for our bearing-accuracy
-properties, and the query-filter patch preserves the preceding camera-zoom fix.
-Tests reuse includes from earlier patches.
+query-filter patch preserves the preceding camera-zoom fix. Tests reuse includes
+from earlier patches.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied

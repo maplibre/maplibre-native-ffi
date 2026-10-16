@@ -1,0 +1,28 @@
+diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
+index c085789a96ed8984e0f28b12a40cce6bb6b23a16..b89c32cf7342ffa3b2c55d265bdf633f77c39775 100644
+--- a/src/mln/style/layers/location_indicator_layer.cpp
++++ b/src/mln/style/layers/location_indicator_layer.cpp
+@@ -245,6 +245,7 @@ void LocationIndicatorLayer::setBearingAccuracyTransition(const TransitionOption
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracy>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyTransition() const {
+@@ -272,6 +273,7 @@ void LocationIndicatorLayer::setBearingAccuracyColorTransition(const TransitionO
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracyColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyColorTransition() const {
+@@ -299,6 +301,7 @@ void LocationIndicatorLayer::setBearingAccuracyRadiusTransition(const Transition
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracyRadius>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyRadiusTransition() const {

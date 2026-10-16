@@ -78,7 +78,7 @@ diff --git a/platform/darwin/core/number_format.mm b/platform/darwin/core/number
 -  return result;
 +  const char* utf8 = formatted.UTF8String;
 +  if (!utf8) {
-+    throw std::runtime_error("Platform number formatting failed");
++    throw util::LocaleException("Platform number formatting failed");
 +  }
 +  return std::string(utf8, [formatted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
  }
@@ -93,7 +93,7 @@ new file mode 100644
 +
 +#import <Foundation/Foundation.h>
 +
-+#include <stdexcept>
++#include <mln/util/exception.hpp>
 +#include <string>
 +
 +namespace mln::platform::detail {
@@ -101,7 +101,7 @@ new file mode 100644
 +inline NSString* stringFromUTF8(const std::string& value) {
 +    NSString* result = [[NSString alloc] initWithBytes:value.data() length:value.size() encoding:NSUTF8StringEncoding];
 +    if (!result) {
-+        throw std::invalid_argument("Invalid UTF-8 in locale expression");
++        throw util::LocaleException("Invalid UTF-8 in locale expression");
 +    }
 +    return result;
 +}

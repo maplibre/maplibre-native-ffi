@@ -1,17 +1,17 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 3b42e4119476..c8c03057ca79 100644
+index 32157bc2e1919f27e7039761670b8689d88dbe38..b92b64c02f4cf20da58aab4c82da02a0b16466ba 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -34,6 +34,7 @@
- ### 🐞 Bug fixes
+@@ -36,6 +36,7 @@
  
  - *...Add new stuff here...*
+ - [core] Fix a crash in `RenderImageSource::update` when an image source's coordinates give an empty tile cover, such as an image wholly beyond the latitudes Web Mercator can show.
 +- [core] Evaluate rendered-feature hit-test paint properties at camera zoom, including fractional zoom and overzooming.
  - [core] Fix rendered-feature queries near the final endpoint of an offset line.
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
  - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index 2edfd668fe64..ecfd8c969643 100644
+index 2edfd668fe642fcc055a868016c086cc9f74a330..ecfd8c9696438279fabce2ec4bbfb1a00a673706 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
 @@ -290,9 +290,16 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
@@ -35,7 +35,7 @@ index 2edfd668fe64..ecfd8c969643 100644
          }
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index dea165d1cf4e..b94f10253df4 100644
+index dea165d1cf4e856ca5262b86355d35f451d12867..b94f10253df4cf7364875a8e80c27f65b7ee2b6a 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -438,3 +438,59 @@ TEST(Query, QueryRenderedFeaturesLineOffsetEndpoint) {
