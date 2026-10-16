@@ -300,7 +300,7 @@ runs:
 
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
-      uses: jakoch/install-vulkan-sdk-action@37effcfa045411f8bfbbda26df2fd1b3bf3436fa # v1.6.0
+      uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
         # hit returns before the runtime is installed, so the entry saved
