@@ -20,13 +20,18 @@ internal object NativeLibrary {
   const val LIBRARY_DIRS_PROPERTY: String = "org.maplibre.nativeffi.library.dirs"
   const val LIBRARY_DIRS_ENV: String = "MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS"
   private const val RESOURCE_ROOT: String = "META-INF/maplibre-native-ffi"
+  private const val SHARED_ROOT_CLAIM_PROPERTY: String = "org.maplibre.nativeffi.extraction.shared"
 
   private val lock = Any()
   private val loadedRuntimeDependencies = mutableSetOf<Path>()
   private val ownerOnly = PosixFilePermissions.fromString("rwx------")
   private val extractionRoot: Path by lazy {
     val temporaryDirectory = Path.of(System.getProperty("java.io.tmpdir"))
-    sharedExtractionRoot(temporaryDirectory) ?: createPrivateExtractionRoot(temporaryDirectory)
+    // The JVM binds a library path to one class loader, so only the first copy of this binding
+    // in a process extracts to the shared root.
+    val claimed = System.getProperties().putIfAbsent(SHARED_ROOT_CLAIM_PROPERTY, "true") == null
+    (if (claimed) sharedExtractionRoot(temporaryDirectory) else null)
+      ?: createPrivateExtractionRoot(temporaryDirectory)
   }
 
   @Volatile private var loadedLibrary: LoadedLibrary? = null
@@ -171,7 +176,11 @@ internal object NativeLibrary {
 
   private fun extractResource(resource: RuntimeResource, directory: Path): Path {
     val destination = directory.resolve(resource.name)
-    if (isExtracted(resource, destination)) {
+    if (
+      Files.isRegularFile(destination) &&
+        Files.size(destination) == resource.bytes.size.toLong() &&
+        MessageDigest.isEqual(sha256(destination), resource.sha256)
+    ) {
       return destination
     }
 
@@ -188,27 +197,16 @@ internal object NativeLibrary {
       } catch (_: AtomicMoveNotSupportedException) {
         Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
       }
-    } catch (error: IOException) {
-      // Another process can extract the same file concurrently, and Windows refuses to
-      // replace a library that process has already loaded.
-      if (!isExtracted(resource, destination)) {
-        throw error
-      }
     } finally {
       Files.deleteIfExists(temporary)
     }
     return destination
   }
 
-  private fun isExtracted(resource: RuntimeResource, path: Path): Boolean =
-    Files.isRegularFile(path) &&
-      Files.size(path) == resource.bytes.size.toLong() &&
-      MessageDigest.isEqual(sha256(path), resource.sha256)
-
   /**
-   * Returns the extraction root that every process of the current user shares, or null when another
-   * user could write to it. Extraction directories under the root are keyed by content digest, so
-   * processes that load the same runtime reuse one copy.
+   * Returns the extraction root that every process of the current user shares, or null when the
+   * file system cannot show that only the user can write to it. Extraction directories under the
+   * root are keyed by content digest, so processes that load the same runtime reuse one copy.
    */
   internal fun sharedExtractionRoot(temporaryDirectory: Path): Path? {
     val userName = System.getProperty("user.name")
@@ -217,20 +215,18 @@ internal object NativeLibrary {
         "maplibre-native-ffi-" + userName.replace(Regex("[^A-Za-z0-9._-]"), "_")
       )
     return try {
-      val posix = Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")
+      // Without POSIX modes, an owner check alone cannot rule out a writable ACL.
+      if (!Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")) {
+        return null
+      }
       try {
-        if (posix) {
-          Files.createDirectory(root, PosixFilePermissions.asFileAttribute(ownerOnly))
-        } else {
-          Files.createDirectory(root)
-        }
+        Files.createDirectory(root, PosixFilePermissions.asFileAttribute(ownerOnly))
       } catch (_: FileAlreadyExistsException) {}
       val trusted =
         Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS) &&
-          (!posix ||
-            (Files.getOwner(root, LinkOption.NOFOLLOW_LINKS) ==
-              root.fileSystem.userPrincipalLookupService.lookupPrincipalByName(userName) &&
-              Files.getPosixFilePermissions(root, LinkOption.NOFOLLOW_LINKS) == ownerOnly))
+          Files.getOwner(root, LinkOption.NOFOLLOW_LINKS) ==
+            root.fileSystem.userPrincipalLookupService.lookupPrincipalByName(userName) &&
+          Files.getPosixFilePermissions(root, LinkOption.NOFOLLOW_LINKS) == ownerOnly
       root.takeIf { trusted }
     } catch (_: IOException) {
       null

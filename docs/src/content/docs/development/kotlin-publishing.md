@@ -176,11 +176,13 @@ Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
 MapLibre Native FFI shared library and the runtime dependencies that the project
 redistributes. It carries their notices under
 `META-INF/licenses/maplibre-native-c`. The JVM binding extracts that packaged
-set to a directory keyed by its content digest, under a per-user root in the
-temporary directory, so every process that loads the same runtime reuses one
-copy. It loads packaged dependencies before the C API library. Linux hosts still
-need the selected graphics loader and driver. Explicit native-library path
-configuration remains available as an override.
+set to a directory keyed by its content digest. On Linux and macOS, that
+directory sits under an owner-only, per-user root in the temporary directory, so
+every process that loads the same runtime reuses one copy. On Windows, and for a
+second copy of the binding in one JVM, each extraction gets a private temporary
+directory. The binding loads packaged dependencies before the C API library.
+Linux hosts still need the selected graphics loader and driver. Explicit
+native-library path configuration remains available as an override.
 
 ## Snapshot publication
 

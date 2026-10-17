@@ -37,15 +37,18 @@ class NativeLibraryTest {
   fun processesShareOneOwnerOnlyExtractionRoot() {
     val temporaryDirectory = createTempDirectory("native-library-test")
     try {
+      // Without POSIX modes, each process extracts to its own private directory instead.
+      if (!posix(temporaryDirectory)) {
+        assertNull(NativeLibrary.sharedExtractionRoot(temporaryDirectory))
+        return
+      }
       val root = assertNotNull(NativeLibrary.sharedExtractionRoot(temporaryDirectory))
 
       assertEquals(root, NativeLibrary.sharedExtractionRoot(temporaryDirectory))
-      if (posix(temporaryDirectory)) {
-        assertEquals(
-          PosixFilePermissions.fromString("rwx------"),
-          Files.getPosixFilePermissions(root),
-        )
-      }
+      assertEquals(
+        PosixFilePermissions.fromString("rwx------"),
+        Files.getPosixFilePermissions(root),
+      )
     } finally {
       temporaryDirectory.deleteRecursively()
     }
@@ -54,12 +57,10 @@ class NativeLibraryTest {
   @Test
   fun sharedExtractionRootRefusesADirectoryOtherUsersCanWrite() {
     val temporaryDirectory = createTempDirectory("native-library-test")
-    // Windows temporary directories are already private to the user and carry no POSIX modes.
-    if (!posix(temporaryDirectory)) {
-      temporaryDirectory.deleteRecursively()
-      return
-    }
     try {
+      if (!posix(temporaryDirectory)) {
+        return
+      }
       val root = assertNotNull(NativeLibrary.sharedExtractionRoot(temporaryDirectory))
       Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("rwxrwxrwx"))
 
