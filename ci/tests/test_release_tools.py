@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from apple_xcframework import PLATFORMS, XCFRAMEWORK_ZIP
 from native_package_release import prepare_assets
 from release_version import (
     family,
@@ -229,6 +230,33 @@ class NativePackageReleaseTest(unittest.TestCase):
             package.addfile(link)
 
         with self.assertRaisesRegex(SystemExit, "unsafe link"):
+            self.prepare("release")
+
+    def apple_archives(self) -> None:
+        self.write_presets(*PLATFORMS)
+        for preset in PLATFORMS:
+            create_archive(
+                self.release_dir / f"maplibre-native-c-{preset}.tar.gz",
+                preset,
+                self.sha,
+            )
+
+    def test_checksums_include_the_xcframework_of_an_apple_release(self) -> None:
+        self.apple_archives()
+        xcframework = self.release_dir / XCFRAMEWORK_ZIP
+        xcframework.write_bytes(b"zip")
+        self.prepare("release")
+
+        checksums = (self.release_dir / "SHA256SUMS").read_text()
+        self.assertIn(
+            f"{hashlib.sha256(b'zip').hexdigest()}  {XCFRAMEWORK_ZIP}\n", checksums
+        )
+        self.assertEqual(len(checksums.splitlines()), len(PLATFORMS) + 1)
+
+    def test_refuses_an_apple_release_without_the_xcframework(self) -> None:
+        self.apple_archives()
+
+        with self.assertRaisesRegex(SystemExit, f"missing {XCFRAMEWORK_ZIP}"):
             self.prepare("release")
 
     def test_release_assets_include_version_provenance_and_checksums(self) -> None:

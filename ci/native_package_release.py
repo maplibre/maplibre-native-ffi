@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 from collections.abc import Iterable
 
+from apple_xcframework import PLATFORMS, XCFRAMEWORK_ZIP
 from release_version import parse_version
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
@@ -240,11 +241,18 @@ def prepare_assets(
         parse_version(version)
     root = repository or pathlib.Path(required_env("MISE_MONOREPO_ROOT"))
     sha = required_env("PUBLISH_SHA")
-    archives = native_archives(release_dir, package_presets(root))
+    presets = package_presets(root)
+    archives = native_archives(release_dir, presets)
     for archive in archives:
         rewrite_archive(archive, expected_sha=sha, version=version)
+    assets = list(archives)
+    if set(PLATFORMS) <= set(presets):
+        xcframework = release_dir / XCFRAMEWORK_ZIP
+        if not xcframework.is_file():
+            raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_ZIP}")
+        assets.append(xcframework)
     write_notes(release_dir, channel, sha, version)
-    write_checksums(release_dir, archives)
+    write_checksums(release_dir, assets)
 
 
 def main(arguments: list[str] | None = None) -> int:

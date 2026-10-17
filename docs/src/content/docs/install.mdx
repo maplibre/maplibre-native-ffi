@@ -50,6 +50,26 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
+An Apple app can take the C library from `MapLibreNativeC.xcframework.zip`,
+which contains the `macos-arm64-metal`, `ios-arm64-metal`, and
+`ios-simulator-arm64-metal` libraries as the framework `MapLibreNativeC`. Swift
+Package Manager takes the zip as a binary target, with the zip's checksum from
+`SHA256SUMS`.
+
+```swift title="Package.swift"
+.binaryTarget(
+  name: "MapLibreNativeC",
+  url: "https://github.com/maplibre/maplibre-native-ffi/releases/download/<tag>/MapLibreNativeC.xcframework.zip",
+  checksum: "<checksum>"
+)
+```
+
+Swift code imports the module `MapLibreNativeC`, and C and Objective-C code
+includes `<MapLibreNativeC/maplibre_native_c.h>`. The submodule
+`MapLibreNativeC.CallbackAdapter` contains `callback_adapter.h`. The module
+excludes `plugin.h`, because its include of `mln/plugin/plugin_api.h` doesn't
+resolve inside a framework.
+
 To build a prefix yourself, see the
 [development overview](/maplibre-native-ffi/development/overview/).
 

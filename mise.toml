@@ -445,6 +445,10 @@ run = "pnpm dlx actions-up"
 description = "Prepare native package snapshot or tagged release assets."
 run = 'python3 ci/native_package_release.py "$@"'
 
+[tasks."ci:prepare-xcframework"]
+description = "Assemble the Apple XCFramework zip from native packages."
+run = 'python3 ci/apple_xcframework.py "$@"'
+
 [tasks."ci:prepare-python-snapshot"]
 description = "Relabel a backend wheel or generate the Python snapshot index."
 run = 'python3 ci/python_snapshot.py "$@"'
