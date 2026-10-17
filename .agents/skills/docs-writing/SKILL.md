@@ -261,6 +261,14 @@ Line markers stay out of it. Expressive Code labels, `mark={"A":15-19}`, hold
 one to three characters and draw on top of longer text, and every line-numbered
 range breaks the next time a formatter moves a line.
 
+### Release versions
+
+Write a release version in code as a placeholder named for its release family,
+such as `{{kotlin}}`. The docs build replaces it with the family's latest
+release tag, so a page never quotes an outdated release. Add a family to
+`docs/scripts/generate-versions.py` before a page quotes it; an unknown name
+fails the build.
+
 ## Specifications
 
 Specifications follow everything above, and add two rules.

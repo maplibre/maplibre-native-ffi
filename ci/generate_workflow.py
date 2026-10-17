@@ -48,8 +48,11 @@ def action(reference: str, inputs: dict | None = None, **fields) -> dict:
     return step
 
 
-def checkout() -> dict:
-    return action("actions/checkout", {"persist-credentials": False})
+def checkout(*, fetch_tags=False) -> dict:
+    inputs = {"persist-credentials": False}
+    if fetch_tags:
+        inputs["fetch-tags"] = True
+    return action("actions/checkout", inputs)
 
 
 def run(command: str, **fields) -> dict:
@@ -60,7 +63,12 @@ def run(command: str, **fields) -> dict:
 
 
 def setup(
-    target: str | None = None, *, zig=False, gradle=True, save_toolchains=False
+    target: str | None = None,
+    *,
+    zig=False,
+    gradle=True,
+    save_toolchains=False,
+    fetch_tags=False,
 ) -> list[dict]:
     inputs = {
         "sccache-access-key-id": "${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -75,7 +83,7 @@ def setup(
     if save_toolchains:
         inputs["save-toolchains"] = True
     return [
-        checkout(),
+        checkout(fetch_tags=fetch_tags),
         {"uses": "./.github/actions/setup-ci-deps", "id": "setup", "with": inputs},
     ]
 
@@ -185,7 +193,8 @@ def docs_job() -> dict:
         "timeout-minutes": 60,
         "environment": SCCACHE_ENVIRONMENT,
         "steps": [
-            *setup(),
+            # The pages quote the latest release versions from the release tags.
+            *setup(fetch_tags=True),
             action(
                 "android-actions/setup-android",
                 {

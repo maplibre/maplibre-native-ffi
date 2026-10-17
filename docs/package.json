@@ -4,11 +4,13 @@
   "private": "true",
   "scripts": {
     "generate-support-matrix": "python scripts/generate-support-matrix.py",
+    "generate-versions": "python scripts/generate-versions.py",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview"
   },
   "dependencies": {
+    "@astrojs/markdown-satteri": "^0.4.3",
     "@astrojs/starlight": "^0.42.6",
     "@fontsource/alata": "^5.3.0",
     "astro": "^7.3.8",

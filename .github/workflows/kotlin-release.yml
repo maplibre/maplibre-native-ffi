@@ -37,3 +37,21 @@ jobs:
       sha: ${{ needs.source.outputs.sha }}
       version: ${{ needs.source.outputs.version }}
     secrets: inherit
+
+  # The docs quote the latest release, so republish them after it publishes.
+  docs:
+    name: Docs
+    needs:
+      - publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh workflow run publish-snapshots.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref main
+          -f components=docs

@@ -121,15 +121,33 @@ done
 '''
 
 [tasks.dev]
-depends = ["api", "install", "generate-support-matrix", "check-snippets"]
+depends = [
+  "api",
+  "install",
+  "generate-support-matrix",
+  "generate-versions",
+  "check-snippets",
+]
 run = "pnpm run dev"
 
 [tasks.build]
-depends = ["api", "install", "generate-support-matrix", "check-snippets"]
+depends = [
+  "api",
+  "install",
+  "generate-support-matrix",
+  "generate-versions",
+  "check-snippets",
+]
 run = "pnpm run build"
 
 [tasks.preview]
-depends = ["api", "install", "generate-support-matrix", "check-snippets"]
+depends = [
+  "api",
+  "install",
+  "generate-support-matrix",
+  "generate-versions",
+  "check-snippets",
+]
 run = "pnpm run preview"
 
 [tasks.astro]
@@ -137,3 +155,7 @@ run = "pnpm exec astro"
 
 [tasks.generate-support-matrix]
 run = "pnpm run generate-support-matrix"
+
+[tasks.generate-versions]
+description = "Write the release versions the pages quote into src/generated"
+run = "pnpm run generate-versions"

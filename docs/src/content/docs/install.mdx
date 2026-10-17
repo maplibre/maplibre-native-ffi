@@ -69,8 +69,8 @@ repositories {
 }
 
 dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.202608.0")
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.202608.0")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi:{{kotlin}}")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{kotlin}}")
 }
 ```
 
@@ -279,7 +279,7 @@ the native library for every ABI and the platform TLS component that Android
 HTTPS requests require.
 
 ```kotlin title="build.gradle.kts"
-implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.202608.0")
+implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{kotlin}}")
 ```
 
 A Kotlin/Native target gets the native library from its runtime KLIB. Add the
@@ -289,7 +289,7 @@ the Kotlin/Native host library already contains the static runtime.
 
 ```kotlin title="build.gradle.kts"
 dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-android:0.202608.0")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-android:{{kotlin}}")
 }
 
 android {
@@ -312,7 +312,7 @@ android {
 }
 
 dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:0.202608.0")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:{{kotlin}}")
 }
 ```
 

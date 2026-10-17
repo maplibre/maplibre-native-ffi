@@ -14,6 +14,9 @@ importers:
 
   docs:
     dependencies:
+      '@astrojs/markdown-satteri':
+        specifier: ^0.4.3
+        version: 0.4.3
       '@astrojs/starlight':
         specifier: ^0.42.6
         version: 0.42.6(astro@7.3.8(@types/node@24.19.2)(esbuild@0.28.2)(yaml@2.9.1))
