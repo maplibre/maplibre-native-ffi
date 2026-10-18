@@ -130,9 +130,10 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
-# the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
-# binding declares its own wider platform set in bindings/zig/mise.toml.
-"core:zig" = { version = "{{vars.zig_version}}", os = ["linux"] }
+# the native toolchain there. See cmake/toolchains/zig-linux.cmake. Nested
+# configs request the same os set so `mise install --monorepo` does not see
+# conflicting option maps for one install destination.
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
