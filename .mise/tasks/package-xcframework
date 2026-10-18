@@ -20,8 +20,8 @@ slices=(
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# Every slice must import as a module without an incomplete-umbrella warning
-# and link. A Mac also runs the macOS and Mac Catalyst slices.
+# Each slice must import cleanly as a module and link, and the macOS and Mac
+# Catalyst slices also run.
 cat >"$work/consumer.m" <<'EOF'
 @import MaplibreNativeC;
 @import MaplibreNativeC.CallbackAdapter;
@@ -38,12 +38,11 @@ for slice in "${slices[@]}"; do
     echo "Missing native package for ${preset} under ${input_root}" >&2
     exit 1
   fi
-  # bsdtar folds an archive's AppleDouble sidecars back into extended
-  # attributes, rather than leaving them as files that codesign rejects as
-  # unsealed bundle content.
+  # bsdtar turns AppleDouble sidecars back into extended attributes, which
+  # codesign would otherwise reject as unsealed files.
   tar -xzf "$archive" -C "$work"
   framework="$work/maplibre-native-c-${preset}/Frameworks/MaplibreNativeC.framework"
-  frameworks+=(-framework "$framework")
+  frameworks+=(-framework "$framework" -debug-symbols "$framework.dSYM")
 
   minimum="$(vtool -show-build "$framework/MaplibreNativeC" | awk '$1 == "minos" { print $2 }')"
   xcrun --sdk "$sdk" clang -target "arm64-apple-${os}${minimum}${variant:+-$variant}" \
@@ -61,7 +60,7 @@ xcframework="$work/MaplibreNativeC.xcframework"
 xcodebuild -create-xcframework "${frameworks[@]}" -output "$xcframework"
 mkdir -p "$(dirname "$output")"
 rm -f "$output"
-# --keepParent puts the XCFramework at the root of the zip, which is where Swift
-# Package Manager looks for it, and ditto keeps the macOS symlinks intact.
+# Swift Package Manager expects the XCFramework at the zip's root, and ditto
+# keeps the macOS symlinks.
 ditto -c -k --norsrc --noextattr --keepParent "$xcframework" "$output"
 echo "$output"

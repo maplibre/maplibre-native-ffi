@@ -1,27 +1,16 @@
 #!/usr/bin/env python3
-# [MISE] description="Reject private exports, build-host paths, and vendored loaders or headers in a native package."
+# [MISE] description="Check a native package's dependencies, exports, headers, and symbols."
 # [MISE] shell="python"
 # USAGE arg "<preset>" help="Native CMake preset"
 
-"""Check what a packaged native artifact depends on and what it carries.
+"""Check what a native package links and carries.
 
-A dependency recorded by absolute path resolves against the build host's
-layout, so an artifact carrying one loads on the machine that produced it and
-nowhere else. Package managers make this easy to get wrong: Homebrew's Vulkan
-loader, for one, has an absolute install name, and linking it is enough to
-stamp `/opt/homebrew/opt/...` into the result.
-
-A graphics loader is the host's to supply, and the library resolves one at run
-time rather than linking it. An artifact that names or carries a loader anyway
-runs a second copy alongside the host's, and handles minted by one are opaque
-pointers the other does not own. Android and OpenHarmony are the exception,
-where the loader is part of the platform at a fixed location.
-
-The headers a host builds surface descriptors against belong to that same
-implementation. An artifact carrying its own copy redistributes a snapshot that
-can disagree with the implementation a host actually loads, so the package holds
-the C API's headers and nothing else. MapLibre Native's plugin header is the one
-addition: it is the contract of a symbol the library itself exports.
+- No dependency or run path names a build-host path. Linking Homebrew's Vulkan
+  loader is enough to record `/opt/homebrew/opt/...`.
+- No graphics loader is linked or carried, since the host supplies its own.
+  Android and OpenHarmony ship theirs with the platform.
+- The only headers are the C API's and MapLibre Native's plugin header.
+- Each Apple library is stripped, with a matching dSYM beside it.
 """
 
 from __future__ import annotations
@@ -35,8 +24,7 @@ import tarfile
 import tempfile
 
 
-# Load commands may name the system libraries every macOS host has at a fixed
-# location, or resolve relative to the loading binary.
+# System libraries, or paths relative to the loading binary.
 MACHO_ALLOWED_PREFIXES = (
     "@rpath/",
     "@loader_path/",
@@ -44,29 +32,25 @@ MACHO_ALLOWED_PREFIXES = (
     "/usr/lib/",
     "/System/Library/",
 )
-# Search paths anchor to the loading binary, either exactly or as the root of a
-# relative path, so the bundle stays relocatable.
+# Search paths must resolve against the loading binary.
 MACHO_SEARCH_PATH_ROOTS = ("@loader_path", "@executable_path")
 ELF_SEARCH_PATH_ROOTS = ("$ORIGIN", "${ORIGIN}")
 
-# 64- and 32-bit thin Mach-O, then the 32- and 64-bit universal headers.
+# Thin 64- and 32-bit Mach-O, then 32- and 64-bit universal headers.
 MACHO_MAGICS = frozenset(
     {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
 )
 PE_MAGIC = b"MZ"
 
-# A path may contain spaces, so it runs to the trailing offset field, which
-# otool always prints. Anything narrower drops the build-host paths that live
-# under a home directory holding a full name.
+# A path may contain spaces, so match up to otool's trailing offset field.
 MACHO_NAME = re.compile(r"^\s*name (?P<name>.+) \(offset \d+\)$")
 MACHO_PATH = re.compile(r"^\s*path (?P<path>.+) \(offset \d+\)$")
 MACHO_COMMAND = re.compile(r"^\s*cmd (?P<command>LC_\w+)$")
+MACHO_UUID = re.compile(r"^\s*uuid (?P<uuid>[0-9A-F-]+)$")
 ELF_ENTRY = re.compile(r"^\s*0x[0-9a-f]+\s+\((?P<tag>\w+)\)\s+.*\[(?P<value>[^\]]*)\]")
 PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
 
-# The name a loader goes by, without the `lib` prefix, the version, and the
-# extension: `libGLESv2.so.2`, `libvulkan.1.dylib`, and `@rpath/libEGL.dylib`
-# all reduce to one of these.
+# Loader names without the `lib` prefix, version, or extension.
 LOADER_NAMES = frozenset(
     {
         "egl",
@@ -80,22 +64,18 @@ LOADER_NAMES = frozenset(
         "vulkan-1",
     }
 )
-# Frameworks under these roots, Metal and OpenGL among them, are the platform's
-# own graphics APIs, which every host reaches at the same fixed path.
+# The platform's own graphics frameworks, such as Metal, live under these.
 PLATFORM_LIBRARY_PREFIXES = ("/System/Library/", "/usr/lib/")
-# The presets whose loader ships with the operating system rather than with a
-# host, and so is linked on purpose.
+# Presets whose platform ships the graphics loader.
 PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
-# The binary of the framework that Apple Metal packages carry beside the prefix.
+# The binary of MaplibreNativeC.framework.
 PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
-# The directories that hold headers: the prefix's, and the framework's.
+# The prefix's and the framework's header directories.
 HEADER_ROOTS = ("include", "Headers")
-# What the include directory holds: the umbrella header and the domain headers
-# beside it.
+# The umbrella header and the directory of domain headers.
 PACKAGED_HEADER_ENTRIES = frozenset({"maplibre_native_c.h", "maplibre_native_c"})
-# MapLibre Native's plugin header, which include/maplibre_native_c/plugin.h
-# includes at upstream's path, and the directories that lead to it.
+# MapLibre Native's plugin header, at the path plugin.h includes it from.
 PACKAGED_PLUGIN_HEADER = pathlib.PurePath("mln/plugin/plugin_api.h")
 
 BUILD_HOST_PATH = "names a build-host path"
@@ -103,32 +83,39 @@ PRIVATE_EXPORT = "exports a private symbol"
 LINKED_LOADER = "links a graphics loader"
 VENDORED_LOADER = "carries a library that is not the C API"
 VENDORED_HEADER = "carries a header that is not the C API's"
+UNSTRIPPED = "keeps local symbols"
+MISSING_DSYM = "has no matching dSYM"
 REMEDIES = {
     BUILD_HOST_PATH: (
-        "The package only loads on hosts that reproduce the paths above. "
-        "Resolve the dependency at runtime, or give it a relocatable install "
-        "name and ship it in the package."
+        "The package only loads where these paths exist. Resolve the "
+        "dependency at run time, or give it a relocatable install name and "
+        "ship it."
     ),
     PRIVATE_EXPORT: (
-        "Only the stable C API belongs in the dynamic symbol table. Hide the "
-        "dependency symbol above or add a public mln_* entry point instead."
+        "Only mln_* symbols belong in the dynamic symbol table. Hide the "
+        "symbol, or add a public mln_* entry point."
     ),
     LINKED_LOADER: (
-        "The package pulls a graphics loader along wherever it is repackaged, "
-        "and a host that loads its own then runs two. Resolve the entry points "
-        "at runtime, the way src/render/opengl/egl_dispatch.cpp does, and link "
-        "the loader into the test harness alone."
+        "A host that loads its own graphics loader would run two. Resolve the "
+        "entry points at run time, as src/render/opengl/egl_dispatch.cpp does, "
+        "and link the loader into the test harness only."
     ),
     VENDORED_LOADER: (
-        "A host supplies its own graphics loader, so the package carries the C "
-        "API and nothing else that loads. Install a local stand-in through the "
-        "loader component instead, which stays out of the artifact."
+        "The host supplies the graphics loader. Install a local stand-in "
+        "through the loader component, which stays out of the package."
     ),
     VENDORED_HEADER: (
-        "A host supplies its own graphics implementation, and its headers come "
-        "with it, so the package carries the C API's headers and nothing else. "
-        "Install a local stand-in through the loader component instead, which "
-        "stays out of the artifact."
+        "Graphics headers come with the host's implementation. Install a local "
+        "stand-in through the loader component, which stays out of the package."
+    ),
+    UNSTRIPPED: (
+        "An Apple library's local symbols belong in its dSYM. CPack strips "
+        "macOS and Mac Catalyst libraries, and mln_ffi_install_apple_dsym "
+        "strips iOS and tvOS ones."
+    ),
+    MISSING_DSYM: (
+        "Debuggers and crash reports find an Apple library's local symbols in "
+        "the dSYM beside it, by UUID. mln_ffi_install_apple_dsym writes it."
     ),
 }
 
@@ -169,8 +156,7 @@ def macho_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, 
             if not name:
                 continue
             dependency = name.group("name")
-            # LC_ID_DYLIB names the library itself, which install_name_dir
-            # already pins to @rpath, so it goes through the same check.
+            # LC_ID_DYLIB, the library's own name, must be relocatable too.
             if not dependency.startswith(MACHO_ALLOWED_PREFIXES):
                 problems.append((BUILD_HOST_PATH, f"{command} {dependency}"))
             elif not links_loader and loader_dependency(dependency):
@@ -190,8 +176,7 @@ def elf_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, st
         if not match:
             continue
         tag, value = match.group("tag"), match.group("value")
-        # A needed library is a soname the dynamic loader resolves through the
-        # host's own search path; one carrying a directory bypasses it.
+        # A soname with a directory bypasses the host's library search path.
         if tag == "NEEDED" and "/" in value:
             problems.append((BUILD_HOST_PATH, f"DT_NEEDED {value}"))
         elif tag == "NEEDED" and not links_loader and loader_dependency(value):
@@ -215,14 +200,46 @@ def pe_problems(binary: pathlib.Path) -> list[tuple[str, str]]:
     return [(PRIVATE_EXPORT, name) for name in exports if not name.startswith("mln_")]
 
 
+def dsym_problems(binary: pathlib.Path, root: pathlib.Path) -> list[tuple[str, str]]:
+    """Local symbols left in an Apple library, and its dSYM's absence or UUID."""
+    problems = []
+    symbols = run(["nm", "-m", "--defined-only", str(binary)]).splitlines()
+    local = sum(" non-external " in line for line in symbols)
+    if local:
+        problems.append((UNSTRIPPED, f"{local} local symbols"))
+
+    # A framework's dSYM sits beside the bundle, and a bare library's beside
+    # the library.
+    bundle = next(
+        (path for path in binary.parents if path.suffix == ".framework"), binary
+    )
+    dsym = bundle.with_name(f"{bundle.name}.dSYM")
+    symbol_file = dsym / "Contents/Resources/DWARF" / binary.name
+    if not symbol_file.is_file():
+        problems.append((MISSING_DSYM, f"no {symbol_file.relative_to(root)}"))
+    elif macho_uuids(symbol_file) != macho_uuids(binary):
+        problems.append(
+            (MISSING_DSYM, f"{dsym.relative_to(root)} describes another build")
+        )
+    return problems
+
+
+def macho_uuids(binary: pathlib.Path) -> list[str]:
+    """The UUID of each slice of a Mach-O file."""
+    return [
+        match.group("uuid")
+        for line in run(["otool", "-l", str(binary)]).splitlines()
+        if (match := MACHO_UUID.match(line))
+    ]
+
+
 def vendored_header(relative: pathlib.PurePath) -> bool:
     """Whether a packaged path is a header the C API does not own."""
     parts = relative.parts
     root = next((part for part in parts if part in HEADER_ROOTS), None)
     if root is None:
         return False
-    # An archive built on macOS carries an AppleDouble sidecar beside each file,
-    # which belongs to whatever it sits next to.
+    # An archive built on macOS has an AppleDouble `._` sidecar for each file.
     under_include = pathlib.PurePath(
         *(part.removeprefix("._") for part in parts[parts.index(root) + 1 :])
     )
@@ -234,11 +251,7 @@ def vendored_header(relative: pathlib.PurePath) -> bool:
 
 
 def image_format(binary: pathlib.Path) -> str | None:
-    """The executable format of a file, or None for one that does not load.
-
-    Static archives and import libraries answer None, and so do the AppleDouble
-    sidecars that an archive built on macOS carries beside each file.
-    """
+    """The executable format of a file, or None for one that doesn't load."""
     with binary.open("rb") as file:
         magic = file.read(4)
     if magic == b"\x7fELF":
@@ -256,13 +269,10 @@ def binary_problems(
     if image == "elf":
         return elf_problems(binary, links_loader)
     if image == "macho":
-        # otool reads every slice of a universal binary, whose header is
-        # big-endian on disk.
+        # otool reads every slice of a universal binary.
         return macho_problems(binary, links_loader)
-    # Windows PE imports name a DLL without a directory, so there is no
-    # build-host path for them to carry, and the one graphics library a WGL
-    # build imports is the system opengl32.dll. Its exports still need to stay
-    # within the public C API.
+    # PE imports carry no directory, and a WGL build imports only the system
+    # opengl32.dll, so only the exports need checking.
     return pe_problems(binary)
 
 
@@ -280,9 +290,12 @@ def main() -> int:
         with tarfile.open(archive) as tar:
             tar.extractall(directory, filter="data")
         for binary in sorted(pathlib.Path(directory).rglob("*")):
-            if not binary.is_file():
-                continue
             relative = binary.relative_to(directory)
+            # dsym_problems checks a dSYM along with its library.
+            if not binary.is_file() or any(
+                part.endswith(".dSYM") for part in relative.parts
+            ):
+                continue
             if vendored_header(relative):
                 problems.append((binary.name, VENDORED_HEADER, str(relative)))
                 continue
@@ -293,13 +306,18 @@ def main() -> int:
                 "lib"
             ).startswith(PACKAGED_LIBRARY_STEM):
                 problems.append((binary.name, VENDORED_LOADER, str(relative)))
-                # What a library that does not belong here depends on says
-                # nothing about the artifact; removing it answers both.
+                # Its dependencies don't matter once it's removed.
                 continue
             problems.extend(
                 (binary.name, kind, detail)
                 for kind, detail in binary_problems(binary, image, links_loader)
             )
+            # Skip the symlink to a macOS framework's binary.
+            if image == "macho" and not binary.is_symlink():
+                problems.extend(
+                    (binary.name, kind, detail)
+                    for kind, detail in dsym_problems(binary, pathlib.Path(directory))
+                )
 
     if not problems:
         return 0

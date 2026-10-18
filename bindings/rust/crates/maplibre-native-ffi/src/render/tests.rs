@@ -960,11 +960,14 @@ impl WebGpuTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         // Waiting on a future with a timeout has to be asked for up front, or
         // wgpuInstanceWaitAny rejects every non-zero timeout instead of waiting.
-        // The capability needs Asyncify or JSPI, which the emdawnwebgpu port
-        // enables, and wgpuCreateInstance answers null when asked without it.
+        // The instance feature needs Asyncify or JSPI, which the emdawnwebgpu
+        // port enables, and wgpuCreateInstance answers null when asked without
+        // it.
         let mut descriptor: webgpu_sys::WGPUInstanceDescriptor = unsafe { std::mem::zeroed() };
-        descriptor.capabilities.timedWaitAnyEnable = 1;
-        // SAFETY: descriptor is live for the call.
+        let timed_wait_any = webgpu_sys::WGPUInstanceFeatureName_TimedWaitAny;
+        descriptor.requiredFeatureCount = 1;
+        descriptor.requiredFeatures = &timed_wait_any;
+        // SAFETY: descriptor and timed_wait_any are live for the call.
         let instance = unsafe { webgpu_sys::wgpuCreateInstance(&descriptor) };
         if instance.is_null() {
             return Err("creating a WebGPU instance with timed waits enabled failed".into());

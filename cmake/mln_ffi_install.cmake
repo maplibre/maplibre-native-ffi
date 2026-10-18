@@ -1,9 +1,8 @@
 include(GNUInstallDirs)
 
-# Records the commit an artifact was built from, so a downloaded prefix can name
-# its provenance. Set MLN_FFI_GIT_SHA to skip discovery when building outside a
-# checkout. This resolves at configure time, so a build tree that predates the
-# current commit keeps the older value until it is reconfigured.
+# Records the commit an artifact was built from. Set MLN_FFI_GIT_SHA to skip
+# discovery outside a checkout. This runs at configure time, so a build tree
+# keeps the old commit until it is reconfigured.
 function(mln_ffi_resolve_git_sha)
   if(MLN_FFI_GIT_SHA)
     return()
@@ -50,9 +49,8 @@ function(mln_ffi_install_zig_libc)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
-# The name a linker takes for a dependency a find module answered with. A full
-# path cannot travel, because the artifact reaches machines that have neither
-# that path nor that SDK.
+# The linker name for a dependency, since a find module's full path won't exist
+# on a consumer's machine.
 function(mln_ffi_link_name out_var entry)
   set(MLN_FFI_NAME "${entry}")
   if(MLN_FFI_NAME MATCHES "[/\\]")
@@ -65,10 +63,9 @@ function(mln_ffi_link_name out_var entry)
   set(${out_var} "${MLN_FFI_NAME}" PARENT_SCOPE)
 endfunction()
 
-# The system libraries a consumer supplies alongside the complete static
-# archive. A target the project builds is already inside the archive, but its
-# own system dependencies are not, so its interface is still walked; an imported
-# target stands for a system library, and resolves to whatever it names.
+# The system libraries and frameworks a consumer links with the complete static
+# archive. The archive holds the project's targets but not their system
+# dependencies, so the walk follows those targets too.
 function(mln_ffi_static_link_metadata libraries_var frameworks_var)
   set(MLN_FFI_PENDING "")
   foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
@@ -88,8 +85,7 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
     endif()
     list(APPEND MLN_FFI_SEEN "${MLN_FFI_ENTRY}")
     if(TARGET ${MLN_FFI_ENTRY})
-      # IMPORTED_LIBNAME carries the name an interface-only imported target
-      # stands for, which is how FindOpenGL spells opengl32 on Windows.
+      # FindOpenGL names opengl32 on Windows through IMPORTED_LIBNAME.
       foreach(property IMPORTED_LOCATION IMPORTED_LIBNAME
               INTERFACE_LINK_LIBRARIES)
         get_target_property(MLN_FFI_VALUE ${MLN_FFI_ENTRY} ${property})
@@ -100,8 +96,7 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
     elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
       list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
     elseif(MLN_FFI_ENTRY MATCHES "^\\$<LINK_ONLY:(.+)>$")
-      # How a static library carries its private system dependencies, which is
-      # where libuv keeps the Windows ones.
+      # A static library's private dependencies, such as libuv's on Windows.
       list(APPEND MLN_FFI_PENDING "${CMAKE_MATCH_1}")
     elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
       continue()
@@ -188,6 +183,54 @@ function(mln_ffi_install_c_api_shared_target target)
     ARCHIVE
       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
       COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  mln_ffi_install_apple_dsym(${target} "${CMAKE_INSTALL_LIBDIR}"
+                             "${MLN_FFI_NATIVE_COMPONENT}")
+endfunction()
+
+# Writes a dSYM beside an installed Apple binary from the unstripped build-tree
+# binary, so debuggers and crash reports can name what a stripping install
+# removes. Release builds have no debug information, so the dSYM holds only the
+# symbol table. CMake doesn't strip iOS or tvOS binaries, so this does.
+function(mln_ffi_install_apple_dsym target destination component)
+  if(NOT APPLE)
+    return()
+  endif()
+  find_program(MLN_FFI_DSYMUTIL NAMES dsymutil llvm-dsymutil REQUIRED)
+
+  get_target_property(framework ${target} FRAMEWORK)
+  if(framework)
+    set(bundle "${destination}/$<TARGET_BUNDLE_DIR_NAME:${target}>")
+  else()
+    set(bundle "${destination}/$<TARGET_FILE_NAME:${target}>")
+  endif()
+  set(prefix "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}")
+  set(dsym "${prefix}/${bundle}.dSYM")
+
+  # --quiet hides the warning that there's no debug information, and the
+  # relocation list is empty but records the build tree's path.
+  set(code
+      "execute_process(
+        COMMAND \"${MLN_FFI_DSYMUTIL}\" --quiet \"$<TARGET_FILE:${target}>\"
+          -o \"${dsym}\"
+        COMMAND_ERROR_IS_FATAL ANY)
+      file(REMOVE_RECURSE \"${dsym}/Contents/Resources/Relocations\")")
+  mln_ffi_apple_is_embedded(embedded)
+  if(embedded)
+    # An iOS or tvOS framework is flat, with its binary at the bundle's root.
+    set(binary "${bundle}")
+    if(framework)
+      set(binary "${bundle}/$<TARGET_FILE_NAME:${target}>")
+    endif()
+    string(
+      APPEND code
+      "
+      if(CMAKE_INSTALL_DO_STRIP)
+        execute_process(
+          COMMAND \"${CMAKE_STRIP}\" -x \"${prefix}/${binary}\"
+          COMMAND_ERROR_IS_FATAL ANY)
+      endif()")
+  endif()
+  install(CODE "${code}" COMPONENT "${component}")
 endfunction()
 
 function(mln_ffi_install_c_api_library target)
@@ -263,9 +306,7 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
     FILES_MATCHING
     PATTERN "*.h")
-  # The contract behind include/maplibre_native_c/plugin.h and the exported
-  # mln_plugin_register_v1, kept at upstream's path so the header stays
-  # verbatim.
+  # plugin.h includes MapLibre Native's plugin API from upstream's path.
   install(
     FILES
     "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include/mln/plugin/plugin_api.h"
@@ -295,11 +336,9 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endforeach()
-  # A graphics implementation is the host's to supply, so a full installation
-  # and the package both leave this component out. The build task installs it
-  # separately for the fixtures and examples, which stand in for a host that
-  # brought one. The headers a caller builds the implementation's descriptors
-  # against belong to that implementation, and travel with it.
+  # The host supplies the graphics implementation and its headers, so this
+  # component stays out of the package. The build task installs it for tests
+  # and examples.
   get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
                       MLN_FFI_INSTALL_LOADER_FILES)
   if(MLN_FFI_INSTALL_LOADER_FILES

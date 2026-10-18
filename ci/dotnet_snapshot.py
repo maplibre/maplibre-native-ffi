@@ -79,10 +79,13 @@ def archive(input_dir: pathlib.Path, preset: str) -> pathlib.Path:
 
 def dynamic_libraries(directory: pathlib.Path) -> list[pathlib.Path]:
     suffixes = (".so", ".dylib", ".dll")
+    # A dSYM's symbol file takes its library's name but doesn't load.
     return [
         path
         for path in directory.rglob("*")
-        if path.is_file() and (path.name.endswith(suffixes) or ".so." in path.name)
+        if path.is_file()
+        and (path.name.endswith(suffixes) or ".so." in path.name)
+        and not any(part.endswith(".dSYM") for part in path.parts)
     ]
 
 

@@ -42,6 +42,16 @@ function(mln_ffi_apple_is_maccatalyst out_var)
   endif()
 endfunction()
 
+# Whether the target is iOS or tvOS rather than macOS or Mac Catalyst.
+function(mln_ffi_apple_is_embedded out_var)
+  mln_ffi_apple_is_maccatalyst(maccatalyst)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(mln_ffi_configure_platform_dependencies target)
   # `c++` is named rather than bundled: Apple ships libc++ as a system library
   # with a stable ABI, so the archive can leave it to the platform.

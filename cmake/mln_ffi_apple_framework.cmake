@@ -2,32 +2,17 @@ include_guard(GLOBAL)
 
 include("${CMAKE_CURRENT_LIST_DIR}/platform/apple.cmake")
 
-# Apple Metal presets also link the C API as MaplibreNativeC.framework, the
-# bundle form that Xcode and Swift Package Manager embed. The
-# `package-xcframework` task combines the framework from each Apple Metal
-# package into MaplibreNativeC.xcframework.
+# Apple Metal presets also build the C API as MaplibreNativeC.framework, which
+# `package-xcframework` combines into MaplibreNativeC.xcframework.
 set(MLN_FFI_APPLE_FRAMEWORK_NAME MaplibreNativeC)
-
-# Whether the framework targets iOS or tvOS rather than macOS or Mac Catalyst.
-# CMake gives these frameworks a flat bundle, and the macOS family a versioned
-# one.
-function(mln_ffi_apple_framework_embedded out_var)
-  mln_ffi_apple_is_maccatalyst(maccatalyst)
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
-    set(${out_var} TRUE PARENT_SCOPE)
-  else()
-    set(${out_var} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
 
 function(mln_ffi_add_c_api_framework target implementation_target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target} ${implementation_target})
 
-  # App Store processing reads the supported platform from every embedded
-  # framework, and MinimumOSVersion from an iOS or tvOS one. The version is the
-  # project's until the publish step relabels it with the release version.
-  mln_ffi_apple_framework_embedded(embedded)
+  # App Store processing needs the platform, and MinimumOSVersion on iOS and
+  # tvOS. The publish step replaces the project version with the release's.
+  mln_ffi_apple_is_embedded(embedded)
   mln_ffi_apple_is_simulator(simulator)
   if(NOT embedded)
     set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM MacOSX)
@@ -66,19 +51,20 @@ function(mln_ffi_add_c_api_framework target implementation_target)
       "${info_plist}")
 endfunction()
 
-# CMake links the framework and writes its Info.plist, and the install adds the
-# rest of the bundle. The Ninja generator copies MACOSX_PACKAGE_LOCATION content
-# only for a target that compiles its own sources, and this target links the
-# shared objects, so headers and resources go in here instead. A consumer that
-# takes the framework through Swift Package Manager receives the bundle alone,
-# so the bundle carries the prefix's license notices too.
+# The install adds the bundle's headers and resources, because Ninja copies
+# MACOSX_PACKAGE_LOCATION files only for a target that compiles its own sources.
+# Swift Package Manager consumers get only the bundle, so it carries the license
+# notices too.
 function(mln_ffi_install_c_api_framework target framework_target component)
   install(
     TARGETS ${framework_target}
     FRAMEWORK DESTINATION Frameworks COMPONENT "${component}")
+  mln_ffi_install_apple_dsym(${framework_target} Frameworks "${component}")
 
+  # CMake gives an iOS or tvOS framework a flat bundle, and a macOS or Mac
+  # Catalyst one a versioned bundle.
   set(framework "Frameworks/${MLN_FFI_APPLE_FRAMEWORK_NAME}.framework")
-  mln_ffi_apple_framework_embedded(embedded)
+  mln_ffi_apple_is_embedded(embedded)
   if(embedded)
     set(content "${framework}")
     set(resources "${content}")
@@ -105,8 +91,7 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     FILES "${PROJECT_SOURCE_DIR}/cmake/apple/module.modulemap"
     DESTINATION "${content}/Modules"
     COMPONENT "${component}")
-  # The core makes the same required-reason API calls under every Apple SDK, so
-  # upstream's iOS SDK manifest describes this library too.
+  # Upstream's iOS privacy manifest covers every Apple SDK.
   install(
     FILES "${MLN_FFI_SOURCE_DIR}/platform/ios/PrivacyInfo.xcprivacy"
     DESTINATION "${resources}"
@@ -117,8 +102,7 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     COMPONENT "${component}")
   mln_ffi_install_licenses(${target} "${component}" "${resources}/licenses")
 
-  # CMake links the binary and Resources at the root of a versioned bundle,
-  # but not the directories that the install adds.
+  # CMake links only the binary and Resources at a versioned bundle's root.
   if(NOT embedded)
     foreach(directory Headers Modules)
       install(

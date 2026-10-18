@@ -680,10 +680,14 @@ static _Thread_local bool thread_webgpu_attempted;
 
 static bool create_webgpu_device(webgpu_state* state) {
   // Timed waits have to be asked for up front, or wgpuInstanceWaitAny rejects
-  // every non-zero timeout. The capability needs Asyncify, which the
+  // every non-zero timeout. The instance feature needs Asyncify, which the
   // emdawnwebgpu port enables; without it wgpuCreateInstance returns NULL.
+  static const WGPUInstanceFeatureName timed_wait_any[] = {
+    WGPUInstanceFeatureName_TimedWaitAny,
+  };
   WGPUInstanceDescriptor instance_descriptor = {
-    .capabilities = {.timedWaitAnyEnable = true},
+    .requiredFeatureCount = 1,
+    .requiredFeatures = timed_wait_any,
   };
   state->instance = wgpuCreateInstance(&instance_descriptor);
   if (state->instance == NULL) {

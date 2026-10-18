@@ -24,10 +24,9 @@ ARCHIVE_SUFFIX = ".tar.gz"
 RELEASE_NOTES_NAME = "RELEASE_NOTES.md"
 XCFRAMEWORK_NAME = "MaplibreNativeC.xcframework.zip"
 XCFRAMEWORK_ROOT = "MaplibreNativeC.xcframework"
-# A framework keeps its Info.plist at the bundle root on iOS and tvOS, and under
-# Versions/A/Resources on macOS and Mac Catalyst.
+# The Info.plist of a flat or versioned framework, or of its dSYM.
 FRAMEWORK_INFO_PLIST = re.compile(
-    r"(^|/)MaplibreNativeC\.framework/(Versions/A/Resources/)?Info\.plist$"
+    r"(^|/)MaplibreNativeC\.framework(/Versions/A/Resources|\.dSYM/Contents)?/Info\.plist$"
 )
 
 

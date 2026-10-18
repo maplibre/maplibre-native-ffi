@@ -49,6 +49,10 @@ FRAMEWORK_PLIST = plistlib.dumps(
 IOS_PLIST = "MaplibreNativeC.xcframework/ios-arm64/MaplibreNativeC.framework/Info.plist"
 MACOS_FRAMEWORK = "MaplibreNativeC.xcframework/macos-arm64/MaplibreNativeC.framework"
 MACOS_PLIST = f"{MACOS_FRAMEWORK}/Versions/A/Resources/Info.plist"
+IOS_DSYM_PLIST = (
+    "MaplibreNativeC.xcframework/ios-arm64/dSYMs/"
+    "MaplibreNativeC.framework.dSYM/Contents/Info.plist"
+)
 
 
 def add_symlink(archive: zipfile.ZipFile, name: str, target: str) -> None:
@@ -65,6 +69,7 @@ def create_xcframework(
         archive.writestr("MaplibreNativeC.xcframework/Info.plist", b"xcframework")
         archive.writestr(IOS_PLIST, FRAMEWORK_PLIST)
         archive.writestr(MACOS_PLIST, FRAMEWORK_PLIST)
+        archive.writestr(IOS_DSYM_PLIST, FRAMEWORK_PLIST)
         add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", link_target)
 
 
@@ -272,7 +277,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         with zipfile.ZipFile(self.xcframework) as xcframework:
             combined = [
                 plistlib.loads(xcframework.read(name))
-                for name in (IOS_PLIST, MACOS_PLIST)
+                for name in (IOS_PLIST, MACOS_PLIST, IOS_DSYM_PLIST)
             ]
             link = xcframework.getinfo(f"{MACOS_FRAMEWORK}/Headers")
             link_target = xcframework.read(link)
