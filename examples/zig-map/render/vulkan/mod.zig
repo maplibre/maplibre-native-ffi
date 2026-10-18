@@ -625,7 +625,7 @@ fn vulkanHandleToBinding(handle: anytype) maplibre.VulkanHandle {
         .optional => if (handle) |value| @intFromPtr(value) else 0,
         .pointer => @intFromPtr(handle),
         .int => @intCast(handle),
-        .@"enum" => @intCast(@intFromEnum(handle)),
+        .@"enum" => @intCast(@backingInt(handle)),
         else => @compileError("unsupported Vulkan handle representation"),
     };
     return maplibre.VulkanHandle.fromBits(bits);
@@ -635,7 +635,7 @@ fn vulkanHandleFromBits(comptime Handle: type, bits: u64) Handle {
     return switch (@typeInfo(Handle)) {
         .optional, .pointer => @ptrFromInt(@as(usize, @intCast(bits))),
         .int => @intCast(bits),
-        .@"enum" => @enumFromInt(bits),
+        .@"enum" => @fromBackingInt(@intCast(bits)),
         else => @compileError("unsupported Vulkan handle representation"),
     };
 }

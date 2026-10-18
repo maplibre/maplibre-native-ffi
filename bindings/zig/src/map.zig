@@ -179,14 +179,14 @@ pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
             ),
             null,
         );
-        return @enumFromInt(out);
+        return @fromBackingInt(@intCast(out));
     }
 
     /// Releases the prepared data from any thread. Releasing again is a no-op,
     /// and sources the data was installed on keep their own reference, so
     /// release never invalidates a source.
     pub fn release(self: GeoJsonSourceDataHandle) void {
-        c.mln_geojson_source_data_destroy(@intFromEnum(self));
+        c.mln_geojson_source_data_destroy(@backingInt(self));
     }
 };
 
@@ -1577,7 +1577,7 @@ pub const MapHandle = enum(c.mln_map) {
             c.mln_map_add_geojson_source_data(
                 try native(self),
                 try temp.stringView(source_id),
-                @intFromEnum(data),
+                @backingInt(data),
             ),
             diagnosticStore(self),
         );
@@ -1596,7 +1596,7 @@ pub const MapHandle = enum(c.mln_map) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), @intFromEnum(data)),
+            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), @backingInt(data)),
             diagnosticStore(self),
         );
     }
@@ -2598,7 +2598,7 @@ fn registerMapState(map: c.mln_map, map_state: *MapState) std.mem.Allocator.Erro
     defer unlockMapRegistry();
 
     try map_registry.put(std.heap.smp_allocator, map, map_state);
-    return @enumFromInt(map);
+    return @fromBackingInt(@intCast(map));
 }
 
 fn mapState(handle: MapHandle) ?*MapState {
@@ -2608,7 +2608,7 @@ fn mapState(handle: MapHandle) ?*MapState {
 }
 
 fn mapStateLocked(handle: MapHandle) ?*MapState {
-    return map_registry.get(@intFromEnum(handle));
+    return map_registry.get(@backingInt(handle));
 }
 
 const MapClose = struct {
@@ -2622,13 +2622,13 @@ fn beginMapClose(handle: MapHandle) status.BindingError!?MapClose {
     lockMapRegistry();
     defer unlockMapRegistry();
 
-    const map_state = map_registry.get(@intFromEnum(handle)) orelse return null;
+    const map_state = map_registry.get(@backingInt(handle)) orelse return null;
     if (map_state.closing) return error.ActiveBorrow;
     if (map_state.attached_render_sessions.load(.seq_cst) != 0) return error.InvalidState;
     map_state.closing = true;
     return .{
         .state = map_state,
-        .native = @intFromEnum(handle),
+        .native = @backingInt(handle),
         .diagnostic_store = map_state.diagnostic_store,
         .runtime_registry = map_state.runtime_registry,
     };
@@ -2645,7 +2645,7 @@ fn finishMapClose(handle: MapHandle) ?*MapState {
     lockMapRegistry();
     defer unlockMapRegistry();
 
-    const entry = map_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    const entry = map_registry.fetchRemove(@backingInt(handle)) orelse return null;
     return entry.value;
 }
 
@@ -2689,7 +2689,7 @@ fn featureStateSelectorToNative(
 pub fn native(handle: *MapHandle) status.BindingError!c.mln_map {
     const map_state = mapState(handle.*) orelse return error.ClosedHandle;
     if (map_state.closing) return error.ActiveBorrow;
-    return @intFromEnum(handle.*);
+    return @backingInt(handle.*);
 }
 
 pub fn diagnosticStore(handle: *MapHandle) ?*diagnostics.DiagnosticStore {
@@ -2705,7 +2705,7 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
     if (map_state.closing) return error.ActiveBorrow;
     _ = map_state.attached_render_sessions.fetchAdd(1, .seq_cst);
     return .{
-        .native = @intFromEnum(handle.*),
+        .native = @backingInt(handle.*),
         .diagnostic_store = map_state.diagnostic_store,
     };
 }
@@ -3118,7 +3118,7 @@ test "a released map id replayed after a new map is reported stale" {
     defer runtime.close() catch @panic("runtime close failed");
 
     var first = try MapHandle.create(&runtime, .{});
-    const released = @intFromEnum(first);
+    const released = @backingInt(first);
     try first.close();
 
     // The released slot is the one the next map takes, so the replayed id
@@ -3154,7 +3154,7 @@ test "a map id passed to a runtime operation is rejected on its kind" {
     // expression in the safe API and needs the raw id.
     try std.testing.expectError(
         error.InvalidArgument,
-        status.checkStatus(c.mln_runtime_pump(@intFromEnum(map), 0, -1), null),
+        status.checkStatus(c.mln_runtime_pump(@backingInt(map), 0, -1), null),
     );
     const message = std.mem.span(c.mln_thread_last_error_message());
     try std.testing.expect(std.mem.indexOf(u8, message, "map") != null);
@@ -3188,7 +3188,7 @@ test "a live map id called from another thread reports wrong thread" {
         }
     };
 
-    var context = CrossThread{ .live = @intFromEnum(map) };
+    var context = CrossThread{ .live = @backingInt(map) };
     const thread = try std.Thread.spawn(.{}, CrossThread.run, .{&context});
     thread.join();
 

@@ -168,19 +168,19 @@ fn registerProjectionState(
     defer unlockProjectionRegistry();
 
     try projection_registry.put(std.heap.smp_allocator, projection, projection_state);
-    return @enumFromInt(projection);
+    return @fromBackingInt(@intCast(projection));
 }
 
 fn projectionLease(handle: MapProjectionHandle) status.BindingError!ProjectionLease {
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const projection_state = projection_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
+    const projection_state = projection_registry.get(@backingInt(handle)) orelse return error.ClosedHandle;
     if (projection_state.closing) return error.ActiveBorrow;
     _ = projection_state.active_leases.fetchAdd(1, .seq_cst);
     return .{
         .state = projection_state,
-        .native = @intFromEnum(handle),
+        .native = @backingInt(handle),
         .diagnostic_store = projection_state.diagnostic_store,
     };
 }
@@ -195,13 +195,13 @@ fn beginProjectionClose(handle: MapProjectionHandle) status.BindingError!?Projec
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const projection_state = projection_registry.get(@intFromEnum(handle)) orelse return null;
+    const projection_state = projection_registry.get(@backingInt(handle)) orelse return null;
     if (projection_state.closing) return error.ActiveBorrow;
     if (projection_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     projection_state.closing = true;
     return .{
         .state = projection_state,
-        .native = @intFromEnum(handle),
+        .native = @backingInt(handle),
         .diagnostic_store = projection_state.diagnostic_store,
     };
 }
@@ -217,7 +217,7 @@ fn finishProjectionClose(handle: MapProjectionHandle) ?*ProjectionState {
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const entry = projection_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    const entry = projection_registry.fetchRemove(@backingInt(handle)) orelse return null;
     return entry.value;
 }
 

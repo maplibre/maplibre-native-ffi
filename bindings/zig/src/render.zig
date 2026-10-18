@@ -103,14 +103,14 @@ pub const NativePointer = enum(usize) {
     /// object valid and synchronized for the borrow window documented by the
     /// descriptor that receives it.
     pub fn fromPtr(ptr: *anyopaque) NativePointer {
-        return @enumFromInt(@intFromPtr(ptr));
+        return @fromBackingInt(@intCast(@intFromPtr(ptr)));
     }
 
     /// Returns the borrowed backend-native address. The pointer grants no
     /// ownership and is valid only for the borrow window documented by the
     /// operation that produced or accepts this value.
     pub fn toPtr(self: NativePointer) *anyopaque {
-        return @ptrFromInt(@intFromEnum(self));
+        return @ptrFromInt(@backingInt(self));
     }
 };
 
@@ -121,11 +121,11 @@ pub const VulkanHandle = enum(u64) {
     _,
 
     pub fn fromBits(raw_bits: u64) VulkanHandle {
-        return @enumFromInt(raw_bits);
+        return @fromBackingInt(@intCast(raw_bits));
     }
 
     pub fn bits(self: VulkanHandle) u64 {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 };
 
@@ -1120,20 +1120,20 @@ fn registerRenderSessionState(
     defer unlockRenderSessionRegistry();
 
     try render_session_registry.put(std.heap.smp_allocator, session, session_state);
-    return @enumFromInt(session);
+    return @fromBackingInt(@intCast(session));
 }
 
 fn renderSessionLease(handle: RenderSessionHandle) status.BindingError!RenderSessionLease {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
+    const session_state = render_session_registry.get(@backingInt(handle)) orelse return error.ClosedHandle;
     if (session_state.closing) return error.ActiveBorrow;
     const session_frame_state = session_state.frame_state orelse return error.ClosedHandle;
     _ = session_state.active_leases.fetchAdd(1, .seq_cst);
     return .{
         .state = session_state,
-        .native = @intFromEnum(handle),
+        .native = @backingInt(handle),
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
     };
@@ -1143,7 +1143,7 @@ fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?Ren
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return null;
+    const session_state = render_session_registry.get(@backingInt(handle)) orelse return null;
     if (session_state.closing) return error.ActiveBorrow;
     if (session_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     const session_frame_state = session_state.frame_state orelse return null;
@@ -1151,7 +1151,7 @@ fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?Ren
     session_state.closing = true;
     return .{
         .state = session_state,
-        .native = @intFromEnum(handle),
+        .native = @backingInt(handle),
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
     };
@@ -1180,7 +1180,7 @@ fn finishRenderSessionClose(handle: RenderSessionHandle) ?*RenderSessionState {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const entry = render_session_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    const entry = render_session_registry.fetchRemove(@backingInt(handle)) orelse return null;
     entry.value.frame_state = null;
     return entry.value;
 }
@@ -1225,7 +1225,7 @@ fn registerOwnedTextureFrameState(comptime T: type, frame_state_handle: *OwnedTe
 }
 
 fn ownedTextureFrameHandle(comptime T: type, index: usize, generation: u64) T {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
+    return @fromBackingInt(@intCast((@as(u128, generation) << 64) | @as(u128, @intCast(index))));
 }
 
 fn ownedTextureFrameHandleIndex(handle_value: u128) ?usize {
@@ -1242,7 +1242,7 @@ fn ownedTextureFrameLease(handle: anytype, kind: OwnedTextureFrameKind) status.B
     lockOwnedTextureFrameRegistry();
     defer unlockOwnedTextureFrameRegistry();
 
-    const handle_value = @intFromEnum(handle);
+    const handle_value = @backingInt(handle);
     const index = ownedTextureFrameHandleIndex(handle_value) orelse return error.ClosedHandle;
     if (index > owned_texture_frame_registry.items.len) return error.ClosedHandle;
     const slot = owned_texture_frame_registry.items[index - 1];
@@ -1267,7 +1267,7 @@ fn beginOwnedTextureFrameClose(handle: anytype, kind: OwnedTextureFrameKind) sta
     lockOwnedTextureFrameRegistry();
     defer unlockOwnedTextureFrameRegistry();
 
-    const handle_value = @intFromEnum(handle);
+    const handle_value = @backingInt(handle);
     const index = ownedTextureFrameHandleIndex(handle_value) orelse return null;
     if (index > owned_texture_frame_registry.items.len) return null;
     const slot = owned_texture_frame_registry.items[index - 1];
@@ -1300,7 +1300,7 @@ fn unregisterOwnedTextureFrameState(handle: anytype) ?*OwnedTextureFrameState {
     lockOwnedTextureFrameRegistry();
     defer unlockOwnedTextureFrameRegistry();
 
-    const handle_value = @intFromEnum(handle);
+    const handle_value = @backingInt(handle);
     const index = ownedTextureFrameHandleIndex(handle_value) orelse return null;
     if (index > owned_texture_frame_registry.items.len) return null;
     const slot_index = index - 1;
