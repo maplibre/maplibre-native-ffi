@@ -11,6 +11,7 @@ license = "BSD-2-Clause"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Rust",
 ]
 dependencies = []
