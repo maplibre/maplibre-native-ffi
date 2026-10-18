@@ -497,33 +497,33 @@ url = "https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de
 checksum = "sha256:731e043390c9457299484d39e427221fc868a9249540a498a5a4f6456c7744d1"
 
 [[tools."aqua:Kitware/CMake"]]
-version = "4.3.3"
+version = "4.4.4"
 backend = "aqua:Kitware/CMake"
 
 [tools."aqua:Kitware/CMake"."platforms.linux-arm64"]
-checksum = "sha256:9ea38356dbd3e32e51029a3e09a0f2f8e117ef4fbcaad7a21ffb36409bbd5cb4"
-url = "https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-aarch64.tar.gz"
-url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/426406946"
+checksum = "sha256:a1b6cc63636a0e55c63257cf3315a8a5f129e42fade25db1afea4ff8ab06f25e"
+url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-aarch64.tar.gz"
+url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605992024"
 
 [tools."aqua:Kitware/CMake"."platforms.linux-x64"]
-checksum = "sha256:927b2368a946c37269c3a66225ab00544e756459cdd0b5d0da438694fb9ff802"
-url = "https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-x86_64.tar.gz"
-url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/426407023"
+checksum = "sha256:e5bb807f7728cb60cd8b27ebc97a2edb469b68655f21e844a600c3575b76f5bb"
+url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-x86_64.tar.gz"
+url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605992585"
 
 [tools."aqua:Kitware/CMake"."platforms.macos-arm64"]
-checksum = "sha256:5221a13450c7a0219a2a0d1b6c9085eb06489721fafd8488ccebc1584175d2fb"
-url = "https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-macos-universal.tar.gz"
-url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/426407094"
+checksum = "sha256:4b7b73704b1db9b374e5c9ab8e17ac6148b817b6396ee75cd94a852cbac9d305"
+url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-macos-universal.tar.gz"
+url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605993514"
 
 [tools."aqua:Kitware/CMake"."platforms.windows-arm64"]
-checksum = "sha256:db6e902b5ba6a08d0abed136763c4bd95adda17e882d659c0f5d14fe158f7395"
-url = "https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-windows-arm64.zip"
-url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/426407399"
+checksum = "sha256:ed673bbc4eb7c1e59b0407fd52f1680fc0ae3229a46b9b7b3ea9133764f07f67"
+url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-arm64.zip"
+url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605997026"
 
 [tools."aqua:Kitware/CMake"."platforms.windows-x64"]
-checksum = "sha256:935ade9e5e8723583c07f44c5592cea2a1c8f65c56ca7e07b34c025c880e0bd6"
-url = "https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-windows-x86_64.zip"
-url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/426407532"
+checksum = "sha256:bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac536"
+url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip"
+url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605998125"
 
 [[tools."aqua:Kotlin/ktfmt"]]
 version = "0.65"
@@ -1060,48 +1060,48 @@ conda_deps = [
 ]
 
 [[tools.dart]]
-version = "3.12.2"
+version = "3.13.5"
 backend = "http:dart"
 
 [tools.dart."platforms.linux-arm64"]
-checksum = "sha256:f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518"
-url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-arm64-release.zip"
+checksum = "sha256:19a731647c3ed55058ee46dde00330150e6a8729bb6121b4a31e86084c8a3e6d"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-linux-arm64-release.zip"
 
 [tools.dart."platforms.linux-x64"]
-checksum = "sha256:28e47b44cf075f36771046c068bb0d174201cf9c7608744aed1cc23204299c2d"
-url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip"
+checksum = "sha256:ea864bc64df30a6b8bdf30b2e32550f7717d9a890de8f40293aeabb924fe232b"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-linux-x64-release.zip"
 
 [tools.dart."platforms.macos-arm64"]
-checksum = "sha256:cd8753928e77b6b665bd70dce0e64b4ec6d2e2fde141d6409bb716c8ac1f1c0a"
-url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-macos-arm64-release.zip"
+checksum = "sha256:9dfe7d6f2558816c2a978aff6c80e8a4509c6cb726c0702a616c64d286f60e88"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-macos-arm64-release.zip"
 
 [tools.dart."platforms.windows-arm64"]
-checksum = "sha256:ef0168b2bbceccda659e3d9a0f5ebebd5326ef84800ca6af7ccceeb1cfd3daf0"
-url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-arm64-release.zip"
+checksum = "sha256:e7df6db651743440194df9e90005f70700da171bcfb8852dd7cc26303792a09b"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-windows-arm64-release.zip"
 
 [tools.dart."platforms.windows-x64"]
-checksum = "sha256:77fd96c823ed09a85e58209a2c5f16b0fc02e5ed4f3e3d46fddf4be763d498d6"
-url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-x64-release.zip"
+checksum = "sha256:aed8e4a8932ce8fa18ea32f990e43b4a1c9390a4c73777ab6fdf77fc9f4524d1"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-windows-x64-release.zip"
 
 [[tools.dotnet]]
-version = "10.0.203"
+version = "10.0.402"
 backend = "core:dotnet"
 
 [[tools.flutter]]
-version = "3.44.8"
+version = "3.47.7"
 backend = "http:flutter"
 
 [tools.flutter."platforms.linux-x64"]
-checksum = "sha256:672089e001571a9fbb209a495c583580c0c6c73ef98999264ba07fa93ace332d"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.8-stable.tar.xz"
+checksum = "sha256:af7455f540df951184c7953fbe3cf884766e7541dacf8571f9f582db03dd6230"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.7-stable.tar.xz"
 
 [tools.flutter."platforms.macos-arm64"]
-checksum = "sha256:c3d6fe95078f7001d947a31d42527de91d5bfe62e4cf444a1493a2e8f1fb199d"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.44.8-stable.zip"
+checksum = "sha256:dd9da574c3168460550117eb0e8dd0313ae934fabf64a82a6d557fff5fd1422e"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.47.7-stable.zip"
 
 [tools.flutter."platforms.windows-x64"]
-checksum = "sha256:095c108a08e0377d8a6501fed65aeb288908a070ed3f135e525dc6431c7686e4"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.44.8-stable.zip"
+checksum = "sha256:c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip"
 
 [[tools."github:EmbarkStudios/cargo-about"]]
 version = "0.9.2"
@@ -1191,28 +1191,28 @@ url = "https://github.com/sargunv/jvl/releases/download/v2026.05.03/jvl-x86_64-p
 url_api = "https://api.github.com/repos/sargunv/jvl/releases/assets/411400578"
 
 [[tools.go]]
-version = "1.26.3"
+version = "1.27.2"
 backend = "core:go"
 
 [tools.go."platforms.linux-arm64"]
-checksum = "sha256:9d89a3ea57d141c2b22d70083f2c8459ba3890f2d9e818e7e933b75614936565"
-url = "https://dl.google.com/go/go1.26.3.linux-arm64.tar.gz"
+checksum = "sha256:94f3e30b8e374bc285e7dadc11e0865726b9bc6e85b841ccceaabc0214c6b7c8"
+url = "https://dl.google.com/go/go1.27.2.linux-arm64.tar.gz"
 
 [tools.go."platforms.linux-x64"]
-checksum = "sha256:2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556"
-url = "https://dl.google.com/go/go1.26.3.linux-amd64.tar.gz"
+checksum = "sha256:ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5"
+url = "https://dl.google.com/go/go1.27.2.linux-amd64.tar.gz"
 
 [tools.go."platforms.macos-arm64"]
-checksum = "sha256:875cf54a15311eee2c99b9dd67c68c4a49351d489ab622bf2cfd28c8f2078d3c"
-url = "https://dl.google.com/go/go1.26.3.darwin-arm64.tar.gz"
+checksum = "sha256:76812b213b1b2302c978d28fa52fa92d541704b9e7d9d5db8002c50e4018c4c5"
+url = "https://dl.google.com/go/go1.27.2.darwin-arm64.tar.gz"
 
 [tools.go."platforms.windows-arm64"]
-checksum = "sha256:95cd63bc6b0da77409ba819215afea9ddf5702c55a3b20af3dd90ea95c7b130c"
-url = "https://dl.google.com/go/go1.26.3.windows-arm64.zip"
+checksum = "sha256:5c4b294f23b558619ae8a4aa94d023e3bca03f52c8398bb41b9026002b0013de"
+url = "https://dl.google.com/go/go1.27.2.windows-arm64.zip"
 
 [tools.go."platforms.windows-x64"]
-checksum = "sha256:20d2ceafb4ed41b96b879010927b28bc92a5be57a7c1801ce365a9ca51d3224a"
-url = "https://dl.google.com/go/go1.26.3.windows-amd64.zip"
+checksum = "sha256:1314008898bd40df77af4b014f777f08873dbdfbcd3d92308728ee03304fe04f"
+url = "https://dl.google.com/go/go1.27.2.windows-amd64.zip"
 
 [[tools.java]]
 version = "zulu-25.36.205.0"
@@ -1345,7 +1345,7 @@ url = "https://github.com/astral-sh/python-build-standalone/releases/download/20
 provenance = "github-attestations"
 
 [[tools.rust]]
-version = "1.95.0"
+version = "1.99.1"
 backend = "core:rust"
 
 [tools.rust.options]
