@@ -107,7 +107,12 @@ case "$1" in
       printf 'include_dir=%s\n' "$zig_include_dir"
       printf 'sys_include_dir=%s\n' "$ndk_sysroot/usr/include"
       printf 'crt_dir=%s\n' "$zig_crt_dir"
-      printf 'msvc_lib_dir=\nkernel32_lib_dir=\ngcc_dir=\n'
+      # Zig 0.17 requires every LibCInstallation field and a non-empty cc_dir on
+      # Linux ABIs. The NDK CRT directory holds crtbegin_dynamic.o.
+      printf 'cc_dir=%s\n' "$zig_crt_dir"
+      printf 'msvc_lib_dir=\n'
+      printf 'kernel32_lib_dir=\n'
+      printf 'darwin_sdk_dir=\n'
     } > "$zig_libc_tmp"
     mv "$zig_libc_tmp" "$zig_libc"
     zig_cross_args=(

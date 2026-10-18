@@ -111,7 +111,7 @@ pub fn build(b: *std.Build) void {
 
     const readback = addReadbackExample(b, options);
     const run_readback = b.addRunArtifact(readback);
-    if (b.args) |args| run_readback.addArgs(args);
+    run_readback.addPassthruArgs();
 
     const run_step = b.step("run", "Render a map image to map.ppm");
     run_step.dependOn(&run_readback.step);

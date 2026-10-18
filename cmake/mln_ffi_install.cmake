@@ -33,16 +33,34 @@ function(mln_ffi_install_zig_libc)
   get_target_property(MLN_FFI_ZIG_LIBC_CRT_DIR mln_ffi_platform_dependencies
                       MLN_FFI_ZIG_LIBC_CRT_DIR)
 
+  # Zig 0.17 requires every LibCInstallation field. crt_dir may not be empty on
+  # any target; cc_dir may not be empty on Linux; darwin_sdk_dir may not be
+  # empty on Darwin. Apple mobile SDKs have no CRT directory of their own, so
+  # the SDK lib path stands in. Linux ABIs (OpenHarmony) reuse that CRT path as
+  # cc_dir, where Zig looks up crtbegin.
+  set(MLN_FFI_ZIG_LIBC_CRT "${MLN_FFI_ZIG_LIBC_CRT_DIR}")
+  if(NOT MLN_FFI_ZIG_LIBC_CRT)
+    set(MLN_FFI_ZIG_LIBC_CRT "${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/lib")
+  endif()
+  set(MLN_FFI_ZIG_LIBC_CC_DIR "")
+  set(MLN_FFI_ZIG_LIBC_DARWIN_SDK_DIR "")
+  if(CMAKE_SYSTEM_NAME MATCHES "Darwin|iOS|tvOS|watchOS|visionOS")
+    set(MLN_FFI_ZIG_LIBC_DARWIN_SDK_DIR "${MLN_FFI_ZIG_LIBC_SYSROOT}")
+  else()
+    set(MLN_FFI_ZIG_LIBC_CC_DIR "${MLN_FFI_ZIG_LIBC_CRT}")
+  endif()
+
   set(MLN_FFI_ZIG_LIBC_FILE "${CMAKE_CURRENT_BINARY_DIR}/zig-libc")
   file(
     WRITE
     "${MLN_FFI_ZIG_LIBC_FILE}"
     "include_dir=${MLN_FFI_ZIG_LIBC_INCLUDE_DIR}\n"
     "sys_include_dir=${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/include\n"
-    "crt_dir=${MLN_FFI_ZIG_LIBC_CRT_DIR}\n"
+    "crt_dir=${MLN_FFI_ZIG_LIBC_CRT}\n"
+    "cc_dir=${MLN_FFI_ZIG_LIBC_CC_DIR}\n"
     "msvc_lib_dir=\n"
     "kernel32_lib_dir=\n"
-    "gcc_dir=\n")
+    "darwin_sdk_dir=${MLN_FFI_ZIG_LIBC_DARWIN_SDK_DIR}\n")
   install(
     FILES "${MLN_FFI_ZIG_LIBC_FILE}"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
