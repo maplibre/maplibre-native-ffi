@@ -38,23 +38,75 @@ def project_configs(root: pathlib.Path) -> list[pathlib.Path]:
     return paths
 
 
-def tool_lines(config: pathlib.Path) -> dict[str, str]:
-    """Map each tool in a config's `[tools]` table to its source line.
+def parse_tool_assignments(body: str) -> dict[str, str]:
+    """Map each `[tools]` key to its full assignment, including wrapped values.
 
-    Reusing the source line keeps the aggregate formatted exactly like the
+    Toml 0.9 wraps inline arrays across lines. Splitting on newlines would treat
+    those continuation lines as keys and emit invalid aggregate TOML.
+    """
+    assignments: dict[str, str] = {}
+    i = 0
+    n = len(body)
+    while i < n:
+        while i < n and body[i] in " \t\r\n":
+            i += 1
+        if i >= n:
+            break
+        if body[i] == "#":
+            while i < n and body[i] != "\n":
+                i += 1
+            continue
+        begin = i
+        while i < n and body[i] != "=":
+            i += 1
+        if i >= n:
+            break
+        key = body[begin:i].strip().strip('"')
+        i += 1
+        depth_brace = 0
+        depth_bracket = 0
+        quote = None
+        escape = False
+        while i < n:
+            ch = body[i]
+            if quote is not None:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == quote:
+                    quote = None
+                i += 1
+                continue
+            if ch in "\"'":
+                quote = ch
+            elif ch == "{":
+                depth_brace += 1
+            elif ch == "}":
+                depth_brace -= 1
+            elif ch == "[":
+                depth_bracket += 1
+            elif ch == "]":
+                depth_bracket -= 1
+            elif ch == "\n" and depth_brace == 0 and depth_bracket == 0:
+                break
+            i += 1
+        assignments[key] = body[begin:i].strip()
+        if i < n and body[i] == "\n":
+            i += 1
+    return assignments
+
+
+def tool_lines(config: pathlib.Path) -> dict[str, str]:
+    """Map each tool in a config's `[tools]` table to its source assignment.
+
+    Reusing the source text keeps the aggregate formatted exactly like the
     project configs, which the formatter has already normalized.
     """
     match = TOOLS_PATTERN.search(config.read_text())
     if not match:
         return {}
-    lines = {}
-    for line in match.group(1).splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        key = stripped.split("=", 1)[0].strip()
-        lines[key.strip('"')] = stripped
-    return lines
+    return parse_tool_assignments(match.group(1))
 
 
 def aggregate(root: pathlib.Path) -> str:
