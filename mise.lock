@@ -1383,44 +1383,30 @@ url = "https://github.com/mozilla/sccache/releases/download/v0.18.0/sccache-v0.1
 url_api = "https://api.github.com/repos/mozilla/sccache/releases/assets/563130158"
 
 [[tools.swift]]
-version = "6.3.1"
+version = "6.4.1"
 backend = "core:swift"
 
+[tools.swift.options]
+swift_platform = "ubuntu24.04"
+
 [tools.swift."platforms.linux-arm64"]
-checksum = "blake3:5757beba33d3dff25fb750a239936827ab0350e65b28ea37a3924449883c6429"
+url = "https://download.swift.org/swift-6.4.1-release/ubuntu2404-aarch64/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-ubuntu24.04-aarch64.tar.gz"
 
 [tools.swift."platforms.linux-x64"]
-checksum = "blake3:8a95707e406fa824266e95319f9f906415871df8f8dce47304a90302ec9977e8"
+url = "https://download.swift.org/swift-6.4.1-release/ubuntu2404/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-ubuntu24.04.tar.gz"
+
+[[tools.swift]]
+version = "6.4.1"
+backend = "core:swift"
 
 [tools.swift."platforms.macos-arm64"]
-checksum = "blake3:7c85377fa6d9bdbeec3f6724522835c59d31483906d5bee41ec41807eff0ab00"
-url = "https://download.swift.org/swift-6.3.1-release/xcode/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-osx.pkg"
+url = "https://download.swift.org/swift-6.4.1-release/xcode/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-osx.pkg"
 
 [tools.swift."platforms.windows-arm64"]
-url = "https://download.swift.org/swift-6.3.1-release/windows10-arm64/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-windows10-arm64.exe"
+url = "https://download.swift.org/swift-6.4.1-release/windows10-arm64/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-windows10-arm64.exe"
 
 [tools.swift."platforms.windows-x64"]
-url = "https://download.swift.org/swift-6.3.1-release/windows10/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-windows10.exe"
-
-[[tools.swift]]
-version = "6.3.1"
-backend = "core:swift"
-
-[tools.swift.options]
-swift_platform = "ubuntu24.04"
-
-[tools.swift."platforms.linux-arm64"]
-url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404-aarch64/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-ubuntu24.04-aarch64.tar.gz"
-
-[tools.swift."platforms.linux-x64"]
-url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-ubuntu24.04.tar.gz"
-
-[[tools.swift]]
-version = "6.3.1"
-backend = "core:swift"
-
-[tools.swift.options]
-swift_platform = "ubuntu24.04"
+url = "https://download.swift.org/swift-6.4.1-release/windows10/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-windows10.exe"
 
 [[tools.swiftformat]]
 version = "0.64.0"
