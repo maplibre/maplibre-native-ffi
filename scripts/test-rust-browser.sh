@@ -21,6 +21,13 @@ mkdir -p "$(dirname "$proxy_main_object")"
 emcc -pthread -fwasm-exceptions -c \
   "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c" \
   -o "$proxy_main_object"
+# emcc aliases `__main_argc_argv` to `main` in this object. Rust 1.99 already
+# defines `main` for the test harness, so rename the alias before linking.
+llvm_root=$(em-config LLVM_ROOT)
+if "$llvm_root/llvm-nm" "$proxy_main_object" | grep -Eq ' [A-Z] main$'; then
+  "$llvm_root/llvm-objcopy" --redefine-sym main=mln_ffi_unused_main \
+    "$proxy_main_object"
+fi
 
 # Browser test harness options.
 harness_flags=(

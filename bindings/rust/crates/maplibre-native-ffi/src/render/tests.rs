@@ -2805,8 +2805,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         pixels
             .as_chunks::<4>()
             .0
-            .iter()
-            .any(|pixel| *pixel == QUERY_STYLE_BACKGROUND_RGBA),
+            .contains(&QUERY_STYLE_BACKGROUND_RGBA),
         "the session should present its frame to the canvas"
     );
 
@@ -2887,8 +2886,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
         pixels
             .as_chunks::<4>()
             .0
-            .iter()
-            .any(|pixel| *pixel == QUERY_STYLE_BACKGROUND_RGBA),
+            .contains(&QUERY_STYLE_BACKGROUND_RGBA),
         "the session should render into the host's texture"
     );
 
@@ -3017,8 +3015,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
                 .unwrap()
                 .as_chunks::<4>()
                 .0
-                .iter()
-                .any(|pixel| *pixel == QUERY_STYLE_BACKGROUND_RGBA);
+                .contains(&QUERY_STYLE_BACKGROUND_RGBA);
         }
         std::thread::sleep(Duration::from_millis(1));
     }
@@ -3097,8 +3094,7 @@ fn set_target_at_the_same_size_renders_without_a_render_update() {
             .unwrap()
             .as_chunks::<4>()
             .0
-            .iter()
-            .any(|pixel| *pixel == QUERY_STYLE_BACKGROUND_RGBA),
+            .contains(&QUERY_STYLE_BACKGROUND_RGBA),
         "the session should render into the replacement texture"
     );
 
@@ -4387,8 +4383,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
         rendered_the_style = reusable
             .as_chunks::<4>()
             .0
-            .iter()
-            .any(|pixel| *pixel == QUERY_STYLE_BACKGROUND_RGBA);
+            .contains(&QUERY_STYLE_BACKGROUND_RGBA);
         std::thread::sleep(Duration::from_millis(5));
     }
     assert!(
