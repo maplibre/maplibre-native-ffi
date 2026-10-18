@@ -28,6 +28,9 @@ harness_flags=(
   "-sENVIRONMENT=web,worker"
   -sOFFSCREENCANVAS_SUPPORT=1
   -sEXPORTED_RUNTIME_METHODS="ENV,GL"
+  # cargo's emscripten test runner sets Module.mainScriptUrlOrBlob. Emscripten
+  # 6 only copies listed incoming Module keys onto the constructed module.
+  -sINCOMING_MODULE_JS_API=mainScriptUrlOrBlob
   -sPROXY_TO_PTHREAD
   # The fixtures create their own OffscreenCanvas.
   "-sOFFSCREENCANVASES_TO_PTHREAD=''"
