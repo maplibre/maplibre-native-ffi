@@ -20,41 +20,41 @@ releases, where they exist, and its snapshot channel.
 
 ## C library
 
-Download `maplibre-native-c-<preset>.tar.gz` for the target from the
-[latest release](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
-and unpack it. The archive root is the install prefix. The
+Each [release](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
+publishes the C library for every preset. The
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
-carries the same assets built from `main` under a fixed tag, so its download
-URLs stay stable.
+rebuilds the same assets from `main` under a fixed tag. To build the library
+yourself, see the
+[development overview](/maplibre-native-ffi/development/overview/).
 
 A preset name has the form `<platform>-<arch>-<backend>`, as in
 `macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their
 context provider in place of the backend: `egl`, `wgl`, or `webgl`.
-[Platforms](#platforms) gives the provider for each platform. Linux names its
-C library explicitly with the `linux-gnu` and `linux-musl` platforms.
+[Platforms](#platforms) lists the backends and providers for each platform.
 
-On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
-your executable, because a prefix carries no loader path there. Linux and macOS
-builds record an rpath into the prefix that they built against.
+### Build against a prefix
 
-Linux prefixes include the shared library, a complete static archive, and its
-companion platform archive. The archives can be linked into a static musl
-executable, but EGL and Vulkan still load system graphics drivers at run time.
-A fully static executable can therefore use non-rendering APIs, but rendering
-needs a dynamic loader and compatible driver libraries.
-
-Export `PKG_CONFIG_PATH` to build against the prefix:
+Download `maplibre-native-c-<preset>.tar.gz` and unpack it. The archive root is
+the install prefix.
 
 ```bash frame="terminal"
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-An Apple app can take the C library as `MaplibreNativeC.xcframework.zip` from
-the same release. The XCFramework holds the framework `MaplibreNativeC` for
-every Apple Metal preset: macOS, iOS, the iOS simulator, Mac Catalyst, tvOS, and
-the tvOS simulator. Swift Package Manager takes the zip as a binary target, with
-the zip's checksum from `SHA256SUMS`.
+On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
+the executable. Linux and macOS executables find the library through the rpath
+that pkg-config adds.
+
+Linux prefixes also carry a complete static archive. A static musl executable
+can link it for the non-rendering APIs, but rendering loads EGL or Vulkan
+drivers at run time and needs a dynamic loader.
+
+### Add the XCFramework to an Apple app
+
+`MaplibreNativeC.xcframework.zip` holds the framework `MaplibreNativeC` for
+every Apple Metal preset. Add it to a Swift package as a binary target, with the
+zip's checksum from `SHA256SUMS`.
 
 ```swift title="Package.swift"
 .binaryTarget(
@@ -64,14 +64,10 @@ the zip's checksum from `SHA256SUMS`.
 )
 ```
 
-Swift code imports the module `MaplibreNativeC`, and C code includes
-`<MaplibreNativeC/maplibre_native_c.h>`. The two headers that
-`maplibre_native_c.h` leaves out are the submodules
-`MaplibreNativeC.CallbackAdapter` and `MaplibreNativeC.Plugin`. Each Apple Metal
-archive also carries its own framework under `Frameworks/`.
-
-To build a prefix yourself, see the
-[development overview](/maplibre-native-ffi/development/overview/).
+Swift imports the module `MaplibreNativeC`, and C includes
+`<MaplibreNativeC/maplibre_native_c.h>`. The callback adapter and plugin
+headers are the submodules `MaplibreNativeC.CallbackAdapter` and
+`MaplibreNativeC.Plugin`.
 
 ## Bindings
 
@@ -188,7 +184,7 @@ cached. Point the hook at your own prefix when you need a fixed native library.
 go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 ```
 
-Install the [C library](#c-library), then export `PKG_CONFIG_PATH`
+Install the [C library](#build-against-a-prefix), then export `PKG_CONFIG_PATH`
 before you build. cgo reads it.
 
 ### Python
@@ -255,7 +251,7 @@ from the repository name rather than from the manifest, so name it as
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
 
-Install the [C library](#c-library), then export `PKG_CONFIG_PATH`
+Install the [C library](#build-against-a-prefix), then export `PKG_CONFIG_PATH`
 before you build.
 
 ### Zig
@@ -266,7 +262,7 @@ before you build.
 zig fetch --save git+https://github.com/maplibre/maplibre-native-ffi
 ```
 
-Install the [C library](#c-library), then pass
+Install the [C library](#build-against-a-prefix), then pass
 `-Dnative-install-dir=<prefix>` when you build.
 
 ## Platforms
