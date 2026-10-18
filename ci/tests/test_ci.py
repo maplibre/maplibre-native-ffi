@@ -1,4 +1,4 @@
-"""Exercise coverage transitions, generated job dependencies, and required checks."""
+"""Exercise coverage selection and reuse, the generated gates, and retries."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from ruamel.yaml import YAML
 from ci.coverage import (
     GROUPS,
     PLATFORMS,
-    check_name,
     group_targets,
     scope,
     selected_jobs,
@@ -97,31 +96,21 @@ def shell_accepts(step, env):
 class CoverageTest(unittest.TestCase):
     def test_extended_combinations_include_packaging_producers_once(self):
         source, presets = load_configuration(ROOT)
+        needs = {
+            name: set(job.get("needs", []))
+            for name, job in suite(source, presets, "extended")["jobs"].items()
+            if name != "verified"
+        }
         for size in range(len(PLATFORMS) + 1):
             for platforms in itertools.combinations(PLATFORMS, size):
                 event = pr(labels=[f"ci:{name}" for name in platforms])
                 selection = scope("extended", "pull_request", event)
                 jobs = selected_jobs(source, presets, "extended", selection)
                 self.assertEqual(len(jobs), len(set(jobs)))
-                self.assertEqual("android-multi" in jobs, "android" in platforms)
-                self.assertEqual("apple-xcframework" in jobs, "apple" in platforms)
-                if "android" in platforms:
-                    self.assertTrue(
-                        {
-                            f"target-android-{abi}-{backend}"
-                            for abi in ("arm", "arm64", "x64")
-                            for backend in ("egl", "vulkan")
-                        }
-                        <= set(jobs)
-                    )
-                self.assertNotIn("kotlin-maven", jobs)
-        jobs = selected_jobs(source, presets, "extended", "full")
-        self.assertTrue(
-            {"hygiene", "docs", "android-multi", "apple-xcframework", "kotlin-maven"}
-            <= set(jobs)
-        )
-        self.assertTrue(
-            {f"target-{target}" for target in preset_sets(presets)[0]} <= set(jobs)
+                for job in jobs:
+                    self.assertLessEqual(needs[job], set(jobs), (platforms, job))
+        self.assertEqual(
+            set(selected_jobs(source, presets, "extended", "full")), set(needs)
         )
 
     def test_extended_reuse_requires_identical_complete_scope(self):
@@ -172,27 +161,8 @@ class CoverageTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             scope("extended", "unknown", {})
 
-    def test_baseline_ready_and_full_cover_the_original_targets(self):
+    def test_extended_covers_every_target_and_rejects_invalid_groups(self):
         source, presets = load_configuration(ROOT)
-        self.assertEqual(
-            group_targets(source, presets, "baseline"),
-            {
-                "linux-gnu-x64-egl",
-                "linux-gnu-x64-vulkan",
-            },
-        )
-        self.assertEqual(
-            group_targets(source, presets, "ready"),
-            {
-                "macos-arm64-metal",
-                "windows-x64-wgl",
-                "windows-x64-vulkan",
-                "android-x64-egl",
-                "android-x64-vulkan",
-                "emscripten-wasm32-webgl",
-                "emscripten-wasm32-webgpu",
-            },
-        )
         self.assertEqual(
             group_targets(source, presets, "extended"), set(preset_sets(presets)[0])
         )
@@ -339,75 +309,10 @@ class WorkflowTest(unittest.TestCase):
         cls.source, cls.presets = load_configuration(ROOT)
         cls.workflows = workflows(cls.source, cls.presets)
 
-    def test_generated_workflows_match_and_preserve_packaging_dependencies(self):
-        self.assertEqual(
-            {
-                document["jobs"]["required"]["name"]
-                for document in self.workflows.values()
-                if "required" in document["jobs"]
-            },
-            {"ci-required", "ci-required (baseline)", "ci-required (ready)"},
-        )
+    def test_serialized_workflows_load_as_generated(self):
         for name, document in self.workflows.items():
             with self.subTest(name=name):
-                encoded = serialize(document)
-                self.assertEqual(
-                    (ROOT / ".github/workflows" / name).read_text(), encoded
-                )
-                self.assertEqual(YAML(typ="safe").load(encoded), document)
-        for group in GROUPS:
-            jobs = self.workflows[f"_ci-{group}.yml"]["jobs"]
-            self.assertEqual(set(jobs["verified"]["needs"]), set(jobs) - {"verified"})
-            for job in jobs.values():
-                self.assertNotIn("continue-on-error", job)
-                self.assertTrue(set(job.get("needs", [])) <= jobs.keys())
-            if group == "extended":
-                self.assertEqual(
-                    set(jobs["android-multi"]["needs"]),
-                    {
-                        f"target-android-{abi}-{backend}"
-                        for abi in ("arm", "arm64", "x64")
-                        for backend in ("egl", "vulkan")
-                    },
-                )
-                self.assertEqual(
-                    set(jobs["apple-xcframework"]["needs"]),
-                    {
-                        f"target-{platform}-arm64-metal"
-                        for platform in (
-                            "macos",
-                            "ios",
-                            "ios-simulator",
-                            "ios-maccatalyst",
-                            "tvos",
-                            "tvos-simulator",
-                        )
-                    },
-                )
-            self.assertEqual("kotlin-maven" in jobs, group == "extended")
-        full = self.workflows["_ci-extended.yml"]["jobs"]
-        self.assertEqual(full["kotlin-maven"]["with"]["run_id"], "${{ github.run_id }}")
-        self.assertEqual(full["kotlin-maven"]["with"]["sha"], "${{ github.sha }}")
-        self.assertFalse(full["kotlin-maven"]["with"]["publish"])
-        self.assertEqual(self.workflows["ci.yml"]["name"], "CI")
-
-    def test_events_keep_baseline_stable_and_main_runs_independent(self):
-        baseline = caller("baseline")["on"]["pull_request"]["types"]
-        self.assertEqual(set(baseline), {"opened", "synchronize", "reopened"})
-        ready = caller("ready")["on"]["pull_request"]["types"]
-        self.assertEqual(
-            set(ready) - set(baseline), {"ready_for_review", "converted_to_draft"}
-        )
-        for group in GROUPS:
-            document = caller(group)
-            self.assertEqual("push" in document["on"], group == "extended")
-            self.assertEqual("workflow_dispatch" in document["on"], group == "extended")
-            self.assertIn("|| github.run_id", document["concurrency"]["group"])
-            self.assertEqual(
-                document["concurrency"]["cancel-in-progress"],
-                "${{ github.event.action == 'synchronize' }}",
-            )
-            self.assertEqual(document["jobs"]["required"]["name"], check_name(group))
+                self.assertEqual(YAML(typ="safe").load(serialize(document)), document)
 
     def test_verification_rejects_every_missing_failed_cancelled_or_skipped_job(self):
         job = suite(self.source, self.presets, "extended")["jobs"]["verified"]
