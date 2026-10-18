@@ -1,6 +1,5 @@
-import Foundation
-
 internal import MaplibreNativeC
+import Foundation
 
 /// Releases a runtime owner thread parked in
 /// `RuntimeHandle.pump(timeout:budget:)`.
