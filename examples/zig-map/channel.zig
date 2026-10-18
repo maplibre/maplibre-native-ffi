@@ -43,7 +43,7 @@ pub const CommandQueue = struct {
     /// Render loop: queues one decoded camera change. Panics on allocation
     /// failure.
     pub fn push(self: *CommandQueue, command: CameraCommand) void {
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         self.items.append(self.allocator, command) catch
             @panic("camera command queue out of memory");
@@ -54,7 +54,7 @@ pub const CommandQueue = struct {
     pub fn drainInto(self: *CommandQueue, out: *std.ArrayList(CameraCommand)) void {
         // `out` belongs to the runtime loop alone, so clear it outside the lock.
         out.clearRetainingCapacity();
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         std.mem.swap(std.ArrayList(CameraCommand), &self.items, out);
     }
@@ -94,7 +94,7 @@ pub const MapChannel = struct {
         map: maplibre.MapHandle,
         wake: maplibre.WakeSourceHandle,
     ) void {
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         self.map = map;
         self.wake = wake;
@@ -105,7 +105,7 @@ pub const MapChannel = struct {
     /// runtime loop has published, when there is nothing parked yet.
     pub fn wakeRuntimeLoop(self: *MapChannel) void {
         if (!self.published.load(.acquire)) return;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         if (self.wake) |wake| wake.signal() catch {};
     }
@@ -113,7 +113,7 @@ pub const MapChannel = struct {
     /// Render loop: the map to attach against, once the runtime loop has one.
     pub fn mapHandle(self: *MapChannel) ?maplibre.MapHandle {
         if (!self.published.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         return self.map;
     }
@@ -139,7 +139,7 @@ pub const MapChannel = struct {
     }
 
     pub fn fail(self: *MapChannel, err: anyerror) void {
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         if (self.failure == null) self.failure = err;
         self.failed.store(true, .release);
@@ -147,7 +147,7 @@ pub const MapChannel = struct {
 
     pub fn failureValue(self: *MapChannel) ?anyerror {
         if (!self.failed.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         return self.failure;
     }

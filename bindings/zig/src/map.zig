@@ -2430,7 +2430,7 @@ fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln
 }
 
 fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
-    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
 
     for (custom_geometry_state_registry.items) |live_state| {
@@ -2470,19 +2470,19 @@ fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void 
 }
 
 fn registerLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) std.mem.Allocator.Error!void {
-    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     try custom_geometry_state_registry.append(std.heap.smp_allocator, source_state);
 }
 
 fn unregisterLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
-    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     removeLiveCustomGeometrySourceStateLocked(source_state);
 }
 
 fn retireLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
-    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     removeLiveCustomGeometrySourceStateLocked(source_state);
 }
@@ -2520,7 +2520,7 @@ fn customMvtVectorCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.ml
 }
 
 fn beginCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) bool {
-    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
 
     for (custom_mvt_vector_state_registry.items) |live_state| {
@@ -2549,19 +2549,19 @@ fn freeCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) voi
 }
 
 fn registerLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) std.mem.Allocator.Error!void {
-    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
     try custom_mvt_vector_state_registry.append(std.heap.smp_allocator, source_state);
 }
 
 fn unregisterLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
-    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
     removeLiveCustomMvtVectorSourceStateLocked(source_state);
 }
 
 fn retireLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
-    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
     removeLiveCustomMvtVectorSourceStateLocked(source_state);
 }
@@ -2718,13 +2718,13 @@ pub fn unregisterRenderSession(handle: MapHandle) void {
 // Callback states the tile trampolines still route through. The C API's release
 // callback is what retires one, so a released state leaves this count.
 fn liveCustomGeometrySourceCountForTesting() usize {
-    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     return custom_geometry_state_registry.items.len;
 }
 
 fn liveCustomMvtVectorSourceCountForTesting() usize {
-    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    std.Io.Threaded.mutexLockUncancelable(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
     return custom_mvt_vector_state_registry.items.len;
 }
@@ -2843,7 +2843,7 @@ fn nulTerminated(
         try status.setBindingDiagnostic(diagnostic_store, diagnostic_message);
         return error.InvalidString;
     }
-    return allocator.dupeZ(u8, value);
+    return allocator.dupeSentinel(u8, value, 0);
 }
 
 const TestCustomGeometryCallbackState = struct {

@@ -1157,9 +1157,10 @@ pub const RuntimeEventMask = struct {
     fn toRaw(self: RuntimeEventMask) u64 {
         @setEvalBranchQuota(4000);
         var raw = self.unknown_bits;
-        inline for (@typeInfo(RuntimeEventMask).@"struct".fields) |field| {
-            if (field.type == bool) {
-                if (@field(self, field.name)) raw |= maskBitForField(field.name);
+        const mask_info = @typeInfo(RuntimeEventMask).@"struct";
+        inline for (mask_info.field_names, mask_info.field_types) |field_name, field_type| {
+            if (field_type == bool) {
+                if (@field(self, field_name)) raw |= maskBitForField(field_name);
             }
         }
         return raw;
@@ -1169,10 +1170,11 @@ pub const RuntimeEventMask = struct {
         @setEvalBranchQuota(4000);
         var mask = RuntimeEventMask{};
         mask.unknown_bits = raw & ~@as(u64, c.MLN_RUNTIME_EVENT_MASK_ALL);
-        inline for (@typeInfo(RuntimeEventMask).@"struct".fields) |field| {
-            if (field.type == bool) {
-                if (raw & maskBitForField(field.name) != 0) {
-                    @field(mask, field.name) = true;
+        const mask_info = @typeInfo(RuntimeEventMask).@"struct";
+        inline for (mask_info.field_names, mask_info.field_types) |field_name, field_type| {
+            if (field_type == bool) {
+                if (raw & maskBitForField(field_name) != 0) {
+                    @field(mask, field_name) = true;
                 }
             }
         }
@@ -2727,7 +2729,7 @@ fn nulTerminated(
         try status.setBindingDiagnostic(diagnostic_store, diagnostic_message);
         return error.InvalidString;
     }
-    return allocator.dupeZ(u8, value);
+    return allocator.dupeSentinel(u8, value, 0);
 }
 
 const offline_style_url_for_testing = "http://example.com/offline-style.json";

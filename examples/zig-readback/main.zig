@@ -251,7 +251,7 @@ const Shared = struct {
     failed: std.atomic.Value(bool) = .init(false),
 
     fn fail(self: *Shared, err: anyerror) void {
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         if (self.failure == null) self.failure = err;
         self.failed.store(true, .release);
@@ -259,7 +259,7 @@ const Shared = struct {
 
     fn failureValue(self: *Shared) ?anyerror {
         if (!self.failed.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         return self.failure;
     }
@@ -269,7 +269,7 @@ const Shared = struct {
         handle: maplibre.MapHandle,
         wake: maplibre.WakeSourceHandle,
     ) void {
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         self.map = handle;
         self.wake = wake;
@@ -279,14 +279,14 @@ const Shared = struct {
     /// Render loop: releases the runtime loop's parked pump.
     fn wakeRuntimeLoop(self: *Shared) void {
         if (!self.map_published.load(.acquire)) return;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         if (self.wake) |wake| wake.signal() catch {};
     }
 
     fn tryTakeMap(self: *Shared) ?maplibre.MapHandle {
         if (!self.map_published.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
+        std.Io.Threaded.mutexLockUncancelable(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         return self.map;
     }

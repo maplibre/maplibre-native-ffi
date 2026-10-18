@@ -124,6 +124,6 @@ pub const TempStorage = struct {
             try status.setBindingDiagnostic(self.diagnostic_store, diagnostic_message);
             return error.InvalidString;
         }
-        return self.arena.allocator().dupeZ(u8, value);
+        return self.arena.allocator().dupeSentinel(u8, value, 0);
     }
 };
