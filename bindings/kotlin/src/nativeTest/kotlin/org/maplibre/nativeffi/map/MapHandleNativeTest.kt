@@ -35,7 +35,7 @@ class MapHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
         scaleFactor = 2.0
         mapMode = MapMode.STATIC
         fastPforEnabled = true
-      }
+      },
     ) { native ->
       assertEquals(320U, native.width)
       assertEquals(240U, native.height)

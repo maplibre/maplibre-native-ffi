@@ -140,10 +140,10 @@ class RuntimeHandleTest {
           handle.complete(
             ResourceResponse(ResourceResponseStatus.OK).apply {
               bytes = STYLE_JSON.encodeToByteArray()
-            }
+            },
           )
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -179,14 +179,14 @@ class RuntimeHandleTest {
             handle.complete(
               ResourceResponse(ResourceResponseStatus.OK).apply {
                 bytes = STYLE_JSON.encodeToByteArray()
-              }
+              },
             )
             ResourceProviderDecision.HANDLE
           } catch (error: Throwable) {
             callbackError.store(error)
             throw error
           }
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -226,7 +226,7 @@ class RuntimeHandleTest {
           }
           handledRequest.store(handle)
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -243,7 +243,7 @@ class RuntimeHandleTest {
         handle.complete(
           ResourceResponse(ResourceResponseStatus.OK).apply {
             bytes = STYLE_JSON.encodeToByteArray()
-          }
+          },
         )
         assertFailsWith<InvalidStateException> { handle.isCancelled() }
         assertFailsWith<InvalidStateException> {
@@ -268,10 +268,10 @@ class RuntimeHandleTest {
             ResourceResponse(ResourceResponseStatus.ERROR).apply {
               errorReason = ResourceErrorReason.NOT_FOUND
               errorMessage = "custom style failed"
-            }
+            },
           )
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -309,7 +309,7 @@ class RuntimeHandleTest {
           }
           handledRequest.store(handle)
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -329,7 +329,7 @@ class RuntimeHandleTest {
         handle.complete(
           ResourceResponse(ResourceResponseStatus.OK).apply {
             bytes = STYLE_JSON.encodeToByteArray()
-          }
+          },
         )
       }
       handle.close()
@@ -358,7 +358,7 @@ class RuntimeHandleTest {
         waitForCondition {
           runtime.pump(1)
           cancels.load() == 1
-        }
+        },
       )
       assertTrue(handle.isCancelled())
       repeat(CANCEL_SETTLE_PUMPS) {
@@ -394,7 +394,7 @@ class RuntimeHandleTest {
         waitForCondition {
           runtime.pump(1)
           closes.load() == 1
-        }
+        },
       )
       assertFailsWith<InvalidStateException> { handle.isCancelled() }
       handle.close()
@@ -419,7 +419,7 @@ class RuntimeHandleTest {
         cancels.addAndFetch(1)
         completionFailure.store(
           runCatching { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-            .exceptionOrNull()
+            .exceptionOrNull(),
         )
       }
 
@@ -440,7 +440,9 @@ class RuntimeHandleTest {
       val cancels = AtomicInt(0)
       handle.setCancelCallback { cancels.addAndFetch(1) }
       handle.complete(
-        ResourceResponse(ResourceResponseStatus.OK).apply { bytes = STYLE_JSON.encodeToByteArray() }
+        ResourceResponse(ResourceResponseStatus.OK).apply {
+          bytes = STYLE_JSON.encodeToByteArray()
+        },
       )
       assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
 
@@ -465,7 +467,7 @@ class RuntimeHandleTest {
         ResourceProviderCallback { _, _ ->
           firstCalls.addAndFetch(1)
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -483,7 +485,7 @@ class RuntimeHandleTest {
           ResourceProviderCallback { _, _ ->
             secondCalls.addAndFetch(1)
             ResourceProviderDecision.PASS_THROUGH
-          }
+          },
         )
         val firstCallsAfterReplace = firstCalls.load()
         loadUnservedStyle(runtime, map, "jar:file:/packaged/second.json")
@@ -519,7 +521,7 @@ class RuntimeHandleTest {
             lastKind.store(request.kind)
             calls.addAndFetch(1)
             "unsupported://rewritten-style.json"
-          }
+          },
         )
         val map =
           MapHandle.create(
@@ -535,7 +537,7 @@ class RuntimeHandleTest {
             waitForCondition {
               runtime.pump(1)
               calls.load() > 0
-            }
+            },
           )
           assertEquals(1, calls.load())
           assertEquals("http://example.invalid/original-style.json", lastUrl.load())
@@ -568,7 +570,7 @@ class RuntimeHandleTest {
             requestHandle.store(handle)
           }
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -605,7 +607,7 @@ class RuntimeHandleTest {
             closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
           }
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -621,7 +623,7 @@ class RuntimeHandleTest {
           waitForCondition {
             runtime.pump(1)
             closeError.load() != null
-          }
+          },
         )
         assertFalse(runtime.isClosed)
       } finally {
@@ -640,7 +642,7 @@ class RuntimeHandleTest {
             closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
           }
           "unsupported://close-during-transform.json"
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -656,7 +658,7 @@ class RuntimeHandleTest {
           waitForCondition {
             runtime.pump(1)
             closeError.load() != null
-          }
+          },
         )
         assertFalse(runtime.isClosed)
       } finally {
@@ -729,7 +731,7 @@ class RuntimeHandleTest {
         }
         handledRequest.store(handle)
         ResourceProviderDecision.HANDLE
-      }
+      },
     )
     return handledRequest
   }

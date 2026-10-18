@@ -27,7 +27,7 @@ class LogCallbackStateTest {
         LogCallback { record ->
           copiedRecord = record
           true
-        }
+        },
       )
       val state = assertNotNull(LogCallbackState.currentForTesting())
 
@@ -64,7 +64,7 @@ class LogCallbackStateTest {
           entered.countDown()
           release.await(5, TimeUnit.SECONDS)
           true
-        }
+        },
       )
     val invocation = thread { state.invoke(MemorySegment.NULL, 0, 0, 0, MemorySegment.NULL) }
     assertTrue(entered.await(5, TimeUnit.SECONDS))
@@ -85,7 +85,7 @@ class LogCallbackStateTest {
         LogCallback {
           reentrant.close()
           true
-        }
+        },
       )
     assertEquals(1, reentrant.invoke(MemorySegment.NULL, 0, 0, 0, MemorySegment.NULL))
     assertTrue(reentrant.isClosedForTesting())
@@ -100,7 +100,7 @@ class LogCallbackStateTest {
         LogCallback {
           copied = it
           false
-        }
+        },
       )
       val previous = assertNotNull(LogCallbackState.currentForTesting())
       assertFailsWith<IllegalStateException> {
@@ -120,7 +120,7 @@ class LogCallbackStateTest {
   }
 
   private fun LogCallbackState.Companion.setForTestingAndGet(
-    callback: LogCallback
+    callback: LogCallback,
   ): LogCallbackState {
     setForTesting(callback)
     return assertNotNull(currentForTesting())

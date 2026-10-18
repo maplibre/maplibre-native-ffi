@@ -354,7 +354,7 @@ internal class LinuxEglContext private constructor() : AutoCloseable {
 
   fun makeCurrent() {
     check(
-      display != EGL_NO_DISPLAY && surface != EGL_NO_SURFACE && shareContext != EGL_NO_CONTEXT
+      display != EGL_NO_DISPLAY && surface != EGL_NO_SURFACE && shareContext != EGL_NO_CONTEXT,
     ) {
       "Linux EGL context is not initialized"
     }

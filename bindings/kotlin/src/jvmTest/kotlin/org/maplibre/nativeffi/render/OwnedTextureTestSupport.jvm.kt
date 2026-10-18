@@ -37,7 +37,7 @@ private class JvmEglOwnedTextureSession(
     return session
       .map()
       .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
   }
 
@@ -109,7 +109,7 @@ private fun createEglSession(
     val configs = stack.mallocPointer(1)
     val configCount = stack.mallocInt(1)
     check(
-      EGL14.eglChooseConfig(display, configAttributes, configs, configCount) && configCount[0] > 0
+      EGL14.eglChooseConfig(display, configAttributes, configs, configCount) && configCount[0] > 0,
     ) {
       "no EGL config supports OpenGL ES 3 pbuffer rendering"
     }
@@ -134,7 +134,7 @@ private fun createEglSession(
       )
     val session =
       map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
     return JvmEglOwnedTextureSession(display, config, surface, context, session)
   } catch (error: Throwable) {

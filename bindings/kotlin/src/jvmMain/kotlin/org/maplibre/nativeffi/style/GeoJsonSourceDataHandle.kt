@@ -23,7 +23,7 @@ internal constructor(private val handle: NativeGeoJsonSourceData) : AutoCloseabl
       destroy = {
         NativeAccess.destroyGeoJsonSourceData(handle)
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
   }
 

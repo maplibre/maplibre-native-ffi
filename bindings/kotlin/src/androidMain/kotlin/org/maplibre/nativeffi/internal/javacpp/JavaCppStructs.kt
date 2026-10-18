@@ -33,7 +33,7 @@ internal object JavaCppStructs {
     JavaCppMapStructs.cameraOptionsRoundTrip(value)
 
   fun animationOptionsSnapshot(
-    value: AnimationOptions
+    value: AnimationOptions,
   ): JavaCppMapStructs.AnimationOptionsSnapshot = JavaCppMapStructs.animationOptionsSnapshot(value)
 
   fun viewportOptionsRoundTrip(value: ViewportOptions): ViewportOptions =
@@ -49,7 +49,7 @@ internal object JavaCppStructs {
     JavaCppRenderStructs.renderedQueryGeometryType(value)
 
   fun featureStateSelectorSnapshot(
-    value: FeatureStateSelector
+    value: FeatureStateSelector,
   ): JavaCppRenderStructs.FeatureStateSelectorSnapshot =
     JavaCppRenderStructs.featureStateSelectorSnapshot(value)
 
@@ -86,7 +86,7 @@ internal object JavaCppStructs {
     JavaCppRuntimeStructs.offlineRegionListCleanupAfterCopyFailure()
 
   fun styleImageOptionsSnapshot(
-    value: StyleImageOptions
+    value: StyleImageOptions,
   ): JavaCppMapStructs.StyleImageOptionsSnapshot =
     JavaCppMapStructs.styleImageOptionsSnapshot(value)
 
@@ -111,19 +111,19 @@ internal object JavaCppStructs {
     JavaCppMapStructs.mapOptionsSnapshot(value)
 
   fun metalSnapshot(
-    value: MetalBorrowedTextureDescriptor
+    value: MetalBorrowedTextureDescriptor,
   ): JavaCppRenderStructs.RenderDescriptorSnapshot = JavaCppRenderStructs.metalSnapshot(value)
 
   fun vulkanSnapshot(
-    value: VulkanBorrowedTextureDescriptor
+    value: VulkanBorrowedTextureDescriptor,
   ): JavaCppRenderStructs.RenderDescriptorSnapshot = JavaCppRenderStructs.vulkanSnapshot(value)
 
   fun openGlSnapshot(
-    value: OpenGLBorrowedTextureDescriptor
+    value: OpenGLBorrowedTextureDescriptor,
   ): JavaCppRenderStructs.RenderDescriptorSnapshot = JavaCppRenderStructs.openGlSnapshot(value)
 
   fun resourceResponseSnapshot(
-    value: ResourceResponse
+    value: ResourceResponse,
   ): JavaCppResourceStructs.ResourceResponseSnapshot =
     JavaCppResourceStructs.resourceResponseSnapshot(value)
 }

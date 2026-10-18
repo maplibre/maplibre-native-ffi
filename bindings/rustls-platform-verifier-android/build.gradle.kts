@@ -4,7 +4,7 @@ val repositoryRoot = projectDir.resolve("../..")
 val verifierSourceDirectory =
   repositoryRoot.resolve(
     "build/dependencies/rustls-platform-verifier/" +
-      "android/rustls-platform-verifier/src/main/java"
+      "android/rustls-platform-verifier/src/main/java",
   )
 val verifierSourceFile =
   verifierSourceDirectory.resolve("org/rustls/platformverifier/CertificateVerifier.kt")

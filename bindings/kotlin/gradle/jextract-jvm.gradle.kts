@@ -113,7 +113,7 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
       Regex(
         """public static final ValueLayout\.Of(?:Int|Long) C_LONG\s*=\s*""" +
           """\(ValueLayout\.Of(?:Int|Long)\)\s*""" +
-          """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);"""
+          """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);""",
       )
     val generatedSource = sharedBindings.readText()
     val matchCount = hostLongLayout.findAll(generatedSource).count()
@@ -124,7 +124,7 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
       hostLongLayout.replaceFirst(
         generatedSource,
         "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
-      )
+      ),
     )
     output
       .walkTopDown()
@@ -132,7 +132,7 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
       .forEach {
         it.writeText(
           it.readText().replace("MapLibreNativeC.C_LONG_LONG", "MapLibreNativeC.C_LONG").trimEnd() +
-            "\n"
+            "\n",
         )
       }
   }

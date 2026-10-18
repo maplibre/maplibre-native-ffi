@@ -146,7 +146,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
             zoom = 13.0
             bearing = 12.0
             pitch = 30.0
-          }
+          },
         )
         return MapState(runtime, map)
       } catch (error: RuntimeException) {

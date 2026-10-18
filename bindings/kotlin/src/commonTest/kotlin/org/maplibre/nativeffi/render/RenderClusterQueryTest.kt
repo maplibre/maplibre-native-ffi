@@ -31,7 +31,7 @@ class RenderClusterQueryTest {
           CameraOptions().apply {
             center = LatLng(0.0, 0.0)
             zoom = 0.0
-          }
+          },
         )
         map.setStyleJson(CLUSTER_STYLE_JSON.encodeToByteArray())
         GeoJsonSourceDataHandle.create(clusterPoints(), clusterSourceOptions()).use { clusterData ->
@@ -47,7 +47,7 @@ class RenderClusterQueryTest {
             ScreenBox(
               ScreenPoint(queryPoint.x - 30.0, queryPoint.y - 30.0),
               ScreenPoint(queryPoint.x + 30.0, queryPoint.y + 30.0),
-            )
+            ),
           )
         val cluster =
           waitForQueriedFeature(runtime, map, session) {
@@ -131,7 +131,7 @@ class RenderClusterQueryTest {
           ${clusterPoint("three", 0.002)}
         ]
       }
-      """
+      """,
     )
 
   private fun clusterPoint(name: String, offset: Double): String =
@@ -156,7 +156,7 @@ class RenderClusterQueryTest {
         "filter": ["has", "point_count"],
         "paint": {"circle-color": "#2563eb", "circle-radius": 20}
       }
-      """
+      """,
     )
 
   private companion object {

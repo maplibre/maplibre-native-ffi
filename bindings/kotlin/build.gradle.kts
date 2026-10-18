@@ -29,7 +29,7 @@ val upstreamPluginHeaders =
   rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
 val androidBackend =
   AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
   )
 val androidTargets =
   AndroidTarget.parseAbis(
@@ -258,13 +258,13 @@ androidComponents {
     // Android KMP does not currently expose a task-provider-backed generated Java source hook.
     // Keep the explicit task dependencies below in sync with this static source directory.
     variant.sources.java?.addStaticSourceDirectory(
-      generatedJavaCppSources.get().asFile.absolutePath
+      generatedJavaCppSources.get().asFile.absolutePath,
     )
     // The JavaCPP bridge is private to this binding, so it ships in this AAR
     // rather than in the shared runtime AARs.
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
+        packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath,
       )
     }
   }
@@ -325,7 +325,7 @@ val checkAndroidApiFloor =
     dependsOn("compileAndroidMain", "compileAndroidMainJavaWithJavac")
     workingDir = rootProject.layout.projectDirectory.asFile
     commandLine(
-      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile
+      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile,
     )
   }
 

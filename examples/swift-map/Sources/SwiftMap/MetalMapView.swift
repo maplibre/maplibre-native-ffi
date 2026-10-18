@@ -169,8 +169,7 @@ final class MetalMapView: NSView {
   }
 
   private func updateViewport() {
-    guard !isShutDown, setupError == nil else { return }
-    guard let graphics else { return }
+    guard !isShutDown, setupError == nil, let graphics else { return }
     let viewport = readViewport()
 
     guard viewport != currentViewport else { return }

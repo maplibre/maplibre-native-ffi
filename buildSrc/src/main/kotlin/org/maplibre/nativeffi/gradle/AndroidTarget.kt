@@ -71,7 +71,7 @@ enum class AndroidTarget(
         entries.firstOrNull { it.ndkAbi == abi }
           ?: error(
             "Unsupported Android ABI '$abi'; maplibre.android.abis supports " +
-              entries.joinToString(",") { it.ndkAbi }
+              entries.joinToString(",") { it.ndkAbi },
           )
       }
     }

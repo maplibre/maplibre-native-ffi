@@ -82,13 +82,13 @@ object LogProcessExitProbe {
           received.countDown()
         }
         true
-      }
+      },
     )
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       MapHandle.create(runtime, MapOptions()).use { map ->
         // An invalid center emits a native parser warning without network or rendering work.
         map.setStyleJson(
-          """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
+          """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray(),
         )
         check(received.await(10, TimeUnit.SECONDS)) { "Native parser warning never reached Java" }
         check(callbackThread.get() !== caller) { "Log callback ran synchronously" }

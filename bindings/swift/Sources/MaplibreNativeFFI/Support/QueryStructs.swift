@@ -51,7 +51,9 @@ struct NativeRenderedFeatureQueryOptions: Equatable {
     _ body: (UnsafePointer<mln_rendered_feature_query_options>?) throws
       -> Result
   ) throws -> Result {
-    if layerIds.isEmpty, filter == nil { return try body(nil) }
+    if layerIds.isEmpty, filter == nil {
+      return try body(nil)
+    }
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     let layerViews = layerIds.map { arena.view($0) }
@@ -94,7 +96,9 @@ struct NativeSourceFeatureQueryOptions: Equatable {
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_source_feature_query_options>?) throws -> Result
   ) throws -> Result {
-    if sourceLayerIds.isEmpty, filter == nil { return try body(nil) }
+    if sourceLayerIds.isEmpty, filter == nil {
+      return try body(nil)
+    }
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     let layerViews = sourceLayerIds.map { arena.view($0) }

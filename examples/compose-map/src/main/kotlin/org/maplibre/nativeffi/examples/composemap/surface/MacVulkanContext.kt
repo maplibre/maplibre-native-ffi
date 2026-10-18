@@ -178,7 +178,7 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       val metalRequirement =
         if (requiredMetalDevice == 0L) "" else " and matches the Skiko Metal device"
       error(
-        "No Vulkan device supports graphics, $VK_EXT_METAL_OBJECTS_EXTENSION_NAME$metalRequirement"
+        "No Vulkan device supports graphics, $VK_EXT_METAL_OBJECTS_EXTENSION_NAME$metalRequirement",
       )
     }
   }
@@ -324,7 +324,7 @@ private constructor(
             VkExtent3D.calloc(stack)
               .width(extent.physicalWidth)
               .height(extent.physicalHeight)
-              .depth(1)
+              .depth(1),
           )
           .mipLevels(1)
           .arrayLayers(1)
@@ -349,7 +349,7 @@ private constructor(
               .baseMipLevel(0)
               .levelCount(1)
               .baseArrayLayer(0)
-              .layerCount(1)
+              .layerCount(1),
           )
       val viewOut = stack.mallocLong(1)
       checkVulkan(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")

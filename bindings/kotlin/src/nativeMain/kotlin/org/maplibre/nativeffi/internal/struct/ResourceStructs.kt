@@ -59,7 +59,7 @@ internal object ResourceStructs {
     native.status = value.status.nativeValue.toUInt()
     if (!value.errorReason.isKnown) {
       throw Status.invalidArgument(
-        "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+        "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}",
       )
     }
     native.error_reason = value.errorReason.nativeValue.toUInt()

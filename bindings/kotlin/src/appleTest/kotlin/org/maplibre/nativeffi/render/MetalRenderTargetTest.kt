@@ -73,7 +73,7 @@ class MetalRenderTargetTest {
             assertSame(borrowedMap, session.map())
             borrowedMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
-              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE),
             )
             assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
@@ -102,13 +102,13 @@ class MetalRenderTargetTest {
                 extent = RenderTargetExtent(32, 16, 1.0),
                 context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
                 layer = NativePointer.ofAddress(layer.address()),
-              )
+              ),
             )
           try {
             assertSame(surfaceMap, session.map())
             surfaceMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
-              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE),
             )
             assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
@@ -155,7 +155,7 @@ class MetalRenderTargetTest {
               extent = extent,
               context = MetalContextDescriptor(NativePointer.NULL_POINTER),
               layer = NativePointer.ofAddress(layer.address()),
-            )
+            ),
           )
         try {
           layer.drawableSize.useContents {
@@ -207,12 +207,12 @@ class MetalRenderTargetTest {
                 physicalWidth = 32,
                 physicalHeight = 16,
                 texture = NativePointer.ofAddress(borrowedTextureAddress),
-              )
+              ),
             )
           try {
             borrowedMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
-              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE),
             )
             assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
@@ -278,12 +278,12 @@ class MetalRenderTargetTest {
                 extent = RenderTargetExtent(32, 16, 1.0),
                 context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
                 layer = NativePointer.ofAddress(layer.address()),
-              )
+              ),
             )
           try {
             surfaceMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
-              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE),
             )
             assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
@@ -294,7 +294,7 @@ class MetalRenderTargetTest {
                 extent = RenderTargetExtent(16, 8, 1.0),
                 context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
                 layer = NativePointer.ofAddress(replacementLayer.address()),
-              )
+              ),
             )
             assertSame(surfaceMap, session.map())
             assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
@@ -343,7 +343,7 @@ class MetalRenderTargetTest {
               physicalWidth = 32,
               physicalHeight = 16,
               texture = NativePointer.ofAddress(texture.address()),
-            )
+            ),
           )
         try {
           map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
@@ -374,7 +374,7 @@ class MetalRenderTargetTest {
               physicalWidth = 32,
               physicalHeight = 16,
               texture = NativePointer.ofAddress(replacementTexture.address()),
-            )
+            ),
           )
           // The session renders the map's latest render update into the replacement.
           assertEquals(RenderResult.RENDERED, session.renderUpdate().result)

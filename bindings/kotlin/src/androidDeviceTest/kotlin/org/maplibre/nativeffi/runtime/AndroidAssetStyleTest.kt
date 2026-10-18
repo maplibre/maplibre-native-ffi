@@ -43,7 +43,7 @@ class AndroidAssetStyleTest {
           "asset://style%20with%20spaces.json?revision=1#style",
           assetPath = assetPath,
           expectedLayer = "custom-root",
-        )
+        ),
       )
     }
   }
@@ -63,7 +63,7 @@ class AndroidAssetStyleTest {
         "file://${File(directory, "style.json").toURI().rawPath}",
         "/android_asset",
         "custom-root",
-      )
+      ),
     )
   }
 
@@ -102,7 +102,7 @@ class AndroidAssetStyleTest {
           sourceErrors.add(record.message)
         }
         false
-      }
+      },
     )
     try {
       RuntimeHandle.create(RuntimeOptions().apply { this.assetPath = assetPath }).use { runtime ->
@@ -117,7 +117,7 @@ class AndroidAssetStyleTest {
           .use { map ->
             map.setStyleJson(
               """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://$archiveUrl"}},"layers":[]}"""
-                .encodeToByteArray()
+                .encodeToByteArray(),
             )
             assertTrue(waitForStyleLoaded(runtime, map))
             assertTrue(map.styleSourceExists("tiles"))

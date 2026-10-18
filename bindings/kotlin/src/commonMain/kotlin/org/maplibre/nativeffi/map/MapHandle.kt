@@ -517,19 +517,19 @@ public expect class MapHandle : AutoCloseable {
   public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle
 
   public fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
+    descriptor: MetalBorrowedTextureDescriptor,
   ): RenderSessionHandle
 
   public fun attachVulkanOwnedTexture(descriptor: VulkanOwnedTextureDescriptor): RenderSessionHandle
 
   public fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): RenderSessionHandle
 
   public fun attachOpenGLOwnedTexture(descriptor: OpenGLOwnedTextureDescriptor): RenderSessionHandle
 
   public fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
+    descriptor: OpenGLBorrowedTextureDescriptor,
   ): RenderSessionHandle
 
   /**

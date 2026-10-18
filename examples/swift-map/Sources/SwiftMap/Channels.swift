@@ -123,7 +123,9 @@ final class Channels: @unchecked Sendable {
     condition.lock()
     defer { condition.unlock() }
     while !shutdown {
-      if !condition.wait(until: deadline) { return }
+      if !condition.wait(until: deadline) {
+        return
+      }
     }
   }
 

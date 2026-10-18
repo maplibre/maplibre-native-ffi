@@ -58,7 +58,7 @@ internal class VulkanBorrowedImage private constructor(graphicsContext: Graphics
             VkExtent3D.calloc(stack)
               .width(viewport.framebufferWidth())
               .height(viewport.framebufferHeight())
-              .depth(1)
+              .depth(1),
           )
           .mipLevels(1)
           .arrayLayers(1)
@@ -97,7 +97,7 @@ internal class VulkanBorrowedImage private constructor(graphicsContext: Graphics
               .baseMipLevel(0)
               .levelCount(1)
               .baseArrayLayer(0)
-              .layerCount(1)
+              .layerCount(1),
           )
       val viewOut = stack.mallocLong(1)
       check(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")

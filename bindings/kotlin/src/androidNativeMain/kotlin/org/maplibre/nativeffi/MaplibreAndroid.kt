@@ -49,7 +49,7 @@ public object MaplibreAndroid {
         jniEnvironment.address.toCPointer<JNIEnvVar>(),
         null,
         context.address.toCPointer<CPointed>(),
-      )
+      ),
     )
   }
 }

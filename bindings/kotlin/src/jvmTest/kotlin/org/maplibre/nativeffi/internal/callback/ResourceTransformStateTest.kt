@@ -19,7 +19,7 @@ class ResourceTransformStateTest {
           copiedKind = request.kind
           copiedUrl = request.url
           null
-        }
+        },
       )
       .use { state ->
         Arena.ofConfined().use { arena ->
@@ -71,7 +71,7 @@ class ResourceTransformStateTest {
           copiedKind = request.kind
           state.close()
           throw IllegalStateException("contained")
-        }
+        },
       )
     Arena.ofConfined().use { arena ->
       val response = arena.allocate(24)

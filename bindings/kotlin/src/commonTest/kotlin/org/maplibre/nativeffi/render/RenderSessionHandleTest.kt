@@ -40,7 +40,7 @@ class RenderSessionHandleTest {
     withOwnedTextureSession { runtime, map, owned ->
       map.setStyleJson(
         """{"version":8,"transition":{"duration":0},"state":{"color":{"default":"#ff0000"}},"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":["global-state","color"]}}]}"""
-          .encodeToByteArray()
+          .encodeToByteArray(),
       )
       fun renderColor(): List<Int> {
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
@@ -73,7 +73,7 @@ class RenderSessionHandleTest {
         ResourceProviderCallback { _, handle ->
           pending.store(handle)
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       try {
         runtime.pump(0)
@@ -113,7 +113,7 @@ class RenderSessionHandleTest {
           .complete(
             ResourceResponse(ResourceResponseStatus.OK).apply {
               bytes = BACKGROUND_STYLE_JSON.encodeToByteArray()
-            }
+            },
           )
         for (attempt in 0 until 500) {
           runtime.pump(0)
@@ -147,7 +147,7 @@ class RenderSessionHandleTest {
             bearing = 23.0
             pitch = 40.0
             padding = EdgeInsets(3.0, 7.0, 5.0, 11.0)
-          }
+          },
         )
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
         map.createProjection().use { expected = it.pixelForLatLng(coordinate) }
@@ -337,7 +337,7 @@ class RenderSessionHandleTest {
           FeatureStateSelector("point").apply {
             featureId = "feature-1"
             stateKey = "hover"
-          }
+          },
         )
         renderIfAvailable(runtime, map, session)
         val afterRemove = map.getFeatureState(featureStateSelector())

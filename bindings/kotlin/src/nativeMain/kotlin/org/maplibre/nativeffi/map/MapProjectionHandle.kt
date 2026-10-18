@@ -54,7 +54,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           mln_map_projection_set_camera(
             handle.rawHandleValue,
             MapStructs.cameraOptions(camera, this),
-          )
+          ),
         )
       }
     }
@@ -70,7 +70,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
             CoreStructs.latLngArray(coordinateSnapshot, this),
             coordinateSnapshot.size.toCSize(),
             CoreStructs.edgeInsets(padding),
-          )
+          ),
         )
       }
     }
@@ -84,7 +84,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
             handle.rawHandleValue,
             ByteStructs.bufferView(geometry, this),
             CoreStructs.edgeInsets(padding),
-          )
+          ),
         )
       }
     }
@@ -98,7 +98,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           handle.rawHandleValue,
           CoreStructs.latLng(coordinate),
           outPoint.ptr,
-        )
+        ),
       )
     }
     CoreStructs.screenPoint(outPoint)
@@ -112,7 +112,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           handle.rawHandleValue,
           CoreStructs.screenPoint(point),
           outCoordinate.ptr,
-        )
+        ),
       )
     }
     CoreStructs.latLng(outCoordinate)
@@ -126,7 +126,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           handle.rawHandleValue,
           CoreStructs.screenPoint(point),
           outCoordinate.ptr,
-        )
+        ),
       )
     }
     CoreStructs.latLng(outCoordinate)
@@ -140,7 +140,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           handle.rawHandleValue,
           latitude,
           outMetersPerPixel.ptr,
-        )
+        ),
       )
     }
     outMetersPerPixel.value

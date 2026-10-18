@@ -108,7 +108,7 @@ internal constructor(
   }
 
   public actual fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
+    operation: AmbientCacheOperation,
   ): OfflineOperationHandle<Unit> = memScoped {
     val outOperationId = alloc<ULongVar>()
     Status.check(
@@ -116,7 +116,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operation.nativeValue.toUInt(),
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -134,7 +134,7 @@ internal constructor(
           state.requireLive().rawHandleValue,
           size.toULong(),
           outOperationId.ptr,
-        )
+        ),
       )
       offlineOperation(
         outOperationId.value,
@@ -155,7 +155,7 @@ internal constructor(
         RuntimeStructs.metadata(metadata, this),
         metadata.size.toCSize(),
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -172,7 +172,7 @@ internal constructor(
           state.requireLive().rawHandleValue,
           id,
           outOperationId.ptr,
-        )
+        ),
       )
       offlineOperation(
         outOperationId.value,
@@ -188,7 +188,7 @@ internal constructor(
         mln_runtime_offline_regions_list_start(
           state.requireLive().rawHandleValue,
           outOperationId.ptr,
-        )
+        ),
       )
       offlineOperation(
         outOperationId.value,
@@ -198,7 +198,7 @@ internal constructor(
     }
 
   public actual fun startMergeOfflineRegionsDatabase(
-    path: String
+    path: String,
   ): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
     MemoryUtil.requireValidCString(path)
     val outOperationId = alloc<ULongVar>()
@@ -207,7 +207,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         path,
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -228,7 +228,7 @@ internal constructor(
         RuntimeStructs.metadata(metadata, this),
         metadata.size.toCSize(),
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -238,7 +238,7 @@ internal constructor(
   }
 
   public actual fun startOfflineRegionStatus(
-    id: Long
+    id: Long,
   ): OfflineOperationHandle<OfflineRegionStatus> = memScoped {
     val outOperationId = alloc<ULongVar>()
     Status.check(
@@ -246,7 +246,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         id,
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -266,7 +266,7 @@ internal constructor(
         id,
         observed,
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -289,7 +289,7 @@ internal constructor(
         id,
         downloadState.nativeValue.toUInt(),
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -306,7 +306,7 @@ internal constructor(
           state.requireLive().rawHandleValue,
           id,
           outOperationId.ptr,
-        )
+        ),
       )
       offlineOperation(
         outOperationId.value,
@@ -322,7 +322,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         id,
         outOperationId.ptr,
-      )
+      ),
     )
     offlineOperation(
       outOperationId.value,
@@ -332,7 +332,7 @@ internal constructor(
   }
 
   public actual fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo = memScoped {
     val outRegion = alloc<ULongVar>()
     outRegion.value = 0uL
@@ -347,16 +347,16 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operationId,
         outRegion.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     RuntimeStructs.offlineRegionSnapshot(
-      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle),
     )
   }
 
   public actual fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
+    operation: OfflineOperationHandle<OfflineRegionInfo?>,
   ): OfflineRegionInfo? = memScoped {
     val outRegion = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
@@ -373,18 +373,18 @@ internal constructor(
         operationId,
         outRegion.ptr,
         outFound.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     if (!outFound.value) null
     else
       RuntimeStructs.offlineRegionSnapshot(
-        outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+        outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle),
       )
   }
 
   public actual fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> = memScoped {
     val outRegions = alloc<ULongVar>()
     outRegions.value = 0uL
@@ -399,16 +399,16 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operationId,
         outRegions.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     RuntimeStructs.offlineRegionList(
-      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
+      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle),
     )
   }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> = memScoped {
     val outRegions = alloc<ULongVar>()
     outRegions.value = 0uL
@@ -423,16 +423,16 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operationId,
         outRegions.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     RuntimeStructs.offlineRegionList(
-      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
+      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle),
     )
   }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo = memScoped {
     val outRegion = alloc<ULongVar>()
     outRegion.value = 0uL
@@ -447,16 +447,16 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operationId,
         outRegion.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     RuntimeStructs.offlineRegionSnapshot(
-      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle),
     )
   }
 
   public actual fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
+    operation: OfflineOperationHandle<OfflineRegionStatus>,
   ): OfflineRegionStatus = memScoped {
     val outStatus = alloc<mln_offline_region_status>()
     outStatus.size = sizeOf<mln_offline_region_status>().toUInt()
@@ -471,7 +471,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         operationId,
         outStatus.ptr,
-      )
+      ),
     )
     operation.markConsumed()
     RuntimeStructs.offlineRegionStatus(outStatus)
@@ -589,7 +589,7 @@ internal constructor(
         mln_runtime_set_http_header_transform(
           state.requireLive().rawHandleValue,
           replacement.descriptor(),
-        )
+        ),
       )
     } catch (error: Throwable) {
       replacement.close()
@@ -643,7 +643,7 @@ internal constructor(
     }
     set(value) {
       Status.check(
-        mln_runtime_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong())
+        mln_runtime_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong()),
       )
     }
 

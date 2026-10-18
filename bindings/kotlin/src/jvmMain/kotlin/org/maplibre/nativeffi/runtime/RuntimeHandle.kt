@@ -54,7 +54,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
+    operation: AmbientCacheOperation,
   ): OfflineOperationHandle<Unit> {
     NativeAccess.ensureLoaded()
     val operationId =
@@ -102,7 +102,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     )
 
   public actual fun startMergeOfflineRegionsDatabase(
-    path: String
+    path: String,
   ): OfflineOperationHandle<List<OfflineRegionInfo>> =
     offlineOperation(
       NativeAccess.startMergeOfflineRegionsDatabase(requireLiveHandle(), path),
@@ -121,7 +121,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     )
 
   public actual fun startOfflineRegionStatus(
-    id: Long
+    id: Long,
   ): OfflineOperationHandle<OfflineRegionStatus> =
     offlineOperation(
       NativeAccess.startOfflineRegionStatus(requireLiveHandle(), id),
@@ -172,7 +172,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     )
 
   public actual fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo {
     val operationId =
       operation.requireLive(
@@ -188,7 +188,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
+    operation: OfflineOperationHandle<OfflineRegionInfo?>,
   ): OfflineRegionInfo? {
     val operationId =
       operation.requireLive(
@@ -204,7 +204,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> {
     val operationId =
       operation.requireLive(
@@ -220,7 +220,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> {
     val operationId =
       operation.requireLive(
@@ -236,7 +236,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo {
     val operationId =
       operation.requireLive(
@@ -252,7 +252,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   public actual fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
+    operation: OfflineOperationHandle<OfflineRegionStatus>,
   ): OfflineRegionStatus {
     val operationId =
       operation.requireLive(
@@ -327,7 +327,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     val replacement = HttpHeaderTransformState(callback)
     try {
       Status.check(
-        NativeAccess.setHttpHeaderTransform(requireLiveHandle(), replacement.descriptor())
+        NativeAccess.setHttpHeaderTransform(requireLiveHandle(), replacement.descriptor()),
       )
     } catch (error: Throwable) {
       closeAndSuppress(error, replacement)

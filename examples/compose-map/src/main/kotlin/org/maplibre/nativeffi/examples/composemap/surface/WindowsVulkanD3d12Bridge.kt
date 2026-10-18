@@ -536,7 +536,7 @@ private constructor(
             VkExtent3D.calloc(stack)
               .width(storageExtent.physicalWidth)
               .height(storageExtent.physicalHeight)
-              .depth(1)
+              .depth(1),
           )
           .mipLevels(1)
           .arrayLayers(1)
@@ -583,7 +583,7 @@ private constructor(
               context.physicalDevice(),
               requirements.memoryTypeBits() and handleProperties.memoryTypeBits(),
               "No compatible Vulkan memory type found for imported D3D12 resource",
-            )
+            ),
           )
       val memoryOut = stack.mallocLong(1)
       checkVulkan(
@@ -605,7 +605,7 @@ private constructor(
               .baseMipLevel(0)
               .levelCount(1)
               .baseArrayLayer(0)
-              .layerCount(1)
+              .layerCount(1),
           )
       val viewOut = stack.mallocLong(1)
       checkVulkan(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")

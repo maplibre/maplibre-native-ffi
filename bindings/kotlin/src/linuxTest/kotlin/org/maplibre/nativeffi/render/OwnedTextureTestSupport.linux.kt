@@ -71,7 +71,7 @@ private class LinuxEglOwnedTextureSession(
     return session
       .map()
       .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
   }
 
@@ -131,7 +131,7 @@ private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedText
       )
     val session =
       map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
     return LinuxEglOwnedTextureSession(display, config, liveSurface, liveContext, session)
   } catch (error: Throwable) {
@@ -186,7 +186,7 @@ private fun chooseConfig(display: COpaquePointer): COpaquePointer = memScoped {
   val count = alloc<IntVar>()
   check(
     eglChooseConfig(display, attributes.toCValues(), configs.ptr, 1, count.ptr) != 0u &&
-      count.value > 0
+      count.value > 0,
   ) {
     "no EGL config supports OpenGL ES 3 pbuffer rendering"
   }

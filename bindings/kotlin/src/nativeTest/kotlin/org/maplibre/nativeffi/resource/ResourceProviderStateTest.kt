@@ -52,7 +52,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         ResourceProviderCallback { request, _ ->
           copied = request
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
     try {
       memScoped {
@@ -178,7 +178,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun hostLanguageFailureTellsNativeNotToPassThrough() {
     val state =
       ResourceProviderState(
-        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
+        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") },
       )
     try {
       memScoped {
@@ -205,7 +205,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
             state.close()
             assertFalse(state.isClosedForTesting())
             ResourceProviderDecision.PASS_THROUGH
-          }
+          },
         )
       val request = alloc<mln_resource_request>()
       request.requested_url = null

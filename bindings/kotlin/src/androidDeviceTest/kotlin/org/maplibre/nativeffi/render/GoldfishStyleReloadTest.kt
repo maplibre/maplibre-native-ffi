@@ -77,17 +77,17 @@ class GoldfishStyleReloadTest {
     private val GREEN = byteArrayOf(0, -1, 0, -1)
     private val BASE_STYLE =
       jsonBytes(
-        """{"version":8,"sources":{},"layers":[{"id":"base","type":"background","paint":{"background-color":"#000000"}}]}"""
+        """{"version":8,"sources":{},"layers":[{"id":"base","type":"background","paint":{"background-color":"#000000"}}]}""",
       )
     private val ALTERNATE_STYLE =
       jsonBytes(
-        """{"version":8,"sources":{},"layers":[{"id":"alternate","type":"background","paint":{"background-color":"#0000ff"}}]}"""
+        """{"version":8,"sources":{},"layers":[{"id":"alternate","type":"background","paint":{"background-color":"#0000ff"}}]}""",
       )
     private val COMPOSED_SOURCE =
       jsonBytes("""{"type":"geojson","data":{"type":"Point","coordinates":[0,0]}}""")
     private val COMPOSED_LAYER =
       jsonBytes(
-        """{"id":"composed-circle","type":"circle","source":"composed-point","paint":{"circle-color":"#00ff00","circle-radius":20}}"""
+        """{"id":"composed-circle","type":"circle","source":"composed-point","paint":{"circle-color":"#00ff00","circle-radius":20}}""",
       )
   }
 }

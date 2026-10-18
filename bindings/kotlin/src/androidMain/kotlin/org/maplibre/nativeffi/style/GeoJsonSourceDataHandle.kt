@@ -27,7 +27,7 @@ public actual class GeoJsonSourceDataHandle internal constructor(private val han
       destroy = {
         MaplibreNativeC.mln_geojson_source_data_destroy(handleId)
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
   }
 
@@ -49,7 +49,7 @@ public actual class GeoJsonSourceDataHandle internal constructor(private val han
                 nativeData.view,
                 nativeOptions.options,
                 outData,
-              )
+              ),
             )
             val handleId = outData.get()
             require(handleId != 0L) { "mln_geojson_source_data_create returned the null handle" }

@@ -39,15 +39,15 @@ class LocaleExpressionsAppleTest {
         map.setStyleJson(
           jsonBytes(
             """{"version":8,"sources":{},"layers":[{
-          "id":"background","type":"background"}]}"""
-          )
+          "id":"background","type":"background"}]}""",
+          ),
         )
         for ((options, expected) in cases) {
           map.setLayerProperty(
             "background",
             "background-opacity",
             jsonBytes(
-              """["case",["==",["number-format",12.3,{"locale":"en-US"${if (options.isEmpty()) "" else ",$options"}}],"$expected"],0.25,0.75]"""
+              """["case",["==",["number-format",12.3,{"locale":"en-US"${if (options.isEmpty()) "" else ",$options"}}],"$expected"],0.25,0.75]""",
             ),
           )
           assertEquals(
@@ -96,14 +96,14 @@ class LocaleExpressionsAppleTest {
         CameraOptions().apply {
           center = LatLng(0.0, 0.0)
           zoom = 2.0
-        }
+        },
       )
       map.setStyleJson(
         rawJSON(
           """{"version":8,"sources":{"point":{"type":"geojson","data":{
         "type":"FeatureCollection","features":[$features]}}},"layers":[{
-        "id":"cases","type":"circle","source":"point","filter":$filter,"paint":{"circle-radius":4}}]}"""
-        )
+        "id":"cases","type":"circle","source":"point","filter":$filter,"paint":{"circle-radius":4}}]}""",
+        ),
       )
       val started = TimeSource.Monotonic.markNow()
       while (!map.isFullyLoaded && started.elapsedNow() < 10.seconds) {

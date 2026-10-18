@@ -40,7 +40,7 @@ class MapProjectionHandleTest {
         CameraOptions().apply {
           center = LatLng(0.0, 0.0)
           zoom = 2.0
-        }
+        },
       )
       val camera = projection.camera
       kotlin.test.assertNotNull(camera.center)

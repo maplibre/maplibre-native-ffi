@@ -500,7 +500,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun styleImageStretches(
-    imageId: String
+    imageId: String,
   ): Pair<List<ImageStretch>, List<ImageStretch>>? {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleImageStretches(requireLiveHandle(), imageId)
@@ -554,7 +554,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun layerVisibility(layerId: String): StyleLayerVisibility {
     NativeAccess.ensureLoaded()
     return StyleLayerVisibility.fromNative(
-      NativeAccess.layerVisibility(requireLiveHandle(), layerId)
+      NativeAccess.layerVisibility(requireLiveHandle(), layerId),
     )
   }
 
@@ -809,7 +809,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor
+    descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(
@@ -819,7 +819,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
+    descriptor: MetalBorrowedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(
@@ -829,7 +829,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor
+    descriptor: VulkanOwnedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(
@@ -839,7 +839,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(
@@ -849,7 +849,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachOpenGLOwnedTexture(
-    descriptor: OpenGLOwnedTextureDescriptor
+    descriptor: OpenGLOwnedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(
@@ -859,7 +859,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
+    descriptor: OpenGLBorrowedTextureDescriptor,
   ): RenderSessionHandle {
     NativeAccess.ensureLoaded()
     return RenderSessionHandle(

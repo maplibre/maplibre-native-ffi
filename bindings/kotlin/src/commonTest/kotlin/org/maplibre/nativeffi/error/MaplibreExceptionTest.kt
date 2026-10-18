@@ -19,19 +19,19 @@ class MaplibreExceptionTest {
   @Test
   fun statusFactoryCreatesStableExceptionSubtypes() {
     assertIs<InvalidArgumentException>(
-      MaplibreException.forStatus(MaplibreStatus.INVALID_ARGUMENT, -1, "bad argument")
+      MaplibreException.forStatus(MaplibreStatus.INVALID_ARGUMENT, -1, "bad argument"),
     )
     assertIs<InvalidStateException>(
-      MaplibreException.forStatus(MaplibreStatus.INVALID_STATE, -2, "bad state")
+      MaplibreException.forStatus(MaplibreStatus.INVALID_STATE, -2, "bad state"),
     )
     assertIs<WrongThreadException>(
-      MaplibreException.forStatus(MaplibreStatus.WRONG_THREAD, -3, "wrong thread")
+      MaplibreException.forStatus(MaplibreStatus.WRONG_THREAD, -3, "wrong thread"),
     )
     assertIs<UnsupportedFeatureException>(
-      MaplibreException.forStatus(MaplibreStatus.UNSUPPORTED, -4, "unsupported")
+      MaplibreException.forStatus(MaplibreStatus.UNSUPPORTED, -4, "unsupported"),
     )
     assertIs<NativeErrorException>(
-      MaplibreException.forStatus(MaplibreStatus.NATIVE_ERROR, -5, "native error")
+      MaplibreException.forStatus(MaplibreStatus.NATIVE_ERROR, -5, "native error"),
     )
   }
 

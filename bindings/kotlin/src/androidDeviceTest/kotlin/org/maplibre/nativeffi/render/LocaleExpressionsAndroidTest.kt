@@ -92,8 +92,8 @@ class LocaleExpressionsAndroidTest {
               ["==",["number-format",1234.5,{"locale":"de-DE","min-fraction-digits":2,"max-fraction-digits":2}],"1.234,50"],
               0.25,0.75]
           }
-        }]}"""
-          )
+        }]}""",
+          ),
         )
         assertEquals(
           "0.25",
@@ -205,7 +205,7 @@ class LocaleExpressionsAndroidTest {
         CameraOptions().apply {
           center = LatLng(0.0, 0.0)
           zoom = 2.0
-        }
+        },
       )
       map.setStyleJson(
         jsonBytes(
@@ -213,8 +213,8 @@ class LocaleExpressionsAndroidTest {
           "type":"FeatureCollection","features":[$features]
         }}},"layers":[{"id":"cases","type":"circle","source":"point",
           "filter":$filter,"paint":{"circle-radius":4}
-        }]}"""
-        )
+        }]}""",
+        ),
       )
       val started = TimeSource.Monotonic.markNow()
       while (!map.isFullyLoaded && started.elapsedNow() < 10.seconds) {

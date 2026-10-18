@@ -6,7 +6,7 @@ import platform.Metal.MTLBlitCommandEncoderProtocol
 import platform.Metal.MTLTextureProtocol
 
 internal actual fun MTLBlitCommandEncoderProtocol.synchronizeTextureForCpu(
-  texture: MTLTextureProtocol
+  texture: MTLTextureProtocol,
 ) {
   synchronizeResource(texture)
 }

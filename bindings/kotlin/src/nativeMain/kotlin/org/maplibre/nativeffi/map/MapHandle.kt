@@ -252,7 +252,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
     set(value) {
       Status.check(
-        mln_map_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong())
+        mln_map_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong()),
       )
     }
 
@@ -267,7 +267,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_set_style_json(
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(json, this),
-        )
+        ),
       )
     }
   }
@@ -279,7 +279,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(propertyName, this),
           ByteStructs.bufferView(value, this),
-        )
+        ),
       )
     }
   }
@@ -298,7 +298,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           QueryStructs.featureStateSelector(selector, this),
           ByteStructs.bufferView(value, this),
-        )
+        ),
       )
     }
   }
@@ -311,7 +311,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         QueryStructs.featureStateSelector(selector, this),
         outState.ptr,
-      )
+      ),
     )
     ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
@@ -322,7 +322,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_remove_feature_state(
           state.requireLive().rawHandleValue,
           QueryStructs.featureStateSelector(selector, this),
-        )
+        ),
       )
     }
   }
@@ -342,7 +342,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           ByteStructs.bufferView(sourceJson, this),
-        )
+        ),
       )
     }
   }
@@ -354,7 +354,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outRemoved.ptr,
-      )
+      ),
     )
     outRemoved.value
   }
@@ -366,7 +366,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outExists.ptr,
-      )
+      ),
     )
     outExists.value
   }
@@ -380,7 +380,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(sourceId, this),
         outType.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (outFound.value) SourceType.fromNative(outType.value) else null
   }
@@ -395,7 +395,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(sourceId, this),
         outInfo.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (!outFound.value) return@memScoped null
     val attribution = copyStyleSourceAttribution(sourceId, outInfo)
@@ -411,7 +411,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           isVolatile,
-        )
+        ),
       )
     }
   }
@@ -435,7 +435,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.geoJsonSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -448,7 +448,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             nativeData.rawHandleValue,
-          )
+          ),
         )
       }
     }
@@ -461,7 +461,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
-        )
+        ),
       )
     }
   }
@@ -474,7 +474,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             nativeData.rawHandleValue,
-          )
+          ),
         )
       }
     }
@@ -487,7 +487,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           enabled,
-        )
+        ),
       )
     }
   }
@@ -507,7 +507,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             sourceState.descriptor(),
-          )
+          ),
         )
       }
     }
@@ -525,7 +525,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           ByteStructs.bufferView(data, this),
-        )
+        ),
       )
     }
   }
@@ -537,7 +537,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
-        )
+        ),
       )
     }
   }
@@ -549,7 +549,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
-        )
+        ),
       )
     }
   }
@@ -567,7 +567,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             sourceState.descriptor(),
-          )
+          ),
         )
       }
     }
@@ -585,7 +585,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           ByteStructs.bufferView(data, this),
-        )
+        ),
       )
     }
   }
@@ -602,7 +602,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           CoreStructs.stringView(message, this),
-        )
+        ),
       )
     }
   }
@@ -614,7 +614,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
-        )
+        ),
       )
     }
   }
@@ -629,7 +629,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -648,7 +648,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -661,7 +661,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -680,7 +680,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -697,7 +697,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -716,7 +716,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -734,7 +734,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             CoreStructs.stringView(imageId, this),
             nativeImage,
             StyleStructs.styleImageOptions(options, this),
-          )
+          ),
         )
       }
     }
@@ -747,7 +747,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outRemoved.ptr,
-      )
+      ),
     )
     outRemoved.value
   }
@@ -759,7 +759,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outExists.ptr,
-      )
+      ),
     )
     outExists.value
   }
@@ -773,13 +773,13 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(imageId, this),
         outInfo,
         outFound.ptr,
-      )
+      ),
     )
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
   }
 
   public actual fun styleImageStretches(
-    imageId: String
+    imageId: String,
   ): Pair<List<ImageStretch>, List<ImageStretch>>? = memScoped {
     val handle = state.requireLive().rawHandleValue
     val outXCount = alloc<CSizeVar>()
@@ -796,7 +796,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         0.toCSize(),
         outYCount.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (!outFound.value) return@memScoped null
 
@@ -815,7 +815,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         yCount.toCSize(),
         outYCount.ptr,
         outFound.ptr,
-      )
+      ),
     )
     val toList = { array: CPointer<mln_image_stretch>?, count: Int ->
       List(count) { index -> ImageStretch(array!![index].from, array[index].to) }
@@ -837,7 +837,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         info.byteLength.toCSize(),
         outByteLength.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (!outFound.value) return@memScoped null
     StyleImage(
@@ -864,7 +864,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toCSize(),
           CoreStructs.stringView(url, this),
-        )
+        ),
       )
     }
   }
@@ -884,7 +884,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             CoreStructs.latLngArray(coordinateSnapshot, this),
             coordinateSnapshot.size.toCSize(),
             nativeImage,
-          )
+          ),
         )
       }
     }
@@ -897,7 +897,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
-        )
+        ),
       )
     }
   }
@@ -910,7 +910,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             nativeImage,
-          )
+          ),
         )
       }
     }
@@ -925,7 +925,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toCSize(),
-        )
+        ),
       )
     }
   }
@@ -942,7 +942,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         4.toCSize(),
         outCoordinateCount.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (outFound.value)
       CoreStructs.latLngArray(
@@ -958,7 +958,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     return memScoped {
       val outAttribution =
         allocArray<ByteVar>(
-          checkedInt(info.attribution_size.toULong(), "style source attribution size")
+          checkedInt(info.attribution_size.toULong(), "style source attribution size"),
         )
       val outAttributionSize = alloc<CSizeVar>()
       val outFound = alloc<BooleanVar>()
@@ -970,12 +970,12 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           info.attribution_size,
           outAttributionSize.ptr,
           outFound.ptr,
-        )
+        ),
       )
       if (outFound.value)
         outAttribution
           .readBytes(
-            checkedInt(outAttributionSize.value.toULong(), "style source copied attribution size")
+            checkedInt(outAttributionSize.value.toULong(), "style source copied attribution size"),
           )
           .decodeToString()
       else null
@@ -997,7 +997,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           info.url_size,
           outUrlSize.ptr,
           outFound.ptr,
-        )
+        ),
       )
       if (outFound.value)
         outUrl
@@ -1022,11 +1022,11 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           outList.ptr,
           outFound.ptr,
-        )
+        ),
       )
       check(outFound.value) { "style source disappeared while its metadata was copied" }
       StyleStructs.styleStringList(
-        outList.value.asHandle("mln_map_get_style_source_tile_urls", ::styleStringListHandle)
+        outList.value.asHandle("mln_map_get_style_source_tile_urls", ::styleStringListHandle),
       )
     }
   }
@@ -1038,7 +1038,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(layerJson, this),
           CoreStructs.stringView(beforeLayerId, this),
-        )
+        ),
       )
     }
   }
@@ -1051,7 +1051,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
-        )
+        ),
       )
     }
   }
@@ -1064,7 +1064,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
-        )
+        ),
       )
     }
   }
@@ -1076,7 +1076,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(beforeLayerId, this),
-        )
+        ),
       )
     }
   }
@@ -1093,7 +1093,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.latLng(coordinate),
           altitude,
-        )
+        ),
       )
     }
   }
@@ -1105,7 +1105,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           bearing,
-        )
+        ),
       )
     }
   }
@@ -1117,7 +1117,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           radius,
-        )
+        ),
       )
     }
   }
@@ -1134,7 +1134,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           imageKind.nativeValue.toUInt(),
           CoreStructs.stringView(imageId, this),
-        )
+        ),
       )
     }
   }
@@ -1146,7 +1146,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outRemoved.ptr,
-      )
+      ),
     )
     outRemoved.value
   }
@@ -1158,7 +1158,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outExists.ptr,
-      )
+      ),
     )
     outExists.value
   }
@@ -1172,7 +1172,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(layerId, this),
         outType.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (outFound.value) CoreStructs.stringView(outType) else null
   }
@@ -1189,7 +1189,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     outList.value = 0uL
     Status.check(mln_map_list_style_layers(state.requireLive().rawHandleValue, outList.ptr))
     StyleStructs.styleLayerList(
-      outList.value.asHandle("mln_map_list_style_layers", ::styleLayerListHandle)
+      outList.value.asHandle("mln_map_list_style_layers", ::styleLayerListHandle),
     )
   }
 
@@ -1200,7 +1200,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(beforeLayerId, this),
-        )
+        ),
       )
     }
   }
@@ -1215,7 +1215,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(layerId, this),
         outLayer.ptr,
         outFound.ptr,
-      )
+      ),
     )
     if (outFound.value)
       ByteStructs.ownedBuffer(outLayer.value.asHandle("mln_buffer", ::ownedBufferHandle))
@@ -1228,7 +1228,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_set_style_light_json(
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(lightJson, this),
-        )
+        ),
       )
     }
   }
@@ -1240,7 +1240,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(propertyName, this),
           ByteStructs.bufferView(value, this),
-        )
+        ),
       )
     }
   }
@@ -1253,7 +1253,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(propertyName, this),
         outValue.ptr,
-      )
+      ),
     )
     if (outValue.value == 0uL) null
     else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
@@ -1265,7 +1265,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_set_style_transition_options(
           state.requireLive().rawHandleValue,
           StyleStructs.styleTransitionOptions(options, this),
-        )
+        ),
       )
     }
   }
@@ -1273,7 +1273,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   public actual fun styleTransitionOptions(): StyleTransitionOptions = memScoped {
     val outOptions = mln_style_transition_options_default().getPointer(this)
     Status.check(
-      mln_map_get_style_transition_options(state.requireLive().rawHandleValue, outOptions)
+      mln_map_get_style_transition_options(state.requireLive().rawHandleValue, outOptions),
     )
     StyleStructs.styleTransitionOptions(outOptions.pointed)
   }
@@ -1286,7 +1286,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(propertyName, this),
           ByteStructs.bufferView(value, this),
-        )
+        ),
       )
     }
   }
@@ -1300,7 +1300,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.stringView(layerId, this),
         CoreStructs.stringView(propertyName, this),
         outValue.ptr,
-      )
+      ),
     )
     if (outValue.value == 0uL) null
     else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
@@ -1313,7 +1313,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           ByteStructs.bufferViewPointer(filter, this),
-        )
+        ),
       )
     }
   }
@@ -1325,7 +1325,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           null,
-        )
+        ),
       )
     }
   }
@@ -1338,7 +1338,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outFilter.ptr,
-      )
+      ),
     )
     if (outFilter.value == 0uL) null
     else ByteStructs.ownedBuffer(outFilter.value.asHandle("mln_buffer", ::ownedBufferHandle))
@@ -1351,7 +1351,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceLayer, this),
-        )
+        ),
       )
     }
   }
@@ -1368,7 +1368,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
-        )
+        ),
       )
     }
   }
@@ -1383,7 +1383,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
    * API answers with OK.
    */
   private fun copyMapText(
-    copy: (ULong, CPointer<ByteVar>?, CSize, CPointer<CSizeVar>) -> Int
+    copy: (ULong, CPointer<ByteVar>?, CSize, CPointer<CSizeVar>) -> Int,
   ): String = memScoped {
     val handle = state.requireLive().rawHandleValue
     val outSize = alloc<CSizeVar>()
@@ -1398,7 +1398,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   }
 
   private fun copyMapBytes(
-    copy: (ULong, CPointer<UByteVar>?, CSize, CPointer<CSizeVar>) -> Int
+    copy: (ULong, CPointer<UByteVar>?, CSize, CPointer<CSizeVar>) -> Int,
   ): ByteArray = memScoped {
     val handle = state.requireLive().rawHandleValue
     val outSize = alloc<CSizeVar>()
@@ -1421,7 +1421,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val handle = state.requireLive().rawHandleValue
     val outSize = alloc<CSizeVar>()
     Status.check(
-      copy(handle, CoreStructs.stringView(layerId, this), null, 0.toCSize(), outSize.ptr)
+      copy(handle, CoreStructs.stringView(layerId, this), null, 0.toCSize(), outSize.ptr),
     )
     val required = checkedInt(outSize.value.toULong(), "layer text size")
     if (required == 0) return@memScoped ""
@@ -1429,7 +1429,13 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val buffer = allocArray<ByteVar>(required)
     val outCopied = alloc<CSizeVar>()
     Status.check(
-      copy(handle, CoreStructs.stringView(layerId, this), buffer, required.toCSize(), outCopied.ptr)
+      copy(
+        handle,
+        CoreStructs.stringView(layerId, this),
+        buffer,
+        required.toCSize(),
+        outCopied.ptr,
+      ),
     )
     buffer
       .readBytes(checkedInt(outCopied.value.toULong(), "layer copied text size"))
@@ -1443,7 +1449,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           minZoom,
-        )
+        ),
       )
     }
   }
@@ -1455,7 +1461,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outZoom.ptr,
-      )
+      ),
     )
     outZoom.value
   }
@@ -1467,7 +1473,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           maxZoom,
-        )
+        ),
       )
     }
   }
@@ -1479,7 +1485,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outZoom.ptr,
-      )
+      ),
     )
     outZoom.value
   }
@@ -1491,7 +1497,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           visibility.nativeValue.toUInt(),
-        )
+        ),
       )
     }
   }
@@ -1503,7 +1509,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outVisibility.ptr,
-      )
+      ),
     )
     StyleLayerVisibility.fromNative(outVisibility.value)
   }
@@ -1533,13 +1539,16 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     get() = memScoped {
       val outEnabled = alloc<BooleanVar>()
       Status.check(
-        mln_map_get_rendering_stats_view_enabled(state.requireLive().rawHandleValue, outEnabled.ptr)
+        mln_map_get_rendering_stats_view_enabled(
+          state.requireLive().rawHandleValue,
+          outEnabled.ptr,
+        ),
       )
       outEnabled.value
     }
     set(enabled) {
       Status.check(
-        mln_map_set_rendering_stats_view_enabled(state.requireLive().rawHandleValue, enabled)
+        mln_map_set_rendering_stats_view_enabled(state.requireLive().rawHandleValue, enabled),
       )
     }
 
@@ -1565,7 +1574,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           outWidth.ptr,
           outHeight.ptr,
           outScaleFactor.ptr,
-        )
+        ),
       )
       MapSize(outWidth.value.toInt(), outHeight.value.toInt(), outScaleFactor.value)
     }
@@ -1582,7 +1591,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           mln_map_set_viewport_options(
             state.requireLive().rawHandleValue,
             MapStructs.viewportOptions(options, this),
-          )
+          ),
         )
       }
     }
@@ -1599,7 +1608,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           mln_map_set_tile_options(
             state.requireLive().rawHandleValue,
             MapStructs.tileOptions(options, this),
-          )
+          ),
         )
       }
     }
@@ -1614,7 +1623,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   public actual fun jumpTo(camera: CameraOptions) {
     memScoped {
       Status.check(
-        mln_map_jump_to(state.requireLive().rawHandleValue, MapStructs.cameraOptions(camera, this))
+        mln_map_jump_to(state.requireLive().rawHandleValue, MapStructs.cameraOptions(camera, this)),
       )
     }
   }
@@ -1626,7 +1635,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1638,7 +1647,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1655,7 +1664,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           deltaX,
           deltaY,
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1666,7 +1675,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         scale,
         anchor?.let { CoreStructs.screenPoint(it) },
-      )
+      ),
     )
   }
 
@@ -1682,7 +1691,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           scale,
           anchor?.let { CoreStructs.screenPoint(it) },
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1693,7 +1702,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(first),
         CoreStructs.screenPoint(second),
-      )
+      ),
     )
   }
 
@@ -1709,7 +1718,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.screenPoint(first),
           CoreStructs.screenPoint(second),
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1725,7 +1734,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           pitch,
           animation?.let { MapStructs.animationOptions(it, this) },
-        )
+        ),
       )
     }
   }
@@ -1738,7 +1747,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     get() = memScoped {
       val outInProgress = alloc<BooleanVar>()
       Status.check(
-        mln_map_is_gesture_in_progress(state.requireLive().rawHandleValue, outInProgress.ptr)
+        mln_map_is_gesture_in_progress(state.requireLive().rawHandleValue, outInProgress.ptr),
       )
       outInProgress.value
     }
@@ -1757,7 +1766,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.latLngBounds(bounds),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
-      )
+      ),
     )
     MapStructs.cameraOptions(outCamera.pointed)
   }
@@ -1775,7 +1784,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         coordinateSnapshot.size.toCSize(),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
-      )
+      ),
     )
     MapStructs.cameraOptions(outCamera.pointed)
   }
@@ -1791,7 +1800,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         ByteStructs.bufferView(geometry, this),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
-      )
+      ),
     )
     MapStructs.cameraOptions(outCamera.pointed)
   }
@@ -1803,7 +1812,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         MapStructs.cameraOptions(camera, this),
         outBounds.ptr,
-      )
+      ),
     )
     CoreStructs.latLngBounds(outBounds)
   }
@@ -1816,7 +1825,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           outBounds.ptr,
-        )
+        ),
       )
       CoreStructs.latLngBounds(outBounds)
     }
@@ -1833,7 +1842,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           mln_map_set_bounds(
             state.requireLive().rawHandleValue,
             MapStructs.boundOptions(options, this),
-          )
+          ),
         )
       }
     }
@@ -1850,7 +1859,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           mln_map_set_free_camera_options(
             state.requireLive().rawHandleValue,
             MapStructs.freeCameraOptions(options, this),
-          )
+          ),
         )
       }
     }
@@ -1867,7 +1876,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           mln_map_set_projection_mode(
             state.requireLive().rawHandleValue,
             MapStructs.projectionModeOptions(mode, this),
-          )
+          ),
         )
       }
     }
@@ -1879,7 +1888,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.latLng(coordinate),
         outPoint.ptr,
-      )
+      ),
     )
     CoreStructs.screenPoint(outPoint)
   }
@@ -1891,7 +1900,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(point),
         outCoordinate.ptr,
-      )
+      ),
     )
     CoreStructs.latLng(outCoordinate)
   }
@@ -1903,7 +1912,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(point),
         outCoordinate.ptr,
-      )
+      ),
     )
     CoreStructs.latLng(outCoordinate)
   }
@@ -1922,7 +1931,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.latLngArray(coordinateSnapshot, this),
         coordinateSnapshot.size.toCSize(),
         outPoints,
-      )
+      ),
     )
     CoreStructs.screenPointArray(outPoints, coordinateSnapshot.size)
   }
@@ -1941,7 +1950,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.screenPointArray(pointSnapshot, this),
         pointSnapshot.size.toCSize(),
         outCoordinates,
-      )
+      ),
     )
     CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
   }
@@ -1960,7 +1969,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         CoreStructs.screenPointArray(pointSnapshot, this),
         pointSnapshot.size.toCSize(),
         outCoordinates,
-      )
+      ),
     )
     CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
   }
@@ -1972,33 +1981,33 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         state.requireLive().rawHandleValue,
         latitude,
         outMetersPerPixel.ptr,
-      )
+      ),
     )
     outMetersPerPixel.value
   }
 
   public actual fun attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor
+    descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
 
   public actual fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
+    descriptor: MetalBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
 
   public actual fun attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor
+    descriptor: VulkanOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
 
   public actual fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
 
   public actual fun attachOpenGLOwnedTexture(
-    descriptor: OpenGLOwnedTextureDescriptor
+    descriptor: OpenGLOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor)
 
   public actual fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
+    descriptor: OpenGLBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor)
 
   public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
@@ -2015,7 +2024,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     outProjection.value = 0uL
     Status.check(mln_map_projection_create(state.requireLive().rawHandleValue, outProjection.ptr))
     MapProjectionHandle(
-      outProjection.value.asHandle("mln_map_projection_create", ::mapProjectionHandle)
+      outProjection.value.asHandle("mln_map_projection_create", ::mapProjectionHandle),
     )
   }
 
@@ -2048,7 +2057,11 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       val outMap = alloc<ULongVar>()
       outMap.value = 0uL
       Status.check(
-        mln_map_create(runtime.nativeHandle().rawHandleValue, mapOptions(options, this), outMap.ptr)
+        mln_map_create(
+          runtime.nativeHandle().rawHandleValue,
+          mapOptions(options, this),
+          outMap.ptr,
+        ),
       )
       val map = MapHandle(runtime, outMap.value.asHandle("mln_map_create", ::mapHandle))
       runtime.registerMap(map)

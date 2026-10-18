@@ -19,7 +19,7 @@ internal class ResourceRequestCancelSetResult(val status: Int, val alreadyCancel
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class ResourceRequestCancelState(
-  private val registration: ResourceRequestCancelRegistration
+  private val registration: ResourceRequestCancelRegistration,
 ) {
   private val slot = AtomicReference<(() -> Unit)?>(null)
 
@@ -164,7 +164,7 @@ internal object ResourceRequestCancelRegistry {
       (Map<Long, WeakBox<ResourceRequestCancelState>>) -> Map<
           Long,
           WeakBox<ResourceRequestCancelState>,
-        >
+        >,
   ) {
     while (true) {
       val current = states.load()

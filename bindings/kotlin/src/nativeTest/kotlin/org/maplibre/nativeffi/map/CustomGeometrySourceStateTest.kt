@@ -26,8 +26,8 @@ class CustomGeometrySourceStateTest : org.maplibre.nativeffi.NativeTestBase() {
             override fun cancelTile(tileId: CanonicalTileId) {
               received += tileId
             }
-          }
-        )
+          },
+        ),
       ) {}
     val tile =
       cValue<mln_canonical_tile_id> {
@@ -60,8 +60,8 @@ class CustomGeometrySourceStateTest : org.maplibre.nativeffi.NativeTestBase() {
             override fun cancelTile(tileId: CanonicalTileId) {
               received += tileId
             }
-          }
-        )
+          },
+        ),
       ) {}
     val tile =
       cValue<mln_canonical_tile_id> {

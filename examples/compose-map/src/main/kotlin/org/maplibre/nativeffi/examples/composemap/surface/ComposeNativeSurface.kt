@@ -63,7 +63,7 @@ public fun ComposeNativeSurface(
           NativeSurfaceState.Failed(
             message = "Native surface bridge initialization failed: ${bridgeSelection.message}",
             cause = bridgeSelection.error,
-          )
+          ),
         )
         onDispose { activeController.setState(NativeSurfaceState.Inactive) }
       }
@@ -72,7 +72,7 @@ public fun ComposeNativeSurface(
           NativeSurfaceState.Unsupported(
             requestedBackend = renderer.backend,
             host = NativeSurfaceBridge.host,
-          )
+          ),
         )
         onDispose { activeController.setState(NativeSurfaceState.Inactive) }
       }
@@ -118,7 +118,7 @@ public fun ComposeNativeSurface(
             message =
               "Native surface bridge failed to resize to ${extent.width}x${extent.height}: ${error.message}",
             cause = error,
-          )
+          ),
         )
       }
     }
@@ -128,7 +128,7 @@ public fun ComposeNativeSurface(
     modifier =
       modifier.fillMaxSize().onSizeChanged { size ->
         extent = SurfaceExtent.fromPhysical(size.width, size.height, density.density.toDouble())
-      }
+      },
   ) {
     frameSignal
     var drew = false
@@ -143,7 +143,7 @@ public fun ComposeNativeSurface(
             NativeSurfaceState.Failed(
               message = "Native surface bridge failed to acquire frame $frameId: ${error.message}",
               cause = error,
-            )
+            ),
           )
           null
         }
@@ -163,7 +163,7 @@ public fun ComposeNativeSurface(
             NativeSurfaceState.Failed(
               message = "Native surface renderer failed for frame $frameId: ${error.message}",
               cause = error,
-            )
+            ),
           )
         } finally {
           bridge.releaseFrame(frame)

@@ -32,7 +32,7 @@ private class AndroidEglOwnedTextureSession(
     return session
       .map()
       .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
   }
 
@@ -94,7 +94,7 @@ private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedText
       )
     val session =
       map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
       )
     return AndroidEglOwnedTextureSession(display, config, surface, context, session)
   } catch (error: Throwable) {
@@ -144,7 +144,7 @@ private fun chooseConfig(display: android.opengl.EGLDisplay): EGLConfig {
   val count = IntArray(1)
   check(
     EGL14.eglChooseConfig(display, attributes, 0, configs, 0, configs.size, count, 0) &&
-      count[0] > 0
+      count[0] > 0,
   ) {
     "no EGL config supports OpenGL ES 3 pbuffer rendering"
   }

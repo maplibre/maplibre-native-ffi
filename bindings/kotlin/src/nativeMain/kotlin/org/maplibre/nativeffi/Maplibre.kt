@@ -117,7 +117,7 @@ public actual object Maplibre {
   public actual fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
     val outCoordinate = alloc<mln_lat_lng>()
     Status.check(
-      mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)
+      mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr),
     )
     CoreStructs.latLng(outCoordinate)
   }

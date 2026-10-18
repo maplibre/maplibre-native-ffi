@@ -2,11 +2,11 @@
 // Repository-wide tools are installed at the root. Language-specific steps
 // enter their binding's mise context and install that toolchain on demand.
 
-amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
 
-import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
 
-local lintSteps = new Mapping<String, Step> {
+steps {
   ["dprint"] = (Builtins.dprint) {
     // the default batch=false hits the cmd length limit on windows
     batch = true
@@ -35,7 +35,6 @@ local lintSteps = new Mapping<String, Step> {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"
   }
-  // Mirrors Builtins.`vp-check` (available in hk 1.46+). dprint owns formatting.
   ["vp-check"] {
     glob = List(
       "**/*.js",
@@ -80,26 +79,5 @@ local lintSteps = new Mapping<String, Step> {
     exclude = List("bindings/dart/**/*.g.dart")
     check = "mise run --quiet //bindings/dart:_format-check {{files}}"
     fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
-  }
-}
-
-hooks {
-  ["pre-commit"] {
-    fix = true
-    stash = "git"
-    steps {
-      ...lintSteps
-    }
-  }
-  ["check"] {
-    steps {
-      ...lintSteps
-    }
-  }
-  ["fix"] {
-    fix = true
-    steps {
-      ...lintSteps
-    }
   }
 }

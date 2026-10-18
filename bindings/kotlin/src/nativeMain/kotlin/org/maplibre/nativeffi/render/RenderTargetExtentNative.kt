@@ -21,7 +21,7 @@ public actual fun RenderTargetExtent.physicalSize(): PhysicalRenderTargetSize = 
   val outWidth = alloc<UIntVar>()
   val outHeight = alloc<UIntVar>()
   Status.check(
-    mln_render_target_extent_physical_size(nativeExtent.ptr, outWidth.ptr, outHeight.ptr)
+    mln_render_target_extent_physical_size(nativeExtent.ptr, outWidth.ptr, outHeight.ptr),
   )
   PhysicalRenderTargetSize(outWidth.value.toInt(), outHeight.value.toInt())
 }

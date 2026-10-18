@@ -56,7 +56,7 @@ public sealed interface RuntimeEventPayload {
      * The transition id the caller set on the animation options that started this transition.
      * Native `uint64_t` preserved as a [Long] bit pattern; format through `toULong()`.
      */
-    public val transitionId: Long
+    public val transitionId: Long,
   ) : RuntimeEventPayload
 
   /**

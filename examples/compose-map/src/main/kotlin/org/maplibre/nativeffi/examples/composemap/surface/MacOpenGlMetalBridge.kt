@@ -335,7 +335,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
 
   fun makeCurrent() {
     check(
-      display != EGL_NO_DISPLAY && surface != EGL_NO_SURFACE && shareContext != EGL_NO_CONTEXT
+      display != EGL_NO_DISPLAY && surface != EGL_NO_SURFACE && shareContext != EGL_NO_CONTEXT,
     ) {
       "ANGLE EGL context is not initialized"
     }
@@ -367,7 +367,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
         )
       if (image == NULL) {
         throw NativeSurfaceBridgeException(
-          "eglCreateImageKHR(EGL_METAL_TEXTURE_ANGLE) failed with ${eglError()}"
+          "eglCreateImageKHR(EGL_METAL_TEXTURE_ANGLE) failed with ${eglError()}",
         )
       }
       return image
@@ -524,12 +524,12 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
       val angleRoot =
         System.getProperty("org.maplibre.nativeffi.library.path")?.let { Path(it).parent }
           ?: throw NativeSurfaceBridgeException(
-            "The native library path is required for macOS EGL; run the example through Gradle"
+            "The native library path is required for macOS EGL; run the example through Gradle",
           )
       val angleRootPath = angleRoot
       if (angleRootPath.isAngleRoot()) return angleRootPath.absolute()
       throw NativeSurfaceBridgeException(
-        "ANGLE runtime libraries are unavailable in $angleRootPath"
+        "ANGLE runtime libraries are unavailable in $angleRootPath",
       )
     }
 

@@ -110,7 +110,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
         OpenGLContextProvider.WGL in providers -> createWgl(title, width, height)
         else ->
           error(
-            "The loaded MapLibre native library does not support an OpenGL context provider usable by lwjgl-map"
+            "The loaded MapLibre native library does not support an OpenGL context provider usable by lwjgl-map",
           )
       }
     }
@@ -142,7 +142,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
           check(glfwGetEGLConfig(window, configs)) { "GLFW did not expose an EGL config" }
           context.eglConfig = configs[0]
           check(
-            context.eglDisplay != NULL && context.eglContext != NULL && context.eglSurface != NULL
+            context.eglDisplay != NULL && context.eglContext != NULL && context.eglSurface != NULL,
           ) {
             "GLFW did not expose EGL handles"
           }

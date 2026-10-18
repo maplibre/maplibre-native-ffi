@@ -39,7 +39,7 @@ public expect class RuntimeHandle : AutoCloseable {
   public fun acquireWakeSource(): WakeSource
 
   public fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
+    operation: AmbientCacheOperation,
   ): OfflineOperationHandle<Unit>
 
   /**
@@ -58,7 +58,7 @@ public expect class RuntimeHandle : AutoCloseable {
   public fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>>
 
   public fun startMergeOfflineRegionsDatabase(
-    path: String
+    path: String,
   ): OfflineOperationHandle<List<OfflineRegionInfo>>
 
   public fun startUpdateOfflineRegionMetadata(
@@ -83,27 +83,27 @@ public expect class RuntimeHandle : AutoCloseable {
   public fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit>
 
   public fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo
 
   public fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
+    operation: OfflineOperationHandle<OfflineRegionInfo?>,
   ): OfflineRegionInfo?
 
   public fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo>
 
   public fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo>
 
   public fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo
 
   public fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
+    operation: OfflineOperationHandle<OfflineRegionStatus>,
   ): OfflineRegionStatus
 
   public fun setResourceProvider(callback: ResourceProviderCallback)

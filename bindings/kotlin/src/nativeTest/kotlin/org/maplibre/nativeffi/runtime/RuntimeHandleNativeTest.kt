@@ -98,7 +98,7 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
       assertTrue(failedTransform?.isClosedForTesting() == true)
 
       runtime.setResourceProvider(
-        ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
+        ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH },
       )
       val initialProvider = runtime.resourceProviderStateForTesting()
       var failedProvider: ResourceProviderState? = null
@@ -106,7 +106,7 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
       val providerError =
         assertFailsWith<MaplibreException> {
           runtime.setResourceProviderForTesting(
-            ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
+            ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH },
           ) { replacement ->
             failedProvider = replacement
             MaplibreStatus.NATIVE_ERROR.nativeCode
@@ -135,7 +135,7 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
           }
           handledRequest.store(handle)
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -439,7 +439,7 @@ private class BackgroundResourceCompletion(
       handle.complete(
         ResourceResponse(ResourceResponseStatus.OK).apply {
           bytes = RuntimeHandleTestStyle.styleJson.encodeToByteArray()
-        }
+        },
       )
     } catch (throwable: Throwable) {
       error.store(throwable)

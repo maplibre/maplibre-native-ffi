@@ -48,7 +48,7 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
       response.pointed.size = kotlinx.cinterop.sizeOf<mln_http_header_transform_response>().toUInt()
       val headers =
         callback.transform(
-          HttpHeaderTransformRequest(ResourceKind.fromNative(rawKind), MemoryUtil.copyCString(url))
+          HttpHeaderTransformRequest(ResourceKind.fromNative(rawKind), MemoryUtil.copyCString(url)),
         )
       if (headers.map { it.name.lowercase() }.toSet().size != headers.size) {
         return MaplibreStatus.INVALID_ARGUMENT.nativeCode

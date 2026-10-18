@@ -86,7 +86,7 @@ class DescriptorValidationTest {
           MaplibreStatus.UNSUPPORTED,
           assertFailsWith<UnsupportedFeatureException> {
               map.attachMetalOwnedTexture(
-                MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer))
+                MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer)),
               )
             }
             .status,
@@ -97,7 +97,7 @@ class DescriptorValidationTest {
           MaplibreStatus.UNSUPPORTED,
           assertFailsWith<UnsupportedFeatureException> {
               map.attachVulkanOwnedTexture(
-                VulkanOwnedTextureDescriptor(extent, context = vulkanContext(pointer))
+                VulkanOwnedTextureDescriptor(extent, context = vulkanContext(pointer)),
               )
             }
             .status,
@@ -111,7 +111,7 @@ class DescriptorValidationTest {
                 OpenGLOwnedTextureDescriptor(
                   extent,
                   context = WglContextDescriptor(pointer, pointer, pointer),
-                )
+                ),
               )
             }
             .status,

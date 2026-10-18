@@ -48,7 +48,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     Status.requireArgument(width >= 0) { "width must be non-negative" }
     Status.requireArgument(height >= 0) { "height must be non-negative" }
     Status.check(
-      MaplibreNativeC.mln_render_session_resize(requireLiveHandle(), width, height, scaleFactor)
+      MaplibreNativeC.mln_render_session_resize(requireLiveHandle(), width, height, scaleFactor),
     )
   }
 
@@ -59,7 +59,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_metal_surface_set_target(
         requireLiveHandle(),
         metalSurfaceDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -70,7 +70,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_vulkan_surface_set_target(
         requireLiveHandle(),
         vulkanSurfaceDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -81,7 +81,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_opengl_surface_set_target(
         requireLiveHandle(),
         openglSurfaceDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -92,7 +92,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_metal_borrowed_texture_set_target(
         requireLiveHandle(),
         metalBorrowedTextureDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -103,7 +103,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
         requireLiveHandle(),
         vulkanBorrowedTextureDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -114,7 +114,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
         requireLiveHandle(),
         openglBorrowedTextureDescriptor(descriptor),
-      )
+      ),
     )
   }
 
@@ -128,7 +128,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         requireLiveHandle(),
         outResult,
         outNeedsRepaint,
-      )
+      ),
     )
     return RenderUpdate(RenderResult.fromNative(outResult[0]), outNeedsRepaint[0])
   }
@@ -138,7 +138,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     LongPointer(1).use { outProjection ->
       outProjection.put(0, 0L)
       Status.check(
-        MaplibreNativeC.mln_render_session_projection_create(requireLiveHandle(), outProjection)
+        MaplibreNativeC.mln_render_session_projection_create(requireLiveHandle(), outProjection),
       )
       val address = outProjection.get()
       require(address != 0L) { "mln_render_session_projection_create returned a null projection" }
@@ -187,7 +187,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               nativeGeometry.geometry,
               nativeOptions.options,
               outResult,
-            )
+            ),
           )
           return queriedFeatureList(outResult.get())
         }
@@ -211,7 +211,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               nativeSourceId.view,
               nativeOptions.options,
               outResult,
-            )
+            ),
           )
           return queriedFeatureList(outResult.get())
         }
@@ -244,7 +244,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
                     nativeExtensionField.view,
                     if (arguments == null) null else nativeArguments.view,
                     outResult,
-                  )
+                  ),
                 )
                 return ownedBuffer(outResult.get())
               }
@@ -287,7 +287,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         buffer.borrowBuffer(),
         buffer.byteLength(),
         outInfo,
-      )
+      ),
     )
     val info = textureImageInfo(outInfo)
     // Native reads an empty destination as a size probe rather than a copy, so the
@@ -303,7 +303,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
+        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame),
       )
       val scope = FrameScope()
       return MetalOwnedTextureFrameHandle(
@@ -326,7 +326,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
+        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame),
       )
       val scope = FrameScope()
       return VulkanOwnedTextureFrameHandle(
@@ -349,7 +349,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
+        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame),
       )
       val scope = FrameScope()
       return OpenGLOwnedTextureFrameHandle(
@@ -518,7 +518,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 }
 
 private fun metalOwnedTextureDescriptor(
-  descriptor: MetalOwnedTextureDescriptor
+  descriptor: MetalOwnedTextureDescriptor,
 ): MaplibreNativeC.mln_metal_owned_texture_descriptor =
   MaplibreNativeC.mln_metal_owned_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -526,7 +526,7 @@ private fun metalOwnedTextureDescriptor(
   }
 
 private fun metalBorrowedTextureDescriptor(
-  descriptor: MetalBorrowedTextureDescriptor
+  descriptor: MetalBorrowedTextureDescriptor,
 ): MaplibreNativeC.mln_metal_borrowed_texture_descriptor =
   MaplibreNativeC.mln_metal_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -536,7 +536,7 @@ private fun metalBorrowedTextureDescriptor(
   }
 
 private fun metalSurfaceDescriptor(
-  descriptor: MetalSurfaceDescriptor
+  descriptor: MetalSurfaceDescriptor,
 ): MaplibreNativeC.mln_metal_surface_descriptor =
   MaplibreNativeC.mln_metal_surface_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -545,7 +545,7 @@ private fun metalSurfaceDescriptor(
   }
 
 private fun vulkanOwnedTextureDescriptor(
-  descriptor: VulkanOwnedTextureDescriptor
+  descriptor: VulkanOwnedTextureDescriptor,
 ): MaplibreNativeC.mln_vulkan_owned_texture_descriptor =
   MaplibreNativeC.mln_vulkan_owned_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -553,7 +553,7 @@ private fun vulkanOwnedTextureDescriptor(
   }
 
 private fun vulkanBorrowedTextureDescriptor(
-  descriptor: VulkanBorrowedTextureDescriptor
+  descriptor: VulkanBorrowedTextureDescriptor,
 ): MaplibreNativeC.mln_vulkan_borrowed_texture_descriptor =
   MaplibreNativeC.mln_vulkan_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -568,7 +568,7 @@ private fun vulkanBorrowedTextureDescriptor(
   }
 
 private fun vulkanSurfaceDescriptor(
-  descriptor: VulkanSurfaceDescriptor
+  descriptor: VulkanSurfaceDescriptor,
 ): MaplibreNativeC.mln_vulkan_surface_descriptor =
   MaplibreNativeC.mln_vulkan_surface_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -577,7 +577,7 @@ private fun vulkanSurfaceDescriptor(
   }
 
 private fun openglOwnedTextureDescriptor(
-  descriptor: OpenGLOwnedTextureDescriptor
+  descriptor: OpenGLOwnedTextureDescriptor,
 ): MaplibreNativeC.mln_opengl_owned_texture_descriptor =
   MaplibreNativeC.mln_opengl_owned_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -585,7 +585,7 @@ private fun openglOwnedTextureDescriptor(
   }
 
 private fun openglBorrowedTextureDescriptor(
-  descriptor: OpenGLBorrowedTextureDescriptor
+  descriptor: OpenGLBorrowedTextureDescriptor,
 ): MaplibreNativeC.mln_opengl_borrowed_texture_descriptor =
   MaplibreNativeC.mln_opengl_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -597,7 +597,7 @@ private fun openglBorrowedTextureDescriptor(
   }
 
 private fun openglSurfaceDescriptor(
-  descriptor: OpenGLSurfaceDescriptor
+  descriptor: OpenGLSurfaceDescriptor,
 ): MaplibreNativeC.mln_opengl_surface_descriptor =
   MaplibreNativeC.mln_opengl_surface_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
@@ -739,7 +739,7 @@ private fun queriedFeatureList(list: Long): List<QueriedFeature> =
         MaplibreNativeC.mln_queried_feature().use { outFeature ->
           outFeature.size(outFeature.sizeof())
           Status.check(
-            MaplibreNativeC.mln_queried_feature_list_get(list, index.toLong(), outFeature)
+            MaplibreNativeC.mln_queried_feature_list_get(list, index.toLong(), outFeature),
           )
           queriedFeature(outFeature)
         }
@@ -783,7 +783,7 @@ private class RenderedQueryGeometryScope(value: RenderedQueryGeometry) : AutoClo
           MaplibreNativeC.mln_rendered_query_geometry_line_string(
             screenPointArray(value.points),
             value.points.size.toLong(),
-          )
+          ),
         )
     }
 

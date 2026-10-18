@@ -136,7 +136,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
   fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
     enqueue(
-      CameraCommand.AdjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
+      CameraCommand.AdjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR),
     )
   }
 

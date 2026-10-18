@@ -21,7 +21,7 @@ class HandleStateCoreTest {
           destroy = {
             attempts += 1
             MaplibreStatus.NATIVE_ERROR.nativeCode
-          }
+          },
         )
       }
 
@@ -34,7 +34,7 @@ class HandleStateCoreTest {
       destroy = {
         attempts += 1
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
 
     assertEquals(2, attempts)
@@ -44,7 +44,7 @@ class HandleStateCoreTest {
       destroy = {
         attempts += 1
         error("destroy must not be called after release")
-      }
+      },
     )
 
     assertEquals(2, attempts)
@@ -68,13 +68,13 @@ class HandleStateCoreTest {
               destroy = {
                 attempts += 1
                 MaplibreStatus.OK.nativeCode
-              }
+              },
             )
           }
         assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
         assertEquals("TestHandle is currently releasing", closeError.diagnostic)
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
 
     assertEquals(1, attempts)
@@ -93,7 +93,7 @@ class HandleStateCoreTest {
           destroy = {
             attempts += 1
             MaplibreStatus.OK.nativeCode
-          }
+          },
         )
       }
 
@@ -109,7 +109,7 @@ class HandleStateCoreTest {
       destroy = {
         attempts += 1
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
 
     assertEquals(1, attempts)
@@ -179,7 +179,7 @@ class HandleStateCoreTest {
       destroy = {
         refusal = assertFailsWith<InvalidStateException> { state.withLive {} }
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
 
     assertTrue(refusal!!.message!!.contains("releasing"))

@@ -59,7 +59,7 @@ internal constructor(
   // would reach the host callback and whatever it captures.
   private val core =
     ResourceRequestHandleCore(
-      ReleaseNativeRequest(handle.rawHandleValue, releaser, cancelRegistration)
+      ReleaseNativeRequest(handle.rawHandleValue, releaser, cancelRegistration),
     )
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.close() }
 

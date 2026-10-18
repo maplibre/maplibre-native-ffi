@@ -21,7 +21,7 @@ internal class OfflineOperationLeakReport(
     if (closed.load() == 0) {
       writeLine(
         "Leaked OfflineOperationHandle id=$id kind=$kind resultKind=$resultKind; " +
-          "take or discard operations explicitly on the runtime owner thread."
+          "take or discard operations explicitly on the runtime owner thread.",
       )
     }
   }

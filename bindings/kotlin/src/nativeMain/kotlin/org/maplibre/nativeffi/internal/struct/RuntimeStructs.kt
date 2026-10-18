@@ -146,7 +146,7 @@ internal object RuntimeStructs {
     )
 
   private fun offlineRegionStatus(
-    value: mln_runtime_event_offline_region_status
+    value: mln_runtime_event_offline_region_status,
   ): RuntimeEventPayload.OfflineRegionStatusChanged =
     RuntimeEventPayload.OfflineRegionStatusChanged(
       value.region_id,
@@ -154,7 +154,7 @@ internal object RuntimeStructs {
     )
 
   private fun offlineRegionResponseError(
-    value: mln_runtime_event_offline_region_response_error
+    value: mln_runtime_event_offline_region_response_error,
   ): RuntimeEventPayload.OfflineRegionResponseError =
     RuntimeEventPayload.OfflineRegionResponseError(
       value.region_id,
@@ -162,7 +162,7 @@ internal object RuntimeStructs {
     )
 
   private fun offlineRegionTileCountLimit(
-    value: mln_runtime_event_offline_region_tile_count_limit
+    value: mln_runtime_event_offline_region_tile_count_limit,
   ): RuntimeEventPayload.OfflineRegionTileCountLimit =
     RuntimeEventPayload.OfflineRegionTileCountLimit(
       value.region_id,
@@ -170,7 +170,7 @@ internal object RuntimeStructs {
     )
 
   private fun offlineOperationCompleted(
-    value: mln_runtime_event_offline_operation_completed
+    value: mln_runtime_event_offline_operation_completed,
   ): RuntimeEventPayload.OfflineOperationCompleted =
     RuntimeEventPayload.OfflineOperationCompleted(
       uint64BitsToLong(value.operation_id),
@@ -181,7 +181,7 @@ internal object RuntimeStructs {
     )
 
   private fun cameraTransitionFinished(
-    value: mln_runtime_event_camera_transition_finished
+    value: mln_runtime_event_camera_transition_finished,
   ): RuntimeEventPayload.CameraTransitionFinished =
     RuntimeEventPayload.CameraTransitionFinished(uint64BitsToLong(value.transition_id))
 
@@ -290,7 +290,7 @@ internal object RuntimeStructs {
     )
 
   private fun offlineRegionDefinition(
-    value: mln_offline_region_definition
+    value: mln_offline_region_definition,
   ): OfflineRegionDefinition =
     when (value.type) {
       MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID -> {

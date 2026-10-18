@@ -53,7 +53,7 @@ class RenderQueryTest {
                 ScreenBox(
                   ScreenPoint(queryPoint.x - 20.0, queryPoint.y - 20.0),
                   ScreenPoint(queryPoint.x + 20.0, queryPoint.y + 20.0),
-                )
+                ),
               )
             val filter = jsonBytes("""["==",["get","kind"],"capital"]""")
             val rendered =

@@ -40,7 +40,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
       response.url(null)
       val replacement =
         callback.transform(
-          ResourceTransformRequest(ResourceKind.fromNative(rawKind), JavaCppSupport.cString(url))
+          ResourceTransformRequest(ResourceKind.fromNative(rawKind), JavaCppSupport.cString(url)),
         )
       if (!replacement.isNullOrEmpty()) {
         if ('\u0000' in replacement) return MaplibreStatus.INVALID_ARGUMENT.nativeCode

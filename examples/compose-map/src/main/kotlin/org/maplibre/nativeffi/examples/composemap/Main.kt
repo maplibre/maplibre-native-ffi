@@ -27,7 +27,7 @@ internal object Main {
     println("native render backends: ${Maplibre.supportedRenderBackends().joinToString()}")
     println("render target: compose-borrowed-texture")
     println(
-      "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface"
+      "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface",
     )
     printControls()
 
@@ -55,7 +55,7 @@ internal object Main {
         ] / [: pitch
         0: reset pitch and bearing
       """
-        .trimIndent()
+        .trimIndent(),
     )
   }
 }

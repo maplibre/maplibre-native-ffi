@@ -93,7 +93,7 @@ internal class MapRuntimeLoop(
           zoom = 13.0
           bearing = 12.0
           pitch = 30.0
-        }
+        },
       )
       publishedMap = createdMap
       pump(createdRuntime, createdMap)
@@ -163,7 +163,7 @@ internal class MapRuntimeLoop(
           CameraOptions().apply {
             bearing = (camera.bearing ?: 0.0) + command.bearingDegrees
             pitch = ((camera.pitch ?: 0.0) + command.pitchDegrees).clampPitch()
-          }
+          },
         )
       }
       is CameraCommand.AdjustBearingAnimated ->

@@ -29,7 +29,7 @@ internal interface GraphicsContext : AutoCloseable {
         return VulkanContext.create(title, width, height)
       }
       throw IllegalStateException(
-        "The loaded MapLibre native library does not support a backend usable by lwjgl-map"
+        "The loaded MapLibre native library does not support a backend usable by lwjgl-map",
       )
     }
   }

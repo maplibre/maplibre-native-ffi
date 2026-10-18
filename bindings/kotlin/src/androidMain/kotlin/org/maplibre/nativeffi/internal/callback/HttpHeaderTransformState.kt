@@ -38,7 +38,7 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
       response.size(response.sizeof())
       val headers =
         callback.transform(
-          HttpHeaderTransformRequest(ResourceKind.fromNative(rawKind), JavaCppSupport.cString(url))
+          HttpHeaderTransformRequest(ResourceKind.fromNative(rawKind), JavaCppSupport.cString(url)),
         )
       if (headers.map { it.name.lowercase() }.toSet().size != headers.size) {
         return MaplibreStatus.INVALID_ARGUMENT.nativeCode

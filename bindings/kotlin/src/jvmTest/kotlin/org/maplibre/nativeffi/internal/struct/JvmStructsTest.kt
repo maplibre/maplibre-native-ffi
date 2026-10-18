@@ -62,7 +62,7 @@ class JvmStructsTest {
           durationMs = 0.0
           velocity = 0.0
           transitionId = -1
-        }
+        },
       )
     assertNotEquals(0, animation.fields)
     assertEquals(0.0, animation.durationMs)
@@ -95,11 +95,11 @@ class JvmStructsTest {
       JvmStructs.renderedQueryGeometryType(RenderedQueryGeometry.Point(ScreenPoint(1.0, 2.0)))
     val box =
       JvmStructs.renderedQueryGeometryType(
-        RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
+        RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0))),
       )
     val line =
       JvmStructs.renderedQueryGeometryType(
-        RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
+        RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0))),
       )
     assertEquals(3, setOf(point, box, line).size)
   }
@@ -119,7 +119,7 @@ class JvmStructsTest {
           sourceLayerId = "layer"
           featureId = "feature-1"
           stateKey = "hover"
-        }
+        },
       )
     assertEquals("point", full.sourceId)
     assertEquals("layer", full.sourceLayerId)
@@ -164,7 +164,7 @@ class JvmStructsTest {
         StyleImageOptions().apply {
           pixelRatio = 0.0f
           sdf = false
-        }
+        },
       )
     assertNotEquals(0, style.fields)
     assertEquals(0.0f, style.pixelRatio)
@@ -192,7 +192,7 @@ class JvmStructsTest {
           scaleFactor = 2.0
           mapMode = MapMode.STATIC
           fastPforEnabled = true
-        }
+        },
       )
     assertEquals(320, snapshot.width)
     assertEquals(240, snapshot.height)
@@ -236,7 +236,7 @@ class JvmStructsTest {
     val extent = RenderTargetExtent(640, 480, 2.0)
     val metal =
       JvmStructs.metalSnapshot(
-        MetalBorrowedTextureDescriptor(extent, 65, 33, NativePointer.ofAddress(0x20))
+        MetalBorrowedTextureDescriptor(extent, 65, 33, NativePointer.ofAddress(0x20)),
       )
     assertEquals(640, metal.width)
     assertEquals(0x20, metal.firstPointer)
@@ -263,7 +263,7 @@ class JvmStructsTest {
             44,
             1,
           )
-          .apply { finalLayout = 2 }
+          .apply { finalLayout = 2 },
       )
     assertEquals(Long.MIN_VALUE, vulkan.firstPointer)
     assertEquals(-1L, vulkan.secondPointer)

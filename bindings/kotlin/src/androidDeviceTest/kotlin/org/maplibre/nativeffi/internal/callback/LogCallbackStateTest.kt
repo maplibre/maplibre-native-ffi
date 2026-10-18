@@ -24,7 +24,7 @@ class LogCallbackStateTest {
           entered.countDown()
           release.await(5, TimeUnit.SECONDS)
           true
-        }
+        },
       )
     val invocation = thread { state.invoke(0, 0, 0, null) }
     assertTrue(entered.await(5, TimeUnit.SECONDS))
@@ -45,7 +45,7 @@ class LogCallbackStateTest {
         LogCallback {
           reentrant.close()
           true
-        }
+        },
       )
     assertEquals(1, reentrant.invoke(0, 0, 0, null))
     assertTrue(reentrant.isClosedForTesting())
@@ -61,7 +61,7 @@ class LogCallbackStateTest {
           LogCallback {
             copied = it
             false
-          }
+          },
         )
       assertFailsWith<IllegalStateException> {
         LogCallbackState.setForTesting(LogCallback { true }) { error("registration failed") }

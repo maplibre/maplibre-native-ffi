@@ -26,7 +26,7 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
   fun verify() {
     if (requireExplicitInput.get() && !explicitlyConfigured.get()) {
       error(
-        "Publishing this runtime requires -P${installPropertyName.get()}=<native install directory>"
+        "Publishing this runtime requires -P${installPropertyName.get()}=<native install directory>",
       )
     }
 

@@ -121,7 +121,7 @@ internal constructor(
     init {
       if (!value.errorReason.isKnown) {
         throw Status.invalidArgument(
-          "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+          "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}",
         )
       }
       response.size(response.sizeof())

@@ -57,7 +57,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
                 nativeCoordinates.coordinates,
                 nativeCoordinates.count,
                 nativePadding,
-              )
+              ),
             )
           }
         }
@@ -79,7 +79,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
                 handle,
                 nativeGeometry.view,
                 nativePadding,
-              )
+              ),
             )
           }
         }
@@ -96,7 +96,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
           coordinate.latitude,
           coordinate.longitude,
           out,
-        )
+        ),
       )
     }
     return ScreenPoint(out[0], out[1])
@@ -107,7 +107,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     val out = DoubleArray(2)
     withLiveHandle { handle ->
       Status.check(
-        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, false, out)
+        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, false, out),
       )
     }
     return LatLng(out[0], out[1])
@@ -118,7 +118,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     val out = DoubleArray(2)
     withLiveHandle { handle ->
       Status.check(
-        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, true, out)
+        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, true, out),
       )
     }
     return LatLng(out[0], out[1])
@@ -133,7 +133,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
           handle,
           latitude,
           outMetersPerPixel,
-        )
+        ),
       )
     }
     return outMetersPerPixel[0]
@@ -169,7 +169,7 @@ private class ProjectionCameraOptionsScope(value: CameraOptions) : AutoCloseable
           .top(it.top)
           .left(it.left)
           .bottom(it.bottom)
-          .right(it.right)
+          .right(it.right),
       )
     }
     value.anchor?.let {

@@ -33,7 +33,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
 
   var isClosed: Bool {
     lock.withLock {
-      if case .closed = state { true } else { false }
+      if case .closed = state {
+        true
+      } else {
+        false
+      }
     }
   }
 

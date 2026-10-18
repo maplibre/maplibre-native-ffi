@@ -27,7 +27,7 @@ internal class SurfaceRenderTarget private constructor(private val session: Rend
     when (graphics) {
       is EglGraphicsContext ->
         session.setOpenGLSurfaceTarget(
-          OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+          OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer),
         )
       is VulkanGraphicsContext ->
         session.resize(viewport.logicalWidth, viewport.logicalHeight, viewport.scaleFactor)

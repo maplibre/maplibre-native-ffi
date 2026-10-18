@@ -21,8 +21,8 @@ class CustomGeometrySourceStateTest {
               state.close()
               throw IllegalStateException("contained")
             }
-          }
-        )
+          },
+        ),
       ) {}
 
     state.fetchTileForTesting(CanonicalTileId(4, 5, 6))

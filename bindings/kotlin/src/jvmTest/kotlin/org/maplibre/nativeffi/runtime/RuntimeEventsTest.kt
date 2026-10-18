@@ -166,10 +166,10 @@ class RuntimeEventsTest {
           handle.complete(
             ResourceResponse(ResourceResponseStatus.OK).apply {
               bytes = STYLE_JSON.encodeToByteArray()
-            }
+            },
           )
           ResourceProviderDecision.HANDLE
-        }
+        },
       )
       val map =
         MapHandle.create(
@@ -247,7 +247,7 @@ class RuntimeEventsTest {
     CustomGeometrySourceOptions(
       object : CustomGeometrySourceCallback {
         override fun fetchTile(tileId: CanonicalTileId) = Unit
-      }
+      },
     )
 
   private fun mapOptions(): MapOptions =

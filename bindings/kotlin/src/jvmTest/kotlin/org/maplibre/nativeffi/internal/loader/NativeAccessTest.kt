@@ -86,7 +86,7 @@ class NativeAccessTest {
           RuntimeOptions().apply {
             assetPath = "bad\u0000path"
             cachePath = ":memory:"
-          }
+          },
         )
       }
 

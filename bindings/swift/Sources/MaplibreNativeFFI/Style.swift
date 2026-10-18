@@ -1189,8 +1189,7 @@ public extension MapHandle {
       guard let info = try NativeStyle.imageInfo(
         requireLiveHandle(),
         imageId: imageIdView
-      ) else { return nil }
-      guard let pixels = try NativeStyle.copyImagePremultipliedRGBA8(
+      ), let pixels = try NativeStyle.copyImagePremultipliedRGBA8(
         requireLiveHandle(),
         imageId: imageIdView,
         capacity: info.byteLength

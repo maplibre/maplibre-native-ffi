@@ -29,7 +29,7 @@ class ResourceProviderStateTest {
         ResourceProviderCallback { request, _ ->
           copied = request
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
       .use { state ->
         Arena.ofConfined().use { arena ->
@@ -63,7 +63,7 @@ class ResourceProviderStateTest {
   @Test
   fun hostLanguageFailureTellsNativeNotToPassThrough() {
     ResourceProviderState(
-        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
+        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") },
       )
       .use { state ->
         Arena.ofConfined().use { arena ->
@@ -87,7 +87,7 @@ class ResourceProviderStateTest {
         ResourceProviderCallback { _, _ ->
           reentrant.close()
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
     Arena.ofConfined().use { arena ->
       assertEquals(
@@ -117,7 +117,7 @@ class ResourceProviderStateTest {
           entered.countDown()
           release.await(5, TimeUnit.SECONDS)
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
     Arena.ofShared().use { arena ->
       val request = resourceRequest(arena)

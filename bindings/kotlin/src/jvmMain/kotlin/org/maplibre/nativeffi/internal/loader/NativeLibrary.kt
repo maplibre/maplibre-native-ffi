@@ -126,7 +126,7 @@ internal object NativeLibrary {
     if (libraryResources.size > 1) {
       throw UnsatisfiedLinkError(
         "Multiple MapLibre native runtime JARs provide $classifier: " +
-          libraryResources.joinToString()
+          libraryResources.joinToString(),
       )
     }
 
@@ -212,7 +212,7 @@ internal object NativeLibrary {
     val userName = System.getProperty("user.name")
     val root =
       temporaryDirectory.resolve(
-        "maplibre-native-ffi-" + userName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        "maplibre-native-ffi-" + userName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
       )
     return try {
       // Without POSIX modes, an owner check alone cannot rule out a writable ACL.
@@ -282,7 +282,7 @@ internal object NativeLibrary {
         } catch (error: UnsatisfiedLinkError) {
           loadedRuntimeDependencies.remove(canonicalPath)
           throw UnsatisfiedLinkError(
-              "Unable to load MapLibre native runtime dependency from $canonicalPath"
+              "Unable to load MapLibre native runtime dependency from $canonicalPath",
             )
             .also { it.addSuppressed(error) }
         }
@@ -296,7 +296,7 @@ internal object NativeLibrary {
         "Unable to load native library $LIBRARY_NAME. Set $LIBRARY_PATH_PROPERTY or " +
           "$LIBRARY_PATH_ENV to an exact library file path, or make the library available on " +
           "the classpath or java.library.path. Set $LIBRARY_DIRS_PROPERTY or $LIBRARY_DIRS_ENV when host " +
-          "runtime dependency directories are needed."
+          "runtime dependency directories are needed.",
       )
     error.addSuppressed(cause)
     return error

@@ -135,7 +135,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
           zoom = 13.0
           bearing = 12.0
           pitch = 30.0
-        }
+        },
       )
       map = createdMap
       handler.post(pump)
@@ -182,7 +182,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
           CameraOptions().apply {
             bearing = (camera.bearing ?: 0.0) + command.degrees
             anchor = command.anchor
-          }
+          },
         )
       }
       is CameraCommand.AdjustPitch -> {
@@ -190,7 +190,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
         map.jumpTo(
           CameraOptions().apply {
             pitch = ((camera.pitch ?: 0.0) + command.degrees).coerceIn(MIN_PITCH, MAX_PITCH)
-          }
+          },
         )
       }
       is CameraCommand.ZoomToNextWholeLevel -> {

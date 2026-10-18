@@ -98,10 +98,14 @@ final class InputController {
     case .none:
       return false
     case .pan:
-      if dx == 0 && dy == 0 { return false }
+      if dx == 0 && dy == 0 {
+        return false
+      }
       commands.push(.moveBy(dx: dx, dy: dy))
     case .rotate:
-      if dx == 0 && dy == 0 { return false }
+      if dx == 0 && dy == 0 {
+        return false
+      }
       commands.push(.adjustBearing(delta: dx * 0.5))
       commands.push(.adjustPitch(delta: -dy * 0.5))
     }
@@ -112,7 +116,9 @@ final class InputController {
                    in view: NSView) -> Bool
   {
     let delta = scrollDelta(event)
-    if delta == 0 { return false }
+    if delta == 0 {
+      return false
+    }
 
     let location = view.convert(event.locationInWindow, from: nil)
     let anchor = ScreenPoint(

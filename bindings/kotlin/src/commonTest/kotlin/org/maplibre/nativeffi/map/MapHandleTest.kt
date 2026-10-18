@@ -102,7 +102,7 @@ class MapHandleTest {
                 "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
                 "{\"id\":\"bg\",\"type\":\"background\"}," +
                 "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}")
-              .encodeToByteArray()
+              .encodeToByteArray(),
           )
 
           assertEquals("", map.layerSourceLayer("fill"))
@@ -464,7 +464,7 @@ class MapHandleTest {
         CustomGeometrySourceOptions(
             object : CustomGeometrySourceCallback {
               override fun fetchTile(tileId: CanonicalTileId) {}
-            }
+            },
           )
           .apply {
             minZoom = 0.0
@@ -516,7 +516,7 @@ class MapHandleTest {
         CustomMvtVectorSourceOptions(
             object : CustomMvtVectorSourceCallback {
               override fun fetchTile(tileId: CanonicalTileId) {}
-            }
+            },
           )
           .apply {
             minZoom = 0.0
@@ -538,7 +538,7 @@ class MapHandleTest {
           CustomMvtVectorSourceOptions(
             object : CustomMvtVectorSourceCallback {
               override fun fetchTile(tileId: CanonicalTileId) {}
-            }
+            },
           ),
         )
       }
@@ -568,7 +568,7 @@ class MapHandleTest {
             CustomGeometrySourceOptions(
               object : CustomGeometrySourceCallback {
                 override fun fetchTile(tileId: CanonicalTileId) {}
-              }
+              },
             )
           val ids = (1..6).map { "custom-$it" }
           ids.forEach { map.addCustomGeometrySource(it, options) }
@@ -599,7 +599,7 @@ class MapHandleTest {
             CustomMvtVectorSourceOptions(
               object : CustomMvtVectorSourceCallback {
                 override fun fetchTile(tileId: CanonicalTileId) {}
-              }
+              },
             )
           val ids = (1..6).map { "custom-mvt-$it" }
           ids.forEach { map.addCustomMvtVectorSource(it, options) }
@@ -694,7 +694,7 @@ class MapHandleTest {
       assertTrue(map.styleLayerIds().contains("background"))
       assertTrue(map.styleLayerIds().contains("puck"))
       assertTrue(
-        map.styleLayerJson("background")!!.decodeToString().contains("\"type\":\"background\"")
+        map.styleLayerJson("background")!!.decodeToString().contains("\"type\":\"background\""),
       )
       map.setLayerProperty("background", "background-opacity", "0.5".encodeToByteArray())
       assertEquals("0.5", map.layerProperty("background", "background-opacity")?.decodeToString())
@@ -739,7 +739,7 @@ class MapHandleTest {
         }
         """
           .trimIndent()
-          .encodeToByteArray()
+          .encodeToByteArray(),
       )
 
       assertEquals(
@@ -994,7 +994,7 @@ class MapHandleTest {
       val bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0))
       assertTrue(map.cameraForLatLngBounds(bounds, fit).center != null)
       assertTrue(
-        map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null
+        map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null,
       )
       assertTrue(map.cameraForGeometry(pointGeometry(), fit).center != null)
       assertTrue(map.latLngBoundsForCamera(camera).southwest.latitude.isFinite())
@@ -1194,7 +1194,7 @@ class MapHandleTest {
         CameraOptions().apply {
           center = LatLng(0.0, longitude)
           zoom = 2.0
-        }
+        },
       )
       return requireNotNull(map.camera.center).longitude
     }
@@ -1274,7 +1274,7 @@ class MapHandleTest {
         CameraOptions().apply {
           center = LatLng(0.0, 180.0)
           zoom = 0.0
-        }
+        },
       )
       val points = listOf(ScreenPoint(0.0, 256.0), ScreenPoint(1024.0, 256.0))
       val wrapped = map.latLngsForPixels(points)
@@ -1309,7 +1309,7 @@ class MapHandleTest {
         CameraOptions().apply {
           center = LatLng(latitude, 0.0)
           zoom = 4.0
-        }
+        },
       )
       val metersPerPixel = map.metersPerPixelAtLatitude(latitude)
       map.createProjection().use { projection ->

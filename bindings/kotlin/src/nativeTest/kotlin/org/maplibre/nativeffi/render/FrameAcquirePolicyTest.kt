@@ -41,7 +41,7 @@ class NativeFrameAcquirePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
                   response.ptr,
                   replacement,
                   replacement.length.toCSize(),
-                )
+                ),
               )
             },
             closeLocal = {},

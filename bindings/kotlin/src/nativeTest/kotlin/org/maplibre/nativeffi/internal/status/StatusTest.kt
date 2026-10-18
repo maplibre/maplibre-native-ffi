@@ -42,7 +42,7 @@ class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
               response.ptr,
               replacement,
               replacement.length.toCSize(),
-            )
+            ),
           )
         }
       assertEquals(MaplibreStatus.INVALID_STATE, invalidState.status)

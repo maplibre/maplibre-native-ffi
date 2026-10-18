@@ -63,7 +63,7 @@ class JavaCppStructsTest {
           durationMs = 0.0
           velocity = 0.0
           transitionId = -1
-        }
+        },
       )
     assertNotEquals(0, animation.fields)
     assertEquals(0.0, animation.durationMs)
@@ -94,11 +94,11 @@ class JavaCppStructsTest {
       JavaCppStructs.renderedQueryGeometryType(RenderedQueryGeometry.Point(ScreenPoint(1.0, 2.0)))
     val box =
       JavaCppStructs.renderedQueryGeometryType(
-        RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
+        RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0))),
       )
     val line =
       JavaCppStructs.renderedQueryGeometryType(
-        RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
+        RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0))),
       )
     assertEquals(3, setOf(point, box, line).size)
   }
@@ -118,7 +118,7 @@ class JavaCppStructsTest {
           sourceLayerId = "layer"
           featureId = "feature-1"
           stateKey = "hover"
-        }
+        },
       )
     assertEquals("point", full.sourceId)
     assertEquals("layer", full.sourceLayerId)
@@ -163,7 +163,7 @@ class JavaCppStructsTest {
         StyleImageOptions().apply {
           pixelRatio = 0.0f
           sdf = false
-        }
+        },
       )
     assertNotEquals(0, style.fields)
     assertEquals(0.0f, style.pixelRatio)
@@ -187,7 +187,7 @@ class JavaCppStructsTest {
     val extent = RenderTargetExtent(640, 480, 2.0)
     val metal =
       JavaCppStructs.metalSnapshot(
-        MetalBorrowedTextureDescriptor(extent, 65, 33, NativePointer.ofAddress(0x20))
+        MetalBorrowedTextureDescriptor(extent, 65, 33, NativePointer.ofAddress(0x20)),
       )
     assertEquals(640, metal.width)
     assertEquals(0x20, metal.firstPointer)
@@ -214,7 +214,7 @@ class JavaCppStructsTest {
             44,
             1,
           )
-          .apply { finalLayout = 2 }
+          .apply { finalLayout = 2 },
       )
     assertEquals(Long.MIN_VALUE, vulkan.firstPointer)
     assertEquals(-1L, vulkan.secondPointer)
@@ -244,7 +244,7 @@ class JavaCppStructsTest {
           scaleFactor = 2.0
           mapMode = MapMode.STATIC
           fastPforEnabled = true
-        }
+        },
       )
     assertEquals(320, map.width)
     assertEquals(240, map.height)
@@ -259,7 +259,7 @@ class JavaCppStructsTest {
           modifiedUnixMs = 10
           expiresUnixMs = 20
           retryAfterUnixMs = 30
-        }
+        },
       )
     assertEquals(ResourceResponseStatus.OK.nativeValue, resource.status)
     assertContentEquals(byteArrayOf(1, 2, 3), resource.bytes)

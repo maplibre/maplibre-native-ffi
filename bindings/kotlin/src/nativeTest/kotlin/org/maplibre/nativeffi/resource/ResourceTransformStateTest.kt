@@ -24,7 +24,7 @@ class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
         ResourceTransformCallback { request ->
           copiedRequest = request
           null
-        }
+        },
       )
     try {
       memScoped {
@@ -46,7 +46,7 @@ class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun embeddedNulReplacementReturnsInvalidArgument() {
     val state =
       ResourceTransformState(
-        ResourceTransformCallback { "https://cdn.example.com/\u0000truncated" }
+        ResourceTransformCallback { "https://cdn.example.com/\u0000truncated" },
       )
     try {
       memScoped {
@@ -70,7 +70,7 @@ class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
       // BND-121.
       val throwingState =
         ResourceTransformState(
-          ResourceTransformCallback { throw IllegalStateException("contained") }
+          ResourceTransformCallback { throw IllegalStateException("contained") },
         )
       val throwingOut = alloc<mln_resource_transform_response>()
       assertEquals(
@@ -92,7 +92,7 @@ class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
           state.close()
           assertFalse(state.isClosedForTesting())
           null
-        }
+        },
       )
     memScoped {
       val out = alloc<mln_resource_transform_response>()

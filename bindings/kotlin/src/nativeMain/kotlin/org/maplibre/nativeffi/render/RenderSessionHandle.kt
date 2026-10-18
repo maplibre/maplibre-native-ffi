@@ -92,7 +92,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         width.toUInt(),
         height.toUInt(),
         scaleFactor,
-      )
+      ),
     )
   }
 
@@ -103,7 +103,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_metal_surface_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -115,7 +115,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_vulkan_surface_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -127,7 +127,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_opengl_surface_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -139,7 +139,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_metal_borrowed_texture_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -151,7 +151,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_vulkan_borrowed_texture_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -163,7 +163,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_opengl_borrowed_texture_set_target(
           state.requireLive().rawHandleValue,
           RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
-        )
+        ),
       )
     }
   }
@@ -179,7 +179,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         state.requireLive().rawHandleValue,
         outResult.ptr,
         outNeedsRepaint.ptr,
-      )
+      ),
     )
     RenderUpdate(RenderResult.fromNative(outResult.value), outNeedsRepaint.value)
   }
@@ -188,10 +188,10 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     val outProjection = alloc<ULongVar>()
     outProjection.value = 0uL
     Status.check(
-      mln_render_session_projection_create(state.requireLive().rawHandleValue, outProjection.ptr)
+      mln_render_session_projection_create(state.requireLive().rawHandleValue, outProjection.ptr),
     )
     MapProjectionHandle(
-      outProjection.value.asHandle("mln_render_session_projection_create", ::mapProjectionHandle)
+      outProjection.value.asHandle("mln_render_session_projection_create", ::mapProjectionHandle),
     )
   }
 
@@ -229,10 +229,10 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         QueryStructs.renderedQueryGeometry(geometry, this),
         QueryStructs.renderedFeatureQueryOptions(options, this),
         outResult.ptr,
-      )
+      ),
     )
     QueryStructs.queriedFeatureList(
-      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle),
     )
   }
 
@@ -249,10 +249,10 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         CoreStructs.stringView(sourceId, this),
         QueryStructs.sourceFeatureQueryOptions(options, this),
         outResult.ptr,
-      )
+      ),
     )
     QueryStructs.queriedFeatureList(
-      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle),
     )
   }
 
@@ -275,7 +275,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         CoreStructs.stringView(extensionField, this),
         arguments?.let { ByteStructs.bufferViewPointer(it, this) },
         outResult.ptr,
-      )
+      ),
     )
     ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
@@ -309,7 +309,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           pointer?.reinterpret<UByteVar>(),
           capacity.toCSize(),
           outInfo,
-        )
+        ),
       )
     }
     val info = RenderStructs.textureImageInfo(outInfo.pointed)
@@ -328,7 +328,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       borrowStarted = true
       frame.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
       Status.check(
-        mln_metal_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+        mln_metal_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr),
       )
       acquired = true
       val scope = FrameScope()
@@ -360,7 +360,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       borrowStarted = true
       frame.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
       Status.check(
-        mln_vulkan_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+        mln_vulkan_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr),
       )
       acquired = true
       val scope = FrameScope()
@@ -392,7 +392,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       borrowStarted = true
       frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
       Status.check(
-        mln_opengl_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+        mln_opengl_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr),
       )
       acquired = true
       val scope = FrameScope()
@@ -525,7 +525,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -544,7 +544,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -563,7 +563,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -582,7 +582,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -601,7 +601,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -620,7 +620,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -639,7 +639,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -658,7 +658,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,
@@ -677,7 +677,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
           outSession.ptr,
-        )
+        ),
       )
       RenderSessionHandle(
         map,

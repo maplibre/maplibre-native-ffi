@@ -252,7 +252,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
               .baseMipLevel(0)
               .levelCount(1)
               .baseArrayLayer(0)
-              .layerCount(1)
+              .layerCount(1),
           )
       val out = stack.mallocLong(1)
       check(vkCreateImageView(context.device(), createInfo, null, out), "vkCreateImageView")
@@ -409,7 +409,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
               VK_COLOR_COMPONENT_R_BIT or
                 VK_COLOR_COMPONENT_G_BIT or
                 VK_COLOR_COMPONENT_B_BIT or
-                VK_COLOR_COMPONENT_A_BIT
+                VK_COLOR_COMPONENT_A_BIT,
             )
         val colorBlend =
           VkPipelineColorBlendStateCreateInfo.calloc(stack)

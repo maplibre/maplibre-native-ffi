@@ -16,7 +16,7 @@ val androidApiLevel = catalogVersionInt("android-minSdk")
 val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
 val androidBackend =
   AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
   )
 val androidTargets =
   AndroidTarget.parseAbis(
@@ -113,7 +113,7 @@ val generateJavaCppBindings =
     outputs.file(
       generatedJavaCppSources.map {
         it.file("org/maplibre/nativeffi/internal/javacpp/MaplibreNativeC.java")
-      }
+      },
     )
   }
 

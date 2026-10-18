@@ -23,8 +23,8 @@ class CustomMvtVectorSourceStateTest {
               state.close()
               throw IllegalStateException("contained")
             }
-          }
-        )
+          },
+        ),
       ) {}
 
     state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
@@ -50,8 +50,8 @@ class CustomMvtVectorSourceStateTest {
               override fun cancelTile(tileId: CanonicalTileId) {
                 cancelled += index to tileId
               }
-            }
-          )
+            },
+          ),
         ) {}
       }
     try {

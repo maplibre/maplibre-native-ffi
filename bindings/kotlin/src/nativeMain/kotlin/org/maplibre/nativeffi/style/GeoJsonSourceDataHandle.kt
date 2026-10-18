@@ -50,10 +50,10 @@ public actual class GeoJsonSourceDataHandle internal constructor(handle: NativeG
           ByteStructs.bufferView(data, this),
           StyleStructs.geoJsonSourceOptions(options, this),
           outData.ptr,
-        )
+        ),
       )
       GeoJsonSourceDataHandle(
-        outData.value.asHandle("mln_geojson_source_data_create", ::geoJsonSourceDataHandle)
+        outData.value.asHandle("mln_geojson_source_data_create", ::geoJsonSourceDataHandle),
       )
     }
   }

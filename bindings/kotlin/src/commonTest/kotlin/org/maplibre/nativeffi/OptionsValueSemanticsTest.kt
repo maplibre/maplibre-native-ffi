@@ -174,7 +174,10 @@ class OptionsValueSemanticsTest {
       },
       copyOf = { it.copy() },
       mutators =
-        listOf({ position = Vec3(9.0, 9.0, 9.0) }, { orientation = Quaternion(1.0, 0.0, 0.0, 0.0) }),
+        listOf(
+          { position = Vec3(9.0, 9.0, 9.0) },
+          { orientation = Quaternion(1.0, 0.0, 0.0, 0.0) },
+        ),
     )
   }
 

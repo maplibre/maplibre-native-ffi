@@ -35,7 +35,7 @@ class HandleStateCoreJvmTest {
         destroy = {
           destroys += 1
           MaplibreStatus.OK.nativeCode
-        }
+        },
       )
       closeReturned.set(true)
     }

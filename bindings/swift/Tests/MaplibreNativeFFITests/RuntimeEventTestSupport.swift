@@ -29,7 +29,9 @@ func pumpUntilEvent(
 func pumpUntilQuiet(_ runtime: RuntimeHandle, iterations: Int = 100) throws {
   for _ in 0 ..< iterations {
     try runtime.pump()
-    if try runtime.drainEvents().events.isEmpty { return }
+    if try runtime.drainEvents().events.isEmpty {
+      return
+    }
   }
   Issue.record("the runtime kept producing events while idle")
 }

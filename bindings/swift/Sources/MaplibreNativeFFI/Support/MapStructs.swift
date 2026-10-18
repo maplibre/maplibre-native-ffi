@@ -294,7 +294,9 @@ struct NativeCameraFitOptionsInput: Equatable {
   ) throws
     -> Result) throws -> Result
   {
-    if padding == nil, bearing == nil, pitch == nil { return try body(nil) }
+    if padding == nil, bearing == nil, pitch == nil {
+      return try body(nil)
+    }
     var options = mln_camera_fit_options_default()
     if let padding {
       options.fields |= MLN_CAMERA_FIT_OPTION_PADDING.rawValue

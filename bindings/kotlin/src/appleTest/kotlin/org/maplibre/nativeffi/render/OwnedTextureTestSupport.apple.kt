@@ -19,7 +19,7 @@ internal actual object OwnedTextureTestSupport {
         MetalOwnedTextureDescriptor(
           extent = RenderTargetExtent(width, height, 1.0),
           context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
-        )
+        ),
       )
     return AppleOwnedTextureSession(device.address(), session)
   }
@@ -36,7 +36,7 @@ private class AppleOwnedTextureSession(
         MetalOwnedTextureDescriptor(
           extent = RenderTargetExtent(width, height, 1.0),
           context = MetalContextDescriptor(NativePointer.ofAddress(deviceAddress)),
-        )
+        ),
       )
 
   override fun acquireFrame(): OwnedTextureTestFrame {

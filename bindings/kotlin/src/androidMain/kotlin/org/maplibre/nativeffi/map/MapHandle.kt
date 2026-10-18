@@ -125,7 +125,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativePropertyName.view,
             nativeValue.view,
-          )
+          ),
         )
       }
     }
@@ -149,7 +149,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSelector.selector,
             nativeValue.view,
-          )
+          ),
         )
       }
     }
@@ -165,7 +165,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSelector.selector,
             outState,
-          )
+          ),
         )
         return ownedBuffer(outState.get())
       }
@@ -176,7 +176,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     FeatureStateSelectorScope(selector).use { nativeSelector ->
       Status.check(
-        MaplibreNativeC.mln_map_remove_feature_state(requireLiveHandle(), nativeSelector.selector)
+        MaplibreNativeC.mln_map_remove_feature_state(requireLiveHandle(), nativeSelector.selector),
       )
     }
   }
@@ -205,7 +205,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeSourceJson.view,
-          )
+          ),
         )
       }
     }
@@ -220,7 +220,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeSourceId.view,
           outRemoved,
-        )
+        ),
       )
     }
     return outRemoved[0]
@@ -235,7 +235,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeSourceId.view,
           outExists,
-        )
+        ),
       )
     }
     return outExists[0]
@@ -252,7 +252,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           nativeSourceId.view,
           outType,
           outFound,
-        )
+        ),
       )
     }
     return if (outFound[0]) SourceType.fromNative(outType[0]) else null
@@ -270,7 +270,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeSourceId.view,
             outInfo,
             outFound,
-          )
+          ),
         )
         if (!outFound[0]) return null
         val attribution =
@@ -289,7 +289,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               outInfo.min_zoom(),
               outInfo.max_zoom(),
               TileScheme.fromNative(outInfo.scheme()),
-              if (fields and STYLE_SOURCE_INFO_BOUNDS != 0) latLngBounds(outInfo.bounds()) else null,
+              if (fields and STYLE_SOURCE_INFO_BOUNDS != 0) latLngBounds(outInfo.bounds())
+              else null,
             )
           else null
         return SourceInfo(
@@ -320,7 +321,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeSourceId.view,
           isVolatile,
-        )
+        ),
       )
     }
   }
@@ -351,7 +352,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeSourceId.view,
               nativeUrl.view,
               nativeOptions.options,
-            )
+            ),
           )
         }
       }
@@ -367,7 +368,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeData,
-          )
+          ),
         )
       }
     }
@@ -382,7 +383,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeUrl.view,
-          )
+          ),
         )
       }
     }
@@ -397,7 +398,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeData,
-          )
+          ),
         )
       }
     }
@@ -411,7 +412,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeSourceId.view,
           enabled,
-        )
+        ),
       )
     }
   }
@@ -432,7 +433,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             sourceState.descriptor,
-          )
+          ),
         )
       }
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
@@ -454,7 +455,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeSourceId.view,
               nativeTileId.tileId,
               nativeData.view,
-            )
+            ),
           )
         }
       }
@@ -470,7 +471,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeTileId.tileId,
-          )
+          ),
         )
       }
     }
@@ -484,7 +485,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeSourceId.view,
           latLngBounds(bounds),
-        )
+        ),
       )
     }
   }
@@ -505,7 +506,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             sourceState.descriptor,
-          )
+          ),
         )
       }
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
@@ -527,7 +528,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeSourceId.view,
               nativeTileId.tileId,
               nativeData.view,
-            )
+            ),
           )
         }
       }
@@ -549,7 +550,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeSourceId.view,
               nativeTileId.tileId,
               nativeMessage.view,
-            )
+            ),
           )
         }
       }
@@ -565,7 +566,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeTileId.tileId,
-          )
+          ),
         )
       }
     }
@@ -638,7 +639,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeImage.image,
               image.pixelsTransit,
               nativeOptions.options,
-            )
+            ),
           )
         }
       }
@@ -654,7 +655,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeImageId.view,
           outRemoved,
-        )
+        ),
       )
     }
     return outRemoved[0]
@@ -669,7 +670,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeImageId.view,
           outExists,
-        )
+        ),
       )
     }
     return outExists[0]
@@ -686,7 +687,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeImageId.view,
             outInfo,
             outFound,
-          )
+          ),
         )
         return if (outFound[0]) styleImageInfo(outInfo) else null
       }
@@ -708,7 +709,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             outPixels.size.toLong(),
             outByteLength,
             outFound,
-          )
+          ),
         )
       }
     }
@@ -733,7 +734,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeCoordinates.coordinates,
               nativeCoordinates.count,
               nativeUrl.view,
-            )
+            ),
           )
         }
       }
@@ -757,7 +758,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeCoordinates.count,
               nativeImage.image,
               image.pixelsTransit,
-            )
+            ),
           )
         }
       }
@@ -773,7 +774,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeSourceId.view,
             nativeUrl.view,
-          )
+          ),
         )
       }
     }
@@ -789,7 +790,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeSourceId.view,
             nativeImage.image,
             image.pixelsTransit,
-          )
+          ),
         )
       }
     }
@@ -805,7 +806,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeSourceId.view,
             nativeCoordinates.coordinates,
             nativeCoordinates.count,
-          )
+          ),
         )
       }
     }
@@ -825,7 +826,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               outCoordinates.count,
               outCoordinateCount,
               outFound,
-            )
+            ),
           )
           return if (outFound[0]) {
             outCoordinates.toList(Math.toIntExact(outCoordinateCount.get()))
@@ -844,7 +845,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerJson.view,
             nativeBeforeLayerId.view,
-          )
+          ),
         )
       }
     }
@@ -861,7 +862,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeLayerId.view,
               nativeSourceId.view,
               nativeBeforeLayerId.view,
-            )
+            ),
           )
         }
       }
@@ -879,7 +880,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeLayerId.view,
               nativeSourceId.view,
               nativeBeforeLayerId.view,
-            )
+            ),
           )
         }
       }
@@ -895,7 +896,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             nativeBeforeLayerId.view,
-          )
+          ),
         )
       }
     }
@@ -915,7 +916,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeLayerId.view,
             nativeCoordinate,
             altitude,
-          )
+          ),
         )
       }
     }
@@ -929,7 +930,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           bearing,
-        )
+        ),
       )
     }
   }
@@ -942,7 +943,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           radius,
-        )
+        ),
       )
     }
   }
@@ -961,7 +962,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeLayerId.view,
             imageKind.nativeValue,
             nativeImageId.view,
-          )
+          ),
         )
       }
     }
@@ -976,7 +977,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           outRemoved,
-        )
+        ),
       )
     }
     return outRemoved[0]
@@ -991,7 +992,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           outExists,
-        )
+        ),
       )
     }
     return outExists[0]
@@ -1008,7 +1009,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeLayerId.view,
             outType,
             outFound,
-          )
+          ),
         )
       }
       return if (outFound[0]) stringView(outType) else null
@@ -1046,7 +1047,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             nativeBeforeLayerId.view,
-          )
+          ),
         )
       }
     }
@@ -1064,7 +1065,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeLayerId.view,
               outSnapshot,
               outFound,
-            )
+            ),
           )
           return if (outFound.get()) ownedBuffer(outSnapshot.get()) else null
         }
@@ -1076,7 +1077,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     ByteArrayViewScope(lightJson).use { nativeLightJson ->
       Status.check(
-        MaplibreNativeC.mln_map_set_style_light_json(requireLiveHandle(), nativeLightJson.view)
+        MaplibreNativeC.mln_map_set_style_light_json(requireLiveHandle(), nativeLightJson.view),
       )
     }
   }
@@ -1090,7 +1091,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativePropertyName.view,
             nativeValue.view,
-          )
+          ),
         )
       }
     }
@@ -1106,7 +1107,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativePropertyName.view,
             outSnapshot,
-          )
+          ),
         )
         return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
       }
@@ -1120,7 +1121,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         MaplibreNativeC.mln_map_set_style_transition_options(
           requireLiveHandle(),
           nativeOptions.options,
-        )
+        ),
       )
     }
   }
@@ -1129,7 +1130,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     MaplibreNativeC.mln_style_transition_options_default().use { outOptions ->
       Status.check(
-        MaplibreNativeC.mln_map_get_style_transition_options(requireLiveHandle(), outOptions)
+        MaplibreNativeC.mln_map_get_style_transition_options(requireLiveHandle(), outOptions),
       )
       return styleTransitionOptions(outOptions)
     }
@@ -1146,7 +1147,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeLayerId.view,
               nativePropertyName.view,
               nativeValue.view,
-            )
+            ),
           )
         }
       }
@@ -1165,7 +1166,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeLayerId.view,
               nativePropertyName.view,
               outSnapshot,
-            )
+            ),
           )
           return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
         }
@@ -1182,7 +1183,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             nativeFilter.view,
-          )
+          ),
         )
       }
     }
@@ -1192,7 +1193,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       Status.check(
-        MaplibreNativeC.mln_map_set_layer_filter(requireLiveHandle(), nativeLayerId.view, null)
+        MaplibreNativeC.mln_map_set_layer_filter(requireLiveHandle(), nativeLayerId.view, null),
       )
     }
   }
@@ -1207,7 +1208,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             outSnapshot,
-          )
+          ),
         )
         return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
       }
@@ -1215,7 +1216,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   }
 
   public actual fun styleImageStretches(
-    imageId: String
+    imageId: String,
   ): Pair<List<ImageStretch>, List<ImageStretch>>? {
     NativeAccess.ensureLoaded()
     StringViewScope(imageId).use { nativeImageId ->
@@ -1233,7 +1234,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               0L,
               outYCount,
               outFound,
-            )
+            ),
           )
           if (!outFound[0]) return null
 
@@ -1253,7 +1254,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
                 yCount.toLong(),
                 outYCount,
                 outFound,
-              )
+              ),
             )
             return readStretches(rawX, xCount) to readStretches(rawY, yCount)
           } finally {
@@ -1274,7 +1275,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             nativeSourceLayer.view,
-          )
+          ),
         )
       }
     }
@@ -1296,7 +1297,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeLayerId.view,
             nativeSourceId.view,
-          )
+          ),
         )
       }
     }
@@ -1313,7 +1314,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       Status.check(
-        MaplibreNativeC.mln_map_set_layer_min_zoom(requireLiveHandle(), nativeLayerId.view, minZoom)
+        MaplibreNativeC.mln_map_set_layer_min_zoom(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          minZoom,
+        ),
       )
     }
   }
@@ -1323,7 +1328,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     StringViewScope(layerId).use { nativeLayerId ->
       val outZoom = doubleArrayOf(0.0)
       Status.check(
-        MaplibreNativeC.mln_map_get_layer_min_zoom(requireLiveHandle(), nativeLayerId.view, outZoom)
+        MaplibreNativeC.mln_map_get_layer_min_zoom(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          outZoom,
+        ),
       )
       return outZoom[0]
     }
@@ -1333,7 +1342,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       Status.check(
-        MaplibreNativeC.mln_map_set_layer_max_zoom(requireLiveHandle(), nativeLayerId.view, maxZoom)
+        MaplibreNativeC.mln_map_set_layer_max_zoom(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          maxZoom,
+        ),
       )
     }
   }
@@ -1343,7 +1356,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     StringViewScope(layerId).use { nativeLayerId ->
       val outZoom = doubleArrayOf(0.0)
       Status.check(
-        MaplibreNativeC.mln_map_get_layer_max_zoom(requireLiveHandle(), nativeLayerId.view, outZoom)
+        MaplibreNativeC.mln_map_get_layer_max_zoom(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          outZoom,
+        ),
       )
       return outZoom[0]
     }
@@ -1357,7 +1374,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           visibility.nativeValue,
-        )
+        ),
       )
     }
   }
@@ -1371,7 +1388,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           nativeLayerId.view,
           outVisibility,
-        )
+        ),
       )
       return StyleLayerVisibility.fromNative(outVisibility[0])
     }
@@ -1397,7 +1414,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     set(value) {
       NativeAccess.ensureLoaded()
       Status.check(
-        MaplibreNativeC.mln_map_set_debug_options(requireLiveHandle(), debugOptionMask(value))
+        MaplibreNativeC.mln_map_set_debug_options(requireLiveHandle(), debugOptionMask(value)),
       )
     }
 
@@ -1406,14 +1423,14 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       val outEnabled = booleanArrayOf(false)
       Status.check(
-        MaplibreNativeC.mln_map_get_rendering_stats_view_enabled(requireLiveHandle(), outEnabled)
+        MaplibreNativeC.mln_map_get_rendering_stats_view_enabled(requireLiveHandle(), outEnabled),
       )
       return outEnabled[0]
     }
     set(value) {
       NativeAccess.ensureLoaded()
       Status.check(
-        MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(requireLiveHandle(), value)
+        MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(requireLiveHandle(), value),
       )
     }
 
@@ -1437,7 +1454,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       val outHeight = intArrayOf(0)
       val outScaleFactor = doubleArrayOf(0.0)
       Status.check(
-        MaplibreNativeC.mln_map_get_size(requireLiveHandle(), outWidth, outHeight, outScaleFactor)
+        MaplibreNativeC.mln_map_get_size(requireLiveHandle(), outWidth, outHeight, outScaleFactor),
       )
       return MapSize(outWidth[0], outHeight[0], outScaleFactor[0])
     }
@@ -1454,7 +1471,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       ViewportOptionsScope(value).use { nativeOptions ->
         Status.check(
-          MaplibreNativeC.mln_map_set_viewport_options(requireLiveHandle(), nativeOptions.options)
+          MaplibreNativeC.mln_map_set_viewport_options(requireLiveHandle(), nativeOptions.options),
         )
       }
     }
@@ -1471,7 +1488,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       TileOptionsScope(value).use { nativeOptions ->
         Status.check(
-          MaplibreNativeC.mln_map_set_tile_options(requireLiveHandle(), nativeOptions.options)
+          MaplibreNativeC.mln_map_set_tile_options(requireLiveHandle(), nativeOptions.options),
         )
       }
     }
@@ -1500,7 +1517,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeCamera.options,
             nativeAnimation.options,
-          )
+          ),
         )
       }
     }
@@ -1515,7 +1532,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             requireLiveHandle(),
             nativeCamera.options,
             nativeAnimation.options,
-          )
+          ),
         )
       }
     }
@@ -1535,7 +1552,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           deltaX,
           deltaY,
           nativeAnimation.options,
-        )
+        ),
       )
     }
   }
@@ -1561,7 +1578,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             scale,
             nativeAnchor.point,
             nativeAnimation.options,
-          )
+          ),
         )
       }
     }
@@ -1574,7 +1591,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         requireLiveHandle(),
         screenPoint(first),
         screenPoint(second),
-      )
+      ),
     )
   }
 
@@ -1591,7 +1608,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           screenPoint(first),
           screenPoint(second),
           nativeAnimation.options,
-        )
+        ),
       )
     }
   }
@@ -1609,7 +1626,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           requireLiveHandle(),
           pitch,
           nativeAnimation.options,
-        )
+        ),
       )
     }
   }
@@ -1624,7 +1641,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       val outInProgress = booleanArrayOf(false)
       Status.check(
-        MaplibreNativeC.mln_map_is_gesture_in_progress(requireLiveHandle(), outInProgress)
+        MaplibreNativeC.mln_map_is_gesture_in_progress(requireLiveHandle(), outInProgress),
       )
       return outInProgress[0]
     }
@@ -1646,7 +1663,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             latLngBounds(bounds),
             nativeFitOptions.options,
             outCamera,
-          )
+          ),
         )
         return cameraOptions(outCamera)
       }
@@ -1668,7 +1685,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeCoordinates.count,
               nativeFitOptions.options,
               outCamera,
-            )
+            ),
           )
           return cameraOptions(outCamera)
         }
@@ -1690,7 +1707,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeGeometry.view,
               nativeFitOptions.options,
               outCamera,
-            )
+            ),
           )
           return cameraOptions(outCamera)
         }
@@ -1724,7 +1741,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       MaplibreNativeC.mln_free_camera_options_default().use { outOptions ->
         Status.check(
-          MaplibreNativeC.mln_map_get_free_camera_options(requireLiveHandle(), outOptions)
+          MaplibreNativeC.mln_map_get_free_camera_options(requireLiveHandle(), outOptions),
         )
         return freeCameraOptions(outOptions)
       }
@@ -1736,7 +1753,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           MaplibreNativeC.mln_map_set_free_camera_options(
             requireLiveHandle(),
             nativeOptions.options,
-          )
+          ),
         )
       }
     }
@@ -1753,7 +1770,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       NativeAccess.ensureLoaded()
       ProjectionModeOptionsScope(value).use { nativeMode ->
         Status.check(
-          MaplibreNativeC.mln_map_set_projection_mode(requireLiveHandle(), nativeMode.mode)
+          MaplibreNativeC.mln_map_set_projection_mode(requireLiveHandle(), nativeMode.mode),
         )
       }
     }
@@ -1767,7 +1784,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         coordinate.latitude,
         coordinate.longitude,
         out,
-      )
+      ),
     )
     return ScreenPoint(out[0], out[1])
   }
@@ -1776,7 +1793,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     val out = DoubleArray(2)
     Status.check(
-      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, false, out)
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, false, out),
     )
     return LatLng(out[0], out[1])
   }
@@ -1785,7 +1802,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     val out = DoubleArray(2)
     Status.check(
-      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, true, out)
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, true, out),
     )
     return LatLng(out[0], out[1])
   }
@@ -1805,7 +1822,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativeCoordinates.coordinates,
             nativeCoordinates.count,
             outPoints.points,
-          )
+          ),
         )
         return outPoints.toList(Math.toIntExact(nativeCoordinates.count))
       }
@@ -1827,7 +1844,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativePoints.points,
             nativePoints.count,
             outCoordinates.coordinates,
-          )
+          ),
         )
         return outCoordinates.toList(Math.toIntExact(nativePoints.count))
       }
@@ -1839,7 +1856,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     val pointSnapshot = points.toList()
     if (pointSnapshot.isEmpty()) {
       Status.check(
-        MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(requireLiveHandle(), null, 0L, null)
+        MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(requireLiveHandle(), null, 0L, null),
       )
       return emptyList()
     }
@@ -1851,7 +1868,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
             nativePoints.points,
             nativePoints.count,
             outCoordinates.coordinates,
-          )
+          ),
         )
         return outCoordinates.toList(Math.toIntExact(nativePoints.count))
       }
@@ -1866,33 +1883,33 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         requireLiveHandle(),
         latitude,
         outMetersPerPixel,
-      )
+      ),
     )
     return outMetersPerPixel[0]
   }
 
   public actual fun attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor
+    descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
 
   public actual fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
+    descriptor: MetalBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
 
   public actual fun attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor
+    descriptor: VulkanOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
 
   public actual fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
 
   public actual fun attachOpenGLOwnedTexture(
-    descriptor: OpenGLOwnedTextureDescriptor
+    descriptor: OpenGLOwnedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor)
 
   public actual fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
+    descriptor: OpenGLBorrowedTextureDescriptor,
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor)
 
   public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
@@ -1951,7 +1968,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeSourceId.view,
               nativeUrl.view,
               nativeOptions.options,
-            )
+            ),
           )
         }
       }
@@ -1982,7 +1999,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
               nativeTiles.views,
               nativeTiles.count,
               nativeOptions.options,
-            )
+            ),
           )
         }
       }
@@ -2009,7 +2026,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         LongPointer(1).use { outMap ->
           outMap.put(0, 0L)
           Status.check(
-            MaplibreNativeC.mln_map_create(runtime.nativeHandleId(), nativeOptions.options, outMap)
+            MaplibreNativeC.mln_map_create(runtime.nativeHandleId(), nativeOptions.options, outMap),
           )
           val address = outMap.get()
           require(address != 0L) { "mln_map_create returned a null map" }
@@ -2185,7 +2202,7 @@ private fun copyStyleSourceAttribution(
           attributionSize.toLong(),
           outSize,
           outFound,
-        )
+        ),
       )
       if (!outFound[0]) return ""
       val bytes = ByteArray(Math.toIntExact(outSize.get()))
@@ -2208,7 +2225,7 @@ private fun copyStyleSourceUrl(mapId: Long, sourceId: StringViewScope, urlSize: 
           urlSize,
           outSize,
           outFound,
-        )
+        ),
       )
       check(outFound[0]) { "style source disappeared while its metadata was copied" }
       val bytes = ByteArray(Math.toIntExact(outSize.get()))
@@ -2223,7 +2240,7 @@ private fun copyStyleSourceTileUrls(mapId: Long, sourceId: StringViewScope): Lis
     outList.put(0, 0L)
     val outFound = booleanArrayOf(false)
     Status.check(
-      MaplibreNativeC.mln_map_get_style_source_tile_urls(mapId, sourceId.view, outList, outFound)
+      MaplibreNativeC.mln_map_get_style_source_tile_urls(mapId, sourceId.view, outList, outFound),
     )
     check(outFound[0]) { "style source disappeared while its metadata was copied" }
     val list = outList.get()
@@ -2327,7 +2344,7 @@ private fun tileOptions(value: MaplibreNativeC.mln_map_tile_options): TileOption
 }
 
 private fun projectionModeOptions(
-  value: MaplibreNativeC.mln_projection_mode
+  value: MaplibreNativeC.mln_projection_mode,
 ): ProjectionModeOptions {
   val fields = value.fields()
   return ProjectionModeOptions().apply {
@@ -3220,7 +3237,7 @@ private class StyleTransitionOptionsScope(value: StyleTransitionOptions) : AutoC
 }
 
 private fun styleTransitionOptions(
-  options: MaplibreNativeC.mln_style_transition_options
+  options: MaplibreNativeC.mln_style_transition_options,
 ): StyleTransitionOptions =
   StyleTransitionOptions().apply {
     val fields = options.fields()

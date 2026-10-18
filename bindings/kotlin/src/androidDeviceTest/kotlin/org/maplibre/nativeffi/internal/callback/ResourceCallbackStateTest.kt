@@ -25,7 +25,7 @@ class ResourceCallbackStateTest {
         ResourceProviderCallback { request, _ ->
           copied = request
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
       .use { state ->
         withRequest { request ->
@@ -46,7 +46,7 @@ class ResourceCallbackStateTest {
         ResourceProviderCallback { _, _ ->
           reentrant.close()
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
     withRequest { request ->
       assertEquals(ResourceProviderDecision.PASS_THROUGH.nativeValue, reentrant.invoke(request, 1))
@@ -62,7 +62,7 @@ class ResourceCallbackStateTest {
           entered.countDown()
           release.await(5, TimeUnit.SECONDS)
           ResourceProviderDecision.PASS_THROUGH
-        }
+        },
       )
     withRequest { request ->
       val invocation = thread { state.invoke(request, 2) }
@@ -90,7 +90,7 @@ class ResourceCallbackStateTest {
           copiedKind = request.kind
           state.close()
           throw IllegalStateException("contained")
-        }
+        },
       )
     JavaCppSupport.cString("https://example.com/style.json").use { url ->
       MaplibreNativeC.mln_resource_transform_response().use { response ->
@@ -113,7 +113,7 @@ class ResourceCallbackStateTest {
           ResourceProviderCallback { _, _ ->
             providerHits[index] += 1
             ResourceProviderDecision.PASS_THROUGH
-          }
+          },
         )
       }
     val transforms =
@@ -122,7 +122,7 @@ class ResourceCallbackStateTest {
           ResourceTransformCallback { _ ->
             transformHits[index] += 1
             null
-          }
+          },
         )
       }
     val headers =
@@ -131,7 +131,7 @@ class ResourceCallbackStateTest {
           HttpHeaderTransformCallback { _ ->
             headerHits[index] += 1
             emptyList()
-          }
+          },
         )
       }
     try {

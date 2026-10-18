@@ -615,12 +615,16 @@ private func pumpUntil(
 ) throws -> Bool {
   let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
-    if try condition() { return true }
+    if try condition() {
+      return true
+    }
     try runtime.pump()
     _ = try runtime.drainEvents()
     Thread.sleep(forTimeInterval: 0.001)
   }
-  if try condition() { return true }
+  if try condition() {
+    return true
+  }
   Issue.record("timed out waiting for \(subject)")
   return false
 }

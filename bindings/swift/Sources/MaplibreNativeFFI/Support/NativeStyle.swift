@@ -544,7 +544,9 @@ enum NativeStyle {
             outHandle,
             found
           ))
-          if !found.pointee { outHandle.pointee = 0 }
+          if !found.pointee {
+            outHandle.pointee = 0
+          }
         }
       }.value
     let buffer = NativeBufferHandle(raw: output)

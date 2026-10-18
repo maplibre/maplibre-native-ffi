@@ -6,7 +6,7 @@ import platform.Metal.MTLBlitCommandEncoderProtocol
 import platform.Metal.MTLTextureProtocol
 
 internal actual fun MTLBlitCommandEncoderProtocol.synchronizeTextureForCpu(
-  texture: MTLTextureProtocol
+  texture: MTLTextureProtocol,
 ) {
   // iOS textures use shared storage, so waiting for the command buffer makes
   // the rendered bytes available to the CPU.

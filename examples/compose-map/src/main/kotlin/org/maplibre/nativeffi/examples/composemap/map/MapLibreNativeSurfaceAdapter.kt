@@ -30,7 +30,7 @@ internal object MapLibreNativeSurfaceAdapter {
   val backend: ProducerBackend =
     Maplibre.supportedRenderBackends().mapNotNull { it.toProducerBackend() }.singleOrNull()
       ?: error(
-        "Expected exactly one MapLibre render backend, found ${Maplibre.supportedRenderBackends()}"
+        "Expected exactly one MapLibre render backend, found ${Maplibre.supportedRenderBackends()}",
       )
 
   fun borrowedTarget(target: NativeSurfaceTarget, extent: SurfaceExtent): BorrowedTarget =

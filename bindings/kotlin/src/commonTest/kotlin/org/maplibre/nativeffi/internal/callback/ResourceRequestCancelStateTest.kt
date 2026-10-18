@@ -24,10 +24,12 @@ class ResourceRequestCancelStateTest {
     var token = 0L
 
     val alreadyCancelled =
-      state.register({
-        calls.addAndFetch(1)
-        throw IllegalStateException("host cancel callback failed")
-      }) { registered ->
+      state.register(
+        {
+          calls.addAndFetch(1)
+          throw IllegalStateException("host cancel callback failed")
+        },
+      ) { registered ->
         token = registered
         ResourceRequestCancelSetResult(MaplibreStatus.OK.nativeCode, false)
       }
@@ -99,11 +101,13 @@ class ResourceRequestCancelStateTest {
     val state = ResourceRequestCancelState(registration)
     val calls = AtomicInt(0)
     var token = 0L
-    state.register({
-      // A host callback that closes its request disposes the token while dispatch runs.
-      registration.dispose()
-      calls.addAndFetch(1)
-    }) { registered ->
+    state.register(
+      {
+        // A host callback that closes its request disposes the token while dispatch runs.
+        registration.dispose()
+        calls.addAndFetch(1)
+      },
+    ) { registered ->
       token = registered
       ResourceRequestCancelSetResult(MaplibreStatus.OK.nativeCode, false)
     }

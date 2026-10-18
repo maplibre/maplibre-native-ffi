@@ -79,7 +79,9 @@ public actual object Maplibre {
   public actual fun restoreDefaultAsyncLogSeverities() {
     NativeAccess.ensureLoaded()
     Status.check(
-      MaplibreNativeC.mln_log_set_async_severity_mask(MaplibreNativeC.MLN_LOG_SEVERITY_MASK_DEFAULT)
+      MaplibreNativeC.mln_log_set_async_severity_mask(
+        MaplibreNativeC.MLN_LOG_SEVERITY_MASK_DEFAULT,
+      ),
     )
   }
 
@@ -147,7 +149,7 @@ internal object NativeAccess {
     val outWidth = intArrayOf(0)
     val outHeight = intArrayOf(0)
     Status.check(
-      MaplibreNativeC.mln_render_target_extent_physical_size(nativeExtent, outWidth, outHeight)
+      MaplibreNativeC.mln_render_target_extent_physical_size(nativeExtent, outWidth, outHeight),
     )
     return outWidth[0] to outHeight[0]
   }

@@ -56,10 +56,10 @@ mise run package-native linux-gnu-x64-egl
 # Build the Android binding for one ABI/backend
 mise run //bindings/kotlin:android-build opengl x86_64
 
-# Run formatters and linters on _all_ files (will stage affected files)
+# Run formatters and linters on _all_ files
 mise run fix
 
-# Run formatters and linters on targeted files (will stage affected files)
+# Run formatters and linters on targeted files; add --stage to stage the fixes
 hk fix [FILES...]
 ```
 

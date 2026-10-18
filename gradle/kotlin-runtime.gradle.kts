@@ -134,7 +134,7 @@ fun configureJvmRuntimeArtifacts(
           "maplibre.runtime.$backend.jvm.$hostClassifier.installDir",
           maplibreNativeC.installDir,
           false,
-        )
+        ),
       )
     } else {
       emptyList()
@@ -224,7 +224,7 @@ fun embedRustlsPlatformVerifier() {
       .file("outputs/aar/rustls-platform-verifier-android-release.aar")
   val verifierJar =
     layout.buildDirectory.file(
-      "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar"
+      "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar",
     )
   val extractVerifierJar =
     tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
@@ -352,13 +352,13 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         destinationDir
           .resolve("prefab.json")
           .writeText(
-            """{"schema_version": 2, "name": "maplibre-native-c", "dependencies": []}""" + "\n"
+            """{"schema_version": 2, "name": "maplibre-native-c", "dependencies": []}""" + "\n",
           )
         module
           .resolve("module.json")
           .writeText(
             """{"export_libraries": [], "library_name": "libmaplibre-native-c", "android": {}}""" +
-              "\n"
+              "\n",
           )
         prefabAbis.forEach { abi ->
           module
@@ -366,7 +366,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
             .writeText(
               """{"abi": "$abi", "api": $prefabMinSdk, "ndk": $prefabNdkMajorVersion, """ +
                 """"stl": "none", "static": false}""" +
-                "\n"
+                "\n",
             )
         }
       }
@@ -488,7 +488,7 @@ extensions.configure<MavenPublishBaseExtension> {
   pom {
     name.set("MapLibre Native FFI ${backend.displayName} runtime")
     description.set(
-      "Native ${backend.displayName} runtime for the MapLibre Native FFI Kotlin binding."
+      "Native ${backend.displayName} runtime for the MapLibre Native FFI Kotlin binding.",
     )
   }
 }

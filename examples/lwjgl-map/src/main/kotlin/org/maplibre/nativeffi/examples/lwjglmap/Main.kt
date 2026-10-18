@@ -62,7 +62,7 @@ internal object Main {
         borrowed-texture  caller-owned texture render target
         native-surface    native surface render target
       """
-        .trimIndent()
+        .trimIndent(),
     )
   }
 

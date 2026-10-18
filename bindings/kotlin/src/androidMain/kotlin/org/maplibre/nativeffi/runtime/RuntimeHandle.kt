@@ -80,7 +80,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
+    operation: AmbientCacheOperation,
   ): OfflineOperationHandle<Unit> {
     NativeAccess.ensureLoaded()
     val outOperationId = longArrayOf(0L)
@@ -89,7 +89,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         requireLiveHandle(),
         operation.nativeValue,
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -107,7 +107,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         requireLiveHandle(),
         size,
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -129,7 +129,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
           metadata,
           metadata.size.toLong(),
           outOperationId,
-        )
+        ),
       )
     }
     return offlineOperation(
@@ -154,7 +154,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     )
 
   public actual fun startMergeOfflineRegionsDatabase(
-    path: String
+    path: String,
   ): OfflineOperationHandle<List<OfflineRegionInfo>> {
     JavaCppSupport.requireValidCString(path)
     val outOperationId = longArrayOf(0L)
@@ -163,7 +163,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         requireLiveHandle(),
         path,
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -184,7 +184,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         metadata,
         metadata.size.toLong(),
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -194,7 +194,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun startOfflineRegionStatus(
-    id: Long
+    id: Long,
   ): OfflineOperationHandle<OfflineRegionStatus> =
     offlineOperation(
       startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_get_status_start),
@@ -213,7 +213,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         id,
         observed,
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -236,7 +236,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         id,
         downloadState.nativeValue,
         outOperationId,
-      )
+      ),
     )
     return offlineOperation(
       outOperationId[0],
@@ -260,7 +260,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     )
 
   public actual fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo {
     val operationId =
       operation.requireLive(
@@ -278,7 +278,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
+    operation: OfflineOperationHandle<OfflineRegionInfo?>,
   ): OfflineRegionInfo? {
     val operationId =
       operation.requireLive(
@@ -295,7 +295,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
             operationId,
             outSnapshot,
             outFound,
-          )
+          ),
         )
         operation.markConsumed()
         return if (outFound.get()) offlineRegionSnapshot(outSnapshot) else null
@@ -304,7 +304,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> {
     val operationId =
       operation.requireLive(
@@ -322,7 +322,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>,
   ): List<OfflineRegionInfo> {
     val operationId =
       operation.requireLive(
@@ -340,7 +340,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OfflineOperationHandle<OfflineRegionInfo>,
   ): OfflineRegionInfo {
     val operationId =
       operation.requireLive(
@@ -358,7 +358,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 
   public actual fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
+    operation: OfflineOperationHandle<OfflineRegionStatus>,
   ): OfflineRegionStatus {
     val operationId =
       operation.requireLive(
@@ -373,7 +373,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
           requireLiveHandle(),
           operationId,
           status,
-        )
+        ),
       )
       operation.markConsumed()
       return offlineRegionStatus(status)
@@ -389,7 +389,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         MaplibreNativeC.mln_runtime_set_resource_provider(
           requireLiveHandle(),
           replacement.descriptor(),
-        )
+        ),
       )
       previous = resourceProviderState
       resourceProviderState = replacement
@@ -420,7 +420,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         MaplibreNativeC.mln_runtime_set_resource_transform(
           requireLiveHandle(),
           replacement.descriptor(),
-        )
+        ),
       )
       previous = resourceTransformState
       resourceTransformState = replacement
@@ -448,7 +448,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         MaplibreNativeC.mln_runtime_set_http_header_transform(
           requireLiveHandle(),
           replacement.descriptor(),
-        )
+        ),
       )
       val previous = httpHeaderTransformState
       httpHeaderTransformState = replacement
@@ -504,7 +504,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     set(value) {
       NativeAccess.ensureLoaded()
       Status.check(
-        MaplibreNativeC.mln_runtime_set_event_mask(requireLiveHandle(), value.nativeValue)
+        MaplibreNativeC.mln_runtime_set_event_mask(requireLiveHandle(), value.nativeValue),
       )
     }
 
@@ -780,7 +780,7 @@ private fun runtimeEventPayload(
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME -> renderFramePayload(events, base)
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
       RuntimeEventPayload.RenderMap(
-        RenderMode.fromNative(events.getInt(base + EventLayout.RENDER_MAP_MODE))
+        RenderMode.fromNative(events.getInt(base + EventLayout.RENDER_MAP_MODE)),
       )
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION -> tileActionPayload(events, base)
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
@@ -851,7 +851,7 @@ private fun offlineRegionStatusPayload(
     events.getLong(base + EventLayout.REGION_STATUS_REGION_ID),
     OfflineRegionStatus(
       OfflineRegionDownloadState.fromNative(
-        events.getInt(base + EventLayout.REGION_STATUS_DOWNLOAD_STATE)
+        events.getInt(base + EventLayout.REGION_STATUS_DOWNLOAD_STATE),
       ),
       events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_RESOURCE_COUNT),
       events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_RESOURCE_SIZE),
@@ -877,7 +877,7 @@ private fun offlineOperationCompletedPayload(
   )
 
 private fun offlineRegionStatus(
-  status: MaplibreNativeC.mln_offline_region_status
+  status: MaplibreNativeC.mln_offline_region_status,
 ): OfflineRegionStatus =
   OfflineRegionStatus(
     OfflineRegionDownloadState.fromNative(status.download_state()),
@@ -947,7 +947,7 @@ private fun offlineRegionInfo(info: MaplibreNativeC.mln_offline_region_info): Of
   )
 
 private fun offlineRegionDefinition(
-  definition: MaplibreNativeC.mln_offline_region_definition
+  definition: MaplibreNativeC.mln_offline_region_definition,
 ): OfflineRegionDefinition =
   when (definition.type()) {
     MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID ->
@@ -958,7 +958,7 @@ private fun offlineRegionDefinition(
   }
 
 private fun offlineTilePyramidDefinition(
-  definition: MaplibreNativeC.mln_offline_tile_pyramid_region_definition
+  definition: MaplibreNativeC.mln_offline_tile_pyramid_region_definition,
 ): OfflineRegionDefinition.TilePyramid =
   OfflineRegionDefinition.TilePyramid(
     byteString(definition.style_url(), cStringLength(definition.style_url())),
@@ -970,7 +970,7 @@ private fun offlineTilePyramidDefinition(
   )
 
 private fun offlineGeometryDefinition(
-  definition: MaplibreNativeC.mln_offline_geometry_region_definition
+  definition: MaplibreNativeC.mln_offline_geometry_region_definition,
 ): OfflineRegionDefinition.GeometryRegion =
   OfflineRegionDefinition.GeometryRegion(
     byteString(definition.style_url(), cStringLength(definition.style_url())),
@@ -1249,7 +1249,7 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
   }
 
   private fun tilePyramid(
-    value: OfflineRegionDefinition.TilePyramid
+    value: OfflineRegionDefinition.TilePyramid,
   ): MaplibreNativeC.mln_offline_tile_pyramid_region_definition {
     val out = own(MaplibreNativeC.mln_offline_tile_pyramid_region_definition())
     out.size(out.sizeof())
@@ -1263,7 +1263,7 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
   }
 
   private fun geometry(
-    value: OfflineRegionDefinition.GeometryRegion
+    value: OfflineRegionDefinition.GeometryRegion,
   ): MaplibreNativeC.mln_offline_geometry_region_definition {
     val out = own(MaplibreNativeC.mln_offline_geometry_region_definition())
     val geometry = ByteArrayViewScope(value.geometryTransit)

@@ -28,7 +28,7 @@ public actual class WakeSource private constructor(private val source: NativeWak
       destroy = {
         NativeAccess.destroyWakeSource(source)
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
   }
 

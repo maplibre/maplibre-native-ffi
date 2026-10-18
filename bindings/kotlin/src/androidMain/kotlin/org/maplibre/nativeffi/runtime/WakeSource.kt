@@ -28,7 +28,7 @@ public actual class WakeSource internal constructor(private val sourceId: Long) 
       destroy = {
         MaplibreNativeC.mln_wake_source_destroy(sourceId)
         MaplibreStatus.OK.nativeCode
-      }
+      },
     )
   }
 }

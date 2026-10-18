@@ -35,7 +35,9 @@ func captureThreadDiagnostic() -> String {
 }
 
 func checkStatus(_ status: mln_status) throws {
-  if status == MLN_STATUS_OK { return }
+  if status == MLN_STATUS_OK {
+    return
+  }
   throw NativeStatusFailure(
     rawStatus: status.rawValue,
     diagnostic: captureThreadDiagnostic()
