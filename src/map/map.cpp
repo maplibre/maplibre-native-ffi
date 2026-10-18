@@ -2853,7 +2853,7 @@ auto camera_transition_finished_payload(uint64_t transition_id)
   payload.camera_transition_finished =
     mln_runtime_event_camera_transition_finished{
       .transition_id = transition_id
-    };
+  };
   return payload;
 }
 

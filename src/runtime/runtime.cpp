@@ -742,7 +742,7 @@ class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
       mln_runtime_event_offline_region_response_error{
         .region_id = region_id_,
         .reason = to_c_resource_error_reason(error.reason)
-      };
+    };
     push_offline_region_event(
       state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR, payload,
@@ -761,7 +761,7 @@ class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
     payload.offline_region_tile_count_limit =
       mln_runtime_event_offline_region_tile_count_limit{
         .region_id = region_id_, .limit = limit
-      };
+    };
     push_offline_region_event(
       state_, region_id_,
       MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
@@ -954,7 +954,7 @@ auto make_offline_completion_payload(
       .result_kind = operation.result_kind,
       .result_status = operation.result_status,
       .found = operation.found
-    };
+  };
   return payload;
 }
 
