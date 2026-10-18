@@ -1,4 +1,5 @@
 include(mln_ffi_lint)
+include(mln_ffi_apple_framework)
 include(mln_ffi_archive)
 include(mln_ffi_platform)
 include(mln_ffi_render_backend)
@@ -231,6 +232,11 @@ function(mln_ffi_add_c_api_library target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target}
                                          ${MLN_FFI_C_API_OBJECT_TARGET})
+
+  if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    mln_ffi_add_c_api_framework(${target}_framework
+                                ${MLN_FFI_C_API_OBJECT_TARGET})
+  endif()
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)

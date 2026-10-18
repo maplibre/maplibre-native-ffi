@@ -104,6 +104,7 @@ class CoverageTest(unittest.TestCase):
                 jobs = selected_jobs(source, presets, "extended", selection)
                 self.assertEqual(len(jobs), len(set(jobs)))
                 self.assertEqual("android-multi" in jobs, "android" in platforms)
+                self.assertEqual("apple-xcframework" in jobs, "apple" in platforms)
                 if "android" in platforms:
                     self.assertTrue(
                         {
@@ -116,7 +117,8 @@ class CoverageTest(unittest.TestCase):
                 self.assertNotIn("kotlin-maven", jobs)
         jobs = selected_jobs(source, presets, "extended", "full")
         self.assertTrue(
-            {"hygiene", "docs", "android-multi", "kotlin-maven"} <= set(jobs)
+            {"hygiene", "docs", "android-multi", "apple-xcframework", "kotlin-maven"}
+            <= set(jobs)
         )
         self.assertTrue(
             {f"target-{target}" for target in preset_sets(presets)[0]} <= set(jobs)
@@ -366,6 +368,20 @@ class WorkflowTest(unittest.TestCase):
                         f"target-android-{abi}-{backend}"
                         for abi in ("arm", "arm64", "x64")
                         for backend in ("egl", "vulkan")
+                    },
+                )
+                self.assertEqual(
+                    set(jobs["apple-xcframework"]["needs"]),
+                    {
+                        f"target-{platform}-arm64-metal"
+                        for platform in (
+                            "macos",
+                            "ios",
+                            "ios-simulator",
+                            "ios-maccatalyst",
+                            "tvos",
+                            "tvos-simulator",
+                        )
                     },
                 )
             self.assertEqual("kotlin-maven" in jobs, group == "extended")

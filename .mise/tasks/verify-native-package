@@ -87,6 +87,10 @@ PLATFORM_LIBRARY_PREFIXES = ("/System/Library/", "/usr/lib/")
 # host, and so is linked on purpose.
 PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
+# The binary of the framework that Apple Metal packages carry beside the prefix.
+PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
+# The directories that hold headers: the prefix's, and the framework's.
+HEADER_ROOTS = ("include", "Headers")
 # What the include directory holds: the umbrella header and the domain headers
 # beside it.
 PACKAGED_HEADER_ENTRIES = frozenset({"maplibre_native_c.h", "maplibre_native_c"})
@@ -214,12 +218,13 @@ def pe_problems(binary: pathlib.Path) -> list[tuple[str, str]]:
 def vendored_header(relative: pathlib.PurePath) -> bool:
     """Whether a packaged path is a header the C API does not own."""
     parts = relative.parts
-    if "include" not in parts:
+    root = next((part for part in parts if part in HEADER_ROOTS), None)
+    if root is None:
         return False
     # An archive built on macOS carries an AppleDouble sidecar beside each file,
     # which belongs to whatever it sits next to.
     under_include = pathlib.PurePath(
-        *(part.removeprefix("._") for part in parts[parts.index("include") + 1 :])
+        *(part.removeprefix("._") for part in parts[parts.index(root) + 1 :])
     )
     if under_include.parts[0] in PACKAGED_HEADER_ENTRIES:
         return False
@@ -284,7 +289,9 @@ def main() -> int:
             image = image_format(binary)
             if image is None:
                 continue
-            if not binary.name.removeprefix("lib").startswith(PACKAGED_LIBRARY_STEM):
+            if binary.name != PACKAGED_FRAMEWORK_BINARY and not binary.name.removeprefix(
+                "lib"
+            ).startswith(PACKAGED_LIBRARY_STEM):
                 problems.append((binary.name, VENDORED_LOADER, str(relative)))
                 # What a library that does not belong here depends on says
                 # nothing about the artifact; removing it answers both.

@@ -19,6 +19,20 @@ function(mln_ffi_apple_is_simulator out_var)
   endif()
 endfunction()
 
+# The SDK that CMAKE_OSX_SYSROOT names, as a path. A Linux host cross-building
+# with xtool already sets a path, and a Mac names the SDK for xcrun to find.
+function(mln_ffi_apple_sdk_path out_var)
+  if(IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
+    set(${out_var} "${CMAKE_OSX_SYSROOT}" PARENT_SCOPE)
+    return()
+  endif()
+  execute_process(
+    COMMAND xcrun --sdk "${CMAKE_OSX_SYSROOT}" --show-sdk-path
+    OUTPUT_VARIABLE sdk_path OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(${out_var} "${sdk_path}" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_apple_is_maccatalyst out_var)
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
      AND CMAKE_OSX_SYSROOT MATCHES "[Mm]ac[Oo][Ss][Xx]")
@@ -100,33 +114,14 @@ function(mln_ffi_configure_platform_dependencies target)
     message(FATAL_ERROR "Unsupported Apple platform: ${CMAKE_SYSTEM_NAME}")
   endif()
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(MLN_FFI_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
-    if(NOT MLN_FFI_APPLE_SDK)
-      set(MLN_FFI_APPLE_SDK macosx)
-    endif()
-    if(NOT IS_ABSOLUTE "${MLN_FFI_APPLE_SDK}")
-      execute_process(
-        COMMAND xcrun --sdk "${MLN_FFI_APPLE_SDK}" --show-sdk-path
-        OUTPUT_VARIABLE MLN_FFI_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY)
-    endif()
-  else()
-    set(MLN_FFI_ZIG_LIBC_SYSROOT "${CMAKE_OSX_SYSROOT}")
-    if(NOT IS_ABSOLUTE "${MLN_FFI_ZIG_LIBC_SYSROOT}")
-      execute_process(
-        COMMAND xcrun --sdk "${MLN_FFI_ZIG_LIBC_SYSROOT}" --show-sdk-path
-        OUTPUT_VARIABLE
-          MLN_FFI_ZIG_LIBC_SYSROOT OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY)
-    endif()
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    mln_ffi_apple_sdk_path(MLN_FFI_ZIG_LIBC_SYSROOT)
     set_target_properties(
       ${target}
       PROPERTIES
         MLN_FFI_ZIG_LIBC_SYSROOT "${MLN_FFI_ZIG_LIBC_SYSROOT}"
         MLN_FFI_ZIG_LIBC_INCLUDE_DIR "${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/include"
         MLN_FFI_ZIG_LIBC_CRT_DIR "")
-    set(MLN_FFI_APPLE_SDK "${MLN_FFI_ZIG_LIBC_SYSROOT}")
   endif()
 
   find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)

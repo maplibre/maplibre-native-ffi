@@ -1,0 +1,17 @@
+// maplibre_native_c.h leaves out callback_adapter.h and plugin.h, so each is
+// an explicit submodule that a consumer imports by name.
+framework module MaplibreNativeC {
+  umbrella header "maplibre_native_c.h"
+  export *
+
+  explicit module CallbackAdapter {
+    header "maplibre_native_c/callback_adapter.h"
+    export *
+  }
+
+  explicit module Plugin {
+    header "maplibre_native_c/plugin.h"
+    header "mln/plugin/plugin_api.h"
+    export *
+  }
+}

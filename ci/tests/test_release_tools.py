@@ -6,13 +6,16 @@ import io
 import json
 import os
 import pathlib
+import plistlib
+import stat
 import subprocess
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from unittest import mock
 
-from native_package_release import prepare_assets
+from native_package_release import XCFRAMEWORK_NAME, prepare_assets
 from release_version import (
     family,
     require_current_month,
@@ -40,9 +43,39 @@ def add_bytes(archive: tarfile.TarFile, name: str, content: bytes) -> None:
     archive.addfile(member, io.BytesIO(content))
 
 
+FRAMEWORK_PLIST = plistlib.dumps(
+    {"CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "0.1.0"}
+)
+IOS_PLIST = "MaplibreNativeC.xcframework/ios-arm64/MaplibreNativeC.framework/Info.plist"
+MACOS_FRAMEWORK = "MaplibreNativeC.xcframework/macos-arm64/MaplibreNativeC.framework"
+MACOS_PLIST = f"{MACOS_FRAMEWORK}/Versions/A/Resources/Info.plist"
+
+
+def add_symlink(archive: zipfile.ZipFile, name: str, target: str) -> None:
+    member = zipfile.ZipInfo(name)
+    member.create_system = 3
+    member.external_attr = (stat.S_IFLNK | 0o755) << 16
+    archive.writestr(member, target)
+
+
+def create_xcframework(
+    path: pathlib.Path, link_target: str = "Versions/Current/Headers"
+) -> None:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("MaplibreNativeC.xcframework/Info.plist", b"xcframework")
+        archive.writestr(IOS_PLIST, FRAMEWORK_PLIST)
+        archive.writestr(MACOS_PLIST, FRAMEWORK_PLIST)
+        add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", link_target)
+
+
 def create_archive(path: pathlib.Path, preset: str, sha: str) -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
+        add_bytes(
+            archive,
+            f"{root}/Frameworks/MaplibreNativeC.framework/Info.plist",
+            FRAMEWORK_PLIST,
+        )
         add_bytes(
             archive,
             f"{root}/share/maplibre-native-c/artifact.json",
@@ -134,6 +167,8 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.sha = "b" * 40
         self.version = "0.202608.0"
         self.write_presets(self.preset)
+        self.xcframework = self.release_dir / XCFRAMEWORK_NAME
+        create_xcframework(self.xcframework)
 
     def write_presets(self, *presets: str) -> None:
         (self.repository / "CMakePresets.json").write_text(
@@ -177,15 +212,21 @@ class NativePackageReleaseTest(unittest.TestCase):
             pkg_config = package.extractfile(
                 f"{root}/share/pkgconfig/maplibre-native-c.pc"
             ).read()
-        checksum, name = (
-            (self.release_dir / "SHA256SUMS").read_text().strip().split("  ")
+        checksums = dict(
+            reversed(line.split("  "))
+            for line in (self.release_dir / "SHA256SUMS").read_text().splitlines()
         )
         notes = (self.release_dir / "RELEASE_NOTES.md").read_text()
 
         self.assertEqual(descriptor["version"], version)
         self.assertIn(f"Version: {version}".encode(), pkg_config)
-        self.assertEqual(checksum, hashlib.sha256(archive.read_bytes()).hexdigest())
-        self.assertEqual(name, archive.name)
+        self.assertEqual(
+            checksums,
+            {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (archive, self.xcframework)
+            },
+        )
         self.assertIn(title, notes)
         self.assertIn(f"/commit/{self.sha}", notes)
         return notes
@@ -209,6 +250,45 @@ class NativePackageReleaseTest(unittest.TestCase):
                 f"maplibre-native-c-{self.preset}/lib/libmaplibre-native-c.so"
             ).read()
         self.assertEqual(library, b"binary")
+
+    def test_refuses_a_release_without_the_xcframework(self) -> None:
+        self.archive()
+        self.xcframework.unlink()
+
+        with self.assertRaisesRegex(SystemExit, f"missing {XCFRAMEWORK_NAME}"):
+            self.prepare("release")
+
+    def test_relabels_every_framework_with_the_bundle_version(self) -> None:
+        archive = self.archive()
+        self.prepare("snapshot", "0.0.0-dev.202608070101")
+
+        with tarfile.open(archive, "r:gz") as package:
+            packaged = plistlib.load(
+                package.extractfile(
+                    f"maplibre-native-c-{self.preset}/Frameworks/"
+                    "MaplibreNativeC.framework/Info.plist"
+                )
+            )
+        with zipfile.ZipFile(self.xcframework) as xcframework:
+            combined = [
+                plistlib.loads(xcframework.read(name))
+                for name in (IOS_PLIST, MACOS_PLIST)
+            ]
+            link = xcframework.getinfo(f"{MACOS_FRAMEWORK}/Headers")
+            link_target = xcframework.read(link)
+
+        for plist in (packaged, *combined):
+            self.assertEqual(plist["CFBundleShortVersionString"], "0.0.0")
+            self.assertEqual(plist["CFBundleVersion"], "0.0.0")
+        self.assertTrue(stat.S_ISLNK(link.external_attr >> 16))
+        self.assertEqual(link_target, b"Versions/Current/Headers")
+
+    def test_rejects_xcframework_escapes(self) -> None:
+        self.archive()
+        create_xcframework(self.xcframework, link_target="../../escape")
+
+        with self.assertRaisesRegex(SystemExit, "unsafe link"):
+            self.prepare("release")
 
     def test_rejects_an_archive_from_another_commit(self) -> None:
         self.archive("a" * 40)

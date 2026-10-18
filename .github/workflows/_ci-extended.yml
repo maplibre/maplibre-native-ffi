@@ -1741,6 +1741,43 @@ jobs:
           path: build/packages/native/android-multi-input
       - run: mise run //:kotlin:verify-android-multi-abi build/packages/native/android-multi-input
     if: contains(fromJSON(inputs.jobs), 'android-multi')
+  apple-xcframework:
+    name: Apple XCFramework
+    runs-on: macos-26
+    timeout-minutes: 30
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    needs:
+      - target-macos-arm64-metal
+      - target-ios-arm64-metal
+      - target-ios-simulator-arm64-metal
+      - target-ios-maccatalyst-arm64-metal
+      - target-tvos-arm64-metal
+      - target-tvos-simulator-arm64-metal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: apple-xcframework
+          gradle: false
+      - name: Download Apple Metal native artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: native-package-*-metal-${{ github.sha }}
+          path: build/packages/native/xcframework-input
+      - run: mise run package-xcframework build/packages/native/xcframework-input
+      - name: Upload XCFramework
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-xcframework-${{ github.sha }}
+          path: build/packages/native/dist/MaplibreNativeC.xcframework.zip
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+    if: contains(fromJSON(inputs.jobs), 'apple-xcframework')
   kotlin-maven:
     name: Kotlin Maven
     permissions:
@@ -1817,11 +1854,12 @@ jobs:
       - target-windows-arm64-wgl
       - target-windows-arm64-vulkan
       - android-multi
+      - apple-xcframework
       - kotlin-maven
     steps:
       - name: Require every coverage job
         env:
-          EXPECTED: '["android-multi", "docs", "hygiene", "kotlin-maven", "target-android-arm-egl", "target-android-arm-vulkan", "target-android-arm64-egl", "target-android-arm64-vulkan", "target-android-x64-egl", "target-android-x64-vulkan", "target-emscripten-wasm32-webgl", "target-emscripten-wasm32-webgpu", "target-ios-arm64-metal", "target-ios-maccatalyst-arm64-metal", "target-ios-simulator-arm64-metal", "target-linux-gnu-arm64-egl", "target-linux-gnu-arm64-vulkan", "target-linux-gnu-x64-egl", "target-linux-gnu-x64-vulkan", "target-linux-musl-arm64-egl", "target-linux-musl-arm64-vulkan", "target-linux-musl-x64-egl", "target-linux-musl-x64-vulkan", "target-macos-arm64-egl", "target-macos-arm64-metal", "target-macos-arm64-vulkan", "target-ohos-arm64-egl", "target-ohos-arm64-vulkan", "target-ohos-x64-egl", "target-ohos-x64-vulkan", "target-tvos-arm64-metal", "target-tvos-simulator-arm64-metal", "target-windows-arm64-vulkan", "target-windows-arm64-wgl", "target-windows-x64-vulkan", "target-windows-x64-wgl"]'
+          EXPECTED: '["android-multi", "apple-xcframework", "docs", "hygiene", "kotlin-maven", "target-android-arm-egl", "target-android-arm-vulkan", "target-android-arm64-egl", "target-android-arm64-vulkan", "target-android-x64-egl", "target-android-x64-vulkan", "target-emscripten-wasm32-webgl", "target-emscripten-wasm32-webgpu", "target-ios-arm64-metal", "target-ios-maccatalyst-arm64-metal", "target-ios-simulator-arm64-metal", "target-linux-gnu-arm64-egl", "target-linux-gnu-arm64-vulkan", "target-linux-gnu-x64-egl", "target-linux-gnu-x64-vulkan", "target-linux-musl-arm64-egl", "target-linux-musl-arm64-vulkan", "target-linux-musl-x64-egl", "target-linux-musl-x64-vulkan", "target-macos-arm64-egl", "target-macos-arm64-metal", "target-macos-arm64-vulkan", "target-ohos-arm64-egl", "target-ohos-arm64-vulkan", "target-ohos-x64-egl", "target-ohos-x64-vulkan", "target-tvos-arm64-metal", "target-tvos-simulator-arm64-metal", "target-windows-arm64-vulkan", "target-windows-arm64-wgl", "target-windows-x64-vulkan", "target-windows-x64-wgl"]'
           RESULTS: ${{ toJSON(needs) }}
           SELECTED: ${{ inputs.jobs }}
         run: |

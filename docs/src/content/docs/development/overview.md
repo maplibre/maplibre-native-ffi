@@ -239,7 +239,8 @@ CI has three required checks:
 Promotion starts ready coverage while baseline results remain valid. The
 extended workflow combines platform labels into one selection. It builds each
 selected target once and includes every producer needed by Android multi-ABI
-packaging. Extended coverage can repeat targets covered by baseline or ready CI.
+packaging and by the Apple XCFramework. Extended coverage can repeat targets
+covered by baseline or ready CI.
 
 State changes reuse actual success, or a failure after its one retry, only for
 the same tested merge commit and complete coverage scope. Adding or removing a
@@ -251,10 +252,10 @@ only unselected jobs may be skipped.
 
 The extended workflow, `CI` (`ci.yml`), runs every target and complete packaging
 verification on main, manual runs, Dependabot PRs, and PRs with `ci:full`. All
-native packages and the verified Maven repository belong to that run. Snapshot
-publishing consumes that single successful main run. Main and manual runs have
-independent concurrency groups; a new PR commit cancels obsolete work in each PR
-workflow.
+native packages, the Apple XCFramework, and the verified Maven repository belong
+to that run. Snapshot publishing consumes that single successful main run. Main
+and manual runs have independent concurrency groups; a new PR commit cancels
+obsolete work in each PR workflow.
 
 Branch protection must require all three checks. Add baseline and ready
 alongside the existing `ci-required` before merging these workflows. An

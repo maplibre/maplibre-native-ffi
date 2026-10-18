@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+#MISE description="Combine the Apple Metal native packages into the XCFramework zip, and check every slice."
+#MISE shell="bash"
+#USAGE arg "[input]" default="build/packages/native/dist" help="Directory that holds the Apple Metal native packages"
+
+set -euo pipefail
+
+input_root="${usage_input?}"
+output="${MISE_MONOREPO_ROOT}/build/packages/native/dist/MaplibreNativeC.xcframework.zip"
+presets=(
+  ios-arm64-metal
+  ios-maccatalyst-arm64-metal
+  ios-simulator-arm64-metal
+  macos-arm64-metal
+  tvos-arm64-metal
+  tvos-simulator-arm64-metal
+)
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+frameworks=()
+for preset in "${presets[@]}"; do
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  if [[ -z "$archive" ]]; then
+    echo "Missing native package for ${preset} under ${input_root}" >&2
+    exit 1
+  fi
+  # bsdtar folds an archive's AppleDouble sidecars back into extended
+  # attributes, rather than leaving them as files that codesign rejects as
+  # unsealed bundle content.
+  tar -xzf "$archive" -C "$work"
+  frameworks+=(-framework "$work/maplibre-native-c-${preset}/Frameworks/MaplibreNativeC.framework")
+done
+
+xcframework="$work/MaplibreNativeC.xcframework"
+xcodebuild -create-xcframework "${frameworks[@]}" -output "$xcframework"
+
+# Each slice must import as a module, with no incomplete-umbrella warning, and
+# link. The slices that a Mac runs must also load and call into the library.
+cat >"$work/consumer.m" <<'EOF'
+@import MaplibreNativeC;
+@import MaplibreNativeC.CallbackAdapter;
+@import MaplibreNativeC.Plugin;
+
+#include <stdio.h>
+
+int main(void) {
+  printf("C API %u, plugin registration %s\n", mln_c_version(),
+         mln_plugin_get_register_function_v1() ? "present" : "missing");
+  return mln_plugin_get_register_function_v1() ? 0 : 1;
+}
+EOF
+for slice in "$xcframework"/*/; do
+  slice="${slice%/}"
+  [[ -d "$slice/MaplibreNativeC.framework" ]] || continue
+  binary="$(find "$slice/MaplibreNativeC.framework" -type f -name MaplibreNativeC -print -quit)"
+  build="$(vtool -show-build "$binary")"
+  platform="$(awk '$1 == "platform" { print $2 }' <<<"$build")"
+  minimum="$(awk '$1 == "minos" { print $2 }' <<<"$build")"
+  case "$platform" in
+    MACOS) sdk=macosx target="arm64-apple-macos${minimum}" runs=true ;;
+    MACCATALYST) sdk=macosx target="arm64-apple-ios${minimum}-macabi" runs=true ;;
+    IOS) sdk=iphoneos target="arm64-apple-ios${minimum}" runs=false ;;
+    IOSSIMULATOR) sdk=iphonesimulator target="arm64-apple-ios${minimum}-simulator" runs=false ;;
+    TVOS) sdk=appletvos target="arm64-apple-tvos${minimum}" runs=false ;;
+    TVOSSIMULATOR) sdk=appletvsimulator target="arm64-apple-tvos${minimum}-simulator" runs=false ;;
+    *)
+      echo "Unexpected platform ${platform} in ${slice##*/}" >&2
+      exit 1
+      ;;
+  esac
+  executable="$work/consumer-${slice##*/}"
+  xcrun --sdk "$sdk" clang -target "$target" \
+    -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" \
+    -fmodules -fmodules-cache-path="$work/module-cache" \
+    -Werror -Wall -Wincomplete-umbrella \
+    -F "$slice" -framework MaplibreNativeC -Wl,-rpath,"$slice" \
+    "$work/consumer.m" -o "$executable"
+  if [[ "$runs" == true ]]; then
+    "$executable"
+  fi
+  echo "Checked ${slice##*/}"
+done
+
+mkdir -p "$(dirname "$output")"
+rm -f "$output"
+# --keepParent puts the XCFramework at the root of the zip, which is where Swift
+# Package Manager looks for it, and ditto keeps the macOS symlinks intact.
+ditto -c -k --norsrc --noextattr --keepParent "$xcframework" "$output"
+echo "$output"

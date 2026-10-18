@@ -50,6 +50,26 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
+An Apple app can take the C library as `MaplibreNativeC.xcframework.zip` from
+the same release. The XCFramework holds the framework `MaplibreNativeC` for
+every Apple Metal preset: macOS, iOS, the iOS simulator, Mac Catalyst, tvOS, and
+the tvOS simulator. Swift Package Manager takes the zip as a binary target, with
+the zip's checksum from `SHA256SUMS`.
+
+```swift title="Package.swift"
+.binaryTarget(
+  name: "MaplibreNativeC",
+  url: "https://github.com/maplibre/maplibre-native-ffi/releases/download/<tag>/MaplibreNativeC.xcframework.zip",
+  checksum: "<checksum>"
+)
+```
+
+Swift code imports the module `MaplibreNativeC`, and C code includes
+`<MaplibreNativeC/maplibre_native_c.h>`. The two headers that
+`maplibre_native_c.h` leaves out are the submodules
+`MaplibreNativeC.CallbackAdapter` and `MaplibreNativeC.Plugin`. Each Apple Metal
+archive also carries its own framework under `Frameworks/`.
+
 To build a prefix yourself, see the
 [development overview](/maplibre-native-ffi/development/overview/).
 

@@ -194,7 +194,8 @@ function(mln_ffi_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
   set(MLN_FFI_LOADER_COMPONENT loader)
   mln_ffi_install_zig_libc()
-  mln_ffi_install_licenses(${target} "${MLN_FFI_NATIVE_COMPONENT}")
+  mln_ffi_install_licenses(${target} "${MLN_FFI_NATIVE_COMPONENT}"
+                           "${CMAKE_INSTALL_DATADIR}/maplibre-native-c/licenses")
 
   get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
   set(MLN_FFI_PKG_CONFIG_CFLAGS "")
@@ -246,6 +247,10 @@ function(mln_ffi_install_c_api_library target)
 
   if(TARGET ${target}_static)
     mln_ffi_install_c_api_complete_static_archive(${target}_static)
+  endif()
+  if(TARGET ${target}_framework)
+    mln_ffi_install_c_api_framework(${target} ${target}_framework
+                                    "${MLN_FFI_NATIVE_COMPONENT}")
   endif()
 
   install(

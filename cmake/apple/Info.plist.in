@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>@MLN_FFI_APPLE_FRAMEWORK_NAME@</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.maplibre.nativeffi.@MLN_FFI_APPLE_FRAMEWORK_NAME@</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>@MLN_FFI_APPLE_FRAMEWORK_NAME@</string>
+  <key>CFBundlePackageType</key>
+  <string>FMWK</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@PROJECT_VERSION@</string>
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>@MLN_FFI_APPLE_FRAMEWORK_PLATFORM@</string>
+  </array>
+  <key>CFBundleVersion</key>
+  <string>@PROJECT_VERSION@</string>
+  <key>@MLN_FFI_APPLE_FRAMEWORK_MINIMUM_KEY@</key>
+  <string>@MLN_FFI_APPLE_FRAMEWORK_MINIMUM@</string>
+</dict>
+</plist>
