@@ -1912,18 +1912,14 @@ void main() {
     );
     expect(map.removeStyleSource('dart-vector-source'), isTrue);
     expect(
-      () => map.addVectorSourceTiles(
-        'dart-vector-invalid-tiles-source',
-        const ['https://example.com/{z}/{x}/{y}.mvt'],
-        options: const TileSourceOptions(tileSize: 4294967297),
-      ),
+      () => map.addVectorSourceTiles('dart-vector-invalid-tiles-source', const [
+        'https://example.com/{z}/{x}/{y}.mvt',
+      ], options: const TileSourceOptions(tileSize: 4294967297)),
       throwsA(isA<InvalidArgumentException>()),
     );
-    map.addVectorSourceTiles(
-      'dart-vector-tiles-source',
-      const ['https://example.com/{z}/{x}/{y}.mvt'],
-      options: const TileSourceOptions(minZoom: 0, maxZoom: 14),
-    );
+    map.addVectorSourceTiles('dart-vector-tiles-source', const [
+      'https://example.com/{z}/{x}/{y}.mvt',
+    ], options: const TileSourceOptions(minZoom: 0, maxZoom: 14));
     expect(
       map.getStyleSourceInfo('dart-vector-tiles-source')!.type,
       SourceType.vector,
