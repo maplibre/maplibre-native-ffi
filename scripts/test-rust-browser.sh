@@ -34,10 +34,9 @@ harness_flags=(
   -sPROXY_TO_PTHREAD
   # The fixtures create their own OffscreenCanvas.
   "-sOFFSCREENCANVASES_TO_PTHREAD=''"
-  # wasm32-unknown-emscripten C ABI aliases `__main_argc_argv` to `main`.
-  # Wrap the CRT's `__main_argc_argv` reference onto the uniquely named shim
-  # so it does not collide with Rust 1.99's `main`.
-  "-Wl,--wrap=__main_argc_argv=mln_ffi_proxy_main"
+  # wasm-ld implements ELF --wrap=foo as __wrap_foo / __real_foo. Wrap `main`
+  # so the C shim can force-exit after Rust 1.99's harness returns.
+  "-Wl,--wrap=main"
   "$proxy_main_object"
 )
 
