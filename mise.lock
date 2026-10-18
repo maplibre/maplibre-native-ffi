@@ -412,6 +412,58 @@ checksum = "sha256:6901f91d398811e4ec89d7e20a69abac02a7bfebfaf073338b7ea3d1a9968
 url = "https://conda.anaconda.org/conda-forge/linux-64/xorg-libxscrnsaver-1.2.4-hb9d3cd8_0.conda"
 checksum = "sha256:58e8fc1687534124832d22e102f098b5401173212ac69eb9fd96b16a3e2c8cb2"
 
+[conda-packages.macos-arm64."bzip2-1.0.8-h4e30115_10"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-h4e30115_10.conda"
+checksum = "sha256:8ec22f0ba25cbfc2e64d70cf29459eccd7ffdf6436f6a6ff15bbfef799f7d4f6"
+
+[conda-packages.macos-arm64."dbus-1.16.2-hf049998_2"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/dbus-1.16.2-hf049998_2.conda"
+checksum = "sha256:60e265d5ac83198f1d13a43ab5cd2de097b10b460a5ad0764ed62af875b4ecdc"
+
+[conda-packages.macos-arm64."libcxx-23.1.3-h55c6f16_0"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libcxx-23.1.3-h55c6f16_0.conda"
+checksum = "sha256:2d9d31172d7919bd276a8d1be338de567dd5afdd181e8d3d3d8c2d8695e09de2"
+
+[conda-packages.macos-arm64."libexpat-2.8.5-h6111c0a_0"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libexpat-2.8.5-h6111c0a_0.conda"
+checksum = "sha256:50aa761b83fc7a116ca88fe0cb4cefce5abababb10a926bf8afbafd5c298d102"
+
+[conda-packages.macos-arm64."libffi-3.7.0-h47dc5ef_1"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libffi-3.7.0-h47dc5ef_1.conda"
+checksum = "sha256:2783389a7b9dda04c62cc54c6bbeb03dd3cef24b3fc642715d02a3fa19464a9a"
+
+[conda-packages.macos-arm64."libglib-2.90.1-hccd281b_0"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libglib-2.90.1-hccd281b_0.conda"
+checksum = "sha256:2272d49bb9855a160ccfdd62fccccc00d2a785b90160c7cf1f8aa92d47965681"
+
+[conda-packages.macos-arm64."libiconv-1.18-he4c29f2_3"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libiconv-1.18-he4c29f2_3.conda"
+checksum = "sha256:689a14968267f2f97c07112fca5636e7d756036b9aee969911267c20bd3eea1f"
+
+[conda-packages.macos-arm64."libintl-1.0-hae62183_0"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libintl-1.0-hae62183_0.conda"
+checksum = "sha256:0c38524361d5dd9e1aff4c2c5e95dc70a8c2c7a092f808a0dc591fc7737d8f38"
+
+[conda-packages.macos-arm64."liblzma-5.8.3-h8088a28_1"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.3-h8088a28_1.conda"
+checksum = "sha256:23d0630046a3e8b164d8f80f2b74ed2605af2e7050ab9913018056402fae4311"
+
+[conda-packages.macos-arm64."libusb-1.0.30-h74c22ad_0"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libusb-1.0.30-h74c22ad_0.conda"
+checksum = "sha256:2a876e51ee52959b1a4439a8386997d34d84d07eb2ea7b2266244b6f6e1f2303"
+
+[conda-packages.macos-arm64."libvulkan-loader-1.4.357.0-hfbe1efa_2"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libvulkan-loader-1.4.357.0-hfbe1efa_2.conda"
+checksum = "sha256:aaf22c7f0bbd2bac3a070a49e03c0c4baedf16ce22ad80ca697a7c15422c5de8"
+
+[conda-packages.macos-arm64."libzlib-1.3.2-h8088a28_3"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.2-h8088a28_3.conda"
+checksum = "sha256:a18fa5d5bac452401459f966cf0d872224e8080c4ff93c77e168d43ab42ef9d7"
+
+[conda-packages.macos-arm64."pcre2-10.47-he63d830_1"]
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/pcre2-10.47-he63d830_1.conda"
+checksum = "sha256:f8c415329b542e1fca1ff2917b80e687c18302dfa0353530668b90cb225b494f"
+
 [conda-packages.windows-x64."libiconv-1.18-hc1393d2_3"]
 url = "https://conda.anaconda.org/conda-forge/win-64/libiconv-1.18-hc1393d2_3.conda"
 checksum = "sha256:35e04e3ddac7720fc7c550a1c9f998604299d6a7bd1f3ec9b2825d825061daa2"
@@ -507,15 +559,15 @@ version = "0.11.11"
 backend = "aqua:astral-sh/uv"
 
 [tools."aqua:astral-sh/uv"."platforms.linux-arm64"]
-checksum = "sha256:0fc9a49b3900f77ffaccf3ff69a70ddbc1d479e70ac5d8fd6416a7577b03c5a1"
-url = "https://github.com/astral-sh/uv/releases/download/0.11.11/uv-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/413802136"
+checksum = "sha256:155fe4d3b3cb4bfce118ab4b1380f71515ae874d13d9858171b4f9c26e16684d"
+url = "https://github.com/astral-sh/uv/releases/download/0.11.11/uv-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/413802129"
 provenance = "github-attestations"
 
 [tools."aqua:astral-sh/uv"."platforms.linux-x64"]
-checksum = "sha256:80521f18ba83109acd17e0730bd8ff898c3426aa62252c627d63418b353e788a"
-url = "https://github.com/astral-sh/uv/releases/download/0.11.11/uv-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/413802220"
+checksum = "sha256:a767848254391855c96df271e9ca8b7f72dd172d310460447853d25d907b9ae0"
+url = "https://github.com/astral-sh/uv/releases/download/0.11.11/uv-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/413802218"
 provenance = "github-attestations"
 
 [tools."aqua:astral-sh/uv"."platforms.macos-arm64"]
@@ -541,14 +593,14 @@ version = "0.53.2"
 backend = "aqua:dprint/dprint"
 
 [tools."aqua:dprint/dprint"."platforms.linux-arm64"]
-checksum = "sha256:c3843a4604dac7428f41f762c4c352e409c63bd634172765bbac482dc59773ba"
-url = "https://github.com/dprint/dprint/releases/download/0.53.2/dprint-aarch64-unknown-linux-musl.zip"
-url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/386379923"
+checksum = "sha256:490b620a386497b09ce25cc92c4cb784dfdb9d15448db972b164721d6f795ddd"
+url = "https://github.com/dprint/dprint/releases/download/0.53.2/dprint-aarch64-unknown-linux-gnu.zip"
+url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/386379926"
 
 [tools."aqua:dprint/dprint"."platforms.linux-x64"]
-checksum = "sha256:7ff2cf9b25c687bd59867528ae9a5526c17e75e82e9788bf1f84a0e3ca7163b6"
-url = "https://github.com/dprint/dprint/releases/download/0.53.2/dprint-x86_64-unknown-linux-musl.zip"
-url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/386379927"
+checksum = "sha256:dcb73c6890c80dff15d5c91f7e01c09a5eb6e4c96373525765d08a60f02e4598"
+url = "https://github.com/dprint/dprint/releases/download/0.53.2/dprint-x86_64-unknown-linux-gnu.zip"
+url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/386379930"
 
 [tools."aqua:dprint/dprint"."platforms.macos-arm64"]
 checksum = "sha256:a185ba53f74e1e3a8ccdaf03a5d6f96b67d3fdf3f86d0d0f98950d15817eb0c4"
@@ -810,6 +862,10 @@ conda_deps = [
 [tools."conda:doxygen"."platforms.macos-arm64"]
 checksum = "sha256:2327ad4e6214accc1e71aea371aee9b9fed864ec36c20f829fd1cb71d4c85202"
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/doxygen-1.13.2-h493aca8_0.conda"
+conda_deps = [
+    "libcxx-23.1.3-h55c6f16_0",
+    "libiconv-1.18-he4c29f2_3",
+]
 
 [tools."conda:doxygen"."platforms.windows-x64"]
 checksum = "sha256:7a0fd40fd704e97a8f6533a081ba29579766d7a60bcb8e5de76679b066c4a72e"
@@ -860,6 +916,11 @@ conda_deps = [
 [tools."conda:libxml2"."platforms.macos-arm64"]
 checksum = "sha256:aca8cdd79d5cf277e3dd8e79dd3420f962d181a4d1b28b9cfe02fc865ce91fe8"
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/libxml2-2.13.9-h226d0e7_0.conda"
+conda_deps = [
+    "libiconv-1.18-he4c29f2_3",
+    "liblzma-5.8.3-h8088a28_1",
+    "libzlib-1.3.2-h8088a28_3",
+]
 
 [tools."conda:libxml2"."platforms.windows-x64"]
 checksum = "sha256:28ac5bbed11644b9e06241ba1dfdac7e3a99e74b69915d45f646717ad9645ca5"
@@ -995,6 +1056,20 @@ conda_deps = [
 [tools."conda:sdl3"."platforms.macos-arm64"]
 checksum = "sha256:06c6f18b5e92eb0fab77066de8dd86c46df5a77b1bef087431eca49693a6e929"
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/sdl3-3.2.30-h6fa9c73_0.conda"
+conda_deps = [
+    "libcxx-23.1.3-h55c6f16_0",
+    "libusb-1.0.30-h74c22ad_0",
+    "dbus-1.16.2-hf049998_2",
+    "libvulkan-loader-1.4.357.0-hfbe1efa_2",
+    "libzlib-1.3.2-h8088a28_3",
+    "libglib-2.90.1-hccd281b_0",
+    "libintl-1.0-hae62183_0",
+    "libexpat-2.8.5-h6111c0a_0",
+    "libffi-3.7.0-h47dc5ef_1",
+    "pcre2-10.47-he63d830_1",
+    "libiconv-1.18-he4c29f2_3",
+    "bzip2-1.0.8-h4e30115_10",
+]
 
 [tools."conda:sdl3"."platforms.windows-x64"]
 checksum = "sha256:6b02bf3f1924bcf3d984a0535528e0b39ba99c5edc758f0d167b39cd33545479"
@@ -1216,6 +1291,30 @@ url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_aarch64.zip"
 checksum = "sha256:ddd68ee54e78b6b19388f517b8a61fbed2856ae3320febe42449bac3021e2729"
 url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_x64.zip"
 
+[[tools.java]]
+version = "temurin-21.0.11+10.0.LTS"
+backend = "core:java"
+
+[tools.java."platforms.linux-arm64"]
+checksum = "sha256:8d498ec88e1c1989fab95c6784240ab92d011e29c54d20a3f9c324b13476f9ad"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.11_10.tar.gz"
+
+[tools.java."platforms.linux-x64"]
+checksum = "sha256:4b2220e232a97997b436ca6ab15cbf70171ecff52958a46159dfa5a8c44ca4de"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_x64_linux_hotspot_21.0.11_10.tar.gz"
+
+[tools.java."platforms.macos-arm64"]
+checksum = "sha256:6ebcf221c9b41507b14c098e93c6ead6440b8d9bd154f8ec666c4c73abbdb201"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.11_10.tar.gz"
+
+[tools.java."platforms.windows-arm64"]
+checksum = "sha256:a6ef0829c261f856ef93d64724be6bc8fd8355c2bbddbd26d6544478a8353f87"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_aarch64_windows_hotspot_21.0.11_10.zip"
+
+[tools.java."platforms.windows-x64"]
+checksum = "sha256:d3625e7cadf23787ea540229544b6e2ab494b3b54da1801879e583e1dfee0a64"
+url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_x64_windows_hotspot_21.0.11_10.zip"
+
 [[tools.ninja]]
 version = "1.13.2"
 backend = "aqua:ninja-build/ninja"
@@ -1270,32 +1369,32 @@ checksum = "sha256:50efaf01a08c520b4bbe499c09a8c5a5c370002c419c0d9da2c6815d3066a
 url = "https://nodejs.org/dist/v26.12.0/node-v26.12.0-win-x64.zip"
 
 [[tools.python]]
-version = "3.14.4"
+version = "3.15.0"
 backend = "core:python"
 
 [tools.python."platforms.linux-arm64"]
-checksum = "sha256:b8b597fdb2f8dccdc502c11947b60a4b65eb6bce79cfa60c7ccf9b6e8352c60a"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4+20260414-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz"
+checksum = "sha256:064778ca701efc4c8366d0b235a2a0f5dbe14d921aeb2ef4f5c7b93e5a75cbd0"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.15.0+20261013-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [tools.python."platforms.linux-x64"]
-checksum = "sha256:fe9a9c32d13870af632cbac3dfc7528ae53597e94472aa4c7d6a42e8166136cd"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4+20260414-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+checksum = "sha256:69740dcd9b3480b3d53760f2d3b75582adb14fa54434628dea32480ddede542a"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.15.0+20261013-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [tools.python."platforms.macos-arm64"]
-checksum = "sha256:6f304f4ec30854611f23316578302235fb517cd970519ecdd11a8c4db87fd843"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4+20260414-aarch64-apple-darwin-install_only_stripped.tar.gz"
+checksum = "sha256:b4ab2009803cef142e4ebf2ebef225f6875f83cc35caf4eefb437aa9b2b76783"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.15.0+20261013-aarch64-apple-darwin-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [tools.python."platforms.windows-arm64"]
-checksum = "sha256:d0cf4212d08a34ecdd614bc655d6502afcf61ce16cf5f566fca6c63884a9d1df"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4+20260414-aarch64-pc-windows-msvc-install_only_stripped.tar.gz"
+checksum = "sha256:01367b4d9a6882429133772f69c3373e1d0c7e40ee7d57be9a7259338de16dfa"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.15.0+20261013-aarch64-pc-windows-msvc-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [tools.python."platforms.windows-x64"]
-checksum = "sha256:a976991dcd085c1bb5d9a8084823a6bc8b7f9b079d8c432574a6ddd68c3a6fe1"
-url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4+20260414-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+checksum = "sha256:743d2269e74a98f7c4281dbc2e8710c171be1965693720aac818ff0157e4d965"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.15.0+20261013-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
 provenance = "github-attestations"
 
 [[tools.rust]]
