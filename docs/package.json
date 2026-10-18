@@ -1,7 +1,7 @@
 {
   "name": "docs",
-  "type": "module",
   "private": "true",
+  "type": "module",
   "scripts": {
     "generate-support-matrix": "python scripts/generate-support-matrix.py",
     "generate-versions": "python scripts/generate-versions.py",

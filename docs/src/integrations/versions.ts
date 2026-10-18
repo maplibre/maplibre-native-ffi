@@ -1,5 +1,6 @@
-import type { SatteriProcessorOptions } from "@astrojs/markdown-satteri";
 import fs from "node:fs";
+
+import type { SatteriProcessorOptions } from "@astrojs/markdown-satteri";
 
 type MdastPluginEntry = NonNullable<
   SatteriProcessorOptions["mdastPlugins"]

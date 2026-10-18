@@ -58,8 +58,8 @@ Every example exposes the same task contract in its `mise.toml`:
 - `run [render-target] [--preset <preset>]` builds and launches the example by
   extending the root `ffi:example-run` task template. The render target defaults
   to `owned-texture`, so `mise run //examples/zig-map:run` works with no
-  arguments, and a mode name overrides it, as in
-  `mise run //examples/zig-map:run borrowed-texture`.
+  arguments, and a mode name overrides it, as in `mise run
+  //examples/zig-map:run borrowed-texture`.
 
 An example that has not yet implemented every backend rejects an unsupported
 preset with an error that names what it supports: `go-map` drives OpenGL
@@ -522,8 +522,8 @@ Derivation rules:
   and on every resize or backing-scale change.
 - Compute logical dimensions from physical size and scale when the toolkit only
   exposes physical pixels (use `ceil(physical / scale)`, minimum `1`).
-- Log viewport changes at informational level with field labels
-  `logical=… physical=… scale=…`.
+- Log viewport changes at informational level with field labels `logical=…
+  physical=… scale=…`.
 
 Pass `logical_*` and `scale_factor` to map creation, session attach, and session
 `resize`.
@@ -621,8 +621,8 @@ For `owned-texture` and `borrowed-texture`, the host-owned compositor that
 samples the map texture into the host swapchain MUST use a fullscreen triangle
 covering the viewport:
 
-- Vertex shader: three corners with pass-through UVs spanning the visible
-  `[0, 1] × [0, 1]` texture range (large-triangle technique).
+- Vertex shader: three corners with pass-through UVs spanning the visible `[0,
+  1] × [0, 1]` texture range (large-triangle technique).
 - Fragment shader: `texture(map_texture, uv)` (straight copy, standard UV
   orientation).
 
@@ -781,8 +781,8 @@ The process MUST accept a render-target mode name:
 | Caller-owned borrowed texture | `borrowed-texture` |
 | Native window surface         | `native-surface`   |
 
-The mode is a required positional argument (for example
-`zig-map owned-texture`). There is no default mode.
+The mode is a required positional argument (for example `zig-map
+owned-texture`). There is no default mode.
 
 On `--help`, print usage listing the three mode names and exit `0` before
 creating a window. On invalid arguments, print usage listing the three mode

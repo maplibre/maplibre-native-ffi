@@ -1,6 +1,10 @@
 [tools]
 "core:dart" = "{{vars.dart_version}}"
-"core:flutter" = { version = "{{vars.flutter_version}}", os = ["linux/x64", "macos/arm64", "windows/x64"] }
+"core:flutter" = { version = "{{vars.flutter_version}}", os = [
+  "linux/x64",
+  "macos/arm64",
+  "windows/x64",
+] }
 
 # The built-in provider runs `dart pub get` and tracks pubspec.yaml/pubspec.lock
 # against .dart_tool/package_config.json. Use `dart pub upgrade` to move the
