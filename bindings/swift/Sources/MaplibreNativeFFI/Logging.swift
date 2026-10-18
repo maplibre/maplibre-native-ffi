@@ -1,5 +1,5 @@
 
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 public enum LogSeverity: Sendable, Hashable {
   case info

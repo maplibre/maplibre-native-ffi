@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 enum NativeProjection {
   static func create(_ session: NativeRenderSessionHandle) throws

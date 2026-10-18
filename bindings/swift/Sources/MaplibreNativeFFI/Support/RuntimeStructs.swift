@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 struct NativeRuntimeOptionsInput: Equatable {
   var assetPath: String?

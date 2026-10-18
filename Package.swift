@@ -9,7 +9,7 @@ import PackageDescription
 
 let testDependencies: [Target.Dependency] = [
   "MaplibreNativeFFI",
-  "CMaplibreNativeC",
+  "MaplibreNativeC",
 ]
 
 let testSourceFiles = [
@@ -43,13 +43,13 @@ let products: [Product] = [
 
 let targets: [Target] = [
   .systemLibrary(
-    name: "CMaplibreNativeC",
-    path: "bindings/swift/Sources/CMaplibreNativeC",
+    name: "MaplibreNativeC",
+    path: "bindings/swift/Sources/MaplibreNativeC",
     pkgConfig: "maplibre-native-c"
   ),
   .target(
     name: "MaplibreNativeFFI",
-    dependencies: ["CMaplibreNativeC"],
+    dependencies: ["MaplibreNativeC"],
     path: "bindings/swift/Sources/MaplibreNativeFFI",
     linkerSettings: [
       .linkedLibrary("c++", .when(platforms: [.iOS, .tvOS])),

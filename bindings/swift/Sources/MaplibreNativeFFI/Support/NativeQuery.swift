@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 enum NativeQuery {

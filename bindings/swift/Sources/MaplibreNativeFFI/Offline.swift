@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 public enum AmbientCacheOperation: UInt32, Sendable, Hashable {

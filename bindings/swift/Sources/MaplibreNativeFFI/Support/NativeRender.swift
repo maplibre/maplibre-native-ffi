@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 enum NativeRender {
   static func metalSurfaceAttach(

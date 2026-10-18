@@ -1,0 +1,11 @@
+// The same module layout as MaplibreNativeC.framework, so the binding imports
+// the C library under one name from a pkg-config prefix or the XCFramework.
+module MaplibreNativeC [system] {
+  umbrella header "include/maplibre_native_c.h"
+  export *
+
+  explicit module Plugin {
+    header "include/plugin.h"
+    export *
+  }
+}

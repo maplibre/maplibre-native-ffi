@@ -1,5 +1,5 @@
 
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 public struct ProjectedMeters: Equatable, Sendable {

@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 enum NativeHandleFactory {
   /// Runs `body` with storage for a handle out-parameter and returns the issued

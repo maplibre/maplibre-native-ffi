@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 enum NativeRuntime {
   static func create(_ options: UnsafePointer<mln_runtime_options>) throws

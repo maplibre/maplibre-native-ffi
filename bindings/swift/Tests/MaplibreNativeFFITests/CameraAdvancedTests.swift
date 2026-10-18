@@ -1,4 +1,4 @@
-import CMaplibreNativeC
+import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 

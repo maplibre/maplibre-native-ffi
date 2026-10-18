@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 struct NativeRenderTargetExtent: Equatable {
   let width: UInt32

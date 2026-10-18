@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC.Plugin
 
 public extension Maplibre {
   /// Returns the process-lifetime address of the v1 plugin registration

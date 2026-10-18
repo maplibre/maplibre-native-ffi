@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 /// Owns per-call byte storage whose pointers stay valid until the C call

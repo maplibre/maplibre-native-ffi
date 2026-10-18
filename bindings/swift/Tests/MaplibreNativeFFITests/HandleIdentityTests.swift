@@ -1,5 +1,5 @@
-import CMaplibreNativeC
 import Foundation
+import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 

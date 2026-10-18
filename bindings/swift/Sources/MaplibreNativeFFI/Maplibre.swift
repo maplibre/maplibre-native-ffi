@@ -1,5 +1,5 @@
 
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 public enum Maplibre {
   public static func cVersion() -> UInt32 {

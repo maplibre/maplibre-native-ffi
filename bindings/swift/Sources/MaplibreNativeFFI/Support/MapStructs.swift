@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 struct NativeLatLng: Equatable {
   let latitude: Double
