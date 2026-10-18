@@ -24,10 +24,24 @@ function(mln_ffi_add_c_api_framework target implementation_target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target} ${implementation_target})
 
-  # App Store validation reads MinimumOSVersion from an embedded iOS or tvOS
-  # framework. The version is the project's until the publish step relabels it
-  # with the release version.
+  # App Store processing reads the supported platform from every embedded
+  # framework, and MinimumOSVersion from an iOS or tvOS one. The version is the
+  # project's until the publish step relabels it with the release version.
   mln_ffi_apple_framework_embedded(embedded)
+  mln_ffi_apple_is_simulator(simulator)
+  if(NOT embedded)
+    set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM MacOSX)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM iPhoneOS)
+    if(simulator)
+      set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM iPhoneSimulator)
+    endif()
+  else()
+    set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM AppleTVOS)
+    if(simulator)
+      set(MLN_FFI_APPLE_FRAMEWORK_PLATFORM AppleTVSimulator)
+    endif()
+  endif()
   set(MLN_FFI_APPLE_FRAMEWORK_MINIMUM_OS "")
   if(embedded)
     set(MLN_FFI_APPLE_FRAMEWORK_MINIMUM_OS

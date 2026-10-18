@@ -289,9 +289,9 @@ def main() -> int:
             image = image_format(binary)
             if image is None:
                 continue
-            if not binary.name.removeprefix("lib").startswith(
-                (PACKAGED_LIBRARY_STEM, PACKAGED_FRAMEWORK_BINARY)
-            ):
+            if binary.name != PACKAGED_FRAMEWORK_BINARY and not binary.name.removeprefix(
+                "lib"
+            ).startswith(PACKAGED_LIBRARY_STEM):
                 problems.append((binary.name, VENDORED_LOADER, str(relative)))
                 # What a library that does not belong here depends on says
                 # nothing about the artifact; removing it answers both.

@@ -14,6 +14,10 @@
   <string>FMWK</string>
   <key>CFBundleShortVersionString</key>
   <string>@PROJECT_VERSION@</string>
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>@MLN_FFI_APPLE_FRAMEWORK_PLATFORM@</string>
+  </array>
   <key>CFBundleVersion</key>
   <string>@PROJECT_VERSION@</string>
   @MLN_FFI_APPLE_FRAMEWORK_MINIMUM_OS@
