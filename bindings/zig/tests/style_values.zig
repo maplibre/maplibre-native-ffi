@@ -139,7 +139,7 @@ test "nine-patch style images round-trip stretch, content, and text fit" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const pixels = [_]u8{0} ** 16;
+    const pixels: [16]u8 = @splat(0);
     const image = maplibre.PremultipliedRgba8Image{
         .width = 2,
         .height = 2,

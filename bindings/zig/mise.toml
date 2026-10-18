@@ -1,5 +1,5 @@
 [tools]
-# Zig 0.16.0 is unusable on Windows ARM64: the native aarch64 build exits
+# Zig 0.17.0 is unusable on Windows ARM64: the native aarch64 build exits
 # non-zero with no diagnostic while loading build.zig, and the x64 build under
 # emulation hangs until the job timeout.
 "core:zig" = { version = "{{vars.zig_version}}", os = [

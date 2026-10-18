@@ -4,6 +4,7 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
+const Translator = @import("translate_c").Translator;
 const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
@@ -33,16 +34,19 @@ fn parseRenderBackend(value: []const u8) RenderBackend {
         std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
-fn lazyPath(path: []const u8) std.Build.LazyPath {
-    return .{ .cwd_relative = path };
+fn cwdRelativePath(path: std.Build.LazyPath) []const u8 {
+    return switch (path) {
+        .cwd_relative => |p| p,
+        else => std.debug.panic("expected a concrete filesystem path, got {f}", .{path}),
+    };
 }
 
 fn installPath(b: *std.Build, install_dir: std.Build.LazyPath, sub_path: []const u8) std.Build.LazyPath {
-    return lazyPath(b.pathJoin(&.{ install_dir.getPath(b), sub_path }));
+    return install_dir.path(b, sub_path);
 }
 
 fn installedArtifactDescriptor(b: *std.Build, install_dir: std.Build.LazyPath) ArtifactDescriptor {
-    const descriptor_path = b.pathJoin(&.{ install_dir.getPath(b), "share", "maplibre-native-c", "artifact.json" });
+    const descriptor_path = b.pathJoin(&.{ cwdRelativePath(install_dir), "share", "maplibre-native-c", "artifact.json" });
     const descriptor = std.Io.Dir.cwd().readFileAlloc(b.graph.io, descriptor_path, b.allocator, .limited(4096)) catch
         std.debug.panic("failed to read native artifact descriptor: {s}", .{descriptor_path});
     const parsed = std.json.parseFromSlice(
@@ -168,7 +172,7 @@ pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Buil
     }
 }
 
-fn addTranslateCIncludePaths(translate_c: *std.Build.Step.TranslateC, include_dirs: []const std.Build.LazyPath) void {
+fn addTranslateCIncludePaths(translate_c: *const Translator, include_dirs: []const std.Build.LazyPath) void {
     for (include_dirs) |include_dir| {
         translate_c.addIncludePath(include_dir);
     }
@@ -209,21 +213,22 @@ pub const TranslateCModuleOptions = struct {
 };
 
 pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Build.Module {
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = options.root_source_file,
+    const translate_c_dep = b.dependency("translate_c", .{});
+    const translator: Translator = .init(translate_c_dep, .{
+        .c_source_file = options.root_source_file,
         .target = options.target,
         .optimize = options.optimize,
     });
-    addTranslateCIncludePaths(translate_c, options.include_dirs);
-    addPlatformSystemHeaderPaths(b, translate_c, options.target, options.system_root);
+    addTranslateCIncludePaths(&translator, options.include_dirs);
+    addPlatformSystemHeaderPaths(b, &translator, options.target, options.system_root);
     if (options.target.result.abi.isAndroid()) {
         // Zig's C translator needs the API level from the resolved Android target.
-        translate_c.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{options.target.result.os.version_range.linux.android}));
+        translator.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{options.target.result.os.version_range.linux.android}));
     }
     for (options.c_macros) |c_macro| {
-        translate_c.defineCMacro(c_macro.name, c_macro.value);
+        translator.defineCMacro(c_macro.name, c_macro.value);
     }
-    return translate_c.createModule();
+    return translator.mod;
 }
 
 fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
@@ -305,12 +310,11 @@ fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, target: std.
 fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const root = system_root orelse return;
-    const system_root_path = root.getPath(b);
 
     if (target.result.os.tag.isDarwin()) {
-        destination.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
+        destination.addSystemFrameworkPath(root.path(b, b.pathJoin(&.{ "System", "Library", "Frameworks" })));
     }
-    destination.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
+    destination.addSystemIncludePath(root.path(b, b.pathJoin(&.{ "usr", "include" })));
 }
 
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
@@ -320,13 +324,12 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
     // the binding tasks pass as a dependency library directory.
     if (target.result.abi == .android) return;
     const root = system_root orelse return;
-    const system_root_path = root.getPath(b);
 
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
+    module.addLibraryPath(root.path(b, b.pathJoin(&.{ "usr", "lib" })));
     if (target.result.os.tag == .linux) {
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib64" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "lib" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "lib64" }) });
+        module.addLibraryPath(root.path(b, b.pathJoin(&.{ "usr", "lib64" })));
+        module.addLibraryPath(root.path(b, "lib"));
+        module.addLibraryPath(root.path(b, "lib64"));
     }
 }
 
@@ -374,7 +377,7 @@ pub fn isAppleSimulator(target: std.Build.ResolvedTarget) bool {
 
 pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
     // Zig Debug Apple-mobile tests hit Mach-O/debug-info linker limits in this dependency graph.
-    if (isAppleMobile(target) and optimize == .Debug) return .ReleaseSafe;
+    if (isAppleMobile(target) and optimize == .debug) return .safe;
     return optimize;
 }
 
@@ -497,7 +500,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         linkSystemLibraries(module_, staticIosLinkLibraries());
         const system_root = options.system_root orelse
             @panic("iOS and tvOS device builds require -Dsystem-root=<path-to-SDK>");
-        module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root.getPath(b), "usr", "lib", "libc++.tbd" }) });
+        module_.addObjectFile(system_root.path(b, b.pathJoin(&.{ "usr", "lib", "libc++.tbd" })));
         linkFrameworks(module_, staticIosFrameworks(options.render_backend));
     } else if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(installPath(b, options.native_install_dir, "lib/maplibre-native-c.lib"));
@@ -626,10 +629,8 @@ pub fn addTestRunStep(
     simulator_runner: std.Build.LazyPath,
 ) *std.Build.Step.Run {
     if (isAppleSimulator(target)) {
-        const run_tests = b.addSystemCommand(&.{
-            "bash",
-            simulator_runner.getPath(b),
-        });
+        const run_tests = b.addSystemCommand(&.{"bash"});
+        run_tests.addFileArg(simulator_runner);
         run_tests.addArtifactArg(tests);
         run_tests.setEnvironmentVariable(
             "MLN_FFI_SIMULATOR_RUNTIME",
@@ -648,12 +649,10 @@ fn addAndroidTestRunStep(
     android_runner: std.Build.LazyPath,
     emulator_api: ?[]const u8,
 ) *std.Build.Step.Run {
-    const run_tests = b.addSystemCommand(&.{
-        "bash",
-        android_runner.getPath(b),
-        "180",
-        installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
-    });
+    const run_tests = b.addSystemCommand(&.{"bash"});
+    run_tests.addFileArg(android_runner);
+    run_tests.addArg("180");
+    run_tests.addFileArg(installPath(b, native_install_dir, "lib/libmaplibre-native-c.so"));
     if (emulator_api) |api| {
         run_tests.addArgs(&.{ "--api", api });
     }
