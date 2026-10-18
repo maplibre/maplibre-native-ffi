@@ -18,16 +18,24 @@ fi
 
 proxy_main_object="$MISE_MONOREPO_ROOT/build/$preset/rust-emscripten-proxy-main.o"
 mkdir -p "$(dirname "$proxy_main_object")"
-emcc -pthread -fwasm-exceptions -c \
-  "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c" \
-  -o "$proxy_main_object"
-# emcc aliases `__main_argc_argv` to `main` in this object. Rust 1.99 already
-# defines `main` for the test harness, so rename the alias before linking.
+# Compile with clang rather than emcc. emcc aliases `__main_argc_argv` to
+# `main`, which collides with the `main` Rust 1.99 emits for the test harness.
 llvm_root=$(em-config LLVM_ROOT)
-if "$llvm_root/llvm-nm" "$proxy_main_object" | grep -Eq ' [A-Z] main$'; then
-  "$llvm_root/llvm-objcopy" --redefine-sym main=mln_ffi_unused_main \
-    "$proxy_main_object"
+emscripten_root=$(em-config EMSCRIPTEN_ROOT)
+sysroot="$emscripten_root/cache/sysroot"
+if [[ ! -d "$sysroot/include" ]]; then
+  tmp_o=$(mktemp --suffix=.o)
+  emcc -c -o "$tmp_o" -x c /dev/null
+  rm -f "$tmp_o"
 fi
+"$llvm_root/clang" \
+  --target=wasm32-unknown-emscripten \
+  --sysroot="$sysroot" \
+  -c \
+  -pthread \
+  -fwasm-exceptions \
+  -o "$proxy_main_object" \
+  "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c"
 
 # Browser test harness options.
 harness_flags=(
