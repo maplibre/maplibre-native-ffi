@@ -178,7 +178,17 @@ static jlong mln_jni_put_utf8(
 ) {
   (void)type;
   const jsize length = (*env)->GetStringLength(env, value);
-  const jchar* text = (*env)->GetStringCritical(env, value, NULL);
+  // ART may allocate a UTF-16 copy when a compact string is pinned.
+  jchar buffer[128];
+  const bool copied = length <= (jsize)(sizeof buffer / sizeof buffer[0]);
+  const jchar* text;
+  if (copied) {
+    (*env)->GetStringRegion(env, value, 0, length, buffer);
+    if ((*env)->ExceptionCheck(env)) return 0;
+    text = buffer;
+  } else {
+    text = (*env)->GetStringCritical(env, value, NULL);
+  }
   if (text == NULL) return 0;
   uint8_t* output = MLN_JNI_POINTER(uint8_t*, address);
   uint8_t* start = output;
@@ -208,7 +218,7 @@ static jlong mln_jni_put_utf8(
       *output++ = (uint8_t)(0x80 | (code & 0x3f));
     }
   }
-  (*env)->ReleaseStringCritical(env, value, text);
+  if (!copied) (*env)->ReleaseStringCritical(env, value, text);
   return (jlong)(output - start);
 }
 

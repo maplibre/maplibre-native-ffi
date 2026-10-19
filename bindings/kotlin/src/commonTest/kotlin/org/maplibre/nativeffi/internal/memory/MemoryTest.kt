@@ -12,7 +12,19 @@ class MemoryTest {
   @Test
   fun stringViewsEncodeUtf8DirectlyWithPlatformReplacement() {
     for (text in
-      listOf("", "plain", "a\u0000b", "é€", "\uD83D\uDE03", "\uD800x\uDC00", "\uDC00\uD800")) {
+      listOf(
+        "",
+        "plain",
+        "a\u0000b",
+        "é€",
+        "\uD83D\uDE03",
+        "\uD800x\uDC00",
+        "\uDC00\uD800",
+        "é".repeat(128),
+        "é".repeat(129),
+        "x".repeat(126) + "\uD83D\uDE03",
+        "x".repeat(127) + "\uD83D\uDE03",
+      )) {
       NativeArena().use { arena ->
         val view = arena.view(text)
         assertContentEquals(
