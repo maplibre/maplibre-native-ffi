@@ -97,7 +97,7 @@ struct StyleOperationResult {
 
 using StyleWork = std::function<mln_status(MapObject&, StyleOperationResult&)>;
 using StyleDelivery =
-  void (*)(const mln_completion&, const StyleOperationResult&) noexcept;
+  void (*)(const CompletionSink&, const StyleOperationResult&) noexcept;
 
 // Views a found image record as the C value. The pixel and stretch views
 // borrow from record.
@@ -110,7 +110,7 @@ auto style_image_info(const StyleImageRecord& record) noexcept
 // function's header annotations.
 template <auto Function>
 auto deliver_style_result(
-  const mln_completion& descriptor, const StyleOperationResult& result
+  const CompletionSink& descriptor, const StyleOperationResult& result
 ) noexcept -> void {
   using Value = CompletionValue<Function>;
   using Type = typename Value::Type;

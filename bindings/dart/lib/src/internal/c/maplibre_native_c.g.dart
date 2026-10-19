@@ -10,6 +10,8 @@ import 'native_asset.dart';
 export 'native_abi.dart';
 
 typedef mln_acquired_frame = Uint64;
+typedef mln_delivery_batch = Uint64;
+typedef mln_delivery_queue = Uint64;
 typedef mln_event_batch = Uint64;
 typedef mln_geojson_source_data = Uint64;
 typedef mln_map = Uint64;
@@ -336,6 +338,8 @@ final class mln_completion extends Struct {
   external mln_completion_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_completion_result extends Struct {
@@ -393,6 +397,37 @@ final class mln_custom_mvt_vector_source_options extends Struct {
   @Double()
   external double max_zoom;
   external mln_user_data_release release_user_data;
+}
+
+final class mln_delivery extends Struct {
+  @Uint32()
+  external int type;
+  @Uint32()
+  external int reserved;
+  external Pointer<Void> user_data;
+  external mln_delivery_payload payload;
+}
+
+final class mln_delivery_batch_view extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int delivery_size;
+  external Pointer<mln_delivery> deliveries;
+  @Size()
+  external int delivery_count;
+}
+
+final class mln_delivery_payload extends Union {
+  external mln_completion_result completion;
+  external mln_log_delivery log_record;
+  external mln_resource_request_delivery resource_request;
+}
+
+final class mln_delivery_queue_options extends Struct {
+  @Uint32()
+  external int size;
+  external mln_wake wake;
 }
 
 final class mln_diagnostic extends Struct {
@@ -551,12 +586,24 @@ final class mln_lat_lng_bounds extends Struct {
   external mln_lat_lng northeast;
 }
 
+final class mln_log_delivery extends Struct {
+  @Uint32()
+  external int severity;
+  @Uint32()
+  external int event;
+  @Int64()
+  external int code;
+  external Pointer<Char> message;
+}
+
 final class mln_log_handler extends Struct {
   @Uint32()
   external int size;
   external mln_log_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_logical_extent extends Struct {
@@ -1044,6 +1091,8 @@ final class mln_resource_provider extends Struct {
   external mln_resource_provider_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_resource_range extends Struct {
@@ -1087,6 +1136,12 @@ final class mln_resource_request_cancel_handler extends Struct {
   external mln_resource_request_cancel_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+}
+
+final class mln_resource_request_delivery extends Struct {
+  external Pointer<mln_resource_request> request;
+  @Uint64()
+  external int handle;
 }
 
 final class mln_resource_response extends Struct {
@@ -1707,6 +1762,12 @@ const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
 // mln_custom_mvt_vector_source_option_field
 const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
 const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
+
+// mln_delivery_type
+const MLN_DELIVERY_TYPE_COMPLETION = 1;
+const MLN_DELIVERY_TYPE_LOG_RECORD = 2;
+const MLN_DELIVERY_TYPE_RESOURCE_REQUEST = 3;
+const MLN_DELIVERY_TYPE_RETIRED = 4;
 
 // mln_feature_state_selector_field
 const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
@@ -2557,6 +2618,58 @@ mln_custom_geometry_source_options_default();
 @Native<mln_custom_mvt_vector_source_options Function()>()
 external mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default();
+
+@Native<
+  Int32 Function(
+    mln_delivery_batch,
+    Pointer<mln_delivery_batch_view>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_delivery_batch_get(
+  int batch,
+  Pointer<mln_delivery_batch_view> out_view,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_delivery_batch)>()
+external void mln_delivery_batch_release(int batch);
+
+@Native<Int32 Function(mln_delivery_batch, Size, Pointer<mln_diagnostic>)>()
+external int mln_delivery_batch_take(
+  int batch,
+  int index,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_delivery_queue_options>,
+    Pointer<mln_delivery_queue>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_delivery_queue_create(
+  Pointer<mln_delivery_queue_options> options,
+  Pointer<mln_delivery_queue> out_queue,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_delivery_queue,
+    Pointer<mln_delivery_batch>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_delivery_queue_drain(
+  int queue,
+  Pointer<mln_delivery_batch> out_batch,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_delivery_queue)>()
+external void mln_delivery_queue_release(int queue);
 
 @Native<
   Int32 Function(

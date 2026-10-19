@@ -82,14 +82,14 @@ typedef enum mln_status : int32_t {
 /**
  * The diagnostic message of one status-returning call.
  *
- * Every status-returning function, except the binding-internal callback
- * adapters, takes a nullable mln_diagnostic* as its last parameter,
- * out_diagnostic. The caller sets size to sizeof(mln_diagnostic). The function
- * writes message as null-terminated UTF-8, truncated to fit. The message is
- * empty when the function returns MLN_STATUS_OK, or MLN_STATUS_NOT_READY from a
- * drain with nothing queued, and describes the failure otherwise. It writes no
- * more than size bytes of the struct. A null out_diagnostic discards the
- * message.
+ * Every status-returning function takes a nullable mln_diagnostic* as its last
+ * parameter, out_diagnostic, except a binding_support.h function that matches
+ * a callback typedef. The caller sets size to sizeof(mln_diagnostic). The
+ * function writes message as null-terminated UTF-8, truncated to fit. The
+ * message is empty when the function returns MLN_STATUS_OK, or
+ * MLN_STATUS_NOT_READY from a drain with nothing queued, and describes the
+ * failure otherwise. It writes no more than size bytes of the struct. A null
+ * out_diagnostic discards the message.
  *
  * Asynchronous failures carry their diagnostic in the completion instead.
  */
@@ -157,6 +157,16 @@ typedef uint64_t mln_acquired_frame MLN_BINDING(
 typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"
   "dispose=mln_render_frame_batch_release"
+);
+/** A host-owned queue that holds deliveries until its host drains them. */
+typedef uint64_t mln_delivery_queue MLN_BINDING(
+  "kind=handle;release=mln_delivery_queue_release;"
+  "dispose=mln_delivery_queue_release"
+);
+/** An owned batch of deliveries from one drain. */
+typedef uint64_t mln_delivery_batch MLN_BINDING(
+  "kind=handle;release=mln_delivery_batch_release;"
+  "dispose=mln_delivery_batch_release"
 );
 
 /**

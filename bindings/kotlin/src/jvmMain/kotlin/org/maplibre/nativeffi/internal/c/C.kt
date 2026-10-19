@@ -48,6 +48,10 @@ internal actual object C {
       "mln_custom_mvt_vector_source_options_default",
       mln_custom_mvt_vector_source_options,
     )
+  private val mln_delivery_batch_release =
+    Ffm.downcall("mln_delivery_batch_release", null, JAVA_LONG)
+  private val mln_delivery_queue_release =
+    Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
   private val mln_event_batch_get =
     Ffm.downcall("mln_event_batch_get", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_event_batch_release = Ffm.downcall("mln_event_batch_release", null, JAVA_LONG)
@@ -1649,6 +1653,14 @@ internal actual object C {
     mln_custom_mvt_vector_source_options_default.invokeExact(
       Ffm.into(returned, mln_custom_mvt_vector_source_options),
     ) as MemorySegment
+  }
+
+  actual fun mln_delivery_batch_release(batch: Long) {
+    mln_delivery_batch_release.invoke(batch)
+  }
+
+  actual fun mln_delivery_queue_release(queue: Long) {
+    mln_delivery_queue_release.invoke(queue)
   }
 
   actual fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =

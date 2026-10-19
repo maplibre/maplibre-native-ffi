@@ -72,28 +72,42 @@ typedef void (*mln_completion_callback)(
 );
 
 /**
- * Callback state for one asynchronous submission.
+ * Callback or queue state for one asynchronous submission.
  *
- * The struct itself is borrowed for the submission call. MLN_STATUS_OK
- * transfers callback, user_data, and release_user_data to the C API. The
- * completion runs exactly once and may run before the submission returns. The
- * release callback runs after the completion returns. A non-OK submission
- * invokes neither callback and leaves user_data owned by the caller.
+ * The struct itself is borrowed for the submission call. Exactly one of
+ * callback and queue is set. MLN_STATUS_OK transfers callback, user_data, and
+ * release_user_data to the C API. The completion runs exactly once and may run
+ * before the submission returns. The release callback runs after the
+ * completion returns. A non-OK submission invokes neither callback and leaves
+ * user_data owned by the caller.
  *
  * The completion thread is unspecified and may be the submitting thread. It
  * can differ from the thread that ran the command. The completion may call
  * any-thread C APIs, but must return promptly and must not wait for runtime or
  * graphics-driver work that can only progress on its current thread.
+ *
+ * In queue mode, no callback runs. The terminal result reaches queue exactly
+ * once as an MLN_DELIVERY_TYPE_COMPLETION delivery, unless the host releases
+ * the queue before the result arrives, which discards it. See delivery.h.
  */
 typedef struct mln_completion {
   uint32_t size;
+  /** Required in callback mode; null in queue mode. */
   mln_completion_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the completing thread after the completion
-   * returns.
+   * returns. Null in queue mode.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Queue delivery: the terminal result is copied into one
+   * MLN_DELIVERY_TYPE_COMPLETION delivery carrying user_data, and no callback
+   * runs. Requires callback and release_user_data null. The delivery may be
+   * queued before the submission returns. A rejected submission queues nothing
+   * and needs no cleanup.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_completion MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

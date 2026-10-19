@@ -207,6 +207,7 @@ class Values:
                 "context",
                 "stride",
                 "arena",
+                "delivery_queue",
             }
         }
         if value.native in self.item_buffers:

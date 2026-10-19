@@ -88,6 +88,10 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
+  @JvmStatic actual external fun mln_delivery_batch_release(batch: Long): Unit
+
+  @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
+
   @JvmStatic
   actual external fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
 

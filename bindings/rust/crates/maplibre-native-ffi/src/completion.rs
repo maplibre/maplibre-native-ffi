@@ -196,6 +196,7 @@ where
         callback: Some(complete::<T>),
         user_data: bridge.cast(),
         release_user_data: Some(release::<T>),
+        queue: sys::mln_delivery_queue(0),
     };
     if let Err(error) = core::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions invoke neither callback and retain no pointer.

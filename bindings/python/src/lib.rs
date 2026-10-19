@@ -376,6 +376,7 @@ fn retire_owners_at_exit(py: Python<'_>) {
                 callback: Some(complete_exit_release),
                 user_data: Arc::into_raw(Arc::clone(&release)).cast_mut().cast(),
                 release_user_data: Some(release_exit_release),
+                queue: sys::mln_delivery_queue(0),
             };
             let status = owner.release_at_exit(raw, &completion);
             if status == sys::MLN_STATUS_OK {
@@ -525,6 +526,7 @@ where
         callback: Some(complete_python_future),
         user_data: bridge.cast(),
         release_user_data: Some(release_python_future),
+        queue: sys::mln_delivery_queue(0),
     };
     if let Err(error) = maplibre_core::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions retain no callback state.

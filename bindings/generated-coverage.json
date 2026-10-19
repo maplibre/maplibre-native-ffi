@@ -318,10 +318,11 @@
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc",
     "src/completion/completion_result_generated.inc",
+    "src/delivery/capture_generated.inc",
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 285,
+  "function_count": 291,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -2464,7 +2465,7 @@
       "unsupported": {}
     }
   },
-  "public_function_count": 254,
+  "public_function_count": 260,
   "runtime_exports": [
     "mln_adapter_arena_adopt_handle",
     "mln_adapter_arena_adopt_release",
@@ -2518,6 +2519,12 @@
       "mln_custom_mvt_vector_source_options_default": {
         "default": "mln_custom_mvt_vector_source_options"
       },
+      "mln_delivery_batch_get": { "delivery": "runtime delivery protocol" },
+      "mln_delivery_batch_release": { "delivery": "runtime delivery protocol" },
+      "mln_delivery_batch_take": { "delivery": "runtime delivery protocol" },
+      "mln_delivery_queue_create": { "delivery": "runtime delivery protocol" },
+      "mln_delivery_queue_drain": { "delivery": "runtime delivery protocol" },
+      "mln_delivery_queue_release": { "delivery": "runtime delivery protocol" },
       "mln_frame_demand_default": { "default": "mln_frame_demand" },
       "mln_free_camera_options_default": {
         "default": "mln_free_camera_options"

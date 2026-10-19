@@ -79,14 +79,14 @@ internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
   allocate(16, 8).also { putProjectedMeters(it, value) }
 
 internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
-  writeU32(target, w(16, 32).toUInt())
+  writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
-  allocate(w(16, 32), w(4, 8)).also { putLogHandler(it, value) }
+  allocate(w(24, 40), 8).also { putLogHandler(it, value) }
 
 internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
   writeU32(target, value.width)
@@ -954,14 +954,14 @@ internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Lo
   allocate(w(16, 32), w(4, 8)).also { putHttpHeaderTransform(it, value) }
 
 internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
-  writeU32(target, w(16, 32).toUInt())
+  writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
-  allocate(w(16, 32), w(4, 8)).also { putResourceProvider(it, value) }
+  allocate(w(24, 40), 8).also { putResourceProvider(it, value) }
 
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(16, 32).toUInt())

@@ -5,6 +5,10 @@ namespace Maplibre.NativeFfi.Internal.C;
 
 internal readonly record struct MlnAcquiredFrame(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnDeliveryBatch(ulong Value) : IMlnHandle;
+
+internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
+
 internal readonly record struct MlnEventBatch(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;
@@ -130,6 +134,7 @@ internal unsafe struct mln_completion
     public delegate* unmanaged[Cdecl]<void*, mln_completion_result*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_completion_result
@@ -171,6 +176,41 @@ internal unsafe struct mln_custom_mvt_vector_source_options
     public double min_zoom;
     public double max_zoom;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
+internal unsafe struct mln_delivery
+{
+    public uint type;
+    public uint reserved;
+    public void* user_data;
+    public mln_delivery_payload payload;
+}
+
+internal unsafe struct mln_delivery_batch_view
+{
+    public uint size;
+    public uint delivery_size;
+    public mln_delivery* deliveries;
+    public nuint delivery_count;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_delivery_payload
+{
+    [FieldOffset(0)]
+    public mln_completion_result completion;
+
+    [FieldOffset(0)]
+    public mln_log_delivery log_record;
+
+    [FieldOffset(0)]
+    public mln_resource_request_delivery resource_request;
+}
+
+internal unsafe struct mln_delivery_queue_options
+{
+    public uint size;
+    public mln_wake wake;
 }
 
 internal unsafe struct mln_diagnostic
@@ -309,12 +349,21 @@ internal unsafe struct mln_lat_lng_bounds
     public mln_lat_lng northeast;
 }
 
+internal unsafe struct mln_log_delivery
+{
+    public uint severity;
+    public uint @event;
+    public long code;
+    public sbyte* message;
+}
+
 internal unsafe struct mln_log_handler
 {
     public uint size;
     public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_logical_extent
@@ -713,6 +762,7 @@ internal unsafe struct mln_resource_provider
         uint> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_resource_range
@@ -746,6 +796,12 @@ internal unsafe struct mln_resource_request_cancel_handler
     public delegate* unmanaged[Cdecl]<void*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
+internal unsafe struct mln_resource_request_delivery
+{
+    public mln_resource_request* request;
+    public MlnResourceRequest handle;
 }
 
 internal unsafe struct mln_resource_response

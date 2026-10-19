@@ -2458,7 +2458,7 @@ final class ProjectedMeters extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 
-/// Process-global log callback state.
+/// Process-global log callback or queue state.
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -4627,6 +4627,10 @@ final class AdapterRoutedResourceProvider extends _Value {
   List<Object?> get _members => [routes, callback];
 }
 
+/// Resource provider state.
+///
+/// See `mln_resource_provider` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 sealed class ResourceProvider {
   const ResourceProvider._();
   const factory ResourceProvider.empty() = ResourceProviderEmpty;

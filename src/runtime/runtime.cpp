@@ -39,6 +39,7 @@
 
 #include "completion/completion.hpp"
 #include "completion/completion_result.hpp"
+#include "delivery/delivery_queue.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/worker_thread.hpp"
@@ -1143,7 +1144,13 @@ auto submit_resource_configuration_command(
 ) -> mln_status {
   const auto status = validate_completion(descriptor);
   if (status != MLN_STATUS_OK) return status;
-  auto completion = std::make_shared<Completion>(*descriptor);
+  auto completion = std::shared_ptr<Completion>{};
+  if (
+    const auto accepted = accept_completion(descriptor, completion);
+    accepted != MLN_STATUS_OK
+  ) {
+    return accepted;
+  }
   return submit_runtime_command(
     runtime,
     [completion,
@@ -1164,8 +1171,12 @@ auto set_resource_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
   if (transform == nullptr) {
     set_thread_error("resource transform must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1245,8 +1256,12 @@ auto clear_resource_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
 
   const auto state = live->resource_transform_state;
   return submit_resource_configuration_command<
@@ -1263,8 +1278,12 @@ auto set_http_header_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
   if (transform == nullptr) {
     set_thread_error("HTTP header transform must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1530,8 +1549,12 @@ auto clear_http_header_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
 
   const auto state = live->http_header_transform_state;
   return submit_resource_configuration_command<
@@ -1565,7 +1588,7 @@ auto present_regions(
     auto value =
       std::any_cast<std::vector<OfflineRegionData>>(std::move(result));
     completion->resolve([value =
-                           std::move(value)](const mln_completion& descriptor) {
+                           std::move(value)](const CompletionSink& descriptor) {
       auto info = std::vector<mln_offline_region_info>(value.size());
       for (size_t index = 0; index < value.size(); ++index) {
         if (fill_region_info(value[index], &info[index]) != MLN_STATUS_OK) {
@@ -1583,7 +1606,7 @@ auto present_regions(
       value =
         std::any_cast<std::optional<OfflineRegionData>>(std::move(result));
       if (!value) {
-        completion->resolve([](const mln_completion& descriptor) {
+        completion->resolve([](const CompletionSink& descriptor) {
           Value::deliver_absent(descriptor);
         });
         return;
@@ -1592,7 +1615,7 @@ auto present_regions(
       value = std::any_cast<OfflineRegionData>(std::move(result));
     }
     completion->resolve(
-      [value = std::move(*value)](const mln_completion& descriptor) {
+      [value = std::move(*value)](const CompletionSink& descriptor) {
         auto info = mln_offline_region_info{};
         if (fill_region_info(value, &info) != MLN_STATUS_OK) {
           deliver_failure(
@@ -1646,7 +1669,13 @@ auto submit_offline_operation(
 ) -> mln_status {
   const auto validation = validate_completion(descriptor);
   if (validation != MLN_STATUS_OK) return validation;
-  auto completion = std::make_shared<Completion>(*descriptor);
+  auto completion = std::shared_ptr<Completion>{};
+  if (
+    const auto accepted = accept_completion(descriptor, completion);
+    accepted != MLN_STATUS_OK
+  ) {
+    return accepted;
+  }
   auto state = std::make_shared<OperationObject>(
     offline_operation_result_callback(completion, present)
   );
@@ -2327,14 +2356,80 @@ auto offline_region_delete_start(
   );
 }
 
+namespace {
+
+// The registration of a provider in queue mode. Native code answers each
+// request and queues a copy for the host.
+struct QueuedProvider {
+  std::shared_ptr<mln::delivery::DeliveryQueueState> queue;
+  void* host_user_data = nullptr;
+  // Pushed after the registration's last request, where callback mode runs
+  // release_user_data.
+  mln::delivery::ItemPtr retired;
+};
+
+auto discard_queued_request(mln::delivery::DeliveryItem& item) noexcept
+  -> void {
+  mln::delivery::discard_mln_resource_request_delivery(
+    item.view.payload.resource_request
+  );
+}
+
+auto queued_provider_callback(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) noexcept -> uint32_t {
+  auto& provider = *static_cast<QueuedProvider*>(user_data);
+  const auto arguments = mln_resource_request_delivery{
+    .request = request,
+    .handle = handle,
+  };
+  try {
+    auto item = mln::delivery::make_item(
+      MLN_DELIVERY_TYPE_RESOURCE_REQUEST, provider.host_user_data,
+      [&](auto& arena, mln_delivery_payload& payload) {
+        payload.resource_request =
+          mln::delivery::capture_mln_resource_request_delivery(
+            arena, arguments
+          );
+      }
+    );
+    item->discard = &discard_queued_request;
+    if (provider.queue->push(item)) {
+      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    }
+    // The refused item still owns nothing: the handle stays with this call,
+    // which passes the request through.
+    item->discard = nullptr;
+  } catch (...) {
+  }
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+auto release_queued_provider(void* user_data) noexcept -> void {
+  const auto provider =
+    std::unique_ptr<QueuedProvider>{static_cast<QueuedProvider*>(user_data)};
+  if (process_exiting()) {
+    mln::delivery::forget_item(std::move(provider->retired));
+    return;
+  }
+  static_cast<void>(provider->queue->push(provider->retired));
+}
+
+}  // namespace
+
 auto set_resource_provider(
   mln_runtime runtime, const mln_resource_provider* provider,
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
   if (provider == nullptr) {
     set_thread_error("provider must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2343,18 +2438,46 @@ auto set_resource_provider(
     set_thread_error("mln_resource_provider.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (provider->callback == nullptr) {
-    set_thread_error("provider callback must not be null");
+  const auto queued = provider->queue != MLN_HANDLE_NULL;
+  if ((provider->callback == nullptr) == !queued) {
+    set_thread_error(
+      "provider requires exactly one of a callback and a delivery queue"
+    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto context = std::make_shared<RuntimeCallbackContext>(
-    provider->user_data, provider->release_user_data
-  );
+  auto queued_provider = std::unique_ptr<QueuedProvider>{};
+  if (queued) {
+    if (provider->release_user_data != nullptr) {
+      set_thread_error("a queue provider must not carry release_user_data");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto queue = mln::delivery::resolve_delivery_queue(provider->queue);
+    if (queue == nullptr) return recorded_handle_fault_status();
+    queued_provider = std::make_unique<QueuedProvider>(QueuedProvider{
+      .queue = std::move(queue),
+      .host_user_data = provider->user_data,
+      .retired = mln::delivery::make_light_item(
+        MLN_DELIVERY_TYPE_RETIRED, provider->user_data
+      ),
+    });
+  }
+
+  const auto context = queued_provider != nullptr
+                         ? std::make_shared<RuntimeCallbackContext>(
+                             queued_provider.get(), &release_queued_provider
+                           )
+                         : std::make_shared<RuntimeCallbackContext>(
+                             provider->user_data, provider->release_user_data
+                           );
   const auto copied = ResourceProvider{
-    .callback = provider->callback,
+    .callback = queued_provider != nullptr ? &queued_provider_callback
+                                           : provider->callback,
     .context = context,
   };
+  // The context owns the queued registration from here; a rejected command
+  // returns it below.
+  auto* const queued_state = queued_provider.release();
   context->transfer_to_runtime();
   const auto state = live->resource_provider_state;
   const auto status =
@@ -2363,7 +2486,11 @@ auto set_resource_provider(
         replace_registration(*state, &ResourceProviderState::provider, copied);
       }
     );
-  if (status != MLN_STATUS_OK) context->return_to_caller();
+  if (status != MLN_STATUS_OK) {
+    context->return_to_caller();
+    // A rejected registration queues no retirement.
+    delete queued_state;
+  }
   return status;
 }
 
@@ -2372,8 +2499,12 @@ auto clear_resource_provider(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (validate_completion(completion) != MLN_STATUS_OK)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (
+    const auto completion_status = validate_completion(completion);
+    completion_status != MLN_STATUS_OK
+  ) {
+    return completion_status;
+  }
 
   const auto state = live->resource_provider_state;
   return submit_resource_configuration_command<
@@ -2427,7 +2558,13 @@ auto runtime_barrier_start(
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto completion_state = std::make_shared<Completion>(*completion);
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto accepted = accept_completion(completion, completion_state);
+    accepted != MLN_STATUS_OK
+  ) {
+    return accepted;
+  }
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
       valueless_completion<&mln_runtime_barrier>().complete(
@@ -2567,11 +2704,11 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
   auto release_completion = std::shared_ptr<Completion>{};
-  try {
-    release_completion = std::make_shared<Completion>(*completion);
-  } catch (...) {
-    set_thread_error("runtime release could not allocate its completion");
-    return MLN_STATUS_NATIVE_ERROR;
+  if (
+    const auto accepted = accept_completion(completion, release_completion);
+    accepted != MLN_STATUS_OK
+  ) {
+    return accepted;
   }
   {
     const std::scoped_lock commit_lock(live->submission_mutex);

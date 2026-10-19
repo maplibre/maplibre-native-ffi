@@ -903,14 +903,15 @@ typedef struct mln_resource_response {
  *   handle.
  * - The C API invokes release_user_data after the final callback returns.
  *
- * A deferring adapter answers MLN_RESOURCE_PROVIDER_DECISION_HANDLE at once for
- * a host that cannot run code on this thread, and delivers a copy of the
- * request with the handle for the host to complete later.
+ * A provider in queue mode answers MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+ * without a callback and queues a copy of the request with its handle as an
+ * mln_resource_request_delivery, for the host to complete later.
  */
 MLN_BINDING(
   "enum=mln_resource_provider_decision;"
   "failure=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
   "deferred=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
+  "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST;"
   "decision_handle=handle;"
   "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
   "decision_pass=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
@@ -975,14 +976,21 @@ typedef struct mln_resource_request_cancel_handler {
   "kind=callback_registration;release=release_user_data"
 );
 
+/**
+ * Resource provider state.
+ *
+ * The struct itself is borrowed for the registering call. Exactly one of
+ * callback and queue is set.
+ */
 typedef struct mln_resource_provider {
   uint32_t size;
+  /** Required in callback mode; null in queue mode. */
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data exactly once for each accepted registration,
    * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned.
+   * and every in-flight callback has returned. Null in queue mode.
    *
    * It may run on a runtime, worker, network, or closing thread, and never runs
    * for a rejected registration. Another thread may retire an accepted
@@ -991,6 +999,17 @@ typedef struct mln_resource_provider {
    * when the registration is rejected.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Queue delivery: native code answers each request
+   * MLN_RESOURCE_PROVIDER_DECISION_HANDLE and queues a copy of the request
+   * with its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
+   * user_data. A request the queue refuses, because the queue was released or
+   * the copy could not be allocated, passes through to native loading. After
+   * replacement, clear, or runtime teardown retires the registration, the
+   * queue receives one MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data,
+   * after the registration's last request delivery.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_provider MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -1047,12 +1066,17 @@ MLN_API mln_status mln_runtime_create(
  * A URL with an unrecognized scheme, such as jar:file:, reaches this callback
  * and completes as an HTTP error when the provider passes it through.
  *
+ * In queue mode, no host code runs on the requesting thread: each request
+ * reaches the provider's queue, and the host completes it after draining.
+ *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, provider is
- *   null, provider->size is too small, callback is null, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
+ *   null, provider->size is too small, neither or both of callback and queue
+ *   are set, release_user_data is set in queue mode, queue is an invalid
+ *   handle, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
+ *   runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_BINDING("execution=operation")

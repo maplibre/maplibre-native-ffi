@@ -258,7 +258,16 @@ class Values:
             f.name
             for f in value.fields
             if f.role
-            in {"size", "reserved", "presence_mask", "count", "tag", "stride", "arena"}
+            in {
+                "size",
+                "reserved",
+                "presence_mask",
+                "count",
+                "tag",
+                "stride",
+                "arena",
+                "delivery_queue",
+            }
         }
         controls |= {
             f.presence.mask for f in value.fields if f.presence and f.presence.mask

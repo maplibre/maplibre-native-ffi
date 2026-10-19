@@ -2311,11 +2311,13 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 	return raw
 }
 
-// LogHandler corresponds to mln_log_handler. Process-global log callback state.
+// LogHandler corresponds to mln_log_handler. Process-global log callback or
+// queue state.
 //
 // See mln_log_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 type LogHandler struct {
+	// Required in callback mode; null in queue mode.
 	Callback func(LogSeverity, LogEvent, int64, string) uint32
 }
 
@@ -3681,7 +3683,13 @@ func copyRenderingStats(raw C.mln_rendering_stats) RenderingStats {
 	return result
 }
 
+// ResourceProvider corresponds to mln_resource_provider. Resource provider
+// state.
+//
+// See mln_resource_provider in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceProvider struct {
+	// Required in callback mode; null in queue mode.
 	Callback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 }
 
@@ -5761,6 +5769,41 @@ func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
 
 // owner returns the handle's owner state, or nil for a nil handle.
 func (handle *AcquiredFrameHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+type DeliveryBatchHandle struct{ *bindingOwner }
+
+func adoptDeliveryBatchHandle(raw uint64, parent any) *DeliveryBatchHandle {
+	owner := &DeliveryBatchHandle{bindingAdopt(raw, parent, "DeliveryBatchHandle", func(raw uint64) { C.mln_delivery_batch_release(C.mln_delivery_batch(raw)) })}
+	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *DeliveryBatchHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// DeliveryQueueHandle corresponds to mln_delivery_queue. A host-owned queue
+// that holds deliveries until its host drains them.
+//
+// See mln_delivery_queue in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type DeliveryQueueHandle struct{ *bindingOwner }
+
+func adoptDeliveryQueueHandle(raw uint64, parent any) *DeliveryQueueHandle {
+	owner := &DeliveryQueueHandle{bindingAdopt(raw, parent, "DeliveryQueueHandle", func(raw uint64) { C.mln_delivery_queue_release(C.mln_delivery_queue(raw)) })}
+	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *DeliveryQueueHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
 	}

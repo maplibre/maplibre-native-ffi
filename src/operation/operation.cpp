@@ -61,10 +61,9 @@ auto create_completion_operation(
   const mln_completion* descriptor, CompletionOperation::Delivery deliver,
   CompletionOperation& out
 ) -> mln_status {
-  const auto status = validate_completion(descriptor);
+  const auto status = accept_completion(descriptor, out.completion);
   if (status != MLN_STATUS_OK) return status;
   try {
-    out.completion = std::make_shared<Completion>(*descriptor);
     out.operation = std::make_shared<OperationObject>(
       [completion = out.completion, deliver = std::move(deliver)](
         mln_status completion_status, std::string diagnostic, std::any result

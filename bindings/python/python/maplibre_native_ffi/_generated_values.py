@@ -1980,7 +1980,7 @@ class LatLngBounds:
 
 @dataclass(frozen=True, slots=True)
 class LogHandler:
-    """Process-global log callback state.
+    """Process-global log callback or queue state.
 
     See `mln_log_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -3304,6 +3304,12 @@ class RenderingStats:
 
 @dataclass(frozen=True, slots=True)
 class ResourceProvider:
+    """Resource provider state.
+
+    See `mln_resource_provider` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     callback: (
         Callable[[ResourceRequest, ResourceRequestHandle], ResourceProviderDecision]
         | None

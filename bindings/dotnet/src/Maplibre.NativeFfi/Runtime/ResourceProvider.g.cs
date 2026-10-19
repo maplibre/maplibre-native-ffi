@@ -2,6 +2,16 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Resource provider state.
+/// </summary>
+/// <remarks>
+/// See <c>mln_resource_provider</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// </remarks>
+/// <param name="Callback">
+/// Required in callback mode; null in queue mode.
+/// </param>
 public readonly partial record struct ResourceProvider(
     Func<ResourceRequest, ResourceRequestHandle, ResourceProviderDecision>? Callback
 );

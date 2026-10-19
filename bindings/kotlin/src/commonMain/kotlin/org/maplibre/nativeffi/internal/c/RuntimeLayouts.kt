@@ -4,11 +4,12 @@ package org.maplibre.nativeffi.internal.c
 import org.maplibre.nativeffi.internal.memory.w
 
 internal object CompletionLayout {
-  val SIZEOF: Int = w(16, 32)
+  val SIZEOF: Int = w(24, 40)
   val SIZE: Int = 0
   val CALLBACK: Int = w(4, 8)
   val USER_DATA: Int = w(8, 16)
   val RELEASE_USER_DATA: Int = w(12, 24)
+  val QUEUE: Int = w(16, 32)
 }
 
 internal object CompletionResultLayout {

@@ -55,6 +55,13 @@ auto descriptor_for(CompletionProbe& probe) -> mln_completion {
   };
 }
 
+auto accepted(const mln_completion& descriptor)
+  -> std::shared_ptr<mln::core::Completion> {
+  auto completion = std::shared_ptr<mln::core::Completion>{};
+  MLN_TEST_OK(mln::core::accept_completion(&descriptor, completion));
+  return completion;
+}
+
 // Resolves completion with a success that carries no value, as the runtime
 // barrier's does.
 void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
@@ -65,13 +72,12 @@ void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
 // runs, then delivers it exactly once and releases the user data after.
 void inline_resolution_waits_for_acceptance() {
   auto probe = CompletionProbe{};
-  auto completion =
-    std::make_shared<mln::core::Completion>(descriptor_for(probe));
+  auto completion = accepted(descriptor_for(probe));
   succeed(completion);
   TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
 
   completion->accept();
-  completion->resolve([](const mln_completion&) {});
+  completion->resolve([](const mln::core::CompletionSink&) {});
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
   TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
   TEST_ASSERT_EQUAL_INT(2, probe.phase.load());
@@ -83,8 +89,7 @@ void inline_resolution_waits_for_acceptance() {
 void rejection_leaves_the_user_data() {
   auto probe = CompletionProbe{};
   {
-    auto completion =
-      std::make_shared<mln::core::Completion>(descriptor_for(probe));
+    auto completion = accepted(descriptor_for(probe));
     completion->reject();
   }
   TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
@@ -96,8 +101,7 @@ void rejection_leaves_the_user_data() {
 void abandonment_reports_cancelled() {
   auto probe = CompletionProbe{};
   {
-    auto completion =
-      std::make_shared<mln::core::Completion>(descriptor_for(probe));
+    auto completion = accepted(descriptor_for(probe));
     completion->accept();
   }
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
@@ -110,8 +114,7 @@ void abandonment_reports_cancelled() {
 void acceptance_and_resolution_race_once() {
   for (auto iteration = 0; iteration < 100; ++iteration) {
     auto probe = CompletionProbe{};
-    auto completion =
-      std::make_shared<mln::core::Completion>(descriptor_for(probe));
+    auto completion = accepted(descriptor_for(probe));
     auto accept = std::thread{[completion]() { completion->accept(); }};
     auto resolve = std::thread{[completion]() { succeed(completion); }};
     accept.join();

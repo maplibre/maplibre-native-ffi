@@ -81,7 +81,7 @@ auto complete_feature_list(
     features.push_back(queried_feature_view(record));
   }
   completion->resolve([list = std::move(*list), features = std::move(features)](
-                        const mln_completion& descriptor
+                        const CompletionSink& descriptor
                       ) {
     static_cast<void>(list);
     CompletionValue<Function>::deliver(descriptor, features);
@@ -103,7 +103,7 @@ auto complete_query_buffer(
     return;
   }
   completion->resolve([bytes =
-                         std::move(*bytes)](const mln_completion& descriptor) {
+                         std::move(*bytes)](const CompletionSink& descriptor) {
     CompletionValue<Function>::deliver(
       descriptor, {.data = bytes.data(), .size = bytes.size()}
     );

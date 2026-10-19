@@ -4041,12 +4041,13 @@ internal constructor(
 )
 
 /**
- * Process-global log callback state.
+ * Process-global log callback or queue state.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogHandler(
+  /** Required in callback mode; null in queue mode. */
   public val callback: LogCallback,
 )
 
@@ -4136,7 +4137,14 @@ public data class HttpHeaderTransform(
 public typealias HttpHeaderTransformCallback =
   (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
 
+/**
+ * Resource provider state.
+ *
+ * See `mln_resource_provider` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class ResourceProvider(
+  /** Required in callback mode; null in queue mode. */
   public val callback: ResourceProviderCallback,
 )
 

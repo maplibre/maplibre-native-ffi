@@ -18,6 +18,9 @@ from .protocol import (
     BUFFER_VIEW,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
+    DELIVERY_BATCH,
+    DELIVERY_PAYLOAD,
+    DELIVERY_QUEUE,
     STATUS,
     is_completion,
     is_status,
@@ -104,6 +107,8 @@ class RegistrationDescriptorPlan:
     # Whether a callback has no owner parameter and calls back only into the
     # receiver of the call that registers it, which the binding records.
     receiver_owned: bool = False
+    # The member that names a delivery queue in place of the callback, or None.
+    queue: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,7 +166,8 @@ class ValuePlan:
 
 # Field roles that hold control state: a struct's size, reserved space, an
 # array's count or stride, an item arena, a presence mask, a union tag, a
-# callback context, and a registration's release callback.
+# callback context, a registration's release callback, and a registration's
+# delivery queue, which a binding runtime sets in place of the callback.
 CONTROL_ROLES = frozenset(
     {
         "size",
@@ -173,6 +179,7 @@ CONTROL_ROLES = frozenset(
         "tag",
         "context",
         "release",
+        "delivery_queue",
     }
 )
 
@@ -229,6 +236,20 @@ class CallbackReentryPlan:
 
 
 @dataclass(frozen=True)
+class DeliveryPlan:
+    """How a queue carries a copy of one callback's arguments.
+
+    `constant` is the mln_delivery_type value, `payload_member` the
+    mln_delivery_payload member that holds the copy, and `record` the record
+    whose fields mirror the callback's arguments other than its context.
+    """
+
+    constant: str
+    payload_member: str
+    record: str
+
+
+@dataclass(frozen=True)
 class CallbackPlan:
     native: str
     parameters: tuple[ParameterPlan, ...]
@@ -242,6 +263,8 @@ class CallbackPlan:
     # copy of the call later.
     deferred: str | None = None
     status: bool = False
+    # How a delivery queue carries the call, for a registration in queue mode.
+    delivery: DeliveryPlan | None = None
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
     # deliver it later, even when it returns nothing.
@@ -260,6 +283,8 @@ class RegistrationPlan:
     # nothing, so the caller still owns the registration; or None when
     # success always transfers it.
     accepted_unless: str | None = None
+    # The descriptor member that names a delivery queue, or None.
+    queue: str | None = None
 
 
 @dataclass(frozen=True)
@@ -300,6 +325,17 @@ class ViewSupport:
 
 
 @dataclass(frozen=True)
+class DeliverySupport:
+    """The operation belongs to the queue delivery protocol.
+
+    A binding runtime creates, drains, and releases delivery queues itself, so
+    the operation is a runtime export with no public member.
+    """
+
+    handle: str
+
+
+@dataclass(frozen=True)
 class AbsencePlan:
     """A failure status that reports the operation's one output as absent.
 
@@ -322,7 +358,9 @@ class OperationPlan:
     result: ValuePlan | None
     registrations: tuple[RegistrationPlan, ...] = ()
     consumes: str | None = None
-    support: DefaultSupport | DisposeSupport | ViewSupport | None = None
+    support: DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None = (
+        None
+    )
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     view: BorrowedViewPlan | None = None
@@ -482,6 +520,8 @@ class BoundApi:
 
 def support_relation(plan: OperationPlan) -> dict[str, str] | None:
     """The support relation of an operation, as coverage reports record it."""
+    if isinstance(plan.support, DeliverySupport):
+        return {"delivery": "runtime delivery protocol"}
     if isinstance(plan.support, DefaultSupport):
         return {"default": plan.support.value}
     if isinstance(plan.support, DisposeSupport):
@@ -917,6 +957,14 @@ class Binder:
                             if member.value.kind == "callback"
                             and member.name != record_metadata["release"]
                         ),
+                        next(
+                            (
+                                member.name
+                                for member in fields
+                                if member.role == "delivery_queue"
+                            ),
+                            None,
+                        ),
                     )
                     if record_metadata.get("kind") == "callback_registration"
                     else None,
@@ -1096,6 +1144,7 @@ class Binder:
                                 registration.release,
                                 path,
                                 function.metadata.get("accepted_unless"),
+                                registration.queue,
                             )
                         )
                         validate_owned_reentry(descriptor)
@@ -1144,7 +1193,14 @@ class Binder:
                 function.return_type
             ):
                 result = self.value(function.return_type, metadata, context + " return")
-        support: DefaultSupport | DisposeSupport | ViewSupport | None = None
+        support: (
+            DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None
+        ) = None
+        for parameter in function.parameters:
+            delivery_handle = type_name(parameter.type.pointee or parameter.type)
+            if delivery_handle in {DELIVERY_QUEUE, DELIVERY_BATCH}:
+                support = DeliverySupport(delivery_handle)
+                break
         for name, typedef in self.typedefs.items():
             if typedef.metadata.get("default") == function.name:
                 support = DefaultSupport(name)
@@ -1313,9 +1369,10 @@ class Binder:
             )
         # A runtime export's caller reads its outputs itself, so only a
         # generated operation and a default copy what native writes.
-        if function.name not in self.api.runtime_exports or isinstance(
-            support, DefaultSupport
-        ):
+        if (
+            function.name not in self.api.runtime_exports
+            and not isinstance(support, DeliverySupport)
+        ) or isinstance(support, DefaultSupport):
             self.returned |= self.copied(
                 (
                     *outputs,
@@ -1503,8 +1560,22 @@ class Binder:
             self.callback_reentry(typedef),
             typedef.metadata.get("deferred"),
             is_status(function.result),
-            typedef.metadata.get("synchronous") == "true",
+            synchronous=typedef.metadata.get("synchronous") == "true",
+            delivery=self.delivery(typedef),
         )
+
+    def delivery(self, typedef) -> DeliveryPlan | None:
+        """The queue delivery that a callback's `delivery=` names."""
+        constant = typedef.metadata.get("delivery")
+        if constant is None:
+            return None
+        payload = self.api.records_by_name[DELIVERY_PAYLOAD]
+        member = next(
+            field
+            for field in payload.fields
+            if field.metadata.get("variant") == constant
+        )
+        return DeliveryPlan(constant, member.name, type_name(member.type))
 
     def receiver_owned(self, name: str) -> bool:
         """Whether a protocol callback names its owner by handle type rather
@@ -1587,7 +1658,7 @@ class Binder:
                 operation
                 for operation in operations
                 if operation.name not in self.api.runtime_exports
-                and not isinstance(operation.support, ViewSupport)
+                and not isinstance(operation.support, (ViewSupport, DeliverySupport))
             ),
             self.values,
             self.callbacks,
@@ -1598,6 +1669,7 @@ class Binder:
                 operation
                 for operation in operations
                 if operation.name in self.api.runtime_exports
+                or isinstance(operation.support, DeliverySupport)
             ),
             tuple(
                 CallbackAdapterPlan(

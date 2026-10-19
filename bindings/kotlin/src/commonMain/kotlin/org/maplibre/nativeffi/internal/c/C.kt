@@ -47,6 +47,10 @@ internal expect object C {
 
   fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
+  fun mln_delivery_batch_release(batch: Long): Unit
+
+  fun mln_delivery_queue_release(queue: Long): Unit
+
   fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
 
   fun mln_event_batch_release(batch: Long): Unit

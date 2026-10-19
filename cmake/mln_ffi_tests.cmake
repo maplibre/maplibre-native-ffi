@@ -18,14 +18,16 @@ set(MLN_NATIVE_ABI_DOMAINS
     style
     render
     backend
+    delivery
     adapter
     platform
     plugin)
 
 # The browser runs the ABI suite as four pages rather than one per file, which
 # would launch Chromium once per file. Each shard names its domains.
-set(MLN_NATIVE_BROWSER_SHARDS "base,completion,runtime"
-    "resources,map,projection,style" "render,backend" "adapter,platform,plugin")
+set(MLN_NATIVE_BROWSER_SHARDS
+    "base,completion,runtime" "resources,map,projection,style" "render,backend"
+    "delivery,adapter,platform,plugin")
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.

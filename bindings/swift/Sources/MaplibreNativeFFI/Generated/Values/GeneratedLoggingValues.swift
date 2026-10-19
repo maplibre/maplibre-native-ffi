@@ -34,11 +34,12 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let timing: LogEvent = .init(rawValue: 16)
 }
 
-/// Process-global log callback state.
+/// Process-global log callback or queue state.
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
+  /// Required in callback mode; null in queue mode.
   public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
     -> UInt32)?
   public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,

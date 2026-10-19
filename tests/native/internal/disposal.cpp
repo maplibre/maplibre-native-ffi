@@ -138,7 +138,9 @@ void runtime_barriers_observe_retired_command_captures() {
   auto runtime = create_runtime();
   auto live = mln::core::lease_runtime(runtime);
   auto result = Result{};
-  auto completion = std::make_shared<mln::core::Completion>(descriptor(result));
+  const auto descriptor_value = descriptor(result);
+  auto completion = std::shared_ptr<mln::core::Completion>{};
+  MLN_TEST_OK(mln::core::accept_completion(&descriptor_value, completion));
   auto capture = std::shared_ptr<Capture>(new Capture{probe});
   MLN_TEST_OK(
     mln::core::submit_runtime_command(

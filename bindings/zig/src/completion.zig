@@ -185,6 +185,7 @@ pub fn Future(comptime T: type) type {
                 .callback = callback,
                 .user_data = state,
                 .release_user_data = releaseUserData,
+                .queue = 0,
             };
         }
     };

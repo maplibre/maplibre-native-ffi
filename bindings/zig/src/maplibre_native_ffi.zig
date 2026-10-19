@@ -1479,7 +1479,7 @@ pub const LogEvent = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Process-global log callback state.
+/// Process-global log callback or queue state.
 ///
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -3408,6 +3408,10 @@ pub const ResourcePriority = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// Resource provider state.
+///
+/// See `mln_resource_provider` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,

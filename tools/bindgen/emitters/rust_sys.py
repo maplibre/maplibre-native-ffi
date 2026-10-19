@@ -118,13 +118,15 @@ class Declarations:
         if name in self.used or name in SCALARS:
             return
         self.used.add(name)
-        if name in self.typedefs:
-            typedef = self.typedefs[name]
-            if typedef.type.kind in {"record", "enum"}:
-                self.use(typedef.type.declaration)
-            else:
-                self.typedef_target(typedef)
-        elif name in self.records:
+        typedef = self.typedefs.get(name)
+        if typedef is not None and typedef.type.kind not in {"record", "enum"}:
+            self.typedef_target(typedef)
+        elif typedef is not None and typedef.type.declaration != name:
+            self.use(typedef.type.declaration)
+        # A typedef that names its own record, as `typedef struct x {...} x`
+        # does, shares the record's name, so the record's members are visited
+        # here.
+        if name in self.records:
             record = self.records[name]
             for field in record.fields:
                 if field.bit_width is not None:

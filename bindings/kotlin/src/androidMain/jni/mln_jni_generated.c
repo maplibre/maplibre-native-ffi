@@ -165,6 +165,18 @@ static void mln_custom_mvt_vector_source_options_default_jni(
     mln_custom_mvt_vector_source_options_default();
 }
 
+static void mln_delivery_batch_release_jni(
+  JNIEnv* env, jclass type, jlong batch
+) {
+  mln_delivery_batch_release((mln_delivery_batch)batch);
+}
+
+static void mln_delivery_queue_release_jni(
+  JNIEnv* env, jclass type, jlong queue
+) {
+  mln_delivery_queue_release((mln_delivery_queue)queue);
+}
+
 static jint mln_event_batch_get_jni(
   JNIEnv* env, jclass type, jlong batch, jlong out_view, jlong out_diagnostic
 ) {
@@ -2652,6 +2664,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_custom_geometry_source_options_default_jni},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_jni},
+  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
+  {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_event_batch_get", "(JJJ)I", (void*)mln_event_batch_get_jni},
   {"mln_event_batch_release", "(J)V", (void*)mln_event_batch_release_jni},
   {"mln_frame_demand_default", "(J)V", (void*)mln_frame_demand_default_jni},

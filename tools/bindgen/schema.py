@@ -12,9 +12,12 @@ from dataclasses import replace
 from .model import Api, CType, Function, ModelError
 from .protocol import (
     BUFFER_VIEW,
+    COMPLETION,
     COMPLETION_RESULT,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
+    DELIVERY_PAYLOAD,
+    DELIVERY_QUEUE,
     NOT_READY,
     STATUS,
     is_buffer_view,
@@ -138,6 +141,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancel_registration",
         "wait_retired",
         "deferred",
+        "delivery",
         "synchronous",
         "prefix",
         "fields",
@@ -159,6 +163,7 @@ KINDS = {
             "context",
             "native_pointer",
             "erased",
+            "delivery_queue",
         }
     ),
     "record": frozenset({"callback_registration", "callback_response"}),
@@ -820,6 +825,14 @@ def validate(api: Api) -> None:
                 metadata_errors(field.metadata, FIELD_KEYS, fcontext, KINDS["field"])
             )
             errors.extend(value_metadata_errors(field.type, field.metadata, fcontext))
+            if field.metadata.get("kind") == "delivery_queue" and (
+                api.typedefs_by_name.get(record.name) is None
+                or api.typedefs_by_name[record.name].metadata.get("kind")
+                != "callback_registration"
+            ):
+                errors.append(
+                    f"{fcontext}: kind=delivery_queue requires a callback registration"
+                )
             # Native can write a value that an older binding's enum lacks.
             enum_name = field.type.canonical.removeprefix("enum ")
             if enum_name != field.type.canonical and enum_name.isidentifier():
@@ -1031,6 +1044,7 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context pointer"
                 )
+            errors.extend(delivery_queue_errors(api, typedef, record, context))
         elif "release_reentry" in typedef.metadata:
             errors.append(
                 f"{context}: release_reentry requires a callback registration"
@@ -1145,6 +1159,8 @@ def validate(api: Api) -> None:
             errors.append(f"{context}: failure requires a callback")
         if "deferred" in typedef.metadata:
             errors.extend(deferred_errors(typedef, enum_constants, context))
+        if "delivery" in typedef.metadata:
+            errors.extend(delivery_errors(api, typedef, enum_constants, context))
         if "synchronous" in typedef.metadata and (
             signature is None or signature.kind != "function"
         ):
@@ -1154,6 +1170,13 @@ def validate(api: Api) -> None:
             and "deferred" in typedef.metadata
         ):
             errors.append(f"{context}: a synchronous callback cannot be deferred")
+        if (
+            typedef.metadata.get("synchronous") == "true"
+            and "delivery" in typedef.metadata
+        ):
+            errors.append(
+                f"{context}: a synchronous callback cannot be delivered through a queue"
+            )
         decision_keys = {
             "decision_handle",
             "decision_accept",
@@ -1761,3 +1784,89 @@ def deferred_errors(typedef, enum_constants, context: str) -> list[str]:
             f"{context}: deferred decision handle {handle} requires the accept value"
         )
     return errors
+
+
+def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
+    """Check a registration's queue field.
+
+    A registration may name one delivery queue in place of its callback, and
+    native code then queues what the callback would receive. Only the protocol
+    completion and a callback that declares its delivery have such a copy.
+    """
+    if record is None:
+        return []
+    queues = [f for f in record.fields if f.metadata.get("kind") == "delivery_queue"]
+    if not queues:
+        return []
+    errors = []
+    if len(queues) > 1:
+        errors.append(f"{context}: a registration takes at most one delivery queue")
+    for field in queues:
+        if field.type.declaration != DELIVERY_QUEUE:
+            errors.append(
+                f"{context}: {field.name}: kind=delivery_queue requires {DELIVERY_QUEUE}"
+            )
+    if record.name == COMPLETION:
+        return errors
+    release = typedef.metadata.get("release")
+    for field in record.fields:
+        callback = api.typedefs_by_name.get(field.type.declaration or "")
+        signature = callback.type.pointee if callback else None
+        if (
+            field.name == release
+            or signature is None
+            or signature.kind != "function"
+            or "delivery" in callback.metadata
+        ):
+            continue
+        errors.append(
+            f"{context}: a queue registration's callback {field.name} requires delivery="
+        )
+    return errors
+
+
+def delivery_errors(api: Api, typedef, enum_constants, context: str) -> list[str]:
+    """Check that a queue can carry a copy of a callback's arguments.
+
+    `delivery=` names the mln_delivery_type constant whose payload variant
+    carries the copy. The variant's fields mirror the callback's arguments
+    other than its context, in order, by name and C type: a pointer argument
+    becomes a pointer the delivery owns, and a handle stays the same handle.
+    """
+    value = typedef.metadata["delivery"]
+    signature = typedef.type.pointee
+    if signature is None or signature.kind != "function":
+        return [f"{context}: delivery requires a callback"]
+    owner = enum_constants.get(value, (None,))[0]
+    if owner is None:
+        return [f"{context}: delivery names an unknown constant {value}"]
+    payload = api.records_by_name.get(DELIVERY_PAYLOAD)
+    variant = next(
+        (
+            field
+            for field in (payload.fields if payload else ())
+            if field.metadata.get("variant") == value
+        ),
+        None,
+    )
+    if variant is None:
+        return [f"{context}: delivery {value} names no {DELIVERY_PAYLOAD} variant"]
+    record = api.records_by_name.get(variant.type.declaration or "")
+    if record is None:
+        return [f"{context}: delivery {value} requires a record variant"]
+    parameters = [p for p in typedef.parameters if p.metadata.get("kind") != "context"]
+    mirrored = len(parameters) == len(record.fields) and all(
+        parameter.name == field.name
+        and parameter.type.canonical == field.type.canonical
+        and (
+            parameter.type.kind != "pointer"
+            or field.metadata.get("lifetime") == "owner"
+        )
+        for parameter, field in zip(parameters, record.fields, strict=False)
+    )
+    if not mirrored:
+        errors = [
+            f"{context}: delivery record {record.name} must mirror the callback's arguments"
+        ]
+        return errors
+    return []

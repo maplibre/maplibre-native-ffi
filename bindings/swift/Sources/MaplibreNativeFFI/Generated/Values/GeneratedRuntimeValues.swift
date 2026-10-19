@@ -390,7 +390,12 @@ public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
   public static let low: ResourcePriority = .init(rawValue: 1)
 }
 
+/// Resource provider state.
+///
+/// See `mln_resource_provider` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
+  /// Required in callback mode; null in queue mode.
   public var callback: (@Sendable (ResourceRequest,
                                    ResourceRequestHandle) throws
       -> ResourceProviderDecision)?

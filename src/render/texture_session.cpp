@@ -616,7 +616,7 @@ auto texture_read_premultiplied_rgba8_start(
       if (status == MLN_STATUS_OK && readback != nullptr) {
         state->resolve([bytes = std::move(readback->bytes),
                         info =
-                          readback->info](const mln_completion& descriptor) {
+                          readback->info](const CompletionSink& descriptor) {
           const auto value = mln_texture_readback_result{
             .data = {.data = bytes.data(), .size = bytes.size()},
             .info = info,

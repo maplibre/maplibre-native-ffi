@@ -60,10 +60,12 @@ typedef enum mln_log_event : uint32_t {
  * consumes the record. Returning zero lets MapLibre Native's platform logger
  * handle it.
  *
- * A deferring adapter consumes each record at once for a host that cannot run
- * code on a logging thread, and delivers a copy of the record later.
+ * A handler in queue mode consumes each record without a callback and queues
+ * a copy as an mln_log_delivery.
  */
-MLN_BINDING("failure=0;reentry=forbid;deferred=1")
+MLN_BINDING(
+  "failure=0;reentry=forbid;deferred=1;delivery=MLN_DELIVERY_TYPE_LOG_RECORD"
+)
 typedef uint32_t (*mln_log_callback)(
   void* user_data, uint32_t severity MLN_BINDING("enum=mln_log_severity"),
   uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
@@ -71,22 +73,33 @@ typedef uint32_t (*mln_log_callback)(
 );
 
 /**
- * Process-global log callback state.
+ * Process-global log callback or queue state.
  *
- * The struct itself is borrowed for mln_log_set_callback().
+ * The struct itself is borrowed for mln_log_set_callback(). Exactly one of
+ * callback and queue is set.
  */
 typedef struct mln_log_handler {
   uint32_t size;
+  /** Required in callback mode; null in queue mode. */
   mln_log_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data after the final callback returns, when the
-   * handler is replaced or cleared.
+   * handler is replaced or cleared. Null in queue mode.
    *
    * It runs on the thread that replaces or clears the handler, and must not
    * call this C API or MapLibre Native APIs.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Queue delivery: native code consumes each record and queues a
+   * copy as an MLN_DELIVERY_TYPE_LOG_RECORD delivery carrying user_data. A
+   * record the queue refuses, because the queue was released or the copy
+   * could not be allocated, goes to the platform logger instead. Replacing or
+   * clearing the handler queues one MLN_DELIVERY_TYPE_RETIRED delivery carrying
+   * user_data after the handler's final record.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data;release_reentry=forbid"
 );
@@ -105,10 +118,15 @@ typedef struct mln_log_handler {
  * must be thread-safe, return promptly, and must not call this C API or
  * MapLibre Native APIs.
  *
+ * In queue mode the handler's records reach the queue instead, and no host
+ * code runs on a logging thread.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when handler is null, handler->size is too
- *   small, or handler->callback is null.
+ *   small, neither or both of callback and queue are set, release_user_data
+ *   is set in queue mode, or queue is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_log_set_callback(
@@ -118,8 +136,8 @@ MLN_API mln_status mln_log_set_callback(
 /**
  * Clears the process-global log callback.
  *
- * The C API invokes the cleared handler's release_user_data, if any, before
- * returning.
+ * The C API invokes the cleared handler's release_user_data, if any, or queues
+ * its MLN_DELIVERY_TYPE_RETIRED delivery, before returning.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

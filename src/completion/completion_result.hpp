@@ -27,8 +27,8 @@ class ErasedCompletionValue final {
   friend class ValuelessCompletion;
 
   static auto deliver(
-    const mln_completion& descriptor, const void* value, std::size_t count,
-    std::uint32_t size
+    const CompletionSink& sink, const void* value, std::size_t count,
+    std::uint32_t size, const delivery::CompletionCapture* capture
   ) noexcept -> void;
 };
 
@@ -48,17 +48,20 @@ class CompletionValue final {
   static constexpr std::uint32_t size = sizeof(Type);
   static constexpr bool array = CompletionResult<Function>::array;
   static constexpr bool nullable = CompletionResult<Function>::nullable;
+  // How a queue copies and disposes the value. A value type without a
+  // generated capture fails to compile here.
+  static constexpr const delivery::CompletionCapture* capture =
+    &delivery::completion_capture<Type>;
 
-  static auto deliver(
-    const mln_completion& descriptor, const Type& value
-  ) noexcept -> void
+  static auto deliver(const CompletionSink& sink, const Type& value) noexcept
+    -> void
     requires(!array)
   {
-    ErasedCompletionValue::deliver(descriptor, &value, 1, size);
+    ErasedCompletionValue::deliver(sink, &value, 1, size, capture);
   }
 
   static auto deliver(
-    const mln_completion& descriptor, std::span<const Type> values
+    const CompletionSink& sink, std::span<const Type> values
   ) noexcept -> void
     requires(array)
   {
@@ -69,13 +72,13 @@ class CompletionValue final {
       static const Type empty{};
       if (data == nullptr) data = &empty;
     }
-    ErasedCompletionValue::deliver(descriptor, data, values.size(), size);
+    ErasedCompletionValue::deliver(sink, data, values.size(), size, capture);
   }
 
-  static auto deliver_absent(const mln_completion& descriptor) noexcept -> void
+  static auto deliver_absent(const CompletionSink& sink) noexcept -> void
     requires(nullable)
   {
-    ErasedCompletionValue::deliver(descriptor, nullptr, 0, 0);
+    ErasedCompletionValue::deliver(sink, nullptr, 0, 0, capture);
   }
 
   static auto complete(
@@ -83,8 +86,8 @@ class CompletionValue final {
   ) noexcept -> void
     requires(!array)
   {
-    completion->resolve([value](const mln_completion& descriptor) {
-      deliver(descriptor, value);
+    completion->resolve([value](const CompletionSink& sink) {
+      deliver(sink, value);
     });
   }
 };
@@ -101,7 +104,7 @@ constexpr auto valueless_completion() noexcept -> ValuelessCompletion;
 class ValuelessCompletion final {
  public:
   auto deliver(
-    const mln_completion& descriptor, mln_status status = MLN_STATUS_OK,
+    const CompletionSink& sink, mln_status status = MLN_STATUS_OK,
     const std::string& diagnostic = {}
   ) const noexcept -> void;
 

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,8 @@ from .model import (
     Record,
     Typedef,
 )
-from .protocol import DIAGNOSTIC
+from .names import type_name
+from .protocol import DELIVERY_BATCH, DELIVERY_QUEUE, DIAGNOSTIC
 from .schema import apply_defaults
 
 # libclang creates its enum members after class construction. Its Python
@@ -553,4 +555,91 @@ def extract_headers(
             runtime_exports=tuple(sorted(runtime - public)),
             runtime_types=tuple(sorted(runtime_types - public_types)),
         )
-    return api
+    return with_delivery_types(api)
+
+
+def delivery_functions(api: Api) -> set[str]:
+    """The functions of the queue delivery protocol: those that take or return
+    a delivery queue or batch handle."""
+    return {
+        function.name
+        for function in api.functions
+        if any(
+            type_name(parameter.type.pointee or parameter.type)
+            in {DELIVERY_QUEUE, DELIVERY_BATCH}
+            for parameter in function.parameters
+        )
+    }
+
+
+def reachable_types(api: Api, functions: Iterable[Function]) -> set[str]:
+    """The records, enums, and typedefs that the functions reach, through their
+    parameters, results, record members, callback signatures, and `enum=`."""
+    typedefs = api.typedefs_by_name
+    records = api.records_by_name
+    seen: set[str] = set()
+
+    def visit_metadata(metadata: dict[str, str]):
+        if "enum" in metadata:
+            seen.add(metadata["enum"])
+
+    def visit(type_: CType | None):
+        while type_ is not None and type_.kind in {"pointer", "array"}:
+            type_ = type_.pointee or type_.element
+        if type_ is None:
+            return
+        name = type_.declaration or ""
+        if not name or name in seen:
+            return
+        seen.add(name)
+        if name in typedefs:
+            typedef = typedefs[name]
+            visit_metadata(typedef.metadata)
+            for parameter in typedef.parameters:
+                visit(parameter.type)
+                visit_metadata(parameter.metadata)
+            signature = typedef.type.pointee
+            if signature is not None and signature.result is not None:
+                visit(signature.result)
+            visit(typedef.type)
+        if name in records:
+            for field in records[name].fields:
+                visit(field.type)
+                visit_metadata(field.metadata)
+
+    for function in functions:
+        visit(function.return_type)
+        visit_metadata(function.metadata)
+        for parameter in function.parameters:
+            visit(parameter.type)
+            visit_metadata(parameter.metadata)
+    return seen
+
+
+def with_delivery_types(api: Api) -> Api:
+    """Mark the types that only the delivery protocol reaches as runtime types.
+
+    A binding runtime drives the protocol itself, so those types, like its
+    functions, stay out of every public API.
+    """
+    delivery = delivery_functions(api)
+    if not delivery:
+        return api
+    functions = api.functions_by_name
+    internal = reachable_types(api, (functions[name] for name in delivery))
+    public = reachable_types(
+        api,
+        (
+            function
+            for function in api.functions
+            if function.name not in delivery
+            and function.name not in api.runtime_exports
+        ),
+    )
+    names = {
+        item.name for kind in (api.records, api.enums, api.typedefs) for item in kind
+    }
+    added = (internal - public) & names
+    if not added:
+        return api
+    return replace(api, runtime_types=tuple(sorted(set(api.runtime_types) | added)))
