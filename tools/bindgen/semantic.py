@@ -259,9 +259,6 @@ class CallbackPlan:
     context: str | None = None
     reentry: str = "allow"
     reentry_policy: CallbackReentryPlan | None = None
-    # The C result an adapter may return at once for a host that receives a
-    # copy of the call later.
-    deferred: str | None = None
     status: bool = False
     # How a delivery queue carries the call, for a registration in queue mode.
     delivery: DeliveryPlan | None = None
@@ -380,13 +377,6 @@ class OperationPlan:
 
 
 @dataclass(frozen=True)
-class CallbackAdapterPlan:
-    function: str
-    callback: str
-    context: str
-
-
-@dataclass(frozen=True)
 class BoundApi:
     source: Api
     operations: tuple[OperationPlan, ...]
@@ -396,7 +386,6 @@ class BoundApi:
     diagnostics: tuple[str, ...] = ()
     unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
     runtime_operations: tuple[OperationPlan, ...] = ()
-    callback_adapters: tuple[CallbackAdapterPlan, ...] = ()
     # The scope operations of borrowed views, which bindings call from the
     # views they generate instead of exposing.
     view_scopes: tuple[OperationPlan, ...] = ()
@@ -461,7 +450,7 @@ class BoundApi:
 
     @property
     def public_handles(self) -> dict[str, HandlePlan]:
-        """Handles a host can own; runtime-adapter handles stay internal."""
+        """Handles a host can own; handles of runtime operations stay internal."""
         runtime = {operation.name for operation in self.runtime_operations}
         return {
             name: handle
@@ -481,32 +470,6 @@ class BoundApi:
             for callback in self.callbacks.values()
             if callback.decision
         }
-
-    def adapter_operations(
-        self, adapter: CallbackAdapterPlan
-    ) -> tuple[OperationPlan, ...]:
-        """The operations that a callback adapter can call for its host.
-
-        A callback answers through the response records it writes, so its
-        adapter calls the operations scoped to those records.
-        """
-        callback = self.callbacks[adapter.callback]
-        responses = {
-            parameter.value.element.native
-            for parameter in callback.parameters
-            if parameter.direction in {"out", "inout"} and parameter.value.element
-        }
-        return tuple(
-            plan
-            for plan in self.operations
-            if plan.scoped_receiver
-            and next(
-                p.value.element.native
-                for p in (*plan.inputs, *plan.outputs)
-                if p.name == plan.scoped_receiver
-            )
-            in responses
-        )
 
     @property
     def defaults(self) -> dict[str, OperationPlan]:
@@ -1558,7 +1521,6 @@ class Binder:
             contexts[0] if contexts else None,
             typedef.metadata.get("reentry", "allow"),
             self.callback_reentry(typedef),
-            typedef.metadata.get("deferred"),
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
             delivery=self.delivery(typedef),
@@ -1637,19 +1599,6 @@ class Binder:
             except ModelError as error:
                 unsupported[function.name] = tuple(error.diagnostics)
                 diagnostics.extend(error.diagnostics)
-        for function in self.api.functions:
-            if "context_type" in function.metadata:
-                name = function.metadata["context_type"]
-                type_ = (
-                    self.typedefs[name].type
-                    if name in self.typedefs
-                    else CType("record", name, "struct " + name, name)
-                )
-                self.value(
-                    CType("typedef", name, type_.canonical, name),
-                    {},
-                    f"{function.location}: adapter context",
-                )
         if require_complete and diagnostics:
             raise ModelError(diagnostics)
         return BoundApi(
@@ -1670,15 +1619,6 @@ class Binder:
                 for operation in operations
                 if operation.name in self.api.runtime_exports
                 or isinstance(operation.support, DeliverySupport)
-            ),
-            tuple(
-                CallbackAdapterPlan(
-                    f.name,
-                    f.metadata["callback_adapter"],
-                    f.metadata["context_type"],
-                )
-                for f in self.api.functions
-                if "callback_adapter" in f.metadata
             ),
             tuple(
                 operation

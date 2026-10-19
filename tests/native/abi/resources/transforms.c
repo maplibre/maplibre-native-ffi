@@ -62,16 +62,23 @@ static void resource_transform_with_zero_size(void* descriptor) {
   ((mln_resource_transform*)descriptor)->size = 0;
 }
 
-static void resource_transform_without_callback(void* descriptor) {
-  ((mln_resource_transform*)descriptor)->callback = NULL;
+static const mln_resource_rewrite_rule unused_rewrite_rule = {
+  .kind = MLN_RESOURCE_KIND_ANY,
+  .url = "http://127.0.0.1/unused",
+};
+
+// A callback transform takes no rules; a rules transform has no callback.
+static void resource_transform_with_rules(void* descriptor) {
+  ((mln_resource_transform*)descriptor)->rules = &unused_rewrite_rule;
+  ((mln_resource_transform*)descriptor)->rule_count = 1;
 }
 
 static const mln_test_validation_case resource_transform_cases[] = {
   {"a well-formed transform", NULL, MLN_STATUS_OK, NULL},
   {"a zero size", resource_transform_with_zero_size,
    MLN_STATUS_INVALID_ARGUMENT, "size"},
-  {"a null callback", resource_transform_without_callback,
-   MLN_STATUS_INVALID_ARGUMENT, "callback"},
+  {"a callback with rules", resource_transform_with_rules,
+   MLN_STATUS_INVALID_ARGUMENT, "rules"},
 };
 
 static void resource_transform_registration_validates_its_descriptor(void) {
@@ -129,8 +136,14 @@ static void header_transform_with_zero_size(void* descriptor) {
   ((mln_http_header_transform*)descriptor)->size = 0;
 }
 
-static void header_transform_without_callback(void* descriptor) {
-  ((mln_http_header_transform*)descriptor)->callback = NULL;
+static const mln_http_header_rule unused_header_rule = {
+  .kind = MLN_RESOURCE_KIND_ANY,
+  .url = "http://127.0.0.1/unused",
+};
+
+static void header_transform_with_rules(void* descriptor) {
+  ((mln_http_header_transform*)descriptor)->rules = &unused_header_rule;
+  ((mln_http_header_transform*)descriptor)->rule_count = 1;
 }
 
 // A transport that cannot drop a transformed header when a redirect changes
@@ -144,8 +157,10 @@ static const mln_test_validation_case header_transform_cases[] = {
 #endif
   {"a zero size", header_transform_with_zero_size, MLN_STATUS_INVALID_ARGUMENT,
    "size"},
-  {"a null callback", header_transform_without_callback,
-   MLN_STATUS_INVALID_ARGUMENT, "callback"},
+#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+  {"a callback with rules", header_transform_with_rules,
+   MLN_STATUS_INVALID_ARGUMENT, "rules"},
+#endif
 };
 
 static void header_transform_registration_validates_its_descriptor(void) {

@@ -178,41 +178,6 @@ internal unsafe struct mln_custom_mvt_vector_source_options
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
-internal unsafe struct mln_delivery
-{
-    public uint type;
-    public uint reserved;
-    public void* user_data;
-    public mln_delivery_payload payload;
-}
-
-internal unsafe struct mln_delivery_batch_view
-{
-    public uint size;
-    public uint delivery_size;
-    public mln_delivery* deliveries;
-    public nuint delivery_count;
-}
-
-[StructLayout(LayoutKind.Explicit)]
-internal unsafe struct mln_delivery_payload
-{
-    [FieldOffset(0)]
-    public mln_completion_result completion;
-
-    [FieldOffset(0)]
-    public mln_log_delivery log_record;
-
-    [FieldOffset(0)]
-    public mln_resource_request_delivery resource_request;
-}
-
-internal unsafe struct mln_delivery_queue_options
-{
-    public uint size;
-    public mln_wake wake;
-}
-
 internal unsafe struct mln_diagnostic
 {
     public uint size;
@@ -304,6 +269,21 @@ internal unsafe struct mln_gpu_sync
     public ulong value;
 }
 
+internal unsafe struct mln_http_header
+{
+    public sbyte* name;
+    public sbyte* value;
+}
+
+internal unsafe struct mln_http_header_rule
+{
+    public uint kind;
+    public uint flags;
+    public sbyte* url;
+    public mln_http_header* headers;
+    public nuint header_count;
+}
+
 internal unsafe struct mln_http_header_transform
 {
     public uint size;
@@ -315,6 +295,8 @@ internal unsafe struct mln_http_header_transform
         mln_status> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public mln_http_header_rule* rules;
+    public nuint rule_count;
 }
 
 internal unsafe struct mln_http_header_transform_response
@@ -347,14 +329,6 @@ internal unsafe struct mln_lat_lng_bounds
 {
     public mln_lat_lng southwest;
     public mln_lat_lng northeast;
-}
-
-internal unsafe struct mln_log_delivery
-{
-    public uint severity;
-    public uint @event;
-    public long code;
-    public sbyte* message;
 }
 
 internal unsafe struct mln_log_handler
@@ -763,6 +737,8 @@ internal unsafe struct mln_resource_provider
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
+    public mln_resource_route* routes;
+    public nuint route_count;
 }
 
 internal unsafe struct mln_resource_range
@@ -798,12 +774,6 @@ internal unsafe struct mln_resource_request_cancel_handler
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
-internal unsafe struct mln_resource_request_delivery
-{
-    public mln_resource_request* request;
-    public MlnResourceRequest handle;
-}
-
 internal unsafe struct mln_resource_response
 {
     public uint size;
@@ -820,6 +790,21 @@ internal unsafe struct mln_resource_response
     public long retry_after_unix_ms;
 }
 
+internal unsafe struct mln_resource_rewrite_rule
+{
+    public uint kind;
+    public uint flags;
+    public sbyte* url;
+    public sbyte* replacement_url;
+}
+
+internal unsafe struct mln_resource_route
+{
+    public uint kind;
+    public uint flags;
+    public sbyte* url;
+}
+
 internal unsafe struct mln_resource_transform
 {
     public uint size;
@@ -831,6 +816,8 @@ internal unsafe struct mln_resource_transform
         mln_status> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public mln_resource_rewrite_rule* rules;
+    public nuint rule_count;
 }
 
 internal unsafe struct mln_resource_transform_response
@@ -1871,6 +1858,13 @@ internal enum mln_tile_operation : uint
     MLN_TILE_OPERATION_ERROR = 6,
     MLN_TILE_OPERATION_CANCELLED = 7,
     MLN_TILE_OPERATION_NULL = 8,
+}
+
+internal enum mln_url_match_flags : uint
+{
+    MLN_URL_MATCH_FLAGS_NONE = 0,
+    MLN_URL_MATCH_GLOB = 1,
+    MLN_URL_MATCH_REQUESTED_URL = 2,
 }
 
 internal enum mln_viewport_mode : uint

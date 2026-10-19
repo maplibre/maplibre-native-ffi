@@ -140,8 +140,8 @@ class GenerateCommandTests(unittest.TestCase):
             header = include / cli.native_capture.HEADER
             header.write_text(
                 header.read_text().replace(
-                    "} mln_adapter_deferred_callback;",
-                    "  MLN_ADAPTER_DEFERRED_STALE = 7U,\n} mln_adapter_deferred_callback;",
+                    "} mln_binding_dart_port_callback;",
+                    "  MLN_BINDING_DART_PORT_STALE = 7U,\n} mln_binding_dart_port_callback;",
                 )
             )
             renders = []

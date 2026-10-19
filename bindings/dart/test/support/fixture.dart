@@ -10,8 +10,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
-    as raw;
 import 'package:test/test.dart';
 
 /// How long any single wait lasts before its test fails.
@@ -55,20 +53,16 @@ Future<T> within<T>(Future<T> future, String what) => future.timeout(
 ///
 /// A test that serves resources installs its own provider in place of this
 /// one.
-final denyingProvider = ResourceProvider.resourceProviderRules(
-  AdapterResourceProviderRules(
-    rules: [
-      AdapterResourceProviderRule(
-        kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
-        flags: AdapterUrlMatchFlags.glob,
-        requestedUrl: '**',
-        response: ResourceResponse(
-          status: ResourceResponseStatus.error,
-          errorMessage: 'the test fixture serves no resources',
-        ),
+final denyingProvider = ResourceProvider(
+  callback: (_, handle) {
+    handle.complete(
+      ResourceResponse(
+        status: ResourceResponseStatus.error,
+        errorMessage: 'the test fixture serves no resources',
       ),
-    ],
-  ),
+    );
+    handle.close();
+  },
 );
 
 /// A runtime whose event wake drives [awaitEvent].
@@ -150,17 +144,16 @@ Future<void> expectCommitted(Future<CommandCompletion> command) async {
   );
 }
 
-/// Registers a routed provider that claims the requests its routes match.
+/// Registers a provider that claims the requests its routes match. Native
+/// loading takes every other request.
 ResourceProvider routedProvider(
-  List<AdapterResourceRoute> routes,
+  List<ResourceRoute> routes,
   ResourceProviderCallback callback,
-) => ResourceProvider.routedResourceProvider(
-  AdapterRoutedResourceProvider(routes: routes, callback: callback),
-);
+) => ResourceProvider(callback: callback, routes: routes);
 
 /// A route that claims one style URL.
-AdapterResourceRoute styleRoute(String url) =>
-    AdapterResourceRoute(kind: ResourceKind.style.rawValue, url: url);
+ResourceRoute styleRoute(String url) =>
+    ResourceRoute(kind: ResourceKind.style.rawValue, url: url);
 
 ResourceResponse get emptyStyleResponse => ResourceResponse(
   status: ResourceResponseStatus.ok,

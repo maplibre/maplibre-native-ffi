@@ -9,7 +9,7 @@ import '../../error/maplibre_exception.dart';
 import 'native_handles.dart';
 
 final NativeFinalizer _ownerFinalizer = NativeFinalizer(
-  Native.addressOf<NativeFinalizerFunction>(raw.mln_adapter_owner_finalize),
+  Native.addressOf<NativeFinalizerFunction>(raw.mln_binding_owner_finalize),
 );
 
 /// Reports an owner the collector reclaimed while it was still open.
@@ -26,9 +26,9 @@ final Finalizer<String> _leakReporter = Finalizer((message) {
   }
 });
 
-const _createOwnerToken = raw.mln_adapter_owner_token_create;
+const _createOwnerToken = raw.mln_binding_owner_token_create;
 
-const _destroyOwnerToken = raw.mln_adapter_owner_token_destroy;
+const _destroyOwnerToken = raw.mln_binding_owner_token_destroy;
 
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   NativeHandleState(this._handle, this.typeName) {

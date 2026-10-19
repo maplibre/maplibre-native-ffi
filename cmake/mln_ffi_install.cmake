@@ -300,7 +300,8 @@ function(mln_ffi_install_c_api_library target)
     FILES "${PROJECT_SOURCE_DIR}/include/maplibre_native_c.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  # binding_support.h is binding-internal support that bindings in this
+  # binding_support.h and binding_support_generated.h are binding-internal
+  # support that bindings in this
   # repository read from the source tree. Keep this exclusion in sync with the
   # Apple framework's in cmake/mln_ffi_apple_framework.cmake, with the
   # header-skew checks in bindings/dart/hook/build.dart and
@@ -312,7 +313,8 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
     FILES_MATCHING
     PATTERN "*.h"
-    PATTERN "binding_support.h" EXCLUDE)
+    PATTERN "binding_support.h" EXCLUDE
+    PATTERN "binding_support_generated.h" EXCLUDE)
   # plugin.h includes MapLibre Native's plugin API from upstream's path.
   install(
     FILES

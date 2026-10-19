@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.internal.cinterop.*
 
 internal actual object UpcallStubs {
   actual val completion: Long =
-    staticCFunction { userData: COpaquePointer?, result: CPointer<mln_completion_result>? ->
+    staticCFunction { userData: COpaquePointer?, result: COpaquePointer? ->
       Upcalls.completion(userData.toLong(), result.toLong())
     }
     .toLong()

@@ -1196,6 +1196,23 @@ final class TileOperation extends _Enum {
   static const nullValue = TileOperation.fromRawValue(8);
 }
 
+/// How a rule or route compares its url against a request URL.
+///
+/// See `mln_url_match_flags` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class UrlMatchFlags extends _Flags<UrlMatchFlags> {
+  const UrlMatchFlags.fromRawValue(super.rawValue);
+  static const flagsNone = UrlMatchFlags.fromRawValue(0);
+
+  /// Reads url as a glob pattern.
+  static const glob = UrlMatchFlags.fromRawValue(1);
+
+  /// Routes only: compare requested_url instead of resolved_url.
+  static const requestedUrl = UrlMatchFlags.fromRawValue(2);
+  @override
+  UrlMatchFlags _of(int rawValue) => UrlMatchFlags.fromRawValue(rawValue);
+}
+
 /// Viewport orientation modes used by `mln_map_viewport_options`.
 ///
 /// See `mln_viewport_mode` in the
@@ -2464,6 +2481,8 @@ typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 final class LogHandler {
   const LogHandler({required this.callback});
+
+  /// Required in callback mode; null in queue mode.
   final LogCallback callback;
 }
 
@@ -4421,117 +4440,58 @@ final class OfflineRegionInfo extends _Value {
   List<Object?> get _members => [id, definition, metadata];
 }
 
-final class AdapterUrlMatchFlags extends _Flags<AdapterUrlMatchFlags> {
-  const AdapterUrlMatchFlags.fromRawValue(super.rawValue);
-  static const flagsNone = AdapterUrlMatchFlags.fromRawValue(0);
-  static const glob = AdapterUrlMatchFlags.fromRawValue(1);
-  @override
-  AdapterUrlMatchFlags _of(int rawValue) =>
-      AdapterUrlMatchFlags.fromRawValue(rawValue);
-}
-
-final class AdapterHttpHeader extends _Value {
-  const AdapterHttpHeader({this.name, this.value});
-  final String? name;
-  final String? value;
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeader extends _Value {
+  const HttpHeader({required this.name, required this.value});
+  final String name;
+  final String value;
 
   @override
   List<Object?> get _members => [name, value];
 }
 
-final class AdapterHttpHeaderTransformRule extends _Value {
-  AdapterHttpHeaderTransformRule({
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeaderRule extends _Value {
+  HttpHeaderRule({
     this.kind = 0,
-    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
-    this.url,
-    required List<AdapterHttpHeader> headers,
+    this.flags = const UrlMatchFlags.fromRawValue(0),
+    required this.url,
+    required List<HttpHeader> headers,
   }) : headers = List.unmodifiable(headers);
+
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
   final int kind;
-  final AdapterUrlMatchFlags flags;
-  final String? url;
-  final List<AdapterHttpHeader> headers;
+
+  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  final UrlMatchFlags flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  /// The headers to set. Registration validates each one as
+  /// `mln_http_header_transform_response_set_header()` does.
+  final List<HttpHeader> headers;
 
   @override
   List<Object?> get _members => [kind, flags, url, headers];
 }
 
-final class AdapterHttpHeaderTransformRules extends _Value {
-  AdapterHttpHeaderTransformRules({
-    required List<AdapterHttpHeaderTransformRule> rules,
-  }) : rules = List.unmodifiable(rules);
-  final List<AdapterHttpHeaderTransformRule> rules;
+/// HTTP header transform state: a callback, or native header rules.
+///
+/// See `mln_http_header_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeaderTransform {
+  HttpHeaderTransform({List<HttpHeaderRule> rules = const []})
+    : rules = List.unmodifiable(rules);
 
-  @override
-  List<Object?> get _members => [rules];
-}
-
-sealed class HttpHeaderTransform {
-  const HttpHeaderTransform._();
-  const factory HttpHeaderTransform.empty() = HttpHeaderTransformEmpty;
-  const factory HttpHeaderTransform.httpHeaderTransformRules(
-    AdapterHttpHeaderTransformRules value,
-  ) = HttpHeaderTransformHttpHeaderTransformRules;
-}
-
-final class HttpHeaderTransformEmpty extends HttpHeaderTransform {
-  const HttpHeaderTransformEmpty() : super._();
-}
-
-final class HttpHeaderTransformHttpHeaderTransformRules
-    extends HttpHeaderTransform {
-  const HttpHeaderTransformHttpHeaderTransformRules(this.value) : super._();
-  final AdapterHttpHeaderTransformRules value;
-}
-
-final class AdapterResourceProviderRule extends _Value {
-  const AdapterResourceProviderRule({
-    this.kind = 0,
-    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
-    this.requestedUrl,
-    required this.response,
-  });
-  final int kind;
-  final AdapterUrlMatchFlags flags;
-  final String? requestedUrl;
-  final ResourceResponse response;
-
-  @override
-  List<Object?> get _members => [kind, flags, requestedUrl, response];
-}
-
-final class AdapterResourceProviderRules extends _Value {
-  AdapterResourceProviderRules({
-    required List<AdapterResourceProviderRule> rules,
-  }) : rules = List.unmodifiable(rules);
-  final List<AdapterResourceProviderRule> rules;
-
-  @override
-  List<Object?> get _members => [rules];
-}
-
-final class AdapterResourceRouteFlags
-    extends _Flags<AdapterResourceRouteFlags> {
-  const AdapterResourceRouteFlags.fromRawValue(super.rawValue);
-  static const flagsNone = AdapterResourceRouteFlags.fromRawValue(0);
-  static const matchGlob = AdapterResourceRouteFlags.fromRawValue(1);
-  static const useRequestedUrl = AdapterResourceRouteFlags.fromRawValue(2);
-  @override
-  AdapterResourceRouteFlags _of(int rawValue) =>
-      AdapterResourceRouteFlags.fromRawValue(rawValue);
-}
-
-final class AdapterResourceRoute extends _Value {
-  const AdapterResourceRoute({
-    this.kind = 0,
-    this.flags = const AdapterResourceRouteFlags.fromRawValue(0),
-    this.url,
-  });
-  final int kind;
-  final AdapterResourceRouteFlags flags;
-  final String? url;
-
-  @override
-  List<Object?> get _members => [kind, flags, url];
+  /// Header rules for a transform without a callback; empty with one.
+  final List<HttpHeaderRule> rules;
 }
 
 /// Inclusive byte range of a resource request.
@@ -4615,85 +4575,83 @@ final class ResourceRequest extends _Value {
 typedef ResourceProviderCallback =
     void Function(ResourceRequest, ResourceRequestHandle);
 
-final class AdapterRoutedResourceProvider extends _Value {
-  AdapterRoutedResourceProvider({
-    required List<AdapterResourceRoute> routes,
-    required this.callback,
-  }) : routes = List.unmodifiable(routes);
-  final List<AdapterResourceRoute> routes;
-  final ResourceProviderCallback callback;
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRoute extends _Value {
+  const ResourceRoute({
+    this.kind = 0,
+    this.flags = const UrlMatchFlags.fromRawValue(0),
+    required this.url,
+  });
+
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+  final int kind;
+
+  /// A bitwise OR of `mln_url_match_flags` values.
+  final UrlMatchFlags flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
 
   @override
-  List<Object?> get _members => [routes, callback];
+  List<Object?> get _members => [kind, flags, url];
 }
 
 /// Resource provider state.
 ///
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-sealed class ResourceProvider {
-  const ResourceProvider._();
-  const factory ResourceProvider.empty() = ResourceProviderEmpty;
-  const factory ResourceProvider.resourceProviderRules(
-    AdapterResourceProviderRules value,
-  ) = ResourceProviderResourceProviderRules;
-  const factory ResourceProvider.routedResourceProvider(
-    AdapterRoutedResourceProvider value,
-  ) = ResourceProviderRoutedResourceProvider;
+final class ResourceProvider {
+  ResourceProvider({
+    required this.callback,
+    List<ResourceRoute> routes = const [],
+  }) : routes = List.unmodifiable(routes);
+
+  /// Required in callback mode; null in queue mode.
+  final ResourceProviderCallback callback;
+
+  /// The requests that reach the provider; empty to claim every request.
+  final List<ResourceRoute> routes;
 }
 
-final class ResourceProviderEmpty extends ResourceProvider {
-  const ResourceProviderEmpty() : super._();
-}
-
-final class ResourceProviderResourceProviderRules extends ResourceProvider {
-  const ResourceProviderResourceProviderRules(this.value) : super._();
-  final AdapterResourceProviderRules value;
-}
-
-final class ResourceProviderRoutedResourceProvider extends ResourceProvider {
-  const ResourceProviderRoutedResourceProvider(this.value) : super._();
-  final AdapterRoutedResourceProvider value;
-}
-
-final class AdapterResourceRewriteRule extends _Value {
-  const AdapterResourceRewriteRule({
+/// One rule of a native resource transform.
+///
+/// See `mln_resource_rewrite_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRewriteRule extends _Value {
+  const ResourceRewriteRule({
     this.kind = 0,
-    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
-    this.url,
+    this.flags = const UrlMatchFlags.fromRawValue(0),
+    required this.url,
     this.replacementUrl,
   });
+
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
   final int kind;
-  final AdapterUrlMatchFlags flags;
-  final String? url;
+
+  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  final UrlMatchFlags flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  /// The replacement URL, or null to leave a matching URL unchanged.
   final String? replacementUrl;
 
   @override
   List<Object?> get _members => [kind, flags, url, replacementUrl];
 }
 
-final class AdapterResourceRewriteRules extends _Value {
-  AdapterResourceRewriteRules({required List<AdapterResourceRewriteRule> rules})
+/// Resource transform state: a callback, or native rewrite rules.
+///
+/// See `mln_resource_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceTransform {
+  ResourceTransform({List<ResourceRewriteRule> rules = const []})
     : rules = List.unmodifiable(rules);
-  final List<AdapterResourceRewriteRule> rules;
 
-  @override
-  List<Object?> get _members => [rules];
-}
-
-sealed class ResourceTransform {
-  const ResourceTransform._();
-  const factory ResourceTransform.empty() = ResourceTransformEmpty;
-  const factory ResourceTransform.resourceRewriteRules(
-    AdapterResourceRewriteRules value,
-  ) = ResourceTransformResourceRewriteRules;
-}
-
-final class ResourceTransformEmpty extends ResourceTransform {
-  const ResourceTransformEmpty() : super._();
-}
-
-final class ResourceTransformResourceRewriteRules extends ResourceTransform {
-  const ResourceTransformResourceRewriteRules(this.value) : super._();
-  final AdapterResourceRewriteRules value;
+  /// Rewrite rules for a transform without a callback; empty with one.
+  final List<ResourceRewriteRule> rules;
 }

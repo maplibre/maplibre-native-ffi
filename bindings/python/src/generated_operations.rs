@@ -3198,12 +3198,49 @@ fn generated_input_mln_gpu_sync<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_http_header<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_http_header> {
+    let mut raw: sys::mln_http_header = unsafe { std::mem::zeroed() };
+    raw.name = storage.c_string(value.getattr("name")?)?;
+    raw.value = storage.c_string(value.getattr("value")?)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_http_header_rule<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_http_header_rule> {
+    let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
+    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.flags = value
+        .getattr("flags")?
+        .extract::<sys::mln_url_match_flags>()?;
+    raw.url = storage.c_string(value.getattr("url")?)?;
+    raw.headers = {
+        let items = generated_items(&value.getattr("headers")?, |item| {
+            generated_input_mln_http_header(&item, storage)
+        })?;
+        raw.header_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    Ok(raw)
+}
+
 fn generated_input_mln_http_header_transform<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_http_header_transform> {
     let mut raw: sys::mln_http_header_transform = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_http_header_transform>() as _;
+    raw.rules = {
+        let items = generated_items(&value.getattr("rules")?, |item| {
+            generated_input_mln_http_header_rule(&item, storage)
+        })?;
+        raw.rule_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -3788,6 +3825,13 @@ fn generated_input_mln_resource_provider<'py>(
 ) -> PyResult<sys::mln_resource_provider> {
     let mut raw: sys::mln_resource_provider = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_provider>() as _;
+    raw.routes = {
+        let items = generated_items(&value.getattr("routes")?, |item| {
+            generated_input_mln_resource_route(&item, storage)
+        })?;
+        raw.route_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -3848,12 +3892,51 @@ fn generated_input_mln_resource_response<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_resource_rewrite_rule<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_resource_rewrite_rule> {
+    let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
+    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.flags = value
+        .getattr("flags")?
+        .extract::<sys::mln_url_match_flags>()?;
+    raw.url = storage.c_string(value.getattr("url")?)?;
+    let field = value.getattr("replacement_url")?;
+    raw.replacement_url = if field.is_none() {
+        std::ptr::null()
+    } else {
+        storage.c_string(field)?
+    };
+    Ok(raw)
+}
+
+fn generated_input_mln_resource_route<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_resource_route> {
+    let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
+    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.flags = value
+        .getattr("flags")?
+        .extract::<sys::mln_url_match_flags>()?;
+    raw.url = storage.c_string(value.getattr("url")?)?;
+    Ok(raw)
+}
+
 fn generated_input_mln_resource_transform<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_resource_transform> {
     let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
+    raw.rules = {
+        let items = generated_items(&value.getattr("rules")?, |item| {
+            generated_input_mln_resource_rewrite_rule(&item, storage)
+        })?;
+        raw.rule_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =

@@ -234,12 +234,21 @@ class AbiNetworkFileSource final : public mln::FileSource {
       );
       if (provider.has_value()) {
         provider_declined = true;
-        auto request = request_custom_resource(
-          resource, resolve_resource_url(options, resource),
-          provider->callback(), provider->user_data(), callback
-        );
-        if (request != nullptr) {
-          return request;
+        auto resolved_url = resolve_resource_url(options, resource);
+        // A request outside the provider's routes passes through, as one the
+        // provider declined does.
+        if (
+          provider->matches(
+            resource_kind_to_abi(resource.kind), resource.url, resolved_url
+          )
+        ) {
+          auto request = request_custom_resource(
+            resource, std::move(resolved_url), provider->callback(),
+            provider->user_data(), callback
+          );
+          if (request != nullptr) {
+            return request;
+          }
         }
       }
     }

@@ -29,8 +29,8 @@ uv.lock                                                     linguist-generated=t
 
 # Generated: tools/bindgen native outputs. Binding outputs are listed in
 # bindings/.gitattributes, which bindgen also generates.
-/include/maplibre_native_c/callback_capture_generated.h     linguist-generated=true
-/src/c_api/callback_capture_generated.inc                   linguist-generated=true
-/src/c_api/callback_port_generated.inc                      linguist-generated=true
+/include/maplibre_native_c/binding_support_generated.h      linguist-generated=true
+/src/c_api/binding_port_generated.inc                       linguist-generated=true
 /src/completion/completion_result_generated.inc             linguist-generated=true
-/tests/native/abi/adapter/adapter_copy_cases_generated.inc  linguist-generated=true
+/src/delivery/capture_generated.inc                         linguist-generated=true
+/tests/native/internal/delivery_copy_cases_generated.inc    linguist-generated=true

@@ -1516,6 +1516,31 @@ public data class TileOperation(public val rawValue: UInt) {
 }
 
 /**
+ * How a rule or route compares its url against a request URL.
+ *
+ * See `mln_url_match_flags` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class UrlMatchFlags(public val rawValue: UInt) {
+  public infix fun or(other: UrlMatchFlags): UrlMatchFlags =
+    UrlMatchFlags(rawValue or other.rawValue)
+
+  public infix fun and(other: UrlMatchFlags): UrlMatchFlags =
+    UrlMatchFlags(rawValue and other.rawValue)
+
+  public operator fun contains(other: UrlMatchFlags): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    public val FLAGS_NONE: UrlMatchFlags = UrlMatchFlags(0u)
+    /** Reads url as a glob pattern. */
+    public val GLOB: UrlMatchFlags = UrlMatchFlags(1u)
+    /** Routes only: compare requested_url instead of resolved_url. */
+    public val REQUESTED_URL: UrlMatchFlags = UrlMatchFlags(2u)
+  }
+}
+
+/**
  * Viewport orientation modes used by `mln_map_viewport_options`.
  *
  * See `mln_viewport_mode` in the
@@ -3904,6 +3929,37 @@ public data class OfflineRegionInfo(
 }
 
 /**
+ * One HTTP header that a header rule supplies.
+ *
+ * See `mln_http_header` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class HttpHeader(
+  public val name: String = "",
+  public val value: String = "",
+)
+
+/**
+ * One rule of a native HTTP header transform.
+ *
+ * See `mln_http_header_rule` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class HttpHeaderRule(
+  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
+  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL. */
+  public val flags: UrlMatchFlags = UrlMatchFlags(0u),
+  /** The URL or glob pattern to compare. */
+  public val url: String = "",
+  /**
+   * The headers to set. Registration validates each one as
+   * `mln_http_header_transform_response_set_header()` does.
+   */
+  public val headers: List<HttpHeader> = emptyList(),
+)
+
+/**
  * Inclusive byte range of a resource request.
  *
  * See `mln_resource_range` in the
@@ -3962,6 +4018,38 @@ public data class ResourceRequest(
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
+
+/**
+ * One request pattern that a resource provider claims.
+ *
+ * See `mln_resource_route` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRoute(
+  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
+  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_url_match_flags` values. */
+  public val flags: UrlMatchFlags = UrlMatchFlags(0u),
+  /** The URL or glob pattern to compare. */
+  public val url: String = "",
+)
+
+/**
+ * One rule of a native resource transform.
+ *
+ * See `mln_resource_rewrite_rule` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRewriteRule(
+  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
+  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL. */
+  public val flags: UrlMatchFlags = UrlMatchFlags(0u),
+  /** The URL or glob pattern to compare. */
+  public val url: String = "",
+  /** The replacement URL, or null to leave a matching URL unchanged. */
+  public val replacementUrl: String? = null,
+)
 
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,
@@ -4124,8 +4212,17 @@ public data class ResourceRequestCancelHandler(
  */
 public typealias ResourceRequestCancelCallback = () -> Unit
 
+/**
+ * HTTP header transform state: a callback, or native header rules.
+ *
+ * See `mln_http_header_transform` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class HttpHeaderTransform(
-  public val callback: HttpHeaderTransformCallback,
+  /** The callback, or null to apply rules. */
+  public val callback: HttpHeaderTransformCallback? = null,
+  /** Header rules for a transform without a callback; empty with one. */
+  public val rules: List<HttpHeaderRule> = emptyList(),
 )
 
 /**
@@ -4146,6 +4243,8 @@ public typealias HttpHeaderTransformCallback =
 public data class ResourceProvider(
   /** Required in callback mode; null in queue mode. */
   public val callback: ResourceProviderCallback,
+  /** The requests that reach the provider; empty to claim every request. */
+  public val routes: List<ResourceRoute> = emptyList(),
 )
 
 /**
@@ -4157,8 +4256,17 @@ public data class ResourceProvider(
 public typealias ResourceProviderCallback =
   (request: ResourceRequest, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
+/**
+ * Resource transform state: a callback, or native rewrite rules.
+ *
+ * See `mln_resource_transform` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class ResourceTransform(
-  public val callback: ResourceTransformCallback,
+  /** The callback, or null to apply rules. */
+  public val callback: ResourceTransformCallback? = null,
+  /** Rewrite rules for a transform without a callback; empty with one. */
+  public val rules: List<ResourceRewriteRule> = emptyList(),
 )
 
 /**

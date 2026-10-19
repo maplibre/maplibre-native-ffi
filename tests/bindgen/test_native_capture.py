@@ -21,7 +21,7 @@ from support import (
 from tools.bindgen import copy_cases
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
-from tools.bindgen.native_capture import capture_roots, copy_kind, generate
+from tools.bindgen.native_capture import completion_values, generate
 
 
 class NativeCaptureTests(unittest.TestCase):
@@ -86,19 +86,21 @@ class NativeCaptureTests(unittest.TestCase):
         )
         compile_and_run(self, generate(api), CAPTURE_TEST)
 
-    def test_every_copy_kind_has_one_copy_case(self):
-        # tests/native/abi/adapter/copies.c runs each case through the adapter.
+    def test_every_completion_value_type_has_one_copy_case(self):
+        # tests/native/internal/delivery_copies.cpp runs each case through the
+        # copy that a queue delivery makes.
         bound = compile_api(self.api)
-        roots, _, _ = capture_roots(bound)
         text = copy_cases.generate(bound)[copy_cases.PATH]
-        table = text[text.index("mln_adapter_copy_cases[] = {") :]
+        table = text[text.index("mln_delivery_copy_cases[] = {") :]
         self.assertEqual(
-            sorted(re.findall(r"\{(MLN_ADAPTER_COMPLETION_COPY_\w+),", table)),
-            sorted(copy_kind(native) for native in roots),
+            sorted(re.findall(r'\{"(\w+)",', table)),
+            sorted(completion_values(bound)),
         )
 
-    def test_deferred_callbacks_answer_early_and_fail_unadopted_decisions(self):
-        compile_and_run(self, generate(self.api), DEFERRED_TEST)
+    def test_delivered_callback_copies_outlive_their_call_and_release_handles(
+        self,
+    ):
+        compile_and_run(self, generate(self.api), DELIVERY_TEST)
 
 
 def compile_and_run(test, outputs, test_source):
@@ -131,82 +133,92 @@ def compile_and_run(test, outputs, test_source):
         run(test, [str(executable)], staging)
 
 
-DEFERRED_TEST = r"""
+DELIVERY_TEST = r"""
 #include <cassert>
 #include <cstring>
-#include "c_api/callback_capture.hpp"
-static mln::capture::DeferredRecord* delivered = nullptr;
-static bool accepting = true;
-auto mln::capture::deliver_deferred(void* context, std::uint32_t kind, DeferredRecord* record) noexcept -> bool {
-  if (!accepting || context == nullptr || kind != record->view.callback) return false;
-  delivered = record;
-  return true;
-}
-static unsigned completions = 0, releases = 0;
-static std::uint32_t completed_size = 1;
-extern "C" mln_status mln_resource_request_complete(mln_resource_request_handle, const mln_resource_response* response, mln_diagnostic*) noexcept {
-  ++completions; completed_size = response->size; return MLN_STATUS_OK;
-}
+#include "delivery/capture.hpp"
+static unsigned releases = 0;
 extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept { ++releases; }
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+
+template <class T, class Capture>
+auto copy(const T& source, Capture capture) -> T {
+  mln::delivery::Arena<false> measure{nullptr, 0};
+  static_cast<void>(capture(measure, source));
+  auto* storage = static_cast<std::byte*>(::operator new(measure.offset));
+  mln::delivery::Arena<true> write{storage, 0, measure.offset};
+  return capture(write, source);
+}
 
 int main() {
-  int context = 0;
   char message[] = "borrowed";
-  auto* log = reinterpret_cast<mln_log_callback>(mln::capture::deferred_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK));
-  assert(log(&context, 1, 2, 3, message) == 1);
+  const mln_log_delivery log{1, 2, 3, message};
+  const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {
+    return mln::delivery::capture_mln_log_delivery(arena, value);
+  });
   std::memset(message, 0, sizeof(message));
-  const auto* copied = static_cast<const mln_adapter_log_callback_arguments*>(delivered->view.arguments);
-  assert(copied->code == 3 && std::strcmp(copied->message, "borrowed") == 0);
-  mln::capture::destroy_deferred(delivered);
-  accepting = false;
-  assert(log(&context, 1, 2, 3, message) == 0);
-  accepting = true;
+  assert(copied.code == 3 && std::strcmp(copied.message, "borrowed") == 0);
+  mln::delivery::discard_mln_log_delivery(copied);
+  assert(releases == 0);
 
   char url[] = "custom://style.json";
   mln_resource_request request{};
   request.requested_url = url;
-  auto* provider = reinterpret_cast<mln_resource_provider_callback>(
-    mln::capture::deferred_function(MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK));
-  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
+  const mln_resource_request_delivery provided{&request, 9};
+  const auto arguments = copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
+    return mln::delivery::capture_mln_resource_request_delivery(arena, value);
+  });
   std::memset(url, 0, sizeof(url));
-  const auto* arguments = static_cast<const mln_adapter_resource_provider_callback_arguments*>(delivered->view.arguments);
-  assert(arguments->handle == 9 && std::strcmp(arguments->request->requested_url, "custom://style.json") == 0);
-  delivered->claimed = true;
-  mln::capture::destroy_deferred(delivered);
-  assert(completions == 0 && releases == 0);
+  assert(arguments.handle == 9 && arguments.request != &request);
+  assert(std::strcmp(arguments.request->requested_url, "custom://style.json") == 0);
+  // An untaken request only releases its handle; native fails the request.
+  mln::delivery::discard_mln_resource_request_delivery(arguments);
+  assert(releases == 1);
+  static_assert(mln::delivery::mln_resource_request_delivery_owns_handles());
+  static_assert(!mln::delivery::mln_log_delivery_owns_handles());
 
-  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
-  mln::capture::destroy_deferred(delivered);
-  // A discarded decision only releases its handle; native fails the request.
-  assert(completions == 0 && releases == 1);
-
+  // A request whose byte count names no bytes cannot be copied.
   request.prior_data_size = 1;
-  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
-  assert(mln::capture::deferred_function(0) == nullptr);
+  bool invalid = false;
+  try { static_cast<void>(copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
+    return mln::delivery::capture_mln_resource_request_delivery(arena, value);
+  })); }
+  catch (const std::invalid_argument&) { invalid = true; }
+  assert(invalid);
 }
 """
-
-
 CAPTURE_TEST = r"""
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <new>
 static std::size_t allocations = 0;
-static bool fail_allocation = false;
 void* operator new(std::size_t size) {
-  if (fail_allocation) throw std::bad_alloc{};
   ++allocations;
   if (auto* p = std::malloc(size)) return p;
   throw std::bad_alloc{};
 }
 void operator delete(void* p) noexcept { std::free(p); }
-#include "c_api/callback_capture.hpp"
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+#include "delivery/delivery_queue.hpp"
 static unsigned disposed = 0;
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
+extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept {}
+
+// Copies count values into one allocation, as a queued completion does.
+template <class T>
+auto copy(const T* values, std::size_t count) -> const T* {
+  const auto& capture = mln::delivery::completion_capture<T>;
+  mln::delivery::Arena<false> measure{nullptr, 0};
+  const auto before = allocations;
+  capture.measure(measure, values, count);
+  assert(allocations == before);
+  auto* storage = static_cast<std::byte*>(::operator new(measure.offset == 0 ? 1 : measure.offset));
+  mln::delivery::Arena<true> write{storage, 0, measure.offset};
+  const auto* copied = static_cast<const T*>(capture.write(write, values, count));
+  assert(allocations == before + 1);
+  return copied;
+}
 
 int main() {
   char url[] = "retained URL";
@@ -217,21 +229,13 @@ int main() {
   source.tilejson.tile_urls = views;
   source.tilejson.tile_url_count = 2;
   source.attribution = {url, 5};
-  mln_completion_result result{};
-  result.status = MLN_STATUS_OK;
-  result.value = &source;
-  result.value_count = 1;
-  const auto before = allocations;
-  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
-  assert(allocations - before == 1);
-  const auto* copied = static_cast<const mln_style_source_info*>(record->view.result.value);
+  const auto* copied = copy(&source, 1);
   assert(reinterpret_cast<std::uintptr_t>(copied) % alignof(mln_style_source_info) == 0);
   assert(copied->tilejson.tile_urls != views && copied->tilejson.tile_urls[0].data != url);
   std::memset(url, 'X', sizeof(url));
   assert(std::memcmp(copied->tilejson.tile_urls[0].data, "retained URL", 12) == 0);
   assert(std::memcmp(copied->attribution.data, "retai", 5) == 0);
   assert(std::memcmp(copied->id.data, "retained", 8) == 0);
-  mln::capture::destroy(record);
 
   // A clear bit leaves the embedded record unread, so the copy never follows
   // its pointer or trusts its count.
@@ -241,64 +245,35 @@ int main() {
   absent.tilejson.tile_urls = reinterpret_cast<const mln_buffer_view*>(1);
   absent.tilejson.tile_url_count = std::numeric_limits<std::size_t>::max();
   absent.tilejson.min_zoom = 3.0;
-  result.value = &absent;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
-  copied = static_cast<const mln_style_source_info*>(record->view.result.value);
+  copied = copy(&absent, 1);
   const mln_style_source_tile_info zero{};
   assert(std::memcmp(&copied->tilejson, &zero, sizeof(zero)) == 0);
-  mln::capture::destroy(record);
 
-  result.value = &source;
-  result.value_count = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
-  assert(record->view.result.value != nullptr);
-  mln::capture::destroy(record);
-  result.value = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
-  assert(record->view.result.value == nullptr);
-  mln::capture::destroy(record);
+  // A present empty array keeps its presence, and an absent one stays absent.
+  assert(copy(&source, 0) != nullptr);
+  assert(copy<mln_style_source_info>(nullptr, 0) == nullptr);
 
-  result.value = &source;
-  result.value_count = std::numeric_limits<std::size_t>::max();
   bool overflow = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO); }
+  try { static_cast<void>(copy(&source, std::numeric_limits<std::size_t>::max())); }
   catch (const std::bad_alloc&) { overflow = true; }
   assert(overflow);
 
   mln_offline_region_info offline{};
   offline.definition.type = std::numeric_limits<std::uint32_t>::max();
-  result.value = &offline;
-  result.value_count = 1;
   bool variant = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO); }
+  try { static_cast<void>(copy(&offline, 1)); }
   catch (const std::invalid_argument&) { variant = true; }
   assert(variant);
 
-  mln_map handle = 42;
-  result.value = &handle;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
-  mln::capture::destroy(record);
-  assert(disposed == 1);
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
-  record->claimed = true;
-  mln::capture::destroy(record);
-  assert(disposed == 1);
-
-  fail_allocation = true;
-  bool failed = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP); }
-  catch (const std::bad_alloc&) { failed = true; }
-  fail_allocation = false;
-  assert(failed);
-  // The callback adapter invokes discard when capture fails.
-  mln::capture::discard(MLN_ADAPTER_COMPLETION_COPY_MAP, result);
-  assert(disposed == 2);
+  // A copied map is still the batch's: discarding it disposes the map, and a
+  // value that owns no handle has nothing to discard.
   mln_map handles[] = {42, 43};
-  result.value = handles;
-  result.value_count = 2;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_MAP);
-  mln::capture::destroy(record);
-  assert(disposed == 4);
+  const auto* maps = copy(handles, 2);
+  assert(maps[0] == 42 && maps[1] == 43);
+  mln::delivery::completion_capture<mln_map>.discard(maps, 2);
+  assert(disposed == 2);
+  assert(mln::delivery::completion_capture<mln_map>.discard_item != nullptr);
+  assert(mln::delivery::completion_capture<mln_style_source_info>.discard_item == nullptr);
 }
 """
 
@@ -320,10 +295,18 @@ MLN_API mln_status mln_map_capture_fixture(mln_map map, const mln_completion* co
 
 FIXTURE_TEST = r"""
 #include "capture_fixture.h"
-#include "c_api/callback_capture.hpp"
+#include "delivery/delivery_queue.hpp"
 #include <cassert>
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept {}
+static auto copy(const mln_capture_fixture& input) -> const mln_capture_fixture* {
+  const auto& capture = mln::delivery::completion_capture<mln_capture_fixture>;
+  mln::delivery::Arena<false> measure{nullptr, 0};
+  capture.measure(measure, &input, 1);
+  auto* storage = static_cast<std::byte*>(::operator new(measure.offset));
+  mln::delivery::Arena<true> write{storage, 0, measure.offset};
+  return static_cast<const mln_capture_fixture*>(capture.write(write, &input, 1));
+}
 int main() {
   char bytes[] = "nested";
   mln_buffer_view view{bytes, 6};
@@ -335,35 +318,25 @@ int main() {
   input.count = 1;
   input.fields = 0;
   input.name = reinterpret_cast<const char*>(1);
-  mln_completion_result result{};
-  result.status = MLN_STATUS_OK;
-  result.value = &input;
-  result.value_count = 1;
-  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
-  auto* copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
+  auto* copied = copy(input);
   std::memset(bytes, 0, sizeof(bytes));
   assert(std::memcmp(copied->nested.tilejson.tile_urls[0].data, "nested", 6) == 0);
   assert(std::memcmp(copied->extra[0].data, "nested", 6) == 0);
   assert(copied->name == nullptr);
-  mln::capture::destroy(record);
 
   input.count = 0;
   input.extra = &view;
   view.size = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
-  copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
+  copied = copy(input);
   assert(copied->extra != nullptr);
   assert(reinterpret_cast<std::uintptr_t>(copied->extra) % alignof(mln_buffer_view) == 0);
   assert(copied->nested.tilejson.tile_urls[0].data != nullptr);
   assert(copied->nested.tilejson.tile_urls[0].size == 0);
-  mln::capture::destroy(record);
 
   input.extra = nullptr;
   view.data = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
-  copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
+  copied = copy(input);
   assert(copied->extra == nullptr);
   assert(copied->nested.tilejson.tile_urls[0].data == nullptr);
-  mln::capture::destroy(record);
 }
 """

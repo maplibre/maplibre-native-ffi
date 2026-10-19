@@ -114,7 +114,11 @@ class Harness:
                 mln.RuntimeOptions.default(), event_wake=mln.Wake(self.events.notify)
             )
         )
-        result(self.runtime.set_resource_provider(mln.ResourceProvider(self._provide)))
+        result(
+            self.runtime.set_resource_provider(
+                mln.ResourceProvider(callback=self._provide)
+            )
+        )
 
     def _provide(
         self, request: mln.ResourceRequest, handle: mln.ResourceRequestHandle

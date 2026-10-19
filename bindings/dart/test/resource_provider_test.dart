@@ -1,8 +1,11 @@
-// Resource providers: native rule tables, and deferred callbacks whose
-// requests the binding hands over as transferable decision handles.
+// Resource providers: routes that decide which requests reach the provider,
+// and queued requests that the binding hands over as transferable decision
+// handles.
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
+    as raw;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show CallbackPortLifecycleProbe, singleCallbackPortProbeForTesting;
 import 'package:test/test.dart';
@@ -10,19 +13,23 @@ import 'package:test/test.dart';
 import 'support/fixture.dart';
 
 void main() {
-  test('native provider rules answer a matching request inline', () async {
-    const styleUrl = 'custom://inline-style.json';
+  test('a routed provider answers the requests its routes match', () async {
+    const styleUrl = 'custom://routed-style.json';
+    final requested = <String?>[];
     final fixture = await openRuntime(
-      provider: ResourceProvider.resourceProviderRules(
-        AdapterResourceProviderRules(
-          rules: [
-            AdapterResourceProviderRule(
-              kind: ResourceKind.style.rawValue,
-              requestedUrl: styleUrl,
-              response: emptyStyleResponse,
-            ),
-          ],
-        ),
+      provider: routedProvider(
+        [
+          ResourceRoute(
+            kind: raw.MLN_RESOURCE_KIND_ANY,
+            flags: UrlMatchFlags.glob,
+            url: 'custom://routed-*.json',
+          ),
+        ],
+        (request, handle) {
+          requested.add(request.requestedUrl);
+          handle.complete(emptyStyleResponse);
+          handle.close();
+        },
       ),
     );
     final map = await fixture.openMap();
@@ -32,6 +39,39 @@ void main() {
       RuntimeEventType.mapStyleLoaded,
     );
     expect(loaded.source, map.id);
+    expect(requested, [styleUrl]);
+  });
+
+  test('a request outside the routes passes through', () async {
+    final fixture = await openRuntime(
+      provider: routedProvider([
+        styleRoute('custom://routed-style.json'),
+      ], (_, _) => fail('the provider saw an unrouted request')),
+    );
+    final map = await fixture.openMap();
+
+    await expectCommitted(map.setStyleUrl('custom://unrouted-style.json'));
+    // Native loading has no handler for the custom scheme.
+    final failure = await fixture.awaitEventType(
+      RuntimeEventType.mapLoadingFailed,
+    );
+    expect(failure.message, contains('declined'));
+  });
+
+  test('an invalid route is refused', () async {
+    final fixture = await openRuntime();
+    expect(
+      () => fixture.runtime.setResourceProvider(
+        routedProvider([
+          ResourceRoute(
+            kind: raw.MLN_RESOURCE_KIND_ANY,
+            flags: const UrlMatchFlags.fromRawValue(1 << 31),
+            url: '**',
+          ),
+        ], (_, _) {}),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
   });
 
   test('a provider answers a request after its callback returns', () async {

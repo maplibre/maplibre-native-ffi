@@ -54,7 +54,7 @@ void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
 """,
                 """
 int main() {
-  const auto callback = reinterpret_cast<mln_sample_notification>(dart_port_function(MLN_ADAPTER_DART_PORT_SAMPLE_OPTIONS_CHANGED));
+  const auto callback = reinterpret_cast<mln_sample_notification>(dart_port_function(MLN_BINDING_DART_PORT_SAMPLE_OPTIONS_CHANGED));
   assert(callback);
   callback(reinterpret_cast<void*>(17), {7, 9});
   assert(deliveries == 1);
@@ -84,7 +84,7 @@ void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
 """,
                 """
 int main() {
-  const auto callback = reinterpret_cast<mln_reading_callback>(dart_port_function(MLN_ADAPTER_DART_PORT_READING_HANDLER_CALLBACK));
+  const auto callback = reinterpret_cast<mln_reading_callback>(dart_port_function(MLN_BINDING_DART_PORT_READING_HANDLER_CALLBACK));
   assert(callback);
   const mln_reading reading = {sizeof(mln_reading), 7, UINT64_MAX};
   callback(reinterpret_cast<void*>(17), &reading);
@@ -109,13 +109,13 @@ static unsigned deliveries = 0;
 template <std::size_t Count>
 void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
   assert(context == reinterpret_cast<void*>(17));
-  assert(Count == 1 && values[0] == MLN_ADAPTER_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK);
+  assert(Count == 1 && values[0] == MLN_BINDING_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK);
   ++deliveries;
 }
 """,
                 """
 int main() {
-  const auto callback = reinterpret_cast<mln_ticket_cancel>(dart_port_function(MLN_ADAPTER_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK));
+  const auto callback = reinterpret_cast<mln_ticket_cancel>(dart_port_function(MLN_BINDING_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK));
   assert(callback);
   callback(reinterpret_cast<void*>(17));
   assert(deliveries == 1);

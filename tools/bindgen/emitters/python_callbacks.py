@@ -216,6 +216,7 @@ def sources(values, plan):
         # Native never returns callbacks, so a copy of a registration's
         # default leaves them at None.
         copied=plan.native in values.api.returned,
+        registration=True,
     )
     rust.append(record_rust)
     python.append(record_python)

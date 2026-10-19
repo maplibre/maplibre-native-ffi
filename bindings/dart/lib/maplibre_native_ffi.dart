@@ -9,6 +9,6 @@ export 'src/runtime/runtime.dart'
         adoptOwnedForTesting,
         decodeLatLngListForTesting,
         decodeRuntimeEventBatchForTesting,
-        globalCallbackPortProbeForTesting,
+        logRegistrationProbeForTesting,
         singleCallbackPortProbeForTesting;
 export 'src/values.dart';

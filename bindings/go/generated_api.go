@@ -1259,6 +1259,23 @@ const (
 	TileOperationNull                 TileOperation = TileOperation(C.MLN_TILE_OPERATION_NULL)
 )
 
+// UrlMatchFlags corresponds to mln_url_match_flags. How a rule or route
+// compares its url against a request URL.
+//
+// See mln_url_match_flags in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type UrlMatchFlags uint32
+
+const (
+	UrlMatchFlagsFlagsNone UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_FLAGS_NONE)
+	// Reads url as a glob pattern.
+	UrlMatchFlagsGlob UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_GLOB)
+	// Routes only: compare requested_url instead of resolved_url.
+	UrlMatchFlagsRequestedUrl UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_REQUESTED_URL)
+)
+
+func (value UrlMatchFlags) Has(flags UrlMatchFlags) bool { return value&flags == flags }
+
 // ViewportMode corresponds to mln_viewport_mode. Viewport orientation modes
 // used by mln_map_viewport_options.
 //
@@ -2176,13 +2193,79 @@ func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 
 func DefaultGpuSync() GpuSync { return copyGpuSync(C.mln_gpu_sync_default()) }
 
+// HttpHeader corresponds to mln_http_header. One HTTP header that a header rule
+// supplies.
+//
+// See mln_http_header in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type HttpHeader struct {
+	Name  string
+	Value string
+}
+
+func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
+	raw := C.mln_http_header{}
+	raw.name = arena.cstring(input.Name)
+	raw.value = arena.cstring(input.Value)
+	return raw
+}
+
+// HttpHeaderRule corresponds to mln_http_header_rule. One rule of a native HTTP
+// header transform.
+//
+// See mln_http_header_rule in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type HttpHeaderRule struct {
+	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
+	Kind uint32
+	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
+	Flags UrlMatchFlags
+	// The URL or glob pattern to compare.
+	Url string
+	// The headers to set. Registration validates each one as
+	// mln_http_header_transform_response_set_header() does.
+	Headers []HttpHeader
+}
+
+func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_header_rule {
+	raw := C.mln_http_header_rule{}
+	raw.kind = C.uint32_t(input.Kind)
+	raw.flags = C.uint32_t(input.Flags)
+	raw.url = arena.cstring(input.Url)
+	{
+		raw.headers = (*C.mln_http_header)(arena.array(len(input.Headers), unsafe.Sizeof(*raw.headers)))
+		items := unsafe.Slice(raw.headers, len(input.Headers))
+		raw.header_count = bindingCountLike(raw.header_count, len(input.Headers))
+		for i, item := range input.Headers {
+			items[i] = nativeHttpHeader(item, arena)
+		}
+	}
+	return raw
+}
+
+// HttpHeaderTransform corresponds to mln_http_header_transform. HTTP header
+// transform state: a callback, or native header rules.
+//
+// See mln_http_header_transform in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeaderTransform struct {
+	// Header rules for a transform without a callback; empty with one.
+	Rules []HttpHeaderRule
+	// The callback, or null to apply rules.
 	Callback func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status
 }
 
 func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C.mln_http_header_transform {
 	raw := C.mln_http_header_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	{
+		raw.rules = (*C.mln_http_header_rule)(arena.array(len(input.Rules), unsafe.Sizeof(*raw.rules)))
+		items := unsafe.Slice(raw.rules, len(input.Rules))
+		raw.rule_count = bindingCountLike(raw.rule_count, len(input.Rules))
+		for i, item := range input.Rules {
+			items[i] = nativeHttpHeaderRule(item, arena)
+		}
+	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -3689,6 +3772,8 @@ func copyRenderingStats(raw C.mln_rendering_stats) RenderingStats {
 // See mln_resource_provider in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceProvider struct {
+	// The requests that reach the provider; empty to claim every request.
+	Routes []ResourceRoute
 	// Required in callback mode; null in queue mode.
 	Callback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 }
@@ -3696,6 +3781,14 @@ type ResourceProvider struct {
 func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_resource_provider {
 	raw := C.mln_resource_provider{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	{
+		raw.routes = (*C.mln_resource_route)(arena.array(len(input.Routes), unsafe.Sizeof(*raw.routes)))
+		items := unsafe.Slice(raw.routes, len(input.Routes))
+		raw.route_count = bindingCountLike(raw.route_count, len(input.Routes))
+		for i, item := range input.Routes {
+			items[i] = nativeResourceRoute(item, arena)
+		}
+	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -3841,13 +3934,78 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	return raw
 }
 
+// ResourceRewriteRule corresponds to mln_resource_rewrite_rule. One rule of a
+// native resource transform.
+//
+// See mln_resource_rewrite_rule in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRewriteRule struct {
+	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
+	Kind uint32
+	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
+	Flags UrlMatchFlags
+	// The URL or glob pattern to compare.
+	Url string
+	// The replacement URL, or null to leave a matching URL unchanged.
+	ReplacementUrl *string
+}
+
+func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C.mln_resource_rewrite_rule {
+	raw := C.mln_resource_rewrite_rule{}
+	raw.kind = C.uint32_t(input.Kind)
+	raw.flags = C.uint32_t(input.Flags)
+	raw.url = arena.cstring(input.Url)
+	if input.ReplacementUrl != nil {
+		raw.replacement_url = arena.cstring((*input.ReplacementUrl))
+	}
+	return raw
+}
+
+// ResourceRoute corresponds to mln_resource_route. One request pattern that a
+// resource provider claims.
+//
+// See mln_resource_route in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRoute struct {
+	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
+	Kind uint32
+	// A bitwise OR of mln_url_match_flags values.
+	Flags UrlMatchFlags
+	// The URL or glob pattern to compare.
+	Url string
+}
+
+func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
+	raw := C.mln_resource_route{}
+	raw.kind = C.uint32_t(input.Kind)
+	raw.flags = C.uint32_t(input.Flags)
+	raw.url = arena.cstring(input.Url)
+	return raw
+}
+
+// ResourceTransform corresponds to mln_resource_transform. Resource transform
+// state: a callback, or native rewrite rules.
+//
+// See mln_resource_transform in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransform struct {
+	// Rewrite rules for a transform without a callback; empty with one.
+	Rules []ResourceRewriteRule
+	// The callback, or null to apply rules.
 	Callback func(ResourceKind, string, *ResourceTransformResponseScope) Status
 }
 
 func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln_resource_transform {
 	raw := C.mln_resource_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	{
+		raw.rules = (*C.mln_resource_rewrite_rule)(arena.array(len(input.Rules), unsafe.Sizeof(*raw.rules)))
+		items := unsafe.Slice(raw.rules, len(input.Rules))
+		raw.rule_count = bindingCountLike(raw.rule_count, len(input.Rules))
+		for i, item := range input.Rules {
+			items[i] = nativeResourceRewriteRule(item, arena)
+		}
+	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -5769,41 +5927,6 @@ func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
 
 // owner returns the handle's owner state, or nil for a nil handle.
 func (handle *AcquiredFrameHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-type DeliveryBatchHandle struct{ *bindingOwner }
-
-func adoptDeliveryBatchHandle(raw uint64, parent any) *DeliveryBatchHandle {
-	owner := &DeliveryBatchHandle{bindingAdopt(raw, parent, "DeliveryBatchHandle", func(raw uint64) { C.mln_delivery_batch_release(C.mln_delivery_batch(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *DeliveryBatchHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// DeliveryQueueHandle corresponds to mln_delivery_queue. A host-owned queue
-// that holds deliveries until its host drains them.
-//
-// See mln_delivery_queue in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type DeliveryQueueHandle struct{ *bindingOwner }
-
-func adoptDeliveryQueueHandle(raw uint64, parent any) *DeliveryQueueHandle {
-	owner := &DeliveryQueueHandle{bindingAdopt(raw, parent, "DeliveryQueueHandle", func(raw uint64) { C.mln_delivery_queue_release(C.mln_delivery_queue(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *DeliveryQueueHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
 	}

@@ -116,7 +116,8 @@ internal object Upcalls {
       setOf("mln_http_header_transform_response_set_header"),
       { outResponse },
     ) { value, scope ->
-      value.callback(
+      val invoke = value.callback ?: return@upcall -5
+      invoke(
         ResourceKind(kind.toUInt()),
         readCString(url),
         HttpHeaderTransformResponse(outResponse, scope),
@@ -155,7 +156,8 @@ internal object Upcalls {
       setOf("mln_resource_transform_response_set_url"),
       { outResponse },
     ) { value, scope ->
-      value.callback(
+      val invoke = value.callback ?: return@upcall -5
+      invoke(
         ResourceKind(kind.toUInt()),
         readCString(url),
         ResourceTransformResponse(outResponse, scope),

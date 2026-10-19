@@ -5,5 +5,5 @@
 // ignore_for_file: camel_case_types, constant_identifier_names
 library;
 
-/// `MLN_ADAPTER_RESOURCE_KIND_ANY` from `callback_adapter.h`.
-const int MLN_ADAPTER_RESOURCE_KIND_ANY = 0xffffffff;
+/// `MLN_RESOURCE_KIND_ANY` from `runtime.h`.
+const int MLN_RESOURCE_KIND_ANY = 0xffffffff;

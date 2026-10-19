@@ -7,6 +7,10 @@
 #include "support/delivery.h"
 #include "support/test_support.h"
 
+#if !defined(__EMSCRIPTEN__)
+#include "support/http_server.h"
+#endif
+
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
@@ -295,6 +299,172 @@ static void a_queue_provider_rejects_an_invalid_shape(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static mln_status submit_routes(
+  mln_runtime runtime, const mln_resource_route* routes, size_t count,
+  mln_diagnostic* diagnostic
+) {
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  mln_resource_provider queued = queue_provider(queue.handle, NULL);
+  queued.routes = routes;
+  queued.route_count = count;
+  mln_test_completion completion = mln_test_completion_default(0);
+  mln_status status = mln_runtime_set_resource_provider(
+    runtime, &queued, &completion.descriptor, diagnostic
+  );
+  if (status == MLN_STATUS_OK) {
+    status = mln_test_completion_settle(&completion);
+    MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
+  } else {
+    mln_test_completion_reject(&completion);
+    mln_test_completion_destroy(&completion);
+  }
+  mln_test_delivery_queue_release(&queue);
+  return status;
+}
+
+static void invalid_routes_are_rejected(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_resource_route routes[] = {
+    {.kind = MLN_RESOURCE_KIND_ANY, .url = "custom://first"},
+    {.kind = MLN_RESOURCE_KIND_ANY, .flags = 1U << 31U, .url = "**"},
+  };
+  MLN_TEST_INVALID(submit_routes(runtime, routes, 2, &diagnostic));
+  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
+  const mln_resource_route null_url = {.kind = MLN_RESOURCE_KIND_ANY};
+  MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
+  MLN_TEST_INVALID(submit_routes(runtime, NULL, 1, NULL));
+  MLN_TEST_OK(submit_routes(runtime, routes, 1, NULL));
+  mln_test_destroy_runtime(runtime);
+}
+
+// A callback provider that answers every request it sees with an empty style.
+static uint32_t answer_with_style(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  atomic_fetch_add((atomic_int*)user_data, 1);
+  const mln_resource_response response = style_response();
+  (void)mln_resource_request_complete(handle, &response, NULL);
+  mln_resource_request_release(handle);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+#if !defined(__EMSCRIPTEN__)
+
+static void load_style(mln_runtime runtime, const char* url) {
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
+  TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
+  mln_test_destroy_map(map);
+}
+
+// Routes filter a callback provider too: a request inside them reaches the
+// callback, and one outside them loads natively from the server.
+static void routes_filter_a_callback_provider(void) {
+  static const mln_test_http_route served[] = {
+    {.path = "/native/style.json",
+     .body = inline_style_json,
+     .body_size = sizeof(inline_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(served, 1);
+  char routed_url[256];
+  char native_url[256];
+  mln_test_http_server_url(
+    server, "/routed/style.json", routed_url, sizeof(routed_url)
+  );
+  mln_test_http_server_url(
+    server, "/native/style.json", native_url, sizeof(native_url)
+  );
+  static atomic_int calls;
+  atomic_store(&calls, 0);
+  const mln_resource_route routes[] = {
+    // Another kind: claims nothing here.
+    {.kind = MLN_RESOURCE_KIND_TILE, .flags = MLN_URL_MATCH_GLOB, .url = "**"},
+    {.kind = MLN_RESOURCE_KIND_STYLE,
+     .flags = MLN_URL_MATCH_GLOB,
+     .url = "http://127.0.0.1:*/routed/**"},
+  };
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = answer_with_style,
+    .user_data = &calls,
+    .routes = routes,
+    .route_count = 2,
+  };
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+
+  load_style(runtime, routed_url);
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&calls));
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/routed/style.json")
+  );
+  load_style(runtime, native_url);
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&calls));
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/native/style.json")
+  );
+
+  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
+// A queue provider's routes decide which requests reach the queue.
+static void routes_filter_a_queue_provider(void) {
+  static const mln_test_http_route served[] = {
+    {.path = "/native/style.json",
+     .body = inline_style_json,
+     .body_size = sizeof(inline_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(served, 1);
+  char native_url[256];
+  mln_test_http_server_url(
+    server, "/native/style.json", native_url, sizeof(native_url)
+  );
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_resource_route route = {
+    .kind = MLN_RESOURCE_KIND_ANY,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = "custom://routed/**",
+  };
+  mln_resource_provider provider = queue_provider(queue.handle, NULL);
+  provider.routes = &route;
+  provider.route_count = 1;
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+
+  load_style(runtime, native_url);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
+
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://routed/style.json"));
+  const mln_resource_request_delivery* request = NULL;
+  const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
+  TEST_ASSERT_EQUAL_STRING(
+    "custom://routed/style.json", request->request->requested_url
+  );
+  const mln_resource_request_handle handle = request->handle;
+  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
+  mln_delivery_batch_release(batch);
+  const mln_resource_response response = style_response();
+  MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
+  mln_resource_request_release(handle);
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+
+  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_http_server_stop(server);
+}
+
+#endif
+
 MLN_TEST_GROUP {
   RUN_TEST(the_host_completes_a_drained_request);
   RUN_TEST(an_untaken_request_fails);
@@ -303,4 +473,9 @@ MLN_TEST_GROUP {
   RUN_TEST(retirement_follows_the_last_request);
   RUN_TEST(a_released_queue_passes_requests_through);
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
+  RUN_TEST(invalid_routes_are_rejected);
+#if !defined(__EMSCRIPTEN__)
+  RUN_TEST(routes_filter_a_callback_provider);
+  RUN_TEST(routes_filter_a_queue_provider);
+#endif
 }

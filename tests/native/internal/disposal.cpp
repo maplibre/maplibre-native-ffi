@@ -318,7 +318,7 @@ void failed_finalizer_token_creation_disposes_the_owner() {
   void* token = nullptr;
   {
     const auto faults = AllocationFaults{};
-    token = mln_adapter_owner_token_create(runtime);
+    token = mln_binding_owner_token_create(runtime);
   }
   TEST_ASSERT_NULL(token);
   TEST_ASSERT_TRUE(expired(weak));
@@ -464,16 +464,16 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
     )
   );
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
-  auto* runtime_token = mln_adapter_owner_token_create(runtime);
-  auto* map_token = mln_adapter_owner_token_create(map);
-  auto* session_token = mln_adapter_owner_token_create(handle);
+  auto* runtime_token = mln_binding_owner_token_create(runtime);
+  auto* map_token = mln_binding_owner_token_create(map);
+  auto* session_token = mln_binding_owner_token_create(handle);
   TEST_ASSERT_NOT_NULL(runtime_token);
   TEST_ASSERT_NOT_NULL(map_token);
   TEST_ASSERT_NOT_NULL(session_token);
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    mln_adapter_owner_finalize(runtime_token);
-    mln_adapter_owner_finalize(map_token);
-    mln_adapter_owner_finalize(session_token);
+    mln_binding_owner_finalize(runtime_token);
+    mln_binding_owner_finalize(map_token);
+    mln_binding_owner_finalize(session_token);
     return MLN_STATUS_OK;
   });
   TEST_ASSERT_NULL_MESSAGE(
@@ -658,9 +658,9 @@ void finalization_abandons_an_attached_session() {
   attach_observed(map, fixture, released);
   mln_test_render_request_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
-  auto* const token = mln_adapter_owner_token_create(fixture.session);
+  auto* const token = mln_binding_owner_token_create(fixture.session);
   TEST_ASSERT_NOT_NULL(token);
-  mln_adapter_owner_finalize(token);
+  mln_binding_owner_finalize(token);
   TEST_ASSERT_TRUE(wake_released(released));
   TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)

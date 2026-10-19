@@ -544,6 +544,7 @@ class Values:
         extra_fields=(),
         extra_methods="",
         copied=True,
+        registration=False,
     ):
         """The Rust copy and the Python class of one record.
 
@@ -566,6 +567,9 @@ class Values:
             public_type = self.type(value)
             if optional(value):
                 default = " = None"
+            elif registration and value.kind == "array":
+                # A registration's routes or rules default to none.
+                default = " = ()"
             elif value.registration:
                 # A registration without presence defaults to a disabled one,
                 # which is what the record's native default holds. The lambda

@@ -21,20 +21,6 @@ typedef mln_render_session = Uint64;
 typedef mln_resource_request_handle = Uint64;
 typedef mln_runtime = Uint64;
 
-typedef mln_adapter_completion_listener =
-    Pointer<NativeFunction<mln_adapter_completion_listenerFunction>>;
-typedef mln_adapter_completion_listenerFunction =
-    Void Function(
-      Pointer<Void> user_data,
-      Pointer<mln_adapter_completion_record> record,
-    );
-typedef mln_adapter_deferred_call_listener =
-    Pointer<NativeFunction<mln_adapter_deferred_call_listenerFunction>>;
-typedef mln_adapter_deferred_call_listenerFunction =
-    Void Function(
-      Pointer<Void> user_data,
-      Pointer<mln_adapter_deferred_call_record> record,
-    );
 typedef mln_camera_transition_end_callback =
     Pointer<NativeFunction<mln_camera_transition_end_callbackFunction>>;
 typedef mln_camera_transition_end_callbackFunction =
@@ -101,102 +87,6 @@ typedef mln_user_data_release =
 typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
-
-final class mln_adapter_completion_record extends Struct {
-  external Pointer<Void> owner;
-  external mln_completion_result result;
-}
-
-final class mln_adapter_deferred_call_record extends Struct {
-  external Pointer<Void> owner;
-  @Uint32()
-  external int callback;
-  external Pointer<Void> arguments;
-}
-
-final class mln_adapter_http_header extends Struct {
-  external Pointer<Char> name;
-  external Pointer<Char> value;
-}
-
-final class mln_adapter_http_header_transform_rule extends Struct {
-  @Uint32()
-  external int kind;
-  @Uint32()
-  external int flags;
-  external Pointer<Char> url;
-  external Pointer<mln_adapter_http_header> headers;
-  @Size()
-  external int header_count;
-}
-
-final class mln_adapter_http_header_transform_rules extends Struct {
-  external Pointer<mln_adapter_http_header_transform_rule> rules;
-  @Size()
-  external int count;
-}
-
-final class mln_adapter_log_callback_arguments extends Struct {
-  @Uint32()
-  external int severity;
-  @Uint32()
-  external int event;
-  @Int64()
-  external int code;
-  external Pointer<Char> message;
-}
-
-final class mln_adapter_resource_provider_callback_arguments extends Struct {
-  external Pointer<mln_resource_request> request;
-  @Uint64()
-  external int handle;
-}
-
-final class mln_adapter_resource_provider_rule extends Struct {
-  @Uint32()
-  external int kind;
-  @Uint32()
-  external int flags;
-  external Pointer<Char> requested_url;
-  external mln_resource_response response;
-}
-
-final class mln_adapter_resource_provider_rules extends Struct {
-  external Pointer<mln_adapter_resource_provider_rule> rules;
-  @Size()
-  external int count;
-}
-
-final class mln_adapter_resource_rewrite_rule extends Struct {
-  @Uint32()
-  external int kind;
-  @Uint32()
-  external int flags;
-  external Pointer<Char> url;
-  external Pointer<Char> replacement_url;
-}
-
-final class mln_adapter_resource_rewrite_rules extends Struct {
-  external Pointer<mln_adapter_resource_rewrite_rule> rules;
-  @Size()
-  external int count;
-}
-
-final class mln_adapter_resource_route extends Struct {
-  @Uint32()
-  external int kind;
-  @Uint32()
-  external int flags;
-  external Pointer<Char> url;
-}
-
-final class mln_adapter_routed_resource_provider extends Struct {
-  external Pointer<mln_adapter_resource_route> routes;
-  @Size()
-  external int route_count;
-  external mln_resource_provider_callback callback;
-  external Pointer<Void> user_data;
-}
 
 final class mln_animation_options extends Struct {
   @Uint32()
@@ -542,12 +432,31 @@ final class mln_gpu_sync extends Struct {
   external int value;
 }
 
+final class mln_http_header extends Struct {
+  external Pointer<Char> name;
+  external Pointer<Char> value;
+}
+
+final class mln_http_header_rule extends Struct {
+  @Uint32()
+  external int kind;
+  @Uint32()
+  external int flags;
+  external Pointer<Char> url;
+  external Pointer<mln_http_header> headers;
+  @Size()
+  external int header_count;
+}
+
 final class mln_http_header_transform extends Struct {
   @Uint32()
   external int size;
   external mln_http_header_transform_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  external Pointer<mln_http_header_rule> rules;
+  @Size()
+  external int rule_count;
 }
 
 final class mln_http_header_transform_response extends Struct {
@@ -1093,6 +1002,9 @@ final class mln_resource_provider extends Struct {
   external mln_user_data_release release_user_data;
   @Uint64()
   external int queue;
+  external Pointer<mln_resource_route> routes;
+  @Size()
+  external int route_count;
 }
 
 final class mln_resource_range extends Struct {
@@ -1168,12 +1080,32 @@ final class mln_resource_response extends Struct {
   external int retry_after_unix_ms;
 }
 
+final class mln_resource_rewrite_rule extends Struct {
+  @Uint32()
+  external int kind;
+  @Uint32()
+  external int flags;
+  external Pointer<Char> url;
+  external Pointer<Char> replacement_url;
+}
+
+final class mln_resource_route extends Struct {
+  @Uint32()
+  external int kind;
+  @Uint32()
+  external int flags;
+  external Pointer<Char> url;
+}
+
 final class mln_resource_transform extends Struct {
   @Uint32()
   external int size;
   external mln_resource_transform_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  external Pointer<mln_resource_rewrite_rule> rules;
+  @Size()
+  external int rule_count;
 }
 
 final class mln_resource_transform_response extends Struct {
@@ -1635,51 +1567,6 @@ final class mln_wgl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
-// mln_adapter_completion_copy_kind
-const MLN_ADAPTER_COMPLETION_COPY_FLAT = 0;
-const MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = 3303399434;
-const MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS = 1729514601;
-const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
-const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = 2638194669;
-const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = 3400515811;
-const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
-const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
-const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
-const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
-const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO = 4245014400;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO = 3674928708;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO = 3318217596;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
-const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT = 2875519289;
-
-// mln_adapter_dart_port_callback
-const MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1068062508;
-const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
-    3644896267;
-const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
-    433183623;
-const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
-    658252347;
-const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
-    1073125309;
-const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK =
-    2876456937;
-const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = 2393247646;
-
-// mln_adapter_deferred_callback
-const MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336;
-const MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793;
-
-// mln_adapter_resource_route_flags
-const MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0;
-const MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1;
-const MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 2;
-
-// mln_adapter_url_match_flags
-const MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0;
-const MLN_ADAPTER_URL_MATCH_GLOB = 1;
-
 // mln_ambient_cache_operation
 const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1;
 const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2;
@@ -1692,6 +1579,20 @@ const MLN_ANIMATION_OPTION_VELOCITY = 2;
 const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
 const MLN_ANIMATION_OPTION_EASING = 8;
 const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
+
+// mln_binding_dart_port_callback
+const MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1068062508;
+const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
+    3644896267;
+const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
+    433183623;
+const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
+    658252347;
+const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
+    1073125309;
+const MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK =
+    2876456937;
+const MLN_BINDING_DART_PORT_WAKE_CALLBACK = 2393247646;
 
 // mln_bound_option_field
 const MLN_BOUND_OPTION_BOUNDS = 1;
@@ -2194,6 +2095,11 @@ const MLN_TILE_OPERATION_ERROR = 6;
 const MLN_TILE_OPERATION_CANCELLED = 7;
 const MLN_TILE_OPERATION_NULL = 8;
 
+// mln_url_match_flags
+const MLN_URL_MATCH_FLAGS_NONE = 0;
+const MLN_URL_MATCH_GLOB = 1;
+const MLN_URL_MATCH_REQUESTED_URL = 2;
+
 // mln_viewport_mode
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
 const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
@@ -2315,274 +2221,6 @@ external int mln_acquired_frame_view_begin(
 @Native<Void Function(Pointer<Void>)>()
 external void mln_acquired_frame_view_end(Pointer<Void> scope);
 
-@Native<Int32 Function(Pointer<Void>, Uint64, Pointer<mln_diagnostic>)>()
-external int mln_adapter_arena_adopt_handle(
-  Pointer<Void> arena,
-  int handle,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    mln_user_data_release,
-    Pointer<Void>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_arena_adopt_release(
-  Pointer<Void> arena,
-  mln_user_data_release release,
-  Pointer<Void> context,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Pointer<Void> Function(Pointer<Void>, Size, Size)>()
-external Pointer<Void> mln_adapter_arena_allocate(
-  Pointer<Void> arena,
-  int size,
-  int alignment,
-);
-
-@Native<Pointer<Void> Function()>()
-external Pointer<Void> mln_adapter_arena_create();
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_arena_destroy(Pointer<Void> arena);
-
-@Native<
-  Int32 Function(
-    Uint32,
-    mln_adapter_completion_listener,
-    Pointer<Void>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_completion_create(
-  int copy_kind,
-  mln_adapter_completion_listener listener,
-  Pointer<Void> user_data,
-  Pointer<mln_completion> out_completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(Pointer<mln_adapter_completion_record>)>()
-external void mln_adapter_completion_record_adopt(
-  Pointer<mln_adapter_completion_record> record,
-);
-
-@Native<Void Function(Pointer<mln_adapter_completion_record>)>()
-external void mln_adapter_completion_record_destroy(
-  Pointer<mln_adapter_completion_record> record,
-);
-
-@Native<Void Function(Pointer<mln_completion>)>()
-external void mln_adapter_completion_reject(Pointer<mln_completion> completion);
-
-@Native<
-  Int32 Function(
-    Uint32,
-    Pointer<Void>,
-    Int64,
-    Int64,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_dart_completion_create(
-  int copy_kind,
-  Pointer<Void> post_cobject,
-  int port,
-  int token,
-  Pointer<mln_completion> out_completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    Uint32,
-    Pointer<Void>,
-    Int64,
-    Pointer<Pointer<Void>>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_dart_deferred_callback_create(
-  int callback,
-  Pointer<Void> post_cobject,
-  int port,
-  Pointer<Pointer<Void>> out_context,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Pointer<Void> Function(Pointer<Void>, Int64)>()
-external Pointer<Void> mln_adapter_dart_port_create(
-  Pointer<Void> post_cobject,
-  int port,
-);
-
-@Native<Pointer<Void> Function(Uint32)>()
-external Pointer<Void> mln_adapter_dart_port_function(int id);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_dart_port_release(Pointer<Void> context);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_dart_release(Pointer<Void> context);
-
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    Int64,
-    Pointer<Void>,
-    Pointer<Void>,
-    Pointer<Uint64>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_dart_release_register(
-  Pointer<Void> post_cobject,
-  int port,
-  Pointer<Void> context,
-  Pointer<Void> arena,
-  Pointer<Uint64> out_registration,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    Int64,
-    Pointer<mln_wake>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_dart_wake_create(
-  Pointer<Void> post_cobject,
-  int port,
-  Pointer<mln_wake> out_wake,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(Pointer<mln_adapter_deferred_call_record>)>()
-external void mln_adapter_deferred_call_record_adopt(
-  Pointer<mln_adapter_deferred_call_record> record,
-);
-
-@Native<Void Function(Pointer<mln_adapter_deferred_call_record>)>()
-external void mln_adapter_deferred_call_record_destroy(
-  Pointer<mln_adapter_deferred_call_record> record,
-);
-
-@Native<
-  Int32 Function(
-    Uint32,
-    mln_adapter_deferred_call_listener,
-    Pointer<Void>,
-    Pointer<Pointer<Void>>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_deferred_callback_create(
-  int callback,
-  mln_adapter_deferred_call_listener listener,
-  Pointer<Void> listener_user_data,
-  Pointer<Pointer<Void>> out_context,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Pointer<Void> Function(Uint32)>()
-external Pointer<Void> mln_adapter_deferred_callback_function(int callback);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_deferred_callback_release(Pointer<Void> context);
-
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    Uint32,
-    Pointer<Char>,
-    Pointer<mln_http_header_transform_response>,
-  )
->()
-external int mln_adapter_http_header_transform_callback(
-  Pointer<Void> user_data,
-  int kind,
-  Pointer<Char> url,
-  Pointer<mln_http_header_transform_response> out_response,
-);
-
-@Native<Int32 Function(Pointer<Char>, Pointer<Char>, Pointer<mln_diagnostic>)>()
-external int mln_adapter_http_header_validate(
-  Pointer<Char> name,
-  Pointer<Char> value,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_owner_finalize(Pointer<Void> token);
-
-@Native<Pointer<Void> Function(Uint64)>()
-external Pointer<Void> mln_adapter_owner_token_create(int handle);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_owner_token_destroy(Pointer<Void> token);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_render_abandon_result>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_adapter_render_session_abandon_at_exit(
-  int session,
-  Pointer<mln_render_abandon_result> out_result,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Uint32 Function(
-    Pointer<Void>,
-    Pointer<mln_resource_request>,
-    mln_resource_request_handle,
-  )
->()
-external int mln_adapter_resource_provider_rules_callback(
-  Pointer<Void> user_data,
-  Pointer<mln_resource_request> request,
-  int handle,
-);
-
-@Native<
-  Int32 Function(
-    Pointer<Void>,
-    Uint32,
-    Pointer<Char>,
-    Pointer<mln_resource_transform_response>,
-  )
->()
-external int mln_adapter_resource_transform_rewrite_callback(
-  Pointer<Void> user_data,
-  int kind,
-  Pointer<Char> url,
-  Pointer<mln_resource_transform_response> out_response,
-);
-
-@Native<
-  Uint32 Function(
-    Pointer<Void>,
-    Pointer<mln_resource_request>,
-    mln_resource_request_handle,
-  )
->()
-external int mln_adapter_routed_resource_provider_callback(
-  Pointer<Void> user_data,
-  Pointer<mln_resource_request> request,
-  int handle,
-);
-
 @Native<Int32 Function(Pointer<Void>, Pointer<Void>, Pointer<mln_diagnostic>)>()
 external int mln_android_init(
   Pointer<Void> jni_env,
@@ -2592,6 +2230,55 @@ external int mln_android_init(
 
 @Native<mln_animation_options Function()>()
 external mln_animation_options mln_animation_options_default();
+
+@Native<Pointer<Void> Function(Pointer<Void>, Int64)>()
+external Pointer<Void> mln_binding_dart_port_create(
+  Pointer<Void> post_cobject,
+  int port,
+);
+
+@Native<Pointer<Void> Function(Uint32)>()
+external Pointer<Void> mln_binding_dart_port_function(int id);
+
+@Native<Void Function(Pointer<Void>)>()
+external void mln_binding_dart_port_release(Pointer<Void> context);
+
+@Native<
+  Int32 Function(
+    Pointer<Void>,
+    Int64,
+    Pointer<mln_wake>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_binding_dart_wake_create(
+  Pointer<Void> post_cobject,
+  int port,
+  Pointer<mln_wake> out_wake,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(Pointer<Void>)>()
+external void mln_binding_owner_finalize(Pointer<Void> token);
+
+@Native<Pointer<Void> Function(Uint64)>()
+external Pointer<Void> mln_binding_owner_token_create(int handle);
+
+@Native<Void Function(Pointer<Void>)>()
+external void mln_binding_owner_token_destroy(Pointer<Void> token);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_render_abandon_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_binding_render_session_abandon_at_exit(
+  int session,
+  Pointer<mln_render_abandon_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @Native<mln_bound_options Function()>()
 external mln_bound_options mln_bound_options_default();

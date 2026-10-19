@@ -126,7 +126,7 @@ endfunction()
 function(mln_ffi_configure_c_api_implementation target)
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
-      ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/binding_support.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/delivery.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
@@ -165,6 +165,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/file_source_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/network_status.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
+      ${PROJECT_SOURCE_DIR}/src/resources/url_rules.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/testing/render_clock.cpp

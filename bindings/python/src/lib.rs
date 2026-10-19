@@ -244,7 +244,7 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
 unsafe extern "C" {
     // Binding-internal export from maplibre_native_c/binding_support.h,
     // which the sys crate does not bind.
-    fn mln_adapter_render_session_abandon_at_exit(
+    fn mln_binding_render_session_abandon_at_exit(
         session: sys::mln_render_session,
         out_result: *mut sys::mln_render_abandon_result,
         out_diagnostic: *mut sys::mln_diagnostic,
@@ -275,7 +275,7 @@ fn end_graphics_at_exit<T: 'static>(raw: u64) {
     // SAFETY: the caller holds sole ownership of the live session, and result
     // is a writable, correctly sized output.
     let _ = unsafe {
-        mln_adapter_render_session_abandon_at_exit(
+        mln_binding_render_session_abandon_at_exit(
             sys::mln_render_session(raw),
             &mut result,
             ptr::null_mut(),

@@ -30,7 +30,7 @@ EXCLUDED_DIRS = ("internal",)
 TEST_SUFFIXES = {".c", ".cpp", ".h", ".hpp", ".m", ".mm"}
 # Adapter and binding support entry points serve hosts and generated bindings
 # rather than map workflows, so the report counts them separately.
-ADAPTER_HEADERS = {"callback_adapter.h", "binding_support.h"}
+ADAPTER_HEADERS = {"binding_support.h"}
 
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 LINE_COMMENT = re.compile(r"//[^\n]*")
@@ -190,7 +190,7 @@ def main() -> int:
     total_adapter = sum(1 for header in exported.values() if header in ADAPTER_HEADERS)
     print(
         f"{len(uncalled) - adapter} of {len(exported) - total_adapter} exported "
-        f"non-adapter functions and {adapter} of {total_adapter} adapter "
+        f"public functions and {adapter} of {total_adapter} binding-support "
         f"functions are uncalled in the ABI suite under "
         f"{SUITE_DIR.relative_to(ROOT).as_posix()}."
     )

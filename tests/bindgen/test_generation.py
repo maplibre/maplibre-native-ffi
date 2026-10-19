@@ -66,7 +66,7 @@ class GenerationTests(unittest.TestCase):
                         set(coverage["generated"])
                         | set(coverage["unsupported"])
                         | set(coverage.get("support", ()))
-                        | set(coverage.get("callback_adapters", ())),
+                        | set(coverage.get("native_rules", ())),
                         {function.name for function in api.public_functions},
                     )
 

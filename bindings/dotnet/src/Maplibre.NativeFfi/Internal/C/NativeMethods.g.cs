@@ -105,40 +105,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_custom_mvt_vector_source_options mln_custom_mvt_vector_source_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_delivery_batch_get(
-        MlnDeliveryBatch batch,
-        mln_delivery_batch_view* out_view,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_delivery_batch_release(MlnDeliveryBatch batch);
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_delivery_batch_take(
-        MlnDeliveryBatch batch,
-        nuint index,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_delivery_queue_create(
-        mln_delivery_queue_options* options,
-        MlnDeliveryQueue* out_queue,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_delivery_queue_drain(
-        MlnDeliveryQueue queue,
-        MlnDeliveryBatch* out_batch,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_delivery_queue_release(MlnDeliveryQueue queue);
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_event_batch_get(
         MlnEventBatch batch,
         mln_event_batch_view* out_view,

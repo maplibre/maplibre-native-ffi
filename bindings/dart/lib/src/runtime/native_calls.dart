@@ -10,9 +10,7 @@ NativeCompletionStart _withArena(_NativeStart start) =>
     (completion) => withNativeArena((arena) => start(arena, completion));
 
 final class _CompletionValue<T> {
-  _CompletionValue(this.copyKind, this.elementSize, this.read);
-
-  final int copyKind;
+  _CompletionValue(this.elementSize, this.read);
 
   /// The size of one element in this binding's header, which the native
   /// stride must cover.
@@ -41,56 +39,42 @@ final class _CompletionValue<T> {
 Future<CommandCompletion> _command(_NativeStart start) =>
     _startCommand(_withArena(start));
 
-Future<void> _run(_NativeStart start) => startNativeCompletion(
-  copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-  start: _withArena(start),
-  decode: (_) {},
-);
+Future<void> _run(_NativeStart start) =>
+    startNativeCompletion(start: _withArena(start), decode: (_) {});
 
 Future<T> _query<T>(_CompletionValue<T> value, _NativeStart start) =>
     startNativeCompletion(
-      copyKind: value.copyKind,
       start: _withArena(start),
       decode: (result) => value.read(result.value),
     );
 
 Future<T?> _queryOptional<T>(_CompletionValue<T?> value, _NativeStart start) =>
     startNativeCompletion(
-      copyKind: value.copyKind,
       start: _withArena(start),
       decode: (result) =>
           result.value_count == 0 ? null : value.read(result.value),
     );
 
 Future<List<T>> _queryList<T>(_CompletionValue<T> value, _NativeStart start) =>
-    startNativeCompletion(
-      copyKind: value.copyKind,
-      start: _withArena(start),
-      decode: value.readList,
-    );
+    startNativeCompletion(start: _withArena(start), decode: value.readList);
 
 // ignore: unused_element
 Future<List<T>?> _queryOptionalList<T>(
   _CompletionValue<T> value,
   _NativeStart start,
 ) => startNativeCompletion(
-  copyKind: value.copyKind,
   start: _withArena(start),
   decode: (result) => result.value == nullptr ? null : value.readList(result),
 );
 
 /// Starts an operation whose completion transfers one handle, which [adopt]
-/// gives its owner once the binding has claimed the native record.
-Future<T> _queryOwned<T>(
-  int copyKind,
-  _NativeStart start,
-  T Function(int handle) adopt,
-) => startNativeCompletion(
-  copyKind: copyKind,
-  start: _withArena(start),
-  decode: (result) => adopt(result.value.cast<Uint64>().value),
-  claimBeforeDecode: true,
-);
+/// gives its owner once the binding has taken it from the delivery batch.
+Future<T> _queryOwned<T>(_NativeStart start, T Function(int handle) adopt) =>
+    startNativeCompletion(
+      start: _withArena(start),
+      decode: (result) => adopt(result.value.cast<Uint64>().value),
+      claimBeforeDecode: true,
+    );
 
 /// Starts an attachment, which writes its owner's handle at admission and
 /// completes once attachment finishes.
@@ -110,7 +94,6 @@ A _attach<T extends Object, A>(
 ) {
   var handle = 0;
   final completed = startNativeCompletion<void>(
-    copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     start: (completion) => withNativeArena((arena) {
       final output = arena<Uint64>();
       final status = start(arena, completion, output);

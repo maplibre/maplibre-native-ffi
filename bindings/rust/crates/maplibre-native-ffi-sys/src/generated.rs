@@ -441,6 +441,10 @@ pub const MLN_TILE_OPERATION_END_PARSE: mln_tile_operation = 5;
 pub const MLN_TILE_OPERATION_ERROR: mln_tile_operation = 6;
 pub const MLN_TILE_OPERATION_CANCELLED: mln_tile_operation = 7;
 pub const MLN_TILE_OPERATION_NULL: mln_tile_operation = 8;
+pub type mln_url_match_flags = u32;
+pub const MLN_URL_MATCH_FLAGS_NONE: mln_url_match_flags = 0;
+pub const MLN_URL_MATCH_GLOB: mln_url_match_flags = 1;
+pub const MLN_URL_MATCH_REQUESTED_URL: mln_url_match_flags = 2;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
@@ -601,35 +605,6 @@ pub struct mln_custom_mvt_vector_source_options {
     pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct mln_delivery {
-    pub type_: u32,
-    pub reserved: u32,
-    pub user_data: *mut std::ffi::c_void,
-    pub payload: mln_delivery_payload,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_delivery_batch_view {
-    pub size: u32,
-    pub delivery_size: u32,
-    pub deliveries: *const mln_delivery,
-    pub delivery_count: usize,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union mln_delivery_payload {
-    pub completion: mln_completion_result,
-    pub log_record: mln_log_delivery,
-    pub resource_request: mln_resource_request_delivery,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_delivery_queue_options {
-    pub size: u32,
-    pub wake: mln_wake,
-}
-#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_diagnostic {
     pub size: u32,
@@ -716,11 +691,28 @@ pub struct mln_gpu_sync {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_http_header {
+    pub name: *const std::ffi::c_char,
+    pub value: *const std::ffi::c_char,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_http_header_rule {
+    pub kind: u32,
+    pub flags: u32,
+    pub url: *const std::ffi::c_char,
+    pub headers: *const mln_http_header,
+    pub header_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_http_header_transform {
     pub size: u32,
     pub callback: mln_http_header_transform_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
+    pub rules: *const mln_http_header_rule,
+    pub rule_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -753,14 +745,6 @@ pub struct mln_lat_lng {
 pub struct mln_lat_lng_bounds {
     pub southwest: mln_lat_lng,
     pub northeast: mln_lat_lng,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_log_delivery {
-    pub severity: u32,
-    pub event: u32,
-    pub code: i64,
-    pub message: *const std::ffi::c_char,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1149,6 +1133,8 @@ pub struct mln_resource_provider {
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
+    pub routes: *const mln_resource_route,
+    pub route_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1185,12 +1171,6 @@ pub struct mln_resource_request_cancel_handler {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_resource_request_delivery {
-    pub request: *const mln_resource_request,
-    pub handle: mln_resource_request_handle,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_response {
     pub size: u32,
     pub fields: u32,
@@ -1207,11 +1187,28 @@ pub struct mln_resource_response {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_resource_rewrite_rule {
+    pub kind: u32,
+    pub flags: u32,
+    pub url: *const std::ffi::c_char,
+    pub replacement_url: *const std::ffi::c_char,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_resource_route {
+    pub kind: u32,
+    pub flags: u32,
+    pub url: *const std::ffi::c_char,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_transform {
     pub size: u32,
     pub callback: mln_resource_transform_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
+    pub rules: *const mln_resource_rewrite_rule,
+    pub rule_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1596,9 +1593,6 @@ pub type mln_custom_source_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_delivery_batch(pub u64);
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_delivery_queue(pub u64);
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1665,7 +1659,6 @@ pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
-    mln_delivery_batch,
     mln_delivery_queue,
     mln_event_batch,
     mln_geojson_source_data,
@@ -1737,28 +1730,6 @@ unsafe extern "C" {
     pub fn mln_camera_update_default() -> mln_camera_update;
     pub fn mln_custom_geometry_source_options_default() -> mln_custom_geometry_source_options;
     pub fn mln_custom_mvt_vector_source_options_default() -> mln_custom_mvt_vector_source_options;
-    pub fn mln_delivery_batch_get(
-        batch: mln_delivery_batch,
-        out_view: *mut mln_delivery_batch_view,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_delivery_batch_release(batch: mln_delivery_batch);
-    pub fn mln_delivery_batch_take(
-        batch: mln_delivery_batch,
-        index: usize,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_delivery_queue_create(
-        options: *const mln_delivery_queue_options,
-        out_queue: *mut mln_delivery_queue,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_delivery_queue_drain(
-        queue: mln_delivery_queue,
-        out_batch: *mut mln_delivery_batch,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
     pub fn mln_event_batch_get(
         batch: mln_event_batch,
         out_view: *mut mln_event_batch_view,

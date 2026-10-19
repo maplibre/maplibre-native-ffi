@@ -709,7 +709,10 @@ mod download {
     /// Headers in the checkout's domain directory that the install leaves out.
     /// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
     /// and `_uninstalledHeaders` in the Dart binding's `hook/build.dart`.
-    const UNINSTALLED_HEADERS: [&str; 1] = ["maplibre_native_c/binding_support.h"];
+    const UNINSTALLED_HEADERS: [&str; 2] = [
+        "maplibre_native_c/binding_support.h",
+        "maplibre_native_c/binding_support_generated.h",
+    ];
 
     /// Digests the public C headers, keyed by their path under `include/`.
     /// Render backend dependencies install their own headers alongside ours, so

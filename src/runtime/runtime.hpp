@@ -14,6 +14,7 @@
 #include <set>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -24,6 +25,7 @@
 #include "execution/runtime_executor.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "resources/url_rules.hpp"
 
 namespace mln {
 class DatabaseFileSource;
@@ -220,6 +222,8 @@ class RuntimeCallbackContext {
 struct ResourceProvider {
   mln_resource_provider_callback callback = nullptr;
   std::shared_ptr<RuntimeCallbackContext> context;
+  // The requests that reach the provider. Null or empty claims every request.
+  std::shared_ptr<const RouteTable> routes;
 };
 
 struct ResourceTransformRegistration {
@@ -276,6 +280,15 @@ class ResourceProviderLease {
   }
   [[nodiscard]] auto user_data() const -> void* {
     return provider_.context->user_data();
+  }
+  // Whether the provider's routes claim a request. A request they do not
+  // claim passes through to native loading.
+  [[nodiscard]] auto matches(
+    std::uint32_t kind, std::string_view requested_url,
+    std::string_view resolved_url
+  ) const noexcept -> bool {
+    return provider_.routes == nullptr ||
+           provider_.routes->matches(kind, requested_url, resolved_url);
   }
 
  private:

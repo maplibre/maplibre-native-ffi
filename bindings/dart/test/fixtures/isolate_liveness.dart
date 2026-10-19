@@ -18,28 +18,24 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
     RuntimeOptions(eventWake: Wake(callback: () {})),
   );
   await runtime.setResourceTransform(
-    ResourceTransform.resourceRewriteRules(
-      AdapterResourceRewriteRules(
-        rules: const [
-          AdapterResourceRewriteRule(
-            url: 'liveness://old',
-            replacementUrl: 'liveness://new',
-          ),
-        ],
-      ),
+    ResourceTransform(
+      rules: const [
+        ResourceRewriteRule(
+          url: 'liveness://old',
+          replacementUrl: 'liveness://new',
+        ),
+      ],
     ),
   );
   await runtime.setResourceProvider(
-    ResourceProvider.routedResourceProvider(
-      AdapterRoutedResourceProvider(
-        routes: [
-          AdapterResourceRoute(
-            kind: ResourceKind.style.rawValue,
-            url: 'liveness://style',
-          ),
-        ],
-        callback: (_, request) => request.close(),
-      ),
+    ResourceProvider(
+      routes: [
+        ResourceRoute(
+          kind: ResourceKind.style.rawValue,
+          url: 'liveness://style',
+        ),
+      ],
+      callback: (_, request) => request.close(),
     ),
   );
   final map = await runtime.createMap(mapOptionsDefault());

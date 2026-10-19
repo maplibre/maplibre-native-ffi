@@ -10,7 +10,6 @@ from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
-from tools.bindgen.native_capture import copy_kind
 from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_support
 
 from .dart_values import (
@@ -364,7 +363,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         public, decode = adopt_owner(
             plan.completion.result_owner, "handle", receiver, function, values
         )
-        operation = f"_queryOwned(raw.{copy_kind(plan.result.native)}, {start}, (handle) => {decode})"
+        operation = f"_queryOwned({start}, (handle) => {decode})"
     else:
         result = plan.result
         values.check(result)
@@ -428,18 +427,13 @@ def method_body(body: list[str]) -> str:
 def completion_value(values: Values, element, read) -> str:
     """The descriptor of how a completion copies and reads one value type."""
     ffi = values.ffi(element)
-    kind = (
-        copy_kind(element.native)
-        if element.kind in {"record", "handle"} or element.buffer_form == "view"
-        else "MLN_ADAPTER_COMPLETION_COPY_FLAT"
-    )
     suffix = (
         ".ref"
         if element.kind == "record" or element.buffer_form == "view"
         else ".value"
     )
     code = (
-        f"_CompletionValue(raw.{kind}, sizeOf<{ffi}>(), "
+        f"_CompletionValue(sizeOf<{ffi}>(), "
         f"(element) => {values.copy(read, f'element.cast<{ffi}>(){suffix}')})"
     )
     stem = "_result" + re.sub(r"\W", "", values.public(read).replace("?", "OrNull"))
@@ -656,19 +650,40 @@ def abi_checked(body: str) -> str:
 
 def coverage(api: Api | BoundApi):
     _, generated, unsupported, values = lower(api)
-    adapters = {}
     bound = values.bound
+    # A callback that must answer on its native thread has no Dart form, so its
+    # registration carries native rules instead. The operations that only such
+    # a callback calls, through the response records it writes, have no caller.
+    rules = {}
     for value in list(values.used.values()):
-        if value.registration:
-            for adapter in values.registration_adapters(value):
-                for plan in bound.adapter_operations(adapter):
-                    adapters[plan.name] = (
-                        f"native callback adapter {adapter.function} for {value.native}"
+        if not value.registration:
+            continue
+        for field in value.fields:
+            if not values.omitted(field):
+                continue
+            callback = bound.callbacks[field.value.native]
+            responses = {
+                parameter.value.element.native
+                for parameter in callback.parameters
+                if parameter.direction in {"out", "inout"} and parameter.value.element
+            }
+            for plan in bound.operations:
+                receiver = next(
+                    (
+                        p.value.element.native
+                        for p in (*plan.inputs, *plan.outputs)
+                        if p.name == plan.scoped_receiver and p.value.element
+                    ),
+                    None,
+                )
+                if plan.scoped_receiver and receiver in responses:
+                    rules[plan.name] = (
+                        f"{callback.native} is answered by native rules in {value.native}"
                     )
                     unsupported.pop(plan.name, None)
     return {
         "generated": generated,
-        "callback_adapters": adapters,
+        "native_rules": rules,
         "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

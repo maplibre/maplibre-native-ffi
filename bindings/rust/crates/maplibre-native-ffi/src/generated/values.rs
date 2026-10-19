@@ -1572,8 +1572,59 @@ pub enum GpuSyncKind: u32 {
 } Unknown
 }
 
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+impl ToNative<sys::mln_http_header> for HttpHeader {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_http_header> {
+        let mut raw: sys::mln_http_header = unsafe { std::mem::zeroed() };
+        raw.name = to_native(&self.name, arena)?;
+        raw.value = to_native(&self.value, arena)?;
+        Ok(raw)
+    }
+}
+
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct HttpHeaderRule {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    pub kind: u32,
+    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    pub flags: UrlMatchFlags,
+    /// The URL or glob pattern to compare.
+    pub url: String,
+    /// The headers to set. Registration validates each one as
+    /// `mln_http_header_transform_response_set_header()` does.
+    pub headers: Vec<HttpHeader>,
+}
+impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_http_header_rule> {
+        let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
+        raw.kind = self.kind;
+        raw.flags = to_native(&self.flags, arena)?;
+        raw.url = to_native(&self.url, arena)?;
+        raw.headers = convert::array(&self.headers, arena)?;
+        raw.header_count = convert::count(self.headers.len())?;
+        Ok(raw)
+    }
+}
+
+/// HTTP header transform state: a callback, or native header rules.
+///
+/// See `mln_http_header_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct HttpHeaderTransform {
+    /// The callback, or null to apply rules.
     pub callback: Option<
         std::sync::Arc<
             dyn Fn(ResourceKind, String, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
@@ -1582,6 +1633,8 @@ pub struct HttpHeaderTransform {
                 + 'static,
         >,
     >,
+    /// Header rules for a transform without a callback; empty with one.
+    pub rules: Vec<HttpHeaderRule>,
 }
 impl std::fmt::Debug for HttpHeaderTransform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1643,6 +1696,7 @@ impl ToNative<sys::mln_http_header_transform> for HttpHeaderTransform {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
+        raw.rules = convert::array(&self.rules, arena)?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4272,6 +4326,8 @@ pub struct ResourceProvider {
                 + 'static,
         >,
     >,
+    /// The requests that reach the provider; empty to claim every request.
+    pub routes: Vec<ResourceRoute>,
 }
 impl std::fmt::Debug for ResourceProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4349,6 +4405,7 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
+        raw.routes = convert::array(&self.routes, arena)?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4626,6 +4683,55 @@ pub enum ResourceResponseStatus: u32 {
 } Unknown
 }
 
+/// One rule of a native resource transform.
+///
+/// See `mln_resource_rewrite_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ResourceRewriteRule {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    pub kind: u32,
+    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    pub flags: UrlMatchFlags,
+    /// The URL or glob pattern to compare.
+    pub url: String,
+    /// The replacement URL, or null to leave a matching URL unchanged.
+    pub replacement_url: Option<String>,
+}
+impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_rewrite_rule> {
+        let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
+        raw.kind = self.kind;
+        raw.flags = to_native(&self.flags, arena)?;
+        raw.url = to_native(&self.url, arena)?;
+        raw.replacement_url = to_native(&self.replacement_url, arena)?;
+        Ok(raw)
+    }
+}
+
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ResourceRoute {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    pub kind: u32,
+    /// A bitwise OR of `mln_url_match_flags` values.
+    pub flags: UrlMatchFlags,
+    /// The URL or glob pattern to compare.
+    pub url: String,
+}
+impl ToNative<sys::mln_resource_route> for ResourceRoute {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_route> {
+        let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
+        raw.kind = self.kind;
+        raw.flags = to_native(&self.flags, arena)?;
+        raw.url = to_native(&self.url, arena)?;
+        Ok(raw)
+    }
+}
+
 native_enum! {
 pub enum ResourceStoragePolicy: u32 {
     Permanent = 0,
@@ -4633,8 +4739,13 @@ pub enum ResourceStoragePolicy: u32 {
 } Unknown
 }
 
+/// Resource transform state: a callback, or native rewrite rules.
+///
+/// See `mln_resource_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct ResourceTransform {
+    /// The callback, or null to apply rules.
     pub callback: Option<
         std::sync::Arc<
             dyn Fn(ResourceKind, String, &mut ResourceTransformResponse<'_>) -> Result<()>
@@ -4643,6 +4754,8 @@ pub struct ResourceTransform {
                 + 'static,
         >,
     >,
+    /// Rewrite rules for a transform without a callback; empty with one.
+    pub rules: Vec<ResourceRewriteRule>,
 }
 impl std::fmt::Debug for ResourceTransform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4703,6 +4816,7 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
+        raw.rules = convert::array(&self.rules, arena)?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -6135,6 +6249,20 @@ impl FromNative<sys::mln_unit_bezier> for UnitBezier {
             y2: raw.y2,
         })
     }
+}
+
+native_flags! {
+/// How a rule or route compares its url against a request URL.
+///
+/// See `mln_url_match_flags` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct UrlMatchFlags: u32 {
+    const FLAGS_NONE = 0;
+    /// Reads url as a glob pattern.
+    const GLOB = 1;
+    /// Routes only: compare requested_url instead of resolved_url.
+    const REQUESTED_URL = 2;
+}
 }
 
 /// Three-component vector used by free camera options.

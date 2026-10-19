@@ -1298,14 +1298,90 @@ pub const GpuSyncKind = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const HttpHeader = struct {
+    name: []const u8 = &.{},
+    value: []const u8 = &.{},
+    pub fn toNative(self: HttpHeader, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_http_header);
+        raw.name = try marshal.cString(allocator, self.name);
+        raw.value = try marshal.cString(allocator, self.value);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header) status.Error!HttpHeader {
+        return .{
+            .name = try allocator.dupe(u8, std.mem.span(raw.name orelse return error.NativeError)),
+            .value = try allocator.dupe(u8, std.mem.span(raw.value orelse return error.NativeError)),
+        };
+    }
+};
+
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const HttpHeaderRule = struct {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
+    /// The URL or glob pattern to compare.
+    url: []const u8 = &.{},
+    /// The headers to set. Registration validates each one as
+    /// `mln_http_header_transform_response_set_header()` does.
+    headers: []const HttpHeader = &.{},
+    pub fn toNative(self: HttpHeaderRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header_rule {
+        var raw = std.mem.zeroes(c.mln_http_header_rule);
+        raw.kind = self.kind;
+        raw.flags = self.flags.toNative();
+        raw.url = try marshal.cString(allocator, self.url);
+        raw.headers = blk: {
+            const items = try allocator.alloc(c.mln_http_header, self.headers.len);
+            for (self.headers, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.header_count = std.math.cast(@TypeOf(raw.header_count), self.headers.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header_rule) status.Error!HttpHeaderRule {
+        return .{
+            .kind = raw.kind,
+            .flags = UrlMatchFlags.fromNative(raw.flags),
+            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+            .headers = blk: {
+                const copied = try allocator.alloc(HttpHeader, raw.header_count);
+                for (try marshal.nativeSlice(c.mln_http_header, raw.headers, raw.header_count), 0..) |item, index| copied[index] = try HttpHeader.fromNative(allocator, item);
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// HTTP header transform state: a callback, or native header rules.
+///
+/// See `mln_http_header_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderTransform = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
     callback: ?*const fn (?*anyopaque, ResourceKind, []const u8, HttpHeaderTransformResponse) status.Error!void = null,
+    /// Header rules for a transform without a callback; empty with one.
+    rules: []const HttpHeaderRule = &.{},
     pub fn toNative(self: HttpHeaderTransform, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header_transform {
-        _ = allocator;
         var raw = std.mem.zeroes(c.mln_http_header_transform);
         raw.size = @sizeOf(c.mln_http_header_transform);
+        raw.rules = blk: {
+            const items = try allocator.alloc(c.mln_http_header_rule, self.rules.len);
+            for (self.rules, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.rule_count = std.math.cast(@TypeOf(raw.rule_count), self.rules.len) orelse return error.InvalidArgument;
         raw.callback = if (self.callback != null) callbackTrampoline else null;
         if (!(self.callback == null)) {
             const retained = try roots.retain(HttpHeaderTransform, self);
@@ -3416,10 +3492,17 @@ pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
     callback: ?*const fn (?*anyopaque, ResourceRequest, ResourceRequestHandle) status.Error!ResourceProviderDecision = null,
+    /// The requests that reach the provider; empty to claim every request.
+    routes: []const ResourceRoute = &.{},
     pub fn toNative(self: ResourceProvider, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_provider {
-        _ = allocator;
         var raw = std.mem.zeroes(c.mln_resource_provider);
         raw.size = @sizeOf(c.mln_resource_provider);
+        raw.routes = blk: {
+            const items = try allocator.alloc(c.mln_resource_route, self.routes.len);
+            for (self.routes, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.route_count = std.math.cast(@TypeOf(raw.route_count), self.routes.len) orelse return error.InvalidArgument;
         raw.callback = if (self.callback != null) callbackTrampoline else null;
         if (!(self.callback == null)) {
             const retained = try roots.retain(ResourceProvider, self);
@@ -3691,6 +3774,68 @@ pub const ResourceResponseStatus = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// One rule of a native resource transform.
+///
+/// See `mln_resource_rewrite_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRewriteRule = struct {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
+    /// The URL or glob pattern to compare.
+    url: []const u8 = &.{},
+    /// The replacement URL, or null to leave a matching URL unchanged.
+    replacement_url: ?[]const u8 = null,
+    pub fn toNative(self: ResourceRewriteRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_rewrite_rule {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_resource_rewrite_rule);
+        raw.kind = self.kind;
+        raw.flags = self.flags.toNative();
+        raw.url = try marshal.cString(allocator, self.url);
+        raw.replacement_url = if (self.replacement_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_rewrite_rule) status.Error!ResourceRewriteRule {
+        return .{
+            .kind = raw.kind,
+            .flags = UrlMatchFlags.fromNative(raw.flags),
+            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+            .replacement_url = if (raw.replacement_url == null) null else try allocator.dupe(u8, std.mem.span(raw.replacement_url orelse return error.NativeError)),
+        };
+    }
+};
+
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRoute = struct {
+    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_url_match_flags` values.
+    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
+    /// The URL or glob pattern to compare.
+    url: []const u8 = &.{},
+    pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_resource_route);
+        raw.kind = self.kind;
+        raw.flags = self.flags.toNative();
+        raw.url = try marshal.cString(allocator, self.url);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_route) status.Error!ResourceRoute {
+        return .{
+            .kind = raw.kind,
+            .flags = UrlMatchFlags.fromNative(raw.flags),
+            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+        };
+    }
+};
+
 pub const ResourceStoragePolicy = enum(u32) {
     @"volatile" = 1,
     permanent = 0,
@@ -3699,14 +3844,25 @@ pub const ResourceStoragePolicy = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// Resource transform state: a callback, or native rewrite rules.
+///
+/// See `mln_resource_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceTransform = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
     callback: ?*const fn (?*anyopaque, ResourceKind, []const u8, ResourceTransformResponse) status.Error!void = null,
+    /// Rewrite rules for a transform without a callback; empty with one.
+    rules: []const ResourceRewriteRule = &.{},
     pub fn toNative(self: ResourceTransform, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_transform {
-        _ = allocator;
         var raw = std.mem.zeroes(c.mln_resource_transform);
         raw.size = @sizeOf(c.mln_resource_transform);
+        raw.rules = blk: {
+            const items = try allocator.alloc(c.mln_resource_rewrite_rule, self.rules.len);
+            for (self.rules, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.rule_count = std.math.cast(@TypeOf(raw.rule_count), self.rules.len) orelse return error.InvalidArgument;
         raw.callback = if (self.callback != null) callbackTrampoline else null;
         if (!(self.callback == null)) {
             const retained = try roots.retain(ResourceTransform, self);
@@ -5022,6 +5178,26 @@ pub const UnitBezier = struct {
             .y2 = raw.y2,
         };
     }
+};
+
+/// How a rule or route compares its url against a request URL.
+///
+/// See `mln_url_match_flags` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const UrlMatchFlags = struct {
+    /// Reads url as a glob pattern.
+    glob: bool = false,
+    /// Routes only: compare requested_url instead of resolved_url.
+    requested_url: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
+    pub const flags_none = fromNative(0);
 };
 
 /// Three-component vector used by free camera options.

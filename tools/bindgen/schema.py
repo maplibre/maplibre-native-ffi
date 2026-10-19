@@ -75,8 +75,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "accepted_unless",
         "absent_on",
         "view_owner",
-        "callback_adapter",
-        "context_type",
         "enum",
     }
 )
@@ -140,7 +138,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancelled",
         "cancel_registration",
         "wait_retired",
-        "deferred",
         "delivery",
         "synchronous",
         "prefix",
@@ -637,37 +634,14 @@ def validate(api: Api) -> None:
             enum.name for enum in api.enums
         }:
             errors.append(f"{context}: return enum names an absent enum")
-        if "callback_adapter" in metadata:
-            callback = api.typedefs_by_name.get(metadata["callback_adapter"])
-            signature = callback.type.pointee if callback else None
-            if (
-                signature is None
-                or signature.kind != "function"
-                or signature.result is None
-                or signature.result.canonical != function.return_type.canonical
-                or tuple(p.canonical for p in signature.parameters)
-                != tuple(p.type.canonical for p in function.parameters)
-            ):
-                errors.append(
-                    f"{context}: callback adapter signature differs from its callback"
-                )
-            if metadata.get("context_type") not in known_types:
-                errors.append(
-                    f"{context}: callback adapter requires a known context type"
-                )
-        elif "context_type" in metadata:
-            errors.append(f"{context}: adapter relationships require callback_adapter")
         execution = metadata.get("execution")
         if execution is None:
             errors.append(f"{context}: missing execution metadata")
         returns_status = is_status(function.return_type)
-        if function.diagnostic != (
-            returns_status and "callback_adapter" not in metadata
-        ):
+        if function.diagnostic != returns_status:
             errors.append(
-                f"{context}: a status-returning function other than a callback "
-                "implementation takes a final mln_diagnostic* parameter, and no other "
-                "function does"
+                f"{context}: a status-returning function takes a final "
+                "mln_diagnostic* parameter, and no other function does"
             )
         completion = has_completion(function)
         if completion:
@@ -1157,19 +1131,12 @@ def validate(api: Api) -> None:
                 )
         elif "failure" in typedef.metadata:
             errors.append(f"{context}: failure requires a callback")
-        if "deferred" in typedef.metadata:
-            errors.extend(deferred_errors(typedef, enum_constants, context))
         if "delivery" in typedef.metadata:
             errors.extend(delivery_errors(api, typedef, enum_constants, context))
         if "synchronous" in typedef.metadata and (
             signature is None or signature.kind != "function"
         ):
             errors.append(f"{context}: synchronous requires a callback")
-        if (
-            typedef.metadata.get("synchronous") == "true"
-            and "deferred" in typedef.metadata
-        ):
-            errors.append(f"{context}: a synchronous callback cannot be deferred")
         if (
             typedef.metadata.get("synchronous") == "true"
             and "delivery" in typedef.metadata
@@ -1739,51 +1706,6 @@ def callback_result_errors(
     if bounds is None or number is None or not bounds[0] <= number <= bounds[1]:
         return [f"{context}: {key} must be an integer the callback result can hold"]
     return []
-
-
-def deferred_errors(typedef, enum_constants, context: str) -> list[str]:
-    """Check that an adapter can answer a callback early and copy its call.
-
-    A deferred callback returns its declared value at once and delivers a copy
-    of its arguments later, so the value must be a result the callback can
-    return and every argument must outlive the call only as a copy.
-    """
-    value = typedef.metadata["deferred"]
-    signature = typedef.type.pointee
-    if (
-        signature is None
-        or signature.kind != "function"
-        or signature.result is None
-        or signature.result.kind == "void"
-    ):
-        return [f"{context}: deferred requires a callback with a result"]
-    errors = callback_result_errors(typedef, value, "deferred", enum_constants, context)
-    contexts = [p for p in typedef.parameters if p.metadata.get("kind") == "context"]
-    if len(contexts) != 1:
-        errors.append(f"{context}: deferred requires one context parameter")
-    for parameter in typedef.parameters:
-        if parameter in contexts:
-            continue
-        if (
-            parameter.metadata.get("direction", "in") != "in"
-            or "consumes" in parameter.metadata
-        ):
-            errors.append(
-                f"{context}: deferred argument {parameter.name} must be a copyable input"
-            )
-        if parameter.type.kind == "pointer" and parameter.metadata.get(
-            "lifetime"
-        ) not in {None, "call"}:
-            errors.append(
-                f"{context}: deferred argument {parameter.name} must be borrowed for the call"
-            )
-    handle = typedef.metadata.get("decision_handle")
-    if handle and typedef.metadata.get("decision_accept") != value:
-        # A handle is only the adapter's to keep after an accepting answer.
-        errors.append(
-            f"{context}: deferred decision handle {handle} requires the accept value"
-        )
-    return errors
 
 
 def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:

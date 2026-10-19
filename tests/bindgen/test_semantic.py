@@ -10,6 +10,7 @@ from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
     DefaultSupport,
+    DeliveryPlan,
     DisposeSupport,
     FieldInitial,
     ViewSupport,
@@ -515,13 +516,12 @@ mln_status create(const settings *options, mln_diagnostic *out_diagnostic);
         self.assertEqual(api.values["signals"].registration.release, "retire")
         self.assertEqual(api.callbacks["notify"].context, "state")
 
-    def test_native_adapter_has_verified_callback_signature_and_protocol(self):
+    def test_protocol_reentry_names_operations_on_its_owner(self):
         source = """
 typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=callback_response");
-typedef struct rules { int value; } rules;
 typedef void (*answer)(void *state, reply *out BIND("direction=out")) BIND("reentry=protocol;reentry_owner=out;reentry_calls=reply_set");
 mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic);
-BIND("callback_adapter=answer;context_type=rules") void adapter(void *state BIND("kind=context"), reply *out BIND("direction=out"));
+void stray(int value);
 """
         api = bind(self.parse(source), require_complete=True)
         policy = api.callbacks["answer"].reentry_policy
@@ -534,20 +534,8 @@ BIND("callback_adapter=answer;context_type=rules") void adapter(void *state BIND
         ):
             bind(
                 self.parse(
-                    source.replace("reentry_calls=reply_set", "reentry_calls=adapter")
+                    source.replace("reentry_calls=reply_set", "reentry_calls=stray")
                 ),
-                require_complete=True,
-            )
-        adapter = api.callback_adapters[0]
-        self.assertEqual((adapter.callback, adapter.context), ("answer", "rules"))
-        # The adapter answers through the response its callback writes.
-        self.assertEqual(
-            [plan.name for plan in api.adapter_operations(adapter)], ["reply_set"]
-        )
-        self.assertIn("rules", api.values)
-        with self.assertRaisesRegex(ModelError, "signature differs"):
-            bind(
-                self.parse(source.replace("void adapter(", "int adapter(")),
                 require_complete=True,
             )
 
@@ -1005,45 +993,78 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         with self.assertRaisesRegex(ModelError, "without registrations"):
             bind(self.parse(source), require_complete=True)
 
-    def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
-        source = """
-typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
-typedef unsigned long request BIND("kind=handle;release=release_request");
-typedef void (*cancel)(void *context);
-typedef void (*release_cancel)(void *context);
-typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
-typedef unsigned (*provider)(void *context, const char *url, request ticket) BIND("enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
-typedef unsigned (*logger)(void *context, int code) BIND("failure=0;deferred=1");
-mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
-mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("accepted_unless=cancelled") mln_status on_cancel(
-  request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
-void release_request(request value);
-mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        self.assertEqual(model.callbacks["provider"].deferred, "CLAIM")
-        self.assertEqual(model.callbacks["logger"].deferred, "1")
+    def test_delivered_callbacks_name_the_payload_that_copies_them(self):
+        text = protocol_header(groups=("delivery",))
+        model = bind(parse_sources({"api.h": text}), require_complete=True)
+        self.assertEqual(
+            model.callbacks["mln_notice_callback"].delivery,
+            DeliveryPlan("MLN_DELIVERY_TYPE_NOTICE", "notice", "mln_notice_delivery"),
+        )
+        self.assertEqual(
+            model.callbacks["mln_ticket_provider_callback"].delivery.record,
+            "mln_ticket_delivery",
+        )
+        registration = model.operations_by_name[
+            "mln_notice_set_callback"
+        ].registrations[0]
+        self.assertEqual(registration.queue, "queue")
+        queue = next(
+            field
+            for field in model.values["mln_notice_handler"].fields
+            if field.name == "queue"
+        )
+        self.assertFalse(queue.public)
+        # A runtime drives the protocol, so it stays out of every public API.
+        self.assertIn(
+            "mln_delivery_queue_drain",
+            {plan.name for plan in model.runtime_operations},
+        )
+        self.assertNotIn("mln_delivery_queue_drain", model.operations_by_name)
+        self.assertNotIn("mln_delivery_type", model.public_values)
+        self.assertNotIn("mln_delivery_queue", model.public_handles)
+        stray = (
+            "typedef struct stray { mln_delivery_queue queue "
+            'BIND("kind=delivery_queue"); } stray;\n'
+        )
+        queue_member = (
+            '  mln_delivery_queue queue BIND("kind=delivery_queue");\n'
+            "} mln_notice_handler"
+        )
         for before, after, error in (
-            ("deferred=CLAIM", "deferred=OTHER", "value of decision"),
-            ("deferred=CLAIM", "deferred=DELEGATE", "requires the accept value"),
-            ("deferred=1", "deferred=-1", "integer the callback result"),
-            ("deferred=1", "deferred=yes", "integer the callback result"),
-            ("void *context, int code", "int code", "one context parameter"),
             (
-                "int code) BIND",
-                'int *code BIND("direction=out")) BIND',
-                "copyable input",
+                "delivery=MLN_DELIVERY_TYPE_NOTICE",
+                "delivery=MLN_DELIVERY_TYPE_UNKNOWN",
+                "unknown constant",
             ),
             (
-                "typedef void (*cancel)(void *context);",
-                'typedef void (*cancel)(void *context) BIND("deferred=0");',
-                "callback with a result",
+                "  int code;\n  const char* text",
+                '  const char* text BIND("lifetime=owner");\n  int code',
+                "must mirror",
+            ),
+            (
+                queue_member,
+                queue_member.replace(
+                    "mln_delivery_queue queue", "unsigned long long queue"
+                ),
+                "requires mln_delivery_queue",
+            ),
+            (
+                queue_member,
+                '  mln_delivery_queue spare BIND("kind=delivery_queue");\n'
+                + queue_member,
+                "at most one delivery queue",
+            ),
+            (
+                "typedef struct mln_notice_delivery {",
+                stray + "typedef struct mln_notice_delivery {",
+                "requires a callback registration",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
+                self.assertIn(before, text)
                 bind(
-                    self.parse(source.replace(before, after, 1)), require_complete=True
+                    parse_sources({"api.h": text.replace(before, after, 1)}),
+                    require_complete=True,
                 )
 
     def test_synchronous_callbacks_run_on_their_thread(self):
@@ -1078,8 +1099,8 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
             ),
             (
                 'BIND("synchronous=true") typedef void (*gate)(void *context);',
-                'BIND("synchronous=true") typedef unsigned (*gate)(void *context) BIND("failure=0;deferred=1");',
-                "cannot be deferred",
+                'BIND("synchronous=true") typedef unsigned (*gate)(void *context) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE");',
+                "cannot be delivered through a queue",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):

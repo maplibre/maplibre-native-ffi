@@ -105,7 +105,9 @@ typedef struct mln_completion {
    * MLN_DELIVERY_TYPE_COMPLETION delivery carrying user_data, and no callback
    * runs. Requires callback and release_user_data null. The delivery may be
    * queued before the submission returns. A rejected submission queues nothing
-   * and needs no cleanup.
+   * and needs no cleanup. A submission rejects an invalid queue handle with
+   * MLN_STATUS_INVALID_ARGUMENT and a released queue with
+   * MLN_STATUS_INVALID_STATE.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_completion MLN_BINDING(

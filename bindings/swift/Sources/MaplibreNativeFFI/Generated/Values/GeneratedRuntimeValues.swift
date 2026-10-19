@@ -75,18 +75,113 @@ public struct EventBatchView: Equatable, Hashable, Sendable {
   }
 }
 
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct HttpHeader: Equatable, Hashable, Sendable {
+  public var name: String
+  public var value: String
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(name: String = "", value: String = "") {
+    self.name = name
+    self.value = value
+  }
+
+  init(
+    raw: mln_http_header,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    name = try NativeString.copyCString(raw.name)
+    value = try NativeString.copyCString(raw.value)
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_http_header {
+    var raw = mln_http_header()
+    raw.name = try arena.cString(name)
+    raw.value = try arena.cString(value)
+    return raw
+  }
+}
+
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct HttpHeaderRule: Equatable, Hashable, Sendable {
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+  public var kind: UInt32
+  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  public var flags: UrlMatchFlags
+  /// The URL or glob pattern to compare.
+  public var url: String
+  /// The headers to set. Registration validates each one as
+  /// `mln_http_header_transform_response_set_header()` does.
+  public var headers: [HttpHeader]
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(
+    kind: UInt32 = 0,
+    flags: UrlMatchFlags = .init(rawValue: 0),
+    url: String = "",
+    headers: [HttpHeader] = []
+  ) {
+    self.kind = kind
+    self.flags = flags
+    self.url = url
+    self.headers = headers
+  }
+
+  init(
+    raw: mln_http_header_rule,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    kind = raw.kind
+    flags = UrlMatchFlags(rawValue: raw.flags)
+    url = try NativeString.copyCString(raw.url)
+    headers = try NativeInputArena.copyArray(
+      raw.headers,
+      count: Int(raw.header_count)
+    ).map { try HttpHeader(raw: $0) }
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
+    var raw = mln_http_header_rule()
+    raw.kind = kind
+    raw.flags = flags.rawValue
+    raw.url = try arena.cString(url)
+    raw.headers = try arena
+      .array(headers.map { try $0.nativeValue(arena: arena) })
+    raw.header_count = try NativeInputArena.count(headers.count)
+    return raw
+  }
+}
+
+/// HTTP header transform state: a callback, or native header rules.
+///
+/// See `mln_http_header_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderTransform: Sendable {
+  /// The callback, or null to apply rules.
   public var callback: (@Sendable (
     ResourceKind,
     String,
     HttpHeaderTransformResponse
   ) throws -> Void)?
-  public init(callback: (@Sendable (
-    ResourceKind,
-    String,
-    HttpHeaderTransformResponse
-  ) throws -> Void)? = nil) {
+  /// Header rules for a transform without a callback; empty with one.
+  public var rules: [HttpHeaderRule]
+  public init(
+    callback: (@Sendable (ResourceKind, String,
+                          HttpHeaderTransformResponse) throws -> Void)? = nil,
+    rules: [HttpHeaderRule] = []
+  ) {
     self.callback = callback
+    self.rules = rules
   }
 
   public static var `default`: Self {
@@ -99,6 +194,8 @@ public struct HttpHeaderTransform: Sendable {
     var raw = mln_http_header_transform()
     raw.size = UInt32(MemoryLayout<mln_http_header_transform>.size)
     raw.callback = callback == nil ? nil : invokeHttpHeaderTransformCallback
+    raw.rules = try arena.array(rules.map { try $0.nativeValue(arena: arena) })
+    raw.rule_count = try NativeInputArena.count(rules.count)
     if callback != nil {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
@@ -399,11 +496,15 @@ public struct ResourceProvider: Sendable {
   public var callback: (@Sendable (ResourceRequest,
                                    ResourceRequestHandle) throws
       -> ResourceProviderDecision)?
-  public init(callback: (@Sendable (ResourceRequest,
-                                    ResourceRequestHandle) throws
-      -> ResourceProviderDecision)? = nil)
-  {
+  /// The requests that reach the provider; empty to claim every request.
+  public var routes: [ResourceRoute]
+  public init(
+    callback: (@Sendable (ResourceRequest, ResourceRequestHandle) throws
+      -> ResourceProviderDecision)? = nil,
+    routes: [ResourceRoute] = []
+  ) {
     self.callback = callback
+    self.routes = routes
   }
 
   public static var `default`: Self {
@@ -414,6 +515,9 @@ public struct ResourceProvider: Sendable {
     var raw = mln_resource_provider()
     raw.size = UInt32(MemoryLayout<mln_resource_provider>.size)
     raw.callback = callback == nil ? nil : invokeResourceProviderCallback
+    raw.routes = try arena
+      .array(routes.map { try $0.nativeValue(arena: arena) })
+    raw.route_count = try NativeInputArena.count(routes.count)
     if callback != nil {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
@@ -829,6 +933,101 @@ public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
 }
 
+/// One rule of a native resource transform.
+///
+/// See `mln_resource_rewrite_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+  public var kind: UInt32
+  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  public var flags: UrlMatchFlags
+  /// The URL or glob pattern to compare.
+  public var url: String
+  /// The replacement URL, or null to leave a matching URL unchanged.
+  public var replacementUrl: String?
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(
+    kind: UInt32 = 0,
+    flags: UrlMatchFlags = .init(rawValue: 0),
+    url: String = "",
+    replacementUrl: String? = nil
+  ) {
+    self.kind = kind
+    self.flags = flags
+    self.url = url
+    self.replacementUrl = replacementUrl
+  }
+
+  init(
+    raw: mln_resource_rewrite_rule,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    kind = raw.kind
+    flags = UrlMatchFlags(rawValue: raw.flags)
+    url = try NativeString.copyCString(raw.url)
+    replacementUrl = raw.replacement_url == nil ? nil : try NativeString
+      .copyCString(raw.replacement_url)
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_rewrite_rule
+  {
+    var raw = mln_resource_rewrite_rule()
+    raw.kind = kind
+    raw.flags = flags.rawValue
+    raw.url = try arena.cString(url)
+    raw.replacement_url = try replacementUrl.map { try arena.cString($0) }
+    return raw
+  }
+}
+
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRoute: Equatable, Hashable, Sendable {
+  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
+  public var kind: UInt32
+  /// A bitwise OR of `mln_url_match_flags` values.
+  public var flags: UrlMatchFlags
+  /// The URL or glob pattern to compare.
+  public var url: String
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(
+    kind: UInt32 = 0,
+    flags: UrlMatchFlags = .init(rawValue: 0),
+    url: String = ""
+  ) {
+    self.kind = kind
+    self.flags = flags
+    self.url = url
+  }
+
+  init(
+    raw: mln_resource_route,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    kind = raw.kind
+    flags = UrlMatchFlags(rawValue: raw.flags)
+    url = try NativeString.copyCString(raw.url)
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
+    var raw = mln_resource_route()
+    raw.kind = kind
+    raw.flags = flags.rawValue
+    raw.url = try arena.cString(url)
+    return raw
+  }
+}
+
 public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -841,18 +1040,26 @@ public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
   public static let volatile: ResourceStoragePolicy = .init(rawValue: 1)
 }
 
+/// Resource transform state: a callback, or native rewrite rules.
+///
+/// See `mln_resource_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
+  /// The callback, or null to apply rules.
   public var callback: (@Sendable (
     ResourceKind,
     String,
     ResourceTransformResponse
   ) throws -> Void)?
-  public init(callback: (@Sendable (
-    ResourceKind,
-    String,
-    ResourceTransformResponse
-  ) throws -> Void)? = nil) {
+  /// Rewrite rules for a transform without a callback; empty with one.
+  public var rules: [ResourceRewriteRule]
+  public init(
+    callback: (@Sendable (ResourceKind, String,
+                          ResourceTransformResponse) throws -> Void)? = nil,
+    rules: [ResourceRewriteRule] = []
+  ) {
     self.callback = callback
+    self.rules = rules
   }
 
   public static var `default`: Self {
@@ -863,6 +1070,8 @@ public struct ResourceTransform: Sendable {
     var raw = mln_resource_transform()
     raw.size = UInt32(MemoryLayout<mln_resource_transform>.size)
     raw.callback = callback == nil ? nil : invokeResourceTransformCallback
+    raw.rules = try arena.array(rules.map { try $0.nativeValue(arena: arena) })
+    raw.rule_count = try NativeInputArena.count(rules.count)
     if callback != nil {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
@@ -1519,4 +1728,23 @@ public struct TileOperation: RawRepresentable, NativeOpenValue, Equatable,
   public static let error: TileOperation = .init(rawValue: 6)
   public static let cancelled: TileOperation = .init(rawValue: 7)
   public static let null: TileOperation = .init(rawValue: 8)
+}
+
+/// How a rule or route compares its url against a request URL.
+///
+/// See `mln_url_match_flags` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct UrlMatchFlags: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let flagsNone: UrlMatchFlags = []
+  /// Reads url as a glob pattern.
+  public static let glob: UrlMatchFlags = .init(rawValue: 1)
+  /// Routes only: compare requested_url instead of resolved_url.
+  public static let requestedUrl: UrlMatchFlags = .init(rawValue: 2)
 }

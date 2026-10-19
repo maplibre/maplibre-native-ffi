@@ -47,6 +47,7 @@
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
+#include "resources/url_rules.hpp"
 #include "testing/sync_point.hpp"
 #include "wake/wake.hpp"
 
@@ -1165,6 +1166,18 @@ auto submit_resource_configuration_command(
 
 }  // namespace
 
+namespace {
+
+auto delete_rewrite_rules(void* table) noexcept -> void {
+  delete static_cast<RewriteRuleTable*>(table);
+}
+
+auto delete_header_rules(void* table) noexcept -> void {
+  delete static_cast<HeaderRuleTable*>(table);
+}
+
+}  // namespace
+
 auto set_resource_transform(
   mln_runtime runtime, const mln_resource_transform* transform,
   const mln_completion* completion
@@ -1185,20 +1198,42 @@ auto set_resource_transform(
     set_thread_error("mln_resource_transform.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto rules = std::unique_ptr<RewriteRuleTable>{};
   if (transform->callback == nullptr) {
-    set_thread_error("resource transform callback must not be null");
+    if (
+      transform->user_data != nullptr || transform->release_user_data != nullptr
+    ) {
+      set_thread_error(
+        "a rules resource transform must not carry user_data or "
+        "release_user_data"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    rules = std::make_unique<RewriteRuleTable>();
+    const auto copied =
+      copy_rewrite_rules(transform->rules, transform->rule_count, *rules);
+    if (copied != MLN_STATUS_OK) return copied;
+  } else if (transform->rule_count != 0) {
+    set_thread_error("a resource transform callback takes no rules");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto context = std::make_shared<RuntimeCallbackContext>(
-    transform->user_data, transform->release_user_data
-  );
+  // A rules table belongs to its context, which deletes it on retirement.
+  const auto context = rules != nullptr
+                         ? std::make_shared<RuntimeCallbackContext>(
+                             rules.get(), &delete_rewrite_rules
+                           )
+                         : std::make_shared<RuntimeCallbackContext>(
+                             transform->user_data, transform->release_user_data
+                           );
   const auto registration = std::make_shared<ResourceTransformRegistration>(
     ResourceTransformRegistration{
-      .callback = transform->callback,
+      .callback =
+        rules != nullptr ? &rewrite_rules_callback : transform->callback,
       .context = context,
     }
   );
+  auto* const table = rules.release();
   context->transfer_to_runtime();
   const auto state = live->resource_transform_state;
   const auto status =
@@ -1209,7 +1244,10 @@ auto set_resource_transform(
         );
       }
     );
-  if (status != MLN_STATUS_OK) context->return_to_caller();
+  if (status != MLN_STATUS_OK) {
+    context->return_to_caller();
+    delete table;
+  }
   return status;
 }
 
@@ -1292,8 +1330,23 @@ auto set_http_header_transform(
     set_thread_error("mln_http_header_transform.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto rules = std::unique_ptr<HeaderRuleTable>{};
   if (transform->callback == nullptr) {
-    set_thread_error("HTTP header transform callback must not be null");
+    if (
+      transform->user_data != nullptr || transform->release_user_data != nullptr
+    ) {
+      set_thread_error(
+        "a rules HTTP header transform must not carry user_data or "
+        "release_user_data"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    rules = std::make_unique<HeaderRuleTable>();
+    const auto copied =
+      copy_header_rules(transform->rules, transform->rule_count, *rules);
+    if (copied != MLN_STATUS_OK) return copied;
+  } else if (transform->rule_count != 0) {
+    set_thread_error("an HTTP header transform callback takes no rules");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1313,15 +1366,21 @@ auto set_http_header_transform(
   return MLN_STATUS_UNSUPPORTED;
 #endif
 
-  const auto context = std::make_shared<RuntimeCallbackContext>(
-    transform->user_data, transform->release_user_data
-  );
+  const auto context = rules != nullptr
+                         ? std::make_shared<RuntimeCallbackContext>(
+                             rules.get(), &delete_header_rules
+                           )
+                         : std::make_shared<RuntimeCallbackContext>(
+                             transform->user_data, transform->release_user_data
+                           );
   const auto registration = std::make_shared<HttpHeaderTransformRegistration>(
     HttpHeaderTransformRegistration{
-      .callback = transform->callback,
+      .callback =
+        rules != nullptr ? &header_rules_callback : transform->callback,
       .context = context,
     }
   );
+  auto* const table = rules.release();
   context->transfer_to_runtime();
   const auto state = live->http_header_transform_state;
   const auto status = submit_resource_configuration_command<
@@ -1332,7 +1391,10 @@ auto set_http_header_transform(
       );
     }
   );
-  if (status != MLN_STATUS_OK) context->return_to_caller();
+  if (status != MLN_STATUS_OK) {
+    context->return_to_caller();
+    delete table;
+  }
   return status;
 }
 
@@ -2446,6 +2508,11 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  auto routes = std::make_shared<RouteTable>();
+  const auto routes_status =
+    copy_routes(provider->routes, provider->route_count, *routes);
+  if (routes_status != MLN_STATUS_OK) return routes_status;
+
   auto queued_provider = std::unique_ptr<QueuedProvider>{};
   if (queued) {
     if (provider->release_user_data != nullptr) {
@@ -2474,6 +2541,7 @@ auto set_resource_provider(
     .callback = queued_provider != nullptr ? &queued_provider_callback
                                            : provider->callback,
     .context = context,
+    .routes = routes->routes.empty() ? nullptr : std::move(routes),
   };
   // The context owns the queued registration from here; a rejected command
   // returns it below.

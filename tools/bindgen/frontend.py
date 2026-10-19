@@ -617,10 +617,11 @@ def reachable_types(api: Api, functions: Iterable[Function]) -> set[str]:
 
 
 def with_delivery_types(api: Api) -> Api:
-    """Mark the types that only the delivery protocol reaches as runtime types.
+    """Mark the delivery protocol's functions as runtime exports, and the types
+    that only they reach as runtime types.
 
-    A binding runtime drives the protocol itself, so those types, like its
-    functions, stay out of every public API.
+    A binding runtime drives the protocol itself, so its functions and types
+    stay out of every public API, as the runtime header's do.
     """
     delivery = delivery_functions(api)
     if not delivery:
@@ -640,6 +641,8 @@ def with_delivery_types(api: Api) -> Api:
         item.name for kind in (api.records, api.enums, api.typedefs) for item in kind
     }
     added = (internal - public) & names
-    if not added:
-        return api
-    return replace(api, runtime_types=tuple(sorted(set(api.runtime_types) | added)))
+    return replace(
+        api,
+        runtime_exports=tuple(sorted(set(api.runtime_exports) | delivery)),
+        runtime_types=tuple(sorted(set(api.runtime_types) | added)),
+    )

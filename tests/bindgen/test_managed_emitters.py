@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import ROOT, parse, require_tool
+from support import ROOT, parse, parse_sources, protocol_header, require_tool
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart, dart_native, dotnet, dotnet_native, kotlin
@@ -122,17 +122,29 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
 
-    def test_dart_generates_callback_registrations_only_when_deferred(self):
-        source = """
-typedef void (*mln_notice_release)(void *context);
-typedef unsigned (*mln_notice_callback)(void *context, int code, const char *text) BIND("failure=0;deferred=1");
-typedef struct mln_notice_handler { unsigned size; mln_notice_callback callback; void *context BIND("kind=context"); mln_notice_release release; } mln_notice_handler BIND("kind=callback_registration;release=release");
-mln_status mln_notice_set_callback(const mln_notice_handler *handler, mln_diagnostic *out_diagnostic);
-"""
-        api = self.parse(source)
-        self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])
-        # Without the annotation, Dart has no way to answer the callback.
-        synchronous = self.parse(source.replace(";deferred=1", ""))
+    def test_dart_generates_callback_registrations_only_with_queue_delivery(
+        self,
+    ):
+        text = protocol_header(groups=("delivery",))
+        api = parse_sources({"api.h": text})
+        generated = dart.coverage(api)["generated"]
+        self.assertIn("mln_notice_set_callback", generated)
+        self.assertIn("mln_host_set_provider", generated)
+        operations = dart.generate(api)
+        self.assertIn("result.ref.queue = isolateDeliveryQueue.handle;", operations)
+        self.assertIn("raw.mln_delivery_batch_take(batch, index", operations)
+        # Without a queue, Dart has no way to answer the callback.
+        synchronous = parse_sources(
+            {
+                "api.h": text.replace(
+                    ' BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE")',
+                    ' BIND("failure=0")',
+                ).replace(
+                    '  mln_delivery_queue queue BIND("kind=delivery_queue");\n} mln_notice_handler',
+                    "} mln_notice_handler",
+                )
+            }
+        )
         self.assertIn(
             "mln_notice_set_callback", dart.coverage(synchronous)["unsupported"]
         )

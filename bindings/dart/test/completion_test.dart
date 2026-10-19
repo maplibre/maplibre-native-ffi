@@ -8,7 +8,7 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
     show nativeDiagnostic;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/callback/completion.dart';
+import 'package:maplibre_native_ffi/src/internal/callback/delivery_queue.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show adoptOwnedForTesting;
@@ -23,7 +23,6 @@ void main() {
       final fixture = await openRuntime();
       var decodes = 0;
       final creation = startNativeCompletion<void>(
-        copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
         start: (completion) => withNativeArena((arena) {
           final options = arena<raw.mln_map_options>();
           options.ref = raw.mln_map_options_default();
@@ -43,8 +42,8 @@ void main() {
       await within(fixture.runtime.barrier(), 'a barrier');
       expect(decodes, 1);
 
-      // The runtime closes only once no map remains, so the copied map was
-      // disposed with the record its conversion abandoned.
+      // The runtime closes only once no map remains, so the batch that held
+      // the map disposed it when the conversion left it untaken.
       await within(fixture.runtime.close(), 'runtime close');
     },
   );
@@ -87,7 +86,6 @@ void main() {
     var rejections = 0;
     expect(
       () => startNativeCompletion<void>(
-        copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
         // The null runtime is never live, so native refuses the barrier.
         start: (completion) =>
             raw.mln_runtime_barrier(0, completion, nativeDiagnostic),

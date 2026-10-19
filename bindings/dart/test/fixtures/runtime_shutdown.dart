@@ -109,25 +109,23 @@ Future<void> exitWithLiveCallbacks() async {
   final waiting = ReceivePort();
   final served = Completer<void>();
   await runtime.setResourceProvider(
-    ResourceProvider.routedResourceProvider(
-      AdapterRoutedResourceProvider(
-        routes: [
-          AdapterResourceRoute(
-            kind: ResourceKind.style.rawValue,
-            url: 'shutdown://style',
+    ResourceProvider(
+      routes: [
+        ResourceRoute(
+          kind: ResourceKind.style.rawValue,
+          url: 'shutdown://style',
+        ),
+      ],
+      callback: (_, request) {
+        request.complete(
+          ResourceResponse(
+            status: ResourceResponseStatus.ok,
+            bytes: _json('{"version":8,"sources":{},"layers":[]}'),
           ),
-        ],
-        callback: (_, request) {
-          request.complete(
-            ResourceResponse(
-              status: ResourceResponseStatus.ok,
-              bytes: _json('{"version":8,"sources":{},"layers":[]}'),
-            ),
-          );
-          waiting.close();
-          served.complete();
-        },
-      ),
+        );
+        waiting.close();
+        served.complete();
+      },
     ),
   );
   final map = await runtime.createMap(mapOptionsDefault());

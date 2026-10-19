@@ -300,7 +300,11 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         return mln.ResourceProviderDecision.PASS_THROUGH
 
     harness.routes[style] = pass_through
-    result(harness.runtime.set_resource_transform(mln.ResourceTransform(transform)))
+    result(
+        harness.runtime.set_resource_transform(
+            mln.ResourceTransform(callback=transform)
+        )
+    )
     map_handle.set_style_url(style)
     harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
     refused(lambda: scopes[0].set_url(rewritten))

@@ -531,7 +531,10 @@ void _warnOnHeaderSkew(
 /// Headers in the checkout's domain directory that the install leaves out.
 /// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
 /// and `UNINSTALLED_HEADERS` in the Rust sys crate's `build.rs`.
-const _uninstalledHeaders = {'maplibre_native_c/binding_support.h'};
+const _uninstalledHeaders = {
+  'maplibre_native_c/binding_support.h',
+  'maplibre_native_c/binding_support_generated.h',
+};
 
 /// Digests the public C headers, keyed by their path under `include/`. Render
 /// backend dependencies install their own headers alongside ours, so this

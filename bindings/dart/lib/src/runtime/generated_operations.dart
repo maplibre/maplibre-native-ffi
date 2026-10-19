@@ -112,7 +112,7 @@ _prepareCameraTransitionHandler(
     }
     port = roots.register({
       if (value.callback != null)
-        (raw.MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
+        (raw.MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
             0xffffffff): (message) => value.callback!(
           CameraTransitionEnd(
             outcome: CameraTransitionOutcome.fromRawValue(message[1] as int),
@@ -123,15 +123,15 @@ _prepareCameraTransitionHandler(
     result.ref.callback = value.callback == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
                     0xffffffff),
               )
               .cast();
     result.ref.user_data = port.context;
     result.ref.release_user_data =
         Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_dart_port_release,
+          raw.mln_binding_dart_port_release,
         ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
@@ -516,7 +516,7 @@ _prepareCustomGeometrySourceOptions(
     }
     port = roots.register({
       if (value.fetchTile != null)
-        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
+        (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
             0xffffffff): (message) => value.fetchTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -525,7 +525,7 @@ _prepareCustomGeometrySourceOptions(
           ),
         ),
       if (value.cancelTile != null)
-        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
+        (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
             0xffffffff): (message) => value.cancelTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -537,16 +537,16 @@ _prepareCustomGeometrySourceOptions(
     result.ref.fetch_tile = value.fetchTile == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
                     0xffffffff),
               )
               .cast();
     result.ref.cancel_tile = value.cancelTile == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
                     0xffffffff),
               )
               .cast();
@@ -581,7 +581,7 @@ _prepareCustomGeometrySourceOptions(
     result.ref.user_data = port.context;
     result.ref.release_user_data =
         Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_dart_port_release,
+          raw.mln_binding_dart_port_release,
         ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
@@ -620,7 +620,7 @@ _prepareCustomMvtVectorSourceOptions(
     }
     port = roots.register({
       if (value.fetchTile != null)
-        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
+        (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
             0xffffffff): (message) => value.fetchTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -629,7 +629,7 @@ _prepareCustomMvtVectorSourceOptions(
           ),
         ),
       if (value.cancelTile != null)
-        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
+        (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
             0xffffffff): (message) => value.cancelTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -641,16 +641,16 @@ _prepareCustomMvtVectorSourceOptions(
     result.ref.fetch_tile = value.fetchTile == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
                     0xffffffff),
               )
               .cast();
     result.ref.cancel_tile = value.cancelTile == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
                     0xffffffff),
               )
               .cast();
@@ -665,7 +665,7 @@ _prepareCustomMvtVectorSourceOptions(
     result.ref.user_data = port.context;
     result.ref.release_user_data =
         Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_dart_port_release,
+          raw.mln_binding_dart_port_release,
         ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
@@ -1038,23 +1038,19 @@ Pointer<raw.mln_projected_meters> _writeProjectedMeters(
 ProjectedMeters _readProjectedMeters(raw.mln_projected_meters source) =>
     ProjectedMeters(northing: source.northing, easting: source.easting);
 
-void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
-  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
-    message[1] as int,
+void _deliverLogCallback(
+  LogCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.log_record;
+  callback(
+    LogSeverity.fromRawValue(payload.severity),
+    LogEvent.fromRawValue(payload.event),
+    payload.code,
+    payload.message.cast<Utf8>().toDartString(),
   );
-  try {
-    final arguments = record.ref.arguments
-        .cast<raw.mln_adapter_log_callback_arguments>()
-        .ref;
-    callback(
-      LogSeverity.fromRawValue(arguments.severity),
-      LogEvent.fromRawValue(arguments.event),
-      arguments.code,
-      arguments.message.cast<Utf8>().toDartString(),
-    );
-  } finally {
-    raw.mln_adapter_deferred_call_record_destroy(record);
-  }
 }
 
 _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
@@ -1062,27 +1058,19 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
   _NativeCallbackPorts roots,
 ) {
   final arena = Arena();
-  _NativeCallbackPort? port;
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_log_handler>();
     result.ref.size = sizeOf<raw.mln_log_handler>();
-    port = roots.registerDeferred(
-      (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-      (message) => _deliverLogCallback(value.callback, message),
-    );
-    result.ref.callback = raw
-        .mln_adapter_deferred_callback_function(
-          (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-        )
-        .cast();
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_deferred_callback_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_LOG_RECORD: (batch, index, delivery) =>
+          _deliverLogCallback(value.callback, batch, index, delivery),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    port?.reject();
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -1276,20 +1264,20 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
     }
     port = roots.register({
       if (value.callback != null)
-        (raw.MLN_ADAPTER_DART_PORT_WAKE_CALLBACK & 0xffffffff): (message) =>
+        (raw.MLN_BINDING_DART_PORT_WAKE_CALLBACK & 0xffffffff): (message) =>
             value.callback!(),
     });
     result.ref.callback = value.callback == null
         ? nullptr
         : raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_WAKE_CALLBACK & 0xffffffff),
+              .mln_binding_dart_port_function(
+                (raw.MLN_BINDING_DART_PORT_WAKE_CALLBACK & 0xffffffff),
               )
               .cast();
     result.ref.user_data = port.context;
     result.ref.release_user_data =
         Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_dart_port_release,
+          raw.mln_binding_dart_port_release,
         ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
@@ -2665,7 +2653,7 @@ _prepareResourceRequestCancelHandler(
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
 
     port = roots.register({
-      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+      (raw.MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
           0xffffffff): (message) {
         if (!receiverClosed()) {
           value.callback();
@@ -2673,15 +2661,15 @@ _prepareResourceRequestCancelHandler(
       },
     });
     result.ref.callback = raw
-        .mln_adapter_dart_port_function(
-          (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+        .mln_binding_dart_port_function(
+          (raw.MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
               0xffffffff),
         )
         .cast();
     result.ref.user_data = port.context;
     result.ref.release_user_data =
         Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_adapter_dart_port_release,
+          raw.mln_binding_dart_port_release,
         ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
@@ -2825,57 +2813,28 @@ OfflineRegionInfo _readOfflineRegionInfo(raw.mln_offline_region_info source) =>
       ),
     );
 
-Pointer<raw.mln_adapter_http_header> _writeAdapterHttpHeader(
-  AdapterHttpHeader value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_http_header>();
-  result.ref.name = value.name == null
-      ? nullptr
-      : nativeUtf8CString(value.name!, arena).pointer.cast<Char>();
-  result.ref.value = value.value == null
-      ? nullptr
-      : nativeUtf8CString(value.value!, arena).pointer.cast<Char>();
+Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
+  final result = arena<raw.mln_http_header>();
+  result.ref.name = nativeUtf8CString(value.name, arena).pointer.cast<Char>();
+  result.ref.value = nativeUtf8CString(value.value, arena).pointer.cast<Char>();
   return result;
 }
 
-Pointer<raw.mln_adapter_http_header_transform_rule>
-_writeAdapterHttpHeaderTransformRule(
-  AdapterHttpHeaderTransformRule value,
+Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
+  HttpHeaderRule value,
   Arena arena,
 ) {
-  final result = arena<raw.mln_adapter_http_header_transform_rule>();
+  final result = arena<raw.mln_http_header_rule>();
   result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
-  result.ref.url = value.url == null
-      ? nullptr
-      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
-  result.ref.headers = arena<raw.mln_adapter_http_header>(
+  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
+  result.ref.headers = arena<raw.mln_http_header>(
     value.headers.isEmpty ? 1 : value.headers.length,
   );
   result.ref.header_count = value.headers.length;
   for (var index = 0; index < value.headers.length; index++) {
-    result.ref.headers[index] = _writeAdapterHttpHeader(
+    result.ref.headers[index] = _writeHttpHeader(
       value.headers[index],
-      arena,
-    ).ref;
-  }
-  return result;
-}
-
-Pointer<raw.mln_adapter_http_header_transform_rules>
-_writeAdapterHttpHeaderTransformRules(
-  AdapterHttpHeaderTransformRules value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_http_header_transform_rules>();
-  result.ref.rules = arena<raw.mln_adapter_http_header_transform_rule>(
-    value.rules.isEmpty ? 1 : value.rules.length,
-  );
-  result.ref.count = value.rules.length;
-  for (var index = 0; index < value.rules.length; index++) {
-    result.ref.rules[index] = _writeAdapterHttpHeaderTransformRule(
-      value.rules[index],
       arena,
     ).ref;
   }
@@ -2884,96 +2843,26 @@ _writeAdapterHttpHeaderTransformRules(
 
 _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
   HttpHeaderTransform value,
-  NativeCallbackReleases roots,
 ) {
-  final arena = NativeOwnedArena();
-  var transferred = false;
+  final arena = Arena();
   try {
-    switch (value) {
-      case HttpHeaderTransformEmpty():
-        final descriptor = arena<raw.mln_http_header_transform>();
-        descriptor.ref.size = sizeOf<raw.mln_http_header_transform>();
-        return _NativeRegistration(
-          descriptor,
-          arena.releaseAll,
-          arena.releaseAll,
-        );
-      case HttpHeaderTransformHttpHeaderTransformRules():
-        final context = _writeAdapterHttpHeaderTransformRules(
-          value.value,
-          arena,
-        );
-        final descriptor = arena<raw.mln_http_header_transform>();
-        descriptor.ref.size = sizeOf<raw.mln_http_header_transform>();
-        descriptor.ref.callback =
-            Native.addressOf<
-              NativeFunction<raw.mln_http_header_transform_callbackFunction>
-            >(raw.mln_adapter_http_header_transform_callback);
-        descriptor.ref.user_data = context.cast();
-        descriptor.ref.release_user_data =
-            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-              raw.mln_adapter_dart_release,
-            );
-        transferred = true;
-        roots.register(context.cast(), arena.releaseAll, arena: arena);
-        return _NativeRegistration(
-          descriptor,
-          () => roots.reject(context.cast()),
-        );
+    final result = arena<raw.mln_http_header_transform>();
+    result.ref.size = sizeOf<raw.mln_http_header_transform>();
+    result.ref.rules = arena<raw.mln_http_header_rule>(
+      value.rules.isEmpty ? 1 : value.rules.length,
+    );
+    result.ref.rule_count = value.rules.length;
+    for (var index = 0; index < value.rules.length; index++) {
+      result.ref.rules[index] = _writeHttpHeaderRule(
+        value.rules[index],
+        arena,
+      ).ref;
     }
+    return _NativeRegistration(result, () {}, arena.releaseAll);
   } catch (_) {
-    if (!transferred) {
-      arena.releaseAll();
-    }
+    arena.releaseAll();
     rethrow;
   }
-}
-
-Pointer<raw.mln_adapter_resource_provider_rule>
-_writeAdapterResourceProviderRule(
-  AdapterResourceProviderRule value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_resource_provider_rule>();
-  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
-  result.ref.flags = value.flags.rawValue;
-  result.ref.requested_url = value.requestedUrl == null
-      ? nullptr
-      : nativeUtf8CString(value.requestedUrl!, arena).pointer.cast<Char>();
-  result.ref.response = _writeResourceResponse(value.response, arena).ref;
-  return result;
-}
-
-Pointer<raw.mln_adapter_resource_provider_rules>
-_writeAdapterResourceProviderRules(
-  AdapterResourceProviderRules value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_resource_provider_rules>();
-  result.ref.rules = arena<raw.mln_adapter_resource_provider_rule>(
-    value.rules.isEmpty ? 1 : value.rules.length,
-  );
-  result.ref.count = value.rules.length;
-  for (var index = 0; index < value.rules.length; index++) {
-    result.ref.rules[index] = _writeAdapterResourceProviderRule(
-      value.rules[index],
-      arena,
-    ).ref;
-  }
-  return result;
-}
-
-Pointer<raw.mln_adapter_resource_route> _writeAdapterResourceRoute(
-  AdapterResourceRoute value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_resource_route>();
-  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = value.url == null
-      ? nullptr
-      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
-  return result;
 }
 
 ResourceRange _readResourceRange(raw.mln_resource_range source) =>
@@ -3013,308 +2902,190 @@ ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
 
 void _deliverResourceProviderCallback(
   ResourceProviderCallback callback,
-  List<dynamic> message,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
 ) {
-  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
-    message[1] as int,
-  );
+  final payload = delivery.ref.payload.resource_request;
   ResourceRequestHandle? owner;
   try {
-    final arguments = record.ref.arguments
-        .cast<raw.mln_adapter_resource_provider_callback_arguments>()
-        .ref;
+    _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
     final adopted = owner = ResourceRequestHandle._(
-      NativeResourceRequest(arguments.handle),
+      NativeResourceRequest(payload.handle),
     );
-    raw.mln_adapter_deferred_call_record_adopt(record);
-    callback(_readResourceRequest(arguments.request.ref), adopted);
+    callback(_readResourceRequest(payload.request.ref), adopted);
   } catch (_) {
     owner?.close();
     rethrow;
-  } finally {
-    raw.mln_adapter_deferred_call_record_destroy(record);
   }
 }
 
-Pointer<raw.mln_adapter_routed_resource_provider>
-_writeAdapterRoutedResourceProvider(
-  AdapterRoutedResourceProvider value,
-  NativeOwnedArena arena,
-  _NativeCallbackPorts ports,
+Pointer<raw.mln_resource_route> _writeResourceRoute(
+  ResourceRoute value,
+  Arena arena,
 ) {
-  final result = arena<raw.mln_adapter_routed_resource_provider>();
-  result.ref.routes = arena<raw.mln_adapter_resource_route>(
-    value.routes.isEmpty ? 1 : value.routes.length,
-  );
-  result.ref.route_count = value.routes.length;
-  for (var index = 0; index < value.routes.length; index++) {
-    result.ref.routes[index] = _writeAdapterResourceRoute(
-      value.routes[index],
-      arena,
-    ).ref;
-  }
-  final portCallback = ports.registerDeferred(
-    (raw.MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK & 0xffffffff),
-    (message) => _deliverResourceProviderCallback(value.callback, message),
-  );
-  arena.adoptRelease(
-    Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-      raw.mln_adapter_deferred_callback_release,
-    ),
-    portCallback.context,
-  );
-  result.ref.callback = raw
-      .mln_adapter_deferred_callback_function(
-        (raw.MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK & 0xffffffff),
-      )
-      .cast();
-  result.ref.user_data = portCallback.context;
+  final result = arena<raw.mln_resource_route>();
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
   return result;
 }
 
 _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
   ResourceProvider value,
-  NativeCallbackReleases roots,
-  _NativeCallbackPorts ports,
+  _NativeCallbackPorts roots,
 ) {
-  final arena = NativeOwnedArena();
-  var transferred = false;
+  final arena = Arena();
+  DeliveryRegistration? registration;
   try {
-    switch (value) {
-      case ResourceProviderEmpty():
-        final descriptor = arena<raw.mln_resource_provider>();
-        descriptor.ref.size = sizeOf<raw.mln_resource_provider>();
-        return _NativeRegistration(
-          descriptor,
-          arena.releaseAll,
-          arena.releaseAll,
-        );
-      case ResourceProviderResourceProviderRules():
-        final context = _writeAdapterResourceProviderRules(value.value, arena);
-        final descriptor = arena<raw.mln_resource_provider>();
-        descriptor.ref.size = sizeOf<raw.mln_resource_provider>();
-        descriptor.ref.callback =
-            Native.addressOf<
-              NativeFunction<raw.mln_resource_provider_callbackFunction>
-            >(raw.mln_adapter_resource_provider_rules_callback);
-        descriptor.ref.user_data = context.cast();
-        descriptor.ref.release_user_data =
-            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-              raw.mln_adapter_dart_release,
-            );
-        transferred = true;
-        roots.register(context.cast(), arena.releaseAll, arena: arena);
-        return _NativeRegistration(
-          descriptor,
-          () => roots.reject(context.cast()),
-        );
-      case ResourceProviderRoutedResourceProvider():
-        final context = _writeAdapterRoutedResourceProvider(
-          value.value,
-          arena,
-          ports,
-        );
-        final descriptor = arena<raw.mln_resource_provider>();
-        descriptor.ref.size = sizeOf<raw.mln_resource_provider>();
-        descriptor.ref.callback =
-            Native.addressOf<
-              NativeFunction<raw.mln_resource_provider_callbackFunction>
-            >(raw.mln_adapter_routed_resource_provider_callback);
-        descriptor.ref.user_data = context.cast();
-        descriptor.ref.release_user_data =
-            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-              raw.mln_adapter_dart_release,
-            );
-        transferred = true;
-        roots.register(context.cast(), arena.releaseAll, arena: arena);
-        return _NativeRegistration(
-          descriptor,
-          () => roots.reject(context.cast()),
-        );
+    final result = arena<raw.mln_resource_provider>();
+    result.ref.size = sizeOf<raw.mln_resource_provider>();
+    result.ref.routes = arena<raw.mln_resource_route>(
+      value.routes.isEmpty ? 1 : value.routes.length,
+    );
+    result.ref.route_count = value.routes.length;
+    for (var index = 0; index < value.routes.length; index++) {
+      result.ref.routes[index] = _writeResourceRoute(
+        value.routes[index],
+        arena,
+      ).ref;
     }
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST: (batch, index, delivery) =>
+          _deliverResourceProviderCallback(
+            value.callback,
+            batch,
+            index,
+            delivery,
+          ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    if (!transferred) {
-      arena.releaseAll();
-    }
+    registration?.reject();
+    arena.releaseAll();
     rethrow;
   }
 }
 
-Pointer<raw.mln_adapter_resource_rewrite_rule> _writeAdapterResourceRewriteRule(
-  AdapterResourceRewriteRule value,
+Pointer<raw.mln_resource_rewrite_rule> _writeResourceRewriteRule(
+  ResourceRewriteRule value,
   Arena arena,
 ) {
-  final result = arena<raw.mln_adapter_resource_rewrite_rule>();
+  final result = arena<raw.mln_resource_rewrite_rule>();
   result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
-  result.ref.url = value.url == null
-      ? nullptr
-      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
+  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
   result.ref.replacement_url = value.replacementUrl == null
       ? nullptr
       : nativeUtf8CString(value.replacementUrl!, arena).pointer.cast<Char>();
   return result;
 }
 
-Pointer<raw.mln_adapter_resource_rewrite_rules>
-_writeAdapterResourceRewriteRules(
-  AdapterResourceRewriteRules value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_resource_rewrite_rules>();
-  result.ref.rules = arena<raw.mln_adapter_resource_rewrite_rule>(
-    value.rules.isEmpty ? 1 : value.rules.length,
-  );
-  result.ref.count = value.rules.length;
-  for (var index = 0; index < value.rules.length; index++) {
-    result.ref.rules[index] = _writeAdapterResourceRewriteRule(
-      value.rules[index],
-      arena,
-    ).ref;
-  }
-  return result;
-}
-
 _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   ResourceTransform value,
-  NativeCallbackReleases roots,
 ) {
-  final arena = NativeOwnedArena();
-  var transferred = false;
+  final arena = Arena();
   try {
-    switch (value) {
-      case ResourceTransformEmpty():
-        final descriptor = arena<raw.mln_resource_transform>();
-        descriptor.ref.size = sizeOf<raw.mln_resource_transform>();
-        return _NativeRegistration(
-          descriptor,
-          arena.releaseAll,
-          arena.releaseAll,
-        );
-      case ResourceTransformResourceRewriteRules():
-        final context = _writeAdapterResourceRewriteRules(value.value, arena);
-        final descriptor = arena<raw.mln_resource_transform>();
-        descriptor.ref.size = sizeOf<raw.mln_resource_transform>();
-        descriptor.ref.callback =
-            Native.addressOf<
-              NativeFunction<raw.mln_resource_transform_callbackFunction>
-            >(raw.mln_adapter_resource_transform_rewrite_callback);
-        descriptor.ref.user_data = context.cast();
-        descriptor.ref.release_user_data =
-            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-              raw.mln_adapter_dart_release,
-            );
-        transferred = true;
-        roots.register(context.cast(), arena.releaseAll, arena: arena);
-        return _NativeRegistration(
-          descriptor,
-          () => roots.reject(context.cast()),
-        );
+    final result = arena<raw.mln_resource_transform>();
+    result.ref.size = sizeOf<raw.mln_resource_transform>();
+    result.ref.rules = arena<raw.mln_resource_rewrite_rule>(
+      value.rules.isEmpty ? 1 : value.rules.length,
+    );
+    result.ref.rule_count = value.rules.length;
+    for (var index = 0; index < value.rules.length; index++) {
+      result.ref.rules[index] = _writeResourceRewriteRule(
+        value.rules[index],
+        arena,
+      ).ref;
     }
+    return _NativeRegistration(result, () {}, arena.releaseAll);
   } catch (_) {
-    if (!transferred) {
-      arena.releaseAll();
-    }
+    arena.releaseAll();
     rethrow;
   }
 }
 
 final _resultCameraOptions = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
   sizeOf<raw.mln_camera_options>(),
   (element) => _readCameraOptions(element.cast<raw.mln_camera_options>().ref),
 );
 final _resultCameraQueryResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
   sizeOf<raw.mln_camera_query_result>(),
   (element) =>
       _readCameraQueryResult(element.cast<raw.mln_camera_query_result>().ref),
 );
 final _resultLatLng = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
   sizeOf<raw.mln_lat_lng>(),
   (element) => _readLatLng(element.cast<raw.mln_lat_lng>().ref),
 );
 final _resultLatLngBounds = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
   sizeOf<raw.mln_lat_lng_bounds>(),
   (element) => _readLatLngBounds(element.cast<raw.mln_lat_lng_bounds>().ref),
 );
 final _resultOfflineRegionInfo = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
   sizeOf<raw.mln_offline_region_info>(),
   (element) =>
       _readOfflineRegionInfo(element.cast<raw.mln_offline_region_info>().ref),
 );
 final _resultOfflineRegionStatus = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS,
   sizeOf<raw.mln_offline_region_status>(),
   (element) => _readOfflineRegionStatus(
     element.cast<raw.mln_offline_region_status>().ref,
   ),
 );
 final _resultQueriedFeature = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
   sizeOf<raw.mln_queried_feature>(),
   (element) => _readQueriedFeature(element.cast<raw.mln_queried_feature>().ref),
 );
 final _resultScreenPoint = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
   sizeOf<raw.mln_screen_point>(),
   (element) => _readScreenPoint(element.cast<raw.mln_screen_point>().ref),
 );
 final _resultString = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) =>
       utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
 );
 final _resultStyleImageInfo = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO,
   sizeOf<raw.mln_style_image_info>(),
   (element) =>
       _readStyleImageInfo(element.cast<raw.mln_style_image_info>().ref),
 );
 final _resultStyleLayerInfo = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO,
   sizeOf<raw.mln_style_layer_info>(),
   (element) =>
       _readStyleLayerInfo(element.cast<raw.mln_style_layer_info>().ref),
 );
 final _resultStyleSourceInfo = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO,
   sizeOf<raw.mln_style_source_info>(),
   (element) =>
       _readStyleSourceInfo(element.cast<raw.mln_style_source_info>().ref),
 );
 final _resultStyleTransitionOptions = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
   sizeOf<raw.mln_style_transition_options>(),
   (element) => _readStyleTransitionOptions(
     element.cast<raw.mln_style_transition_options>().ref,
   ),
 );
 final _resultTextureReadbackResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT,
   sizeOf<raw.mln_texture_readback_result>(),
   (element) => _readTextureReadbackResult(
     element.cast<raw.mln_texture_readback_result>().ref,
   ),
 );
 final _resultUint8List = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) => _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 final _resultUint8ListOrNull = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
       ? null
       : _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 final _resultdouble = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
   sizeOf<Double>(),
   (element) => element.cast<Double>().value,
 );
@@ -7232,7 +7003,6 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<MapHandle> createMap(MapOptions options) => _queryOwned(
-    raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
     (arena, completion) => raw.mln_runtime_create_map(
       _handle.raw,
       _writeMapOptions(options, arena),
@@ -7438,9 +7208,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
         return registrations.run(
           () => raw.mln_runtime_set_http_header_transform(
             _handle.raw,
-            registrations.add(
-              _prepareHttpHeaderTransform(transform, _callbackReleases),
-            ),
+            registrations.add(_prepareHttpHeaderTransform(transform)),
             completion,
             nativeDiagnostic,
           ),
@@ -7502,11 +7270,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
           () => raw.mln_runtime_set_resource_provider(
             _handle.raw,
             registrations.add(
-              _prepareResourceProvider(
-                provider,
-                _callbackReleases,
-                registrations.ports,
-              ),
+              _prepareResourceProvider(provider, registrations.ports),
             ),
             completion,
             nativeDiagnostic,
@@ -7524,9 +7288,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
         return registrations.run(
           () => raw.mln_runtime_set_resource_transform(
             _handle.raw,
-            registrations.add(
-              _prepareResourceTransform(transform, _callbackReleases),
-            ),
+            registrations.add(_prepareResourceTransform(transform)),
             completion,
             nativeDiagnostic,
           ),

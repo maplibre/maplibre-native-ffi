@@ -944,34 +944,51 @@ internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefini
   allocate(72, 8).also { putOfflineRegionDefinition(it, value) }
 
 internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
-  writeU32(target, w(16, 32).toUInt())
+  writeU32(target, w(24, 48).toUInt())
+  writeAddress(
+    target + w(16, 32),
+    array(value.rules, w(20, 32), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
+  )
+  writeSize(target + w(20, 40), value.rules.size.toULong())
+  if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.httpHeaderTransformCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
-  allocate(w(16, 32), w(4, 8)).also { putHttpHeaderTransform(it, value) }
+  allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransform(it, value) }
 
 internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
-  writeU32(target, w(24, 40).toUInt())
+  writeU32(target, w(32, 56).toUInt())
+  writeAddress(
+    target + w(24, 40),
+    array(value.routes, w(12, 16), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+  )
+  writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
-  allocate(w(24, 40), 8).also { putResourceProvider(it, value) }
+  allocate(w(32, 56), 8).also { putResourceProvider(it, value) }
 
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
-  writeU32(target, w(16, 32).toUInt())
+  writeU32(target, w(24, 48).toUInt())
+  writeAddress(
+    target + w(16, 32),
+    array(value.rules, w(16, 24), w(4, 8)) { at, item -> putResourceRewriteRule(at, item) },
+  )
+  writeSize(target + w(20, 40), value.rules.size.toULong())
+  if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
-  allocate(w(16, 32), w(4, 8)).also { putResourceTransform(it, value) }
+  allocate(w(24, 48), w(4, 8)).also { putResourceTransform(it, value) }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
@@ -1849,6 +1866,39 @@ internal fun NativeArena.writeOfflineGeometryRegionDefinition(
   value: OfflineGeometryRegionDefinition,
 ): Long = allocate(w(40, 48), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
+internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
+  writeU32(target, value.kind)
+  writeU32(target + 4, value.flags.rawValue)
+  writeAddress(target + 8, cString(value.url))
+  writeAddress(
+    target + w(12, 16),
+    array(value.headers, w(8, 16), w(4, 8)) { at, item -> putHttpHeader(at, item) },
+  )
+  writeSize(target + w(16, 24), value.headers.size.toULong())
+}
+
+internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
+  allocate(w(20, 32), w(4, 8)).also { putHttpHeaderRule(it, value) }
+
+internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
+  writeU32(target, value.kind)
+  writeU32(target + 4, value.flags.rawValue)
+  writeAddress(target + 8, cString(value.url))
+}
+
+internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
+  allocate(w(12, 16), w(4, 8)).also { putResourceRoute(it, value) }
+
+internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
+  writeU32(target, value.kind)
+  writeU32(target + 4, value.flags.rawValue)
+  writeAddress(target + 8, cString(value.url))
+  writeAddress(target + w(12, 16), value.replacementUrl?.let { cString(it) } ?: 0L)
+}
+
+internal fun NativeArena.writeResourceRewriteRule(value: ResourceRewriteRule): Long =
+  allocate(w(16, 24), w(4, 8)).also { putResourceRewriteRule(it, value) }
+
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
@@ -2096,6 +2146,14 @@ internal fun NativeArena.putWebglContextDescriptor(target: Long, value: WebglCon
 
 internal fun NativeArena.writeWebglContextDescriptor(value: WebglContextDescriptor): Long =
   allocate(w(16, 24), w(4, 8)).also { putWebglContextDescriptor(it, value) }
+
+internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
+  writeAddress(target, cString(value.name))
+  writeAddress(target + w(4, 8), cString(value.value))
+}
+
+internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
+  allocate(w(8, 16), w(4, 8)).also { putHttpHeader(it, value) }
 
 internal fun readResourceRange(source: Long): ResourceRange =
   ResourceRange(start = readU64(source), end = readU64(source + 8))

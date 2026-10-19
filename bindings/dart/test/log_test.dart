@@ -8,7 +8,7 @@ import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show globalCallbackPortProbeForTesting;
+    show logRegistrationProbeForTesting;
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';
@@ -37,11 +37,11 @@ void main() {
   setUp(() async {
     // MapLibre delivers info records from a worker by default, and a record
     // from one dump could then reach the callback installed for the next.
-    // Synchronous records reach the callback's port before the dump's own
+    // Synchronous records reach the delivery queue before the dump's own
     // completion does, so awaiting a dump fences its records.
     logSetAsyncSeverityMask(const LogSeverityMask.fromRawValue(0));
     addTearDown(() async {
-      final installed = globalCallbackPortProbeForTesting();
+      final installed = logRegistrationProbeForTesting();
       logClearCallback();
       logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
       // The next test finds no registration of this one still pending.
@@ -59,7 +59,7 @@ void main() {
     'replacing the log callback releases the previous registration',
     () async {
       final first = _collectDumpRules();
-      final firstPort = globalCallbackPortProbeForTesting()!;
+      final firstPort = logRegistrationProbeForTesting()!;
       await dump();
       final rules = first.length;
       expect(rules, greaterThan(0));
@@ -71,7 +71,7 @@ void main() {
       expect(replacement, hasLength(rules));
       expect(first, hasLength(rules));
 
-      final replacementPort = globalCallbackPortProbeForTesting()!;
+      final replacementPort = logRegistrationProbeForTesting()!;
       logClearCallback();
       await within(
         replacementPort.released,
@@ -86,9 +86,9 @@ void main() {
     'another isolate can clear the registration this one installed',
     () async {
       final cleared = _collectDumpRules();
-      final clearedPort = globalCallbackPortProbeForTesting()!;
+      final clearedPort = logRegistrationProbeForTesting()!;
       // The registration is process-global, so another isolate clears it, and
-      // native releases it to this isolate's port.
+      // native retires it through this isolate's delivery queue.
       await Isolate.run(_clearLogCallback);
       await within(clearedPort.released, 'the cleared registration release');
 

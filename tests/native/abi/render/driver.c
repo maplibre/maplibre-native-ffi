@@ -436,7 +436,7 @@ static void abandon_at_exit_keeps_every_graphics_object(void) {
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  MLN_TEST_OK(mln_adapter_render_session_abandon_at_exit(
+  MLN_TEST_OK(mln_binding_render_session_abandon_at_exit(
     fixture.session, &abandoned, NULL
   ));
   TEST_ASSERT_EQUAL_UINT32(

@@ -773,6 +773,34 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_http_header NativeHttpHeader(HttpHeader value, NativeCallScope scope)
+    {
+        Required(value.Name, "HttpHeader.Name must not be null.");
+        Required(value.Value, "HttpHeader.Value must not be null.");
+        var native = new mln_http_header();
+        native.name = scope.CString(value.Name);
+        native.value = scope.CString(value.Value);
+        return native;
+    }
+
+    internal static mln_http_header_rule NativeHttpHeaderRule(
+        HttpHeaderRule value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Url, "HttpHeaderRule.Url must not be null.");
+        var native = new mln_http_header_rule();
+        native.kind = value.Kind;
+        native.flags = (uint)value.Flags;
+        native.url = scope.CString(value.Url);
+        native.headers = scope.Array<mln_http_header, HttpHeader>(
+            value.HeadersStorage.Items,
+            item => NativeHttpHeader(item, scope)
+        );
+        native.header_count = checked((nuint)value.HeadersStorage.Items.Length);
+        return native;
+    }
+
     private static readonly string[] AllowedHttpHeaderTransformCallback =
     [
         "mln_http_header_transform_response_set_header",
@@ -827,6 +855,11 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeHttpHeaderTransformCallback;
         }
+        native.rules = scope.Array<mln_http_header_rule, HttpHeaderRule>(
+            value.RulesStorage.Items,
+            item => NativeHttpHeaderRule(item, scope)
+        );
+        native.rule_count = checked((nuint)value.RulesStorage.Items.Length);
         return native;
     }
 
@@ -2062,6 +2095,11 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeResourceProviderCallback;
         }
+        native.routes = scope.Array<mln_resource_route, ResourceRoute>(
+            value.RoutesStorage.Items,
+            item => NativeResourceRoute(item, scope)
+        );
+        native.route_count = checked((nuint)value.RoutesStorage.Items.Length);
         return native;
     }
 
@@ -2231,6 +2269,35 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_resource_rewrite_rule NativeResourceRewriteRule(
+        ResourceRewriteRule value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Url, "ResourceRewriteRule.Url must not be null.");
+        var native = new mln_resource_rewrite_rule();
+        native.kind = value.Kind;
+        native.flags = (uint)value.Flags;
+        native.url = scope.CString(value.Url);
+        native.replacement_url = value.ReplacementUrl is null
+            ? null
+            : scope.CString(value.ReplacementUrl);
+        return native;
+    }
+
+    internal static mln_resource_route NativeResourceRoute(
+        ResourceRoute value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Url, "ResourceRoute.Url must not be null.");
+        var native = new mln_resource_route();
+        native.kind = value.Kind;
+        native.flags = (uint)value.Flags;
+        native.url = scope.CString(value.Url);
+        return native;
+    }
+
     private static readonly string[] AllowedResourceTransformCallback =
     [
         "mln_resource_transform_response_set_url",
@@ -2285,6 +2352,11 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeResourceTransformCallback;
         }
+        native.rules = scope.Array<mln_resource_rewrite_rule, ResourceRewriteRule>(
+            value.RulesStorage.Items,
+            item => NativeResourceRewriteRule(item, scope)
+        );
+        native.rule_count = checked((nuint)value.RulesStorage.Items.Length);
         return native;
     }
 

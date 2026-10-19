@@ -19,7 +19,7 @@ set(MLN_NATIVE_ABI_DOMAINS
     render
     backend
     delivery
-    adapter
+    binding
     platform
     plugin)
 
@@ -27,7 +27,7 @@ set(MLN_NATIVE_ABI_DOMAINS
 # would launch Chromium once per file. Each shard names its domains.
 set(MLN_NATIVE_BROWSER_SHARDS
     "base,completion,runtime" "resources,map,projection,style" "render,backend"
-    "delivery,adapter,platform,plugin")
+    "delivery,binding,platform,plugin")
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.

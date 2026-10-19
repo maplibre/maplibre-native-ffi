@@ -157,14 +157,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_delivery_batch_release(batch: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_delivery_batch_release(batch.toULong())
-  }
-
-  actual fun mln_delivery_queue_release(queue: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
-  }
-
   actual fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_event_batch_get(
       batch.toULong(),

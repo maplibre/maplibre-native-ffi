@@ -7,8 +7,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../error/maplibre_exception.dart';
-import '../internal/callback/completion.dart';
-import '../internal/callback/retained.dart';
+import '../internal/callback/delivery_queue.dart';
 import '../internal/c/maplibre_native_c.dart'
     show checkNativeCall, ensureAbiVersion, nativeDiagnostic;
 import '../internal/c/maplibre_native_c.g.dart' as raw;
@@ -23,17 +22,8 @@ import '../values.dart';
 part 'generated_operations.dart';
 part 'native_calls.dart';
 
-/// Native release roots for the adapter rule contexts.
-///
-/// Native code retires each registration with a release message, which can
-/// arrive after the owner that registered it is closed or collected. Nothing
-/// here captures an owner, so one set serves the isolate.
-final _callbackReleases = NativeCallbackReleases();
-
-/// Port roots for process-global registrations, such as the log callback.
-///
-/// Native release retires each port, including from another isolate that
-/// replaces or clears the registration.
+/// Port roots for process-global registrations. The log callback arrives
+/// through the isolate's delivery queue instead, which needs no port roots.
 final _globalCallbackPorts = _NativeCallbackPorts();
 
 final class CallbackPortLifecycleProbe {
@@ -58,83 +48,53 @@ CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
   return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
 }
 
-/// Returns the most recently registered process-global port that is still
-/// pending, such as the log callback's, or null when none is.
-CallbackPortLifecycleProbe? globalCallbackPortProbeForTesting() {
-  final pending = _globalCallbackPorts.pending;
-  return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.last);
-}
+/// Returns the most recent log callback registration that native code has
+/// not yet retired, or null when none is pending.
+DeliveryRegistration? logRegistrationProbeForTesting() => isolateDeliveryQueue
+    .latestRegistrationForTesting(raw.MLN_DELIVERY_TYPE_LOG_RECORD);
 
 final class _NativeCallbackPorts {
   final pending = <_NativeCallbackPort>{};
+
+  /// Queued registrations, which this owner keeps until they retire.
+  final queued = <DeliveryRegistration>{};
+
+  DeliveryRegistration registerQueued(Map<int, DeliveryHandler> handlers) {
+    final registration = isolateDeliveryQueue.register(handlers);
+    queued.add(registration);
+    registration.onRetired = () => queued.remove(registration);
+    return registration;
+  }
+
   _NativeCallbackPort register(
     Map<int, void Function(List<dynamic>)> callbacks,
   ) {
     final port = _NativeCallbackPort(
       callbacks,
       (port) => pending.remove(port),
-      (nativePort) => raw.mln_adapter_dart_port_create(
+      (nativePort) => raw.mln_binding_dart_port_create(
         NativeApi.postCObject.cast(),
         nativePort,
       ),
-      raw.mln_adapter_dart_port_release,
-    );
-    pending.add(port);
-    return port;
-  }
-
-  /// Registers a port that receives copied calls of one deferred callback.
-  ///
-  /// Each message carries a native record that [deliver] must destroy. A
-  /// message that arrives after this owner is collected is destroyed unread.
-  _NativeCallbackPort registerDeferred(
-    int callback,
-    void Function(List<dynamic>) deliver,
-  ) {
-    final port = _NativeCallbackPort(
-      {callback: deliver},
-      (port) => pending.remove(port),
-      (nativePort) => withNativeArena((arena) {
-        final context = arena<Pointer<Void>>();
-        _check(
-          raw.mln_adapter_dart_deferred_callback_create(
-            callback,
-            NativeApi.postCObject.cast(),
-            nativePort,
-            context,
-            nativeDiagnostic,
-          ),
-        );
-        return context.value;
-      }),
-      raw.mln_adapter_deferred_callback_release,
-      _destroyDeferredMessage,
+      raw.mln_binding_dart_port_release,
     );
     pending.add(port);
     return port;
   }
 }
 
-void _destroyDeferredMessage(List<dynamic> message) =>
-    raw.mln_adapter_deferred_call_record_destroy(
-      Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
-        message[1] as int,
-      ),
-    );
-
 final class _NativeCallbackPort {
   _NativeCallbackPort(
     Map<int, void Function(List<dynamic>)> callbacks,
     this._onReleased,
     Pointer<Void> Function(int nativePort) create,
-    this._release, [
-    void Function(List<dynamic>)? discard,
-  ]) {
+    this._release,
+  ) {
     _callbacks = callbacks;
     // A registration lives as long as its owner, so its port leaves the
     // isolate free to finish. Only pending completions keep it alive.
     _port = RawReceivePort()..keepIsolateAlive = false;
-    _port.handler = _callbackPortHandler(WeakReference(this), _port, discard);
+    _port.handler = _callbackPortHandler(WeakReference(this), _port);
     try {
       context = create(_port.sendPort.nativePort);
     } catch (_) {
@@ -184,15 +144,10 @@ final class _NativeCallbackPort {
 void Function(dynamic) _callbackPortHandler(
   WeakReference<_NativeCallbackPort> reference,
   RawReceivePort port,
-  void Function(List<dynamic>)? discard,
 ) => (dynamic message) {
   final state = reference.target;
   if (state == null) {
-    if (message == 0) {
-      port.close();
-    } else if (message is List<dynamic>) {
-      discard?.call(message);
-    }
+    if (message == 0) port.close();
     return;
   }
   state._deliver(message);
@@ -213,7 +168,6 @@ Future<CommandCompletion> _startCommand(
   NativeCompletionStart start, {
   void Function()? onRejected,
 }) => startNativeCompletion(
-  copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
   start: start,
   onRejected: onRejected,
   acceptErrorStatus: true,

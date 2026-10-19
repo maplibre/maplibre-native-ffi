@@ -1146,6 +1146,18 @@ class TileOperation(UnknownIntEnum):
     NULL = 8
 
 
+class UrlMatchFlags(IntFlag):
+    """How a rule or route compares its url against a request URL.
+
+    See `mln_url_match_flags` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    FLAGS_NONE = 0
+    GLOB = 1
+    REQUESTED_URL = 2
+
+
 class ViewportMode(UnknownIntEnum):
     """Viewport orientation modes used by `mln_map_viewport_options`.
 
@@ -1878,10 +1890,67 @@ class GpuSync:
 
 
 @dataclass(frozen=True, slots=True)
+class HttpHeader:
+    """One HTTP header that a header rule supplies.
+
+    See `mln_http_header` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    name: str
+
+    value: str
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(name=raw["name"], value=raw["value"])
+
+
+@dataclass(frozen=True, slots=True)
+class HttpHeaderRule:
+    """One rule of a native HTTP header transform.
+
+    See `mln_http_header_rule` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    kind: int
+    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+
+    flags: UrlMatchFlags
+    """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
+
+    url: str
+    """The URL or glob pattern to compare."""
+
+    headers: tuple[HttpHeader, ...]
+    """The headers to set. Registration validates each one as
+    `mln_http_header_transform_response_set_header()` does.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            kind=raw["kind"],
+            flags=UrlMatchFlags(raw["flags"]),
+            url=raw["url"],
+            headers=tuple(HttpHeader._from_native(item) for item in raw["headers"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class HttpHeaderTransform:
+    """HTTP header transform state: a callback, or native header rules.
+
+    See `mln_http_header_transform` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     callback: (
         Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status] | None
     ) = None
+    rules: tuple[HttpHeaderRule, ...] = ()
+    """Header rules for a transform without a callback; empty with one."""
 
     def _invoke_callback(self, kind, url, out_response):
         callback = self.callback
@@ -3314,6 +3383,8 @@ class ResourceProvider:
         Callable[[ResourceRequest, ResourceRequestHandle], ResourceProviderDecision]
         | None
     ) = None
+    routes: tuple[ResourceRoute, ...] = ()
+    """The requests that reach the provider; empty to claim every request."""
 
     def _invoke_callback(self, request, handle):
         callback = self.callback
@@ -3449,10 +3520,70 @@ class ResourceResponse:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceRewriteRule:
+    """One rule of a native resource transform.
+
+    See `mln_resource_rewrite_rule` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    kind: int
+    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+
+    flags: UrlMatchFlags
+    """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
+
+    url: str
+    """The URL or glob pattern to compare."""
+
+    replacement_url: str | None = None
+    """The replacement URL, or null to leave a matching URL unchanged."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            kind=raw["kind"],
+            flags=UrlMatchFlags(raw["flags"]),
+            url=raw["url"],
+            replacement_url=raw["replacement_url"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceRoute:
+    """One request pattern that a resource provider claims.
+
+    See `mln_resource_route` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    kind: int
+    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+
+    flags: UrlMatchFlags
+    """A bitwise OR of `mln_url_match_flags` values."""
+
+    url: str
+    """The URL or glob pattern to compare."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(kind=raw["kind"], flags=UrlMatchFlags(raw["flags"]), url=raw["url"])
+
+
+@dataclass(frozen=True, slots=True)
 class ResourceTransform:
+    """Resource transform state: a callback, or native rewrite rules.
+
+    See `mln_resource_transform` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     callback: (
         Callable[[ResourceKind, str, ResourceTransformResponseScope], Status] | None
     ) = None
+    rules: tuple[ResourceRewriteRule, ...] = ()
+    """Rewrite rules for a transform without a callback; empty with one."""
 
     def _invoke_callback(self, kind, url, out_response):
         callback = self.callback

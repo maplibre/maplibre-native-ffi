@@ -19,7 +19,6 @@
 #include <unistd.h>
 #endif
 
-#include "maplibre_native_c/callback_adapter.h"
 #include "support/test_support.h"
 
 static void restore_log_defaults(void) {
@@ -113,44 +112,6 @@ LOG_STATE_CASE(a_rejected_handler_keeps_the_installed_one) {
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, installed_releases);
   TEST_ASSERT_EQUAL_INT(0, rejected_releases);
-}
-
-// Counts the releases a deferred log context hands its listener.
-static void count_deferred_release(
-  void* user_data, mln_adapter_deferred_call_record* record
-) {
-  if (record == NULL) {
-    atomic_fetch_add((atomic_int*)user_data, 1);
-  } else {
-    mln_adapter_deferred_call_record_destroy(record);
-  }
-}
-
-// Setting and clearing a deferred log registration releases its context once,
-// after the final call. The counter outlives a failed case, whose registration
-// restoring_log_state() releases later.
-LOG_STATE_CASE(a_deferred_log_registration_releases_its_context_once) {
-  static atomic_int releases;
-  atomic_store(&releases, 0);
-  void* context = NULL;
-  MLN_TEST_OK(mln_adapter_deferred_callback_create(
-    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, count_deferred_release, &releases,
-    &context, NULL
-  ));
-  void* address =
-    mln_adapter_deferred_callback_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK);
-  TEST_ASSERT_NOT_NULL(address);
-  mln_log_callback callback = NULL;
-  memcpy(&callback, &address, sizeof(callback));
-
-  const mln_log_handler handler =
-    log_handler(callback, context, mln_adapter_deferred_callback_release);
-  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&releases));
-  MLN_TEST_OK(mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
-  MLN_TEST_OK(mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
 }
 
 static const struct {
@@ -439,7 +400,6 @@ LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
 MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
   RUN_TEST(a_rejected_handler_keeps_the_installed_one);
-  RUN_TEST(a_deferred_log_registration_releases_its_context_once);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
