@@ -13,19 +13,34 @@ import 'support/fixture.dart';
 void main() {
   test('a routed provider answers the requests its routes match', () async {
     const styleUrl = 'custom://routed-style.json';
-    final requested = <String?>[];
+    const sourceUrl = 'custom://routed-source.json';
+    final requested = <(String?, ResourceKind)>[];
+    final sourceRequested = Completer<void>();
     final fixture = await openRuntime(
       provider: routedProvider(
         [
+          // A route that names no kinds claims the style and its source alike.
           ResourceRoute(
             flags: UrlMatchFlags.glob,
             url: 'custom://routed-*.json',
           ),
         ],
         (request, handle) {
-          requested.add(request.requestedUrl);
-          handle.complete(emptyStyleResponse);
+          requested.add((request.requestedUrl, request.kind));
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: jsonBytes(
+                request.kind == ResourceKind.style
+                    ? '{"version":8,"sources":{"routed":{"type":"vector",'
+                          '"url":"$sourceUrl"}},"layers":[]}'
+                    : '{"tilejson":"3.0.0",'
+                          '"tiles":["custom://unrouted/{z}/{x}/{y}.pbf"]}',
+              ),
+            ),
+          );
           handle.close();
+          if (request.kind == ResourceKind.source) sourceRequested.complete();
         },
       ),
     );
@@ -36,18 +51,25 @@ void main() {
       RuntimeEventType.mapStyleLoaded,
     );
     expect(loaded.source, map.id);
-    expect(requested, [styleUrl]);
+    await within(sourceRequested.future, 'the source request');
+    expect(requested, [
+      (styleUrl, ResourceKind.style),
+      (sourceUrl, ResourceKind.source),
+    ]);
   });
 
   test('a request outside the routes passes through', () async {
+    const styleUrl = 'custom://unrouted-style.json';
     final fixture = await openRuntime(
       provider: routedProvider([
         styleRoute('custom://routed-style.json'),
+        // The URL matches, but the route claims only sources.
+        ResourceRoute(kinds: ResourceKindMask.source, url: styleUrl),
       ], (_, _) => fail('the provider saw an unrouted request')),
     );
     final map = await fixture.openMap();
 
-    await expectCommitted(map.setStyleUrl('custom://unrouted-style.json'));
+    await expectCommitted(map.setStyleUrl(styleUrl));
     // Native loading has no handler for the custom scheme.
     final failure = await fixture.awaitEventType(
       RuntimeEventType.mapLoadingFailed,

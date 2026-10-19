@@ -33,6 +33,8 @@
 "CB-07" = "bindings/zig/tests/callbacks.zig::replacing the process-global log callback releases the previous one"
 "CB-08" = "bindings/zig/tests/callbacks.zig::a registration that reports cancellation is never rooted"
 "CB-09" = "bindings/zig/tests/callbacks.zig::a camera end handler inside a command is released after it runs"
+"CB-10" = "bindings/zig/tests/callbacks.zig::a provider receives only the requests its routes match"
+"CB-11" = "bindings/zig/tests/callbacks.zig::a transform's rules rewrite a request with no callback registered"
 "VAL-01" = "bindings/zig/tests/values.zig::strings cross as terminated and explicit-length views"
 "VAL-02" = "bindings/zig/tests/values.zig::optional fields and masks round-trip through presence bits"
 "VAL-03" = "bindings/zig/tests/values.zig::a strided event batch with an unknown payload arm decodes without loss"

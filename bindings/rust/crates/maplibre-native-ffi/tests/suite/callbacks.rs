@@ -1,5 +1,6 @@
 //! Callback registrations: rooting and release, the admission policy inside a
-//! callback, panics, decision handles, and process-global callbacks.
+//! callback, panics, decision handles, provider routes and transform rules, and
+//! process-global callbacks.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -7,6 +8,9 @@ use std::sync::{Arc, Mutex, mpsc};
 use maplibre_native_ffi::*;
 
 use crate::support::*;
+
+/// A style whose GeoJSON source loads from a URL beside it.
+const ROUTED_STYLE_JSON: &str = r#"{"version":8,"sources":{"points":{"type":"geojson","data":"custom://routed/source.geojson"}},"layers":[]}"#;
 
 #[test]
 fn a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released() {
@@ -270,6 +274,112 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
     .join()
     .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+}
+
+#[test]
+fn a_provider_receives_only_the_requests_its_routes_match() {
+    let fixture = Fixture::new();
+    let server = LoopbackServer::start("/native/style.json", BACKGROUND_STYLE_JSON);
+    let (sender, requests) = mpsc::channel();
+    let sender = Mutex::new(sender);
+    // The call consumes the provider, its routes, and their strings, so
+    // native can only be matching against the copy it took.
+    let provider = ResourceProvider {
+        routes: vec![
+            // Another kind: the style request below matches this pattern, so
+            // a kind mask lost on the way to native would claim it.
+            ResourceRoute {
+                kinds: ResourceKindMask::TILE,
+                flags: UrlMatchFlags::GLOB,
+                url: "**".to_owned(),
+            },
+            // Only a URL pattern: every kind under it reaches the provider.
+            ResourceRoute {
+                flags: UrlMatchFlags::GLOB,
+                url: "custom://routed/**".to_owned(),
+                ..Default::default()
+            },
+        ],
+        ..ResourceProvider::new(move |request, handle| {
+            let url = request.requested_url.unwrap_or_default();
+            let body = match url.as_str() {
+                "custom://routed/style.json" => ROUTED_STYLE_JSON,
+                _ => r#"{"type":"FeatureCollection","features":[]}"#,
+            };
+            handle.complete(&ok_response(body)).unwrap();
+            sender.lock().unwrap().send((request.kind, url)).unwrap();
+            ResourceProviderDecision::Handle
+        })
+    };
+    wait_for(fixture.runtime().set_resource_provider(provider));
+
+    // The style and the source it names both match the URL-only route.
+    fixture
+        .map()
+        .set_style_url("custom://routed/style.json")
+        .unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+    let mut received = vec![
+        requests.recv_timeout(timeout()).unwrap(),
+        requests.recv_timeout(timeout()).unwrap(),
+    ];
+    received.sort_by(|left, right| left.1.cmp(&right.1));
+    assert_eq!(
+        received,
+        [
+            (
+                ResourceKind::Source,
+                "custom://routed/source.geojson".to_owned()
+            ),
+            (ResourceKind::Style, "custom://routed/style.json".to_owned()),
+        ]
+    );
+
+    // A style that no route claims loads natively, without reaching the
+    // provider.
+    fixture
+        .map()
+        .set_style_url(&server.url("/native/style.json"))
+        .unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+    assert_eq!(server.requests(), ["/native/style.json"]);
+    assert!(requests.try_recv().is_err());
+}
+
+#[test]
+fn a_transform_rewrites_through_its_rules_with_no_callback() {
+    let fixture = Fixture::new();
+    let server = LoopbackServer::start("/rewritten.json", BACKGROUND_STYLE_JSON);
+    // With no provider, the style request reaches the online source, where
+    // the transform runs.
+    wait_for(fixture.runtime().clear_resource_provider());
+    // The call consumes the transform, its rules, and their strings, so
+    // native can only be matching against the copy it took.
+    let original = server.url("/original.json");
+    let transform = ResourceTransform {
+        callback: None,
+        rules: vec![
+            // Another kind: a kind mask lost on the way to native would send
+            // the style here.
+            ResourceRewriteRule {
+                kinds: ResourceKindMask::TILE,
+                url: original.clone(),
+                replacement_url: Some(server.url("/tile.json")),
+                ..Default::default()
+            },
+            ResourceRewriteRule {
+                kinds: ResourceKindMask::STYLE,
+                url: original.clone(),
+                replacement_url: Some(server.url("/rewritten.json")),
+                ..Default::default()
+            },
+        ],
+    };
+    wait_for(fixture.runtime().set_resource_transform(transform));
+
+    fixture.map().set_style_url(&original).unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+    assert_eq!(server.requests(), ["/rewritten.json"]);
 }
 
 #[test]

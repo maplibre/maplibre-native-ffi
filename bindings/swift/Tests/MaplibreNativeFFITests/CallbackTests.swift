@@ -259,6 +259,86 @@ func installProvider(
   }
 }
 
+/// A provider's routes reach native as a copied array: the provider sees only
+/// the requests they match, and a route that names only a URL pattern
+/// matches every resource kind. A request outside the routes loads natively.
+@Test func aProviderReceivesOnlyTheRequestsItsRoutesMatch() async throws {
+  try await withMapFixture { fixture in
+    // The sprite adds a sprite JSON and a sprite image request under the
+    // routed prefix.
+    let style = Data(#"""
+    {"version":8,"sources":{},"layers":[],"sprite":"custom://routed/sprite"}
+    """#.utf8)
+    let seen = LockedBox<[ResourceRequest]>([])
+    try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
+      callback: { request, handle in
+        seen.update { $0.append(request) }
+        try handle.complete(response: request.kind == .style
+          ? ResourceResponse(status: .ok, bytes: style)
+          : ResourceResponse(
+            status: .error,
+            errorReason: .notFound,
+            errorMessage: "the test serves no sprite"
+          ))
+        try handle.close()
+        return .handle
+      },
+      routes: [ResourceRoute(flags: .glob, url: "custom://routed/**")]
+    ))
+
+    try await fixture.map.setStyleUrl(url: "custom://routed/style.json")
+    await awaitCondition("the routed style and sprite requests") {
+      Set(seen.value.map(\.kind))
+        .isSuperset(of: [.style, .spriteJson, .spriteImage])
+    }
+
+    // Outside the routes, native loading has no transport for the scheme.
+    try await fixture.map.setStyleUrl(url: "custom://elsewhere/style.json")
+    #expect(try await fixture.awaitEvent("the unrouted style to fail") {
+      $0.type == .mapLoadingFailed && $0.message.contains("elsewhere")
+    } != nil)
+    #expect(seen.value.allSatisfy {
+      $0.requestedUrl?.hasPrefix("custom://routed/") == true
+    })
+  }
+}
+
+/// A transform's rules reach native as a copied array and rewrite a request
+/// with no host callback registered, matching each rule's kinds and URL
+/// pattern as given.
+@Test func aRulesTransformRewritesWithoutAHostCallback() async throws {
+  let server = try LoopbackServer(bodies: ["/rewritten.json": emptyStyle])
+  defer { server.stop() }
+  try await withMapFixture { fixture in
+    let original = server.url("/original.json")
+    try await installProvider(on: fixture.runtime, for: original) { _ in
+      .passThrough
+    }
+    try await fixture.runtime.setResourceTransform(transform: ResourceTransform(
+      rules: [
+        // Another kind: matches the URL but not the style request.
+        ResourceRewriteRule(
+          kinds: .tile,
+          url: original,
+          replacementUrl: "http://127.0.0.1:1/tile.json"
+        ),
+        ResourceRewriteRule(
+          kinds: .style,
+          flags: .glob,
+          url: "http://127.0.0.1:*/original.json",
+          replacementUrl: server.url("/rewritten.json")
+        ),
+      ]
+    ))
+
+    try await fixture.map.setStyleUrl(url: original)
+    #expect(try await fixture.awaitEvent("the rewritten style") {
+      $0.type == .mapStyleLoaded
+    } != nil)
+    #expect(server.requestedPaths == ["/rewritten.json"])
+  }
+}
+
 /// A cancel callback registered on a request native already cancelled is
 /// rejected through the registration's cancelled output, and the binding
 /// frees it at once rather than rooting it.

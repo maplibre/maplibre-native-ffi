@@ -53,6 +53,8 @@
 "CB-07" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/LogCallbackTest.kt::replacingTheLogCallbackReleasesThePreviousRegistration"
 "CB-08" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelRegistrationNativeDoesNotStoreIsNotRooted"
 "CB-09" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CameraEndHandlerTest.kt::anEndHandlerIsRootedUntilItRuns"
+"CB-10" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::routesDecideWhichRequestsReachTheProviderAndAUrlOnlyRouteMatchesEveryKind"
+"CB-11" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::rewriteRulesRewriteARequestWithNoHostCallback"
 "VAL-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt"
 "VAL-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::presenceFieldsRoundTripSetAndAbsentValues"
 "VAL-03" = "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventNativeTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"

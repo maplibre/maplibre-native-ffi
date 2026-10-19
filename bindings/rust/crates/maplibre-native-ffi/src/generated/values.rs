@@ -1698,6 +1698,7 @@ impl ToNative<sys::mln_http_header_transform> for HttpHeaderTransform {
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
         raw.rules = convert::array(&self.rules, arena)?;
+        raw.rule_count = convert::count(self.rules.len())?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4427,6 +4428,7 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
         raw.routes = convert::array(&self.routes, arena)?;
+        raw.route_count = convert::count(self.routes.len())?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4840,6 +4842,7 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
         raw.rules = convert::array(&self.rules, arena)?;
+        raw.rule_count = convert::count(self.rules.len())?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };

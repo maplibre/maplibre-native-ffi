@@ -1,7 +1,7 @@
 """Retained callback descriptors, scoped responses, and decision handles."""
 
 from .rust import Unsupported, doc, identifier, native_call, native_identifier
-from .rust_dynamic_values import decode, encode
+from .rust_dynamic_values import decode, encode, optional
 
 
 def native_type(values, ctype):
@@ -214,6 +214,22 @@ def declaration(values, value):
             writes.insert(0, f"{place} = 0;")
         if field.role == "size":
             writes.insert(0, f"{place} = std::mem::size_of::<{raw}>() as _;")
+            continue
+        if field.role == "count":
+            # A registration's arrays, such as provider routes, carry counts
+            # like any other record's.
+            array = next(
+                (f for f in value.fields if f.value.length == field.name), None
+            )
+            if array is None:
+                raise Unsupported(f"{value.native}.{field.name}: count has no array")
+            source = f"self.{identifier(array.name)}"
+            length = (
+                f"{source}.as_ref().map_or(0, |items| items.len())"
+                if optional(array.value) or array.presence
+                else f"{source}.len()"
+            )
+            writes.append(f"{place} = convert::count({length})?;")
             continue
         if not field.public or field.name in value.registration.callbacks:
             continue

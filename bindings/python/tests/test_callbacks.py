@@ -1,10 +1,13 @@
 """Python callbacks that native holds and invokes."""
 
+import contextlib
 import gc
+import http.server
 import sys
 import threading
+import typing
 import weakref
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 
 import maplibre_native_ffi as mln
@@ -13,6 +16,7 @@ from support import (
     EMPTY_STYLE,
     TIMEOUT,
     Harness,
+    denied_response,
     leak_reports,
     ok_response,
     result,
@@ -368,3 +372,148 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
     del callback
     assert retired.is_set()
     handle.close()
+
+
+def test_a_providers_routes_decide_which_requests_reach_it(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    seen: list[tuple[mln.ResourceKind, str | None]] = []
+    sprites = {mln.ResourceKind.SPRITE_JSON, mln.ResourceKind.SPRITE_IMAGE}
+    sprites_seen = threading.Event()
+    routed_style = (
+        b'{"version":8,"sprite":"custom://routed/sprite","sources":{},"layers":[]}'
+    )
+
+    def provide(
+        request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
+    ) -> mln.ResourceProviderDecision:
+        seen.append((request.kind, request.requested_url))
+        if request.kind == mln.ResourceKind.STYLE:
+            handle.complete(ok_response(routed_style))
+        else:
+            handle.complete(denied_response())
+        if sprites <= {kind for kind, _ in seen}:
+            sprites_seen.set()
+        return mln.ResourceProviderDecision.HANDLE
+
+    routes = [
+        # Another kind: claims no style or sprite, whatever its URL.
+        mln.ResourceRoute(
+            kinds=mln.ResourceKindMask.TILE, flags=mln.UrlMatchFlags.GLOB, url="**"
+        ),
+        # A URL pattern alone claims every kind under it.
+        mln.ResourceRoute(
+            kinds=mln.ResourceKindMask.ANY,
+            flags=mln.UrlMatchFlags.GLOB,
+            url="custom://routed/**",
+        ),
+    ]
+    registered = harness.runtime.set_resource_provider(
+        mln.ResourceProvider(callback=provide, routes=typing.cast(typing.Any, routes))
+    )
+    # Native holds its own copy, so a route that would claim everything,
+    # added after the call, claims nothing.
+    routes[0] = mln.ResourceRoute(
+        kinds=mln.ResourceKindMask.ANY, flags=mln.UrlMatchFlags.GLOB, url="**"
+    )
+    routes.clear()
+    result(registered)
+
+    # A style outside the routes passes through to native, which serves no
+    # such scheme.
+    map_handle.set_style_url("custom://elsewhere/style.json")
+    harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
+    assert seen == []
+
+    map_handle.set_style_url("custom://routed/style.json")
+    harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+    assert sprites_seen.wait(TIMEOUT)
+    assert seen[0] == (mln.ResourceKind.STYLE, "custom://routed/style.json")
+    assert all(
+        url is not None and url.startswith("custom://routed/") for _, url in seen
+    )
+
+
+@contextlib.contextmanager
+def _loopback_server(
+    requests: list[tuple[str, str | None]],
+) -> Iterator[str]:
+    """Serve an empty style at every path on a loopback port, and record each
+    request's path and X-Rule header."""
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            requests.append((self.path, self.headers.get("X-Rule")))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(EMPTY_STYLE)))
+            self.end_headers()
+            self.wfile.write(EMPTY_STYLE)
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    serving = threading.Thread(target=server.serve_forever)
+    serving.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        serving.join(TIMEOUT)
+        server.server_close()
+
+
+def test_transform_rules_rewrite_a_request_without_a_callback(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    requests: list[tuple[str, str | None]] = []
+    with _loopback_server(requests) as base:
+        original = f"{base}/original.json"
+        rewritten = f"{base}/rewritten.json"
+        harness.routes[original] = lambda request, handle: (
+            mln.ResourceProviderDecision.PASS_THROUGH
+        )
+
+        rewrite_rules = [
+            # Another kind: no match.
+            mln.ResourceRewriteRule(
+                kinds=mln.ResourceKindMask.TILE,
+                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                url=original,
+                replacement_url=f"{base}/tile.json",
+            ),
+            mln.ResourceRewriteRule(
+                kinds=mln.ResourceKindMask.STYLE,
+                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                url=original,
+                replacement_url=rewritten,
+            ),
+        ]
+        header_rules = [
+            # Header rules match the URL that the resource rules produced.
+            mln.HttpHeaderRule(
+                kinds=mln.ResourceKindMask.ANY,
+                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                url=rewritten,
+                headers=(mln.HttpHeader(name="X-Rule", value="applied"),),
+            ),
+        ]
+        rewrite = harness.runtime.set_resource_transform(
+            mln.ResourceTransform(rules=typing.cast(typing.Any, rewrite_rules))
+        )
+        headers = harness.runtime.set_http_header_transform(
+            mln.HttpHeaderTransform(rules=typing.cast(typing.Any, header_rules))
+        )
+        # Native holds its own copies, so these changes reach no request.
+        rewrite_rules.clear()
+        header_rules[0] = replace(
+            header_rules[0], headers=(mln.HttpHeader(name="X-Rule", value="replaced"),)
+        )
+        result(rewrite)
+        result(headers)
+
+        map_handle.set_style_url(original)
+        harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert requests == [("/rewritten.json", "applied")]

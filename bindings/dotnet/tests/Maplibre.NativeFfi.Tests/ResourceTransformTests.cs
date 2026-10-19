@@ -45,4 +45,48 @@ public sealed class ResourceTransformTests
         Assert.NotNull(retained);
         Assert.Throws<InvalidOperationException>(() => retained.SetUrl("other"));
     }
+
+    // A rules transform rewrites in native code. The provider's route claims nothing on the
+    // server, so no managed code runs for the request between the map and the server.
+    [Fact]
+    public async Task RulesRewriteARequestWithoutAHostCallback()
+    {
+        using var server = new LoopbackHttpServer(
+            new Dictionary<string, byte[]> { ["/rewritten.json"] = NativeFixture.EmptyStyle }
+        );
+        var original = server.Url("/original.json");
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: NativeFixture.DenyingProvider with
+            {
+                Routes = [new ResourceRoute(ResourceKindMask.Any, UrlMatchFlags.Glob, "deny://**")],
+            }
+        );
+        await fixture.Runtime.SetResourceTransformAsync(
+            new ResourceTransform
+            {
+                Rules =
+                [
+                    // Another kind: no match.
+                    new ResourceRewriteRule(
+                        ResourceKindMask.Tile,
+                        UrlMatchFlags.FlagsNone,
+                        original,
+                        server.Url("/tile.json")
+                    ),
+                    new ResourceRewriteRule(
+                        ResourceKindMask.Style,
+                        UrlMatchFlags.FlagsNone,
+                        original,
+                        server.Url("/rewritten.json")
+                    ),
+                ],
+            },
+            TestWaits.Token
+        );
+
+        await fixture.Map.SetStyleUrlAsync(original, TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+
+        Assert.Equal(["/rewritten.json"], server.RequestedPaths);
+    }
 }

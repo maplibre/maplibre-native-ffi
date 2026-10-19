@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
@@ -79,6 +80,69 @@ public sealed class ResourceProviderTests
         Assert.False(handle.IsClosed);
         handle.Close();
         handle.WaitUntilRetired();
+    }
+
+    // A request outside the routes passes through to native loading, which refuses the scheme.
+    // The route without kinds claims both the style and the source that the style names.
+    [Fact]
+    public async Task RoutesDecideWhichRequestsReachTheProvider()
+    {
+        const string routedStyle = "routed-test://maps/style.json";
+        const string routedSource = "routed-test://maps/source.json";
+        var style =
+            """{"version":8,"sources":{"s":{"type":"vector","url":"routed-test://maps/source.json"}},"layers":[]}"""u8.ToArray();
+        var seen = new ConcurrentQueue<(ResourceKind, string?)>();
+        var sourceRequested = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider
+            {
+                Callback = (request, handle) =>
+                {
+                    seen.Enqueue((request.Kind, request.RequestedUrl));
+                    handle.Complete(
+                        request.Kind == ResourceKind.Style
+                            ? new ResourceResponse
+                            {
+                                Status = ResourceResponseStatus.Ok,
+                                Bytes = style,
+                            }
+                            : new ResourceResponse
+                            {
+                                Status = ResourceResponseStatus.Error,
+                                ErrorReason = ResourceErrorReason.NotFound,
+                            }
+                    );
+                    handle.Close();
+                    if (request.Kind == ResourceKind.Source)
+                        sourceRequested.TrySetResult();
+                    return ResourceProviderDecision.Handle;
+                },
+                Routes =
+                [
+                    // Another kind: claims no style.
+                    new ResourceRoute(
+                        ResourceKindMask.Tile,
+                        UrlMatchFlags.Glob,
+                        "unrouted-test://**"
+                    ),
+                    new ResourceRoute(ResourceKindMask.Any, UrlMatchFlags.Glob, "routed-test://**"),
+                ],
+            }
+        );
+
+        await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json", TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        Assert.Empty(seen);
+
+        await fixture.Map.SetStyleUrlAsync(routedStyle, TestWaits.Token);
+        await sourceRequested.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+
+        Assert.Equal(
+            [(ResourceKind.Style, routedStyle), (ResourceKind.Source, routedSource)],
+            seen.Distinct()
+        );
     }
 
     // A provider's exception is contained: native receives a pass-through, and the exception goes

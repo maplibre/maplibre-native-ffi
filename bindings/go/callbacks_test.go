@@ -407,6 +407,90 @@ func TestProviderDecisionFollowsTheRequestHandle(t *testing.T) {
 	failures.check(t)
 }
 
+// Native copies a provider's routes, so the caller may reuse the slice once the
+// submission returns. Only a request that a route matches reaches the
+// callback, and any other passes through to native loading. A route that names
+// a kind claims no other kind, and one that names only a URL pattern claims
+// every kind.
+func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
+	f := newFixture(t)
+	const routedStyle = `{"version":8,"sources":{"tiles":{"type":"vector","url":"custom://any/tiles.json"}},"layers":[]}`
+	type routed struct {
+		url  string
+		kind ResourceKind
+	}
+	requests := make(chan routed, 8)
+	deny := denyingProvider().Callback
+	routes := []ResourceRoute{
+		{Kinds: ResourceKindMaskTile, Flags: UrlMatchFlagsGlob, Url: "**"},
+		{Kinds: ResourceKindMaskStyle, Url: "custom://routed/style.json"},
+		{Flags: UrlMatchFlagsGlob, Url: "custom://any/**"},
+	}
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		offer(requests, routed{*request.RequestedUrl, request.Kind})
+		if *request.RequestedUrl != "custom://routed/style.json" {
+			return deny(request, handle)
+		}
+		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(routedStyle)})
+		_ = handle.Close()
+		return ResourceProviderDecisionHandle
+	}})))
+	for i := range routes {
+		routes[i] = ResourceRoute{Url: "custom://overwritten.json"}
+	}
+
+	if _, err := f.m.SetStyleUrl("custom://routed/style.json"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the routed style load", isStyleLoaded)
+	for _, want := range []routed{
+		{"custom://routed/style.json", ResourceKindStyle},
+		{"custom://any/tiles.json", ResourceKindSource},
+	} {
+		if got := receive(t, requests, want.url); got != want {
+			t.Fatalf("the provider received %+v, want %+v", got, want)
+		}
+	}
+
+	// No route claims this style, so native loading fails it for its scheme.
+	if _, err := f.m.SetStyleUrl("custom://unrouted/style.json"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the unrouted style's loading failure", isLoadingFailure("custom://unrouted/style.json"))
+	select {
+	case got := <-requests:
+		t.Fatalf("the provider received %+v, which no route matches", got)
+	default:
+	}
+}
+
+// Native copies a transform's rules, so the caller may reuse the slice once the
+// submission returns. A transform without a callback roots nothing, and its
+// rules rewrite each request in native code.
+func TestTransformRulesRewriteWithoutACallback(t *testing.T) {
+	f := newFixture(t)
+	base := f.serveLoopback(t, map[string]string{"/rewritten.json": emptyStyle})
+	roots := rootCount(f.runtime.bindingOwner)
+	rewritten := base + "/rewritten.json"
+	unserved := base + "/unserved.json"
+	rules := []ResourceRewriteRule{
+		{Kinds: ResourceKindMaskTile, Url: base + "/original.json", ReplacementUrl: &unserved},
+		{Kinds: ResourceKindMaskStyle, Url: base + "/original.json", ReplacementUrl: &rewritten},
+	}
+	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Rules: rules})))
+	for i := range rules {
+		rules[i] = ResourceRewriteRule{Flags: UrlMatchFlagsGlob, Url: "**", ReplacementUrl: &unserved}
+	}
+	if got := rootCount(f.runtime.bindingOwner); got != roots {
+		t.Fatalf("roots after a rules transform = %d, want %d", got, roots)
+	}
+
+	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the rewritten style load", isStyleLoaded)
+}
+
 // A transform's response object works only inside its invocation and on the
 // thread native called it on.
 func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {

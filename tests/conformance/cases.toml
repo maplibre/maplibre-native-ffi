@@ -34,6 +34,8 @@
 "CB-07" = "Replacing a process-global callback releases the previous registration"
 "CB-08" = "A registration whose accepted_unless output reports rejection is not rooted"
 "CB-09" = "A registration nested in a command's input record is rooted until native runs and releases it, and a command that native rejects does not root it"
+"CB-10" = "A provider's routes cross to native as a copied array: the provider receives only the requests its routes match, and a route that names only a URL pattern matches every resource kind"
+"CB-11" = "A transform's rules cross to native as a copied array and rewrite a request with no host callback registered"
 
 # Generated value shapes
 "VAL-01" = "Strings cross as NUL-terminated and as explicit-length views, and an embedded NUL is rejected where the C API needs termination"

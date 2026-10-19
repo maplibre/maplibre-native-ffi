@@ -1,5 +1,6 @@
 //! Callback registrations, host errors inside callbacks, resource-request
-//! decisions, and scoped callback arguments.
+//! decisions, provider routes and transform rules, and scoped callback
+//! arguments.
 
 const std = @import("std");
 const testing = std.testing;
@@ -326,6 +327,192 @@ test "a scoped response rejects use after its callback and from another thread" 
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.resourceTransformResponseSetUrl(probe.saved.?, "unsupported://late.json", &diagnostic));
     try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+}
+
+const routed_style_url = "custom://routed/style.json";
+const routed_source_url = "custom://routed/source.json";
+
+/// A style whose one source is fetched under the routed prefix as a source
+/// request, not a style request.
+const routed_style_json =
+    \\{"version":8,"sources":{"routed":{"type":"vector","url":"custom://routed/source.json"}},"layers":[]}
+;
+
+/// A provider that serves the routed style, denies the routed source, and
+/// counts every request it receives by what it is.
+const RoutedProvider = struct {
+    styles: support.Counter = .{},
+    sources: support.Counter = .{},
+    others: support.Counter = .{},
+
+    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+        const self: *RoutedProvider = @ptrCast(@alignCast(context.?));
+        const url = request.requested_url orelse "";
+        const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
+        const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
+        if (is_style) {
+            try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = routed_style_json }, null);
+        } else {
+            try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
+        }
+        try maplibre.resourceRequestRelease(handle);
+        if (is_style) {
+            self.styles.add();
+        } else if (is_source) {
+            self.sources.add();
+        } else {
+            self.others.add();
+        }
+        return .handle;
+    }
+
+    fn calls(self: *RoutedProvider) usize {
+        return self.styles.get() + self.sources.get() + self.others.get();
+    }
+};
+
+// Registration copies the routes, so the caller frees them before the
+// registration settles. A style request outside every route passes through to
+// the native loader, even though a tile route's pattern matches its URL. The
+// route that names only a URL pattern claims both the style and the source
+// that the style references.
+test "a provider receives only the requests its routes match" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    var provider = RoutedProvider{};
+
+    var scratch = std.heap.ArenaAllocator.init(testing.allocator);
+    defer scratch.deinit();
+    const routes = try scratch.allocator().dupe(maplibre.ResourceRoute, &.{
+        .{ .kinds = .{ .tile = true }, .flags = .{ .glob = true }, .url = try scratch.allocator().dupe(u8, "**") },
+        .{ .flags = .{ .glob = true }, .url = try scratch.allocator().dupe(u8, "custom://routed/**") },
+    });
+    const registered = try maplibre.runtimeSetResourceProvider(testing.allocator, fixture.runtime, .{
+        .callback = RoutedProvider.provide,
+        .context = &provider,
+        .routes = routes,
+    }, null);
+    _ = scratch.reset(.free_all);
+    try support.resolve(registered);
+
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "custom://outside.json", null));
+    var failed = try fixture.waitForEvent(.map_loading_failed);
+    defer failed.deinit();
+    try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://outside.json") != null);
+    try testing.expectEqual(@as(usize, 0), provider.calls());
+
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, routed_style_url, null));
+    var loaded = try fixture.waitForEvent(.map_style_loaded);
+    loaded.deinit();
+    try provider.sources.waitFor(1);
+    try testing.expectEqual(@as(usize, 1), provider.styles.get());
+    try testing.expectEqual(@as(usize, 0), provider.others.get());
+}
+
+/// A loopback HTTP server on its own thread that serves the fixture style at
+/// one path, answers every other path with 404, and counts both.
+const LoopbackServer = struct {
+    server: std.Io.net.Server,
+    thread: std.Thread = undefined,
+    served_path: []const u8,
+    stopping: std.atomic.Value(bool) = .init(false),
+    served: std.atomic.Value(usize) = .init(0),
+    missed: std.atomic.Value(usize) = .init(0),
+
+    fn start(self: *LoopbackServer) !void {
+        self.thread = try std.Thread.spawn(.{}, run, .{self});
+    }
+
+    fn port(self: *const LoopbackServer) u16 {
+        return self.server.socket.address.getPort();
+    }
+
+    /// Wakes the blocked accept with a connection of its own, then closes the
+    /// listening socket.
+    fn stop(self: *LoopbackServer) void {
+        self.stopping.store(true, .release);
+        const address = std.Io.net.IpAddress{ .ip4 = .loopback(self.port()) };
+        if (address.connect(testing.io, .{ .mode = .stream })) |stream| stream.close(testing.io) else |_| {}
+        self.thread.join();
+        self.server.deinit(testing.io);
+    }
+
+    fn run(self: *LoopbackServer) void {
+        while (true) {
+            const stream = self.server.accept(testing.io) catch return;
+            defer stream.close(testing.io);
+            if (self.stopping.load(.acquire)) return;
+            self.answer(stream) catch {};
+        }
+    }
+
+    fn answer(self: *LoopbackServer, stream: std.Io.net.Stream) !void {
+        var read_buffer: [4096]u8 = undefined;
+        var reader = stream.reader(testing.io, &read_buffer);
+        const request_line = try reader.interface.takeDelimiterInclusive('\n');
+        var parts = std.mem.tokenizeScalar(u8, request_line, ' ');
+        _ = parts.next();
+        const found = std.mem.eql(u8, parts.next() orelse "", self.served_path);
+        while (std.mem.trim(u8, try reader.interface.takeDelimiterInclusive('\n'), "\r\n").len != 0) {}
+        // Count before answering, so the count is final once the client has
+        // the response.
+        _ = (if (found) &self.served else &self.missed).fetchAdd(1, .acq_rel);
+
+        var write_buffer: [1024]u8 = undefined;
+        var writer = stream.writer(testing.io, &write_buffer);
+        const body = if (found) support.style_json else "";
+        try writer.interface.print("HTTP/1.1 {s}\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n{s}", .{
+            if (found) "200 OK" else "404 Not Found",
+            body.len,
+            body,
+        });
+        try writer.interface.flush();
+    }
+};
+
+// A transform without a callback rewrites in native code through its rules,
+// which registration copies, so the caller frees them before the registration
+// settles. The style rule rewrites the request to the one path the server
+// serves; the tile rule before it matches the same URL but not the kind.
+test "a transform's rules rewrite a request with no callback registered" {
+    var address = std.Io.net.IpAddress{ .ip4 = .loopback(0) };
+    var server = LoopbackServer{ .server = try address.listen(testing.io, .{}), .served_path = "/rewritten.json" };
+    server.start() catch |err| {
+        server.server.deinit(testing.io);
+        return err;
+    };
+    defer server.stop();
+
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    // A pass-through provider leaves every request to the native loader.
+    try fixture.setProvider(.{ .callback = passThrough });
+
+    var original_buffer: [64]u8 = undefined;
+    const original = try std.fmt.bufPrint(&original_buffer, "http://127.0.0.1:{d}/original.json", .{server.port()});
+    var scratch = std.heap.ArenaAllocator.init(testing.allocator);
+    defer scratch.deinit();
+    const rules = try scratch.allocator().dupe(maplibre.ResourceRewriteRule, &.{
+        .{
+            .kinds = .{ .tile = true },
+            .url = try scratch.allocator().dupe(u8, original),
+            .replacement_url = try scratch.allocator().dupe(u8, "http://127.0.0.1:1/tile.json"),
+        },
+        .{
+            .kinds = .{ .style = true },
+            .url = try scratch.allocator().dupe(u8, original),
+            .replacement_url = try std.fmt.allocPrint(scratch.allocator(), "http://127.0.0.1:{d}/rewritten.json", .{server.port()}),
+        },
+    });
+    const registered = try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .rules = rules }, null);
+    _ = scratch.reset(.free_all);
+    try support.resolve(registered);
+
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, original, null));
+    var loaded = try fixture.waitForEvent(.map_style_loaded);
+    loaded.deinit();
+    try testing.expectEqual(@as(usize, 1), server.served.load(.acquire));
+    try testing.expectEqual(@as(usize, 0), server.missed.load(.acquire));
 }
 
 // A camera command carries its end handler two records deep in its input.

@@ -9,8 +9,10 @@
 pub mod graphics;
 
 use std::future::Future;
+use std::io::{BufRead, BufReader, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::pin::pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, mpsc};
 use std::task::{Context, Poll, Wake, Waker};
 use std::time::{Duration, Instant};
@@ -190,6 +192,95 @@ pub fn serving_provider(url: &'static str, body: &'static str) -> ResourceProvid
             .expect("the response was not accepted");
         ResourceProviderDecision::Handle
     })
+}
+
+/// An HTTP server on a loopback port that serves one body at one path, answers
+/// every other path with 404, and records each path it is asked for.
+pub struct LoopbackServer {
+    address: SocketAddr,
+    requests: Arc<Mutex<Vec<String>>>,
+    stopped: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl LoopbackServer {
+    pub fn start(path: &'static str, body: &'static str) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let stopped = Arc::new(AtomicBool::new(false));
+        let thread = std::thread::spawn({
+            let requests = Arc::clone(&requests);
+            let stopped = Arc::clone(&stopped);
+            move || {
+                for stream in listener.incoming() {
+                    if stopped.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    if let Ok(stream) = stream {
+                        Self::answer(stream, path, body, &requests);
+                    }
+                }
+            }
+        });
+        Self {
+            address,
+            requests,
+            stopped,
+            thread: Some(thread),
+        }
+    }
+
+    /// The URL that names `path` on this server.
+    pub fn url(&self, path: &str) -> String {
+        format!("http://{}{path}", self.address)
+    }
+
+    /// The paths requested so far, in order.
+    pub fn requests(&self) -> Vec<String> {
+        self.requests.lock().unwrap().clone()
+    }
+
+    fn answer(mut stream: TcpStream, path: &str, body: &str, requests: &Mutex<Vec<String>>) {
+        let _ = stream.set_read_timeout(Some(timeout()));
+        let mut reader = BufReader::new(&stream);
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            return;
+        }
+        // Reads the headers through the blank line that ends them.
+        let mut header = String::new();
+        while reader.read_line(&mut header).is_ok_and(|read| read > 2) {
+            header.clear();
+        }
+        let requested = request_line
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or_default()
+            .to_owned();
+        let (status, body) = if requested == path {
+            ("200 OK", body)
+        } else {
+            ("404 Not Found", "")
+        };
+        requests.lock().unwrap().push(requested);
+        let _ = write!(
+            stream,
+            "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+    }
+}
+
+impl Drop for LoopbackServer {
+    fn drop(&mut self) {
+        // A connection wakes the accept loop so it sees the stop.
+        self.stopped.store(true, Ordering::SeqCst);
+        let _ = TcpStream::connect(self.address);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 /// Signals once it drops, so a test can wait for native to release the
