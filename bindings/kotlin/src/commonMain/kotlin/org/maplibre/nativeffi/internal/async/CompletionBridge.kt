@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.async
 
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.MaplibreException
@@ -30,13 +28,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
  * stays valid only while the conversion runs. Each submission call throws the mapped status error
  * when native rejects it synchronously.
  */
-@OptIn(ExperimentalAtomicApi::class)
 internal object CompletionBridge {
-  private val pending = AtomicInt(0)
-
-  /** Counts the completions native holds and has not yet released. */
-  fun pendingCountForTesting(): Int = pending.load()
-
   private class State<T>(
     private val convert: (Long) -> T,
     private val acceptErrorStatus: Boolean,
@@ -101,7 +93,6 @@ internal object CompletionBridge {
   ): Deferred<T> {
     val state = State(convert, acceptErrorStatus, closeDropped)
     val token = NativeRoots.retain(state)
-    pending.addAndFetch(1)
     try {
       val completion = arena.allocate(CompletionLayout.SIZEOF)
       writeU32(completion + CompletionLayout.SIZE, CompletionLayout.SIZEOF.toUInt())
@@ -125,7 +116,7 @@ internal object CompletionBridge {
 
   /** Drops the state once native calls the completion's `release_user_data`. */
   fun release(userData: Long) {
-    if (NativeRoots.release(userData) is State<*>) pending.addAndFetch(-1)
+    NativeRoots.release(userData)
   }
 
   private fun commandCompletion(result: Long): CommandCompletion =

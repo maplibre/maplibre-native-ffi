@@ -18,23 +18,16 @@ public sealed class LeakReportTests
     public void AnAbandonedHandleIsDisposedAndReportedAsALeak()
     {
         using var standardError = new StandardErrorCapture();
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var (map, mapId, undisposable) = Abandon(runtime);
 
         Gc.Collect();
 
         Assert.False(map.IsAlive);
         Assert.False(undisposable.IsAlive);
-        // The finalizer only starts the map's native disposal, and a runtime release refuses a
-        // child that is still retiring. Disposing the runtime waits for that child instead.
-        runtime.Dispose();
-        Assert.Equal(
-            1,
-            Occurrences(
-                standardError.Text,
-                $"Leaked MapHandle native handle 0x{mapId:x}; it was disposed when collected."
-            )
-        );
+        var report = $"Leaked MapHandle native handle 0x{mapId:x}; it was disposed when collected.";
+        Assert.Contains(report, standardError.Text, StringComparison.Ordinal);
+        Assert.Equal(1, Occurrences(standardError.Text, report));
         Assert.Equal(
             1,
             Occurrences(
@@ -50,6 +43,9 @@ public sealed class LeakReportTests
     )
     {
         var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        // The creation's completion roots its result until native releases it. A barrier fences
+        // that release before collection can queue the map's finalizer.
+        runtime.BarrierAsync().GetAwaiter().GetResult();
         // A state whose disposal throws stands in for a native disposal that fails.
         var undisposable = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(5678),

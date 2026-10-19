@@ -17,8 +17,11 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapDebugOption
 import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.OfflineRegionDownloadState
-import org.maplibre.nativeffi.pendingCompletionsForTesting
+import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.CompletionLayout
+import org.maplibre.nativeffi.internal.call.nativeUnit
+import org.maplibre.nativeffi.internal.callback.NativeRoots
+import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitFailed
 import org.maplibre.nativeffi.withMap
@@ -40,15 +43,28 @@ class CompletionTest {
   @Test
   fun aSubmissionNativeRejectsLeavesNoCompletionBehind(): Unit = runSuspendTest {
     withMap {
-      val before = pendingCompletionsForTesting()
+      var token = 0L
       // Native rejects the unknown state before it takes the completion, so the call itself throws
       // the rejection and the bridge frees its state without returning a Deferred.
       val failure =
         assertFailsWith<InvalidArgumentException> {
-          runtime.setOfflineRegionDownloadState(1, OfflineRegionDownloadState(900u))
+          nativeUnit(runtime, runtime.binding, "mln_runtime_set_offline_region_download_state") {
+            token = readAddress(completion + CompletionLayout.USER_DATA)
+            check(
+              C.mln_runtime_set_offline_region_download_state(
+                handle,
+                1,
+                900,
+                completion,
+                diagnostic,
+              ),
+            )
+          }
         }
       assertTrue(failure.diagnostic.isNotEmpty(), "the rejection carries its diagnostic")
-      assertEquals(before, pendingCompletionsForTesting())
+      assertTrue(token != 0L, "the rejected call received a completion token")
+      // Setup completions may still be releasing their state, so inspect only this call's root.
+      assertNull(NativeRoots.get(token))
     }
   }
 

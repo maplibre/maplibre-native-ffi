@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.error.CallbackException
-import org.maplibre.nativeffi.internal.async.CompletionBridge
 
 /** A native thread that starts running [block] at construction. */
 internal expect class TestThread(block: () -> Unit) {
@@ -35,9 +34,6 @@ internal expect fun awaitCollected(reference: TestWeakReference): Boolean
  * cleaners run on their own worker, so a caller still waits for what they do.
  */
 internal expect fun requestCollection()
-
-/** Counts the completions the completion bridge has handed to native. */
-internal fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()
 
 /**
  * Routes each callback failure that the binding hands to the platform's handler to [sink], and
