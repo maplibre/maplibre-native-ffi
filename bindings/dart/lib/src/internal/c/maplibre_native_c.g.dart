@@ -1707,11 +1707,6 @@ const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2;
 const MLN_GPU_SYNC_OPENGL_FENCE = 3;
 const MLN_GPU_SYNC_WEBGPU_TOKEN = 4;
 
-// mln_location_indicator_image_kind
-const MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0;
-const MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1;
-const MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2;
-
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;
 const MLN_LOG_EVENT_SETUP = 1;
@@ -2477,25 +2472,6 @@ external int mln_logical_extent_physical_size(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_color_relief_layer(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_id,
-  mln_buffer_view before_layer_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     Pointer<mln_custom_geometry_source_options>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -2566,25 +2542,6 @@ external int mln_map_add_geojson_source_url(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_hillshade_layer(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_id,
-  mln_buffer_view before_layer_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     Pointer<mln_lat_lng>,
     Size,
     Pointer<mln_premultiplied_rgba8_image>,
@@ -2619,23 +2576,6 @@ external int mln_map_add_image_source_url(
   Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   mln_buffer_view url,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_location_indicator_layer(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view before_layer_id,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3243,21 +3183,6 @@ external int mln_map_get_style_image(
   )
 >()
 external int mln_map_get_style_layer(
-  int map,
-  mln_buffer_view layer_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_get_style_layer_filter(
   int map,
   mln_buffer_view layer_id,
   Pointer<mln_completion> completion,
@@ -4058,78 +3983,6 @@ external int mln_map_set_image_source_url(
 @Native<
   Int32 Function(
     mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_location_indicator_accuracy_radius(
-  int map,
-  mln_buffer_view layer_id,
-  double radius,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_location_indicator_bearing(
-  int map,
-  mln_buffer_view layer_id,
-  double bearing,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Uint32,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_location_indicator_image_name(
-  int map,
-  mln_buffer_view layer_id,
-  int image_kind,
-  mln_buffer_view image_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_lat_lng,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_location_indicator_location(
-  int map,
-  mln_buffer_view layer_id,
-  mln_lat_lng coordinate,
-  double altitude,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     Pointer<mln_projection_mode>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -4195,57 +4048,6 @@ external int mln_map_set_style_json(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    Pointer<mln_buffer_view>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_filter(
-  int map,
-  mln_buffer_view layer_id,
-  Pointer<mln_buffer_view> filter,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_max_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  double max_zoom,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_min_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  double min_zoom,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
     Pointer<mln_completion>,
@@ -4257,57 +4059,6 @@ external int mln_map_set_style_layer_property(
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
   mln_buffer_view value,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_source_id(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_source_layer(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_layer,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Uint32,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_layer_visibility(
-  int map,
-  mln_buffer_view layer_id,
-  int visibility,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

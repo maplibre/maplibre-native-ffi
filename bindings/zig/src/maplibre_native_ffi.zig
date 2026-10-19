@@ -1519,19 +1519,6 @@ pub const LatLngBounds = struct {
     }
 };
 
-/// Location indicator image-name properties.
-///
-/// See `mln_location_indicator_image_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const LocationIndicatorImageKind = enum(u32) {
-    shadow = 2,
-    bearing = 1,
-    top = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 /// Log event categories emitted by MapLibre Native.
 ///
 /// See `mln_log_event` in the
@@ -6187,14 +6174,6 @@ pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostic
     return .{ .width = out[0], .height = out[1] };
 }
 
-/// Adds a color-relief layer for a raster DEM source.
-///
-/// See `mln_map_add_color_relief_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddColorReliefLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_color_relief_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, source_id, before_layer_id });
-}
-
 /// Adds a custom geometry source.
 ///
 /// See `mln_map_add_custom_geometry_source` in the
@@ -6227,14 +6206,6 @@ pub fn mapAddGeojsonSourceUrl(allocator: std.mem.Allocator, map: Map, source_id:
     return call.submit("mln_map_add_geojson_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
 }
 
-/// Adds a hillshade layer for a raster DEM source.
-///
-/// See `mln_map_add_hillshade_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddHillshadeLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_hillshade_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, source_id, before_layer_id });
-}
-
 /// Adds an image source with inline image pixels.
 ///
 /// See `mln_map_add_image_source_image` in the
@@ -6249,14 +6220,6 @@ pub fn mapAddImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id:
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     return call.submit("mln_map_add_image_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
-}
-
-/// Adds a source-free location indicator layer.
-///
-/// See `mln_map_add_location_indicator_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddLocationIndicatorLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_location_indicator_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, before_layer_id });
 }
 
 /// Adds a raster DEM source with inline tile URLs.
@@ -6584,14 +6547,6 @@ pub fn mapGetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []cons
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapGetStyleLayer(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleLayerInfo)) {
     return call.submit("mln_map_get_style_layer", .lease, map, call.orNull(call.value(OwnedValue(StyleLayerInfo), c.mln_style_layer_info)), allocator, diagnostic, .{layer_id});
-}
-
-/// Serializes one layer filter as a style-spec JSON value.
-///
-/// See `mln_map_get_style_layer_filter` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetStyleLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_get_style_layer_filter", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{layer_id});
 }
 
 /// Serializes one style layer as a full style-spec layer JSON object.
@@ -7030,38 +6985,6 @@ pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8, di
     return call.submit("mln_map_set_image_source_url", .lease, map, call.command, null, diagnostic, .{ source_id, url });
 }
 
-/// Sets a location indicator layer accuracy radius in meters.
-///
-/// See `mln_map_set_location_indicator_accuracy_radius` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLocationIndicatorAccuracyRadius(map: Map, layer_id: []const u8, radius: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_location_indicator_accuracy_radius", .lease, map, call.command, null, diagnostic, .{ layer_id, radius });
-}
-
-/// Sets a location indicator layer bearing in degrees.
-///
-/// See `mln_map_set_location_indicator_bearing` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLocationIndicatorBearing(map: Map, layer_id: []const u8, bearing: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_location_indicator_bearing", .lease, map, call.command, null, diagnostic, .{ layer_id, bearing });
-}
-
-/// Sets one location indicator image-name property.
-///
-/// See `mln_map_set_location_indicator_image_name` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLocationIndicatorImageName(map: Map, layer_id: []const u8, image_kind: LocationIndicatorImageKind, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_location_indicator_image_name", .lease, map, call.command, null, diagnostic, .{ layer_id, image_kind, image_id });
-}
-
-/// Sets a location indicator layer location.
-///
-/// See `mln_map_set_location_indicator_location` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLocationIndicatorLocation(map: Map, layer_id: []const u8, coordinate: LatLng, altitude: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_location_indicator_location", .lease, map, call.command, null, diagnostic, .{ layer_id, coordinate, altitude });
-}
-
 /// Submits copied axonometric rendering option fields.
 ///
 /// See `mln_map_set_projection_mode` in the
@@ -7094,60 +7017,12 @@ pub fn mapSetStyleJson(map: Map, json: []const u8, diagnostic: ?*diagnostics.Dia
     return call.submit("mln_map_set_style_json", .lease, map, call.command, null, diagnostic, .{json});
 }
 
-/// Sets or clears one layer filter.
-///
-/// See `mln_map_set_style_layer_filter` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, filter: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_filter", .lease, map, call.command, allocator, diagnostic, .{ layer_id, filter });
-}
-
-/// Sets the highest zoom at which one layer draws.
-///
-/// See `mln_map_set_style_layer_max_zoom` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_max_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, max_zoom });
-}
-
-/// Sets the lowest zoom at which one layer draws.
-///
-/// See `mln_map_set_style_layer_min_zoom` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_min_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, min_zoom });
-}
-
 /// Sets one layer property using its MapLibre style-spec property name.
 ///
 /// See `mln_map_set_style_layer_property` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapSetStyleLayerProperty(map: Map, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     return call.submit("mln_map_set_style_layer_property", .lease, map, call.command, null, diagnostic, .{ layer_id, property_name, value });
-}
-
-/// Sets one layer's source ID.
-///
-/// See `mln_map_set_style_layer_source_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_source_id", .lease, map, call.command, null, diagnostic, .{ layer_id, source_id });
-}
-
-/// Sets one layer's source-layer ID.
-///
-/// See `mln_map_set_style_layer_source_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_source_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, source_layer });
-}
-
-/// Sets whether one layer draws.
-///
-/// See `mln_map_set_style_layer_visibility` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetStyleLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLayerVisibility, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_layer_visibility", .lease, map, call.command, null, diagnostic, .{ layer_id, visibility });
 }
 
 /// Sets the style light from a style-spec light JSON object.

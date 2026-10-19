@@ -34,7 +34,6 @@ from ._generated_values import (
     HttpHeaderTransform,
     LatLng,
     LatLngBounds,
-    LocationIndicatorImageKind,
     LogHandler,
     LogicalExtent,
     LogSeverityMask,
@@ -82,7 +81,6 @@ from ._generated_values import (
     StyleImageInfo,
     StyleImageOptions,
     StyleLayerInfo,
-    StyleLayerVisibility,
     StyleSourceInfo,
     StyleTileSourceOptions,
     StyleTransitionOptions,
@@ -318,16 +316,6 @@ class _HttpHeaderTransformResponseScopeOperations(GeneratedOperations):
 class _MapHandleOperations(GeneratedOperations):
     _native: _native._MapHandle
 
-    def add_color_relief_layer(
-        self, layer_id: str, source_id: str, before_layer_id: str | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a color-relief layer for a raster DEM source.
-
-        See `mln_map_add_color_relief_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_color_relief_layer(layer_id, source_id, before_layer_id)
-
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions | None = None
     ) -> Future[CommandCompletion]:
@@ -368,16 +356,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_geojson_source_url(source_id, url, options)
 
-    def add_hillshade_layer(
-        self, layer_id: str, source_id: str, before_layer_id: str | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a hillshade layer for a raster DEM source.
-
-        See `mln_map_add_hillshade_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_hillshade_layer(layer_id, source_id, before_layer_id)
-
     def add_image_source_image(
         self,
         source_id: str,
@@ -400,16 +378,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.add_image_source_url(source_id, coordinates, url)
-
-    def add_location_indicator_layer(
-        self, layer_id: str, before_layer_id: str | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a source-free location indicator layer.
-
-        See `mln_map_add_location_indicator_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_location_indicator_layer(layer_id, before_layer_id)
 
     def add_raster_dem_source_tiles(
         self,
@@ -879,14 +847,6 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: _maybe(StyleLayerInfo._from_native, value),
         )
 
-    def get_style_layer_filter(self, layer_id: str) -> Future[bytes | None]:
-        """Serializes one layer filter as a style-spec JSON value.
-
-        See `mln_map_get_style_layer_filter` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.get_style_layer_filter(layer_id)
-
     def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
         """Serializes one style layer as a full style-spec layer JSON object.
 
@@ -1335,50 +1295,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_image_source_url(source_id, url)
 
-    def set_location_indicator_accuracy_radius(
-        self, layer_id: str, radius: float
-    ) -> Future[CommandCompletion]:
-        """Sets a location indicator layer accuracy radius in meters.
-
-        See `mln_map_set_location_indicator_accuracy_radius` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_location_indicator_accuracy_radius(layer_id, radius)
-
-    def set_location_indicator_bearing(
-        self, layer_id: str, bearing: float
-    ) -> Future[CommandCompletion]:
-        """Sets a location indicator layer bearing in degrees.
-
-        See `mln_map_set_location_indicator_bearing` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_location_indicator_bearing(layer_id, bearing)
-
-    def set_location_indicator_image_name(
-        self, layer_id: str, image_kind: LocationIndicatorImageKind, image_id: str
-    ) -> Future[CommandCompletion]:
-        """Sets one location indicator image-name property.
-
-        See `mln_map_set_location_indicator_image_name` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_location_indicator_image_name(
-            layer_id, image_kind, image_id
-        )
-
-    def set_location_indicator_location(
-        self, layer_id: str, coordinate: LatLng, altitude: float
-    ) -> Future[CommandCompletion]:
-        """Sets a location indicator layer location.
-
-        See `mln_map_set_location_indicator_location` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_location_indicator_location(
-            layer_id, coordinate, altitude
-        )
-
     def set_projection_mode(
         self, mode: ProjectionMode | None = None
     ) -> Future[CommandCompletion]:
@@ -1420,36 +1336,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_json(json)
 
-    def set_style_layer_filter(
-        self, layer_id: str, filter: bytes | None = None
-    ) -> Future[CommandCompletion]:
-        """Sets or clears one layer filter.
-
-        See `mln_map_set_style_layer_filter` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_filter(layer_id, filter)
-
-    def set_style_layer_max_zoom(
-        self, layer_id: str, max_zoom: float
-    ) -> Future[CommandCompletion]:
-        """Sets the highest zoom at which one layer draws.
-
-        See `mln_map_set_style_layer_max_zoom` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_max_zoom(layer_id, max_zoom)
-
-    def set_style_layer_min_zoom(
-        self, layer_id: str, min_zoom: float
-    ) -> Future[CommandCompletion]:
-        """Sets the lowest zoom at which one layer draws.
-
-        See `mln_map_set_style_layer_min_zoom` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_min_zoom(layer_id, min_zoom)
-
     def set_style_layer_property(
         self, layer_id: str, property_name: str, value: bytes
     ) -> Future[CommandCompletion]:
@@ -1459,36 +1345,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.set_style_layer_property(layer_id, property_name, value)
-
-    def set_style_layer_source_id(
-        self, layer_id: str, source_id: str
-    ) -> Future[CommandCompletion]:
-        """Sets one layer's source ID.
-
-        See `mln_map_set_style_layer_source_id` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_source_id(layer_id, source_id)
-
-    def set_style_layer_source_layer(
-        self, layer_id: str, source_layer: str | None = None
-    ) -> Future[CommandCompletion]:
-        """Sets one layer's source-layer ID.
-
-        See `mln_map_set_style_layer_source_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_source_layer(layer_id, source_layer)
-
-    def set_style_layer_visibility(
-        self, layer_id: str, visibility: StyleLayerVisibility
-    ) -> Future[CommandCompletion]:
-        """Sets whether one layer draws.
-
-        See `mln_map_set_style_layer_visibility` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_style_layer_visibility(layer_id, visibility)
 
     def set_style_light_json(self, light_json: bytes) -> Future[CommandCompletion]:
         """Sets the style light from a style-spec light JSON object.

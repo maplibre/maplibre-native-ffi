@@ -118,13 +118,6 @@ struct CompletionResult<&mln_map_get_style_layer> {
   static constexpr bool nullable = true;
 };
 template <>
-struct CompletionResult<&mln_map_get_style_layer_filter> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
 struct CompletionResult<&mln_map_get_style_layer_json> {
   static constexpr bool has_value = true;
   using type = mln_buffer_view;

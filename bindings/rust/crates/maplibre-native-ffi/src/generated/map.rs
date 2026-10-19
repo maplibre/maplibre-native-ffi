@@ -12,32 +12,6 @@ native_owner! {
 }
 
 impl MapHandle {
-    /// Adds a color-relief layer for a raster DEM source.
-    ///
-    /// See `mln_map_add_color_relief_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_color_relief_layer(
-        &self,
-        layer_id: &str,
-        source_id: &str,
-        before_layer_id: Option<&str>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_color_relief_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_id = call.input(&source_id)?;
-        let before_layer_id = call.input(&before_layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_color_relief_layer(
-                map,
-                layer_id,
-                source_id,
-                before_layer_id,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Adds a custom geometry source.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
@@ -127,32 +101,6 @@ impl MapHandle {
         })
     }
 
-    /// Adds a hillshade layer for a raster DEM source.
-    ///
-    /// See `mln_map_add_hillshade_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_hillshade_layer(
-        &self,
-        layer_id: &str,
-        source_id: &str,
-        before_layer_id: Option<&str>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_hillshade_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_id = call.input(&source_id)?;
-        let before_layer_id = call.input(&before_layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_hillshade_layer(
-                map,
-                layer_id,
-                source_id,
-                before_layer_id,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Adds an image source with inline image pixels.
     ///
     /// See `mln_map_add_image_source_image` in the
@@ -203,29 +151,6 @@ impl MapHandle {
                 coordinates,
                 coordinate_count,
                 url,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Adds a source-free location indicator layer.
-    ///
-    /// See `mln_map_add_location_indicator_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_location_indicator_layer(
-        &self,
-        layer_id: &str,
-        before_layer_id: Option<&str>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_location_indicator_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        let before_layer_id = call.input(&before_layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_location_indicator_layer(
-                map,
-                layer_id,
-                before_layer_id,
                 completion,
                 out_diagnostic,
             )
@@ -1146,21 +1071,6 @@ impl MapHandle {
         )
     }
 
-    /// Serializes one layer filter as a style-spec JSON value.
-    ///
-    /// See `mln_map_get_style_layer_filter` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_layer_filter(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer_filter")?;
-        let layer_id = call.input(&layer_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_layer_filter(map, layer_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
     /// Serializes one style layer as a full style-spec layer JSON object.
     ///
     /// See `mln_map_get_style_layer_json` in the
@@ -1979,104 +1889,6 @@ impl MapHandle {
         })
     }
 
-    /// Sets a location indicator layer accuracy radius in meters.
-    ///
-    /// See `mln_map_set_location_indicator_accuracy_radius` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_location_indicator_accuracy_radius(
-        &self,
-        layer_id: &str,
-        radius: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_location_indicator_accuracy_radius")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_location_indicator_accuracy_radius(
-                map,
-                layer_id,
-                radius,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets a location indicator layer bearing in degrees.
-    ///
-    /// See `mln_map_set_location_indicator_bearing` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_location_indicator_bearing(
-        &self,
-        layer_id: &str,
-        bearing: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_location_indicator_bearing")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_location_indicator_bearing(
-                map,
-                layer_id,
-                bearing,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets one location indicator image-name property.
-    ///
-    /// See `mln_map_set_location_indicator_image_name` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_location_indicator_image_name(
-        &self,
-        layer_id: &str,
-        image_kind: LocationIndicatorImageKind,
-        image_id: &str,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_location_indicator_image_name")?;
-        let layer_id = call.input(&layer_id)?;
-        let image_id = call.input(&image_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_location_indicator_image_name(
-                map,
-                layer_id,
-                image_kind.to_native(),
-                image_id,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets a location indicator layer location.
-    ///
-    /// See `mln_map_set_location_indicator_location` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_location_indicator_location(
-        &self,
-        layer_id: &str,
-        coordinate: LatLng,
-        altitude: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_location_indicator_location")?;
-        let layer_id = call.input(&layer_id)?;
-        let coordinate = call.input(&coordinate)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_location_indicator_location(
-                map,
-                layer_id,
-                coordinate,
-                altitude,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Submits copied axonometric rendering option fields.
     ///
     /// See `mln_map_set_projection_mode` in the
@@ -2139,67 +1951,6 @@ impl MapHandle {
         })
     }
 
-    /// Sets or clears one layer filter.
-    ///
-    /// See `mln_map_set_style_layer_filter` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_filter(
-        &self,
-        layer_id: &str,
-        filter: Option<&[u8]>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_filter")?;
-        let layer_id = call.input(&layer_id)?;
-        let filter = call.optional_reference(filter)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_filter(map, layer_id, filter, completion, out_diagnostic)
-        })
-    }
-
-    /// Sets the highest zoom at which one layer draws.
-    ///
-    /// See `mln_map_set_style_layer_max_zoom` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_max_zoom(
-        &self,
-        layer_id: &str,
-        max_zoom: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_max_zoom")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_max_zoom(
-                map,
-                layer_id,
-                max_zoom,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets the lowest zoom at which one layer draws.
-    ///
-    /// See `mln_map_set_style_layer_min_zoom` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_min_zoom(
-        &self,
-        layer_id: &str,
-        min_zoom: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_min_zoom")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_min_zoom(
-                map,
-                layer_id,
-                min_zoom,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Sets one layer property using its MapLibre style-spec property name.
     ///
     /// See `mln_map_set_style_layer_property` in the
@@ -2220,74 +1971,6 @@ impl MapHandle {
                 layer_id,
                 property_name,
                 value_,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets one layer's source ID.
-    ///
-    /// See `mln_map_set_style_layer_source_id` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_source_id(
-        &self,
-        layer_id: &str,
-        source_id: &str,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_source_id")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_id = call.input(&source_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_source_id(
-                map,
-                layer_id,
-                source_id,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets one layer's source-layer ID.
-    ///
-    /// See `mln_map_set_style_layer_source_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_source_layer(
-        &self,
-        layer_id: &str,
-        source_layer: Option<&str>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_source_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_layer = call.input(&source_layer)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_source_layer(
-                map,
-                layer_id,
-                source_layer,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets whether one layer draws.
-    ///
-    /// See `mln_map_set_style_layer_visibility` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_layer_visibility(
-        &self,
-        layer_id: &str,
-        visibility: StyleLayerVisibility,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_visibility")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_layer_visibility(
-                map,
-                layer_id,
-                visibility.to_native(),
                 completion,
                 out_diagnostic,
             )

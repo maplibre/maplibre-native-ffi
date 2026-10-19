@@ -365,19 +365,6 @@ const (
 	GpuSyncKindWebgpuToken GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
 )
 
-// LocationIndicatorImageKind corresponds to mln_location_indicator_image_kind.
-// Location indicator image-name properties.
-//
-// See mln_location_indicator_image_kind in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type LocationIndicatorImageKind uint32
-
-const (
-	LocationIndicatorImageKindTop     LocationIndicatorImageKind = LocationIndicatorImageKind(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP)
-	LocationIndicatorImageKindBearing LocationIndicatorImageKind = LocationIndicatorImageKind(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING)
-	LocationIndicatorImageKindShadow  LocationIndicatorImageKind = LocationIndicatorImageKind(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW)
-)
-
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
 // MapLibre Native.
 //
@@ -6385,16 +6372,6 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (LogicalExtentPhysicalSizeR
 	})
 }
 
-// AddColorReliefLayer adds a color-relief layer for a raster DEM source.
-//
-// See mln_map_add_color_relief_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddColorReliefLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_color_relief_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_color_relief_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
 // AddCustomGeometrySource adds a custom geometry source.
 //
 // See mln_map_add_custom_geometry_source in the C API reference:
@@ -6435,16 +6412,6 @@ func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, opti
 	}, completionCommand)
 }
 
-// AddHillshadeLayer adds a hillshade layer for a raster DEM source.
-//
-// See mln_map_add_hillshade_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddHillshadeLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_hillshade_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_hillshade_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
 // AddImageSourceImage adds an image source with inline image pixels.
 //
 // See mln_map_add_image_source_image in the C API reference:
@@ -6462,16 +6429,6 @@ func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []La
 func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddLocationIndicatorLayer adds a source-free location indicator layer.
-//
-// See mln_map_add_location_indicator_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddLocationIndicatorLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_location_indicator_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_location_indicator_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7002,16 +6959,6 @@ func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInf
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
 	}, completionNullable(completionOf(copyStyleLayerInfo)))
-}
-
-// GetStyleLayerFilter serializes one layer filter as a style-spec JSON value.
-//
-// See mln_map_get_style_layer_filter in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerFilter(layerId string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_layer_filter(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 // GetStyleLayerJson serializes one style layer as a full style-spec layer JSON
@@ -7582,49 +7529,6 @@ func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Futu
 	}, completionCommand)
 }
 
-// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy
-// radius in meters.
-//
-// See mln_map_set_location_indicator_accuracy_radius in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLocationIndicatorAccuracyRadius(layerId string, radius float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_accuracy_radius), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(raw), bindingView(layerId, arena), C.double(radius), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLocationIndicatorBearing sets a location indicator layer bearing in
-// degrees.
-//
-// See mln_map_set_location_indicator_bearing in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLocationIndicatorBearing(layerId string, bearing float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_bearing), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(raw), bindingView(layerId, arena), C.double(bearing), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLocationIndicatorImageName sets one location indicator image-name
-// property.
-//
-// See mln_map_set_location_indicator_image_name in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLocationIndicatorImageName(layerId string, imageKind LocationIndicatorImageKind, imageId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_image_name), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(imageKind), bindingView(imageId, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLocationIndicatorLocation sets a location indicator layer location.
-//
-// See mln_map_set_location_indicator_location in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLocationIndicatorLocation(layerId string, coordinate LatLng, altitude float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_location), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_location_indicator_location(C.mln_map(raw), bindingView(layerId, arena), nativeLatLng(coordinate, arena), C.double(altitude), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetProjectionMode submits copied axonometric rendering option fields.
 //
 // See mln_map_set_projection_mode in the C API reference:
@@ -7665,36 +7569,6 @@ func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion]
 	}, completionCommand)
 }
 
-// SetStyleLayerFilter sets or clears one layer filter.
-//
-// See mln_map_set_style_layer_filter in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerFilter(layerId string, filter *[]byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_filter(C.mln_map(raw), bindingView(layerId, arena), bindingStoreOptional(filter, arena, bindingView[[]byte]), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetStyleLayerMaxZoom sets the highest zoom at which one layer draws.
-//
-// See mln_map_set_style_layer_max_zoom in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerMaxZoom(layerId string, maxZoom float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_max_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_max_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(maxZoom), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetStyleLayerMinZoom sets the lowest zoom at which one layer draws.
-//
-// See mln_map_set_style_layer_min_zoom in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerMinZoom(layerId string, minZoom float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_min_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_min_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(minZoom), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetStyleLayerProperty sets one layer property using its MapLibre style-spec
 // property name.
 //
@@ -7703,36 +7577,6 @@ func (receiver *MapHandle) SetStyleLayerMinZoom(layerId string, minZoom float64)
 func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetStyleLayerSourceId sets one layer's source ID.
-//
-// See mln_map_set_style_layer_source_id in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerSourceId(layerId string, sourceId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetStyleLayerSourceLayer sets one layer's source-layer ID.
-//
-// See mln_map_set_style_layer_source_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerSourceLayer(layerId string, sourceLayer *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(sourceLayer, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetStyleLayerVisibility sets whether one layer draws.
-//
-// See mln_map_set_style_layer_visibility in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerVisibility(layerId string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_visibility), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_layer_visibility(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(visibility), completion, diagnostic))
 	}, completionCommand)
 }
 

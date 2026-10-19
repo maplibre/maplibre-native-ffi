@@ -178,16 +178,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_color_relief_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_id,
-        mln_buffer_view before_layer_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_add_custom_geometry_source(
         MlnMap map,
         mln_buffer_view source_id,
@@ -225,16 +215,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_hillshade_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_id,
-        mln_buffer_view before_layer_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_add_image_source_image(
         MlnMap map,
         mln_buffer_view source_id,
@@ -252,15 +232,6 @@ internal static unsafe partial class NativeMethods
         mln_lat_lng* coordinates,
         nuint coordinate_count,
         mln_buffer_view url,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_location_indicator_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view before_layer_id,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -602,14 +573,6 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_get_style_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_style_layer_filter(
         MlnMap map,
         mln_buffer_view layer_id,
         mln_completion* completion,
@@ -1057,44 +1020,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_location_indicator_accuracy_radius(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double radius,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_location_indicator_bearing(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double bearing,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_location_indicator_image_name(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        uint image_kind,
-        mln_buffer_view image_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_location_indicator_location(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_lat_lng coordinate,
-        double altitude,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_projection_mode(
         MlnMap map,
         mln_projection_mode* mode,
@@ -1129,65 +1054,11 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_filter(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view* filter,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_max_zoom(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double max_zoom,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_min_zoom(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double min_zoom,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_style_layer_property(
         MlnMap map,
         mln_buffer_view layer_id,
         mln_buffer_view property_name,
         mln_buffer_view value,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_source_id(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_source_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_layer,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_layer_visibility(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        uint visibility,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

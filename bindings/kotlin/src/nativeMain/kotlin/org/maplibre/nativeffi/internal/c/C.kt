@@ -263,23 +263,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_color_relief_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_color_relief_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      beforeLayerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_add_custom_geometry_source(
     map: Long,
     sourceId: Long,
@@ -342,23 +325,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_hillshade_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_hillshade_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      beforeLayerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -393,21 +359,6 @@ internal actual object C {
       coordinates.toCPointer(),
       coordinateCount.convert(),
       url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_add_location_indicator_layer(
-    map: Long,
-    layerId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_location_indicator_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      beforeLayerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -942,19 +893,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_get_style_layer_filter(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_layer_filter(
       map.toULong(),
       layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
@@ -1650,70 +1588,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_location_indicator_accuracy_radius(
-    map: Long,
-    layerId: Long,
-    radius: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_location_indicator_accuracy_radius(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      radius,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_location_indicator_bearing(
-    map: Long,
-    layerId: Long,
-    bearing: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_location_indicator_bearing(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      bearing,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_location_indicator_image_name(
-    map: Long,
-    layerId: Long,
-    imageKind: Int,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_location_indicator_image_name(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      imageKind.toUInt(),
-      imageId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_location_indicator_location(
-    map: Long,
-    layerId: Long,
-    coordinate: Long,
-    altitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_location_indicator_location(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      coordinate.toCPointer<mln_lat_lng>()!!.pointed.readValue(),
-      altitude,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_set_projection_mode(
     map: Long,
     mode: Long,
@@ -1770,51 +1644,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_style_layer_filter(
-    map: Long,
-    layerId: Long,
-    filter: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_filter(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      filter.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_style_layer_max_zoom(
-    map: Long,
-    layerId: Long,
-    maxZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_max_zoom(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      maxZoom,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_style_layer_min_zoom(
-    map: Long,
-    layerId: Long,
-    minZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_min_zoom(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      minZoom,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_set_style_layer_property(
     map: Long,
     layerId: Long,
@@ -1828,51 +1657,6 @@ internal actual object C {
       layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       propertyName.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       value.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_style_layer_source_id(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_source_id(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_style_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    sourceLayer: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_source_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      sourceLayer.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_style_layer_visibility(
-    map: Long,
-    layerId: Long,
-    visibility: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_layer_visibility(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      visibility.toUInt(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

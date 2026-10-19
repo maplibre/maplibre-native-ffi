@@ -170,7 +170,6 @@
 /dotnet/src/Maplibre.NativeFfi/Style/GeojsonSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/ImageContent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/ImageStretch.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Style/LocationIndicatorImageKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/PremultipliedRgba8Image.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfo.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfoField.g.cs linguist-generated=true

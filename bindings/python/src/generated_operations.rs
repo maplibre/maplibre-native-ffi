@@ -4912,34 +4912,6 @@ impl HttpHeaderTransformResponseScope {
 
 #[pymethods]
 impl MapHandle {
-    #[pyo3(signature = (layer_id, source_id, before_layer_id=None))]
-    fn add_color_relief_layer(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        source_id: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_color_relief_layer", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
-        let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_color_relief_layer(
-                    handle,
-                    layer_id_value,
-                    source_id_value,
-                    before_layer_id_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (source_id, options=None))]
     fn add_custom_geometry_source(
         &self,
@@ -5054,34 +5026,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id, source_id, before_layer_id=None))]
-    fn add_hillshade_layer(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        source_id: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_hillshade_layer", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
-        let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_hillshade_layer(
-                    handle,
-                    layer_id_value,
-                    source_id_value,
-                    before_layer_id_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (source_id, coordinates, image=None))]
     fn add_image_source_image(
         &self,
@@ -5137,32 +5081,6 @@ impl MapHandle {
                     coordinates_values.as_ptr(),
                     coordinates_values.len(),
                     url_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, before_layer_id=None))]
-    fn add_location_indicator_layer(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_location_indicator_layer", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
-        let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_location_indicator_layer(
-                    handle,
-                    layer_id_value,
-                    before_layer_id_value,
                     completion,
                     diagnostic,
                 )
@@ -6303,39 +6221,6 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (layer_id))]
-    fn get_style_layer_filter(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_layer_filter", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || unsafe {
-                generated_bytes(py, value)
-            })
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_get_style_layer_filter(
-                        handle,
-                        layer_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (layer_id))]
     fn get_style_layer_json(
         &self,
         py: Python<'_>,
@@ -7378,120 +7263,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id, radius))]
-    fn set_location_indicator_accuracy_radius(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        radius: f64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_location_indicator_accuracy_radius",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_location_indicator_accuracy_radius(
-                    handle,
-                    layer_id_value,
-                    radius,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, bearing))]
-    fn set_location_indicator_bearing(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        bearing: f64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_location_indicator_bearing",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_location_indicator_bearing(
-                    handle,
-                    layer_id_value,
-                    bearing,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, image_kind, image_id))]
-    fn set_location_indicator_image_name(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        image_kind: sys::mln_location_indicator_image_kind,
-        image_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_location_indicator_image_name",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_location_indicator_image_name(
-                    handle,
-                    layer_id_value,
-                    image_kind,
-                    image_id_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, coordinate, altitude))]
-    fn set_location_indicator_location(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        coordinate: &Bound<'_, PyAny>,
-        altitude: f64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_location_indicator_location",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_location_indicator_location(
-                    handle,
-                    layer_id_value,
-                    coordinate_value,
-                    altitude,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (mode=None))]
     fn set_projection_mode(
         &self,
@@ -7572,79 +7343,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id, filter=None))]
-    fn set_style_layer_filter(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        filter: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_layer_filter", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let filter = filter.unwrap_or_else(|| py.None().into_bound(py));
-        let filter_value = generated_maybe(&filter, |filter| storage.buffer(filter, false))?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_filter(
-                    handle,
-                    layer_id_value,
-                    generated_pointer(&filter_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, max_zoom))]
-    fn set_style_layer_max_zoom(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        max_zoom: f64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_max_zoom", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_max_zoom(
-                    handle,
-                    layer_id_value,
-                    max_zoom,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, min_zoom))]
-    fn set_style_layer_min_zoom(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        min_zoom: f64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_min_zoom", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_min_zoom(
-                    handle,
-                    layer_id_value,
-                    min_zoom,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (layer_id, property_name, value))]
     fn set_style_layer_property(
         &self,
@@ -7667,81 +7365,6 @@ impl MapHandle {
                     layer_id_value,
                     property_name_value,
                     value_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, source_id))]
-    fn set_style_layer_source_id(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        source_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_source_id", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_source_id(
-                    handle,
-                    layer_id_value,
-                    source_id_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, source_layer=None))]
-    fn set_style_layer_source_layer(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        source_layer: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_source_layer", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let source_layer = source_layer.unwrap_or_else(|| py.None().into_bound(py));
-        let source_layer_value = storage.buffer(source_layer.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_source_layer(
-                    handle,
-                    layer_id_value,
-                    source_layer_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (layer_id, visibility))]
-    fn set_style_layer_visibility(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-        visibility: sys::mln_style_layer_visibility,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_visibility", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_layer_visibility(
-                    handle,
-                    layer_id_value,
-                    visibility,
                     completion,
                     diagnostic,
                 )

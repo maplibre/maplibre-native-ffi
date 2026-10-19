@@ -43,35 +43,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a color-relief layer for a raster DEM source.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_add_color_relief_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> AddColorReliefLayerAsync(
-        string layerId,
-        string sourceId,
-        string beforeLayerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_add_color_relief_layer");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_add_color_relief_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceId),
-                    scope.Utf8(beforeLayerId),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Adds a custom geometry source.
     /// </summary>
     /// <remarks>
@@ -184,35 +155,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a hillshade layer for a raster DEM source.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_add_hillshade_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> AddHillshadeLayerAsync(
-        string layerId,
-        string sourceId,
-        string beforeLayerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_add_hillshade_layer");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_add_hillshade_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceId),
-                    scope.Utf8(beforeLayerId),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Adds an image source with inline image pixels.
     /// </summary>
     /// <remarks>
@@ -265,33 +207,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
                     checked((nuint)coordinates.Length),
                     scope.Utf8(url),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Adds a source-free location indicator layer.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_add_location_indicator_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> AddLocationIndicatorLayerAsync(
-        string layerId,
-        string beforeLayerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_add_location_indicator_layer");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_add_location_indicator_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(beforeLayerId),
                     completion,
                     diagnostic
                 ),
@@ -1265,32 +1180,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     diagnostic
                 ),
             CopyStyleLayerInfo,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Serializes one layer filter as a style-spec JSON value.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_get_style_layer_filter</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<byte[]?> GetStyleLayerFilterAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_filter");
-        return scope.QueryOptional<mln_buffer_view, byte[]>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_get_style_layer_filter(
-                    Handle,
-                    scope.Utf8(layerId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyBufferView,
             cancellationToken
         );
     }
@@ -2439,121 +2328,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets a location indicator layer accuracy radius in meters.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_location_indicator_accuracy_radius</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLocationIndicatorAccuracyRadiusAsync(
-        string layerId,
-        double radius,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_set_location_indicator_accuracy_radius"
-        );
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_location_indicator_accuracy_radius(
-                    Handle,
-                    scope.Utf8(layerId),
-                    radius,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets a location indicator layer bearing in degrees.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_location_indicator_bearing</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLocationIndicatorBearingAsync(
-        string layerId,
-        double bearing,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_location_indicator_bearing");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_location_indicator_bearing(
-                    Handle,
-                    scope.Utf8(layerId),
-                    bearing,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one location indicator image-name property.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_location_indicator_image_name</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLocationIndicatorImageNameAsync(
-        string layerId,
-        LocationIndicatorImageKind imageKind,
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_location_indicator_image_name");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_location_indicator_image_name(
-                    Handle,
-                    scope.Utf8(layerId),
-                    (uint)imageKind,
-                    scope.Utf8(imageId),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets a location indicator layer location.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_location_indicator_location</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLocationIndicatorLocationAsync(
-        string layerId,
-        LatLng coordinate,
-        double altitude,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_location_indicator_location");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_location_indicator_location(
-                    Handle,
-                    scope.Utf8(layerId),
-                    NativeLatLng(coordinate),
-                    altitude,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Submits copied axonometric rendering option fields.
     /// </summary>
     /// <remarks>
@@ -2658,87 +2432,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets or clears one layer filter.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_filter</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerFilterAsync(
-        string layerId,
-        byte[]? filter,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_filter");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_filter(
-                    Handle,
-                    scope.Utf8(layerId),
-                    filter is null ? null : scope.Value(scope.Buffer(filter)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets the highest zoom at which one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_max_zoom</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerMaxZoomAsync(
-        string layerId,
-        double maxZoom,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_max_zoom");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_max_zoom(
-                    Handle,
-                    scope.Utf8(layerId),
-                    maxZoom,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets the lowest zoom at which one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_min_zoom</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerMinZoomAsync(
-        string layerId,
-        double minZoom,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_min_zoom");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_min_zoom(
-                    Handle,
-                    scope.Utf8(layerId),
-                    minZoom,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Sets one layer property using its MapLibre style-spec property name.
     /// </summary>
     /// <remarks>
@@ -2760,87 +2453,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     scope.Utf8(layerId),
                     scope.Utf8(propertyName),
                     scope.Buffer(value),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one layer's source ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_source_id</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerSourceIdAsync(
-        string layerId,
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_source_id");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_source_id(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceId),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one layer's source-layer ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_source_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerSourceLayerAsync(
-        string layerId,
-        string sourceLayer,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_source_layer");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_source_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceLayer),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets whether one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_style_layer_visibility</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLayerVisibilityAsync(
-        string layerId,
-        StyleLayerVisibility visibility,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_visibility");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_style_layer_visibility(
-                    Handle,
-                    scope.Utf8(layerId),
-                    (uint)visibility,
                     completion,
                     diagnostic
                 ),

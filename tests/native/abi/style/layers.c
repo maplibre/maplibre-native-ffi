@@ -1,6 +1,6 @@
 // Style layers: the layer result, properties and filters through JSON, layer
-// JSON, listing in style order, source bindings, the typed terrain adders, and
-// the location indicator setters.
+// JSON, listing in style order, source bindings, terrain, and location
+// indicators.
 
 #include <math.h>
 
@@ -122,25 +122,28 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, probe.info.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(INFINITY, probe.info.max_zoom);
 
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_min_zoom(
-    map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("minzoom"),
+    MLN_BUFFER_LITERAL("3.0"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_max_zoom(
-    map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("maxzoom"),
+    MLN_BUFFER_LITERAL("12.0"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_visibility(
-    map, MLN_BUFFER_LITERAL("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
-    &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("visibility"),
+    MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "visibility is invalid",
-    mln_map_set_style_layer_visibility(
-      map, MLN_BUFFER_LITERAL("info-layer"), 7, &completion.descriptor, NULL
+    MLN_STATUS_INVALID_ARGUMENT, "layer property",
+    mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("visibility"),
+      MLN_BUFFER_LITERAL("7"), &completion.descriptor, NULL
     )
   );
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
-    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("roads"),
-    &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("source-layer"),
+    MLN_BUFFER_LITERAL("\"roads\""), &completion.descriptor, NULL
   ));
   probe = take_layer_result(runtime, map, "info-layer");
   TEST_ASSERT_TRUE(probe.found);
@@ -184,8 +187,9 @@ static mln_status read_layer_filter(
   mln_map map, const char* layer, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(mln_map_get_style_layer_filter(
-    map, mln_test_view_of(layer), &completion.descriptor, NULL
+  MLN_TEST_OK(mln_map_get_style_layer_property(
+    map, mln_test_view_of(layer), MLN_BUFFER_LITERAL("filter"),
+    &completion.descriptor, NULL
   ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
 }
@@ -255,24 +259,27 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   TEST_ASSERT_EQUAL_STRING("", filter);
   const mln_buffer_view kind_filter =
     MLN_BUFFER_LITERAL("[\"==\",[\"get\",\"kind\"],\"park\"]");
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_filter(
-    map, MLN_BUFFER_LITERAL("dots"), &kind_filter, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"), kind_filter,
+    &completion.descriptor, NULL
   ));
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   const mln_buffer_view bad_filter =
     MLN_BUFFER_LITERAL("[\"no-such-operator\",1]");
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "filter",
-    mln_map_set_style_layer_filter(
-      map, MLN_BUFFER_LITERAL("dots"), &bad_filter, &completion.descriptor, NULL
+    MLN_STATUS_INVALID_ARGUMENT, "layer property",
+    mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"), bad_filter,
+      &completion.descriptor, NULL
     )
   );
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   // A null filter clears it.
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_filter(
-    map, MLN_BUFFER_LITERAL("dots"), NULL, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"),
+    MLN_BUFFER_LITERAL("null"), &completion.descriptor, NULL
   ));
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("", filter);
@@ -291,6 +298,45 @@ static mln_status read_layer_json(
   return mln_test_style_finish_text(&completion, out, capacity, found);
 }
 
+static void root_properties_match_serialization_and_null_resets_zoom(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  add_source(map, "points");
+  add_layer(
+    map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
+  );
+  EXPECT_LAYER_PROPERTY("\"points\"", map, "dots", "source");
+  EXPECT_LAYER_PROPERTY("", map, "dots", "source-layer");
+  EXPECT_LAYER_PROPERTY("", map, "dots", "minzoom");
+  EXPECT_LAYER_PROPERTY("", map, "dots", "maxzoom");
+
+  static const char* zoom_names[] = {"minzoom", "maxzoom"};
+  for (size_t index = 0; index < 2; index += 1) {
+    MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("dots"), mln_test_view_of(zoom_names[index]),
+      MLN_BUFFER_LITERAL("4.5"), &completion.descriptor, NULL
+    ));
+    EXPECT_LAYER_PROPERTY("4.5", map, "dots", zoom_names[index]);
+    MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("dots"), mln_test_view_of(zoom_names[index]),
+      MLN_BUFFER_LITERAL("null"), &completion.descriptor, NULL
+    ));
+    EXPECT_LAYER_PROPERTY("", map, "dots", zoom_names[index]);
+  }
+  const layer_probe probe = take_layer_result(runtime, map, "dots");
+  TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, probe.info.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(INFINITY, probe.info.max_zoom);
+  char json[512];
+  bool found = false;
+  MLN_TEST_OK(read_layer_json(map, "dots", json, sizeof(json), &found));
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_NULL(strstr(json, "minzoom"));
+  TEST_ASSERT_NULL(strstr(json, "maxzoom"));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Layer JSON serializes the whole layer as it stands after later edits, and
 // adds back as the same layer.
 static void layer_json_serializes_the_current_layer(void) {
@@ -302,8 +348,9 @@ static void layer_json_serializes_the_current_layer(void) {
     "\"background-color\":\"#ff0000\"}}",
     ""
   );
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_min_zoom(
-    map, MLN_BUFFER_LITERAL("paper"), 2.0, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("minzoom"),
+    MLN_BUFFER_LITERAL("2.0"), &completion.descriptor, NULL
   ));
 
   char json[512];
@@ -397,55 +444,53 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   );
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
 
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_id(
-    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("not-yet-added"),
-    &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("source"),
+    MLN_BUFFER_LITERAL("\"not-yet-added\""), &completion.descriptor, NULL
   ));
   layer_probe probe = take_layer_result(runtime, map, "dots");
   TEST_ASSERT_EQUAL_STRING("not-yet-added", probe.source_id);
+  EXPECT_LAYER_PROPERTY("\"not-yet-added\"", map, "dots", "source");
   TEST_ASSERT_EQUAL_STRING("", probe.source_layer);
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
-    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("pois"),
-    &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("source-layer"),
+    MLN_BUFFER_LITERAL("\"pois\""), &completion.descriptor, NULL
   ));
   probe = take_layer_result(runtime, map, "dots");
   TEST_ASSERT_EQUAL_STRING("pois", probe.source_layer);
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
-    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
-    &completion.descriptor, NULL
+  EXPECT_LAYER_PROPERTY("\"pois\"", map, "dots", "source-layer");
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("source-layer"),
+    MLN_BUFFER_LITERAL("\"\""), &completion.descriptor, NULL
   ));
   probe = take_layer_result(runtime, map, "dots");
   TEST_ASSERT_EQUAL_STRING("", probe.source_layer);
+  EXPECT_LAYER_PROPERTY("", map, "dots", "source-layer");
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source",
-    mln_map_set_style_layer_source_id(
-      map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("points"),
-      &completion.descriptor, NULL
+    mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("source"),
+      MLN_BUFFER_LITERAL("\"points\""), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source-layer",
-    mln_map_set_style_layer_source_layer(
-      map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("pois"),
-      &completion.descriptor, NULL
+    mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("source-layer"),
+      MLN_BUFFER_LITERAL("\"pois\""), &completion.descriptor, NULL
     )
   );
   probe = take_layer_result(runtime, map, "paper");
   TEST_ASSERT_EQUAL_STRING("", probe.source_id);
+  EXPECT_LAYER_PROPERTY("", map, "paper", "source");
+  EXPECT_LAYER_PROPERTY("", map, "paper", "source-layer");
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-typedef mln_status (*terrain_adder)(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id, const mln_completion* completion,
-  mln_diagnostic* diagnostic
-);
-
-// Hillshade and color-relief layers draw a raster DEM source, so the typed
-// adders check the source kind the style-spec JSON path leaves to rendering.
+// Hillshade and color-relief layers require a raster DEM source.
 static void terrain_layers_require_a_raster_dem_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -456,46 +501,62 @@ static void terrain_layers_require_a_raster_dem_source(void) {
   static const struct {
     const char* layer;
     const char* type;
-    terrain_adder add;
   } adders[] = {
-    {"hillshade", "hillshade", mln_map_add_hillshade_layer},
-    {"relief", "color-relief", mln_map_add_color_relief_layer},
+    {"hillshade", "hillshade"},
+    {"relief", "color-relief"},
   };
   for (size_t index = 0; index < 2; index += 1) {
-    const mln_buffer_view layer = mln_test_view_of(adders[index].layer);
-    // Each goes under the paper, before the layer the loop added last.
-    MLN_TEST_AWAIT_OK(
-      adders[index].add(
-        map, layer, MLN_BUFFER_LITERAL("dem"), MLN_BUFFER_LITERAL("paper"),
-        &completion.descriptor, NULL
-      )
+    char layer_json[256];
+    snprintf(
+      layer_json, sizeof(layer_json),
+      "{\"id\":\"%s\",\"type\":\"%s\",\"source\":\"dem\"}", adders[index].layer,
+      adders[index].type
     );
+    const mln_buffer_view layer = mln_test_view_of(layer_json);
+    // Each goes under the paper, before the layer the loop added last.
+    MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+      map, layer, MLN_BUFFER_LITERAL("paper"), &completion.descriptor, NULL
+    ));
     layer_probe probe = take_layer_result(runtime, map, adders[index].layer);
     TEST_ASSERT_EQUAL_STRING(adders[index].type, probe.type);
     TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
 
     MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_INVALID_ARGUMENT, "layer already exists",
-      adders[index].add(
-        map, layer, MLN_BUFFER_LITERAL("dem"), MLN_BUFFER_LITERAL(""),
+      mln_map_add_style_layer_json(
+        map, layer, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+      )
+    );
+    snprintf(
+      layer_json, sizeof(layer_json),
+      "{\"id\":\"on-points\",\"type\":\"%s\",\"source\":\"points\"}",
+      adders[index].type
+    );
+    MLN_TEST_EXPECT_COMMAND_FAILED(
+      MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
+      mln_map_add_style_layer_json(
+        map, mln_test_view_of(layer_json), MLN_BUFFER_LITERAL(""),
         &completion.descriptor, NULL
       )
     );
     MLN_TEST_EXPECT_COMMAND_FAILED(
-      MLN_STATUS_INVALID_ARGUMENT, "not a raster DEM source",
-      adders[index].add(
-        map, MLN_BUFFER_LITERAL("on-points"), MLN_BUFFER_LITERAL("points"),
-        MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-      )
-    );
-    MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_NOT_FOUND, "before_layer_id does not exist",
-      adders[index].add(
-        map, MLN_BUFFER_LITERAL("before-missing"), MLN_BUFFER_LITERAL("dem"),
-        MLN_BUFFER_LITERAL("missing"), &completion.descriptor, NULL
+      mln_map_add_style_layer_json(
+        map, mln_test_view_of(layer_json), MLN_BUFFER_LITERAL("missing"),
+        &completion.descriptor, NULL
       )
     );
   }
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
+    mln_map_add_style_layer_json(
+      map,
+      MLN_BUFFER_LITERAL(
+        "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"dem\"}"
+      ),
+      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+    )
+  );
   const mln_test_style_list ids = mln_test_style_list_layers(map);
   MLN_TEST_OK(ids.status);
   TEST_ASSERT_EQUAL_size_t(3, ids.count);
@@ -522,55 +583,7 @@ static void terrain_layers_require_a_raster_dem_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_status set_indicator_location(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_location(
-    map, layer, (mln_lat_lng){.latitude = 37.5, .longitude = -122.25}, 12.0,
-    completion, NULL
-  );
-}
-static mln_status set_indicator_bearing(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_bearing(
-    map, layer, 90.0, completion, NULL
-  );
-}
-static mln_status set_indicator_radius(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_accuracy_radius(
-    map, layer, 25.0, completion, NULL
-  );
-}
-static mln_status set_indicator_image(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_image_name(
-    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
-    MLN_BUFFER_LITERAL("arrow"), completion, NULL
-  );
-}
-static mln_status set_indicator_top_image(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_image_name(
-    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
-    MLN_BUFFER_LITERAL("dot"), completion, NULL
-  );
-}
-static mln_status set_indicator_shadow_image(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_image_name(
-    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
-    MLN_BUFFER_LITERAL("halo"), completion, NULL
-  );
-}
-
-// The typed setters write location-indicator properties in the renderer's
-// order and units, and refuse every other layer type.
+// Location-indicator properties use the renderer's order and units.
 static void location_indicator_setters_write_its_properties(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -578,33 +591,34 @@ static void location_indicator_setters_write_its_properties(void) {
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
   );
-  MLN_TEST_AWAIT_OK(mln_map_add_location_indicator_layer(
-    map, MLN_BUFFER_LITERAL("puck"), MLN_BUFFER_LITERAL(""),
-    &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL("{\"id\":\"puck\",\"type\":\"location-indicator\"}"),
+    MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
   ));
 
   static const struct {
     const char* label;
-    mln_status (*set)(mln_map, mln_buffer_view, const mln_completion*);
+    const char* value;
     const char* property;
     // A fragment of the property's JSON.
     const char* expected;
   } setters[] = {
-    {"location", set_indicator_location, "location", "[37.5,-122.25,12.0]"},
-    {"bearing", set_indicator_bearing, "bearing", "90.0"},
-    {"accuracy radius", set_indicator_radius, "accuracy-radius", "25.0"},
-    {"bearing image", set_indicator_image, "bearing-image",
-     "\"name\":\"arrow\""},
-    {"top image", set_indicator_top_image, "top-image", "\"name\":\"dot\""},
-    {"shadow image", set_indicator_shadow_image, "shadow-image",
-     "\"name\":\"halo\""},
+    {"location", "[37.5,-122.25,12.0]", "location", "[37.5,-122.25,12.0]"},
+    {"bearing", "90", "bearing", "90.0"},
+    {"accuracy radius", "25", "accuracy-radius", "25.0"},
+    {"bearing image", "\"arrow\"", "bearing-image", "\"name\":\"arrow\""},
+    {"top image", "\"dot\"", "top-image", "\"name\":\"dot\""},
+    {"shadow image", "\"halo\"", "shadow-image", "\"name\":\"halo\""},
   };
   for (size_t index = 0; index < sizeof(setters) / sizeof(setters[0]);
        index += 1) {
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK_MESSAGE(
-      setters[index].set(
-        map, MLN_BUFFER_LITERAL("puck"), &completion.descriptor
+      mln_map_set_style_layer_property(
+        map, MLN_BUFFER_LITERAL("puck"),
+        mln_test_view_of(setters[index].property),
+        mln_test_view_of(setters[index].value), &completion.descriptor, NULL
       ),
       setters[index].label
     );
@@ -620,59 +634,21 @@ static void location_indicator_setters_write_its_properties(void) {
     );
 
     completion = mln_test_completion_default(0);
-    MLN_TEST_OK(
-      setters[index].set(
-        map, MLN_BUFFER_LITERAL("dots"), &completion.descriptor
-      )
-    );
+    MLN_TEST_OK(mln_map_set_style_layer_property(
+      map, MLN_BUFFER_LITERAL("dots"),
+      mln_test_view_of(setters[index].property),
+      mln_test_view_of(setters[index].value), &completion.descriptor, NULL
+    ));
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&completion),
       setters[index].label
     );
     TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(
-        mln_test_completion_diagnostic(&completion),
-        "not a location indicator layer"
-      ),
+      strstr(mln_test_completion_diagnostic(&completion), "layer property"),
       setters[index].label
     );
     mln_test_completion_destroy(&completion);
   }
-
-  // Values the renderer cannot hold are rejected at submission and change
-  // nothing.
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "radius must be non-negative",
-    mln_map_set_location_indicator_accuracy_radius(
-      map, MLN_BUFFER_LITERAL("puck"), -1.0, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "bearing must fit in finite float32",
-    mln_map_set_location_indicator_bearing(
-      map, MLN_BUFFER_LITERAL("puck"), 1e39, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "altitude must be finite",
-    mln_map_set_location_indicator_location(
-      map, MLN_BUFFER_LITERAL("puck"),
-      (mln_lat_lng){.latitude = 37.5, .longitude = -122.25}, INFINITY,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "image_kind is invalid",
-    mln_map_set_location_indicator_image_name(
-      map, MLN_BUFFER_LITERAL("puck"), 9, MLN_BUFFER_LITERAL("arrow"),
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_LAYER_PROPERTY("25.0", map, "puck", "accuracy-radius");
-  EXPECT_LAYER_PROPERTY("90.0", map, "puck", "bearing");
-  EXPECT_LAYER_PROPERTY("[37.5,-122.25,12.0]", map, "puck", "location");
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -681,6 +657,7 @@ static void location_indicator_setters_write_its_properties(void) {
 MLN_TEST_GROUP {
   RUN_TEST(layer_result_reports_scalars_and_carries_the_source_ids);
   RUN_TEST(layer_properties_and_filters_round_trip_through_json);
+  RUN_TEST(root_properties_match_serialization_and_null_resets_zoom);
   RUN_TEST(layer_json_serializes_the_current_layer);
   RUN_TEST(layers_list_in_style_order_after_moves);
   RUN_TEST(source_bindings_change_only_on_layers_that_take_a_source);

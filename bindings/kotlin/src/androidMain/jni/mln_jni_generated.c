@@ -332,19 +332,6 @@ static jint mln_logical_extent_physical_size_jni(
   );
 }
 
-static jint mln_map_add_color_relief_layer_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong source_id,
-  jlong before_layer_id, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_add_color_relief_layer(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_buffer_view, source_id),
-    MLN_JNI_RECORD(mln_buffer_view, before_layer_id),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_add_custom_geometry_source_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong options,
   jlong completion, jlong out_diagnostic
@@ -394,19 +381,6 @@ static jint mln_map_add_geojson_source_url_jni(
   );
 }
 
-static jint mln_map_add_hillshade_layer_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong source_id,
-  jlong before_layer_id, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_add_hillshade_layer(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_buffer_view, source_id),
-    MLN_JNI_RECORD(mln_buffer_view, before_layer_id),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_add_image_source_image_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong coordinates,
   jlong coordinate_count, jlong image, jlong completion, jlong out_diagnostic
@@ -428,18 +402,6 @@ static jint mln_map_add_image_source_url_jni(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     MLN_JNI_POINTER(const mln_lat_lng*, coordinates), (size_t)coordinate_count,
     MLN_JNI_RECORD(mln_buffer_view, url),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_add_location_indicator_layer_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong before_layer_id,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_add_location_indicator_layer(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_buffer_view, before_layer_id),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -909,17 +871,6 @@ static jint mln_map_get_style_layer_jni(
   jlong out_diagnostic
 ) {
   return (jint)mln_map_get_style_layer(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_get_style_layer_filter_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_get_style_layer_filter(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
@@ -1522,52 +1473,6 @@ static jint mln_map_set_image_source_url_jni(
   );
 }
 
-static jint mln_map_set_location_indicator_accuracy_radius_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jdouble radius,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_location_indicator_accuracy_radius(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id), (double)radius,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_location_indicator_bearing_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jdouble bearing,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_location_indicator_bearing(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id), (double)bearing,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_location_indicator_image_name_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jint image_kind,
-  jlong image_id, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_location_indicator_image_name(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    (uint32_t)image_kind, MLN_JNI_RECORD(mln_buffer_view, image_id),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_location_indicator_location_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong coordinate,
-  jdouble altitude, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_location_indicator_location(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_lat_lng, coordinate), (double)altitude,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_set_projection_mode_jni(
   JNIEnv* env, jclass type, jlong map, jlong mode, jlong completion,
   jlong out_diagnostic
@@ -1614,40 +1519,6 @@ static jint mln_map_set_style_json_jni(
   );
 }
 
-static jint mln_map_set_style_layer_filter_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong filter,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_filter(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_POINTER(const mln_buffer_view*, filter),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_style_layer_max_zoom_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jdouble max_zoom,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_max_zoom(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id), (double)max_zoom,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_style_layer_min_zoom_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jdouble min_zoom,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_min_zoom(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id), (double)min_zoom,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_set_style_layer_property_jni(
   JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong property_name,
   jlong value, jlong completion, jlong out_diagnostic
@@ -1657,41 +1528,6 @@ static jint mln_map_set_style_layer_property_jni(
     MLN_JNI_RECORD(mln_buffer_view, property_name),
     MLN_JNI_RECORD(mln_buffer_view, value),
     MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_style_layer_source_id_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong source_id,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_source_id(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_buffer_view, source_id),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_style_layer_source_layer_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong source_layer,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_source_layer(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    MLN_JNI_RECORD(mln_buffer_view, source_layer),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_set_style_layer_visibility_jni(
-  JNIEnv* env, jclass type, jlong map, jlong layer_id, jint visibility,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_layer_visibility(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
-    (uint32_t)visibility, MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2868,8 +2704,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_log_set_callback", "(JJ)I", (void*)mln_log_set_callback_jni},
   {"mln_logical_extent_physical_size", "(JJJJ)I",
    (void*)mln_logical_extent_physical_size_jni},
-  {"mln_map_add_color_relief_layer", "(JJJJJJ)I",
-   (void*)mln_map_add_color_relief_layer_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_mvt_vector_source", "(JJJJJ)I",
@@ -2878,14 +2712,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_geojson_source_data_jni},
   {"mln_map_add_geojson_source_url", "(JJJJJJ)I",
    (void*)mln_map_add_geojson_source_url_jni},
-  {"mln_map_add_hillshade_layer", "(JJJJJJ)I",
-   (void*)mln_map_add_hillshade_layer_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},
   {"mln_map_add_image_source_url", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_url_jni},
-  {"mln_map_add_location_indicator_layer", "(JJJJJ)I",
-   (void*)mln_map_add_location_indicator_layer_jni},
   {"mln_map_add_raster_dem_source_tiles", "(JJJJJJJ)I",
    (void*)mln_map_add_raster_dem_source_tiles_jni},
   {"mln_map_add_raster_dem_source_url", "(JJJJJJ)I",
@@ -2955,8 +2785,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_get_snapshot", "(JJJ)I", (void*)mln_map_get_snapshot_jni},
   {"mln_map_get_style_image", "(JJJJ)I", (void*)mln_map_get_style_image_jni},
   {"mln_map_get_style_layer", "(JJJJ)I", (void*)mln_map_get_style_layer_jni},
-  {"mln_map_get_style_layer_filter", "(JJJJ)I",
-   (void*)mln_map_get_style_layer_filter_jni},
   {"mln_map_get_style_layer_json", "(JJJJ)I",
    (void*)mln_map_get_style_layer_json_jni},
   {"mln_map_get_style_layer_property", "(JJJJJ)I",
@@ -3054,34 +2882,14 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_set_image_source_image_jni},
   {"mln_map_set_image_source_url", "(JJJJJ)I",
    (void*)mln_map_set_image_source_url_jni},
-  {"mln_map_set_location_indicator_accuracy_radius", "(JJDJJ)I",
-   (void*)mln_map_set_location_indicator_accuracy_radius_jni},
-  {"mln_map_set_location_indicator_bearing", "(JJDJJ)I",
-   (void*)mln_map_set_location_indicator_bearing_jni},
-  {"mln_map_set_location_indicator_image_name", "(JJIJJJ)I",
-   (void*)mln_map_set_location_indicator_image_name_jni},
-  {"mln_map_set_location_indicator_location", "(JJJDJJ)I",
-   (void*)mln_map_set_location_indicator_location_jni},
   {"mln_map_set_projection_mode", "(JJJJ)I",
    (void*)mln_map_set_projection_mode_jni},
   {"mln_map_set_rendering_stats_view_enabled", "(JZJJ)I",
    (void*)mln_map_set_rendering_stats_view_enabled_jni},
   {"mln_map_set_style_image", "(JJJJJJ)I", (void*)mln_map_set_style_image_jni},
   {"mln_map_set_style_json", "(JJJJ)I", (void*)mln_map_set_style_json_jni},
-  {"mln_map_set_style_layer_filter", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_filter_jni},
-  {"mln_map_set_style_layer_max_zoom", "(JJDJJ)I",
-   (void*)mln_map_set_style_layer_max_zoom_jni},
-  {"mln_map_set_style_layer_min_zoom", "(JJDJJ)I",
-   (void*)mln_map_set_style_layer_min_zoom_jni},
   {"mln_map_set_style_layer_property", "(JJJJJJ)I",
    (void*)mln_map_set_style_layer_property_jni},
-  {"mln_map_set_style_layer_source_id", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_source_id_jni},
-  {"mln_map_set_style_layer_source_layer", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_source_layer_jni},
-  {"mln_map_set_style_layer_visibility", "(JJIJJ)I",
-   (void*)mln_map_set_style_layer_visibility_jni},
   {"mln_map_set_style_light_json", "(JJJJ)I",
    (void*)mln_map_set_style_light_json_jni},
   {"mln_map_set_style_light_property", "(JJJJJ)I",
@@ -3340,8 +3148,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_log_set_callback", "(JJ)I", (void*)mln_log_set_callback_jni},
   {"mln_logical_extent_physical_size", "(JJJJ)I",
    (void*)mln_logical_extent_physical_size_jni},
-  {"mln_map_add_color_relief_layer", "(JJJJJJ)I",
-   (void*)mln_map_add_color_relief_layer_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_mvt_vector_source", "(JJJJJ)I",
@@ -3350,14 +3156,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_geojson_source_data_jni},
   {"mln_map_add_geojson_source_url", "(JJJJJJ)I",
    (void*)mln_map_add_geojson_source_url_jni},
-  {"mln_map_add_hillshade_layer", "(JJJJJJ)I",
-   (void*)mln_map_add_hillshade_layer_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},
   {"mln_map_add_image_source_url", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_url_jni},
-  {"mln_map_add_location_indicator_layer", "(JJJJJ)I",
-   (void*)mln_map_add_location_indicator_layer_jni},
   {"mln_map_add_raster_dem_source_tiles", "(JJJJJJJ)I",
    (void*)mln_map_add_raster_dem_source_tiles_jni},
   {"mln_map_add_raster_dem_source_url", "(JJJJJJ)I",
@@ -3427,8 +3229,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_get_snapshot", "(JJJ)I", (void*)mln_map_get_snapshot_critical},
   {"mln_map_get_style_image", "(JJJJ)I", (void*)mln_map_get_style_image_jni},
   {"mln_map_get_style_layer", "(JJJJ)I", (void*)mln_map_get_style_layer_jni},
-  {"mln_map_get_style_layer_filter", "(JJJJ)I",
-   (void*)mln_map_get_style_layer_filter_jni},
   {"mln_map_get_style_layer_json", "(JJJJ)I",
    (void*)mln_map_get_style_layer_json_jni},
   {"mln_map_get_style_layer_property", "(JJJJJ)I",
@@ -3526,34 +3326,14 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_set_image_source_image_jni},
   {"mln_map_set_image_source_url", "(JJJJJ)I",
    (void*)mln_map_set_image_source_url_jni},
-  {"mln_map_set_location_indicator_accuracy_radius", "(JJDJJ)I",
-   (void*)mln_map_set_location_indicator_accuracy_radius_jni},
-  {"mln_map_set_location_indicator_bearing", "(JJDJJ)I",
-   (void*)mln_map_set_location_indicator_bearing_jni},
-  {"mln_map_set_location_indicator_image_name", "(JJIJJJ)I",
-   (void*)mln_map_set_location_indicator_image_name_jni},
-  {"mln_map_set_location_indicator_location", "(JJJDJJ)I",
-   (void*)mln_map_set_location_indicator_location_jni},
   {"mln_map_set_projection_mode", "(JJJJ)I",
    (void*)mln_map_set_projection_mode_jni},
   {"mln_map_set_rendering_stats_view_enabled", "(JZJJ)I",
    (void*)mln_map_set_rendering_stats_view_enabled_jni},
   {"mln_map_set_style_image", "(JJJJJJ)I", (void*)mln_map_set_style_image_jni},
   {"mln_map_set_style_json", "(JJJJ)I", (void*)mln_map_set_style_json_jni},
-  {"mln_map_set_style_layer_filter", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_filter_jni},
-  {"mln_map_set_style_layer_max_zoom", "(JJDJJ)I",
-   (void*)mln_map_set_style_layer_max_zoom_jni},
-  {"mln_map_set_style_layer_min_zoom", "(JJDJJ)I",
-   (void*)mln_map_set_style_layer_min_zoom_jni},
   {"mln_map_set_style_layer_property", "(JJJJJJ)I",
    (void*)mln_map_set_style_layer_property_jni},
-  {"mln_map_set_style_layer_source_id", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_source_id_jni},
-  {"mln_map_set_style_layer_source_layer", "(JJJJJ)I",
-   (void*)mln_map_set_style_layer_source_layer_jni},
-  {"mln_map_set_style_layer_visibility", "(JJIJJ)I",
-   (void*)mln_map_set_style_layer_visibility_jni},
   {"mln_map_set_style_light_json", "(JJJJ)I",
    (void*)mln_map_set_style_light_json_jni},
   {"mln_map_set_style_light_property", "(JJJJJ)I",

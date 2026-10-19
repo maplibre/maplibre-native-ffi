@@ -63,17 +63,21 @@ def test_absent_fields_stay_distinct_from_present_values(
             b'[{"id":"circles","type":"circle","source":"points"}]}'
         )
     )
-    assert result(map_handle.get_style_layer_filter("circles")) is None
+    assert result(map_handle.get_style_layer_property("circles", "filter")) is None
     result(
-        map_handle.set_style_layer_filter("circles", b'["==",["get","kind"],"park"]')
+        map_handle.set_style_layer_property(
+            "circles", "filter", b'["==",["get","kind"],"park"]'
+        )
     )
-    assert json.loads(result(map_handle.get_style_layer_filter("circles"))) == [
+    assert json.loads(
+        result(map_handle.get_style_layer_property("circles", "filter"))
+    ) == [
         "==",
         ["get", "kind"],
         "park",
     ]
-    result(map_handle.set_style_layer_filter("circles", None))
-    assert result(map_handle.get_style_layer_filter("circles")) is None
+    result(map_handle.set_style_layer_property("circles", "filter", b"null"))
+    assert result(map_handle.get_style_layer_property("circles", "filter")) is None
 
 
 def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(

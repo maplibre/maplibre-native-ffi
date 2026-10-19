@@ -156,16 +156,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_add_color_relief_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_add_custom_geometry_source(
     map: Long,
     sourceId: Long,
@@ -203,16 +193,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_add_hillshade_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -230,15 +210,6 @@ internal actual object C {
     coordinates: Long,
     coordinateCount: Long,
     url: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_add_location_indicator_layer(
-    map: Long,
-    layerId: Long,
-    beforeLayerId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -568,14 +539,6 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_map_get_style_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_get_style_layer_filter(
     map: Long,
     layerId: Long,
     completion: Long,
@@ -1007,44 +970,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_location_indicator_accuracy_radius(
-    map: Long,
-    layerId: Long,
-    radius: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_location_indicator_bearing(
-    map: Long,
-    layerId: Long,
-    bearing: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_location_indicator_image_name(
-    map: Long,
-    layerId: Long,
-    imageKind: Int,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_location_indicator_location(
-    map: Long,
-    layerId: Long,
-    coordinate: Long,
-    altitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_set_projection_mode(
     map: Long,
     mode: Long,
@@ -1079,65 +1004,11 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_style_layer_filter(
-    map: Long,
-    layerId: Long,
-    filter: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_style_layer_max_zoom(
-    map: Long,
-    layerId: Long,
-    maxZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_style_layer_min_zoom(
-    map: Long,
-    layerId: Long,
-    minZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_set_style_layer_property(
     map: Long,
     layerId: Long,
     propertyName: Long,
     value: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_style_layer_source_id(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_style_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    sourceLayer: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_style_layer_visibility(
-    map: Long,
-    layerId: Long,
-    visibility: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int

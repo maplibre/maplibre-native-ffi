@@ -258,13 +258,6 @@ typedef enum MLN_BINDING(
   MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2U,
 } mln_style_transition_option_field;
 
-/** Location indicator image-name properties. */
-typedef enum mln_location_indicator_image_kind : uint32_t {
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0,
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1,
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
-} mln_location_indicator_image_kind;
-
 /**
  * Inline TileJSON metadata of a tile source.
  *
@@ -1625,184 +1618,6 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a hillshade layer for a raster DEM source.
- *
- * layer_id, source_id, and before_layer_id are borrowed for the call. Passing
- * an empty before_layer_id appends the layer; otherwise the layer is inserted
- * before that existing layer.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has source_id, or before_layer_id
- *   is non-empty and no style layer has it.
- * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
- *   is not a raster DEM source.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_hillshade_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a color-relief layer for a raster DEM source.
- *
- * layer_id, source_id, and before_layer_id are borrowed for the call. Passing
- * an empty before_layer_id appends the layer; otherwise the layer is inserted
- * before that existing layer. Use mln_map_set_style_layer_property() with
- * color-relief-color to set the color ramp expression.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style source has source_id, or before_layer_id
- *   is non-empty and no style layer has it.
- * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
- *   is not a raster DEM source.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_color_relief_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a source-free location indicator layer.
- *
- * layer_id and before_layer_id are borrowed for the call. Passing an empty
- * before_layer_id appends the layer; otherwise the layer is inserted before
- * that existing layer.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when before_layer_id is non-empty and no style layer
- *   has it.
- * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_location_indicator_layer(
-  mln_map map, mln_buffer_view layer_id,
-  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets a location indicator layer location.
- *
- * coordinate uses C API latitude/longitude order.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, coordinate or altitude is invalid, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
- *   layer.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_location_indicator_location(
-  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets a location indicator layer bearing in degrees.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, bearing is not finite float32, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
- *   layer.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_location_indicator_bearing(
-  mln_map map, mln_buffer_view layer_id, double bearing,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets a location indicator layer accuracy radius in meters.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, radius is negative or not finite float32, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
- *   layer.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_buffer_view layer_id, double radius,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets one location indicator image-name property.
- *
- * image_id is borrowed for the call and copied into native style storage. The
- * named style image does not need to exist when this function is called.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
- *   image_id is invalid or empty, image_kind is invalid, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
- *   layer.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_location_indicator_image_name(
-  mln_map map, mln_buffer_view layer_id,
-  uint32_t image_kind MLN_BINDING("enum=mln_location_indicator_image_kind"),
-  mln_buffer_view image_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Adds one style layer from a full style-spec layer JSON object.
  *
  * layer_json and before_layer_id are borrowed for the call. layer_json must
@@ -1820,7 +1635,8 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  * - MLN_STATUS_NOT_FOUND when before_layer_id is non-empty and no style layer
  *   has it, or the layer requires a source no style source has.
  * - MLN_STATUS_INVALID_ARGUMENT when the layer JSON cannot be converted, or a
- *   layer already has the JSON's id.
+ *   layer already has the JSON's id, or the source does not support the layer
+ *   type.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
@@ -2064,6 +1880,14 @@ MLN_API mln_status mln_map_get_style_transition_options(
  *
  * layer_id, property_name, and value are borrowed for the call. value is a
  * style-spec JSON value; expressions use style-spec expression JSON arrays.
+ * Paint and layout property names are unprefixed. The root keys filter,
+ * source, source-layer, minzoom, and maxzoom are also supported.
+ *
+ * JSON null clears a filter and resets minzoom or maxzoom to an unbounded
+ * range (-INFINITY or INFINITY). For paint and layout properties, JSON null
+ * restores the property's default. source and source-layer take JSON strings;
+ * an empty source-layer string clears it. A source ID may name a source that
+ * has not been added yet. Zoom values are rounded to single precision.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -2076,7 +1900,8 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown for that
- *   layer, or the value cannot be converted for that property.
+ *   layer, the value cannot be converted for that property, or source or
+ *   source-layer is set on a layer type that takes no source.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_layer_property(
@@ -2090,6 +1915,11 @@ MLN_API mln_status mln_map_set_style_layer_property(
  *
  * A defined property completes with one borrowed mln_buffer_view. An undefined
  * property completes successfully with no value.
+ *
+ * Paint and layout property names are unprefixed. The root keys filter,
+ * source, source-layer, minzoom, and maxzoom use the layer's serialized values.
+ * An unset filter, an empty source or source-layer, and an unbounded minzoom
+ * or maxzoom complete successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -2107,176 +1937,6 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_map_get_style_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets or clears one layer filter.
- *
- * layer_id and filter are borrowed for the call and copied before return.
- * Passing null for filter clears the layer filter. Non-null filters use the
- * MapLibre style-spec filter JSON representation.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, filter points to an invalid or empty view, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the filter cannot be converted.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_filter(
-  mln_map map, mln_buffer_view layer_id,
-  const mln_buffer_view* filter MLN_BINDING("encoding=json;nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Serializes one layer filter as a style-spec JSON value.
- *
- * A present filter completes with one borrowed mln_buffer_view. A missing
- * filter completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;nullable=true;"
-  "encoding=json"
-)
-MLN_API mln_status mln_map_get_style_layer_filter(
-  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets one layer's source-layer ID.
- *
- * layer_id and source_layer are borrowed for the call and copied before
- * return. Passing an empty source_layer clears it.
- *
- * Only layer types that require a source carry a source-layer; this rejects the
- * others, such as background and custom.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, source_layer is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id,
-  mln_buffer_view source_layer MLN_BINDING("optional=empty"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets one layer's source ID.
- *
- * layer_id and source_id are borrowed for the call and copied before return.
- * This does not require the named source to exist yet; MapLibre reports an
- * unresolved source through style events.
- *
- * Only layer types that require a source carry a source ID; this rejects the
- * others, such as background and custom.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, source_id is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets the lowest zoom at which one layer draws.
- *
- * Pass -INFINITY for no lower bound. The value is rounded to single precision.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, min_zoom is NaN, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double min_zoom,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets the highest zoom at which one layer draws.
- *
- * Pass INFINITY for no upper bound. The value is rounded to single precision.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, max_zoom is NaN, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double max_zoom,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets whether one layer draws.
- *
- * visibility is an mln_style_layer_visibility value.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, visibility is not an mln_style_layer_visibility value, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_layer_visibility(
-  mln_map map, mln_buffer_view layer_id,
-  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

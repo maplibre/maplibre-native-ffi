@@ -337,17 +337,6 @@ final class GpuSyncKind extends _Enum {
   static const webgpuToken = GpuSyncKind.fromRawValue(4);
 }
 
-/// Location indicator image-name properties.
-///
-/// See `mln_location_indicator_image_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class LocationIndicatorImageKind extends _Enum {
-  const LocationIndicatorImageKind.fromRawValue(super.rawValue);
-  static const top = LocationIndicatorImageKind.fromRawValue(0);
-  static const bearing = LocationIndicatorImageKind.fromRawValue(1);
-  static const shadow = LocationIndicatorImageKind.fromRawValue(2);
-}
-
 /// Log event categories emitted by MapLibre Native.
 ///
 /// See `mln_log_event` in the

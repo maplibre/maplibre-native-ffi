@@ -3994,25 +3994,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   /// this handle.
   BigInt get id => uint64FromNative(_state.handleId);
 
-  /// Adds a color-relief layer for a raster DEM source.
-  ///
-  /// See `mln_map_add_color_relief_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addColorReliefLayer(
-    String layerId,
-    String sourceId, {
-    String? beforeLayerId,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_color_relief_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView((beforeLayerId ?? ''), arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Adds a custom geometry source.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
@@ -4093,25 +4074,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Adds a hillshade layer for a raster DEM source.
-  ///
-  /// See `mln_map_add_hillshade_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addHillshadeLayer(
-    String layerId,
-    String sourceId, {
-    String? beforeLayerId,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_hillshade_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView((beforeLayerId ?? ''), arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Adds an image source with inline image pixels.
   ///
   /// See `mln_map_add_image_source_image` in the
@@ -4163,23 +4125,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
-
-  /// Adds a source-free location indicator layer.
-  ///
-  /// See `mln_map_add_location_indicator_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addLocationIndicatorLayer(
-    String layerId, {
-    String? beforeLayerId,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_location_indicator_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView((beforeLayerId ?? ''), arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
 
   /// Adds a raster DEM source with inline tile URLs.
   ///
@@ -5018,20 +4963,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Serializes one layer filter as a style-spec JSON value.
-  ///
-  /// See `mln_map_get_style_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getStyleLayerFilter(String layerId) => _queryOptional(
-    _resultUint8ListOrNull,
-    (arena, completion) => raw.mln_map_get_style_layer_filter(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Serializes one style layer as a full style-spec layer JSON object.
   ///
   /// See `mln_map_get_style_layer_json` in the
@@ -5713,78 +5644,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         ),
       );
 
-  /// Sets a location indicator layer accuracy radius in meters.
-  ///
-  /// See `mln_map_set_location_indicator_accuracy_radius` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLocationIndicatorAccuracyRadius(
-    String layerId,
-    double radius,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_location_indicator_accuracy_radius(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      radius,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets a location indicator layer bearing in degrees.
-  ///
-  /// See `mln_map_set_location_indicator_bearing` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLocationIndicatorBearing(
-    String layerId,
-    double bearing,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_location_indicator_bearing(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      bearing,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets one location indicator image-name property.
-  ///
-  /// See `mln_map_set_location_indicator_image_name` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLocationIndicatorImageName(
-    String layerId,
-    LocationIndicatorImageKind imageKind,
-    String imageId,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_location_indicator_image_name(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      imageKind.rawValue,
-      nativeStringView(imageId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets a location indicator layer location.
-  ///
-  /// See `mln_map_set_location_indicator_location` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLocationIndicatorLocation(
-    String layerId,
-    LatLng coordinate,
-    double altitude,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_location_indicator_location(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      _writeLatLng(coordinate, arena).ref,
-      altitude,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Submits copied axonometric rendering option fields.
   ///
   /// See `mln_map_set_projection_mode` in the
@@ -5844,63 +5703,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Sets or clears one layer filter.
-  ///
-  /// See `mln_map_set_style_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerFilter(
-    String layerId, {
-    Uint8List? filter,
-  }) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_filter(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      filter == null
-          ? nullptr
-          : (() {
-              final storage = arena<raw.mln_buffer_view>();
-              storage.ref = nativeBufferView(filter, arena);
-              return storage;
-            })(),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets the highest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_max_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerMaxZoom(
-    String layerId,
-    double maxZoom,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_max_zoom(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      maxZoom,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets the lowest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_min_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerMinZoom(
-    String layerId,
-    double minZoom,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_min_zoom(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      minZoom,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Sets one layer property using its MapLibre style-spec property name.
   ///
   /// See `mln_map_set_style_layer_property` in the
@@ -5915,57 +5717,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeStringView(layerId, arena).value,
       nativeStringView(propertyName, arena).value,
       nativeBufferView(value, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets one layer's source ID.
-  ///
-  /// See `mln_map_set_style_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerSourceId(
-    String layerId,
-    String sourceId,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_source_id(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView(sourceId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets one layer's source-layer ID.
-  ///
-  /// See `mln_map_set_style_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerSourceLayer(
-    String layerId, {
-    String? sourceLayer,
-  }) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_source_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView((sourceLayer ?? ''), arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets whether one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_visibility` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLayerVisibility(
-    String layerId,
-    StyleLayerVisibility visibility,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_style_layer_visibility(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      visibility.rawValue,
       completion,
       nativeDiagnostic,
     ),

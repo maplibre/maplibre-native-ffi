@@ -320,63 +320,6 @@ static void empty_views_are_rejected_at_submission(void) {
   // Layers. An empty before_layer_id means the top of the stack, so it is
   // accepted.
   EXPECT_EMPTY_REJECTED(
-    "layer_id",
-    mln_map_add_hillshade_layer(
-      map, empty, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_hillshade_layer(
-      map, id, empty, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id",
-    mln_map_add_color_relief_layer(
-      map, empty, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_color_relief_layer(
-      map, id, empty, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_add_location_indicator_layer(
-                  map, empty, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id",
-    mln_map_set_location_indicator_location(
-      map, empty, corners[0], 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_location_indicator_bearing(
-                  map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_location_indicator_accuracy_radius(
-                  map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_location_indicator_image_name(
-                  map, empty, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP, id,
-                  &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_set_location_indicator_image_name(
-                  map, id, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP, empty,
-                  &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
     "layer_json",
     mln_map_add_style_layer_json(
       map, empty, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
@@ -429,52 +372,6 @@ static void empty_views_are_rejected_at_submission(void) {
     mln_map_get_style_layer_property(
       map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_filter(
-                  map, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "filter", mln_map_set_style_layer_filter(
-                map, id, &empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-              )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_style_layer_filter(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_source_layer(
-                  map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_source_id(
-                  map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_style_layer_source_id(
-                   map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_min_zoom(
-                  map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_max_zoom(
-                  map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_style_layer_visibility(
-                  map, empty, MLN_STYLE_LAYER_VISIBILITY_NONE,
-                  &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
   );
 
   // Style-wide values.

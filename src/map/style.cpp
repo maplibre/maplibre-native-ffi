@@ -50,9 +50,6 @@
 #include <mln/style/conversion_impl.hpp>
 #include <mln/style/image.hpp>
 #include <mln/style/layer.hpp>
-#include <mln/style/layers/color_relief_layer.hpp>
-#include <mln/style/layers/hillshade_layer.hpp>
-#include <mln/style/layers/location_indicator_layer.hpp>
 #include <mln/style/light.hpp>
 #include <mln/style/rapidjson_conversion.hpp>
 #include <mln/style/source.hpp>
@@ -109,13 +106,6 @@ auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
 
 namespace {
 
-auto buffer_view_from_string(const std::string& value) -> mln_buffer_view {
-  return {
-    .data = value.data(),
-    .size = value.size(),
-  };
-}
-
 using mln::core::TileSourceOptionKind;
 
 auto validate_string_view(mln_buffer_view string, const char* name) -> bool {
@@ -132,10 +122,6 @@ auto string_from_view(mln_buffer_view string) -> std::string {
     return {};
   }
   return std::string{static_cast<const char*>(string.data), string.size};
-}
-
-auto string_view_from_literal(const char* string) -> mln_buffer_view {
-  return mln_buffer_view{.data = string, .size = std::strlen(string)};
 }
 
 auto to_c_source_type(mln::style::SourceType type) -> uint32_t {
@@ -2346,246 +2332,6 @@ auto map_get_image_source_coordinates(
   return MLN_STATUS_OK;
 }
 
-auto map_add_hillshade_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status {
-  auto& style = map_native(live).getStyle();
-  const auto layer = string_from_view(layer_id);
-  const auto source = string_from_view(source_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* source_ptr = style.getSource(source);
-  if (source_ptr == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  if (!source_ptr->is<mln::style::RasterDEMSource>()) {
-    set_thread_error("source is not a raster DEM source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_NOT_FOUND;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mln::style::HillshadeLayer>(layer, source), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_color_relief_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status {
-  auto& style = map_native(live).getStyle();
-  const auto layer = string_from_view(layer_id);
-  const auto source = string_from_view(source_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* source_ptr = style.getSource(source);
-  if (source_ptr == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  if (!source_ptr->is<mln::style::RasterDEMSource>()) {
-    set_thread_error("source is not a raster DEM source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_NOT_FOUND;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mln::style::ColorReliefLayer>(layer, source), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_location_indicator_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
-) -> mln_status {
-  auto& style = map_native(live).getStyle();
-  const auto layer = string_from_view(layer_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_NOT_FOUND;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mln::style::LocationIndicatorLayer>(layer), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto find_location_indicator_layer(MapObject& map, mln_buffer_view layer_id)
-  -> mln_status {
-  const auto* layer =
-    map_native(map).getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  if (std::strcmp(layer->getTypeInfo()->type, "location-indicator") != 0) {
-    set_thread_error("layer is not a location indicator layer");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_float64_to_float32(double value, const char* name) -> mln_status {
-  if (
-    !std::isfinite(value) || value < -std::numeric_limits<float>::max() ||
-    value > std::numeric_limits<float>::max()
-  ) {
-    const auto message = std::string{name} + " must fit in finite float32";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto location_indicator_image_property(uint32_t image_kind)
-  -> std::optional<mln_buffer_view> {
-  switch (image_kind) {
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
-      return string_view_from_literal("top-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING:
-      return string_view_from_literal("bearing-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW:
-      return string_view_from_literal("shadow-image");
-    default:
-      return std::nullopt;
-  }
-}
-
-auto validate_location_indicator_location_command(
-  mln_lat_lng coordinate, double altitude
-) -> mln_status {
-  const auto coordinate_status = validate_lat_lng(coordinate);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-  if (!std::isfinite(altitude)) {
-    set_thread_error("altitude must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_location_indicator_bearing_command(double bearing) -> mln_status {
-  return validate_float64_to_float32(bearing, "bearing");
-}
-
-auto validate_location_indicator_accuracy_radius_command(double radius)
-  -> mln_status {
-  const auto radius_status = validate_float64_to_float32(radius, "radius");
-  if (radius_status != MLN_STATUS_OK) {
-    return radius_status;
-  }
-  if (radius < 0.0) {
-    set_thread_error("radius must be non-negative");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_location_indicator_image_kind(uint32_t image_kind) -> mln_status {
-  if (!location_indicator_image_property(image_kind)) {
-    set_thread_error("image_kind is invalid");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_set_location_indicator_location(
-  MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude
-) -> mln_status {
-  const auto layer_status = find_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-
-  // The style property is [latitude, longitude, altitude]; the renderer reads
-  // it back as LatLng{values[0], values[1]}.
-  const auto location = serialize_json_value(
-    mln::Value{mapbox::base::ValueArray{
-      mln::Value{coordinate.latitude}, mln::Value{coordinate.longitude},
-      mln::Value{altitude}
-    }}
-  );
-  return map_set_layer_property(
-    live, layer_id, string_view_from_literal("location"),
-    buffer_view_from_string(location)
-  );
-}
-
-auto map_set_location_indicator_bearing(
-  MapObject& live, mln_buffer_view layer_id, double bearing
-) -> mln_status {
-  const auto layer_status = find_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto value = serialize_json_value(mln::Value{bearing});
-  return map_set_layer_property(
-    live, layer_id, string_view_from_literal("bearing"),
-    buffer_view_from_string(value)
-  );
-}
-
-auto map_set_location_indicator_accuracy_radius(
-  MapObject& live, mln_buffer_view layer_id, double radius
-) -> mln_status {
-  const auto layer_status = find_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto value = serialize_json_value(mln::Value{radius});
-  return map_set_layer_property(
-    live, layer_id, string_view_from_literal("accuracy-radius"),
-    buffer_view_from_string(value)
-  );
-}
-
-auto map_set_location_indicator_image_name(
-  MapObject& live, mln_buffer_view layer_id, uint32_t image_kind,
-  mln_buffer_view image_id
-) -> mln_status {
-  const auto layer_status = find_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto value =
-    serialize_json_value(mln::Value{string_from_view(image_id)});
-  return map_set_layer_property(
-    live, layer_id, *location_indicator_image_property(image_kind),
-    buffer_view_from_string(value)
-  );
-}
-
 auto map_add_style_layer_json(
   MapObject& live, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status {
@@ -2616,11 +2362,17 @@ auto map_add_style_layer_json(
   }
   if (
     (*layer)->getTypeInfo()->source ==
-      mln::style::LayerTypeInfo::Source::Required &&
-    style.getSource((*layer)->getSourceID()) == nullptr
+    mln::style::LayerTypeInfo::Source::Required
   ) {
-    set_thread_error("layer source does not exist");
-    return MLN_STATUS_NOT_FOUND;
+    const auto* source = style.getSource((*layer)->getSourceID());
+    if (source == nullptr) {
+      set_thread_error("layer source does not exist");
+      return MLN_STATUS_NOT_FOUND;
+    }
+    if (!source->supportsLayerType((*layer)->getTypeInfo())) {
+      set_thread_error("source does not support layer type");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
 
   style.addLayer(std::move(*layer), before);
@@ -2869,6 +2621,25 @@ auto map_get_style_transition_options(MapObject& live)
   return result;
 }
 
+namespace {
+
+// MapLibre's setProperty path otherwise logs a warning and ignores the field.
+auto require_layer_takes_source(
+  const mln::style::Layer& layer, const char* field
+) -> bool {
+  if (
+    layer.getTypeInfo()->source == mln::style::LayerTypeInfo::Source::Required
+  ) {
+    return true;
+  }
+  const auto message = std::string{"layer type does not take a "} + field +
+                       "; layer id is " + layer.getID();
+  set_thread_error(message.c_str());
+  return false;
+}
+
+}  // namespace
+
 auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
@@ -2885,11 +2656,32 @@ auto map_set_layer_property(
     return MLN_STATUS_NOT_FOUND;
   }
 
-  auto error = layer->setProperty(
-    string_from_view(property_name),
-    mln::style::conversion::Convertible{
-      static_cast<const mln::JSValue*>(&document)
+  const auto name = string_from_view(property_name);
+  if (
+    (name == "source" || name == "source-layer") &&
+    !require_layer_takes_source(*layer, name.c_str())
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (document.IsNull()) {
+    if (name == "filter") {
+      layer->setFilter(mln::style::Filter{});
+      return MLN_STATUS_OK;
     }
+    if (name == "minzoom") {
+      layer->setMinZoom(-std::numeric_limits<float>::infinity());
+      return MLN_STATUS_OK;
+    }
+    if (name == "maxzoom") {
+      layer->setMaxZoom(std::numeric_limits<float>::infinity());
+      return MLN_STATUS_OK;
+    }
+  }
+
+  auto error = layer->setProperty(
+    name, mln::style::conversion::Convertible{
+            static_cast<const mln::JSValue*>(&document)
+          }
   );
   if (error) {
     set_style_conversion_error("layer property", *error);
@@ -2911,190 +2703,39 @@ auto map_get_layer_property(
     return MLN_STATUS_NOT_FOUND;
   }
 
-  const auto property = layer->getProperty(string_from_view(property_name));
-  if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
-    return MLN_STATUS_OK;
+  const auto name = string_from_view(property_name);
+  auto root = mln::Value{};
+  if (name == "filter") {
+    if (!layer->getFilter()) {
+      return MLN_STATUS_OK;
+    }
+    root = layer->getFilter().serialize();
+  } else if (name == "source" || name == "source-layer") {
+    auto source =
+      name == "source" ? layer->getSourceID() : layer->getSourceLayer();
+    if (source.empty()) {
+      return MLN_STATUS_OK;
+    }
+    root = std::move(source);
+  } else if (name == "minzoom" || name == "maxzoom") {
+    const auto zoom =
+      name == "minzoom" ? layer->getMinZoom() : layer->getMaxZoom();
+    const auto unbounded = name == "minzoom"
+                             ? -std::numeric_limits<float>::infinity()
+                             : std::numeric_limits<float>::infinity();
+    if (zoom == unbounded) {
+      return MLN_STATUS_OK;
+    }
+    root = zoom;
+  } else {
+    const auto property = layer->getProperty(name);
+    if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
+      return MLN_STATUS_OK;
+    }
+    root = property.getValue();
   }
-  out_value = serialize_json_value(property.getValue());
+  out_value = serialize_json_value(root);
   out_found = true;
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
-) -> mln_status {
-  auto* layer =
-    map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-
-  if (filter == nullptr) {
-    layer->setFilter(mln::style::Filter{});
-    return MLN_STATUS_OK;
-  }
-
-  auto native_filter = to_native_style_filter(filter);
-  if (!native_filter) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setFilter(*native_filter);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
-  bool& out_found
-) -> mln_status {
-  out_found = false;
-  auto* layer =
-    map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-
-  const auto filter = layer->getFilter().serialize();
-  if (filter.is<mln::NullValue>()) {
-    return MLN_STATUS_OK;
-  }
-  out_filter = serialize_json_value(filter);
-  out_found = true;
-  return MLN_STATUS_OK;
-}
-
-namespace {
-
-auto resolve_layer_for_access(
-  MapObject& live, mln_buffer_view layer_id, mln::style::Layer*& out_layer
-) -> mln_status {
-  auto* layer =
-    map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  out_layer = layer;
-  return MLN_STATUS_OK;
-}
-
-// MapLibre's setProperty path logs a warning and does nothing when a layer type
-// takes no source, so the typed setters reject that case instead.
-auto require_layer_takes_source(
-  const mln::style::Layer& layer, const char* field
-) -> bool {
-  if (
-    layer.getTypeInfo()->source == mln::style::LayerTypeInfo::Source::Required
-  ) {
-    return true;
-  }
-  auto message = std::string{"layer type does not take a "} + field +
-                 "; layer id is " + layer.getID();
-  set_thread_error(message.c_str());
-  return false;
-}
-
-// MapLibre stores the layer zoom range as floats, and infinities survive the
-// narrowing that bounds a layer to one end of the range.
-auto validate_layer_zoom(double zoom, const char* field) -> bool {
-  if (!std::isnan(zoom)) {
-    return true;
-  }
-  auto message = std::string{field} + " must not be NaN";
-  set_thread_error(message.c_str());
-  return false;
-}
-
-}  // namespace
-
-auto map_set_layer_source_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!require_layer_takes_source(*layer, "source-layer")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setSourceLayer(string_from_view(source_layer));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_source_id(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!require_layer_takes_source(*layer, "source")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setSourceID(string_from_view(source_id));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_min_zoom(
-  MapObject& live, mln_buffer_view layer_id, double min_zoom
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_layer_zoom(min_zoom, "min_zoom")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setMinZoom(static_cast<float>(min_zoom));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_max_zoom(
-  MapObject& live, mln_buffer_view layer_id, double max_zoom
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_layer_zoom(max_zoom, "max_zoom")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setMaxZoom(static_cast<float>(max_zoom));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_visibility(
-  MapObject& live, mln_buffer_view layer_id, uint32_t visibility
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  auto native_visibility = mln::style::VisibilityType::Visible;
-  switch (visibility) {
-    case MLN_STYLE_LAYER_VISIBILITY_VISIBLE:
-      native_visibility = mln::style::VisibilityType::Visible;
-      break;
-    case MLN_STYLE_LAYER_VISIBILITY_NONE:
-      native_visibility = mln::style::VisibilityType::None;
-      break;
-    default:
-      set_thread_error("visibility is invalid");
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setVisibility(native_visibility);
   return MLN_STATUS_OK;
 }
 

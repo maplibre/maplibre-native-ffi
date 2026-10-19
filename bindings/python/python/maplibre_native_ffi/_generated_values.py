@@ -428,18 +428,6 @@ class GpuSyncKind(UnknownIntEnum):
     WEBGPU_TOKEN = 4
 
 
-class LocationIndicatorImageKind(UnknownIntEnum):
-    """Location indicator image-name properties.
-
-    See `mln_location_indicator_image_kind` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    TOP = 0
-    BEARING = 1
-    SHADOW = 2
-
-
 class LogEvent(UnknownIntEnum):
     """Log event categories emitted by MapLibre Native.
 

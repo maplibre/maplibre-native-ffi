@@ -15,30 +15,6 @@ public abstract class GeneratedMapOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Adds a color-relief layer for a raster DEM source.
-   *
-   * See `mln_map_add_color_relief_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun addColorReliefLayer(
-    layerId: String,
-    sourceId: String,
-    beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_color_relief_layer") {
-      check(
-        C.mln_map_add_color_relief_layer(
-          handle,
-          view(layerId),
-          view(sourceId),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Adds a custom geometry source.
    *
    * See `mln_map_add_custom_geometry_source` in the
@@ -129,30 +105,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Adds a hillshade layer for a raster DEM source.
-   *
-   * See `mln_map_add_hillshade_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun addHillshadeLayer(
-    layerId: String,
-    sourceId: String,
-    beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_hillshade_layer") {
-      check(
-        C.mln_map_add_hillshade_layer(
-          handle,
-          view(layerId),
-          view(sourceId),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Adds an image source with inline image pixels.
    *
    * See `mln_map_add_image_source_image` in the
@@ -196,28 +148,6 @@ public abstract class GeneratedMapOperations internal constructor() {
           array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           view(url),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Adds a source-free location indicator layer.
-   *
-   * See `mln_map_add_location_indicator_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun addLocationIndicatorLayer(
-    layerId: String,
-    beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_location_indicator_layer") {
-      check(
-        C.mln_map_add_location_indicator_layer(
-          handle,
-          view(layerId),
-          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -1103,25 +1033,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Serializes one layer filter as a style-spec JSON value.
-   *
-   * See `mln_map_get_style_layer_filter` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun getStyleLayerFilter(layerId: String): Deferred<ByteArray?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_style_layer_filter",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_layer_filter(handle, view(layerId), completion, diagnostic))
-    }
-
-  /**
    * Serializes one style layer as a full style-spec layer JSON object.
    *
    * See `mln_map_get_style_layer_json` in the
@@ -1970,98 +1881,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Sets a location indicator layer accuracy radius in meters.
-   *
-   * See `mln_map_set_location_indicator_accuracy_radius` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLocationIndicatorAccuracyRadius(
-    layerId: String,
-    radius: Double,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_location_indicator_accuracy_radius") {
-      check(
-        C.mln_map_set_location_indicator_accuracy_radius(
-          handle,
-          view(layerId),
-          radius,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets a location indicator layer bearing in degrees.
-   *
-   * See `mln_map_set_location_indicator_bearing` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLocationIndicatorBearing(
-    layerId: String,
-    bearing: Double,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_location_indicator_bearing") {
-      check(
-        C.mln_map_set_location_indicator_bearing(
-          handle,
-          view(layerId),
-          bearing,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets one location indicator image-name property.
-   *
-   * See `mln_map_set_location_indicator_image_name` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLocationIndicatorImageName(
-    layerId: String,
-    imageKind: LocationIndicatorImageKind,
-    imageId: String,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_location_indicator_image_name") {
-      check(
-        C.mln_map_set_location_indicator_image_name(
-          handle,
-          view(layerId),
-          imageKind.rawValue.toInt(),
-          view(imageId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets a location indicator layer location.
-   *
-   * See `mln_map_set_location_indicator_location` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLocationIndicatorLocation(
-    layerId: String,
-    coordinate: LatLng,
-    altitude: Double,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_location_indicator_location") {
-      check(
-        C.mln_map_set_location_indicator_location(
-          handle,
-          view(layerId),
-          writeLatLng(coordinate),
-          altitude,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Submits copied axonometric rendering option fields.
    *
    * See `mln_map_set_projection_mode` in the
@@ -2121,54 +1940,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Sets or clears one layer filter.
-   *
-   * See `mln_map_set_style_layer_filter` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerFilter(
-    layerId: String,
-    filter: ByteArray? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_filter") {
-      check(
-        C.mln_map_set_style_layer_filter(
-          handle,
-          view(layerId),
-          filter?.let { view(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets the highest zoom at which one layer draws.
-   *
-   * See `mln_map_set_style_layer_max_zoom` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_max_zoom") {
-      check(
-        C.mln_map_set_style_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic),
-      )
-    }
-
-  /**
-   * Sets the lowest zoom at which one layer draws.
-   *
-   * See `mln_map_set_style_layer_min_zoom` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_min_zoom") {
-      check(
-        C.mln_map_set_style_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic),
-      )
-    }
-
-  /**
    * Sets one layer property using its MapLibre style-spec property name.
    *
    * See `mln_map_set_style_layer_property` in the
@@ -2186,69 +1957,6 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(layerId),
           view(propertyName),
           view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets one layer's source ID.
-   *
-   * See `mln_map_set_style_layer_source_id` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerSourceId(layerId: String, sourceId: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_source_id") {
-      check(
-        C.mln_map_set_style_layer_source_id(
-          handle,
-          view(layerId),
-          view(sourceId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets one layer's source-layer ID.
-   *
-   * See `mln_map_set_style_layer_source_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerSourceLayer(
-    layerId: String,
-    sourceLayer: String? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_source_layer") {
-      check(
-        C.mln_map_set_style_layer_source_layer(
-          handle,
-          view(layerId),
-          view(sourceLayer),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Sets whether one layer draws.
-   *
-   * See `mln_map_set_style_layer_visibility` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setStyleLayerVisibility(
-    layerId: String,
-    visibility: StyleLayerVisibility,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_visibility") {
-      check(
-        C.mln_map_set_style_layer_visibility(
-          handle,
-          view(layerId),
-          visibility.rawValue.toInt(),
           completion,
           diagnostic,
         ),

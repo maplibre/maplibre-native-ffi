@@ -35,13 +35,13 @@ one that the style specification defines for that layer's type.
 
 <Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
-Set a filter to select which source features the layer draws. It uses the same
-JSON representation as a style property.
+Set the `filter` property to select which source features the layer draws.
+Pass JSON `null` to clear the filter.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-The host owns the byte storage. MapLibre parses or copies a property value or
-filter before the call returns.
+The host owns the byte storage. Each call copies the property value before it
+returns.
 
 Render the next map update to show the new appearance. The
 [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines property

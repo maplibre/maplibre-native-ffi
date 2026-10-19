@@ -34,8 +34,12 @@ mln_status add_hillshading(
 
   // #region layer
   // An empty before-layer ID puts the layer on top of the style.
-  return mln_map_add_hillshade_layer(
-    map, view("hillshading"), view("terrain"), view(""), layer_completion, NULL
+  return mln_map_add_style_layer_json(
+    map,
+    view(
+      "{\"id\":\"hillshading\",\"type\":\"hillshade\",\"source\":\"terrain\"}"
+    ),
+    view(""), layer_completion, NULL
   );
   // #endregion layer
 }

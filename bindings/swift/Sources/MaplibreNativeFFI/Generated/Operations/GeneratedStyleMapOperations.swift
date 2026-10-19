@@ -4,28 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Adds a color-relief layer for a raster DEM source.
-  ///
-  /// See `mln_map_add_color_relief_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addColorReliefLayer(
-    layerId bindingArg0: String,
-    sourceId bindingArg1: String,
-    beforeLayerId bindingArg2: String? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_color_relief_layer") { raw, arena, completion, diagnostic in
-      mln_map_add_color_relief_layer(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Adds a custom geometry source.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
@@ -108,28 +86,6 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a hillshade layer for a raster DEM source.
-  ///
-  /// See `mln_map_add_hillshade_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addHillshadeLayer(
-    layerId bindingArg0: String,
-    sourceId bindingArg1: String,
-    beforeLayerId bindingArg2: String? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_hillshade_layer") { raw, arena, completion, diagnostic in
-      mln_map_add_hillshade_layer(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Adds an image source with inline image pixels.
   ///
   /// See `mln_map_add_image_source_image` in the
@@ -170,26 +126,6 @@ public extension MapHandle {
         arena.array(bindingArg1.map { $0.nativeValue() }),
         NativeInputArena.count(bindingArg1.count),
         arena.view(bindingArg3),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a source-free location indicator layer.
-  ///
-  /// See `mln_map_add_location_indicator_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addLocationIndicatorLayer(
-    layerId bindingArg0: String,
-    beforeLayerId bindingArg1: String? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_location_indicator_layer") { raw, arena, completion, diagnostic in
-      mln_map_add_location_indicator_layer(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
         completion,
         diagnostic
       )
@@ -459,29 +395,6 @@ public extension MapHandle {
         ))
       }
     ) { raw, arena, completion, diagnostic in mln_map_get_style_layer(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Serializes one layer filter as a style-spec JSON value.
-  ///
-  /// See `mln_map_get_style_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLayerFilter(layerId bindingArg0: String) async throws -> Data? {
-    try await nativeStart(
-      "mln_map_get_style_layer_filter",
-      convert: { result in
-        if result.pointee
-          .value_count == 0
-        {
-          return nil
-        }; return try NativeCompletion
-          .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_filter(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -984,90 +897,6 @@ public extension MapHandle {
     }
   }
 
-  /// Sets a location indicator layer accuracy radius in meters.
-  ///
-  /// See `mln_map_set_location_indicator_accuracy_radius` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLocationIndicatorAccuracyRadius(
-    layerId bindingArg0: String,
-    radius bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_location_indicator_accuracy_radius") { raw, arena, completion, diagnostic in
-      mln_map_set_location_indicator_accuracy_radius(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets a location indicator layer bearing in degrees.
-  ///
-  /// See `mln_map_set_location_indicator_bearing` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLocationIndicatorBearing(
-    layerId bindingArg0: String,
-    bearing bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_location_indicator_bearing") { raw, arena, completion, diagnostic in
-      mln_map_set_location_indicator_bearing(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one location indicator image-name property.
-  ///
-  /// See `mln_map_set_location_indicator_image_name` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLocationIndicatorImageName(
-    layerId bindingArg0: String,
-    imageKind bindingArg1: LocationIndicatorImageKind,
-    imageId bindingArg2: String
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_location_indicator_image_name") { raw, arena, completion, diagnostic in
-      mln_map_set_location_indicator_image_name(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.nativeValue(),
-        arena.view(bindingArg2),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets a location indicator layer location.
-  ///
-  /// See `mln_map_set_location_indicator_location` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLocationIndicatorLocation(
-    layerId bindingArg0: String,
-    coordinate bindingArg1: LatLng,
-    altitude bindingArg2: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_location_indicator_location") { raw, arena, completion, diagnostic in
-      mln_map_set_location_indicator_location(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.nativeValue(),
-        bindingArg2,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Sets one runtime style image.
   ///
   /// See `mln_map_set_style_image` in the
@@ -1090,66 +919,6 @@ public extension MapHandle {
     }
   }
 
-  /// Sets or clears one layer filter.
-  ///
-  /// See `mln_map_set_style_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerFilter(
-    layerId bindingArg0: String,
-    filter bindingArg1: Data? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_filter") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_filter(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.store(arena.view($0)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets the highest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_max_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerMaxZoom(
-    layerId bindingArg0: String,
-    maxZoom bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_max_zoom") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_max_zoom(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets the lowest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_min_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerMinZoom(
-    layerId bindingArg0: String,
-    minZoom bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_min_zoom") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_min_zoom(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Sets one layer property using its MapLibre style-spec property name.
   ///
   /// See `mln_map_set_style_layer_property` in the
@@ -1166,66 +935,6 @@ public extension MapHandle {
         arena.view(bindingArg0),
         arena.view(bindingArg1),
         arena.view(bindingArg2),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one layer's source ID.
-  ///
-  /// See `mln_map_set_style_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerSourceId(
-    layerId bindingArg0: String,
-    sourceId bindingArg1: String
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_source_id") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_source_id(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one layer's source-layer ID.
-  ///
-  /// See `mln_map_set_style_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerSourceLayer(
-    layerId bindingArg0: String,
-    sourceLayer bindingArg1: String? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_source_layer") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_source_layer(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets whether one layer draws.
-  ///
-  /// See `mln_map_set_style_layer_visibility` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setStyleLayerVisibility(
-    layerId bindingArg0: String,
-    visibility bindingArg1: StyleLayerVisibility
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_visibility") { raw, arena, completion, diagnostic in
-      mln_map_set_style_layer_visibility(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.nativeValue(),
         completion,
         diagnostic
       )

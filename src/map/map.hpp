@@ -241,13 +241,6 @@ auto make_style_image(
 auto validate_image_source_coordinates(
   const mln_lat_lng* coordinates, size_t coordinate_count
 ) -> mln_status;
-auto validate_location_indicator_location_command(
-  mln_lat_lng coordinate, double altitude
-) -> mln_status;
-auto validate_location_indicator_bearing_command(double bearing) -> mln_status;
-auto validate_location_indicator_accuracy_radius_command(double radius)
-  -> mln_status;
-auto validate_location_indicator_image_kind(uint32_t image_kind) -> mln_status;
 
 auto create_map_start(
   mln_runtime runtime, const mln_map_options* options,
@@ -402,31 +395,6 @@ auto map_get_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id,
   std::vector<mln_lat_lng>& out_coordinates
 ) -> mln_status;
-auto map_add_hillshade_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status;
-auto map_add_color_relief_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status;
-auto map_add_location_indicator_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
-) -> mln_status;
-auto map_set_location_indicator_location(
-  MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude
-) -> mln_status;
-auto map_set_location_indicator_bearing(
-  MapObject& live, mln_buffer_view layer_id, double bearing
-) -> mln_status;
-auto map_set_location_indicator_accuracy_radius(
-  MapObject& live, mln_buffer_view layer_id, double radius
-) -> mln_status;
-auto map_set_location_indicator_image_name(
-  MapObject& live, mln_buffer_view layer_id, uint32_t image_kind,
-  mln_buffer_view image_id
-) -> mln_status;
 auto map_add_style_layer_json(
   MapObject& live, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status;
@@ -467,28 +435,6 @@ auto map_set_layer_property(
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   std::string& out_value, bool& out_found
-) -> mln_status;
-auto map_set_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
-) -> mln_status;
-auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
-  bool& out_found
-) -> mln_status;
-auto map_set_layer_source_layer(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer
-) -> mln_status;
-auto map_set_layer_source_id(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
-) -> mln_status;
-auto map_set_layer_min_zoom(
-  MapObject& live, mln_buffer_view layer_id, double min_zoom
-) -> mln_status;
-auto map_set_layer_max_zoom(
-  MapObject& live, mln_buffer_view layer_id, double max_zoom
-) -> mln_status;
-auto map_set_layer_visibility(
-  MapObject& live, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status;
 auto map_update_camera(
   mln_map map, const mln_camera_update* update, const mln_completion* completion

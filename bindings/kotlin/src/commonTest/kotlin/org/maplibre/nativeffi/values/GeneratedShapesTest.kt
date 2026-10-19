@@ -25,12 +25,10 @@ import org.maplibre.nativeffi.generated.RenderedQueryGeometry
 import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.StyleImageOptions
-import org.maplibre.nativeffi.generated.StyleLayerVisibility
 import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
-import org.maplibre.nativeffi.runtime.awaitFailed
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -156,11 +154,12 @@ class GeneratedShapesTest {
   @Test
   fun openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits(): Unit = runSuspendTest {
     withMap {
-      loadStyle("""{"version":8,"sources":{},"layers":[{"id":"bg","type":"background"}]}""")
       // The binding passes an unknown enum value through unchanged, and native rejects it.
-      map
-        .setStyleLayerVisibility("bg", StyleLayerVisibility(900u))
-        .awaitFailed(MaplibreStatus.INVALID_ARGUMENT)
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          GeneratedApi.networkSetStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
+        }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, error.nativeStatusCode)
 
       // A map's event source is its handle, whose top byte carries the handle kind.
       map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()

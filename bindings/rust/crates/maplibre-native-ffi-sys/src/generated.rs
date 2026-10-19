@@ -108,10 +108,6 @@ pub const MLN_GPU_SYNC_METAL_SHARED_EVENT: mln_gpu_sync_kind = 1;
 pub const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE: mln_gpu_sync_kind = 2;
 pub const MLN_GPU_SYNC_OPENGL_FENCE: mln_gpu_sync_kind = 3;
 pub const MLN_GPU_SYNC_WEBGPU_TOKEN: mln_gpu_sync_kind = 4;
-pub type mln_location_indicator_image_kind = u32;
-pub const MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP: mln_location_indicator_image_kind = 0;
-pub const MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING: mln_location_indicator_image_kind = 1;
-pub const MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW: mln_location_indicator_image_kind = 2;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;
@@ -1784,14 +1780,6 @@ unsafe extern "C" {
         out_height: *mut u32,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_color_relief_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_id: mln_buffer_view,
-        before_layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_add_custom_geometry_source(
         map: mln_map,
         source_id: mln_buffer_view,
@@ -1821,14 +1809,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_hillshade_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_id: mln_buffer_view,
-        before_layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_add_image_source_image(
         map: mln_map,
         source_id: mln_buffer_view,
@@ -1844,13 +1824,6 @@ unsafe extern "C" {
         coordinates: *const mln_lat_lng,
         coordinate_count: usize,
         url: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_location_indicator_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        before_layer_id: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2114,12 +2087,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_get_style_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_get_style_layer_filter(
         map: mln_map,
         layer_id: mln_buffer_view,
         completion: *const mln_completion,
@@ -2457,36 +2424,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_location_indicator_accuracy_radius(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        radius: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_location_indicator_bearing(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        bearing: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_location_indicator_image_name(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        image_kind: u32,
-        image_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_location_indicator_location(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        coordinate: mln_lat_lng,
-        altitude: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_projection_mode(
         map: mln_map,
         mode: *const mln_projection_mode,
@@ -2513,53 +2450,11 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_style_layer_filter(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        filter: *const mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_style_layer_max_zoom(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        max_zoom: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_style_layer_min_zoom(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        min_zoom: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_style_layer_property(
         map: mln_map,
         layer_id: mln_buffer_view,
         property_name: mln_buffer_view,
         value: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_style_layer_source_id(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_style_layer_source_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_layer: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_style_layer_visibility(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        visibility: u32,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

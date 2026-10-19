@@ -76,8 +76,7 @@ A raster-DEM source takes the same tile URL templates as a raster source.
 
 <Code code={region(rasterDemSnippet, "source")} lang="c" title="tile-source-raster-dem.c" />
 
-A hillshade layer requires a raster-DEM source. The dedicated hillshade-layer
-call adds it without a JSON layer object.
+Add a hillshade layer with a JSON object that names the raster-DEM source.
 
 <Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />
 

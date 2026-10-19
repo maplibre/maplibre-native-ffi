@@ -108,9 +108,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     defer fixture.destroy();
     try fixture.loadStyle();
 
-    const rejected = try support.resolve(try maplibre.mapSetStyleLayerVisibility(fixture.map, "background", @enumFromInt(900), null));
-    try testing.expectEqual(maplibre.CommandDisposition.failed, rejected.disposition);
-    try testing.expectError(error.InvalidArgument, rejected.statusError());
+    try testing.expectError(error.InvalidArgument, maplibre.networkSetStatus(@enumFromInt(900), null));
 
     // Cancelling the identifier ends only the ease that carries it, so the
     // identifier crossed whole both times. The end handler sits two records

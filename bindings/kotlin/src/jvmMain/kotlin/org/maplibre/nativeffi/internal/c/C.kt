@@ -101,17 +101,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_color_relief_layer =
-    Ffm.downcall(
-      "mln_map_add_color_relief_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_add_custom_geometry_source =
     Ffm.downcall(
       "mln_map_add_custom_geometry_source",
@@ -153,17 +142,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_hillshade_layer =
-    Ffm.downcall(
-      "mln_map_add_hillshade_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_add_image_source_image =
     Ffm.downcall(
       "mln_map_add_image_source_image",
@@ -184,16 +162,6 @@ internal actual object C {
       mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_location_indicator_layer =
-    Ffm.downcall(
-      "mln_map_add_location_indicator_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
       mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
@@ -503,15 +471,6 @@ internal actual object C {
   private val mln_map_get_style_layer =
     Ffm.downcall(
       "mln_map_get_style_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_get_style_layer_filter =
-    Ffm.downcall(
-      "mln_map_get_style_layer_filter",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -922,48 +881,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_location_indicator_accuracy_radius =
-    Ffm.downcall(
-      "mln_map_set_location_indicator_accuracy_radius",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_location_indicator_bearing =
-    Ffm.downcall(
-      "mln_map_set_location_indicator_bearing",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_location_indicator_image_name =
-    Ffm.downcall(
-      "mln_map_set_location_indicator_image_name",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_INT,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_location_indicator_location =
-    Ffm.downcall(
-      "mln_map_set_location_indicator_location",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_lat_lng,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_set_projection_mode =
     Ffm.downcall(
       "mln_map_set_projection_mode",
@@ -1002,36 +919,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_style_layer_filter =
-    Ffm.downcall(
-      "mln_map_set_style_layer_filter",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_style_layer_max_zoom =
-    Ffm.downcall(
-      "mln_map_set_style_layer_max_zoom",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_style_layer_min_zoom =
-    Ffm.downcall(
-      "mln_map_set_style_layer_min_zoom",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_set_style_layer_property =
     Ffm.downcall(
       "mln_map_set_style_layer_property",
@@ -1040,36 +927,6 @@ internal actual object C {
       mln_buffer_view,
       mln_buffer_view,
       mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_style_layer_source_id =
-    Ffm.downcall(
-      "mln_map_set_style_layer_source_id",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_style_layer_source_layer =
-    Ffm.downcall(
-      "mln_map_set_style_layer_source_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_style_layer_visibility =
-    Ffm.downcall(
-      "mln_map_set_style_layer_visibility",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1743,23 +1600,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_color_relief_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_color_relief_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(beforeLayerId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_add_custom_geometry_source(
     map: Long,
     sourceId: Long,
@@ -1822,23 +1662,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_hillshade_layer(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_hillshade_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(beforeLayerId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -1873,21 +1696,6 @@ internal actual object C {
       coordinates,
       coordinateCount,
       Ffm.value(url, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_location_indicator_layer(
-    map: Long,
-    layerId: Long,
-    beforeLayerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_location_indicator_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(beforeLayerId, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int
@@ -2367,19 +2175,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_map_get_style_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_get_style_layer_filter(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_get_style_layer_filter.invokeExact(
       map,
       Ffm.value(layerId, mln_buffer_view),
       completion,
@@ -2984,70 +2779,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_location_indicator_accuracy_radius(
-    map: Long,
-    layerId: Long,
-    radius: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_location_indicator_accuracy_radius.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      radius,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_location_indicator_bearing(
-    map: Long,
-    layerId: Long,
-    bearing: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_location_indicator_bearing.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      bearing,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_location_indicator_image_name(
-    map: Long,
-    layerId: Long,
-    imageKind: Int,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_location_indicator_image_name.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      imageKind,
-      Ffm.value(imageId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_location_indicator_location(
-    map: Long,
-    layerId: Long,
-    coordinate: Long,
-    altitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_location_indicator_location.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(coordinate, mln_lat_lng),
-      altitude,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_set_projection_mode(
     map: Long,
     mode: Long,
@@ -3094,51 +2825,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_style_layer_filter(
-    map: Long,
-    layerId: Long,
-    filter: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_filter.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      filter,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_layer_max_zoom(
-    map: Long,
-    layerId: Long,
-    maxZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_max_zoom.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      maxZoom,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_layer_min_zoom(
-    map: Long,
-    layerId: Long,
-    minZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_min_zoom.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      minZoom,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_set_style_layer_property(
     map: Long,
     layerId: Long,
@@ -3152,51 +2838,6 @@ internal actual object C {
       Ffm.value(layerId, mln_buffer_view),
       Ffm.value(propertyName, mln_buffer_view),
       Ffm.value(value, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_layer_source_id(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_source_id.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(sourceId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    sourceLayer: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_source_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      Ffm.value(sourceLayer, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_layer_visibility(
-    map: Long,
-    layerId: Long,
-    visibility: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_layer_visibility.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      visibility,
       completion,
       outDiagnostic,
     ) as Int

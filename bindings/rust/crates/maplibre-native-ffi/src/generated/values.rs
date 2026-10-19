@@ -1900,18 +1900,6 @@ impl FromNative<sys::mln_lat_lng_bounds> for LatLngBounds {
 }
 
 native_enum! {
-/// Location indicator image-name properties.
-///
-/// See `mln_location_indicator_image_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub enum LocationIndicatorImageKind: u32 {
-    Top = 0,
-    Bearing = 1,
-    Shadow = 2,
-} Unknown
-}
-
-native_enum! {
 /// Log event categories emitted by MapLibre Native.
 ///
 /// See `mln_log_event` in the

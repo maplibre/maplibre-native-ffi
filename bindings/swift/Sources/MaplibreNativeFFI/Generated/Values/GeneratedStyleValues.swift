@@ -567,23 +567,6 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
   }
 }
 
-/// Location indicator image-name properties.
-///
-/// See `mln_location_indicator_image_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct LocationIndicatorImageKind: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let top: LocationIndicatorImageKind = .init(rawValue: 0)
-  public static let bearing: LocationIndicatorImageKind = .init(rawValue: 1)
-  public static let shadow: LocationIndicatorImageKind = .init(rawValue: 2)
-}
-
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
 /// See `mln_premultiplied_rgba8_image` in the

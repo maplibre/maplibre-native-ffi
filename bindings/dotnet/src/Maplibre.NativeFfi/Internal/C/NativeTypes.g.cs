@@ -1363,13 +1363,6 @@ internal enum mln_gpu_sync_kind : uint
     MLN_GPU_SYNC_WEBGPU_TOKEN = 4,
 }
 
-internal enum mln_location_indicator_image_kind : uint
-{
-    MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0,
-    MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1,
-    MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
-}
-
 internal enum mln_log_event : uint
 {
     MLN_LOG_EVENT_GENERAL = 0,

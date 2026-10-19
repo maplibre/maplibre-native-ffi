@@ -448,20 +448,6 @@ public data class GpuSyncKind(public val rawValue: UInt) {
 }
 
 /**
- * Location indicator image-name properties.
- *
- * See `mln_location_indicator_image_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class LocationIndicatorImageKind(public val rawValue: UInt) {
-  public companion object {
-    public val TOP: LocationIndicatorImageKind = LocationIndicatorImageKind(0u)
-    public val BEARING: LocationIndicatorImageKind = LocationIndicatorImageKind(1u)
-    public val SHADOW: LocationIndicatorImageKind = LocationIndicatorImageKind(2u)
-  }
-}
-
-/**
  * Log event categories emitted by MapLibre Native.
  *
  * See `mln_log_event` in the
