@@ -50,6 +50,7 @@ bool mln_jni_upcall_long(
 // org.maplibre.nativeffi.internal.c.C, the Upcalls methods, and one C function
 // per upcall, in the order UpcallStubs indexes them.
 extern const JNINativeMethod mln_jni_methods[];
+extern const JNINativeMethod mln_jni_critical_methods[];
 extern const size_t mln_jni_method_count;
 extern mln_jni_upcall mln_jni_upcalls[];
 extern void* const mln_jni_upcall_stubs[];

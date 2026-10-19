@@ -31,7 +31,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           handle,
           view(layerId),
           view(sourceId),
-          view(beforeLayerId ?: ""),
+          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -97,7 +97,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_add_geojson_source_data(
           handle,
           view(sourceId),
-          data.binding.handle(),
+          argument(data, data.binding),
           completion,
           diagnostic,
         ),
@@ -145,7 +145,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           handle,
           view(layerId),
           view(sourceId),
-          view(beforeLayerId ?: ""),
+          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -217,7 +217,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_add_location_indicator_layer(
           handle,
           view(layerId),
-          view(beforeLayerId ?: ""),
+          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -341,7 +341,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_add_style_layer_json(
           handle,
           view(layerJson),
-          view(beforeLayerId ?: ""),
+          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -1536,7 +1536,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_move_style_layer(
           handle,
           view(layerId),
-          view(beforeLayerId ?: ""),
+          view(beforeLayerId),
           completion,
           diagnostic,
         ),
@@ -1847,7 +1847,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_set_geojson_source_data(
           handle,
           view(sourceId),
-          data.binding.handle(),
+          argument(data, data.binding),
           completion,
           diagnostic,
         ),
@@ -1897,14 +1897,14 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setGlobalStateProperty(
     propertyName: String,
-    valueValue: ByteArray,
+    value: ByteArray,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_global_state_property") {
       check(
         C.mln_map_set_global_state_property(
           handle,
           view(propertyName),
-          view(valueValue),
+          view(value),
           completion,
           diagnostic,
         ),
@@ -2177,7 +2177,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setStyleLayerProperty(
     layerId: String,
     propertyName: String,
-    valueValue: ByteArray,
+    value: ByteArray,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_layer_property") {
       check(
@@ -2185,7 +2185,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           handle,
           view(layerId),
           view(propertyName),
-          view(valueValue),
+          view(value),
           completion,
           diagnostic,
         ),
@@ -2226,7 +2226,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         C.mln_map_set_style_layer_source_layer(
           handle,
           view(layerId),
-          view(sourceLayer ?: ""),
+          view(sourceLayer),
           completion,
           diagnostic,
         ),
@@ -2274,14 +2274,14 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setStyleLightProperty(
     propertyName: String,
-    valueValue: ByteArray,
+    value: ByteArray,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_light_property") {
       check(
         C.mln_map_set_style_light_property(
           handle,
           view(propertyName),
-          view(valueValue),
+          view(value),
           completion,
           diagnostic,
         ),

@@ -221,7 +221,7 @@ public object GeneratedApi {
   public fun httpHeaderTransformResponseSetHeader(
     response: HttpHeaderTransformResponse,
     name: String,
-    valueValue: String,
+    value: String,
   ): Unit =
     nativeRespond(
       response.bindingScope,
@@ -229,14 +229,14 @@ public object GeneratedApi {
       "mln_http_header_transform_response_set_header",
     ) {
       val nameUtf8 = name.encodeToByteArray()
-      val valueValueUtf8 = valueValue.encodeToByteArray()
+      val valueUtf8 = value.encodeToByteArray()
       check(
         C.mln_http_header_transform_response_set_header(
           handle,
           bytes(nameUtf8),
           nameUtf8.size.toLong(),
-          bytes(valueValueUtf8),
-          valueValueUtf8.size.toLong(),
+          bytes(valueUtf8),
+          valueUtf8.size.toLong(),
           diagnostic,
         ),
       )

@@ -22,6 +22,7 @@ import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.posix.calloc
+import platform.posix.malloc
 import platform.posix.memcpy
 import platform.posix.strlen
 
@@ -35,6 +36,11 @@ internal actual object NativeMemory {
     }
 
   actual fun free(address: Long) = platform.posix.free(address.toCPointer<ByteVar>())
+
+  actual fun allocateUninitialized(size: Long): Long =
+    malloc(maxOf(size, 1L).convert()).toLong().also {
+      if (it == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")
+    }
 
   private inline fun <reified T : CVariable> at(address: Long): CPointer<T> =
     requireNotNull(address.toCPointer<T>())

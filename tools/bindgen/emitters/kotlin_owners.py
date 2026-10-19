@@ -53,20 +53,8 @@ def release(bound, native, plans):
 
 
 def defaulted(parameter):
-    value = (
-        parameter.value.element
-        if parameter.value.kind == "reference"
-        else parameter.value
-    )
+    value = parameter.value.unwrapped
     return bool(parameter.value.nullable or parameter.value.optional or value.default)
-
-
-def enum_number(bound, symbol):
-    for value in bound.values.values():
-        for key, number in value.enum_values:
-            if key == symbol:
-                return number
-    raise ValueError(f"decision constant {symbol} has no enum value")
 
 
 def state_type(bound, native):
@@ -104,8 +92,8 @@ def owner(bound, native, plans):
             raise ValueError(
                 f"{native}: a decision owner releases through its disposal path"
             )
-        accept = enum_number(bound, choice.accept)
-        pass_through = enum_number(bound, choice.pass_through)
+        accept = bound.enum_number(choice.accept)
+        pass_through = bound.enum_number(choice.pass_through)
         body.append(
             f'  internal override val binding = DecisionOwnerState("{owner_class}", handle, accept = {accept}u, passThrough = {pass_through}u, dispose = dispose)'
         )

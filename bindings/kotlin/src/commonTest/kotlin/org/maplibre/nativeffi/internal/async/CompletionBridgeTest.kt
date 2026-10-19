@@ -60,7 +60,7 @@ internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 internal expect fun callCompletionRelease(release: Long, userData: Long)
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
-private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
+internal fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
   var fields: Triple<Long, Long, Long>? = null
   val deferred = submit { descriptor ->
     fields =
@@ -78,18 +78,26 @@ private fun generation(result: Long): ULong = readU64(result + CompletionResultL
 
 /** A completion whose value is its result's generation. */
 internal fun handDeliveredGeneration(): HandDeliveredCompletion<ULong> = capture { call ->
-  CompletionBridge.submit(::generation, call)
+  NativeArena().use { arena -> CompletionBridge.submit(arena, ::generation, call) }
 }
 
 /** An owned completion that hands a value nobody adopted to [closeDropped]. */
 internal fun handDeliveredOwned(closeDropped: (ULong) -> Unit): HandDeliveredCompletion<ULong> =
   capture { call ->
-    CompletionBridge.submitOwned(::generation, closeDropped, disposeUnadopted = {}, call = call)
+    NativeArena().use { arena ->
+      CompletionBridge.submitOwned(
+        arena,
+        ::generation,
+        closeDropped,
+        disposeUnadopted = {},
+        call = call,
+      )
+    }
   }
 
 /** An ordered command completion. */
 internal fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
-  CompletionBridge.command(call)
+  NativeArena().use { arena -> CompletionBridge.command(arena, call) }
 }
 
 /** The completion bridge and its upcall stubs, driven without native. */

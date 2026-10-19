@@ -1,5 +1,6 @@
 // The hand-written half of the Android JNI shim: native registration, native
 // memory access, and the upcall entry points. See mln_jni.h.
+#include <android/api-level.h>
 #include <android/log.h>
 #include <maplibre_native_c.h>
 #include <pthread.h>
@@ -103,42 +104,35 @@ bool mln_jni_upcall_long(
 // memcpy, which the compiler lowers to one load or store, so a caller's
 // alignment never matters.
 
-static jint mln_jni_address_size(JNIEnv* env, jclass type) {
-  (void)env;
-  (void)type;
-  return (jint)sizeof(void*);
-}
+static jint mln_jni_address_size(void) { return (jint)sizeof(void*); }
 
-static jlong mln_jni_allocate(JNIEnv* env, jclass type, jlong size) {
-  (void)env;
-  (void)type;
+static jlong mln_jni_allocate(jlong size) {
   if (size < 0 || (uint64_t)size > SIZE_MAX) {
     return 0;
   }
   return MLN_JNI_ADDRESS(calloc(1, size == 0 ? 1 : (size_t)size));
 }
 
-static void mln_jni_free(JNIEnv* env, jclass type, jlong address) {
-  (void)env;
-  (void)type;
+static jlong mln_jni_allocate_uninitialized(jlong size) {
+  if (size < 0 || (uint64_t)size > SIZE_MAX) {
+    return 0;
+  }
+  return MLN_JNI_ADDRESS(malloc(size == 0 ? 1 : (size_t)size));
+}
+
+static void mln_jni_free(jlong address) {
   free(MLN_JNI_POINTER(void*, address));
 }
 
 // Defines the getter and setter of one primitive Java type.
-#define MLN_JNI_ACCESSORS(name, java_type)                                  \
-  static java_type mln_jni_get_##name(JNIEnv* env, jclass type, jlong at) { \
-    (void)env;                                                              \
-    (void)type;                                                             \
-    java_type value;                                                        \
-    memcpy(&value, MLN_JNI_POINTER(const void*, at), sizeof value);         \
-    return value;                                                           \
-  }                                                                         \
-  static void mln_jni_put_##name(                                           \
-    JNIEnv* env, jclass type, jlong at, java_type value                     \
-  ) {                                                                       \
-    (void)env;                                                              \
-    (void)type;                                                             \
-    memcpy(MLN_JNI_POINTER(void*, at), &value, sizeof value);               \
+#define MLN_JNI_ACCESSORS(name, java_type)                          \
+  static java_type mln_jni_get_##name(jlong at) {                   \
+    java_type value;                                                \
+    memcpy(&value, MLN_JNI_POINTER(const void*, at), sizeof value); \
+    return value;                                                   \
+  }                                                                 \
+  static void mln_jni_put_##name(jlong at, java_type value) {       \
+    memcpy(MLN_JNI_POINTER(void*, at), &value, sizeof value);       \
   }
 
 MLN_JNI_ACCESSORS(byte, jbyte)
@@ -171,31 +165,74 @@ static void mln_jni_put_bytes(
   );
 }
 
-static jlong mln_jni_string_length(JNIEnv* env, jclass type, jlong address) {
-  (void)env;
-  (void)type;
+static jlong mln_jni_string_length(jlong address) {
   return (jlong)strlen(MLN_JNI_POINTER(const char*, address));
 }
 
+// API 24-25 ignore CriticalNative, so their entry points retain the JNI prefix.
+#define MLN_JNI_FALLBACK(result, name, parameters, arguments) \
+  static result name##_jni parameters {                       \
+    (void)env;                                                \
+    (void)type;                                               \
+    return name arguments;                                    \
+  }
+MLN_JNI_FALLBACK(jint, mln_jni_address_size, (JNIEnv * env, jclass type), ())
+MLN_JNI_FALLBACK(
+  jlong, mln_jni_allocate, (JNIEnv * env, jclass type, jlong size), (size)
+)
+MLN_JNI_FALLBACK(
+  jlong, mln_jni_allocate_uninitialized,
+  (JNIEnv * env, jclass type, jlong size), (size)
+)
+MLN_JNI_FALLBACK(
+  void, mln_jni_free, (JNIEnv * env, jclass type, jlong address), (address)
+)
+MLN_JNI_FALLBACK(
+  jlong, mln_jni_string_length, (JNIEnv * env, jclass type, jlong address),
+  (address)
+)
+#define MLN_JNI_ACCESSOR_FALLBACK(name, java_type)                             \
+  MLN_JNI_FALLBACK(                                                            \
+    java_type, mln_jni_get_##name, (JNIEnv * env, jclass type, jlong at), (at) \
+  )                                                                            \
+  MLN_JNI_FALLBACK(                                                            \
+    void, mln_jni_put_##name,                                                  \
+    (JNIEnv * env, jclass type, jlong at, java_type value), (at, value)        \
+  )
+MLN_JNI_ACCESSOR_FALLBACK(byte, jbyte)
+MLN_JNI_ACCESSOR_FALLBACK(short, jshort)
+MLN_JNI_ACCESSOR_FALLBACK(int, jint)
+MLN_JNI_ACCESSOR_FALLBACK(long, jlong)
+MLN_JNI_ACCESSOR_FALLBACK(float, jfloat)
+MLN_JNI_ACCESSOR_FALLBACK(double, jdouble)
+
+#define MLN_JNI_MEMORY_METHODS(suffix)                               \
+  {"addressSizeNative", "()I", (void*)mln_jni_address_size##suffix}, \
+    {"allocateNative", "(J)J", (void*)mln_jni_allocate##suffix},     \
+    {"allocateUninitializedNative", "(J)J",                          \
+     (void*)mln_jni_allocate_uninitialized##suffix},                 \
+    {"free", "(J)V", (void*)mln_jni_free##suffix},                   \
+    {"getByte", "(J)B", (void*)mln_jni_get_byte##suffix},            \
+    {"putByte", "(JB)V", (void*)mln_jni_put_byte##suffix},           \
+    {"getShort", "(J)S", (void*)mln_jni_get_short##suffix},          \
+    {"putShort", "(JS)V", (void*)mln_jni_put_short##suffix},         \
+    {"getInt", "(J)I", (void*)mln_jni_get_int##suffix},              \
+    {"putInt", "(JI)V", (void*)mln_jni_put_int##suffix},             \
+    {"getLong", "(J)J", (void*)mln_jni_get_long##suffix},            \
+    {"putLong", "(JJ)V", (void*)mln_jni_put_long##suffix},           \
+    {"getFloat", "(J)F", (void*)mln_jni_get_float##suffix},          \
+    {"putFloat", "(JF)V", (void*)mln_jni_put_float##suffix},         \
+    {"getDouble", "(J)D", (void*)mln_jni_get_double##suffix},        \
+    {"putDouble", "(JD)V", (void*)mln_jni_put_double##suffix},       \
+    {"stringLength", "(J)J", (void*)mln_jni_string_length##suffix},  \
+    {"getBytes", "(JI)[B", (void*)mln_jni_get_bytes},                \
+    {"putBytes", "(J[B)V", (void*)mln_jni_put_bytes},
+
 static const JNINativeMethod mln_jni_memory_methods[] = {
-  {"addressSizeNative", "()I", (void*)mln_jni_address_size},
-  {"allocateNative", "(J)J", (void*)mln_jni_allocate},
-  {"free", "(J)V", (void*)mln_jni_free},
-  {"getByte", "(J)B", (void*)mln_jni_get_byte},
-  {"putByte", "(JB)V", (void*)mln_jni_put_byte},
-  {"getShort", "(J)S", (void*)mln_jni_get_short},
-  {"putShort", "(JS)V", (void*)mln_jni_put_short},
-  {"getInt", "(J)I", (void*)mln_jni_get_int},
-  {"putInt", "(JI)V", (void*)mln_jni_put_int},
-  {"getLong", "(J)J", (void*)mln_jni_get_long},
-  {"putLong", "(JJ)V", (void*)mln_jni_put_long},
-  {"getFloat", "(J)F", (void*)mln_jni_get_float},
-  {"putFloat", "(JF)V", (void*)mln_jni_put_float},
-  {"getDouble", "(J)D", (void*)mln_jni_get_double},
-  {"putDouble", "(JD)V", (void*)mln_jni_put_double},
-  {"getBytes", "(JI)[B", (void*)mln_jni_get_bytes},
-  {"putBytes", "(J[B)V", (void*)mln_jni_put_bytes},
-  {"stringLength", "(J)J", (void*)mln_jni_string_length},
+  MLN_JNI_MEMORY_METHODS(_jni)
+};
+static const JNINativeMethod mln_jni_memory_critical_methods[] = {
+  MLN_JNI_MEMORY_METHODS()
 };
 
 // org.maplibre.nativeffi.internal.c.Jni.
@@ -247,13 +284,22 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_ERR;
   }
   mln_jni_vm = vm;
+  const int api_level = android_get_device_api_level();
+  if (api_level < 0) {
+    MLN_JNI_LOG("cannot read the Android API level");
+    return JNI_ERR;
+  }
+  const bool critical = api_level >= 26;
   if (
     pthread_key_create(&mln_jni_detach_key, mln_jni_detach) != 0 ||
     !mln_jni_register(
-      env, MLN_JNI_PACKAGE "c/C", mln_jni_methods, mln_jni_method_count
+      env, MLN_JNI_PACKAGE "c/C",
+      critical ? mln_jni_critical_methods : mln_jni_methods,
+      mln_jni_method_count
     ) ||
     !mln_jni_register(
-      env, MLN_JNI_PACKAGE "memory/NativeMemory", mln_jni_memory_methods,
+      env, MLN_JNI_PACKAGE "memory/NativeMemory",
+      critical ? mln_jni_memory_critical_methods : mln_jni_memory_methods,
       sizeof mln_jni_memory_methods / sizeof mln_jni_memory_methods[0]
     ) ||
     !mln_jni_register(

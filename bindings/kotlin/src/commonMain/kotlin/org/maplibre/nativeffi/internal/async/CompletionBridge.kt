@@ -65,32 +65,35 @@ internal object CompletionBridge {
     }
   }
 
-  fun <T> submit(convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> =
-    submitInternal(convert, false, call)
+  fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> =
+    submitInternal(arena, convert, false, call)
 
   /**
    * Submits a completion that produces an owned handle wrapper, handing the wrapper to
    * [closeDropped] when the caller cancelled the deferred before the value arrived.
    */
   fun <T> submitOwned(
+    arena: NativeArena,
     convert: (Long) -> T,
     closeDropped: (T) -> Unit,
     disposeUnadopted: (Long) -> Unit,
     call: (Long) -> Unit,
   ): Deferred<T> =
     submitInternal(
+      arena,
       { result -> adoptOwned(result, disposeUnadopted, convert) },
       false,
       call,
       closeDropped,
     )
 
-  fun unit(call: (Long) -> Unit): Deferred<Unit> = submit({}, call)
+  fun unit(arena: NativeArena, call: (Long) -> Unit): Deferred<Unit> = submit(arena, {}, call)
 
-  fun command(call: (Long) -> Unit): Deferred<CommandCompletion> =
-    submitInternal(::commandCompletion, true, call)
+  fun command(arena: NativeArena, call: (Long) -> Unit): Deferred<CommandCompletion> =
+    submitInternal(arena, ::commandCompletion, true, call)
 
   private fun <T> submitInternal(
+    arena: NativeArena,
     convert: (Long) -> T,
     acceptErrorStatus: Boolean,
     call: (Long) -> Unit,
@@ -100,14 +103,12 @@ internal object CompletionBridge {
     val token = NativeRoots.retain(state)
     pending.addAndFetch(1)
     try {
-      NativeArena().use { arena ->
-        val completion = arena.allocate(CompletionLayout.SIZEOF)
-        writeU32(completion + CompletionLayout.SIZE, CompletionLayout.SIZEOF.toUInt())
-        writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
-        writeAddress(completion + CompletionLayout.USER_DATA, token)
-        writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
-        call(completion)
-      }
+      val completion = arena.allocate(CompletionLayout.SIZEOF)
+      writeU32(completion + CompletionLayout.SIZE, CompletionLayout.SIZEOF.toUInt())
+      writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
+      writeAddress(completion + CompletionLayout.USER_DATA, token)
+      writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
+      call(completion)
     } catch (failure: Throwable) {
       // A throw from [call] means native rejected the submission, which then never takes the
       // token, so nothing else releases it. Nothing in [call] may throw once native accepted.
@@ -119,7 +120,7 @@ internal object CompletionBridge {
 
   /** Delivers the result that native passes to the `mln_completion_callback`. */
   fun complete(userData: Long, result: Long) {
-    if (result != 0L) (NativeRoots.get(userData) as? State<*>)?.complete(result)
+    (NativeRoots.get(userData) as? State<*>)?.complete(result)
   }
 
   /** Drops the state once native calls the completion's `release_user_data`. */

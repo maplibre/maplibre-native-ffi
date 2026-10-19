@@ -41,25 +41,37 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 
 
 def lower(api: Api | BoundApi):
+    functions, unsupported, *_ = lowered(api)
+    return functions, unsupported
+
+
+def lowered(api: Api | BoundApi):
     functions, unsupported = [], {}
     bound = compile_api(api)
-    api = bound.source
+    values = Values(bound)
+    native = Native(bound)
+    bodies = {}
+    for value in bound.public_values.values():
+        if value.kind == "enum":
+            values.check(value)
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     conflicts = conflicting_functions(bound, "kotlin")
+    groups = {}
     for plan in bound.operations:
+        receiver = receiver_value(plan).native if plan.receiver else None
+        groups.setdefault(receiver, []).append(plan)
+    for plan in (plan for plans in groups.values() for plan in plans):
         function = plan.function
         try:
             if function.name in conflicts:
                 raise Unsupported("public method name collides after conversion")
-            values = Values(bound)
-            operation(plan, values, Native(bound))
-            values.codecs()
-            functions.append(function)
+            bodies[function.name] = operation(plan, values, native)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
-    return functions, unsupported
+    functions = [plan.function for plan in bound.operations if plan.name in bodies]
+    return functions, unsupported, bodies, values, native
 
 
 def callback_owner(bound, receiver):
@@ -78,12 +90,7 @@ def callback_owner(bound, receiver):
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
     bound = compile_api(api)
-    functions, _ = lower(bound)
-    values = Values(bound)
-    native = Native(bound)
-    for value in bound.public_values.values():
-        if value.kind == "enum":
-            values.check(value)
+    functions, _, rendered, values, native = lowered(bound)
     groups = {}
     for function in functions:
         plan = bound.operations_by_name[function.name]
@@ -93,10 +100,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         groups.setdefault(owner, [])
     outputs = {}
     for receiver, plans in groups.items():
-        bodies = [
-            doc(bound, plan.name, "  ") + operation(plan, values, native)
-            for plan in plans
-        ]
+        bodies = [doc(bound, plan.name, "  ") + rendered[plan.name] for plan in plans]
         header = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"
@@ -137,18 +141,12 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n\n"
         + owner_disposal(bound, native)
     )
-    codecs = values.codecs()
-    outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = codecs.replace(
-        "import org.maplibre.nativeffi.internal.c.C\n",
-        "import org.maplibre.nativeffi.internal.c.C\n"
-        "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
-        "import org.maplibre.nativeffi.internal.call.NativeCall\n"
-        "import org.maplibre.nativeffi.render.NativePointer\n",
-    )
+    outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = values.codecs()
     outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
     outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
-    called = {**native.functions, **values.functions}
-    shims = NativeShims(bound, called, kotlin_callbacks.sites(values).values())
+    shims = NativeShims(
+        bound, native.functions, kotlin_callbacks.sites(values).values()
+    )
     outputs[f"{COMMON}/internal/c/C.kt"] = shims.common()
     outputs[f"{COMMON}/internal/c/RuntimeLayouts.kt"] = shims.runtime_layouts()
     for directory, platform in PLATFORMS.items():

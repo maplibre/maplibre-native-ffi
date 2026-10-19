@@ -9,7 +9,7 @@ def operation(plan, values):
 
     view = plan.view
     output = view.output.value
-    value = output.element if output.kind == "reference" else output
+    value = output.unwrapped
     values.add(value)
     public = values.public(value)
     scoped = public + "View"

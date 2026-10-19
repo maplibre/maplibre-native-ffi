@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from ..model import CType, Function
 from ..protocol import COMPLETION, COMPLETION_RESULT, DIAGNOSTIC
+from ..semantic import DefaultSupport, DeliverySupport
 from .kotlin_abi import (
     POINTER,
     Abi,
@@ -175,7 +176,37 @@ class NativeShims:
         self.abi = Abi(bound.source)
         self.sites = list(sites)
         self.signatures = [self.signature(f) for _, f in sorted(functions.items())]
+        self.critical = {
+            plan.name
+            for plan in (*bound.operations, *bound.runtime_operations)
+            if self.critical_native(plan)
+        }
         self.layouts = {}
+
+    @staticmethod
+    def critical_native(plan):
+        # Defaults, published snapshots, and event drains neither wait for work
+        # nor invoke host code. Other immediate calls can wait or release callbacks;
+        # submissions can deliver their completion inline, including on rejection.
+        # A delivery queue drain can wake its queue again, which runs host code.
+        def has_callback(value):
+            return (
+                value.kind == "callback"
+                or value.registration is not None
+                or (value.element is not None and has_callback(value.element))
+                or any(has_callback(field.value) for field in value.fields)
+            )
+
+        return (
+            (
+                isinstance(plan.support, DefaultSupport)
+                or plan.execution in {"snapshot", "event_batch"}
+            )
+            and not isinstance(plan.support, DeliverySupport)
+            and not plan.completion
+            and not plan.registrations
+            and not any(has_callback(parameter.value) for parameter in plan.inputs)
+        )
 
     def classify(self, ctype):
         if ctype.kind == "void" or ctype.spelling == "void":
@@ -237,13 +268,15 @@ class NativeShims:
             (COMPLETION, "CompletionLayout"),
             (COMPLETION_RESULT, "CompletionResultLayout"),
             (DIAGNOSTIC, "DiagnosticLayout"),
+            ("mln_render_abandon_result", "RenderAbandonResultLayout"),
         ):
             if record not in self.bound.source.records_by_name:
                 continue
             narrow = self.abi.record_named(record, 32)
             wide = self.abi.record_named(record, 64)
             members = [
-                f"  val SIZEOF: Int = {width_expression((narrow.size, wide.size))}"
+                f"  val SIZEOF: Int = {width_expression((narrow.size, wide.size))}",
+                f"  val ALIGNOF: Int = {width_expression((narrow.align, wide.align))}",
             ]
             for field, offset in wide.offsets.items():
                 members.append(
@@ -481,7 +514,8 @@ class NativeShims:
 
     def android(self):
         externals = [
-            f"  @JvmStatic actual external fun {s.function}({self.kotlin_parameters(s)}): {s.carrier}"
+            ("  @CriticalNative\n" if s.function in self.critical else "")
+            + f"  @JvmStatic actual external fun {s.function}({self.kotlin_parameters(s)}): {s.carrier}"
             for s in self.signatures
         ]
         stubs = [
@@ -491,6 +525,7 @@ class NativeShims:
         kotlin = (
             HEADER
             + f"package {PACKAGE}\n\n"
+            + "import dalvik.annotation.optimization.CriticalNative\n\n"
             + "/** The JNI native behind each C function, registered by `src/androidMain/jni`. */\n"
             + "internal actual object C {\n"
             + "  init {\n    Jni.load()\n  }\n\n"
@@ -518,11 +553,10 @@ class NativeShims:
         return f"({spelling}){parameter.c_name}"
 
     def jni(self):
-        functions, methods = [], []
+        functions, methods, critical_methods = [], [], []
         for s in self.signatures:
-            parameters = ["JNIEnv* env", "jclass type"] + [
-                f"{JNI_TYPE[p.carrier]} {p.c_name}" for p in s.parameters
-            ]
+            carriers = [f"{JNI_TYPE[p.carrier]} {p.c_name}" for p in s.parameters]
+            parameters = ["JNIEnv* env", "jclass type", *carriers]
             arguments = [self.c_argument(p) for p in s.parameters if not p.returned]
             call = f"{s.function}({', '.join(arguments)})"
             if isinstance(s.result, Record):
@@ -535,6 +569,12 @@ class NativeShims:
                 body = f"return MLN_JNI_ADDRESS({call});"
             else:
                 body = f"return ({JNI_TYPE[s.carrier]}){call};"
+            if s.function in self.critical:
+                functions.append(
+                    f"static {JNI_TYPE[s.carrier]} {s.function}_critical({', '.join(carriers) or 'void'}) {{\n  {body}\n}}"
+                )
+                forward = f"{s.function}_critical({', '.join(p.c_name for p in s.parameters)});"
+                body = ("return " if s.carrier != "Unit" else "") + forward
             functions.append(
                 f"static {JNI_TYPE[s.carrier]} {s.function}_jni({', '.join(parameters)}) {{\n  {body}\n}}"
             )
@@ -546,6 +586,10 @@ class NativeShims:
             )
             methods.append(
                 f'  {{"{s.function}", "{descriptor}", (void*){s.function}_jni}},'
+            )
+            target = "critical" if s.function in self.critical else "jni"
+            critical_methods.append(
+                f'  {{"{s.function}", "{descriptor}", (void*){s.function}_{target}}},'
             )
         upcalls, entries, stubs = [], [], []
         for index, site in enumerate(self.sites):
@@ -604,6 +648,9 @@ class NativeShims:
             + "\n".join(methods)
             + "\n};\nconst size_t mln_jni_method_count =\n"
             + "  sizeof mln_jni_methods / sizeof mln_jni_methods[0];\n\n"
+            + "const JNINativeMethod mln_jni_critical_methods[] = {\n"
+            + "\n".join(critical_methods)
+            + "\n};\n\n"
             + "mln_jni_upcall mln_jni_upcalls[] = {\n"
             + "\n".join(entries)
             + "\n};\n\n"

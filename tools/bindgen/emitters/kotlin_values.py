@@ -165,14 +165,7 @@ class Values:
         self.attachments = {}
         self.writers = {}
         self.readers = {}
-        self.functions = {}
         self.sites = None
-
-    def default_call(self, value):
-        """Initialize a record at `target` with its C default constructor."""
-        function = self.bound.source.functions_by_name[value.default]
-        self.functions[function.name] = function
-        return f"C.{function.name}(target)"
 
     def needs_registration(self, value):
         return bool(
@@ -565,7 +558,7 @@ class Values:
         if callback is not None:
             return callback
         if value.kind == "handle":
-            return f"{expression}.binding.handle()"
+            return f"argument({expression}, {expression}.binding)"
         if value.kind == "native_pointer":
             return f"{expression}.address"
         if value.kind == "reference":
@@ -593,9 +586,6 @@ class Values:
             )
             return f"{expression}?.let {{ {written} }} ?: 0L" if nullable else written
         if value.kind == "buffer" and value.buffer_form == "view":
-            if value.optional:
-                empty = '""' if value.encoding == "utf8" else "byteArrayOf()"
-                return f"view({expression} ?: {empty})"
             return f"view({expression})"
         if value.kind == "buffer" and value.length == "nul":
             if value.nullable or value.optional:
@@ -646,28 +636,19 @@ class Values:
         lines = [
             f"internal fun {receiver}.{self.put(value)}(target: Long, value: {public}) {{"
         ]
-        if value.default:
-            lines.append("  " + self.default_call(value) + "")
-        else:
-            for field in value.fields:
-                if field.role == "size":
-                    lines.append(
-                        "  "
-                        + self.write_scalar(
-                            field.value,
-                            self.at("target", value, field.name),
-                            f"{self.size(value.native)}.toUInt()",
-                        )
-                    )
         for field in value.fields:
-            if field.role == "presence_mask" and value.default:
+            if field.role == "size":
                 lines.append(
                     "  "
                     + self.write_scalar(
                         field.value,
                         self.at("target", value, field.name),
-                        literal(0, self.scalar(field.value)[0]),
+                        f"{self.size(value.native)}.toUInt()",
                     )
+                )
+            if field.role == "presence_mask":
+                lines.append(
+                    f"  var {identifier(field.name)} = {literal(0, self.scalar(field.value)[0])}"
                 )
         for flag in value.mask_flags:
             member = self.flag_name(value, flag)
@@ -691,6 +672,16 @@ class Values:
                 lines.append("  }")
             else:
                 lines += ["  " + line for line in body]
+        for field in value.fields:
+            if field.role == "presence_mask":
+                lines.append(
+                    "  "
+                    + self.write_scalar(
+                        field.value,
+                        self.at("target", value, field.name),
+                        identifier(field.name),
+                    )
+                )
         lines.append("}")
         lines.append(
             f"internal fun {receiver}.{self.write(value)}(value: {public}): Long = "
@@ -710,11 +701,7 @@ class Values:
     def write_count(self, record, value, expression):
         count = self.field_plan(record, value.length)
         typ = self.scalar(count.value)[0]
-        size = (
-            f"{expression}.encodeToByteArray().size"
-            if (value.kind == "buffer" and value.encoding == "utf8")
-            else f"{expression}.size"
-        )
+        size = f"{expression}.size"
         if value.nullable or value.optional:
             size = size.replace(f"{expression}.", f"{expression}?.", 1) + " ?: 0"
             size = f"({size})"
@@ -738,19 +725,9 @@ class Values:
         return address == "it" and self.accessor(size.value)[0] == "U32"
 
     def mark(self, record, mask, bit):
-        mask_field = self.field_plan(record, mask)
-        address = self.at("target", record, mask)
-        typ = self.scalar(mask_field.value)[0]
-        number = next(
-            number
-            for e in self.bound.values.values()
-            for key, number in e.enum_values
-            if key == bit
-        )
-        suffix = self.accessor(mask_field.value)[0]
-        if suffix == "U32":
-            return f"markPresent({address}, {literal(number, typ)})"
-        return f"write{suffix}({address}, read{suffix}({address}) or {literal(number, typ)})"
+        typ = self.scalar(self.field_plan(record, mask).value)[0]
+        local = identifier(mask)
+        return f"{local} = {local} or {literal(self.bound.enum_number(bit), typ)}"
 
     def union_write(self, record, field, expression):
         public = name(record.native) + pascal(field.name)
@@ -760,7 +737,7 @@ class Values:
         tag_type = self.scalar(tag.value)[0]
         lines = [f"  when (val variant = {expression}) {{"]
         for variant in field.value.fields:
-            number = self.enum_number(variant.presence.variant)
+            number = self.bound.enum_number(variant.presence.variant)
             lines.append(
                 f"    is {public}.{pascal(variant.name)} -> {{ "
                 + self.write_scalar(tag.value, tag_address, literal(number, tag_type))
@@ -778,18 +755,10 @@ class Values:
                 )
             )
         lines.append(
-            f'    is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
+            f'    is {public}.Unknown -> throw Status.invalidArgument("unknown native union variants cannot be submitted")'
         )
         lines.append("  }")
         return lines
-
-    def enum_number(self, symbol):
-        return next(
-            number
-            for value in self.bound.values.values()
-            for key, number in value.enum_values
-            if key == symbol
-        )
 
     def read(self, record):
         """Name the reader of [record], emitting it once."""
@@ -867,6 +836,21 @@ class Values:
                 if item.encoding == "utf8"
                 else "ByteArray = byteArrayOf()"
             )
+        locals = []
+        for field in value.fields:
+            if field.role == "presence_mask":
+                suffix, _ = self.accessor(field.value)
+                locals.append(
+                    f"val {identifier(field.name)} = read{suffix}({self.at('source', value, field.name)})"
+                )
+        for field in self.fields(value):
+            if field.value.item_buffer:
+                item = field.value.item_buffer
+                local = identifier(field.name)
+                locals.append(
+                    f"val {local}Data = readAddress({self.at('source', value, item.data)})"
+                )
+                locals.append(f"val {local}Size = {self.read_count(value, item.size)}")
         arguments = []
         for flag in value.mask_flags:
             arguments.append(
@@ -888,6 +872,12 @@ class Values:
         body = f"{public}(" + ", ".join(arguments) + ")"
         if scoped:
             body += ".also { it.bindingScope = scope }"
+        if locals:
+            return (
+                f"internal fun {self.read(value)}({parameters}): {public} {{\n  "
+                + "\n  ".join(locals)
+                + f"\n  return {body}\n}}"
+            )
         return f"internal fun {self.read(value)}({parameters}): {public} = {body}"
 
     def field_read(self, record, field, scope):
@@ -908,20 +898,22 @@ class Values:
             element = value.element
             if value.stride:
                 stride = self.read_count(record, value.stride)
-                item = self.decode_item(element, "item", value.item_buffer, record)
+                item = self.decode_item(
+                    element, "item", value.item_buffer, record, identifier(field.name)
+                )
                 return f"readStrided({pointer}, {count}, {stride}, {self.element_size(element)}) {{ item -> {item} }}"
             item = self.decode_item(element, "item", None, record)
             return f"readArray({pointer}, {count}, {self.element_size(element)}.toLong()) {{ item -> {item} }}"
         return self.decode(value, address, scope)
 
-    def decode_item(self, element, address, item_buffer, record):
+    def decode_item(self, element, address, item_buffer, record, local=None):
         if element.kind == "buffer":
             return self.decode(element, address)
         reader = self.read(element)
         if not item_buffer:
             return f"{reader}({address})"
-        data = f"readAddress({self.at('source', record, item_buffer.data)})"
-        size = self.read_count(record, item_buffer.size)
+        data = local + "Data"
+        size = local + "Size"
         offset = self.item_count(element, address, item_buffer.offset)
         length = self.item_count(element, address, item_buffer.length)
         message = f"readItem({data}, {size}, {offset}, {length})"
@@ -945,11 +937,10 @@ class Values:
 
     def present(self, base, record, mask, bit):
         mask_field = self.field_plan(record, mask)
-        address = self.at(base, record, mask)
-        suffix, typ = self.accessor(mask_field.value)
-        number = self.enum_number(bit)
+        _suffix, typ = self.accessor(mask_field.value)
+        number = self.bound.enum_number(bit)
         zero = literal(0, typ)
-        return f"(read{suffix}({address}) and {literal(number, typ)}) != {zero}"
+        return f"({identifier(mask)} and {literal(number, typ)}) != {zero}"
 
     def union_read(self, record, field):
         public = name(record.native) + pascal(field.name)
@@ -958,7 +949,7 @@ class Values:
         union = self.at("source", record, field.name)
         arms = []
         for variant in field.value.fields:
-            number = self.enum_number(variant.presence.variant)
+            number = self.bound.enum_number(variant.presence.variant)
             arms.append(
                 f"{literal(number, tag_type)} -> {public}.{pascal(variant.name)}({self.decode(variant.value, union)})"
             )
@@ -1006,6 +997,10 @@ class Values:
             "// Generated by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi.generated\n\n"
             "import org.maplibre.nativeffi.internal.c.C\n"
+            "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
+            "import org.maplibre.nativeffi.internal.call.NativeCall\n"
+            "import org.maplibre.nativeffi.internal.status.Status\n"
+            "import org.maplibre.nativeffi.render.NativePointer\n"
             + (
                 "import org.maplibre.nativeffi.internal.lifecycle.ViewScope\n"
                 if self.views

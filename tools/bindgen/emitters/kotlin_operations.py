@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..managed_contracts import LOCALS
 from ..semantic import output_member
 from .kotlin_values import Unsupported, identifier, name, owner_name
 
@@ -22,6 +21,32 @@ EXECUTIONS = {
     "render_driver",
     "lifecycle",
     "event_batch",
+}
+
+LOCALS = {
+    "handle",
+    "completion",
+    "diagnostic",
+    "out",
+    "raw",
+    "holder",
+    "registrations",
+    "binding",
+    "bindingCallbacks",
+    "scope",
+    "block",
+    "adopt",
+    "adoptRegistered",
+    "attach",
+    "allocate",
+    "sized",
+    "check",
+    "present",
+    "argument",
+    "array",
+    "bytes",
+    "cString",
+    "view",
 }
 
 
@@ -64,7 +89,7 @@ def parameter_name(native):
 
 def receiver_value(plan):
     value = next(p.value for p in plan.inputs if p.name == plan.receiver)
-    return value.element if value.kind == "reference" else value
+    return value.unwrapped
 
 
 def method_name(plan):
@@ -87,14 +112,7 @@ def needs_read(plan):
         and not plan.consumes
         and not plan.owned_outputs
         and not plan.view
-        and any(
-            copies_borrowed(
-                output.value.element
-                if output.value.kind == "reference"
-                else output.value
-            )
-            for output in plan.outputs
-        )
+        and any(copies_borrowed(output.value.unwrapped) for output in plan.outputs)
     )
 
 
@@ -115,10 +133,9 @@ def signature(plan, values):
     if (
         plan.registrations
         and any(not registration.path for registration in plan.registrations)
+        and not plan.completion
     ) or plan.scoped_receiver:
         raise Unsupported("operation requires an owner or callback transaction")
-    if plan.view:
-        values.views.add(plan.outputs[0].value.element.native)
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
     if receiver and receiver_value(plan).native not in values.bound.public_handles:
         raise Unsupported("operation requires its generated owner")
@@ -172,11 +189,7 @@ def outputs_signature(plan, values):
     result_name = name(plan.name) + "Result"
     fields = []
     for parameter in plan.outputs:
-        value = (
-            parameter.value.element
-            if parameter.value.kind == "reference"
-            else parameter.value
-        )
+        value = parameter.value.unwrapped
         values.check(value)
         if value.kind not in {"scalar", "enum", "record", "buffer"}:
             raise Unsupported("output parameter requires copied value storage")
@@ -347,7 +360,6 @@ def operation(plan, values, native):
     callback = kotlin_callbacks.operation(plan, values, native)
     if callback is not None:
         return callback
-    method, params, _inputs, result, result_type = signature(plan, values)
     if plan.consumes:
         return lifecycle(plan, values, native)
     if len(plan.outputs) > 1:
@@ -358,6 +370,7 @@ def operation(plan, values, native):
         return owned(plan, values, native)
     if not plan.completion:
         return immediate(plan, values, native)
+    method, params, _inputs, result, result_type = signature(plan, values)
     arguments = call_arguments(plan, values) + ["completion"]
     body = encodings(plan) + native.checked(plan.function, arguments)
     head = f"  public fun {method}({declaration(params)}): Deferred<{result_type}> ="
@@ -503,13 +516,13 @@ def owned(plan, values, native):
 
 def lifecycle(plan, values, native):
     method, params, inputs, _result, _result_type = signature(plan, values)
+    if receiver_value(plan).native in {
+        decision.handle.native for decision in values.bound.decisions.values()
+    }:
+        return f"  public fun {method}(): Unit = binding.close()\n"
     defaults = {}
     for (local, _typ), parameter in zip(params, inputs, strict=True):
-        value = (
-            parameter.value.element
-            if parameter.value.kind == "reference"
-            else parameter.value
-        )
+        value = parameter.value.unwrapped
         if value.default and not _typ.endswith("?"):
             defaults[local] = (
                 "GeneratedApi."
@@ -545,6 +558,7 @@ def lifecycle(plan, values, native):
 
 
 def view(plan, values, native):
+    values.views.add(plan.outputs[0].value.element.native)
     method, _params, _inputs, result, result_type = signature(plan, values)
     method = identifier("with_" + plan.view.stem)
     functions = values.bound.source.functions_by_name
@@ -573,9 +587,12 @@ def owner_disposal(bound, native):
         method = name(handle.native)
         method = method[0].lower() + method[1:]
         function = bound.source.functions_by_name[handle.dispose]
-        call = native.checked(function, ["handle"])
+        call = (
+            native.call(function, ["handle"])
+            if not function.diagnostic
+            else native.status(function, ["handle"])
+        )
         if function.diagnostic:
-            call = call.removeprefix("check(").removesuffix(")")
             call = "NativeDiagnostics.check { diagnostic -> " + call + " }"
         lines.append(
             f'  fun {method}(handle: Long) {{ CallbackAdmission.check(handle, "{handle.dispose}"); {call} }}'

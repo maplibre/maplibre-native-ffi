@@ -497,13 +497,7 @@ class Values:
             ):
                 for field in union.fields:
                     variant_name = self.variant_name(union, field)
-                    tag = next(
-                        number
-                        for p in parent.fields
-                        if p.name == union.tag
-                        for key, number in p.value.enum_values
-                        if key == field.presence.variant
-                    )
+                    tag = self.api.enum_number(field.presence.variant)
                     python.append(
                         f"@dataclass(frozen=True, slots=True)\nclass {variant_name}:\n"
                         + docs.docstring(

@@ -23,6 +23,8 @@ internal object Upcalls {
   fun releaseRoot(userData: Long): Unit =
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
+  private val logHandlerCallbackAllowed: Set<String> = setOf()
+
   @JvmStatic
   fun logHandlerCallback(
     userData: Long,
@@ -31,7 +33,9 @@ internal object Upcalls {
     code: Long,
     message: Long,
   ): Int =
-    upcall<LogHandler, Int>("mln_log_callback", userData, 0, setOf()) { value, scope ->
+    upcall<LogHandler, Int>("mln_log_callback", userData, 0, logHandlerCallbackAllowed) {
+      value,
+      scope ->
       value
         .callback(
           LogSeverity(severity.toUInt()),
@@ -90,22 +94,28 @@ internal object Upcalls {
       invoke(readCanonicalTileId(tileId))
     }
 
+  private val resourceRequestCancelHandlerCallbackAllowed: Set<String> =
+    setOf(
+      "mln_resource_request_complete",
+      "mln_resource_request_is_cancelled",
+      "mln_resource_request_set_cancel_callback",
+      "mln_resource_request_release",
+    )
+
   @JvmStatic
   fun resourceRequestCancelHandlerCallback(userData: Long): Unit =
     upcall<ResourceRequestCancelHandler, Unit>(
       "mln_resource_request_cancel_callback",
       userData,
       Unit,
-      setOf(
-        "mln_resource_request_complete",
-        "mln_resource_request_is_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-      ),
+      resourceRequestCancelHandlerCallbackAllowed,
       { it.owner },
     ) { value, scope ->
       value.callback()
     }
+
+  private val httpHeaderTransformCallbackAllowed: Set<String> =
+    setOf("mln_http_header_transform_response_set_header")
 
   @JvmStatic
   fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
@@ -113,7 +123,7 @@ internal object Upcalls {
       "mln_http_header_transform_callback",
       userData,
       -5,
-      setOf("mln_http_header_transform_response_set_header"),
+      httpHeaderTransformCallbackAllowed,
       { outResponse },
     ) { value, scope ->
       val invoke = value.callback ?: return@upcall -5
@@ -125,18 +135,21 @@ internal object Upcalls {
       0
     }
 
+  private val resourceProviderCallbackAllowed: Set<String> =
+    setOf(
+      "mln_resource_request_complete",
+      "mln_resource_request_is_cancelled",
+      "mln_resource_request_set_cancel_callback",
+      "mln_resource_request_release",
+    )
+
   @JvmStatic
   fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
     upcall<ResourceProvider, Int>(
       "mln_resource_provider_callback",
       userData,
       0,
-      setOf(
-        "mln_resource_request_complete",
-        "mln_resource_request_is_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-      ),
+      resourceProviderCallbackAllowed,
       { handle },
     ) { value, scope ->
       val decisionOwner = ResourceRequestHandle(handle)
@@ -147,13 +160,16 @@ internal object Upcalls {
         .toInt()
     }
 
+  private val resourceTransformCallbackAllowed: Set<String> =
+    setOf("mln_resource_transform_response_set_url")
+
   @JvmStatic
   fun resourceTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
     upcall<ResourceTransform, Int>(
       "mln_resource_transform_callback",
       userData,
       -5,
-      setOf("mln_resource_transform_response_set_url"),
+      resourceTransformCallbackAllowed,
       { outResponse },
     ) { value, scope ->
       val invoke = value.callback ?: return@upcall -5
@@ -172,16 +188,24 @@ internal object Upcalls {
       invoke()
     }
 
+  private val queueLockLockAllowed: Set<String> = setOf()
+
   @JvmStatic
   fun queueLockLock(userData: Long): Unit =
-    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, setOf()) { value, scope ->
+    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, queueLockLockAllowed) {
+      value,
+      scope ->
       val invoke = value.lock ?: return@upcall Unit
       invoke()
     }
 
+  private val queueLockUnlockAllowed: Set<String> = setOf()
+
   @JvmStatic
   fun queueLockUnlock(userData: Long): Unit =
-    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, setOf()) { value, scope ->
+    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, queueLockUnlockAllowed) {
+      value,
+      scope ->
       val invoke = value.unlock ?: return@upcall Unit
       invoke()
     }

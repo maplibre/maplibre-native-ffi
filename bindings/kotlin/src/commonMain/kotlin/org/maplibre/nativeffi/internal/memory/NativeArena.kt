@@ -4,7 +4,9 @@ import org.maplibre.nativeffi.internal.status.Status
 
 /** Pointers allocated here expire when the C call returns. */
 internal open class NativeArena : AutoCloseable {
-  private val blocks = ArrayList<Long>(2)
+  private var firstBlock = 0L
+  private var blocks: LongArray? = null
+  private var blockCount = 0
   private var cursor = 0L
   private var limit = 0L
 
@@ -28,18 +30,35 @@ internal open class NativeArena : AutoCloseable {
   fun sized(size: Int, alignment: Int): Long =
     allocate(size, alignment).also { writeU32(it, size.toUInt()) }
 
-  private fun block(size: Long): Long = NativeMemory.allocate(size).also { blocks.add(it) }
+  private fun block(size: Long, zeroed: Boolean = true): Long {
+    if (firstBlock != 0L) {
+      val existing = blocks
+      if (existing == null) blocks = LongArray(2)
+      else if (blockCount == existing.size) blocks = existing.copyOf(existing.size * 2)
+    }
+    val address =
+      if (zeroed) NativeMemory.allocate(size) else NativeMemory.allocateUninitialized(size)
+    if (firstBlock == 0L) firstBlock = address else requireNotNull(blocks)[blockCount++] = address
+    return address
+  }
 
   /** Copies [value] and returns its address, which is valid even when [value] is empty. */
   fun bytes(value: ByteArray): Long =
-    allocate(maxOf(value.size, 1), 1).also {
-      if (value.isNotEmpty()) NativeMemory.putBytes(it, value)
-    }
+    (if (value.size > BLOCK_SIZE / 4) block(value.size.toLong(), false)
+      else allocate(maxOf(value.size, 1), 1))
+      .also {
+        if (value.isNotEmpty()) NativeMemory.putBytes(it, value)
+      }
 
   /** Copies [value] as NUL-terminated UTF-8, refusing an embedded NUL that C would truncate at. */
   fun cString(value: String): Long {
     Status.requireArgument('\u0000' !in value) { "text contains an embedded NUL" }
-    return bytes(value.encodeToByteArray() + byteArrayOf(0))
+    val encoded = value.encodeToByteArray()
+    val size = encoded.size.toLong() + 1
+    return (if (size > BLOCK_SIZE / 4) block(size, false) else allocate(size, 1)).also {
+      NativeMemory.putBytes(it, encoded)
+      NativeMemory.putByte(it + encoded.size, 0)
+    }
   }
 
   fun putView(address: Long, value: ByteArray?) {
@@ -63,8 +82,10 @@ internal open class NativeArena : AutoCloseable {
   }
 
   override fun close() {
-    blocks.forEach(NativeMemory::free)
-    blocks.clear()
+    if (firstBlock != 0L) NativeMemory.free(firstBlock)
+    blocks?.let { for (index in 0 until blockCount) NativeMemory.free(it[index]) }
+    firstBlock = 0L
+    blockCount = 0
     cursor = 0L
     limit = 0L
   }

@@ -26,6 +26,7 @@ class Site:
     result_carrier: str
     body: str
     failure: str = "0"
+    allowed: str | None = None
 
 
 def status_callback(callback):
@@ -198,15 +199,7 @@ def failure_literal(callback, values):
     if callback.result.native == "void":
         return "Unit"
     symbol = callback.failure
-    number = next(
-        (
-            number
-            for value in values.bound.values.values()
-            for key, number in value.enum_values
-            if key == symbol
-        ),
-        None,
-    )
+    number = values.bound.enum_numbers.get(symbol)
     if number is None:
         try:
             number = int(symbol, 0) if symbol else 0
@@ -267,6 +260,8 @@ def callback_site(site_name, callback_value, member, root_type, values):
         )
         + ")"
     )
+    allowed_value = allowed
+    allowed = "null" if allowed == "null" else site_name + "Allowed"
     failure = failure_literal(callback, values)
     result = carrier(callback.result, values)
     parameters = []
@@ -321,6 +316,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
         result,
         body,
         failure,
+        None if allowed_value == "null" else allowed_value,
     )
     return site_name
 
@@ -341,6 +337,10 @@ def upcalls(values):
     entries = []
     for site in sites(values).values():
         parameters = ", ".join(f"{local}: {typ}" for local, _c, typ in site.parameters)
+        if site.allowed is not None:
+            entries.append(
+                f"  private val {site.name}Allowed: Set<String> = {site.allowed}"
+            )
         entries.append(
             f"  @JvmStatic fun {site.name}({parameters}): {site.result_carrier} = {site.body}"
         )
@@ -370,8 +370,13 @@ def put_function(value, values):
     lines = [
         f"internal fun NativeCall.{values.put(value)}(target: Long, value: {public_name}) {{"
     ]
-    if value.default:
-        lines.append("  " + values.default_call(value) + "")
+    for field in value.fields:
+        if field.role == "presence_mask":
+            from .kotlin_values import literal
+
+            lines.append(
+                f"  var {identifier(field.name)} = {literal(0, values.scalar(field.value)[0])}"
+            )
     size = next((f for f in value.fields if f.role == "size"), None)
     if size:
         lines.append(
@@ -393,6 +398,16 @@ def put_function(value, values):
             lines.append(f"  {expression}?.let {{ {mark}; {'; '.join(writes)} }}")
         else:
             lines += ["  " + line for line in writes]
+    for field in value.fields:
+        if field.role == "presence_mask":
+            lines.append(
+                "  "
+                + values.write_scalar(
+                    field.value,
+                    values.at("target", value, field.name),
+                    identifier(field.name),
+                )
+            )
     # With every callback nullable, the descriptor stays unregistered when all
     # are absent. A lone callback is then known present past that return.
     all_nullable = all(f.value.nullable for f in callbacks)
@@ -437,6 +452,13 @@ def read_function(value, values):
     """Copy a registration's native default, whose callbacks are unset."""
     public_name = name(value.native)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+    locals = []
+    for field in value.fields:
+        if field.role == "presence_mask":
+            suffix, _ = values.accessor(field.value)
+            locals.append(
+                f"val {identifier(field.name)} = read{suffix}({values.at('source', value, field.name)})"
+            )
     arguments = []
     for member, _typ, field in values.members(value):
         if field in callbacks:
@@ -446,10 +468,14 @@ def read_function(value, values):
         if field.presence and field.presence.mask:
             decoded = f"if ({values.present('source', value, field.presence.mask, field.presence.bit)}) {decoded} else null"
         arguments.append(f"{member} = {decoded}")
-    return (
-        f"internal fun {values.read(value)}(source: Long): {public_name} = "
-        f"{public_name}({', '.join(arguments)})"
-    )
+    body = f"{public_name}({', '.join(arguments)})"
+    if locals:
+        return (
+            f"internal fun {values.read(value)}(source: Long): {public_name} {{\n  "
+            + "\n  ".join(locals)
+            + f"\n  return {body}\n}}"
+        )
+    return f"internal fun {values.read(value)}(source: Long): {public_name} = {body}"
 
 
 def operation(plan, values, native):
@@ -458,7 +484,6 @@ def operation(plan, values, native):
         declaration,
         encodings,
         parameter_name,
-        receiver_arguments,
     )
 
     decision = next(
@@ -513,18 +538,7 @@ def operation(plan, values, native):
         raise Unsupported(
             "callback registration needs its native admission transaction"
         )
-    inputs = [p for p in plan.inputs if p.name != plan.receiver]
-    params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
-    receiver = next(p for p in plan.inputs if p.name == plan.receiver)
-    method = identifier(plan.name.removeprefix(receiver.value.native + "_"))
-    arguments = call_arguments(plan, values) + ["completion"]
-    helper = "nativeCommand" if plan.execution == "command" else "nativeUnit"
-    result = "CommandCompletion" if plan.execution == "command" else "Unit"
-    return (
-        f"  public fun {method}({', '.join(f'{n}: {t}' for n, t in params)}): Deferred<{result}> = "
-        f'{helper}({receiver_arguments(plan)}, "{plan.name}", bindingCallbacks) '
-        f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
-    )
+    return None
 
 
 def immediate_registration(plan, values, native):

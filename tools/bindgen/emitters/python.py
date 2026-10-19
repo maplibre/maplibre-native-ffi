@@ -369,9 +369,7 @@ def operation(
     outputs = []
     product = None
     for output in plan.outputs:
-        value = (
-            output.value.element if output.value.kind == "reference" else output.value
-        )
+        value = output.value.unwrapped
         if value is None:
             raise unsupported(function, "output requires an element value")
         if (

@@ -98,6 +98,8 @@ BACKPORTED_MEMBERS = frozenset(
 # reasoning rather than being silently tolerated.
 ALLOWED_ABOVE_FLOOR = frozenset(
     {
+        # ART 26-33 honors this hidden annotation; 24-25 ignores it and uses the fallback method table.
+        "dalvik/annotation/optimization/CriticalNative",
         # BindingKeepAlive uses this only when SDK_INT >= 28; API 24-27 use
         # an AtomicReference publication and compare-and-set fence instead.
         "java/lang/ref/Reference#reachabilityFence(Ljava/lang/Object;)V",

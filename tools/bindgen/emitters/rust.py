@@ -232,7 +232,7 @@ def reads_receiver(plan: OperationPlan) -> bool:
     from .rust_dynamic_values import dynamic
 
     def borrowed(value):
-        target = value.element if value.kind == "reference" else value
+        target = value.unwrapped
         return "owner" in {value.lifetime, target.lifetime} or dynamic(target)
 
     return bool(

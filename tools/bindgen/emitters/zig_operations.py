@@ -39,7 +39,7 @@ RESERVED = {
 
 
 def element(value):
-    return value.element if value.kind == "reference" else value
+    return value.unwrapped
 
 
 def validate_input(function, name, value):

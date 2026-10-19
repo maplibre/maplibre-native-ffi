@@ -163,6 +163,10 @@ class ValuePlan:
     # meaning, as with coordinates, so a binding may construct it positionally.
     ordered: bool = False
 
+    @property
+    def unwrapped(self) -> ValuePlan:
+        return self.element if self.kind == "reference" else self
+
 
 # Field roles that hold control state: a struct's size, reserved space, an
 # array's count or stride, an item arena, a presence mask, a union tag, a
@@ -393,6 +397,17 @@ class BoundApi:
     # operation's output or result, a callback's argument, or a record default
     # reaches. A copy leaves a callback registration field unset.
     returned: frozenset[str] = frozenset()
+
+    @functools.cached_property
+    def enum_numbers(self) -> dict[str, int]:
+        return {
+            member.name: member.value
+            for enum in self.source.enums
+            for member in enum.values
+        }
+
+    def enum_number(self, symbol: str) -> int:
+        return self.enum_numbers[symbol]
 
     @functools.cached_property
     def docs(self) -> dict[str, docs.Doc]:

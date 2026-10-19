@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.RenderAbandonResultLayout
 import org.maplibre.nativeffi.internal.c.Upcalls
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
@@ -118,8 +119,7 @@ internal class ExitSessions {
  */
 private fun abandonAtExit(handle: Long) {
   NativeArena().use { call ->
-    // sizeof(mln_render_abandon_result), with uint32_t alignment.
-    val out = call.sized(16, 4)
+    val out = call.sized(RenderAbandonResultLayout.SIZEOF, RenderAbandonResultLayout.ALIGNOF)
     C.mln_render_session_abandon(handle, out, NativeDiagnostics.buffer())
   }
 }

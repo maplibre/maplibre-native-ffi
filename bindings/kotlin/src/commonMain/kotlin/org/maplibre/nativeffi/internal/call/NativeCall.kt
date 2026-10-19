@@ -23,8 +23,15 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /** Callback registrations remain rooted only if the native call accepts them. */
-internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeArena() {
+internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeArena() {
   private var scope: CallbackRegistrationScope? = null
+  private var arguments: MutableList<Any>? = null
+
+  fun argument(owner: Any, state: OwnerState): Long {
+    val retained = arguments ?: ArrayList<Any>(1).also { arguments = it }
+    retained.add(owner)
+    return state.handle()
+  }
 
   val diagnostic: Long
     get() = NativeDiagnostics.buffer()
@@ -83,7 +90,7 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     result: (RenderSessionHandle, Deferred<Unit>) -> R,
   ): R {
     val out = allocate(8)
-    val ready = CompletionBridge.unit { completion -> check(submit(out, completion)) }
+    val ready = CompletionBridge.unit(this) { completion -> check(submit(out, completion)) }
     val owner =
       if (callbacks == null) adopt(out, dispose, create)
       else adoptRegistered(out, dispose, create, callbacks, drop)
@@ -127,8 +134,12 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     }
 
   override fun close() {
-    scope?.close()
-    super.close()
+    try {
+      scope?.close()
+      super.close()
+    } finally {
+      arguments?.forEach { bindingKeepAlive(it) }
+    }
   }
 }
 
@@ -184,7 +195,9 @@ internal fun <T> nativeSubmit(
   body: NativeCall.() -> Unit,
 ): Deferred<T> =
   receive(owner, state, name, Access.LIVE) { handle ->
-    CompletionBridge.submit(decode) { completion -> run(handle, completion, callbacks, body) }
+    NativeCall(handle).use { call ->
+      CompletionBridge.submit(call, decode) { completion -> run(call, completion, callbacks, body) }
+    }
   }
 
 internal fun nativeUnit(
@@ -195,7 +208,9 @@ internal fun nativeUnit(
   body: NativeCall.() -> Unit,
 ): Deferred<Unit> =
   receive(owner, state, name, Access.LIVE) { handle ->
-    CompletionBridge.unit { completion -> run(handle, completion, callbacks, body) }
+    NativeCall(handle).use { call ->
+      CompletionBridge.unit(call) { completion -> run(call, completion, callbacks, body) }
+    }
   }
 
 /**
@@ -210,7 +225,9 @@ internal fun nativeCommand(
   body: NativeCall.() -> Unit,
 ): Deferred<CommandCompletion> =
   receive(owner, state, name, Access.LIVE) { handle ->
-    CompletionBridge.command { completion -> run(handle, completion, callbacks, body) }
+    NativeCall(handle).use { call ->
+      CompletionBridge.command(call) { completion -> run(call, completion, callbacks, body) }
+    }
   }
 
 /**
@@ -227,25 +244,27 @@ internal fun <T> nativeSubmitOwned(
   body: NativeCall.() -> Unit,
 ): Deferred<T> =
   receive(owner, state, name, Access.LIVE) { handle ->
-    CompletionBridge.submitOwned(
-      { result -> adopt(readI64(CompletionBridge.value(result))) },
-      drop,
-      { result -> dispose(readI64(CompletionBridge.value(result))) },
-    ) { completion ->
-      run(handle, completion, null, body)
+    NativeCall(handle).use { call ->
+      CompletionBridge.submitOwned(
+        call,
+        { result -> adopt(readI64(CompletionBridge.value(result))) },
+        drop,
+        { result -> dispose(readI64(CompletionBridge.value(result))) },
+      ) { completion ->
+        run(call, completion, null, body)
+      }
     }
   }
 
 private fun run(
-  handle: Long,
+  call: NativeCall,
   completion: Long,
   callbacks: CallbackOwner?,
   body: NativeCall.() -> Unit,
 ) {
-  NativeCall(handle, completion).use { call ->
-    call.body()
-    if (callbacks != null) call.accept(callbacks)
-  }
+  call.completion = completion
+  call.body()
+  if (callbacks != null) call.accept(callbacks)
 }
 
 /** Runs the C operation [name] that answers [state]'s decision, keeping it retryable on refusal. */
@@ -300,8 +319,10 @@ internal fun nativeRetire(
     state.retireHandle { handle ->
       CallbackAdmission.check(handle, name)
       // Native roots the conversion until it releases the completion, including terminal callbacks.
-      CompletionBridge.submit({ bindingKeepAlive(owner) }) { completion ->
-        NativeCall(handle, completion).use { it.body() }
+      NativeCall(handle).use { call ->
+        CompletionBridge.submit(call, { bindingKeepAlive(owner) }) { completion ->
+          run(call, completion, null, body)
+        }
       }
     }
   } finally {

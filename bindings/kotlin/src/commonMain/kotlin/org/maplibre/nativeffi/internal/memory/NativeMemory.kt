@@ -14,6 +14,9 @@ internal expect object NativeMemory {
   /** Allocates [size] zeroed bytes aligned for any C type, throwing when native memory runs out. */
   fun allocate(size: Long): Long
 
+  /** Allocates bytes that the caller must initialize before reading. */
+  fun allocateUninitialized(size: Long): Long
+
   fun free(address: Long)
 
   fun getByte(address: Long): Byte

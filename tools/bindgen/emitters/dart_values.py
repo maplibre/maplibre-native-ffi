@@ -523,7 +523,7 @@ class Values:
         return result
 
     def enum_constant(self, bit):
-        if not any(v.name == bit for e in self.bound.source.enums for v in e.values):
+        if bit not in self.bound.enum_numbers:
             raise Unsupported(f"{bit}: no C enum declares this constant")
         return f"raw.{bit}"
 
@@ -869,14 +869,7 @@ class Values:
             children.append(
                 f"final class {variant} extends {public} {{\n  const {variant}(this.value) : super._();\n  final {typ} value;\n  @override bool operator ==(Object other) => other is {variant} && other.value == value;\n  @override int get hashCode => value.hashCode;\n}}"
             )
-            tag = str(
-                next(
-                    item.value
-                    for enum in self.bound.source.enums
-                    for item in enum.values
-                    if item.name == arm.presence.variant
-                )
-            )
+            tag = str(self.bound.enum_number(arm.presence.variant))
             writes.append(
                 f"    case {variant}():\n      result.ref.{union.presence.tag} = {tag};\n      result.ref.{union.name}.{arm.name} = {self.native(arm.value, 'value.value')};"
             )
@@ -961,12 +954,7 @@ class Values:
                 doc(self.bound, f"{union.value.native}.{arm.name}")
                 + f"final class {variant} extends {payload} {{\n  const {variant}(this.value) : super._();\n  final {typ} value;\n}}"
             )
-            tag = next(
-                item.value
-                for enum in self.bound.source.enums
-                for item in enum.values
-                if item.name == arm.presence.variant
-            )
+            tag = self.bound.enum_number(arm.presence.variant)
             cases.append(
                 f"    case {variant}(:final value):\n      result.ref.{union.presence.tag} = {tag};\n      result.ref.{union.name}.{arm.name} = {self.native(arm.value, 'value')};"
             )

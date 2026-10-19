@@ -47,11 +47,7 @@ def validate(values, plan):
                 continue
             if callback.decision and parameter.name == callback.decision.parameter:
                 continue
-            response = (
-                parameter.value.element
-                if parameter.value.kind == "reference"
-                else parameter.value
-            )
+            response = parameter.value.unwrapped
             if parameter.direction != "in" and not response.response:
                 values.fail(plan, "callback output requires a scoped response")
             values.supported(parameter.value)
@@ -136,11 +132,7 @@ def sources(values, plan):
         def copy_parameter(parameter, callback=callback, owner=decision_owner):
             if callback.decision and parameter.name == callback.decision.parameter:
                 return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(std::sync::Weak::new()) }})?"
-            value = (
-                parameter.value.element
-                if parameter.value.kind == "reference"
-                else parameter.value
-            )
+            value = parameter.value.unwrapped
             if value.response:
                 return f"Py::new(py, {public_name(value.native)}Scope {{ native: {rust_field(parameter.name)} as usize, scope: callback_scope.scope() }})?"
             return values.copy(parameter.value, rust_field(parameter.name))
@@ -148,10 +140,7 @@ def sources(values, plan):
         copied = ", ".join(copy_parameter(p) for p in parameters)
         scope = (
             "let callback_scope = GeneratedCallbackGuard::new();"
-            if any(
-                (p.value.element if p.value.kind == "reference" else p.value).response
-                for p in parameters
-            )
+            if any((p.value.unwrapped).response for p in parameters)
             else ""
         )
         if len(parameters) == 1:

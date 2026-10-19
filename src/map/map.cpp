@@ -3855,6 +3855,7 @@ auto discarded_completion() noexcept -> mln_completion {
     .callback = discard_completion,
     .user_data = nullptr,
     .release_user_data = nullptr,
+    .queue = MLN_HANDLE_NULL,
   };
 }
 

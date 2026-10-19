@@ -41,10 +41,7 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun release(): Unit =
-    nativeClose(this, binding, "mln_resource_request_release") {
-      C.mln_resource_request_release(handle)
-    }
+  public fun release(): Unit = binding.close()
 
   /**
    * Registers a callback that runs when MapLibre cancels a C API resource provider request.

@@ -3,42 +3,61 @@ package org.maplibre.nativeffi.internal.async
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.c.CompletionResultLayout
+import org.maplibre.nativeffi.internal.memory.NativeArena
+import org.maplibre.nativeffi.internal.memory.readU64
 import org.maplibre.nativeffi.runSuspendTest
+
+private fun <T> ownedCompletion(
+  closeDropped: (T) -> Unit,
+  disposeUnadopted: (ULong) -> Unit,
+  convert: (ULong) -> T,
+): HandDeliveredCompletion<T> = capture { call ->
+  NativeArena().use { arena ->
+    CompletionBridge.submitOwned(
+      arena,
+      convert = { convert(readU64(it + CompletionResultLayout.GENERATION)) },
+      closeDropped = closeDropped,
+      disposeUnadopted = { disposeUnadopted(readU64(it + CompletionResultLayout.GENERATION)) },
+      call = call,
+    )
+  }
+}
 
 class OwnedCompletionTest {
   @Test
   fun conversionFailureReleasesTheRawOwnerAndCompletesExceptionally(): Unit = runSuspendTest {
-    val raw = CompletableDeferred<Int>()
     val failure = IllegalStateException("conversion")
-    var disposed = 0
-    val wrapped =
-      raw.mapHandleDeferred<Int, String>(
+    var disposed = 0uL
+    val completion =
+      ownedCompletion<String>(
         closeDropped = { error("No wrapper was constructed") },
         disposeUnadopted = { disposed += it },
-        transform = { throw failure },
+        convert = { throw failure },
       )
-    raw.complete(7)
+    completion.deliver(MaplibreStatus.OK.nativeCode, 7u)
+    completion.release()
     assertEquals(
       failure.message,
-      assertFailsWith<IllegalStateException> { wrapped.await() }.message,
+      assertFailsWith<IllegalStateException> { completion.deferred.await() }.message,
     )
-    assertEquals(7, disposed)
+    assertEquals(7uL, disposed)
   }
 
   @Test
   fun cancellationReleasesTheAdoptedWrapperExactlyOnce(): Unit = runSuspendTest {
-    val raw = CompletableDeferred<Int>()
     var disposed = 0
     var closed = 0
-    val wrapped =
-      raw.mapHandleDeferred(
+    val completion =
+      ownedCompletion(
         closeDropped = { value: String -> closed += value.length },
         disposeUnadopted = { disposed++ },
-        transform = { it.toString() },
+        convert = { it.toString() },
       )
-    wrapped.cancel()
-    raw.complete(17)
+    completion.deferred.cancel()
+    completion.deliver(MaplibreStatus.OK.nativeCode, 17u)
+    completion.release()
     assertEquals(2, closed)
     assertEquals(0, disposed)
   }
@@ -46,14 +65,15 @@ class OwnedCompletionTest {
   @Test
   fun successfulAdoptionTransfersTheRawOwner(): Unit = runSuspendTest {
     var disposed = 0
-    val wrapped =
-      CompletableDeferred(17)
-        .mapHandleDeferred(
-          closeDropped = { _: String -> error("The result is observed") },
-          disposeUnadopted = { disposed++ },
-          transform = { it.toString() },
-        )
-    assertEquals("17", wrapped.await())
+    val completion =
+      ownedCompletion(
+        closeDropped = { _: String -> error("The result is observed") },
+        disposeUnadopted = { disposed++ },
+        convert = { it.toString() },
+      )
+    completion.deliver(MaplibreStatus.OK.nativeCode, 17u)
+    completion.release()
+    assertEquals("17", completion.deferred.await())
     assertEquals(0, disposed)
   }
 }

@@ -26,6 +26,11 @@ internal actual object NativeMemory {
       linker.defaultLookup().findOrThrow("free"),
       FunctionDescriptor.ofVoid(JAVA_LONG),
     )
+  private val malloc =
+    linker.downcallHandle(
+      linker.defaultLookup().findOrThrow("malloc"),
+      FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
+    )
   private val strlen =
     linker.downcallHandle(
       linker.defaultLookup().findOrThrow("strlen"),
@@ -42,6 +47,12 @@ internal actual object NativeMemory {
 
   actual fun free(address: Long) {
     freeMemory.invoke(address)
+  }
+
+  actual fun allocateUninitialized(size: Long): Long {
+    val address = malloc.invokeExact(maxOf(size, 1L)) as Long
+    if (address == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")
+    return address
   }
 
   actual fun getByte(address: Long): Byte = memory.get(JAVA_BYTE, address)

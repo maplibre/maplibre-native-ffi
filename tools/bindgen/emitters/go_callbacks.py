@@ -134,13 +134,10 @@ def sources(values, plan):
             + failure
             + " } }()"
         )
-        if any(
-            (p.value.element if p.value.kind == "reference" else p.value).response
-            for p in parameters
-        ):
+        if any((p.value.unwrapped).response for p in parameters):
             setup.append("scope := bindingNewScope(); defer scope.alive.Store(false)")
         for p in parameters:
-            value = p.value.element if p.value.kind == "reference" else p.value
+            value = p.value.unwrapped
             if decision and p.name == decision.parameter:
                 copied.append("request")
             elif value.response:

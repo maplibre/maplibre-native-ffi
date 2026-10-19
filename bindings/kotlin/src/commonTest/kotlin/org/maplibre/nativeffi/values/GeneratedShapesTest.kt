@@ -21,9 +21,13 @@ import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
+import org.maplibre.nativeffi.generated.RenderedQueryGeometry
+import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.StyleLayerVisibility
+import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
+import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.awaitFailed
@@ -34,6 +38,19 @@ import org.maplibre.nativeffi.withMap
  * common code over each platform's native memory, so every target runs this file.
  */
 class GeneratedShapesTest {
+  @Test
+  fun submittingAnUnknownUnionVariantUsesTheBindingError() {
+    NativeArena().use { arena ->
+      val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          arena.writeRenderedQueryGeometry(geometry)
+        }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+      assertNull(error.nativeStatusCode)
+    }
+  }
+
   @Test
   fun terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt(): Unit = runSuspendTest {
     withMap {

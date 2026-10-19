@@ -9,7 +9,7 @@ from .go_values import Values, absent, public
 
 
 def element(value):
-    return value.element if value.kind == "reference" else value
+    return value.unwrapped
 
 
 def method_name(plan, receiver, handle):
