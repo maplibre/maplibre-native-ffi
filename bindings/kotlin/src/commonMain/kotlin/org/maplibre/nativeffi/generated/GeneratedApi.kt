@@ -181,7 +181,7 @@ public object GeneratedApi {
           options?.let { writeGeojsonSourceOptions(it) } ?: 0L,
           out,
           diagnostic,
-        )
+        ),
       )
       adopt(out, GeneratedOwnerDisposal::geojsonSourceData) { GeojsonSourceDataHandle(it) }
     }
@@ -238,7 +238,7 @@ public object GeneratedApi {
           bytes(valueValueUtf8),
           valueValueUtf8.size.toLong(),
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -597,7 +597,7 @@ public object GeneratedApi {
           bytes(urlUtf8),
           urlUtf8.size.toLong(),
           diagnostic,
-        )
+        ),
       )
     }
 

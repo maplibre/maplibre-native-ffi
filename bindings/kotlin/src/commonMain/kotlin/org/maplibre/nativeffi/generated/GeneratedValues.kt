@@ -2164,7 +2164,10 @@ public data class BoundOptions(
  * See `mln_screen_point` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class ScreenPoint(public val x: Double = 0.0, public val y: Double = 0.0)
+public data class ScreenPoint(
+  public val x: Double = 0.0,
+  public val y: Double = 0.0,
+)
 
 /**
  * One atomic relative camera update.
@@ -2463,7 +2466,7 @@ public data class MapViewportOptions(
  */
 public data class MetalBorrowedTexture(
   /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
-  public val texture: NativePointer
+  public val texture: NativePointer,
 )
 
 /**
@@ -2497,7 +2500,7 @@ public data class MetalBorrowedTextureDescriptor(
  */
 public data class MetalContextDescriptor(
   /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
-  public val device: NativePointer
+  public val device: NativePointer,
 )
 
 /**
@@ -2651,7 +2654,7 @@ public data class OpenglContextDescriptor(
  */
 public data class OpenglBorrowedTexture(
   /** Borrowed OpenGL texture object name. Required. */
-  public val texture: UInt = 0u
+  public val texture: UInt = 0u,
 )
 
 /**
@@ -2839,7 +2842,7 @@ public data class ScreenBox(
  */
 public data class ScreenLineString(
   /** Points. Null only when point_count is 0. Copied value, owned by the caller. */
-  public val points: List<ScreenPoint> = emptyList()
+  public val points: List<ScreenPoint> = emptyList(),
 )
 
 /**
@@ -2872,7 +2875,9 @@ public sealed interface RenderedQueryGeometryData {
  * See `mln_rendered_query_geometry` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-public data class RenderedQueryGeometry(public val data: RenderedQueryGeometryData)
+public data class RenderedQueryGeometry(
+  public val data: RenderedQueryGeometryData,
+)
 
 /**
  * Options used when creating a runtime.
@@ -2930,7 +2935,10 @@ public data class SourceFeatureQueryOptions(
  * See `mln_image_stretch` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
+public data class ImageStretch(
+  public val from: Float = 0f,
+  public val to: Float = 0f,
+)
 
 /**
  * Content-box insets in image pixels, measured from the image's top-left.
@@ -3280,7 +3288,7 @@ public data class RuntimeEventRenderFrame(
  */
 public data class RuntimeEventRenderMap(
   /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode(0u)
+  public val mode: RenderMode = RenderMode(0u),
 )
 
 /**
@@ -3379,11 +3387,11 @@ public sealed interface RuntimeEventPayload {
     RuntimeEventPayload
 
   public data class OfflineRegionResponseError(
-    public val value: RuntimeEventOfflineRegionResponseError
+    public val value: RuntimeEventOfflineRegionResponseError,
   ) : RuntimeEventPayload
 
   public data class OfflineRegionTileCountLimit(
-    public val value: RuntimeEventOfflineRegionTileCountLimit
+    public val value: RuntimeEventOfflineRegionTileCountLimit,
   ) : RuntimeEventPayload
 
   public data object None : RuntimeEventPayload
@@ -3437,7 +3445,7 @@ public data class RuntimeEvent(
  */
 public data class EventBatchView(
   /** Copied value, owned by the caller. */
-  public val events: List<RuntimeEvent> = emptyList()
+  public val events: List<RuntimeEvent> = emptyList(),
 )
 
 /**
@@ -3632,7 +3640,7 @@ public data class StyleSourceInfo(
  */
 public data class RenderFrameBatchView(
   /** Copied value, owned by the caller. */
-  public val results: List<RenderFrameResult> = emptyList()
+  public val results: List<RenderFrameResult> = emptyList(),
 )
 
 public data class RenderAbandonResult(
@@ -3868,7 +3876,9 @@ public sealed interface OfflineRegionDefinitionData {
  * See `mln_offline_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class OfflineRegionDefinition(public val data: OfflineRegionDefinitionData)
+public data class OfflineRegionDefinition(
+  public val data: OfflineRegionDefinitionData,
+)
 
 /**
  * Region data delivered by an offline completion. Copied result, owned by the caller. Copied
@@ -3958,7 +3968,10 @@ public data class RenderSessionAttachment(
   public val ready: kotlinx.coroutines.Deferred<Unit>,
 )
 
-public data class LogicalExtentPhysicalSizeResult(public val width: UInt, public val height: UInt)
+public data class LogicalExtentPhysicalSizeResult(
+  public val width: UInt,
+  public val height: UInt,
+)
 
 /**
  * Callback state that one camera command copies to report the end of its transitions.
@@ -3966,7 +3979,9 @@ public data class LogicalExtentPhysicalSizeResult(public val width: UInt, public
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class CameraTransitionHandler(public val callback: CameraTransitionEndCallback? = null)
+public data class CameraTransitionHandler(
+  public val callback: CameraTransitionEndCallback? = null,
+)
 
 /**
  * Receives the end of one camera command's transitions.
@@ -4031,7 +4046,9 @@ internal constructor(
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-public data class LogHandler(public val callback: LogCallback)
+public data class LogHandler(
+  public val callback: LogCallback,
+)
 
 /**
  * Receives a MapLibre Native log record.
@@ -4049,7 +4066,9 @@ public typealias LogCallback =
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
-public data class Wake(public val callback: WakeCallback? = null)
+public data class Wake(
+  public val callback: WakeCallback? = null,
+)
 
 /**
  * Schedules service by the receiver that owns a queue or driver.
@@ -4092,7 +4111,9 @@ internal constructor(
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public data class ResourceRequestCancelHandler(public val callback: ResourceRequestCancelCallback)
+public data class ResourceRequestCancelHandler(
+  public val callback: ResourceRequestCancelCallback,
+)
 
 /**
  * Reports that MapLibre cancelled a C API resource provider request.
@@ -4102,7 +4123,9 @@ public data class ResourceRequestCancelHandler(public val callback: ResourceRequ
  */
 public typealias ResourceRequestCancelCallback = () -> Unit
 
-public data class HttpHeaderTransform(public val callback: HttpHeaderTransformCallback)
+public data class HttpHeaderTransform(
+  public val callback: HttpHeaderTransformCallback,
+)
 
 /**
  * Adds end-to-end headers to one outgoing HTTP request attempt.
@@ -4113,7 +4136,9 @@ public data class HttpHeaderTransform(public val callback: HttpHeaderTransformCa
 public typealias HttpHeaderTransformCallback =
   (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
 
-public data class ResourceProvider(public val callback: ResourceProviderCallback)
+public data class ResourceProvider(
+  public val callback: ResourceProviderCallback,
+)
 
 /**
  * Intercepts a network resource request.
@@ -4124,7 +4149,9 @@ public data class ResourceProvider(public val callback: ResourceProviderCallback
 public typealias ResourceProviderCallback =
   (request: ResourceRequest, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
-public data class ResourceTransform(public val callback: ResourceTransformCallback)
+public data class ResourceTransform(
+  public val callback: ResourceTransformCallback,
+)
 
 /**
  * Rewrites a network resource URL.

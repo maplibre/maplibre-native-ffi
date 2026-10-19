@@ -156,7 +156,7 @@ public data class SurfaceExtent(
 
   public fun log(label: String) {
     println(
-      "$label: logical=${width}x${height} physical=${physicalWidth}x${physicalHeight} scale=${"%.2f".format(scaleFactor)}"
+      "$label: logical=${width}x${height} physical=${physicalWidth}x${physicalHeight} scale=${"%.2f".format(scaleFactor)}",
     )
   }
 

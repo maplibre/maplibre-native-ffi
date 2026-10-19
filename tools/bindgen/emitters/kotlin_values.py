@@ -9,10 +9,10 @@ allocates and writes one, and `readX` copies one into its Kotlin value.
 from __future__ import annotations
 
 from dataclasses import replace
-from os.path import commonprefix
 
 from .. import docs
 from ..names import camel, pascal
+from ..semantic import enum_member_prefix
 from .kotlin_abi import Abi, LayoutError, width_expression
 
 
@@ -373,10 +373,7 @@ class Values:
             public = name(value.native)
             if value.kind == "enum":
                 scalar = self.scalar(value)[0]
-                prefix = (
-                    commonprefix([n for n, _ in value.enum_values]).rsplit("_", 1)[0]
-                    + "_"
-                )
+                prefix = enum_member_prefix(n for n, _ in value.enum_values)
                 constants = [
                     f"{doc(self.bound, native, '    ')}    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
                     for native, number in value.enum_values

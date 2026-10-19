@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 /// A handle the C API issued. The C API spells every handle as one integer
 /// type, so each kind gets its own wrapper here to stay distinct at compile

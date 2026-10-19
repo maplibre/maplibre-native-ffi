@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 /// Owns per-call byte storage whose pointers stay valid until the C call
@@ -39,7 +39,9 @@ final class NativeInputArena {
 
   func submit(_ body: () throws -> mln_status) rethrows -> mln_status {
     let status = try body()
-    if status == MLN_STATUS_OK, !declined { accept() }
+    if status == MLN_STATUS_OK, !declined {
+      accept()
+    }
     return status
   }
 

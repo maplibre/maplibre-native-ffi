@@ -329,7 +329,9 @@ final class MetalTextureCompositor {
   ) throws -> Bool {
     // The layer's drawable matches the frame it shows.
     let size = CGSize(width: texture.width, height: texture.height)
-    if layer.drawableSize != size { layer.drawableSize = size }
+    if layer.drawableSize != size {
+      layer.drawableSize = size
+    }
     guard let drawable = layer.nextDrawable() else { return false }
     let passDescriptor = MTLRenderPassDescriptor()
     guard let colorAttachment = passDescriptor.colorAttachments[0] else {

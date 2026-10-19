@@ -28,7 +28,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   fun setGestureInProgress(inProgress: Boolean) {
     submit("gesture update") {
       map.updateCamera(
-        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END),
       )
     }
   }
@@ -60,7 +60,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
           mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
           camera = camera,
           animation = animation(durationMs),
-        )
+        ),
       )
     }
   }
@@ -102,7 +102,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
     fun create(viewport: Viewport, eventWake: Wake, styleJson: String? = null): MapState {
       val runtime =
         GeneratedApi.runtimeCreate(
-          GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake)
+          GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake),
         )
       val initialCamera =
         CameraOptions(
@@ -121,7 +121,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
                     initialExtent = RenderTarget.extent(viewport),
                     mapMode = MapMode.CONTINUOUS,
                     eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
-                  )
+                  ),
               )
               .await()
           }

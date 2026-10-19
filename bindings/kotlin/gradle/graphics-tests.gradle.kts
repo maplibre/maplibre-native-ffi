@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 val host = HostPlatform.current()
 val backend =
   AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
   )
 val targets =
   AndroidTarget.parseAbis(
@@ -30,7 +30,7 @@ val builds = targets.map { target ->
   }
   val compiler = sdk.map {
     it.file(
-      "ndk/$ndkVersion/toolchains/llvm/prebuilt/${host.androidNdkPrebuiltTag}/bin/${target.ndkCompilerName(apiLevel)}${host.androidNdkCommandSuffix}"
+      "ndk/$ndkVersion/toolchains/llvm/prebuilt/${host.androidNdkPrebuiltTag}/bin/${target.ndkCompilerName(apiLevel)}${host.androidNdkCommandSuffix}",
     )
   }
   tasks.register<Exec>("buildAndroidTestGraphics${target.taskSuffix}") {

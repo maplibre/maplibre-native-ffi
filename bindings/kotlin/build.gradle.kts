@@ -32,7 +32,7 @@ val upstreamPluginHeaders =
   rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
 val androidBackend =
   AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
   )
 val androidTargets =
   AndroidTarget.parseAbis(
@@ -220,7 +220,7 @@ kotlin {
                 fixture.resolve("graphics.c").absolutePath,
                 "-o",
                 objectFile.get().asFile.absolutePath,
-              )
+              ),
           )
         }
       binaries.withType<TestExecutable>().configureEach {
@@ -316,7 +316,7 @@ androidComponents {
             .dir("generated/jniLibs/graphicsTest/${target.cargoTarget}")
             .get()
             .asFile
-            .absolutePath
+            .absolutePath,
         )
       }
     }
@@ -324,7 +324,7 @@ androidComponents {
     // than in the shared runtime AARs.
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
+        packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath,
       )
     }
   }
@@ -395,7 +395,7 @@ val checkAndroidApiFloor =
     dependsOn("compileAndroidMain")
     workingDir = rootProject.layout.projectDirectory.asFile
     commandLine(
-      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile
+      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile,
     )
   }
 

@@ -22,9 +22,13 @@ ready = [
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
   { task = "//bindings/rust:test", exclude = ["linux-gnu-x64-vulkan"] },
-  { task = "//bindings/rust:test", args = ["release"], include = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/rust:test", args = ["release"], include = [
+    "linux-gnu-x64-vulkan",
+  ] },
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
-  { task = "//examples/rust-map:smoke", exclude = ["macos-arm64-egl"], display = true },
+  { task = "//examples/rust-map:smoke", exclude = [
+    "macos-arm64-egl",
+  ], display = true },
 ]
 
 # A glibc runner builds the consumers, which execute against their packaged
@@ -42,8 +46,12 @@ commands = [
 [[suites]]
 platforms = ["linux-gnu"]
 commands = [
-  { task = "//bindings/rust:test:download", include = ["linux-gnu-x64-vulkan"] },
-  { task = "//bindings/dart:test:download", include = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/rust:test:download", include = [
+    "linux-gnu-x64-vulkan",
+  ] },
+  { task = "//bindings/dart:test:download", include = [
+    "linux-gnu-x64-vulkan",
+  ] },
 ]
 
 # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
@@ -69,19 +77,30 @@ commands = [
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:test" },
-  { task = "//examples/compose-map:smoke", exclude = ["windows-x64-vulkan", "windows-arm64-vulkan"], display = true },
-  { task = "//examples/compose-map:build", include = ["windows-x64-vulkan", "windows-arm64-vulkan"] },
+  { task = "//examples/compose-map:smoke", exclude = [
+    "windows-x64-vulkan",
+    "windows-arm64-vulkan",
+  ], display = true },
+  { task = "//examples/compose-map:build", include = [
+    "windows-x64-vulkan",
+    "windows-arm64-vulkan",
+  ] },
   { task = "//examples/lwjgl-map:smoke", display = true },
 ]
 environments = [
-  { include = ["windows-x64-wgl", "windows-arm64-wgl"], env = { GALLIUM_DRIVER = "d3d12", LIBGL_ALWAYS_SOFTWARE = "true" } },
+  { include = [
+    "windows-x64-wgl",
+    "windows-arm64-wgl",
+  ], env = { GALLIUM_DRIVER = "d3d12", LIBGL_ALWAYS_SOFTWARE = "true" } },
 ]
 
 [[suites]]
 platforms = ["linux-gnu", "macos"]
 commands = [
   { task = "//bindings/swift:test", exclude = ["linux-gnu-x64-vulkan"] },
-  { task = "//bindings/swift:test", args = ["release"], include = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/swift:test", args = ["release"], include = [
+    "linux-gnu-x64-vulkan",
+  ] },
   { task = "//examples/swift-map:smoke", include = ["macos-arm64-metal"] },
 ]
 
@@ -100,8 +119,14 @@ commands = [{ task = "//bindings/go:test" }]
 [[suites]]
 platforms = ["linux-gnu"]
 commands = [
-  { task = "//examples/go-map:check", include = ["linux-gnu-x64-egl", "linux-gnu-arm64-egl"] },
-  { task = "//examples/go-map:smoke", include = ["linux-gnu-x64-egl", "linux-gnu-arm64-egl"], display = true },
+  { task = "//examples/go-map:check", include = [
+    "linux-gnu-x64-egl",
+    "linux-gnu-arm64-egl",
+  ] },
+  { task = "//examples/go-map:smoke", include = [
+    "linux-gnu-x64-egl",
+    "linux-gnu-arm64-egl",
+  ], display = true },
 ]
 
 [[suites]]

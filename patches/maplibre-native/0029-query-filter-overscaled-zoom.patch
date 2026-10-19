@@ -1,17 +1,17 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index c8c03057ca79..0d126e2483e8 100644
+index b92b64c02f4cf20da58aab4c82da02a0b16466ba..05b837ed1288510ba7b5158d28769169679df9d3 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -34,6 +34,7 @@
- ### 🐞 Bug fixes
+@@ -36,6 +36,7 @@
  
  - *...Add new stuff here...*
+ - [core] Fix a crash in `RenderImageSource::update` when an image source's coordinates give an empty tile cover, such as an image wholly beyond the latitudes Web Mercator can show.
 +- [core] Evaluate rendered-feature query filters at overscaled tile zoom, matching layer filters and source queries when overzoomed.
  - [core] Evaluate rendered-feature hit-test paint properties at camera zoom, including fractional zoom and overzooming.
  - [core] Fix rendered-feature queries near the final endpoint of an offset line.
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index f63904c2136b..3366ce49f538 100644
+index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8cab386315 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
 @@ -155,7 +155,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
@@ -50,7 +50,7 @@ index f63904c2136b..3366ce49f538 100644
                                const std::unordered_map<std::string, const RenderLayer*>& layers,
                                const GeometryCoordinates& queryGeometry,
                                const TransformState& transformState,
-@@ -302,13 +302,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -303,13 +303,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
              continue;
          }
  
@@ -69,7 +69,7 @@ index f63904c2136b..3366ce49f538 100644
          feature.sourceLayer = sourceLayer->getName();
          feature.state = state;
 diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
-index 84eacdf3bebe..4d337e6f2f94 100644
+index 84eacdf3bebe65e002e03844fe5b50e709e689af..4d337e6f2f94c24684f619fb3291408a152852d8 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
 @@ -126,7 +126,7 @@ public:
@@ -91,7 +91,7 @@ index 84eacdf3bebe..4d337e6f2f94 100644
                      const GeometryCoordinates& queryGeometry,
                      const TransformState& transformState,
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index a817b5d0f226..999ae01a5787 100644
+index a817b5d0f226e51d06216713ccbcb27a5b83b36b..999ae01a578748d08d306286badfb683afa6f5cd 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
 @@ -535,7 +535,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
@@ -104,7 +104,7 @@ index a817b5d0f226..999ae01a5787 100644
                                        queryPadding * transformState.maxPitchScaleFactor(),
                                        featureState);
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index b94f10253df4..332ece1727ac 100644
+index b94f10253df4cf7364875a8e80c27f65b7ee2b6a..332ece1727acb037704d85a86a91ad8337547af0 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -1,4 +1,5 @@

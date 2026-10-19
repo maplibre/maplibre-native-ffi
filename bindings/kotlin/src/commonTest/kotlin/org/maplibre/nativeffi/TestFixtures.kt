@@ -57,7 +57,7 @@ internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
  * null for the rest.
  */
 internal fun denyingProvider(
-  serve: (ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ -> null }
+  serve: (ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ -> null },
 ): ResourceProvider = ResourceProvider { request, handle ->
   serve(request, handle) ?: handle.deny()
 }
@@ -69,7 +69,7 @@ internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {
       status = ResourceResponseStatus.ERROR,
       errorReason = ResourceErrorReason.NOT_FOUND,
       errorMessage = "the test fixture serves no resources",
-    )
+    ),
   )
   close()
   return ResourceProviderDecision.HANDLE

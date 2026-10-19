@@ -1,9 +1,9 @@
 """Compile Go records and native storage from resolved C value plans."""
 
-import os
 from dataclasses import replace
 
 from ..model import ModelError
+from ..semantic import enum_member_prefix
 from .go import doc, name, native_identifier
 
 
@@ -341,12 +341,7 @@ class Values:
         chunks = []
         for native, value in sorted(self.enums.items()):
             typename = public(native)
-            prefix = (
-                os.path.commonprefix([key for key, _ in value.enum_values]).rsplit(
-                    "_", 1
-                )[0]
-                + "_"
-            )
+            prefix = enum_member_prefix(key for key, _ in value.enum_values)
             constants = "\n".join(
                 doc(self.api, key, None)
                 + f"{typename}{name(key.removeprefix(prefix).lower())} {typename} = {typename}(C.{key})"

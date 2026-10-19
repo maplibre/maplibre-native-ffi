@@ -46,7 +46,7 @@ class ResourceCallbackTest {
       val cancels = AtomicInt(0)
 
       assertFalse(
-        request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) })
+        request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) }),
       )
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
       // Native keeps the first registration, and the rejected second one keeps no root.
@@ -80,8 +80,8 @@ class ResourceCallbackTest {
           ResourceRequestCancelHandler {
             cancels.addAndFetch(1)
             cancelled.complete(Unit)
-          }
-        )
+          },
+        ),
       )
 
       map.release().awaitWithin("the map release")
@@ -123,14 +123,14 @@ class ResourceCallbackTest {
           runCatching { fixtureRuntime.barrier() }.exceptionOrNull(),
           runCatching { fixtureRuntime.release() }.exceptionOrNull(),
           runCatching {
-              handle.complete(
-                ResourceResponse(
-                  ResourceResponseStatus.OK,
-                  bytes = EMPTY_STYLE_JSON.encodeToByteArray(),
-                )
-              )
-              handle.close()
-            }
+            handle.complete(
+              ResourceResponse(
+                ResourceResponseStatus.OK,
+                bytes = EMPTY_STYLE_JSON.encodeToByteArray(),
+              ),
+            )
+            handle.close()
+          }
             .exceptionOrNull(),
         )
       outcome.complete(results)
@@ -193,11 +193,11 @@ class ResourceCallbackTest {
         provider =
           denyingProvider { request, _ ->
             if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
-          }
+          },
       ) {
         runtime
           .setResourceTransform(
-            ResourceTransform { _, url, _ -> if (url == STYLE_URL) throw thrown }
+            ResourceTransform { _, url, _ -> if (url == STYLE_URL) throw thrown },
           )
           .awaitWithin("the transform")
         map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -218,7 +218,7 @@ class ResourceCallbackTest {
       val request = claimed.awaitWithin("the provider to claim the request")
 
       request.complete(
-        ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray())
+        ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
       // A request takes one response.
       assertFailsWith<InvalidStateException> {
@@ -242,9 +242,10 @@ class ResourceCallbackTest {
           runCatching { GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL) }
             .exceptionOrNull()
       }
-      val inside =
-        runCatching { GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL) }
-          .exceptionOrNull()
+      val inside = runCatching {
+        GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL)
+      }
+        .exceptionOrNull()
       outcome.complete(inside to fromAnotherThread)
     }
     // The provider passes the style through to the online source, which applies the transform.
@@ -252,7 +253,7 @@ class ResourceCallbackTest {
       provider =
         denyingProvider { request, _ ->
           if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
-        }
+        },
     ) {
       runtime.setResourceTransform(transform).awaitWithin("the transform")
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -277,11 +278,11 @@ class ResourceCallbackTest {
       val request = claimed.awaitWithin("the provider to claim the request")
       assertFailsWith<InvalidArgumentException> {
         request.complete(
-          ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message")
+          ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message"),
         )
       }
       request.complete(
-        ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray())
+        ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
       request.close()
       awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)

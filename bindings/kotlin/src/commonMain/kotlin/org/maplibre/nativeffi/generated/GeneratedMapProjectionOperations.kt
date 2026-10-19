@@ -43,7 +43,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
     nativeCall(this, binding, "mln_map_projection_lat_lng_for_pixel") {
       val out = allocate(16, 8)
       check(
-        C.mln_map_projection_lat_lng_for_pixel(handle, writeScreenPoint(point), out, diagnostic)
+        C.mln_map_projection_lat_lng_for_pixel(handle, writeScreenPoint(point), out, diagnostic),
       )
       readLatLng(out)
     }
@@ -63,7 +63,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
           writeScreenPoint(point),
           out,
           diagnostic,
-        )
+        ),
       )
       readLatLng(out)
     }
@@ -92,7 +92,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
     nativeCall(this, binding, "mln_map_projection_pixel_for_lat_lng") {
       val out = allocate(16, 8)
       check(
-        C.mln_map_projection_pixel_for_lat_lng(handle, writeLatLng(coordinate), out, diagnostic)
+        C.mln_map_projection_pixel_for_lat_lng(handle, writeLatLng(coordinate), out, diagnostic),
       )
       readScreenPoint(out)
     }
@@ -123,7 +123,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
           coordinates.size.toLong(),
           writeEdgeInsets(padding),
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -141,7 +141,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
           view(geometry),
           writeEdgeInsets(padding),
           diagnostic,
-        )
+        ),
       )
     }
 }

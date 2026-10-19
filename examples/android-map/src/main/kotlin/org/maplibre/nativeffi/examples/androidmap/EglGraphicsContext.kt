@@ -46,7 +46,7 @@ private constructor(
             NativePointer.ofAddress(shareContext.nativeHandle),
             org.maplibre.nativeffi.generated.OpenglClientApi.GLES,
             NativePointer.NULL_POINTER,
-          )
+          ),
         ),
       )
 

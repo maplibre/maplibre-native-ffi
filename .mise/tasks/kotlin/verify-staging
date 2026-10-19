@@ -347,8 +347,20 @@ def verify_android(root: pathlib.Path) -> None:
                 )
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
+            prefab = "prefab/modules/maplibre-native-c"
+            for expected in (
+                "prefab/prefab.json",
+                f"{prefab}/module.json",
+                f"{prefab}/include/maplibre_native_c.h",
+            ):
+                if expected not in names:
+                    raise SystemExit(f"{runtime} is missing {expected}")
             abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
             for abi in abis:
+                for name in ("abi.json", "libmaplibre-native-c.so"):
+                    expected = f"{prefab}/libs/android.{abi}/{name}"
+                    if expected not in names:
+                        raise SystemExit(f"{runtime} is missing {expected}")
                 expected = f"jni/{abi}/libmaplibre-native-c.so"
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")

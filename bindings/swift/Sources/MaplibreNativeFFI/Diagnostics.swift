@@ -45,8 +45,11 @@ enum NativeDiagnostics {
     }
     defer { admission?.end() }
     let current = lock.withLock { handler }
-    if let current { current(diagnostic) }
-    else { writeStandardError(describe(diagnostic)) }
+    if let current {
+      current(diagnostic)
+    } else {
+      writeStandardError(describe(diagnostic))
+    }
   }
 
   static func setHandler(_ replacement: (@Sendable (MaplibreDiagnostic)

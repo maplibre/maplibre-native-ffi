@@ -15,8 +15,8 @@ interface, and its comments state each function's contract.
 builds it twice:
 
 - `mln_test_graphics_objects` links into the C suite's executable.
-- `mln_test_graphics` is a shared library for the binding suites.
-  `mise run build` installs it into `build/<preset>/install` with its header and
+- `mln_test_graphics` is a shared library for the binding suites. `mise run
+  build` installs it into `build/<preset>/install` with its header and
   `share/pkgconfig/mln-test-graphics.pc`, through the `test-graphics` component.
   That component stays out of a full installation and out of the package.
 

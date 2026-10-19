@@ -254,10 +254,14 @@ final class RenderThread: @unchecked Sendable {
         let work = tasks
         tasks.removeAll()
         let target = workPending ? session : nil
-        if target != nil { workPending = false }
+        if target != nil {
+          workPending = false
+        }
         return (work, target, stopping && work.isEmpty)
       }
-      if stop { break }
+      if stop {
+        break
+      }
       for task in work {
         task()
       }

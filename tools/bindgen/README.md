@@ -64,10 +64,10 @@ function that reports a fixed fact of the library is a noun, as in
 Each declaration follows these rules, which every binding relies on:
 
 - Declare each function as `MLN_API <type> <name>(...) MLN_NOEXCEPT`.
-- A fallible function returns `mln_status` and takes
-  `mln_diagnostic* out_diagnostic` as its last parameter, except a callback
-  implementation, which matches its callback typedef. The handle comment in
-  `base.h` defines the status for an invalid or released handle.
+- A fallible function returns `mln_status` and takes `mln_diagnostic*
+  out_diagnostic` as its last parameter, except a callback implementation, which
+  matches its callback typedef. The handle comment in `base.h` defines the
+  status for an invalid or released handle.
 - A new or changed function lists every status that it returns under `Returns:`
   in its comment. An asynchronous function also lists its completion outcomes
   under `Completes with:`.

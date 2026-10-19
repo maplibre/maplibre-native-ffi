@@ -19,7 +19,7 @@ internal object Main {
       LogHandler { severity, event, code, message ->
         System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
         1u
-      }
+      },
     )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
@@ -61,7 +61,7 @@ internal object Main {
         borrowed-texture  caller-owned texture render target
         native-surface    native surface render target
       """
-        .trimIndent()
+        .trimIndent(),
     )
   }
 

@@ -36,7 +36,7 @@ internal object CallbackAdmission {
     while (scope != null) {
       if (scope.allowed != null && operation !in scope.allowed)
         throw Status.invalidState(
-          "native operation is forbidden by the active callback: $operation"
+          "native operation is forbidden by the active callback: $operation",
         )
       scope = scope.parent
     }
@@ -47,7 +47,7 @@ internal object CallbackAdmission {
     while (scope != null) {
       if (scope.allowed != null && (scope.owner != owner || operation !in scope.allowed))
         throw Status.invalidState(
-          "native operation is forbidden by the active callback: $operation"
+          "native operation is forbidden by the active callback: $operation",
         )
       scope = scope.parent
     }

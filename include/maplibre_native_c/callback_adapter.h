@@ -25,11 +25,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "maplibre_native_c/base.h"            // IWYU pragma: export
-#include "maplibre_native_c/logging.h"         // IWYU pragma: export
-#include "maplibre_native_c/render_session.h"  // IWYU pragma: export
-#include "maplibre_native_c/runtime.h"         // IWYU pragma: export
-#include "maplibre_native_c/wake.h"            // IWYU pragma: export
+#include "base.h"            // IWYU pragma: export
+#include "logging.h"         // IWYU pragma: export
+#include "render_session.h"  // IWYU pragma: export
+#include "runtime.h"         // IWYU pragma: export
+#include "wake.h"            // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,7 +40,7 @@ extern "C" {
 /** Rule kind that matches every resource kind. */
 #define MLN_ADAPTER_RESOURCE_KIND_ANY UINT32_MAX
 
-#include "maplibre_native_c/callback_capture_generated.h"
+#include "callback_capture_generated.h"
 
 /** Native-owned completion copy delivered to an asynchronous host listener. */
 typedef struct mln_adapter_completion_record {

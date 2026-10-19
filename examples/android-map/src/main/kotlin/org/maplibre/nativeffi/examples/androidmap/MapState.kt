@@ -35,7 +35,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
 
   private val runtime =
     GeneratedApi.runtimeCreate(
-      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake)
+      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake),
     )
   private lateinit var ownedMap: MapHandle
   val map: MapHandle
@@ -51,7 +51,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
                 initialExtent = initialViewport.extent,
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
-              )
+              ),
           )
           .await()
       }
@@ -77,7 +77,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   fun setGestureInProgress(inProgress: Boolean) {
     submit("gesture update") {
       map.updateCamera(
-        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END),
       )
     }
   }
@@ -106,7 +106,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
         scale = 2.0.pow(round(zoom) + 1.0 - zoom),
         anchor = anchor,
         animation = animation(DOUBLE_TAP_DURATION_MS),
-      )
+      ),
     )
   }
 

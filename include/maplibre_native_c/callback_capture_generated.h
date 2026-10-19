@@ -3,9 +3,9 @@
 #define MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H
 #include <stdint.h>
 
-#include "maplibre_native_c/base.h"
-#include "maplibre_native_c/logging.h"
-#include "maplibre_native_c/runtime.h"
+#include "base.h"
+#include "logging.h"
+#include "runtime.h"
 typedef enum mln_adapter_completion_copy_kind : uint32_t {
   MLN_ADAPTER_COMPLETION_COPY_FLAT = 0,
   MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = 3303399434U,

@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 
 let expectedCAbiVersion: UInt32 = 0
 
@@ -19,11 +19,15 @@ enum NativeAbi {
   /// check, so on a mismatched library a program that builds a value first
   /// reads that struct before its first call throws.
   static func ensureCompatible() throws {
-    if let loadedMismatch { throw loadedMismatch }
+    if let loadedMismatch {
+      throw loadedMismatch
+    }
   }
 
   static func mismatch(actual: UInt32) -> MaplibreError? {
-    if actual == expectedCAbiVersion { return nil }
+    if actual == expectedCAbiVersion {
+      return nil
+    }
     return MaplibreError(
       kind: .abiVersionMismatch,
       rawStatus: nil,

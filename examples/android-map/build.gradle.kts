@@ -6,7 +6,7 @@ plugins { id("com.android.application") }
 
 val androidBackend =
   AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
   )
 val androidTargets =
   AndroidTarget.parseAbis(
@@ -79,7 +79,7 @@ dependencies {
     implementation("org.maplibre.nativeffi:maplibre-native-ffi:$maplibrePublicationVersion")
     implementation(
       "org.maplibre.nativeffi:maplibre-native-ffi-runtime-$androidBackend:" +
-        maplibrePublicationVersion
+        maplibrePublicationVersion,
     )
   } else {
     implementation(project(":bindings:kotlin"))

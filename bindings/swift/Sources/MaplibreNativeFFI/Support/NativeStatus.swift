@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 struct NativeStatusFailure: Error, Equatable {
@@ -38,7 +38,9 @@ func checkStatus(
     diagnostic.pointee.size = UInt32(MemoryLayout<mln_diagnostic>.size)
     diagnostic.pointee.message.0 = 0
     let status = try call(diagnostic)
-    if status == MLN_STATUS_OK { return }
+    if status == MLN_STATUS_OK {
+      return
+    }
     throw NativeStatusFailure(
       rawStatus: status.rawValue,
       diagnostic: message(of: diagnostic)

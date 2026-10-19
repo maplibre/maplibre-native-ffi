@@ -96,7 +96,7 @@ internal actual object C {
 
   actual fun mln_acquired_frame_view_end(scope: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_view_end(
-      scope.toCPointer<CPointed>()
+      scope.toCPointer<CPointed>(),
     )
   }
 

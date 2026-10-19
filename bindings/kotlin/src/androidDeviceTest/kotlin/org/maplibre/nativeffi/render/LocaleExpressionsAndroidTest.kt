@@ -77,7 +77,7 @@ class LocaleExpressionsAndroidTest {
               ["==",["number-format",1234.5,{"locale":"de-DE","min-fraction-digits":2,"max-fraction-digits":2}],"1.234,50"],
               0.25,0.75]
           }
-        }]}"""
+        }]}""",
       )
       assertEquals(
         "0.25",

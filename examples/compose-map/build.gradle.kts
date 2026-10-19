@@ -44,7 +44,7 @@ dependencies {
     implementation("org.maplibre.nativeffi:maplibre-native-ffi-jvm:$maplibrePublicationVersion")
     runtimeOnly(
       "org.maplibre.nativeffi:maplibre-native-ffi-runtime-$maplibreRuntimeBackend-jvm:" +
-        "$maplibrePublicationVersion:${hostPlatform.maplibreNativeClassifier}"
+        "$maplibrePublicationVersion:${hostPlatform.maplibreNativeClassifier}",
     )
   } else {
     implementation(project(":bindings:kotlin"))

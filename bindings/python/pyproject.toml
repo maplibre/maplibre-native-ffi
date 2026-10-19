@@ -11,6 +11,7 @@ license = "BSD-2-Clause"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Rust",
 ]
 dependencies = []
@@ -25,7 +26,7 @@ docs = [
   "pdoc>=16,<17",
 ]
 android = [
-  "cibuildwheel>=4.2.1,<5",
+  "cibuildwheel>=4.3.1,<5",
 ]
 
 [tool.maturin]

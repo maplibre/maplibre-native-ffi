@@ -28,8 +28,8 @@ third_party/              The MapLibre Native submodule
 
 ## Dev tool commands
 
-Mise provides every tool and task. Run anything else under `mise exec --`.
-`mise tasks --all` lists every task, and
+Mise provides every tool and task. Run anything else under `mise exec --`. `mise
+tasks --all` lists every task, and
 [the development overview](docs/src/content/docs/development/overview.md) covers
 platform setup and cross-compilation SDKs.
 
@@ -49,8 +49,8 @@ hk fix <files>                         # Format and lint some files
 
 The default preset is the host's; `CMakePresets.json` lists the others. Clangd
 uses the compilation database of the last `mise run build <preset>`. The
-pre-commit hook runs the formatters and linters, and `fix` stages what it
-changes.
+pre-commit hook runs the formatters and linters, and `hk fix --stage` stages
+what it changes.
 
 ## Project invariants
 
@@ -80,12 +80,12 @@ changes.
 - Each binding maps every case in `tests/conformance/cases.toml` to a test or to
   a reason that it does not apply. `scripts/check-conformance.py --strict`
   enforces the mapping.
-- The ABI suite calls every exported function by name.
-  `mise run check-export-calls` enforces it, and `tests/uncalled-exports.txt`
-  only shrinks.
+- The ABI suite calls every exported function by name. `mise run
+  check-export-calls` enforces it, and `tests/uncalled-exports.txt` only
+  shrinks.
 - Use `tests/native/internal` and the `src/testing` seams only for orderings
-  that no public signal reaches. The seams stay unexported, which
-  `mise run check-exports` enforces.
+  that no public signal reaches. The seams stay unexported, which `mise run
+  check-exports` enforces.
 - Generator tests assert on semantic plans, coverage reports, or generated code
   that they compile and run, never on fragments of emitted source.
 - Tests wait on signals, never on elapsed time, and serve every request from a
@@ -96,9 +96,8 @@ changes.
   run on every target, so fix the CI environment rather than skip one.
 - Each example has a `smoke` task and no other tests.
 - Before you delete a binding test, run `mise run coverage` for that binding and
-  for `native`, then
-  `mise run coverage-diff --only-in <binding> --not-in native`, and cover each
-  listed line in C. See
+  for `native`, then `mise run coverage-diff --only-in <binding> --not-in
+  native`, and cover each listed line in C. See
   [Code coverage](docs/src/content/docs/development/overview.md#code-coverage).
 - Skip trivial tests, tests of constants or third-party code, and negative
   assertions that prove little.

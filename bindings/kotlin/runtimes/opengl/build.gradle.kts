@@ -38,7 +38,7 @@ kotlin {
     // on the classpath references it, so only this rule survives minification.
     optimization {
       consumerKeepRules.file(
-        rootProject.file("bindings/rustls-platform-verifier-android/consumer-rules.pro")
+        rootProject.file("bindings/rustls-platform-verifier-android/consumer-rules.pro"),
       )
       consumerKeepRules.publish = true
     }
@@ -49,7 +49,7 @@ androidComponents {
   onVariants { variant ->
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidRuntimeLibs.get().dir("opengl/${target.cargoTarget}").asFile.absolutePath
+        packagedAndroidRuntimeLibs.get().dir("opengl/${target.cargoTarget}").asFile.absolutePath,
       )
     }
   }

@@ -56,7 +56,7 @@ internal object CompletionBridge {
               MaplibreStatus.fromNative(status),
               status,
               diagnostic(result),
-            )
+            ),
           )
         }
       } catch (failure: Throwable) {

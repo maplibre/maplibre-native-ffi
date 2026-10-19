@@ -187,7 +187,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   // carry CopySrc usage.
   //
   // wgpuInstanceWaitAny is unusable: a non-zero timeout is legal only on an
-  // instance created with timedWaitAnyEnable, and the host's instance is
+  // instance created with the TimedWaitAny feature, and the host's instance is
   // optional. A spontaneous callback needs no instance, and yielding to the
   // browser's job queue is what lets it arrive.
   mln::PremultipliedImage readStillImage() override {

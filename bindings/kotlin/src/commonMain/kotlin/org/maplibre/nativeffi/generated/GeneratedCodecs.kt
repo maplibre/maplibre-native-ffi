@@ -210,7 +210,7 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
 }
 
 internal fun NativeCall.writeCustomMvtVectorSourceOptions(
-  value: CustomMvtVectorSourceOptions
+  value: CustomMvtVectorSourceOptions,
 ): Long = allocate(w(48, 56), 8).also { putCustomMvtVectorSourceOptions(it, value) }
 
 internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {
@@ -311,7 +311,7 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
 }
 
 internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
-  value: MetalBorrowedTextureDescriptor
+  value: MetalBorrowedTextureDescriptor,
 ): Long = allocate(w(40, 48), 8).also { putMetalBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeCall.putRenderSessionAttachOptions(
@@ -339,7 +339,7 @@ internal fun NativeArena.putMetalOwnedTextureDescriptor(
 }
 
 internal fun NativeArena.writeMetalOwnedTextureDescriptor(
-  value: MetalOwnedTextureDescriptor
+  value: MetalOwnedTextureDescriptor,
 ): Long = allocate(32, 8).also { putMetalOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
@@ -370,7 +370,7 @@ internal fun NativeArena.putOpenglBorrowedTextureDescriptor(
 }
 
 internal fun NativeArena.writeOpenglBorrowedTextureDescriptor(
-  value: OpenglBorrowedTextureDescriptor
+  value: OpenglBorrowedTextureDescriptor,
 ): Long = allocate(w(72, 104), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putOpenglOwnedTextureDescriptor(
@@ -383,7 +383,7 @@ internal fun NativeArena.putOpenglOwnedTextureDescriptor(
 }
 
 internal fun NativeArena.writeOpenglOwnedTextureDescriptor(
-  value: OpenglOwnedTextureDescriptor
+  value: OpenglOwnedTextureDescriptor,
 ): Long = allocate(w(56, 72), 8).also { putOpenglOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putOpenglSurfaceDescriptor(target: Long, value: OpenglSurfaceDescriptor) {
@@ -416,7 +416,7 @@ internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
 }
 
 internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
-  value: VulkanBorrowedTextureDescriptor
+  value: VulkanBorrowedTextureDescriptor,
 ): Long = allocate(w(80, 120), 8).also { putVulkanBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanOwnedTextureDescriptor(
@@ -429,7 +429,7 @@ internal fun NativeArena.putVulkanOwnedTextureDescriptor(
 }
 
 internal fun NativeArena.writeVulkanOwnedTextureDescriptor(
-  value: VulkanOwnedTextureDescriptor
+  value: VulkanOwnedTextureDescriptor,
 ): Long = allocate(w(56, 80), 8).also { putVulkanOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanSurfaceDescriptor) {
@@ -460,7 +460,7 @@ internal fun NativeArena.putWebgpuBorrowedTextureDescriptor(
 }
 
 internal fun NativeArena.writeWebgpuBorrowedTextureDescriptor(
-  value: WebgpuBorrowedTextureDescriptor
+  value: WebgpuBorrowedTextureDescriptor,
 ): Long = allocate(w(56, 80), 8).also { putWebgpuBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putWebgpuOwnedTextureDescriptor(
@@ -473,7 +473,7 @@ internal fun NativeArena.putWebgpuOwnedTextureDescriptor(
 }
 
 internal fun NativeArena.writeWebgpuOwnedTextureDescriptor(
-  value: WebgpuOwnedTextureDescriptor
+  value: WebgpuOwnedTextureDescriptor,
 ): Long = allocate(w(40, 48), 8).also { putWebgpuOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putWebgpuSurfaceDescriptor(target: Long, value: WebgpuSurfaceDescriptor) {
@@ -834,7 +834,7 @@ internal fun NativeArena.putRenderedFeatureQueryOptions(
 }
 
 internal fun NativeArena.writeRenderedFeatureQueryOptions(
-  value: RenderedFeatureQueryOptions
+  value: RenderedFeatureQueryOptions,
 ): Long = allocate(w(24, 40), w(4, 8)).also { putRenderedFeatureQueryOptions(it, value) }
 
 internal fun NativeArena.putSourceFeatureQueryOptions(
@@ -910,7 +910,7 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 }
 
 internal fun NativeCall.writeResourceRequestCancelHandler(
-  value: ResourceRequestCancelHandler
+  value: ResourceRequestCancelHandler,
 ): Long = allocate(w(16, 32), w(4, 8)).also { putResourceRequestCancelHandler(it, value) }
 
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
@@ -1315,7 +1315,7 @@ internal fun readRenderedQueryGeometry(source: Long): RenderedQueryGeometry =
           3u -> RenderedQueryGeometryData.LineString(readScreenLineString(source + 8))
           else -> RenderedQueryGeometryData.Unknown(tag, NativeMemory.getBytes(source + 8, 32))
         }
-      }
+      },
   )
 
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
@@ -1471,7 +1471,7 @@ internal fun readEventBatchView(source: Long): EventBatchView =
             )
             .decodeToString(),
         )
-      }
+      },
   )
 
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
@@ -1575,7 +1575,7 @@ internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
         48,
       ) { item ->
         readRenderFrameResult(item)
-      }
+      },
   )
 
 internal fun readRenderAbandonResult(source: Long): RenderAbandonResult =
@@ -1830,7 +1830,7 @@ internal fun NativeArena.putOfflineTilePyramidRegionDefinition(
 }
 
 internal fun NativeArena.writeOfflineTilePyramidRegionDefinition(
-  value: OfflineTilePyramidRegionDefinition
+  value: OfflineTilePyramidRegionDefinition,
 ): Long = allocate(64, 8).also { putOfflineTilePyramidRegionDefinition(it, value) }
 
 internal fun NativeArena.putOfflineGeometryRegionDefinition(
@@ -1846,7 +1846,7 @@ internal fun NativeArena.putOfflineGeometryRegionDefinition(
 }
 
 internal fun NativeArena.writeOfflineGeometryRegionDefinition(
-  value: OfflineGeometryRegionDefinition
+  value: OfflineGeometryRegionDefinition,
 ): Long = allocate(w(40, 48), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
@@ -1936,7 +1936,7 @@ internal fun readScreenLineString(source: Long): ScreenLineString =
     points =
       readArray(readAddress(source), readSize(source + w(4, 8)), 16.toLong()) { item ->
         readScreenPoint(item)
-      }
+      },
   )
 
 internal fun readImageStretch(source: Long): ImageStretch =
@@ -1992,15 +1992,15 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
           4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 48))
           5u ->
             RuntimeEventPayload.OfflineRegionStatus(
-              readRuntimeEventOfflineRegionStatus(source + 48)
+              readRuntimeEventOfflineRegionStatus(source + 48),
             )
           6u ->
             RuntimeEventPayload.OfflineRegionResponseError(
-              readRuntimeEventOfflineRegionResponseError(source + 48)
+              readRuntimeEventOfflineRegionResponseError(source + 48),
             )
           7u ->
             RuntimeEventPayload.OfflineRegionTileCountLimit(
-              readRuntimeEventOfflineRegionTileCountLimit(source + 48)
+              readRuntimeEventOfflineRegionTileCountLimit(source + 48),
             )
           0u -> RuntimeEventPayload.None
           else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
@@ -2039,13 +2039,13 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
         when (tag) {
           1u ->
             OfflineRegionDefinitionData.TilePyramid(
-              readOfflineTilePyramidRegionDefinition(source + 8)
+              readOfflineTilePyramidRegionDefinition(source + 8),
             )
           2u ->
             OfflineRegionDefinitionData.Geometry(readOfflineGeometryRegionDefinition(source + 8))
           else -> OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, 64))
         }
-      }
+      },
   )
 
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
@@ -2147,7 +2147,7 @@ internal fun readRuntimeEventOfflineRegionStatus(source: Long): RuntimeEventOffl
   )
 
 internal fun readRuntimeEventOfflineRegionResponseError(
-  source: Long
+  source: Long,
 ): RuntimeEventOfflineRegionResponseError =
   RuntimeEventOfflineRegionResponseError(
     regionId = readI64(source),
@@ -2155,12 +2155,12 @@ internal fun readRuntimeEventOfflineRegionResponseError(
   )
 
 internal fun readRuntimeEventOfflineRegionTileCountLimit(
-  source: Long
+  source: Long,
 ): RuntimeEventOfflineRegionTileCountLimit =
   RuntimeEventOfflineRegionTileCountLimit(regionId = readI64(source), limit = readU64(source + 8))
 
 internal fun readOfflineTilePyramidRegionDefinition(
-  source: Long
+  source: Long,
 ): OfflineTilePyramidRegionDefinition =
   OfflineTilePyramidRegionDefinition(
     styleUrl = readCString(readAddress(source)),

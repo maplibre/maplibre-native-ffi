@@ -61,7 +61,7 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
           writeResourceRequestCancelHandler(handler),
           out,
           diagnostic,
-        )
+        ),
       )
       val outCancelled = readBool(out)
       if (!outCancelled) accept(bindingCallbacks)

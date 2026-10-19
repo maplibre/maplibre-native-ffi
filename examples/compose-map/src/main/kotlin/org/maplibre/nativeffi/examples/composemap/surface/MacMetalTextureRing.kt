@@ -55,7 +55,7 @@ internal class MacMetalTextureRing {
             oldTexture = reusable,
             width = extent.physicalWidth,
             height = extent.physicalHeight,
-          )
+          ),
         )
       }
     if (replacement != outgoing) {

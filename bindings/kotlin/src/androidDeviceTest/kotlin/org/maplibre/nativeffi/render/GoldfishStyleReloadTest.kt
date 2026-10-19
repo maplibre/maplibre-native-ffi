@@ -27,7 +27,7 @@ class GoldfishStyleReloadTest {
   private suspend fun OwnedTextureFixture.addComposition() {
     val map = mapFixture.map
     assertCommitted(
-      complete(map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE.encodeToByteArray()))
+      complete(map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE.encodeToByteArray())),
     )
     assertCommitted(complete(map.addStyleLayerJson(COMPOSED_LAYER.encodeToByteArray(), "")))
   }

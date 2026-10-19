@@ -76,3 +76,85 @@ class AndroidPackagesTest(unittest.TestCase):
             self.capture.read_text().splitlines(),
             [f"--sdk_root={self.sdk}", "--install", "ndk;test-ndk"],
         )
+
+
+class AndroidEmulatorPackagesTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="android emulator packages ")
+        self.addCleanup(temporary.cleanup)
+        self.directory = Path(temporary.name)
+        self.sdk = self.directory / "selected sdk"
+        tools = self.sdk / "cmdline-tools/latest/bin"
+        tools.mkdir(parents=True)
+        commands = self.directory / "commands"
+        commands.mkdir()
+        self.write_command(
+            tools / "sdkmanager",
+            'attempt=$(($(cat "$CAPTURE_PATH/count" 2>/dev/null || printf 0) + 1))\n'
+            'echo "$attempt" > "$CAPTURE_PATH/count"\n'
+            'printf "%s\\n" "$@" > "$CAPTURE_PATH/arguments-$attempt"\n'
+            'cat > "$CAPTURE_PATH/licenses-$attempt"\n'
+            "if ((attempt <= SDK_FAILURES)); then exit 17; fi\n",
+        )
+        # Stop at AVD creation so the tests exercise provisioning without a device.
+        self.write_command(
+            tools / "avdmanager", 'touch "$CAPTURE_PATH/avd-reached"\nexit 73\n'
+        )
+        self.write_command(commands / "sleep", 'echo "$1" >> "$CAPTURE_PATH/delays"\n')
+        self.environment = os.environ | {
+            "ANDROID_HOME": str(self.sdk),
+            "MISE_MONOREPO_ROOT": str(self.directory),
+            "CAPTURE_PATH": str(self.directory),
+            "PATH": f"{commands}{os.pathsep}{os.defpath}",
+        }
+
+    def write_command(self, path, body):
+        path.write_text("#!/usr/bin/env bash\n" + body)
+        path.chmod(0o755)
+
+    def provision(self, failures):
+        return subprocess.run(
+            ["bash", str(ROOT / "scripts/boot-android-emulator.sh"), "26", "x86_64"],
+            env=self.environment | {"SDK_FAILURES": str(failures)},
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    def test_transient_download_failures_recover_before_avd_creation(self):
+        result = self.provision(failures=2)
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertTrue((self.directory / "avd-reached").exists())
+        self.assertEqual(
+            (self.directory / "delays").read_text().splitlines(), ["5", "10"]
+        )
+        for attempt in range(1, 4):
+            self.assertEqual(
+                (self.directory / f"arguments-{attempt}").read_text().splitlines(),
+                [
+                    f"--sdk_root={self.sdk}",
+                    "--install",
+                    "platform-tools",
+                    "emulator",
+                    "system-images;android-26;default;x86_64",
+                ],
+            )
+            self.assertEqual(
+                (self.directory / f"licenses-{attempt}").read_text().splitlines(),
+                ["y", "y", "y"],
+            )
+
+    def test_successful_downloads_continue_without_retrying(self):
+        result = self.provision(failures=0)
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertTrue((self.directory / "avd-reached").exists())
+        self.assertEqual((self.directory / "count").read_text().strip(), "1")
+        self.assertFalse((self.directory / "delays").exists())
+
+    def test_persistent_download_failures_stop_with_the_sdkmanager_status(self):
+        result = self.provision(failures=3)
+        self.assertEqual(result.returncode, 17, result.stderr)
+        self.assertEqual((self.directory / "count").read_text().strip(), "3")
+        self.assertFalse((self.directory / "avd-reached").exists())
+        self.assertIn("installation failed after 3 attempts", result.stderr)

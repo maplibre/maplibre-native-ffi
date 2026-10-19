@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#MISE description="Combine the Apple Metal native packages into the XCFramework zip, and check every slice."
+#MISE shell="bash"
+#USAGE arg "[input]" default="build/packages/native/dist" help="Directory that holds the Apple Metal native packages"
+
+set -euo pipefail
+
+input_root="${usage_input?}"
+output="${MISE_MONOREPO_ROOT}/build/packages/native/dist/MaplibreNativeC.xcframework.zip"
+# Each slice's preset, SDK, and clang target OS and variant.
+slices=(
+  "ios-arm64-metal iphoneos ios"
+  "ios-maccatalyst-arm64-metal macosx ios macabi"
+  "ios-simulator-arm64-metal iphonesimulator ios simulator"
+  "macos-arm64-metal macosx macos"
+  "tvos-arm64-metal appletvos tvos"
+  "tvos-simulator-arm64-metal appletvsimulator tvos simulator"
+)
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+# Each slice must import cleanly as a module and link, and the macOS and Mac
+# Catalyst slices also run.
+cat >"$work/consumer.m" <<'EOF'
+@import MaplibreNativeC;
+@import MaplibreNativeC.Plugin;
+
+int main(void) { return mln_plugin_get_register_function_v1() == NULL; }
+EOF
+
+frameworks=()
+for slice in "${slices[@]}"; do
+  read -r preset sdk os variant <<<"$slice"
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  if [[ -z "$archive" ]]; then
+    echo "Missing native package for ${preset} under ${input_root}" >&2
+    exit 1
+  fi
+  # bsdtar turns AppleDouble sidecars back into extended attributes, which
+  # codesign would otherwise reject as unsealed files.
+  tar -xzf "$archive" -C "$work"
+  framework="$work/maplibre-native-c-${preset}/Frameworks/MaplibreNativeC.framework"
+  frameworks+=(-framework "$framework" -debug-symbols "$framework.dSYM")
+
+  minimum="$(vtool -show-build "$framework/MaplibreNativeC" | awk '$1 == "minos" { print $2 }')"
+  xcrun --sdk "$sdk" clang -target "arm64-apple-${os}${minimum}${variant:+-$variant}" \
+    -fmodules -fmodules-cache-path="$work/module-cache" \
+    -Werror -Wall -Wincomplete-umbrella \
+    -F "${framework%/*}" -framework MaplibreNativeC -Wl,-rpath,"${framework%/*}" \
+    "$work/consumer.m" -o "$work/consumer-${preset}"
+  if [[ "$sdk" == macosx ]]; then
+    "$work/consumer-${preset}"
+  fi
+  echo "Checked ${preset}"
+done
+
+xcframework="$work/MaplibreNativeC.xcframework"
+xcodebuild -create-xcframework "${frameworks[@]}" -output "$xcframework"
+mkdir -p "$(dirname "$output")"
+rm -f "$output"
+# Swift Package Manager expects the XCFramework at the zip's root, and ditto
+# keeps the macOS symlinks.
+ditto -c -k --norsrc --noextattr --keepParent "$xcframework" "$output"
+echo "$output"

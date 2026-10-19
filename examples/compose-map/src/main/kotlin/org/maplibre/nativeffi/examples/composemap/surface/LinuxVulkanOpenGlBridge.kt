@@ -467,7 +467,7 @@ private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseabl
       val deviceRequirement =
         if (requiredDeviceUuids.isEmpty()) "" else " and matches the Skiko OpenGL device UUID"
       error(
-        "No Vulkan device supports graphics, $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME$deviceRequirement"
+        "No Vulkan device supports graphics, $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME$deviceRequirement",
       )
     }
   }
@@ -590,7 +590,7 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
             VkExtent3D.calloc(stack)
               .width(extent.physicalWidth)
               .height(extent.physicalHeight)
-              .depth(1)
+              .depth(1),
           )
           .mipLevels(1)
           .arrayLayers(1)
@@ -625,7 +625,7 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
               context.physicalDevice(),
               requirements.memoryTypeBits(),
               "No compatible Vulkan memory type found",
-            )
+            ),
           )
       val memoryOut = stack.mallocLong(1)
       checkVulkan(
@@ -647,7 +647,7 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
               .baseMipLevel(0)
               .levelCount(1)
               .baseArrayLayer(0)
-              .layerCount(1)
+              .layerCount(1),
           )
       val viewOut = stack.mallocLong(1)
       checkVulkan(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")

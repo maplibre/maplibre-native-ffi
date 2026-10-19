@@ -65,14 +65,14 @@ skipping its cases at run time.
 
 ## Rules
 
-- The ABI suite calls every exported function by name.
-  `mise run check-export-calls` fails on one that it misses, unless
+- The ABI suite calls every exported function by name. `mise run
+  check-export-calls` fails on one that it misses, unless
   `tests/uncalled-exports.txt` lists it, and on a listed one that it calls.
   Calls from `internal/` do not count.
 - A case goes in `internal/` only when no public signal can order it. First look
   for a completion that a later command fences, a gate completion, or a stepped
-  frame. The internal suite uses the seams in `src/testing`, which
-  `mise run check-exports` keeps out of the shipped library's exports.
+  frame. The internal suite uses the seams in `src/testing`, which `mise run
+  check-exports` keeps out of the shipped library's exports.
 - Create runtimes, maps, and render fixtures with the `mln_test_create_*` and
   fixture helpers. The harness reclaims what they recorded after a failure, and
   fails a passing case that leaves any behind.

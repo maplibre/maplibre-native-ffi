@@ -185,7 +185,9 @@ private final class WakeRelay {
   ) -> Wake {
     Wake(callback: { [self] in
       Task { @MainActor in
-        if let loop { work(loop) }
+        if let loop {
+          work(loop)
+        }
       }
     })
   }

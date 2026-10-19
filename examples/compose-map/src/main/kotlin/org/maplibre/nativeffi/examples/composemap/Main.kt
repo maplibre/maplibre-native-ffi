@@ -33,7 +33,7 @@ internal object Main {
       LogHandler { severity, event, code, message ->
         System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
         1u
-      }
+      },
     )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
@@ -41,7 +41,7 @@ internal object Main {
     println("native render backends: ${GeneratedApi.supportedRenderBackendMask()}")
     println("render target: compose-borrowed-texture")
     println(
-      "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface"
+      "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface",
     )
     println("render driver: ${MapLibreNativeSurfaceAdapter.driverLabel}")
     printControls()
@@ -73,7 +73,8 @@ internal object Main {
           LaunchedEffect(rendered) {
             smokeRendered = withTimeoutOrNull(SMOKE_TIMEOUT) { rendered.await() } != null
             println(
-              if (smokeRendered) "smoke: rendered a frame" else "smoke: no frame reached the window"
+              if (smokeRendered) "smoke: rendered a frame"
+              else "smoke: no frame reached the window",
             )
             exitApplication()
           }
@@ -107,7 +108,7 @@ internal object Main {
         ] / [: pitch
         0: reset pitch and bearing
       """
-        .trimIndent()
+        .trimIndent(),
     )
   }
 }

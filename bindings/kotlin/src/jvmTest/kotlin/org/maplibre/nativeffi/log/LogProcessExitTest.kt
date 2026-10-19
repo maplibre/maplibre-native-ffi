@@ -57,7 +57,7 @@ object LogProcessExitProbe {
           received.countDown()
         }
         1u
-      }
+      },
     )
     if (callbackState == "live") {
       // The runtime keeps its provider and wake, and the map a loaded style, as the process exits.

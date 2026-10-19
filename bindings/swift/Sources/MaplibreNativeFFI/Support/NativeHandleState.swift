@@ -72,7 +72,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
 
   var isClosed: Bool {
     lock.withLock {
-      if case .closed = state { true } else { false }
+      if case .closed = state {
+        true
+      } else {
+        false
+      }
     }
   }
 
@@ -107,7 +111,9 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
       switch state {
       case let .live(handle):
         if pendingDecision || (protocolOwner && (claims > 0 || readers > 0)) {
-          if pendingDecision { claimed = true }
+          if pendingDecision {
+            claimed = true
+          }
           deferredClose = destroy
           return nil
         }
@@ -142,7 +148,9 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
     return NativeClaim { [self] accepted in
       lock.withLock {
-        if accepted { claimed = true }
+        if accepted {
+          claimed = true
+        }
         claims -= 1
       }
       finishDeferredClose()

@@ -33,7 +33,7 @@ internal object VulkanRenderTarget {
               ),
               options,
             )
-          }
+          },
         )
       RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, driver, session)
       RenderTargetMode.BORROWED_TEXTURE ->
@@ -164,7 +164,7 @@ internal object VulkanRenderTarget {
       replacement: List<VulkanBorrowedImage>,
     ): Deferred<Unit> =
       session.setVulkanBorrowedTextureTarget(
-        borrowedDescriptor(sessionContext, viewport, replacement)
+        borrowedDescriptor(sessionContext, viewport, replacement),
       )
 
     override fun draw(frame: AcquiredFrameHandle): Boolean = draw(compositor, frame)

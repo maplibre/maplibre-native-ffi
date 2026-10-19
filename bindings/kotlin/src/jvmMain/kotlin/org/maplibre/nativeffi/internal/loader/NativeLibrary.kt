@@ -1,8 +1,11 @@
 package org.maplibre.nativeffi.internal.loader
 
+import java.io.IOException
 import java.net.URL
 import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
@@ -17,10 +20,19 @@ internal object NativeLibrary {
   const val LIBRARY_DIRS_PROPERTY: String = "org.maplibre.nativeffi.library.dirs"
   const val LIBRARY_DIRS_ENV: String = "MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS"
   private const val RESOURCE_ROOT: String = "META-INF/maplibre-native-ffi"
+  private const val SHARED_ROOT_CLAIM_PROPERTY: String = "org.maplibre.nativeffi.extraction.shared"
 
   private val lock = Any()
   private val loadedRuntimeDependencies = mutableSetOf<Path>()
-  private val extractionRoot: Path by lazy { createPrivateExtractionRoot() }
+  private val ownerOnly = PosixFilePermissions.fromString("rwx------")
+  private val extractionRoot: Path by lazy {
+    val temporaryDirectory = Path.of(System.getProperty("java.io.tmpdir"))
+    // The JVM binds a library path to one class loader, so only the first copy of this binding
+    // in a process extracts to the shared root.
+    val claimed = System.getProperties().putIfAbsent(SHARED_ROOT_CLAIM_PROPERTY, "true") == null
+    (if (claimed) sharedExtractionRoot(temporaryDirectory) else null)
+      ?: createPrivateExtractionRoot(temporaryDirectory)
+  }
 
   @Volatile private var loadedLibrary: LoadedLibrary? = null
 
@@ -114,7 +126,7 @@ internal object NativeLibrary {
     if (libraryResources.size > 1) {
       throw UnsatisfiedLinkError(
         "Multiple MapLibre native runtime JARs provide $classifier: " +
-          libraryResources.joinToString()
+          libraryResources.joinToString(),
       )
     }
 
@@ -191,18 +203,46 @@ internal object NativeLibrary {
     return destination
   }
 
-  private fun createPrivateExtractionRoot(): Path {
-    val temporaryDirectory = Path.of(System.getProperty("java.io.tmpdir"))
-    return if (Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")) {
+  /**
+   * Returns the extraction root that every process of the current user shares, or null when the
+   * file system cannot show that only the user can write to it. Extraction directories under the
+   * root are keyed by content digest, so processes that load the same runtime reuse one copy.
+   */
+  internal fun sharedExtractionRoot(temporaryDirectory: Path): Path? {
+    val userName = System.getProperty("user.name")
+    val root =
+      temporaryDirectory.resolve(
+        "maplibre-native-ffi-" + userName.replace(Regex("[^A-Za-z0-9._-]"), "_"),
+      )
+    return try {
+      // Without POSIX modes, an owner check alone cannot rule out a writable ACL.
+      if (!Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")) {
+        return null
+      }
+      try {
+        Files.createDirectory(root, PosixFilePermissions.asFileAttribute(ownerOnly))
+      } catch (_: FileAlreadyExistsException) {}
+      val trusted =
+        Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS) &&
+          Files.getOwner(root, LinkOption.NOFOLLOW_LINKS) ==
+            root.fileSystem.userPrincipalLookupService.lookupPrincipalByName(userName) &&
+          Files.getPosixFilePermissions(root, LinkOption.NOFOLLOW_LINKS) == ownerOnly
+      root.takeIf { trusted }
+    } catch (_: IOException) {
+      null
+    }
+  }
+
+  private fun createPrivateExtractionRoot(temporaryDirectory: Path): Path =
+    if (Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")) {
       Files.createTempDirectory(
         temporaryDirectory,
         "maplibre-native-ffi-",
-        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")),
+        PosixFilePermissions.asFileAttribute(ownerOnly),
       )
     } else {
       Files.createTempDirectory(temporaryDirectory, "maplibre-native-ffi-")
     }
-  }
 
   private fun sha256(path: Path): ByteArray {
     val digest = MessageDigest.getInstance("SHA-256")
@@ -242,7 +282,7 @@ internal object NativeLibrary {
         } catch (error: UnsatisfiedLinkError) {
           loadedRuntimeDependencies.remove(canonicalPath)
           throw UnsatisfiedLinkError(
-              "Unable to load MapLibre native runtime dependency from $canonicalPath"
+              "Unable to load MapLibre native runtime dependency from $canonicalPath",
             )
             .also { it.addSuppressed(error) }
         }
@@ -256,7 +296,7 @@ internal object NativeLibrary {
         "Unable to load native library $LIBRARY_NAME. Set $LIBRARY_PATH_PROPERTY or " +
           "$LIBRARY_PATH_ENV to an exact library file path, or make the library available on " +
           "the classpath or java.library.path. Set $LIBRARY_DIRS_PROPERTY or $LIBRARY_DIRS_ENV when host " +
-          "runtime dependency directories are needed."
+          "runtime dependency directories are needed.",
       )
     error.addSuppressed(cause)
     return error

@@ -152,7 +152,7 @@ internal object TestGraphics {
                   pointer(context.eglContext),
                   OpenglClientApi.GLES,
                   NativePointer.NULL_POINTER,
-                )
+                ),
               ),
             ),
           ),
@@ -169,7 +169,7 @@ internal object TestGraphics {
                   pointer(context.wglDeviceContext),
                   pointer(context.wglContext),
                   NativePointer.NULL_POINTER,
-                )
+                ),
               ),
             ),
           ),

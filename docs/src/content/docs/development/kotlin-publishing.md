@@ -129,6 +129,11 @@ AAR carries that one library per ABI and redistributes no `libc++_shared.so`.
 Runtime AARs include the native dependency notices and the Android NDK notice
 under `META-INF/licenses`.
 
+Each Android runtime AAR also contains a Prefab module, `maplibre-native-c`,
+with the C headers and a second copy of each `jni/` library for a host's native
+build to link. The copy doubles the native payload of the AAR, but an APK
+packages only the `jni/` library.
+
 Each Android runtime AAR also contains the JVM helper built from the pinned,
 patched `rustls-platform-verifier` checkout acquired by mise, its consumer R8
 rule, and the upstream licenses. The helper and Rust JNI descriptors use the
@@ -168,9 +173,13 @@ Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
 MapLibre Native FFI shared library and the runtime dependencies that the project
 redistributes. It carries their notices under
 `META-INF/licenses/maplibre-native-c`. The JVM binding extracts that packaged
-set to a versioned directory and loads packaged dependencies before the C API
-library. Linux hosts still need the selected graphics loader and driver.
-Explicit native-library path configuration remains available as an override.
+set to a directory keyed by its content digest. On Linux and macOS, that
+directory sits under an owner-only, per-user root in the temporary directory, so
+every process that loads the same runtime reuses one copy. On Windows, and for a
+second copy of the binding in one JVM, each extraction gets a private temporary
+directory. The binding loads packaged dependencies before the C API library.
+Linux hosts still need the selected graphics loader and driver. Explicit
+native-library path configuration remains available as an override.
 
 ## Snapshot publication
 
@@ -190,11 +199,11 @@ hash of the commit it last published from, so a change confined to another
 binding leaves the Kotlin modules alone. That commit is recorded as a floating
 `snapshot-state/<component>` tag, whose annotated message carries the timestamp
 and run URL of the publish, and only components that published successfully have
-their tag moved, so a failure is retried the next day.
-`git ls-remote --tags origin 'refs/tags/snapshot-state/*'` reports where every
-snapshot stands. Dispatch the workflow manually to publish sooner: `all` applies
-the same gate immediately, and naming one component republishes it whether or
-not its inputs changed.
+their tag moved, so a failure is retried the next day. `git ls-remote --tags
+origin 'refs/tags/snapshot-state/*'` reports where every snapshot stands.
+Dispatch the workflow manually to publish sooner: `all` applies the same gate
+immediately, and naming one component republishes it whether or not its inputs
+changed.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

@@ -95,7 +95,7 @@ private constructor(
             )
           if (library == NULL) {
             error(
-              "Metal shader library creation failed: ${MacObjectiveC.errorDescription(errorOut[0])}"
+              "Metal shader library creation failed: ${MacObjectiveC.errorDescription(errorOut[0])}",
             )
           }
           vertex = MacObjectiveC.sendPointer(library, "newFunctionWithName:", vertexName)
@@ -123,7 +123,7 @@ private constructor(
             )
           if (pipeline == NULL) {
             error(
-              "Metal render pipeline creation failed: ${MacObjectiveC.errorDescription(errorOut[0])}"
+              "Metal render pipeline creation failed: ${MacObjectiveC.errorDescription(errorOut[0])}",
             )
           }
           return pipeline

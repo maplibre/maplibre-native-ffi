@@ -7,7 +7,6 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 from __future__ import annotations
 
 import functools
-import os
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
@@ -542,7 +541,15 @@ def field_initial(value: ValuePlan, literal: str) -> FieldInitial:
 def enum_member_prefix(constants) -> str:
     """The prefix that an enum's constants share, cut back to a whole word."""
     names = list(constants)
-    return os.path.commonprefix(names).rsplit("_", 1)[0] + "_" if names else ""
+    if not names:
+        return ""
+    # The lexically first and last names differ wherever any two names do.
+    first, last = min(names), max(names)
+    shared = next(
+        (first[:index] for index, (a, b) in enumerate(zip(first, last)) if a != b),
+        first,
+    )
+    return shared.rsplit("_", 1)[0] + "_"
 
 
 SCALAR_CANONICAL_TYPES = frozenset(

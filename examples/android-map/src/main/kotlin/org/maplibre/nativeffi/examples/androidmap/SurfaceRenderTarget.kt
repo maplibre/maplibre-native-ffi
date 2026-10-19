@@ -106,7 +106,11 @@ private constructor(
         is EglGraphicsContext -> {
           session
             .setOpenglSurfaceTarget(
-              OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+              OpenglSurfaceDescriptor(
+                viewport.extent,
+                graphics.descriptor,
+                graphics.surfacePointer,
+              ),
             )
             .invokeOnCompletion(handover::settle)
           state.resize(viewport)

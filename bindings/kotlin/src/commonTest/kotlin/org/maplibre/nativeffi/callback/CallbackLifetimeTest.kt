@@ -31,7 +31,7 @@ class CallbackLifetimeTest {
   }
 
   private fun selfCapturingProvider(
-    claimed: CompletableDeferred<TestWeakReference>
+    claimed: CompletableDeferred<TestWeakReference>,
   ): ResourceProvider = denyingProvider { request, handle ->
     if (request.requestedUrl != STYLE_URL) return@denyingProvider null
     handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })

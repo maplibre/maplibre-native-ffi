@@ -43,7 +43,7 @@ object AbandonedMapProbe {
         }
 
         override fun println(x: Any?) = println(x?.toString())
-      }
+      },
     )
     Maplibre.loadNativeLibrary()
     runSuspendTest { abandonAMapAndAwaitItsDisposal() }

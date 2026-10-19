@@ -65,13 +65,13 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}",
         )
     val contextHandler = requireMetalContextHandler(layer)
     val device =
       contextHandler.getField("device")
         ?: throw NativeSurfaceBridgeException(
-          "${contextHandler.javaClass.name}.device was null; Skiko has not created the Metal device yet"
+          "${contextHandler.javaClass.name}.device was null; Skiko has not created the Metal device yet",
         )
     val ptr =
       when (device) {
@@ -80,7 +80,7 @@ internal object SkikoHost {
           device.getField("ptr") as? Long
             ?: device.invokeNoArg("getPtr") as? Long
             ?: throw NativeSurfaceBridgeException(
-              "${device.javaClass.name} did not expose the Skiko MetalDevice pointer"
+              "${device.javaClass.name} did not expose the Skiko MetalDevice pointer",
             )
       }
     if (ptr == 0L) {
@@ -93,7 +93,7 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}",
         )
     val redrawer = requireDirect3DRedrawer(layer)
     val ptr =
@@ -179,7 +179,7 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}",
         )
     readLinuxOpenGlContext(requireLinuxOpenGlRedrawer(layer))
   }
@@ -287,7 +287,7 @@ internal object SkikoHost {
     val contextHandler =
       redrawer.getField("contextHandler")
         ?: throw NativeSurfaceBridgeException(
-          "$LINUX_OPENGL_REDRAWER_CLASS.contextHandler was null"
+          "$LINUX_OPENGL_REDRAWER_CLASS.contextHandler was null",
         )
     val skia =
       (contextHandler.getField("context") as? DirectContext)
@@ -350,7 +350,7 @@ internal object SkikoHost {
       append(
         window.walkComponents().drop(1).take(12).joinToString { component ->
           component.javaClass.name
-        }
+        },
       )
       append("]")
     }
@@ -445,7 +445,7 @@ internal object SkikoHost {
       val currentSurface =
         surface
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap Metal texture ${target.texture.address}"
+            "Skia could not wrap Metal texture ${target.texture.address}",
           )
       currentSurface.notifyContentWillChange(ContentChangeMode.DISCARD)
       val image = currentSurface.makeImageSnapshot()
@@ -492,7 +492,7 @@ internal object SkikoHost {
           surfaceProps = null,
         )
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap Metal texture ${target.texture.address} as a render target"
+            "Skia could not wrap Metal texture ${target.texture.address} as a render target",
           )
     }
 
@@ -541,7 +541,7 @@ internal object SkikoHost {
       val currentSurface =
         surface
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap Direct3D texture ${target.texture.address}"
+            "Skia could not wrap Direct3D texture ${target.texture.address}",
           )
       currentSurface.notifyContentWillChange(ContentChangeMode.DISCARD)
       val image = currentSurface.makeImageSnapshot()
@@ -593,7 +593,7 @@ internal object SkikoHost {
           surfaceProps = null,
         )
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap Direct3D texture ${target.texture.address} as a render target"
+            "Skia could not wrap Direct3D texture ${target.texture.address} as a render target",
           )
     }
 
@@ -645,7 +645,7 @@ internal object SkikoHost {
       val currentSurface =
         surface
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap OpenGL texture ${target.textureName}"
+            "Skia could not wrap OpenGL texture ${target.textureName}",
           )
       context.resetGLAll()
       currentSurface.notifyContentWillChange(ContentChangeMode.DISCARD)
@@ -709,7 +709,7 @@ internal object SkikoHost {
           surfaceProps = null,
         )
           ?: throw NativeSurfaceBridgeException(
-            "Skia could not wrap OpenGL framebuffer $framebuffer for texture ${target.textureName}"
+            "Skia could not wrap OpenGL framebuffer $framebuffer for texture ${target.textureName}",
           )
     }
 

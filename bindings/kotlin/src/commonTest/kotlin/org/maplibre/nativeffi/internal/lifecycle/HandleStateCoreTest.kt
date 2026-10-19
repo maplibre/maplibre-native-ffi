@@ -31,7 +31,7 @@ class HandleStateCoreTest {
             call = {
               releases++
               CompletableDeferred(Unit)
-            }
+            },
           )
         }
       assertEquals("Batch is in use", error.diagnostic)
@@ -43,7 +43,7 @@ class HandleStateCoreTest {
       call = {
         releases++
         CompletableDeferred(Unit)
-      }
+      },
     )
     assertEquals(1, releases)
     assertTrue(state.isReleased())
@@ -85,7 +85,7 @@ class HandleStateCoreTest {
           destroy = {
             attempts += 1
             throw Status.exception(MaplibreStatus.NATIVE_ERROR.nativeCode, "destroy failed")
-          }
+          },
         )
       }
 
@@ -103,7 +103,7 @@ class HandleStateCoreTest {
       destroy = {
         attempts += 1
         error("destroy must not be called after release")
-      }
+      },
     )
 
     assertEquals(2, attempts)
@@ -126,7 +126,7 @@ class HandleStateCoreTest {
           assertFailsWith<InvalidStateException> { state.closeOnce(destroy = { attempts += 1 }) }
         assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
         assertEquals("TestHandle is closing", closeError.diagnostic)
-      }
+      },
     )
 
     assertEquals(1, attempts)
@@ -165,7 +165,7 @@ class HandleStateCoreTest {
     assertEquals(
       listOf(
         "Leaked MapHandle native handle 0x5678; close it explicitly. " +
-          "Disposing it failed: the map is closing"
+          "Disposing it failed: the map is closing",
       ),
       reports,
     )
@@ -179,7 +179,7 @@ class HandleStateCoreTest {
     // Runs while closeOnce holds the releasing state, the window a use on another thread
     // would land in.
     state.closeOnce(
-      destroy = { refusal = assertFailsWith<InvalidStateException> { state.withLive {} } }
+      destroy = { refusal = assertFailsWith<InvalidStateException> { state.withLive {} } },
     )
 
     assertEquals("TestHandle is closing", (refusal as InvalidStateException).diagnostic)

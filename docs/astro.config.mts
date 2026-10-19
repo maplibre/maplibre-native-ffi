@@ -1,11 +1,14 @@
 // @ts-check
 
-import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
+import { satteri } from "@astrojs/markdown-satteri";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightCopyButton from "starlight-copy-button";
 import starlightLinksValidator from "starlight-links-validator";
 import starlightLlmsTxt from "starlight-llms-txt";
+
+import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
+import { versionsPlugin } from "./src/integrations/versions";
 
 const base = "/maplibre-native-ffi";
 
@@ -13,6 +16,9 @@ const base = "/maplibre-native-ffi";
 export default defineConfig({
   site: "https://maplibre.org",
   base,
+  markdown: {
+    processor: satteri({ mdastPlugins: [versionsPlugin] }),
+  },
   integrations: [
     publicDirectoryIndex(base),
     starlight({

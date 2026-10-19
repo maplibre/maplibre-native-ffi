@@ -35,7 +35,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
 
   private val runtime =
     GeneratedApi.runtimeCreate(
-      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake)
+      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake),
     )
   private lateinit var ownedMap: MapHandle
   val map: MapHandle
@@ -51,7 +51,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
                 initialExtent = currentSize,
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
-              )
+              ),
           )
           .await()
       }
@@ -77,7 +77,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
   fun setGestureInProgress(inProgress: Boolean) {
     submit("gesture update") {
       map.updateCamera(
-        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END),
       )
     }
   }
@@ -91,7 +91,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
       CameraDelta(
         offset = ScreenPoint(deltaX, deltaY),
         animation = animation(KEYBOARD_ANIMATION_MS),
-      )
+      ),
     )
   }
 
@@ -138,7 +138,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
           mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
           camera = camera,
           animation = AnimationOptions(durationMs = durationMs),
-        )
+        ),
       )
     }
   }

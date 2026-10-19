@@ -42,8 +42,11 @@ enum NativeCallbackGuard {
   struct Scope {
     fileprivate let previous: Any?
     func end() {
-      if let previous { Thread.current.threadDictionary[key] = previous }
-      else { Thread.current.threadDictionary.removeObject(forKey: key) }
+      if let previous {
+        Thread.current.threadDictionary[key] = previous
+      } else {
+        Thread.current.threadDictionary.removeObject(forKey: key)
+      }
     }
   }
 }

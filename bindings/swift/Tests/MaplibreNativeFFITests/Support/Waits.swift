@@ -85,7 +85,9 @@ func awaitCondition(
   let deadline = TestTimeout.deadline(seconds: seconds)
   while true {
     let seen = Pulse.shared.generation
-    if try condition() { return true }
+    if try condition() {
+      return true
+    }
     let now = DispatchTime.now()
     guard now < deadline else {
       Issue.record(

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import keyword
-import os
 import re
 from dataclasses import replace
 from typing import NoReturn
 
 from .. import docs
 from ..model import ModelError
-from ..semantic import BoundApi, ValuePlan
+from ..semantic import BoundApi, ValuePlan, enum_member_prefix
 
 SCALARS = {
     "bool": "bool",
@@ -513,12 +512,7 @@ class Values:
                         + f"    value: {self.type(field.value)}\n    _tag = {tag}\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls({self.facade_copy(field.value, 'raw')})\n"
                     )
         for name, plan in sorted(self.enums.items()):
-            prefix = (
-                os.path.commonprefix([key for key, _ in plan.enum_values]).rsplit(
-                    "_", 1
-                )[0]
-                + "_"
-            )
+            prefix = enum_member_prefix(key for key, _ in plan.enum_values)
             body = "\n".join(
                 f"    {key.removeprefix(prefix)} = {value}"
                 for key, value in plan.enum_values

@@ -1,15 +1,8 @@
 # MapLibre Native patches
 
 `.mise/bin/sync-submodules` applies these to the `third_party/maplibre-native`
-worktree after checking out the pinned commit. The submodule keeps tracking
-upstream, so the pin stays honest and each patch is a change we are carrying
-only until it lands there.
-
-`0002-windows-local-file-urls.patch` removes the URI-only leading slash from
-canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
-APIs. This lets the local file source load percent-encoded `file:///C:/...`
-resources whose paths contain spaces or non-ASCII characters. Upstream:
-[maplibre-native#4572](https://github.com/maplibre/maplibre-native/pull/4572).
+worktree after checking out the pinned commit. The submodule tracks upstream.
+The patches below describe the changes that we carry and their upstream status.
 
 `0004-opengl-valid-api-calls.patch` allocates storage before copying a uniform
 buffer and isolates allocation errors from earlier OpenGL calls. This prevents
@@ -68,9 +61,8 @@ at commit `0b5d2502bb39aa2098c585ae29684956d9e1ffd6`.
 `0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
 with an angular half-width, a radius in logical pixels, and a color that fades
 toward the outer edge. The paint properties support zoom expressions and
-transitions; their transition setters publish layer changes. The patch includes
-the upstream conversion test and three render fixtures with their binary
-reference images. It carries the closed
+transitions. The patch includes the upstream conversion test and three render
+fixtures with their binary reference images. It carries the closed
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
 at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`, until a location indicator
 plugin can replace the core layer.
@@ -89,17 +81,23 @@ style load whose parse added no layer published no update to the renderer. The
 legacy annotation source hid both, because it joined every style. Upstream:
 [maplibre-native#4674](https://github.com/maplibre/maplibre-native/pull/4674).
 
-`0024-render-update-publication.patch` publishes render updates after image and
-source removal, source insertion, tile-selection changes, and transition
-changes. Generated layer transition setters also refresh the style's immutable
-layer collection. The bearing-accuracy setters belong to 0021. Native
-regressions cover collection changes, transition options, and tile-selection
-updates. Upstream:
-[maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676),
-[maplibre-native#4677](https://github.com/maplibre/maplibre-native/pull/4677),
-and
-[maplibre-native#4678](https://github.com/maplibre/maplibre-native/pull/4678).
+`0024-source-image-publication.patch` publishes render updates after source
+insertion, successful source removal, and image removal. Native regressions
+check that the renderer receives the changed collections. Upstream:
+[maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676).
 See [issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
+
+`0040-tile-selection-publication.patch` publishes render updates when the
+prefetch zoom delta or a tile LOD option changes. The Native regression checks
+that all six setters publish new values and preserve the snapshot when a value
+stays the same. Upstream:
+[maplibre-native#4678](https://github.com/maplibre/maplibre-native/pull/4678).
+
+`0041-bearing-accuracy-transition-publication.patch` refreshes the style's
+immutable layer collection after changing transition options for bearing
+accuracy, its color, or its radius. It depends on
+`0021-location-indicator-bearing-accuracy.patch` and remains local with those
+properties until a location indicator plugin replaces them.
 
 `0025-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
 timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
@@ -139,21 +137,6 @@ icons on existing tiles. Native pixel regressions cover late registration with
 synchronous and asynchronous GeoJSON, with and without text. Upstream:
 [maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
-`0031-custom-geometry-query-before-data.patch` returns an empty source query
-while a custom geometry tile awaits its first data. The Native tile regression
-queries before delivery and after parsing. Upstream:
-[maplibre-native#4718](https://github.com/maplibre/maplibre-native/pull/4718).
-
-`0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
-advances the frame count when a render pass begins, matching Metal and Vulkan
-cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
-and Vulkan. A Native map regression checks frame progression and draw counts
-before and after hiding a layer, and the C suite's
-`frame_statistics_count_each_frame_and_its_draws` case in
-`tests/native/abi/render/invalidation.c` checks the statistics that frame events
-report. Upstream:
-[maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
-
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
 page boundary and updates dedicated OpenGL uniform buffers without reading an
 absent CPU copy. The regression reads back allocations and repeated updates at
@@ -174,18 +157,11 @@ defaults. See
 Upstream:
 [maplibre-native#4744](https://github.com/maplibre/maplibre-native/pull/4744).
 
-`0037-platform-locale-expression-errors.patch` converts C++ failures from
-platform number formatters and collators into expression evaluation errors.
-Collator comparison helpers allow exceptions to reach the evaluator. A failed
-layer filter excludes the feature, and a failed property expression uses its
-default value. This lets Android JNI failures follow Native's expression error
-handling instead of terminating the process. Upstream:
-[maplibre-native#4745](https://github.com/maplibre/maplibre-native/pull/4745).
-
 `0038-apple-locale-expressions.patch` applies explicit fraction limits to
 Foundation decimal and currency formatters while retaining omitted defaults.
 Apple locale expressions reject malformed UTF-8 as expression errors and
-preserve embedded null characters during string conversion.
+preserve embedded null characters during string conversion. Failures use
+Native's `LocaleException` so that expression evaluation reports an error.
 
 `0039-color-ramp-global-state.patch` builds line gradient, heatmap color, and
 color relief ramps during layer evaluation, using the global state of the
@@ -195,7 +171,7 @@ ramp reads had changed. A write to an unrelated key in the same update therefore
 left an added layer with an empty ramp, and a changed layer with outdated
 colors. Native map pixel regressions cover both cases for all three layer types.
 
-`0040-destroy-thread-local-run-loop.patch` preserves thread-exit cleanup for the
+`0042-destroy-thread-local-run-loop.patch` preserves thread-exit cleanup for the
 run loop that `Scheduler::GetCurrent()` creates for a thread with no scheduler.
 It applies `[[clang::always_destroy]]` when the compiler supports the attribute
 and leaves other compilers' normal destruction unchanged. This supports builds
@@ -208,7 +184,7 @@ destructor; glslang compiles shaders in pools that `TShader` and `TProgram` own,
 so a thread leaks only what it allocated from the default pool outside them.
 Upstream: not yet proposed.
 
-`0041-cancel-camera-transitions-by-id.patch` adds an optional
+`0043-cancel-camera-transitions-by-id.patch` adds an optional
 `AnimationOptions::transitionId` and a `cancelTransitions(uint64_t)` overload on
 `Transform` and `Map`. The overload cancels the commands that carry that
 identity and leaves the others animating, so a host can end one camera command
@@ -220,7 +196,7 @@ needs and this build turns off. The patch includes a Transform regression for a
 matching cancellation, a cancellation that matches nothing, and the command that
 keeps running. Upstream: not yet proposed; it depends on 0015.
 
-`0042-fly-duration-range.patch` rejects a flight whose derived duration cannot
+`0044-fly-duration-range.patch` rejects a flight whose derived duration cannot
 fit Native's duration before converting seconds to integer ticks. The bound uses
 an exclusive maximum because the floating-point representation of the maximum
 integer duration rounds upward. Padding can make the flight's visible span
@@ -232,9 +208,8 @@ Upstream: not yet proposed.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
-bearing-accuracy patch includes its transition setters, and the query-filter
-patch preserves the preceding camera-zoom fix. Tests reuse includes from earlier
-patches.
+query-filter patch preserves the preceding camera-zoom fix. Tests reuse includes
+from earlier patches.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied

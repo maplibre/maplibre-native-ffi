@@ -35,7 +35,7 @@ function(mln_ffi_add_core_licenses target)
   endif()
 endfunction()
 
-function(mln_ffi_install_licenses target component)
+function(mln_ffi_install_licenses target component destination)
   set(license_targets ${target} mln_ffi_platform_dependencies
       mln_ffi_render_dependencies)
   if(TARGET mln_ffi_platform_rust)
@@ -68,7 +68,7 @@ function(mln_ffi_install_licenses target component)
       list(APPEND installed_names "${license_name}")
       install(
         FILES "${license_file}"
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c/licenses"
+        DESTINATION "${destination}"
         RENAME "${license_name}"
         COMPONENT "${component}")
     endforeach()

@@ -26,7 +26,9 @@ bindgen = { version = "0.72.1", optional = true }
 
 [dev-dependencies]
 # The tests make the C ABI check see another version.
-maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core", features = ["abi-version-override"] }
+maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core", features = [
+  "abi-version-override",
+] }
 static_assertions = "1.1.0"
 
 # Loads the GPU fixtures from tests/graphics.

@@ -65,10 +65,12 @@ internal class HandleStateCore(
   override fun issued(): Long = handleId
 
   override fun closeHandle(name: String, call: (Long) -> Unit) {
-    closeOnce({
-      CallbackAdmission.check(handleId, name)
-      call(handleId)
-    })
+    closeOnce(
+      {
+        CallbackAdmission.check(handleId, name)
+        call(handleId)
+      },
+    )
   }
 
   /**

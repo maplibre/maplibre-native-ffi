@@ -106,7 +106,7 @@ class AndroidAssetStyleTest {
       runtimeOptions = runtimeOptions(assetPath),
     ) {
       setStyle(
-        """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://$archiveUrl"}},"layers":[]}"""
+        """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://$archiveUrl"}},"layers":[]}""",
       )
       renderStill()
     }

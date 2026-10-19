@@ -34,7 +34,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(beforeLayerId ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -56,7 +56,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCustomGeometrySourceOptions(options),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -78,7 +78,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCustomMvtVectorSourceOptions(options),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -100,7 +100,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           data.binding.handle(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -124,7 +124,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeGeojsonSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -148,7 +148,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(beforeLayerId ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -173,7 +173,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writePremultipliedRgba8Image(image),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -198,7 +198,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(url),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -220,7 +220,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(beforeLayerId ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -247,7 +247,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -271,7 +271,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -298,7 +298,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -322,7 +322,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -344,7 +344,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(beforeLayerId ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -366,7 +366,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(sourceJson),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -393,7 +393,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -417,7 +417,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleTileSourceOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -826,7 +826,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -853,7 +853,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -881,7 +881,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -895,7 +895,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun cancelCameraTransition(transitionId: ULong): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_cancel_camera_transition") {
       check(
-        C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic)
+        C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic),
       )
     }
 
@@ -989,7 +989,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeFeatureStateSelector(selector),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1163,7 +1163,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(propertyName),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1255,7 +1255,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeLatLngBounds(bounds),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1277,7 +1277,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCanonicalTileId(tileId),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1299,7 +1299,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCanonicalTileId(tileId),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1322,7 +1322,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCameraOptions(camera),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1345,7 +1345,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeCameraOptions(camera),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1384,7 +1384,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeScreenPoint(point),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1417,7 +1417,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           points.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1450,7 +1450,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           points.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1539,7 +1539,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(beforeLayerId ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1588,7 +1588,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           coordinates.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1617,7 +1617,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeFeatureStateSelector(selector),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1718,7 +1718,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(data),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1742,7 +1742,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(data),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1766,7 +1766,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(message),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1810,7 +1810,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(state),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1828,7 +1828,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeFreeCameraOptions(options),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1850,7 +1850,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           data.binding.handle(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1872,7 +1872,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           enabled,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1885,7 +1885,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setGeojsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_geojson_source_url") {
       check(
-        C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic)
+        C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
     }
 
@@ -1907,7 +1907,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(valueValue),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1930,7 +1930,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           coordinates.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1952,7 +1952,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writePremultipliedRgba8Image(image),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -1965,7 +1965,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_image_source_url") {
       check(
-        C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic)
+        C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
     }
 
@@ -1987,7 +1987,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           radius,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2009,7 +2009,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           bearing,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2033,7 +2033,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(imageId),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2057,7 +2057,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           altitude,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2070,7 +2070,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setProjectionMode(mode: ProjectionMode): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_projection_mode") {
       check(
-        C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic)
+        C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic),
       )
     }
 
@@ -2105,7 +2105,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           options?.let { writeStyleImageOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2138,7 +2138,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           filter?.let { view(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2151,7 +2151,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setStyleLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_layer_max_zoom") {
       check(
-        C.mln_map_set_style_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic)
+        C.mln_map_set_style_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic),
       )
     }
 
@@ -2164,7 +2164,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setStyleLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_layer_min_zoom") {
       check(
-        C.mln_map_set_style_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic)
+        C.mln_map_set_style_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic),
       )
     }
 
@@ -2188,7 +2188,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(valueValue),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2207,7 +2207,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(sourceId),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2229,7 +2229,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(sourceLayer ?: ""),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2251,7 +2251,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           visibility.rawValue.toInt(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2284,7 +2284,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           view(valueValue),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2306,7 +2306,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           isVolatile,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2317,7 +2317,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setStyleTransitionOptions(
-    options: StyleTransitionOptions
+    options: StyleTransitionOptions,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_transition_options") {
       check(
@@ -2326,7 +2326,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeStyleTransitionOptions(options),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -2350,7 +2350,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setTileOptions(options: MapTileOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_tile_options") {
       check(
-        C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic)
+        C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
       )
     }
 
@@ -2368,7 +2368,7 @@ public abstract class GeneratedMapOperations internal constructor() {
           writeMapViewportOptions(options),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 

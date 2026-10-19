@@ -50,7 +50,7 @@ internal suspend fun assertFilterSelects(
     val ids = expected.map { "case-$it" }.toSet()
     val source =
       complete(
-        session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = encode(filter)))
+        session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = encode(filter))),
       )
     assertEquals(ids, source.map { it.stringId() }.toSet(), "source query: $filter")
     val rendered =
@@ -61,11 +61,11 @@ internal suspend fun assertFilterSelects(
               ScreenBox(
                 ScreenPoint(0.0, 0.0),
                 ScreenPoint(FILTER_MAP_SIZE.toDouble(), FILTER_MAP_SIZE.toDouble()),
-              )
-            )
+              ),
+            ),
           ),
           RenderedFeatureQueryOptions(layerIds = listOf("cases")),
-        )
+        ),
       )
     assertEquals(ids, rendered.map { it.stringId() }.toSet(), "rendered layer filter: $filter")
   }

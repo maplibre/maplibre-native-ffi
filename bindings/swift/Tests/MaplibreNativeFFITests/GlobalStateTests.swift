@@ -3,8 +3,8 @@
 #elseif canImport(Glibc)
   import Glibc
 #endif
-import CMaplibreNativeC
 import Foundation
+import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
@@ -263,7 +263,9 @@ private final class StandardErrorCapture: @unchecked Sendable {
     Thread { [captured, drained] in
       while true {
         let chunk = reader.availableData
-        if chunk.isEmpty { break }
+        if chunk.isEmpty {
+          break
+        }
         captured.update { $0.append(chunk) }
       }
       drained.signal()

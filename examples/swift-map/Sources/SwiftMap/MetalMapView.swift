@@ -82,40 +82,56 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    if let mapState { input.mouseDown(event, mapState: mapState) }
+    if let mapState {
+      input.mouseDown(event, mapState: mapState)
+    }
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    if let mapState { input.rightMouseDown(event, mapState: mapState) }
+    if let mapState {
+      input.rightMouseDown(event, mapState: mapState)
+    }
   }
 
   override func mouseUp(with event: NSEvent) {
-    if let mapState { input.mouseUp(event, mapState: mapState) }
+    if let mapState {
+      input.mouseUp(event, mapState: mapState)
+    }
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    if let mapState { input.rightMouseUp(event, mapState: mapState) }
+    if let mapState {
+      input.rightMouseUp(event, mapState: mapState)
+    }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    if let mapState { input.mouseDragged(event, mapState: mapState) }
+    if let mapState {
+      input.mouseDragged(event, mapState: mapState)
+    }
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    if let mapState { input.mouseDragged(event, mapState: mapState) }
+    if let mapState {
+      input.mouseDragged(event, mapState: mapState)
+    }
   }
 
   override func scrollWheel(with event: NSEvent) {
-    if let mapState { input.scrollWheel(event, in: self, mapState: mapState) }
+    if let mapState {
+      input.scrollWheel(event, in: self, mapState: mapState)
+    }
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    if let mapState { input.keyDown(
-      event,
-      viewport: viewport,
-      mapState: mapState
-    ) }
+    if let mapState {
+      input.keyDown(
+        event,
+        viewport: viewport,
+        mapState: mapState
+      )
+    }
   }
 
   /// The map that input drives, once the loop is running.

@@ -318,7 +318,7 @@ runs:
 
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
-      uses: jakoch/install-vulkan-sdk-action@37effcfa045411f8bfbbda26df2fd1b3bf3436fa # v1.6.0
+      uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
         # hit returns before the runtime is installed, so the entry saved
@@ -372,7 +372,7 @@ runs:
       run: |
         prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
-        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore toolchains
       id: toolchains
@@ -403,12 +403,11 @@ runs:
     - name: Bootstrap repository
       uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       with:
-        version: 2026.8.2
+        version: 2026.10.13
         cache: false
         bootstrap: true
-        # mise 2026.8.2 validates the Unix-only managed-files phase even when
-        # the repository declares no managed files. Skip that unused phase on
-        # Windows until mise handles an empty configuration there.
+        # The repository declares no managed files. Skip that unused Unix-only
+        # files phase on Windows so bootstrap does not validate an empty config.
         bootstrap_skip: ${{ runner.os == 'Windows' && 'files' || '' }}
 
     # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
@@ -418,6 +417,8 @@ runs:
     - name: Install project toolchains (Unix)
       if: runner.os != 'Windows'
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: MISE_NO_HOOKS=1 mise install --monorepo
 
     # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
@@ -428,6 +429,8 @@ runs:
     - name: Install project toolchains (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         $env:MISE_NO_HOOKS = "1"
         foreach ($attempt in 1..2) {

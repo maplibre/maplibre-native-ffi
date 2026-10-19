@@ -227,7 +227,7 @@ private fun OpenGlContextHandles.toDescriptor(): OpenglContextDescriptor =
               shareContext.toPointer(),
               org.maplibre.nativeffi.generated.OpenglClientApi.GLES,
               getProcAddress.toPointer(),
-            )
+            ),
           )
         is WglContextHandles ->
           org.maplibre.nativeffi.generated.OpenglContextDescriptorData.Wgl(
@@ -235,7 +235,7 @@ private fun OpenGlContextHandles.toDescriptor(): OpenglContextDescriptor =
               deviceContext.toPointer(),
               shareContext.toPointer(),
               getProcAddress.toPointer(),
-            )
+            ),
           )
       },
   )

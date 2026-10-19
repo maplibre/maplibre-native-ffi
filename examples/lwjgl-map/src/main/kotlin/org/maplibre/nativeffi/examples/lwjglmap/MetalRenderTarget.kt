@@ -31,7 +31,7 @@ internal object MetalRenderTarget {
               ),
               options,
             )
-          }
+          },
         )
       RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, driver)
       RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(context, map, viewport, driver)

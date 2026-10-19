@@ -1641,13 +1641,13 @@ internal actual object C {
 
   actual fun mln_custom_geometry_source_options_default(returned: Long) {
     mln_custom_geometry_source_options_default.invokeExact(
-      Ffm.into(returned, mln_custom_geometry_source_options)
+      Ffm.into(returned, mln_custom_geometry_source_options),
     ) as MemorySegment
   }
 
   actual fun mln_custom_mvt_vector_source_options_default(returned: Long) {
     mln_custom_mvt_vector_source_options_default.invokeExact(
-      Ffm.into(returned, mln_custom_mvt_vector_source_options)
+      Ffm.into(returned, mln_custom_mvt_vector_source_options),
     ) as MemorySegment
   }
 
@@ -3292,19 +3292,19 @@ internal actual object C {
 
   actual fun mln_metal_borrowed_texture_descriptor_default(returned: Long) {
     mln_metal_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_borrowed_texture_descriptor)
+      Ffm.into(returned, mln_metal_borrowed_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_metal_owned_texture_descriptor_default(returned: Long) {
     mln_metal_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_owned_texture_descriptor)
+      Ffm.into(returned, mln_metal_owned_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_metal_surface_descriptor_default(returned: Long) {
     mln_metal_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_surface_descriptor)
+      Ffm.into(returned, mln_metal_surface_descriptor),
     ) as MemorySegment
   }
 
@@ -3316,13 +3316,13 @@ internal actual object C {
 
   actual fun mln_opengl_borrowed_texture_descriptor_default(returned: Long) {
     mln_opengl_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_borrowed_texture_descriptor)
+      Ffm.into(returned, mln_opengl_borrowed_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_opengl_owned_texture_descriptor_default(returned: Long) {
     mln_opengl_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_owned_texture_descriptor)
+      Ffm.into(returned, mln_opengl_owned_texture_descriptor),
     ) as MemorySegment
   }
 
@@ -3331,7 +3331,7 @@ internal actual object C {
 
   actual fun mln_opengl_surface_descriptor_default(returned: Long) {
     mln_opengl_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_surface_descriptor)
+      Ffm.into(returned, mln_opengl_surface_descriptor),
     ) as MemorySegment
   }
 
@@ -3340,7 +3340,7 @@ internal actual object C {
 
   actual fun mln_premultiplied_rgba8_image_default(returned: Long) {
     mln_premultiplied_rgba8_image_default.invokeExact(
-      Ffm.into(returned, mln_premultiplied_rgba8_image)
+      Ffm.into(returned, mln_premultiplied_rgba8_image),
     ) as MemorySegment
   }
 
@@ -3378,7 +3378,7 @@ internal actual object C {
 
   actual fun mln_render_session_attach_options_default(returned: Long) {
     mln_render_session_attach_options_default.invokeExact(
-      Ffm.into(returned, mln_render_session_attach_options)
+      Ffm.into(returned, mln_render_session_attach_options),
     ) as MemorySegment
   }
 
@@ -3631,7 +3631,7 @@ internal actual object C {
 
   actual fun mln_rendered_feature_query_options_default(returned: Long) {
     mln_rendered_feature_query_options_default.invokeExact(
-      Ffm.into(returned, mln_rendered_feature_query_options)
+      Ffm.into(returned, mln_rendered_feature_query_options),
     ) as MemorySegment
   }
 
@@ -3922,7 +3922,7 @@ internal actual object C {
 
   actual fun mln_source_feature_query_options_default(returned: Long) {
     mln_source_feature_query_options_default.invokeExact(
-      Ffm.into(returned, mln_source_feature_query_options)
+      Ffm.into(returned, mln_source_feature_query_options),
     ) as MemorySegment
   }
 
@@ -3933,13 +3933,13 @@ internal actual object C {
 
   actual fun mln_style_tile_source_options_default(returned: Long) {
     mln_style_tile_source_options_default.invokeExact(
-      Ffm.into(returned, mln_style_tile_source_options)
+      Ffm.into(returned, mln_style_tile_source_options),
     ) as MemorySegment
   }
 
   actual fun mln_style_transition_options_default(returned: Long) {
     mln_style_transition_options_default.invokeExact(
-      Ffm.into(returned, mln_style_transition_options)
+      Ffm.into(returned, mln_style_transition_options),
     ) as MemorySegment
   }
 
@@ -3948,37 +3948,37 @@ internal actual object C {
 
   actual fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long) {
     mln_vulkan_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_borrowed_texture_descriptor)
+      Ffm.into(returned, mln_vulkan_borrowed_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_vulkan_owned_texture_descriptor_default(returned: Long) {
     mln_vulkan_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_owned_texture_descriptor)
+      Ffm.into(returned, mln_vulkan_owned_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_vulkan_surface_descriptor_default(returned: Long) {
     mln_vulkan_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_surface_descriptor)
+      Ffm.into(returned, mln_vulkan_surface_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long) {
     mln_webgpu_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_borrowed_texture_descriptor)
+      Ffm.into(returned, mln_webgpu_borrowed_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_webgpu_owned_texture_descriptor_default(returned: Long) {
     mln_webgpu_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_owned_texture_descriptor)
+      Ffm.into(returned, mln_webgpu_owned_texture_descriptor),
     ) as MemorySegment
   }
 
   actual fun mln_webgpu_surface_descriptor_default(returned: Long) {
     mln_webgpu_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_surface_descriptor)
+      Ffm.into(returned, mln_webgpu_surface_descriptor),
     ) as MemorySegment
   }
 }

@@ -1,37 +1,13 @@
 // swift-tools-version: 6.0
 
-import Foundation
 import PackageDescription
-
-let xtoolBuild = ProcessInfo.processInfo.environment["MLN_FFI_XTOOL_BUILD"] == "1"
-let swiftMapIOSDependencies: [Target.Dependency] = [
-  .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi"),
-]
-let swiftMapIOSLinkerSettings: [LinkerSetting] = [
-  .linkedFramework("Metal"),
-  .linkedFramework("QuartzCore"),
-  .linkedFramework("UIKit"),
-]
-let swiftMapIOSTarget: Target = xtoolBuild
-  ? .target(
-    name: "SwiftMapIOS",
-    dependencies: swiftMapIOSDependencies,
-    linkerSettings: swiftMapIOSLinkerSettings
-  )
-  : .executableTarget(
-    name: "SwiftMapIOS",
-    dependencies: swiftMapIOSDependencies,
-    linkerSettings: swiftMapIOSLinkerSettings
-  )
 
 let package = Package(
   name: "swift-map",
   platforms: [.macOS("14.3"), .iOS("15.5")],
   products: [
     .executable(name: "swift-map", targets: ["SwiftMap"]),
-    xtoolBuild
-      ? .library(name: "swift-map-ios", targets: ["SwiftMapIOS"])
-      : .executable(name: "swift-map-ios", targets: ["SwiftMapIOS"]),
+    .executable(name: "swift-map-ios", targets: ["SwiftMapIOS"]),
   ],
   dependencies: [
     .package(name: "maplibre-native-ffi", path: "../.."),
@@ -48,6 +24,16 @@ let package = Package(
         .linkedFramework("QuartzCore"),
       ]
     ),
-    swiftMapIOSTarget,
+    .executableTarget(
+      name: "SwiftMapIOS",
+      dependencies: [
+        .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi"),
+      ],
+      linkerSettings: [
+        .linkedFramework("Metal"),
+        .linkedFramework("QuartzCore"),
+        .linkedFramework("UIKit"),
+      ]
+    ),
   ]
 )

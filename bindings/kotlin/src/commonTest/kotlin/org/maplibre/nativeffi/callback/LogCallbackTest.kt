@@ -27,7 +27,7 @@ class LogCallbackTest {
         LogHandler { _, event, _, _ ->
           if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
           0u
-        }
+        },
       )
       assertEquals(base + 1, roots.rootCountForTesting())
 
@@ -35,7 +35,7 @@ class LogCallbackTest {
         // A style whose center has the wrong JSON type logs a parser warning.
         map
           .setStyleJson(
-            """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
+            """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray(),
           )
           .awaitWithin("the style command")
         assertEquals(

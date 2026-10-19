@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from os.path import commonprefix
 
 from .. import docs, native_ports
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..native_capture import arguments_record, deferred_constant
-from ..semantic import BoundApi, ValuePlan
+from ..semantic import BoundApi, ValuePlan, enum_member_prefix
 
 SCALARS = {
     "bool": ("bool", "Bool"),
@@ -1075,12 +1074,7 @@ class Values:
             documented.append((len(declarations), value.native))
             if value.kind == "enum":
                 public = public_name(value.native)
-                prefix = (
-                    commonprefix([name for name, _ in value.enum_values]).rsplit(
-                        "_", 1
-                    )[0]
-                    + "_"
-                )
+                prefix = enum_member_prefix(name for name, _ in value.enum_values)
                 members = "\n".join(
                     f"{doc(self.bound, name, '  ')}  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
                     for name, number in value.enum_values

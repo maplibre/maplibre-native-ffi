@@ -41,11 +41,11 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertEqual(swift.coverage(api)["unsupported"], {})
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            # Generated code imports the C declarations as CMaplibreNativeC.
+            # Generated code imports the C declarations as MaplibreNativeC.
             (root / "include").mkdir()
             (root / "include/api.h").write_text(header)
             (root / "include/module.modulemap").write_text(
-                'module CMaplibreNativeC {\n  header "api.h"\n  export *\n}\n'
+                'module MaplibreNativeC {\n  header "api.h"\n  export *\n}\n'
             )
             sources = []
             for path, text in swift.generate(api).items():

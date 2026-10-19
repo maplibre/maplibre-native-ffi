@@ -94,10 +94,14 @@ final class InputController {
     case .none:
       return
     case .pan:
-      if dx == 0, dy == 0 { return }
+      if dx == 0, dy == 0 {
+        return
+      }
       mapState.moveBy(dx: dx, dy: dy)
     case .rotate:
-      if dx == 0, dy == 0 { return }
+      if dx == 0, dy == 0 {
+        return
+      }
       mapState.adjustOrientation(bearing: dx * 0.5, pitch: dy * 0.5)
     }
   }
@@ -108,7 +112,9 @@ final class InputController {
     mapState: MapState
   ) {
     let delta = scrollDelta(event)
-    if delta == 0 { return }
+    if delta == 0 {
+      return
+    }
 
     let location = view.convert(event.locationInWindow, from: nil)
     let anchor = ScreenPoint(

@@ -77,12 +77,23 @@ def selected_jobs(source: dict, presets: dict, group: str, selection: str) -> li
     jobs = []
     if group == "extended":
         if selection == "full":
-            jobs.extend(["hygiene", "docs", "android-multi", "kotlin-maven"])
+            jobs.extend(
+                [
+                    "hygiene",
+                    "docs",
+                    "android-multi",
+                    "apple-xcframework",
+                    "kotlin-maven",
+                ]
+            )
         else:
-            platforms = set().union(*(PLATFORMS[name] for name in selection.split("+")))
+            names = selection.split("+")
+            platforms = set().union(*(PLATFORMS[name] for name in names))
             targets = {target for target in targets if platform(target) in platforms}
-            if "android" in platforms:
+            if "android" in names:
                 jobs.append("android-multi")
+            if "apple" in names:
+                jobs.append("apple-xcframework")
     elif group == "baseline":
         jobs.extend(["hygiene", "docs"])
     return sorted([*jobs, *(f"target-{target}" for target in targets)])

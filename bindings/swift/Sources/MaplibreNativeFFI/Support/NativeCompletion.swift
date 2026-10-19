@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 private protocol AnyNativeCompletionState: AnyObject {
@@ -48,7 +48,9 @@ private final class NativeCompletionState<Value: Sendable>:
         self.waiter = nil
         return (waiter, false)
       }
-      if cancelled { return (nil, true) }
+      if cancelled {
+        return (nil, true)
+      }
       result = converted
       return (nil, false)
     }
@@ -73,12 +75,16 @@ private final class NativeCompletionState<Value: Sendable>:
             self.result = nil
             return result
           }
-          if cancelled { return .failure(CancellationError()) }
+          if cancelled {
+            return .failure(CancellationError())
+          }
           precondition(waiter == nil)
           waiter = continuation
           return nil
         }
-        if let completed { continuation.resume(with: completed) }
+        if let completed {
+          continuation.resume(with: completed)
+        }
       }
     } onCancel: {
       let waiter = lock.withLock { () -> CheckedContinuation<Value, Error>? in

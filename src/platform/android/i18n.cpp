@@ -1,6 +1,7 @@
 #include <atomic>
-#include <stdexcept>
 #include <string>
+
+#include <mln/util/exception.hpp>
 
 #include "platform/android/i18n.hpp"
 
@@ -52,7 +53,7 @@ void detach_thread() { thread_environment().reset(); }
 auto attached_environment() -> jni::UniqueEnv {
   auto* jvm = java_vm().load(std::memory_order_acquire);
   if (jvm == nullptr) {
-    throw std::runtime_error(
+    throw util::LocaleException(
       "Android platform services are not initialized; call mln_android_init"
     );
   }
@@ -61,7 +62,7 @@ auto attached_environment() -> jni::UniqueEnv {
 
 void throw_java_error(JNIEnv& env) {
   env.ExceptionClear();
-  throw std::runtime_error("Android locale API call failed");
+  throw util::LocaleException("Android locale API call failed");
 }
 
 auto locale_for_tag(JNIEnv& env, const std::string& tag)

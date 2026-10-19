@@ -87,7 +87,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
             .context = state->context,
           }
         },
-      };
+    };
     *out_state = state;
     return true;
   }
@@ -142,7 +142,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
           .context = state->context,
         }
       },
-    };
+  };
   *out_state = state;
   return true;
 }

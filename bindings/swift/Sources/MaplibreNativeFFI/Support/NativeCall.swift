@@ -1,4 +1,4 @@
-internal import CMaplibreNativeC
+internal import MaplibreNativeC
 import Foundation
 
 // Copy borrowed outputs while the receiver is held. Input storage and callback
@@ -265,7 +265,9 @@ private func withNative<T>(
 ) throws -> T {
   // An entry point without a receiver can be a program's first call, so it
   // checks the loaded library's C ABI version before anything reaches C.
-  if owner == nil { try NativeAbi.ensureCompatible() }
+  if owner == nil {
+    try NativeAbi.ensureCompatible()
+  }
   try NativeCallbackGuard.check(owner: owner, operation: operation)
   let arena = NativeInputArena()
   defer { withExtendedLifetime(arena) {} }

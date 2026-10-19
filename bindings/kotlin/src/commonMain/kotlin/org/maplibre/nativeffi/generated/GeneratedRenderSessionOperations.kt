@@ -201,7 +201,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           arguments?.let { view(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -237,7 +237,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           options?.let { writeRenderedFeatureQueryOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -273,7 +273,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           options?.let { writeSourceFeatureQueryOptions(it) } ?: 0L,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -355,7 +355,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setMetalBorrowedTextureTarget(
-    descriptor: MetalBorrowedTextureDescriptor
+    descriptor: MetalBorrowedTextureDescriptor,
   ): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_set_metal_borrowed_texture_target") {
       check(
@@ -364,7 +364,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeMetalBorrowedTextureDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -382,7 +382,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeMetalSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -393,7 +393,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setOpenglBorrowedTextureTarget(
-    descriptor: OpenglBorrowedTextureDescriptor
+    descriptor: OpenglBorrowedTextureDescriptor,
   ): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_set_opengl_borrowed_texture_target") {
       check(
@@ -402,7 +402,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeOpenglBorrowedTextureDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -420,7 +420,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeOpenglSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -431,7 +431,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setVulkanBorrowedTextureTarget(
-    descriptor: VulkanBorrowedTextureDescriptor
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_set_vulkan_borrowed_texture_target") {
       check(
@@ -440,7 +440,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeVulkanBorrowedTextureDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -458,7 +458,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeVulkanSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -469,7 +469,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setWebgpuBorrowedTextureTarget(
-    descriptor: WebgpuBorrowedTextureDescriptor
+    descriptor: WebgpuBorrowedTextureDescriptor,
   ): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_set_webgpu_borrowed_texture_target") {
       check(
@@ -478,7 +478,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeWebgpuBorrowedTextureDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -496,7 +496,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           writeWebgpuSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 }

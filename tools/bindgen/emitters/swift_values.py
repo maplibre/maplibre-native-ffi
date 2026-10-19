@@ -1,8 +1,7 @@
 """Generate Swift record values and C conversion from typed semantic plans."""
 
-from os.path import commonprefix
-
 from ..model import ModelError
+from ..semantic import enum_member_prefix
 from .swift import SCALARS, camel, doc, identifier, name
 
 
@@ -265,9 +264,7 @@ class Values:
                 "unsigned long long": "UInt64",
             }.get(canonical, "UInt32"),
         )
-        prefix = (
-            commonprefix([key for key, _ in value.enum_values]).rsplit("_", 1)[0] + "_"
-        )
+        prefix = enum_member_prefix(key for key, _ in value.enum_values)
         members = "\n".join(
             f"{doc(self.bound, key, '  ')}  public static let {identifier(camel(key.removeprefix(prefix).lower()))}: {public} = "
             + (

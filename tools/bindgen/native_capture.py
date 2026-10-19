@@ -8,6 +8,7 @@ result and preserve the call's arguments for a host that runs it later.
 from __future__ import annotations
 
 import zlib
+from pathlib import Path
 
 from .compiler import compile_api
 from .model import Api, CType, Field, Function, ModelError, Record
@@ -278,11 +279,15 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         "#ifndef MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H",
         "#define MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H",
         "#include <stdint.h>",
+        # Siblings include by bare name, as the public domain headers do.
         *(
             f'#include "{path}"'
             for path in sorted(
-                {"maplibre_native_c/base.h"}
-                | {typedef.location.path for _, typedef in deferred_callbacks(bound)}
+                {"base.h"}
+                | {
+                    Path(typedef.location.path).name
+                    for _, typedef in deferred_callbacks(bound)
+                }
             )
         ),
         "typedef enum mln_adapter_completion_copy_kind : uint32_t {",

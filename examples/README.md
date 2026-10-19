@@ -46,9 +46,9 @@ At startup, an example prints the mode, a `render target status:` line, and
   intent carries the boolean extra `smoke` set to `true`.
 - In smoke mode, the example loads an inline style in place of the style URL and
   renders where no one sees it.
-- After the first frame that it shows, the example prints
-  `smoke: rendered a frame`, shuts down, and exits `0`. The Android smoke script
-  waits for that line in logcat.
+- After the first frame that it shows, the example prints `smoke: rendered a
+  frame`, shuts down, and exits `0`. The Android smoke script waits for that
+  line in logcat.
 - When setup fails, or no frame renders within 60 seconds, a desktop example
   prints the failure and exits nonzero.
 

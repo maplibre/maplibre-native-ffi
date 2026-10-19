@@ -24,8 +24,9 @@ typedef struct webgpu_state {
 // device requests are futures, and the suite runs on a worker where blocking on
 // them is legal.
 static bool await_future(WGPUInstance instance, WGPUFuture future) {
-  // A non-zero wait timeout requires timedWaitAnyEnable. Bound adapter creation
-  // so an unavailable adapter fails the fixture instead of hanging the runner.
+  // A non-zero wait timeout requires the TimedWaitAny instance feature. Bound
+  // adapter creation so an unavailable adapter fails the fixture instead of
+  // hanging the runner.
   const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
   const WGPUWaitStatus status =
@@ -73,10 +74,14 @@ static MLN_TEST_THREAD_LOCAL bool thread_webgpu_attempted;
 
 static bool create_webgpu_device(webgpu_state* state) {
   // Timed waits have to be asked for up front, or wgpuInstanceWaitAny rejects
-  // every non-zero timeout. The capability needs Asyncify, which the
+  // every non-zero timeout. The instance feature needs Asyncify, which the
   // emdawnwebgpu port enables; without it wgpuCreateInstance returns NULL.
+  static const WGPUInstanceFeatureName timed_wait_any[] = {
+    WGPUInstanceFeatureName_TimedWaitAny,
+  };
   WGPUInstanceDescriptor instance_descriptor = {
-    .capabilities = {.timedWaitAnyEnable = true},
+    .requiredFeatureCount = 1,
+    .requiredFeatures = timed_wait_any,
   };
   state->instance = wgpuCreateInstance(&instance_descriptor);
   if (state->instance == NULL) {

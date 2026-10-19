@@ -37,7 +37,7 @@ internal object OpenGLRenderTarget {
               ),
               options,
             )
-          }
+          },
         )
       RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, driver)
       RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(context, map, viewport, driver)
@@ -113,7 +113,7 @@ internal object OpenGLRenderTarget {
               shareContext = NativePointer.ofAddress(context.eglContextAddress()),
               clientApi = OpenglClientApi.GLES,
               getProcAddress = NativePointer.NULL_POINTER,
-            )
+            ),
           )
         } else {
           OpenglContextDescriptorData.Wgl(
@@ -121,7 +121,7 @@ internal object OpenGLRenderTarget {
               deviceContext = NativePointer.ofAddress(context.hdcAddress()),
               shareContext = NativePointer.ofAddress(context.wglContextAddress()),
               getProcAddress = NativePointer.NULL_POINTER,
-            )
+            ),
           )
         },
     )

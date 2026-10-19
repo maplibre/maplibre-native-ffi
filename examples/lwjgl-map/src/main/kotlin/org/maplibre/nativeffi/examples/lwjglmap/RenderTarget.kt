@@ -210,7 +210,7 @@ internal open class RenderTarget(
       if (abandoned.quarantinedResourceCount > 0u) {
         graphicsKept = true
         System.err.println(
-          "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit"
+          "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit",
         )
       }
     }

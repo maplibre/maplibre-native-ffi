@@ -21,9 +21,9 @@ mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
 The test task builds the selected CMake preset, points the build hook at the
 resulting install prefix, analyzes the package, and runs the Dart tests. The
 private raw declarations in `lib/src/internal/c/maplibre_native_c.g.dart` are
-checked in so Git and pub package consumers receive a complete library.
-`mise run bindings:generate` writes them with the rest of the generated binding,
-and `mise run bindings:check` fails on any diff.
+checked in so Git and pub package consumers receive a complete library. `mise
+run bindings:generate` writes them with the rest of the generated binding, and
+`mise run bindings:check` fails on any diff.
 
 The suite tests what the binding adds on top of the C API: handle ownership,
 completions, callback ports, generated value shapes, rendering through a
@@ -86,11 +86,10 @@ frames, and request handles before their parent runtime. A scoped backend value
 is valid until its frame or owner closes.
 
 Close every handle explicitly. When the collector reclaims a handle that is
-still open, a native finalizer disposes it, and the binding writes
-`Leaked <type> native handle 0x<id>; close it explicitly.` to standard error.
-That warning comes from a Dart finalizer, which runs from the event loop after
-the collection, and it is skipped for handles that the isolate's shutdown
-disposes.
+still open, a native finalizer disposes it, and the binding writes `Leaked
+<type> native handle 0x<id>; close it explicitly.` to standard error. That
+warning comes from a Dart finalizer, which runs from the event loop after the
+collection, and it is skipped for handles that the isolate's shutdown disposes.
 
 A map creates a projection handle synchronously from its latest published
 snapshot, and every later projection call is also synchronous. Any isolate can

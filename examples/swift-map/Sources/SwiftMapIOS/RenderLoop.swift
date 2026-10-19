@@ -18,7 +18,9 @@ final class RenderLoop {
   /// pauses otherwise, while the runtime keeps loading.
   var isPresenting = true {
     didSet {
-      if isPresenting, !oldValue { requestFrame() }
+      if isPresenting, !oldValue {
+        requestFrame()
+      }
     }
   }
 
@@ -167,7 +169,9 @@ private final class WakeRelay {
   ) -> Wake {
     Wake(callback: { [self] in
       Task { @MainActor in
-        if let loop { work(loop) }
+        if let loop {
+          work(loop)
+        }
       }
     })
   }

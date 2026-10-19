@@ -99,7 +99,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           metadata.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -251,7 +251,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           cString(sideDatabasePath),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -280,7 +280,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           operation.rawValue.toInt(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -309,7 +309,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           writeHttpHeaderTransform(transform),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -322,7 +322,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
   public fun setMaximumAmbientCacheSize(size: ULong): Deferred<Unit> =
     nativeUnit(this, binding, "mln_runtime_set_maximum_ambient_cache_size") {
       check(
-        C.mln_runtime_set_maximum_ambient_cache_size(handle, size.toLong(), completion, diagnostic)
+        C.mln_runtime_set_maximum_ambient_cache_size(handle, size.toLong(), completion, diagnostic),
       )
     }
 
@@ -344,7 +344,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           state.rawValue.toInt(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -363,7 +363,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           observed,
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -381,7 +381,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           writeResourceProvider(provider),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -399,7 +399,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           writeResourceTransform(transform),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 
@@ -427,7 +427,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           metadata.size.toLong(),
           completion,
           diagnostic,
-        )
+        ),
       )
     }
 }

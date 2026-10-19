@@ -1,17 +1,17 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index e335240491ef..3b42e4119476 100644
+index 5c1c2ca0412b2b7c46fc2c33502209fff6d2d92e..32157bc2e1919f27e7039761670b8689d88dbe38 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -34,6 +34,7 @@
- ### 🐞 Bug fixes
+@@ -36,6 +36,7 @@
  
  - *...Add new stuff here...*
+ - [core] Fix a crash in `RenderImageSource::update` when an image source's coordinates give an empty tile cover, such as an image wholly beyond the latitudes Web Mercator can show.
 +- [core] Fix rendered-feature queries near the final endpoint of an offset line.
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
  - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
  - [core] Fix `ImageSource` not rendering across world copies ([#4508](https://github.com/maplibre/maplibre-native/issues/4508)).
 diff --git a/src/mln/renderer/layers/render_line_layer.cpp b/src/mln/renderer/layers/render_line_layer.cpp
-index de2cb8615c17..730afbf2e8f5 100644
+index f7f29b63bd1362953e73d4c79b080abbf1e0c892..c9126efc98ca386f86e2af8f9810cc2b2ded397b 100644
 --- a/src/mln/renderer/layers/render_line_layer.cpp
 +++ b/src/mln/renderer/layers/render_line_layer.cpp
 @@ -145,7 +145,8 @@ GeometryCollection offsetLine(const GeometryCollection& rings, double offset) {
@@ -25,7 +25,7 @@ index de2cb8615c17..730afbf2e8f5 100644
              Point<double> extrude = util::unit(aToB + bToC);
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index 193ca91c177a..dea165d1cf4e 100644
+index 193ca91c177a4a3d0272e93158b0c6661c02b380..dea165d1cf4e856ca5262b86355d35f451d12867 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -410,3 +410,31 @@ TEST(Query, LocationIndicatorTopImageOnly) {

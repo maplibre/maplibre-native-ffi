@@ -7,7 +7,6 @@ result copies. Unsupported declarations carry an explicit diagnostic.
 
 from __future__ import annotations
 
-import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from tools.bindgen.semantic import (
     DefaultSupport,
     HandlePlan,
     OperationPlan,
+    enum_member_prefix,
     output_member,
     public_stem,
     view_support,
@@ -1107,12 +1107,7 @@ def emit(api: Api | BoundApi) -> Emission:
         if enum.name not in enum_names:
             continue
         directory = directory_for(enum.location.path)
-        prefix = (
-            os.path.commonprefix([value.name for value in enum.values]).rsplit("_", 1)[
-                0
-            ]
-            + "_"
-        )
+        prefix = enum_member_prefix(value.name for value in enum.values)
         underlying = PRIMITIVES.get(enum.underlying_type.spelling)
         if underlying is None:
             underlying = {

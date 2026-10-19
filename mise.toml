@@ -36,7 +36,7 @@ activate_aggressive = true
 dotnet.isolated = true
 
 [monorepo]
-config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
+config_roots = ["bindings/*", "examples/*", "docs"]
 lockfile = true
 
 # Inline task scripts across the workspace are Bash. Cascading the shell gives
@@ -65,42 +65,39 @@ android_ndk_version = "30.0.16248370"
 # image carries no Google APIs and is the smallest image with a full graphics
 # stack.
 android_system_image_api = "36"
-cargo_about_version = "0.9.1"
+cargo_about_version = "0.9.2"
 cmake_version = "4.3.3"
 dart_version = "3.12.2"
 dotnet_version = "10.0.203"
 doxygen_version = "1.18.0"
-dprint_version = "0.53.2"
-emsdk_version = "4.0.10"
+dprint_version = "0.63.0"
+emsdk_version = "6.0.12"
 go_version = "1.26.3"
 doc2go_version = "0.12.2"
-gofumpt_version = "0.10.0"
+gofumpt_version = "0.12.0"
 flutter_version = "3.44.8"
-hk_version = "1.45.0"
-java_version = "zulu-25.34.17.0"
+hk_version = "2.7.0"
+java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
-ktfmt_version = "0.62"
+ktfmt_version = "0.65"
 libxml2_version = "2.13.9"
-node_version = "24.11.0"
+node_version = "26.12.0"
 ninja_version = "1.13.2"
 ohos_sdk_version = "6.1"
-pkl_version = "0.31.0"
-pnpm_version = "10.33.2"
-python_version = "3.14.4"
+pnpm_version = "12.14.0"
+python_version = "3.15.0"
 rust_version = "1.95.0"
-sccache_version = "0.16.0"
+sccache_version = "0.18.0"
 sdl3_version = "3.2"
 shellcheck_version = "0.11.0"
 swift_version = "6.3.1"
-swiftformat_version = "0.61.1"
-uv_version = "0.11.11"
-xtool_version = "1.17.0"
+swiftformat_version = "0.64.0"
+uv_version = "0.13.1"
 zig_version = "0.16.0"
 
 [tools]
 # Repository and native tooling
 "aqua:jdx/hk" = "{{vars.hk_version}}" # Linter orchestration
-"aqua:apple/pkl" = "{{vars.pkl_version}}" # hk config dependency
 "aqua:dprint/dprint" = "{{vars.dprint_version}}" # Formatter orchestration
 "github:sargunv/jvl" = "{{vars.jvl_version}}" # JSON validator
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
@@ -129,9 +126,14 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
-# the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
-# binding declares its own wider platform set in bindings/zig/mise.toml.
-"core:zig" = { version = "{{vars.zig_version}}", os = ["linux"] }
+# the native toolchain there. See cmake/toolchains/zig-linux.cmake. Nested
+# configs request the same os set so `mise install --monorepo` does not see
+# conflicting option maps for one install destination.
+"core:zig" = { version = "{{vars.zig_version}}", os = [
+  "linux",
+  "macos",
+  "windows/x64",
+] }
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
@@ -463,7 +465,11 @@ description = "Stop the OpenHarmony emulator started by mise."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+  "linux",
+  "macos",
+  "windows/x64",
+] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
@@ -472,7 +478,11 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+  "linux",
+  "macos",
+  "windows/x64",
+] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools

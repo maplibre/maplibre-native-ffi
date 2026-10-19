@@ -29,7 +29,7 @@ class AbandonedHandleAndroidTest {
         }
 
         override fun println(x: Any?) = println(x?.toString())
-      }
+      },
     )
     try {
       runSuspendTest { abandonAMapAndAwaitItsDisposal() }

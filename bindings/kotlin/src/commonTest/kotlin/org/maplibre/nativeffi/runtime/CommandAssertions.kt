@@ -15,7 +15,7 @@ internal suspend fun Deferred<CommandCompletion>.awaitCommitted(): CommandComple
 
 /** Awaits one ordered command and asserts that its body rejected the work with [status]. */
 internal suspend fun Deferred<CommandCompletion>.awaitFailed(
-  status: MaplibreStatus
+  status: MaplibreStatus,
 ): CommandCompletion {
   val completion = await()
   assertEquals(CommandDisposition.FAILED, completion.disposition)

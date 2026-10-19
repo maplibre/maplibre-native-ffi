@@ -225,7 +225,7 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
             } else {
               checkNotNull(wgl).tryImportD3D12(sharedHandle, memorySize, extent)
                 ?: throw NativeSurfaceBridgeException(
-                  "The WGL context could not import every texture of the ring"
+                  "The WGL context could not import every texture of the ring",
                 )
             }
         } finally {
@@ -529,7 +529,7 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
       return affinityContext
         ?: throw NativeSurfaceBridgeException(
           "No WGL context could import the Skiko D3D12 shared texture; " +
-            "the OpenGL producer context must use the same graphics adapter as Skiko Direct3D"
+            "the OpenGL producer context must use the same graphics adapter as Skiko Direct3D",
         )
     }
   }
@@ -540,8 +540,10 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
     extent: SurfaceExtent,
   ): WindowsWglImport? {
     makeCurrent()
-    val wglCapabilities =
-      runCatching { GL.getCapabilitiesWGL() }.getOrElse { GL.createCapabilitiesWGL() }
+    val wglCapabilities = runCatching {
+      GL.getCapabilitiesWGL()
+    }
+      .getOrElse { GL.createCapabilitiesWGL() }
     if (!wglCapabilities.WGL_NV_gpu_affinity) {
       return null
     }

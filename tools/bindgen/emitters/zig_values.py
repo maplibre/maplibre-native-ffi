@@ -1,9 +1,7 @@
 """Generate allocator-free Zig values from resolved scalar and record plans."""
 
-from os.path import commonprefix
-
 from ..model import ModelError
-from ..semantic import ValuePlan
+from ..semantic import ValuePlan, enum_member_prefix
 from .zig import SCALARS, doc, documented, identifier, pascal
 
 
@@ -255,9 +253,7 @@ class Values:
                 "unsigned long long": "u64",
             }.get(canonical, "u32"),
         )
-        prefix = (
-            commonprefix([key for key, _ in value.enum_values]).rsplit("_", 1)[0] + "_"
-        )
+        prefix = enum_member_prefix(key for key, _ in value.enum_values)
         if value.enum_kind == "bitmask":
             single = [
                 (identifier(key.removeprefix(prefix).lower()), number, key)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import replace
 
@@ -11,7 +10,7 @@ from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
 from ..names import pascal
-from ..semantic import BoundApi, FieldPlan, ValuePlan
+from ..semantic import BoundApi, FieldPlan, ValuePlan, enum_member_prefix
 
 SCALARS = {
     "bool": "bool",
@@ -125,12 +124,7 @@ class Values:
             return
         if plan.kind == "enum":
             self.enum_names.add(plan.native)
-            prefix = (
-                os.path.commonprefix([name for name, _ in plan.enum_values]).rsplit(
-                    "_", 1
-                )[0]
-                + "_"
-            )
+            prefix = enum_member_prefix(name for name, _ in plan.enum_values)
             members = [
                 pascal(name.removeprefix(prefix).lower())
                 for name, _ in plan.enum_values

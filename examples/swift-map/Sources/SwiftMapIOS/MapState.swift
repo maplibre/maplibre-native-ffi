@@ -85,8 +85,7 @@ final class MapState {
   /// Drains every queued runtime event and reports whether the map published
   /// a render update.
   func drainEvents() throws -> Bool {
-    guard !isClosed else { return false }
-    guard let batch = try runtime.drainEvents() else { return false }
+    guard !isClosed, let batch = try runtime.drainEvents() else { return false }
     defer { try? batch.close() }
     return try batch.get().events.contains {
       $0.sourceType == .map && $0.source == map.id &&

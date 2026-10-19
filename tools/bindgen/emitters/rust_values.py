@@ -1,8 +1,6 @@
 """Rust value types from resolved value plans."""
 
-from os.path import commonprefix
-
-from ..semantic import BoundApi, ValuePlan
+from ..semantic import BoundApi, ValuePlan, enum_member_prefix
 from .rust import SCALARS, Unsupported, doc, pascal
 
 
@@ -182,9 +180,7 @@ class Values:
     def enum(self, value: ValuePlan) -> str:
         public = pascal(value.native)
         raw = self.scalar(value) or "u32"
-        prefix = (
-            commonprefix([key for key, _ in value.enum_values]).rsplit("_", 1)[0] + "_"
-        )
+        prefix = enum_member_prefix(key for key, _ in value.enum_values)
         if value.enum_kind == "bitmask":
             members = "\n".join(
                 f"{doc(self.bound, key, '    ')}    const {key.removeprefix(prefix)} = {number};"

@@ -142,7 +142,7 @@ internal class MapLibreSurfaceRenderer(
       FrameDemand(
         flags = if (forced) FrameDemandFlag(0u) else FrameDemandFlag.IF_NEEDED,
         token = token,
-      )
+      ),
     )
     val result = awaitResult(session, token)
     // The result carries the map's own follow-up demand, so an ongoing transition needs no runtime
@@ -419,7 +419,7 @@ internal class MapLibreSurfaceRenderer(
     if (abandoned.quarantinedResourceCount > 0u) {
       VulkanDeviceRetention.keepUntilExit = true
       System.err.println(
-        "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit"
+        "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit",
       )
     }
   }

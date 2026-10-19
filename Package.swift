@@ -9,7 +9,7 @@ import PackageDescription
 
 let testDependencies: [Target.Dependency] = [
   "MaplibreNativeFFI",
-  "CMaplibreNativeC",
+  "MaplibreNativeC",
   "GraphicsSupport",
 ]
 
@@ -34,13 +34,13 @@ let targets: [Target] = [
     linkerSettings: [.linkedLibrary("dl", .when(platforms: [.linux]))]
   ),
   .systemLibrary(
-    name: "CMaplibreNativeC",
-    path: "bindings/swift/Sources/CMaplibreNativeC",
+    name: "MaplibreNativeC",
+    path: "bindings/swift/Sources/MaplibreNativeC",
     pkgConfig: "maplibre-native-c"
   ),
   .target(
     name: "MaplibreNativeFFI",
-    dependencies: ["CMaplibreNativeC"],
+    dependencies: ["MaplibreNativeC"],
     path: "bindings/swift/Sources/MaplibreNativeFFI",
     // An async operation runs on its caller's executor until it first
     // suspends, which is after it submits to native, so operations that one
