@@ -22,6 +22,9 @@ enum class SyncPoint : std::uint8_t {
   // retirement until they drain. It fires only when retirement is deferred,
   // after the caller has registered for the drain and before it returns.
   RuntimeRetirementDeferred,
+  // A runtime worker has destroyed its run loop and is about to return from
+  // its thread body, before platform TLS cleanup. No lock is held.
+  RuntimeWorkerExiting,
   // A writer found the runtime's resource transform or resource provider
   // registration in use by a callback and is about to wait for its exclusive
   // lock: setting or clearing the registration, or runtime teardown releasing

@@ -48,6 +48,7 @@
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
+#include "resources/custom_resource_provider.hpp"
 #include "resources/url_rules.hpp"
 #include "testing/sync_point.hpp"
 #include "wake/wake.hpp"
@@ -2540,7 +2541,7 @@ auto queued_provider_callback(
   } catch (...) {
   }
   if (process_exiting()) return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-  mln_resource_request_release(handle);
+  release_resource_request(handle);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 

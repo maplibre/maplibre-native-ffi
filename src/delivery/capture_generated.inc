@@ -148,7 +148,7 @@ auto capture_element(
 }
 inline auto discard_element([[maybe_unused]] const mln_map& value) noexcept
   -> void {
-  static_cast<void>(mln_map_dispose(value, nullptr));
+  static_cast<void>(dispose_owner(mln::core::HandleKind::Map, value));
 }
 constexpr auto element_owns_handles(const mln_map*) noexcept -> bool {
   return true;
@@ -437,65 +437,10 @@ auto capture_mln_resource_request_delivery(
 inline auto discard_mln_resource_request_delivery(
   [[maybe_unused]] const mln_resource_request_delivery& value
 ) noexcept -> void {
-  mln_resource_request_release(value.handle);
+  static_cast<void>(
+    dispose_owner(mln::core::HandleKind::ResourceRequest, value.handle)
+  );
 }
 constexpr auto mln_resource_request_delivery_owns_handles() noexcept -> bool {
   return true;
-}
-inline auto dispose_owner(
-  mln::core::HandleKind kind, std::uint64_t handle
-) noexcept -> mln_status {
-  switch (kind) {
-    case mln::core::HandleKind::AcquiredFrame: {
-      return mln_acquired_frame_dispose(
-        static_cast<mln_acquired_frame>(handle), nullptr
-      );
-    }
-    case mln::core::HandleKind::DeliveryBatch: {
-      mln_delivery_batch_release(static_cast<mln_delivery_batch>(handle));
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::DeliveryQueue: {
-      mln_delivery_queue_release(static_cast<mln_delivery_queue>(handle));
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::EventBatch: {
-      mln_event_batch_release(static_cast<mln_event_batch>(handle));
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::GeoJsonSourceData: {
-      mln_geojson_source_data_release(
-        static_cast<mln_geojson_source_data>(handle)
-      );
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::Map: {
-      return mln_map_dispose(static_cast<mln_map>(handle), nullptr);
-    }
-    case mln::core::HandleKind::MapProjection: {
-      return mln_map_projection_release(
-        static_cast<mln_map_projection>(handle), nullptr
-      );
-    }
-    case mln::core::HandleKind::RenderFrameBatch: {
-      mln_render_frame_batch_release(
-        static_cast<mln_render_frame_batch>(handle)
-      );
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::RenderSession: {
-      return mln_render_session_dispose(
-        static_cast<mln_render_session>(handle), nullptr
-      );
-    }
-    case mln::core::HandleKind::ResourceRequest: {
-      mln_resource_request_release(static_cast<mln_resource_request>(handle));
-      return MLN_STATUS_OK;
-    }
-    case mln::core::HandleKind::Runtime: {
-      return mln_runtime_dispose(static_cast<mln_runtime>(handle), nullptr);
-    }
-    default:
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
 }

@@ -389,11 +389,11 @@ struct ThreadExitProbe {
 };
 
 struct ThreadExitSentinel {
-  ThreadExitProbe* probe = nullptr;
-  mln_test_gate* gate = nullptr;
+  std::shared_ptr<ThreadExitProbe> probe;
   ~ThreadExitSentinel() {
-    if (gate != nullptr) mln_test_gate_park(gate);
-    if (probe != nullptr) mln_test_flag_set(&probe->destroyed);
+    // Windows runs TLS destructors under the loader lock. Store without
+    // acquiring the test waiter's locks or blocking another thread's exit.
+    if (probe != nullptr) probe->destroyed.store(true);
   }
 };
 
@@ -401,22 +401,34 @@ void a_blocked_worker_exit_does_not_hold_other_retirements() {
   const auto runtime = create_runtime();
   auto live = mln::core::lease_runtime(runtime);
   const auto weak = std::weak_ptr{live};
-  auto exit_gate = mln_test_gate{};
-  mln_test_gate_init(&exit_gate);
-  live->executor.invoke([&exit_gate] {
-    [[clang::always_destroy]] thread_local ThreadExitSentinel sentinel;
-    sentinel.gate = &exit_gate;
-  });
+  struct ExitGate {
+    std::atomic_bool claimed = false;
+    mln_test_gate gate;
+  };
+  auto exit_gate = std::make_shared<ExitGate>();
+  mln_test_gate_init(&exit_gate->gate);
+  // Park before TLS cleanup: Windows serializes thread startup and TLS
+  // destruction under the loader lock.
+  mln::testing::set_sync_point_handler(
+    [](SyncPoint point, void* context) noexcept {
+      if (point != SyncPoint::RuntimeWorkerExiting) return;
+      const auto owned = *static_cast<std::shared_ptr<ExitGate>*>(context);
+      if (!owned->claimed.exchange(true)) mln_test_gate_park(&owned->gate);
+    },
+    &exit_gate
+  );
   auto closed = mln_test_completion_default(0);
   MLN_TEST_OK(mln_runtime_release(runtime, &closed.descriptor, nullptr));
   live.reset();
-  const auto exiting = mln_test_gate_wait_entered(&exit_gate);
+  const auto exiting = mln_test_gate_wait_entered(&exit_gate->gate);
   const auto retained = !weak.expired();
   const auto completed_early = mln_test_completion_poll(&closed);
   const auto other = create_runtime();
   const auto other_status = mln_test_runtime_close(other);
-  mln_test_gate_release(&exit_gate);
-  MLN_TEST_OK(mln_test_completion_settle(&closed));
+  mln_test_gate_release(&exit_gate->gate);
+  const auto status = mln_test_completion_settle(&closed);
+  mln::testing::set_sync_point_handler(nullptr, nullptr);
+  MLN_TEST_OK(status);
   TEST_ASSERT_TRUE(exiting);
   TEST_ASSERT_TRUE(retained);
   TEST_ASSERT_FALSE(completed_early);
@@ -468,32 +480,35 @@ void abandoned_completion_keeps_its_submission_pending_until_delivery() {
 void runtime_release_waits_for_worker_thread_destruction() {
   const auto runtime = create_runtime();
   auto live = mln::core::lease_runtime(runtime);
-  auto probe = ThreadExitProbe{};
-  live->executor.invoke([&probe] {
+  auto probe = std::make_shared<ThreadExitProbe>();
+  live->executor.invoke([probe] {
     [[clang::always_destroy]] thread_local ThreadExitSentinel sentinel;
-    sentinel.probe = &probe;
+    sentinel.probe = probe;
   });
   auto descriptor = mln_completion{
     .size = sizeof(mln_completion),
     .callback =
       [](void* context, const mln_completion_result*) {
-        auto& state = *static_cast<ThreadExitProbe*>(context);
+        auto& state = **static_cast<std::shared_ptr<ThreadExitProbe>*>(context);
         state.destroyed_at_completion = state.destroyed.load();
       },
-    .user_data = &probe,
+    .user_data = new std::shared_ptr{probe},
     .release_user_data =
       [](void* context) {
-        mln_test_flag_set(&static_cast<ThreadExitProbe*>(context)->checked);
+        const auto owned = std::unique_ptr<std::shared_ptr<ThreadExitProbe>>{
+          static_cast<std::shared_ptr<ThreadExitProbe>*>(context)
+        };
+        mln_test_flag_set(&(*owned)->checked);
       },
   };
   MLN_TEST_OK(mln_runtime_release(runtime, &descriptor, nullptr));
   live.reset();
-  const auto completion_ran = mln_test_wait_for_flag(&probe.checked);
-  const auto thread_ended = mln_test_wait_for_flag(&probe.destroyed);
+  const auto completion_ran = mln_test_wait_for_flag(&probe->checked);
+  const auto thread_ended = mln_test_wait_for_flag(&probe->destroyed);
   TEST_ASSERT_TRUE(completion_ran);
   TEST_ASSERT_TRUE(thread_ended);
   TEST_ASSERT_TRUE_MESSAGE(
-    probe.destroyed_at_completion.load(),
+    probe->destroyed_at_completion.load(),
     "runtime release completed before its worker's TLS destructor"
   );
 }

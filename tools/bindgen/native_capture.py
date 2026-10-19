@@ -9,8 +9,7 @@ each pointer that the header declares.
 from __future__ import annotations
 
 from .compiler import compile_api
-from .model import Api, Function, ModelError
-from .schema import has_diagnostic
+from .model import Api, ModelError
 from .semantic import BoundApi, ValuePlan
 
 # The generated binding-support header, under the include directory. The
@@ -19,13 +18,6 @@ from .semantic import BoundApi, ValuePlan
 HEADER = "maplibre_native_c/binding_support_generated.h"
 # The copies that the native core makes for queue deliveries.
 DELIVERY_CAPTURE = "src/delivery/capture_generated.inc"
-
-
-def native_call(function: Function, *arguments: str) -> str:
-    """Calls a C function, discarding its diagnostic when it takes one."""
-    if has_diagnostic(function):
-        arguments = (*arguments, "nullptr")
-    return f"{function.name}({', '.join(arguments)})"
 
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
@@ -88,42 +80,15 @@ def delivery_records(bound: BoundApi):
     return sorted(entries, key=lambda entry: entry[1].native)
 
 
-def _dispose_owner(bound: BoundApi) -> list[str]:
-    source = bound.source
-    output = [
-        "inline auto dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {",
-        "  switch (kind) {",
-    ]
-    for handle in sorted(bound.handles.values(), key=lambda item: item.native):
-        if not handle.dispose:
-            continue
-        operation = source.functions_by_name[handle.dispose]
-        call = native_call(operation, f"static_cast<{handle.native}>(handle)")
-        body = (
-            f"{call}; return MLN_STATUS_OK;"
-            if operation.return_type.kind == "void"
-            else f"return {call};"
-        )
-        kind = "".join(
-            word.title()
-            for word in handle.native.removeprefix("mln_")
-            .removesuffix("_handle")
-            .split("_")
-        )
-        kind = {"GeojsonSourceData": "GeoJsonSourceData"}.get(kind, kind)
-        output.append(f"    case mln::core::HandleKind::{kind}: {{ {body} }}")
-    output.extend(["    default: return MLN_STATUS_INVALID_ARGUMENT;", "  }", "}", ""])
-    return output
-
-
-def _release_call(bound: BoundApi, handle, value: str) -> str:
-    function = bound.source.functions_by_name[handle.dispose or handle.release]
-    call = native_call(function, value)
-    return (
-        f"static_cast<void>({call});"
-        if function.return_type.kind != "void"
-        else f"{call};"
+def _release_call(handle, value: str) -> str:
+    kind = "".join(
+        word.title()
+        for word in handle.native.removeprefix("mln_")
+        .removesuffix("_handle")
+        .split("_")
     )
+    kind = {"GeojsonSourceData": "GeoJsonSourceData"}.get(kind, kind)
+    return f"static_cast<void>(dispose_owner(mln::core::HandleKind::{kind}, {value}));"
 
 
 def delivery_capture(bound: BoundApi) -> str:
@@ -150,7 +115,7 @@ def delivery_capture(bound: BoundApi) -> str:
                 "  return result;",
                 "}",
                 f"inline auto discard_element([[maybe_unused]] const {native}& value) noexcept -> void {{",
-                *([f"  {_release_call(bound, plan.handle, 'value')}"] if owned else []),
+                *([f"  {_release_call(plan.handle, 'value')}"] if owned else []),
                 "}",
                 f"constexpr auto element_owns_handles(const {native}*) noexcept -> bool {{",
                 f"  return {'true' if owned else 'false'};",
@@ -173,7 +138,7 @@ def delivery_capture(bound: BoundApi) -> str:
                 f"inline auto discard_{record}([[maybe_unused]] const {record}& value) noexcept -> void {{",
                 *(
                     [
-                        f"  {_release_call(bound, decision.handle, f'value.{decision.parameter}')}"
+                        f"  {_release_call(decision.handle, f'value.{decision.parameter}')}"
                     ]
                     if decision
                     else []
@@ -184,7 +149,7 @@ def delivery_capture(bound: BoundApi) -> str:
                 "}",
             ]
         )
-    output.extend(_dispose_owner(bound))
+    output.append("")
     return "\n".join(output)
 
 

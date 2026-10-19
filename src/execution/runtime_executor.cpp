@@ -5,6 +5,8 @@
 
 #include "execution/runtime_executor.hpp"
 
+#include "testing/sync_point.hpp"
+
 namespace mln::core {
 
 struct RuntimeExecutor::Finalization {
@@ -79,6 +81,7 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
           }
           started_.notify_all();
         }
+        testing::hit(testing::SyncPoint::RuntimeWorkerExiting);
       }
     );
   } catch (...) {

@@ -270,11 +270,9 @@ auto rewrite_rules_callback(
   for (const auto& rule : table.rules) {
     if (!rule.pattern.matches(kind, candidate)) continue;
     if (!rule.replacement_url.has_value()) return MLN_STATUS_OK;
-    return mln_resource_transform_response_set_url(
-      out_response,
-      {.data = rule.replacement_url->data(),
-       .size = rule.replacement_url->size()},
-      nullptr
+    return resource_transform_response_set_url(
+      out_response, {.data = rule.replacement_url->data(),
+                     .size = rule.replacement_url->size()}
     );
   }
   return MLN_STATUS_OK;
@@ -292,9 +290,9 @@ auto header_rules_callback(
   for (const auto& rule : table.rules) {
     if (!rule.pattern.matches(kind, candidate)) continue;
     for (const auto& [name, value] : rule.headers) {
-      const auto status = mln_http_header_transform_response_set_header(
+      const auto status = http_header_transform_response_set(
         out_response, {.data = name.data(), .size = name.size()},
-        {.data = value.data(), .size = value.size()}, nullptr
+        {.data = value.data(), .size = value.size()}
       );
       if (status != MLN_STATUS_OK) return status;
     }

@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include "handles/handle_table.hpp"
+#include "delivery/dispose.hpp"
 #include "maplibre_native_c.h"
 
 namespace mln::delivery {
@@ -95,7 +95,7 @@ auto string(Arena<Writing>& arena, const char* value) -> const char* {
 
 // The generated copies: capture_element() and discard_element() for each
 // completion value type, the copies of mln_log_delivery and
-// mln_resource_request_delivery, and dispose_owner(). A completion value type
+// mln_resource_request_delivery. A completion value type
 // without an overload fails to compile where its completion is delivered.
 #include "delivery/capture_generated.inc"
 

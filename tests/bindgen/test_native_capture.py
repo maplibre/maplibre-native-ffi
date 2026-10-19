@@ -138,8 +138,11 @@ DELIVERY_TEST = r"""
 #include <cstring>
 #include "delivery/capture.hpp"
 static unsigned releases = 0;
-extern "C" void mln_resource_request_release(mln_resource_request) noexcept { ++releases; }
-extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
+  assert(kind == mln::core::HandleKind::ResourceRequest && handle == 9);
+  ++releases;
+  return MLN_STATUS_OK;
+}
 
 template <class T, class Capture>
 auto copy(const T& source, Capture capture) -> T {
@@ -202,8 +205,11 @@ void operator delete(void* p) noexcept { std::free(p); }
 void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 #include "delivery/delivery_queue.hpp"
 static unsigned disposed = 0;
-extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
-extern "C" void mln_resource_request_release(mln_resource_request) noexcept {}
+auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
+  assert(kind == mln::core::HandleKind::Map && (handle == 42 || handle == 43));
+  ++disposed;
+  return MLN_STATUS_OK;
+}
 
 // Copies count values into one allocation, as a queued completion does.
 template <class T>
@@ -303,8 +309,7 @@ FIXTURE_TEST = r"""
 #include "capture_fixture.h"
 #include "delivery/delivery_queue.hpp"
 #include <cassert>
-extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
-extern "C" void mln_resource_request_release(mln_resource_request) noexcept {}
+
 static auto copy(const mln_capture_fixture& input) -> const mln_capture_fixture* {
   const auto& capture = mln::delivery::completion_capture<mln_capture_fixture>;
   mln::delivery::Arena<false> measure{nullptr, 0};
