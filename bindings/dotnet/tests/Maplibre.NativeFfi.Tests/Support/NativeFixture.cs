@@ -21,8 +21,9 @@ internal sealed class NativeFixture : IAsyncDisposable
 
     /// <summary>Completes every request with a not-found error, so nothing leaves the process.</summary>
     internal static ResourceProvider DenyingProvider =>
-        new(
-            (_, request) =>
+        new()
+        {
+            Callback = (_, request) =>
             {
                 request.Complete(
                     new ResourceResponse
@@ -34,8 +35,8 @@ internal sealed class NativeFixture : IAsyncDisposable
                 );
                 request.Close();
                 return ResourceProviderDecision.Handle;
-            }
-        );
+            },
+        };
 
     private readonly SemaphoreSlim events;
 

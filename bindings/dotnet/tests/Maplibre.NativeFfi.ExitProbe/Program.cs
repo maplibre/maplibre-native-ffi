@@ -13,14 +13,15 @@ var held = new TaskCompletionSource<ResourceRequestHandle>(
 );
 var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { EventWake = new Wake(() => { }) });
 await runtime.SetResourceProviderAsync(
-    new ResourceProvider(
-        (_, request) =>
+    new ResourceProvider
+    {
+        Callback = (_, request) =>
         {
             request.SetCancelCallback(new ResourceRequestCancelHandler(() => { }));
             held.TrySetResult(request);
             return ResourceProviderDecision.Handle;
-        }
-    )
+        },
+    }
 );
 var map = await runtime.CreateMapAsync(MapOptions.Default);
 await map.SetStyleUrlAsync("exit-probe://style.json");

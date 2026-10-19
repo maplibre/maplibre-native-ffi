@@ -26,8 +26,9 @@ public sealed class ResourceProviderTests
         Exception? reentry = null;
         Exception? waitReentry = null;
         await using var fixture = await NativeFixture.CreateAsync(
-            provider: new ResourceProvider(
-                (request, handle) =>
+            provider: new ResourceProvider
+            {
+                Callback = (request, handle) =>
                 {
                     requested = request.RequestedUrl;
                     retained = handle;
@@ -38,8 +39,8 @@ public sealed class ResourceProviderTests
                     waitReentry = Record.Exception(handle.WaitUntilRetired);
                     handle.Complete(StyleResponse());
                     return ResourceProviderDecision.PassThrough;
-                }
-            )
+                },
+            }
         );
         owner = fixture;
 
@@ -103,14 +104,15 @@ public sealed class ResourceProviderTests
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(
-            new ResourceProvider(
-                (request, handle) =>
+            new ResourceProvider
+            {
+                Callback = (request, handle) =>
                 {
                     copied = request;
                     escaped = handle;
                     throw thrown;
-                }
-            ),
+                },
+            },
             scope
         );
         var bytes = scope.Buffer([1, 2, 3]);
@@ -209,16 +211,17 @@ public sealed class ResourceProviderTests
         ResourceRequestHandle? escaped = null;
         var calls = 0;
         await using var fixture = await NativeFixture.CreateAsync(
-            provider: new ResourceProvider(
-                (_, handle) =>
+            provider: new ResourceProvider
+            {
+                Callback = (_, handle) =>
                 {
                     escaped = handle;
                     handle.SetCancelCallback(
                         new ResourceRequestCancelHandler(() => Interlocked.Increment(ref calls))
                     );
                     return ResourceProviderDecision.PassThrough;
-                }
-            )
+                },
+            }
         );
 
         await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
@@ -271,13 +274,14 @@ public sealed class ResourceProviderTests
 
     /// <summary>A provider that keeps each request to answer later.</summary>
     private static ResourceProvider Holding(TaskCompletionSource<ResourceRequestHandle> received) =>
-        new(
-            (_, handle) =>
+        new()
+        {
+            Callback = (_, handle) =>
             {
                 received.TrySetResult(handle);
                 return ResourceProviderDecision.Handle;
-            }
-        );
+            },
+        };
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
