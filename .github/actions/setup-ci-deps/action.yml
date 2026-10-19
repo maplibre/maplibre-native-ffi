@@ -385,7 +385,12 @@ runs:
     - name: Bootstrap repository
       uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       with:
-        version: 2026.10.13
+        # Windows uses 2026.8.2. mise 2026.10.13 extracts http:flutter into
+        # installs\flutter\.mise-tmp-* and fails with Access is denied (os
+        # error 5) on a toolchain-cache miss. 2026.8.2 extracts the same
+        # Flutter 3.44.8 zip into http-tarballs and succeeds on the same
+        # windows-2022 image (#844).
+        version: ${{ runner.os == 'Windows' && '2026.8.2' || '2026.10.13' }}
         cache: false
         bootstrap: true
         # The repository declares no managed files. Skip that unused Unix-only
