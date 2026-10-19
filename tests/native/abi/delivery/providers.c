@@ -284,6 +284,30 @@ static void a_released_queue_passes_requests_through(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Releasing a queue that holds an undrained request releases its handle,
+// which fails the request instead of leaving its load waiting.
+static void releasing_a_queue_fails_its_pending_requests(void) {
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_resource_provider provider = queue_provider(queue.handle, NULL);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://pending.json"));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
+
+  mln_test_delivery_queue_release(&queue);
+  char message[256] = {0};
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
+
+  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void a_queue_provider_rejects_an_invalid_shape(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -472,6 +496,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_request_cancelled_before_the_drain_reports_it);
   RUN_TEST(retirement_follows_the_last_request);
   RUN_TEST(a_released_queue_passes_requests_through);
+  RUN_TEST(releasing_a_queue_fails_its_pending_requests);
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
   RUN_TEST(invalid_routes_are_rejected);
 #if !defined(__EMSCRIPTEN__)
