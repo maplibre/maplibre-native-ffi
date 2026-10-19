@@ -1,5 +1,6 @@
-#include <array>
+#include <bitset>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -36,13 +37,36 @@ auto check_pattern(
   if ((flags & ~known_url_match_flags) != 0) {
     return reject(what, index, "has unknown flag bits");
   }
+  if (
+    (flags & MLN_URL_MATCH_GLOB) != 0 &&
+    CompiledGlob::token_count(string_view_from_view(url)) >
+      CompiledGlob::max_tokens
+  ) {
+    return reject(what, index, "exceeds the glob limit of 4096 tokens");
+  }
   return MLN_STATUS_OK;
 }
 
 }  // namespace
 
+auto CompiledGlob::token_count(std::string_view pattern) noexcept
+  -> std::size_t {
+  auto count = std::size_t{0};
+  for (auto index = std::size_t{0}; index < pattern.size(); ++index) {
+    if (pattern[index] == '*') {
+      while (index + 1 < pattern.size() && pattern[index + 1] == '*') ++index;
+    } else if (pattern[index] == '\\' && index + 1 < pattern.size()) {
+      ++index;
+    }
+    ++count;
+  }
+  return count;
+}
+
 CompiledGlob::CompiledGlob(std::string_view pattern) {
-  tokens_.reserve(pattern.size());
+  const auto count = token_count(pattern);
+  if (count > max_tokens) throw std::length_error{"glob exceeds 4096 tokens"};
+  tokens_.reserve(count);
   for (auto index = std::size_t{0}; index < pattern.size(); ++index) {
     const auto value = pattern[index];
     if (value == '*') {
@@ -58,18 +82,10 @@ CompiledGlob::CompiledGlob(std::string_view pattern) {
   }
 }
 
-auto CompiledGlob::matches(std::string_view candidate, std::size_t* steps) const
-  -> bool {
-  // The library builds without static and thread-local destructors, so the
-  // state row lives on the stack and only an unusually long pattern allocates.
-  constexpr auto inline_state_count = std::size_t{256};
-  auto inline_states = std::array<std::uint8_t, inline_state_count>{};
-  auto heap_states = std::vector<std::uint8_t>{};
-  auto* states = inline_states.data();
-  if (tokens_.size() + 1 > inline_state_count) {
-    heap_states.resize(tokens_.size() + 1);
-    states = heap_states.data();
-  }
+auto CompiledGlob::matches(
+  std::string_view candidate, std::size_t* steps
+) const noexcept -> bool {
+  auto states = std::bitset<max_tokens + 1>{};
   if (steps != nullptr) *steps = 0;
   states[0] = 1;
   for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
@@ -78,11 +94,11 @@ auto CompiledGlob::matches(std::string_view candidate, std::size_t* steps) const
       (kind == Kind::Segment || kind == Kind::Spanning) && states[index] != 0;
   }
   for (const auto byte : candidate) {
-    auto previous = states[0];
+    auto previous = static_cast<bool>(states[0]);
     states[0] = 0;
     for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
       if (steps != nullptr) ++*steps;
-      const auto old = states[index + 1];
+      const auto old = static_cast<bool>(states[index + 1]);
       const auto token = tokens_[index];
       switch (token.kind) {
         case Kind::Segment:
@@ -116,7 +132,7 @@ UrlPattern::UrlPattern(
 
 auto UrlPattern::matches(
   std::uint32_t request_kind, std::string_view candidate
-) const -> bool {
+) const noexcept -> bool {
   return matches_kind(kinds, request_kind) &&
          (glob != nullptr ? glob->matches(candidate) : url == candidate);
 }
@@ -124,7 +140,7 @@ auto UrlPattern::matches(
 auto RouteTable::matches(
   std::uint32_t kind, std::string_view requested_url,
   std::string_view resolved_url
-) const -> bool {
+) const noexcept -> bool {
   if (routes.empty()) return true;
   for (const auto& route : routes) {
     const auto requested = route.url_stage == MLN_RESOURCE_ROUTE_URL_REQUESTED;

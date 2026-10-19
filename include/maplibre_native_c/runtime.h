@@ -646,6 +646,11 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
 /// a pattern that describes a suffix opens with a wildcard. Comparison is
 /// case-sensitive either way, and applies no URL parsing or normalization.
 ///
+/// A glob accepts at most 4096 tokens. Each literal byte, escaped byte, `?`,
+/// or consecutive run of `*` bytes counts as one token. Registering a longer
+/// glob returns MLN_STATUS_INVALID_ARGUMENT. Exact URL matches have no token
+/// limit. Matching uses bounded stack storage and never allocates.
+///
 /// Confining `*` to one path segment is what makes a host pattern hold:
 /// `https://*.example.com/**` matches every subdomain of example.com and never
 /// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern

@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <atomic>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -8,12 +8,11 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
 #include <mln/actor/actor_ref.hpp>
-#include <mln/actor/mailbox.hpp>
-#include <mln/actor/scheduler.hpp>
 #include <mln/storage/file_source.hpp>
 #include <mln/storage/file_source_request.hpp>
 #include <mln/storage/resource.hpp>
@@ -26,26 +25,59 @@
 #include "diagnostics/diagnostics.hpp"
 #include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
+#include "execution/retirement_wake.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "testing/sync_point.hpp"
 
 namespace mln::core {
 
-// Owns both phases on the requesting scheduler. Closing its mailbox prevents a
-// cancelled request from starting native loading after destruction.
+struct ResourceRequestObject;
+
+// Owns both phases and a reserved decision wake on the requesting run loop.
 class ProviderRequest final : public mln::AsyncRequest {
  public:
   using StartNative = std::function<
     std::unique_ptr<mln::AsyncRequest>(mln::FileSource::Callback)>;
+  enum class Decision { None, PassThrough, Failure };
+  enum class Failure {
+    Released,
+    UnknownDecision,
+    Exception,
+    ProcessExit,
+    Native
+  };
+  static constexpr auto failure_messages = std::array{
+    std::string_view{"resource request was released without a response"},
+    std::string_view{"resource provider returned an unknown decision"},
+    std::string_view{"resource provider threw an exception"},
+    std::string_view{"the process is exiting"},
+    std::string_view{"native resource loading failed"},
+  };
   ProviderRequest(mln::FileSource::Callback callback, StartNative start)
-      : response(std::move(callback)),
+      : response(mln::FileSource::Callback{callback}),
         start_(std::move(start)),
-        mailbox_(
-          std::make_shared<mln::Mailbox>(*mln::Scheduler::GetCurrent())
-        ) {}
-  ~ProviderRequest() override { mailbox_->close(); }
-  auto actor() -> mln::ActorRef<ProviderRequest> { return {*this, mailbox_}; }
+        failure_callback_(std::move(callback)),
+        failure_error_(
+          std::make_unique<mln::Response::Error>(
+            mln::Response::Error::Reason::Other
+          )
+        ) {
+    auto capacity = std::size_t{0};
+    for (const auto message : failure_messages)
+      capacity = std::max(capacity, message.size());
+    failure_error_->message.reserve(capacity);
+  }
+  ~ProviderRequest() override;
+  void prepare(const std::shared_ptr<ResourceRequestObject>& object);
+  // The caller holds the request mutex. The wake is reserved by prepare().
+  void schedule(
+    Decision decision, Failure failure = Failure::Released
+  ) noexcept {
+    if (decision == Decision::Failure) set_failure(failure);
+    pending_ = decision;
+    wake_->send();
+  }
   void pass_through() {
     const auto target = response.actor();
     try {
@@ -53,27 +85,32 @@ class ProviderRequest final : public mln::AsyncRequest {
         target.invoke(&mln::FileSourceRequest::setResponse, result);
       });
     } catch (...) {
-      auto result = mln::Response{};
-      result.error = std::make_unique<mln::Response::Error>(
-        mln::Response::Error::Reason::Other, "native resource loading failed"
-      );
-      target.invoke(&mln::FileSourceRequest::setResponse, result);
+      deliver_failure(Failure::Native);
     }
   }
   mln::FileSourceRequest response;
 
  private:
+  void drain();
+  void set_failure(Failure failure) noexcept {
+    const auto message = failure_messages[static_cast<std::size_t>(failure)];
+    failure_error_->message.assign(message.data(), message.size());
+  }
+  void deliver_failure(Failure failure);
   StartNative start_;
-  std::shared_ptr<mln::Mailbox> mailbox_;
+  mln::FileSource::Callback failure_callback_;
+  std::unique_ptr<mln::Response::Error> failure_error_;
+  std::shared_ptr<ResourceRequestObject> object_;
+  Decision pending_ = Decision::None;
   std::unique_ptr<mln::AsyncRequest> native_;
+  std::unique_ptr<RetirementWake> wake_;
 };
 
 struct ResourceRequestObject {
   ResourceRequestObject(
-    mln::ActorRef<mln::FileSourceRequest> actor_,
-    mln::ActorRef<ProviderRequest> loader_
+    mln::ActorRef<mln::FileSourceRequest> actor_, ProviderRequest* loader_
   )
-      : actor(std::move(actor_)), loader(std::move(loader_)) {}
+      : actor(std::move(actor_)), loader(loader_) {}
 
   mutable std::mutex mutex;
   std::condition_variable state_changed;
@@ -101,13 +138,55 @@ struct ResourceRequestObject {
   std::thread::id cancel_callback_thread;
   mln_resource_request handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
-  mln::ActorRef<ProviderRequest> loader;
+  ProviderRequest* loader;
   // The cached bytes MapLibre withheld from the requester until this request
   // revalidates them. Set before the provider sees the handle, then only read.
   std::shared_ptr<const std::string> prior_data;
   std::optional<mln::Timestamp> prior_modified;
   std::optional<std::string> prior_etag;
 };
+
+ProviderRequest::~ProviderRequest() {
+  if (object_ != nullptr) {
+    const auto lock = std::scoped_lock{object_->mutex};
+    object_->cancelled = true;
+    object_->loader = nullptr;
+  }
+}
+
+void ProviderRequest::prepare(
+  const std::shared_ptr<ResourceRequestObject>& object
+) {
+  object_ = object;
+  wake_ = std::make_unique<RetirementWake>([this] { drain(); });
+}
+
+void ProviderRequest::deliver_failure(Failure failure) {
+  set_failure(failure);
+  auto result = mln::Response{};
+  result.error = std::move(failure_error_);
+  // The callback may destroy this request. Move its storage before invoking it.
+  auto callback = std::move(failure_callback_);
+  callback(result);
+}
+
+void ProviderRequest::drain() {
+  auto decision = Decision::None;
+  {
+    const auto lock = std::scoped_lock{object_->mutex};
+    if (object_->cancelled) return;
+    decision = std::exchange(pending_, Decision::None);
+  }
+  if (decision == Decision::PassThrough) {
+    pass_through();
+  } else if (decision == Decision::Failure) {
+    // The diagnostic and callback storage were reserved before publication.
+    auto result = mln::Response{};
+    result.error = std::move(failure_error_);
+    auto callback = std::move(failure_callback_);
+    callback(result);
+  }
+}
 
 // Host code may complete a request from any thread, and mbgl's cancel path runs
 // on its own, so the object must be leasable to outlive a racing release.
@@ -280,19 +359,14 @@ auto response_from_abi(const mln_resource_response& provider_response)
 
 // The caller holds object.mutex and keeps the object alive after handle
 // release.
-void fail_locked(ResourceRequestObject& object, const char* message) noexcept {
+void fail_locked(
+  ResourceRequestObject& object, ProviderRequest::Failure failure
+) noexcept {
   if (object.completed || object.cancelled) {
     return;
   }
+  object.loader->schedule(ProviderRequest::Decision::Failure, failure);
   object.completed = true;
-  try {
-    object.actor.invoke(
-      &mln::FileSourceRequest::setResponse,
-      error_response(message, mln::Response::Error::Reason::Other)
-    );
-  } catch (...) {
-    // Failure delivery must not unwind through provider or release callbacks.
-  }
 }
 
 // Runs the registered cancel callback, if any, for a request that has not been
@@ -472,12 +546,13 @@ struct CustomProviderInvocation {
 
 // Answers a request that the provider did not answer with an error, and
 // retires it.
-auto fail_request(ResourceRequestObject& object, const char* message) noexcept
-  -> void {
+auto fail_request(
+  ResourceRequestObject& object, ProviderRequest::Failure failure
+) noexcept -> void {
   {
     const std::scoped_lock lock(object.mutex);
     object.deciding = false;
-    fail_locked(object, message);
+    fail_locked(object, failure);
   }
   retire_request(object.handle);
 }
@@ -486,7 +561,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
   -> bool {
   try {
     if (process_exiting()) {
-      fail_request(*invocation.object, "the process is exiting");
+      fail_request(*invocation.object, ProviderRequest::Failure::ProcessExit);
       return true;
     }
     const auto request =
@@ -503,10 +578,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
         invocation.object->claimed = true;
         if (invocation.object->released_while_deciding) {
-          fail_locked(
-            *invocation.object,
-            "resource request was released without a response"
-          );
+          fail_locked(*invocation.object, ProviderRequest::Failure::Released);
         }
       }
     }
@@ -516,14 +588,14 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
       fail_request(
-        *invocation.object, "resource provider returned an unknown decision"
+        *invocation.object, ProviderRequest::Failure::UnknownDecision
       );
       return true;
     }
     // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
-    fail_request(*invocation.object, "resource provider threw an exception");
+    fail_request(*invocation.object, ProviderRequest::Failure::Exception);
     return true;
   }
 }
@@ -540,8 +612,9 @@ auto request_custom_resource(
     std::move(file_source_callback), std::move(start_native)
   );
   auto object = std::make_shared<ResourceRequestObject>(
-    request->response.actor(), request->actor()
+    request->response.actor(), request.get()
   );
+  request->prepare(object);
   object->prior_data = resource.priorData;
   object->prior_modified = resource.priorModified;
   object->prior_etag = resource.priorEtag;
@@ -639,7 +712,7 @@ auto pass_through_resource_request(mln_resource_request handle) -> mln_status {
     );
     return MLN_STATUS_INVALID_STATE;
   }
-  live->loader.invoke(&ProviderRequest::pass_through);
+  live->loader->schedule(ProviderRequest::Decision::PassThrough);
   live->completed = true;
   return MLN_STATUS_OK;
 }
@@ -742,9 +815,7 @@ void release_resource_request(mln_resource_request handle) noexcept {
     const std::scoped_lock lock(object->mutex);
     if (!object->retired) {
       if (object->claimed) {
-        fail_locked(
-          *object, "resource request was released without a response"
-        );
+        fail_locked(*object, ProviderRequest::Failure::Released);
       } else if (object->deciding) {
         object->released_while_deciding = true;
       }

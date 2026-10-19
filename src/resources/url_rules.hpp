@@ -15,13 +15,16 @@ namespace mln::core {
 
 // A glob compiled into a linear NFA. Each candidate byte visits each token
 // once, so work is O(pattern length * candidate length). Scratch storage is
-// reused per thread, so concurrent matches share no writable storage.
+// bounded on the stack, so matching never allocates.
 class CompiledGlob {
  public:
+  static constexpr auto max_tokens = std::size_t{4096};
+  [[nodiscard]] static auto token_count(std::string_view pattern) noexcept
+    -> std::size_t;
   explicit CompiledGlob(std::string_view pattern);
   [[nodiscard]] auto matches(
     std::string_view candidate, std::size_t* steps = nullptr
-  ) const -> bool;
+  ) const noexcept -> bool;
 
  private:
   enum class Kind : std::uint8_t { Literal, Any, Segment, Spanning };
@@ -49,7 +52,7 @@ struct UrlPattern {
 
   [[nodiscard]] auto matches(
     std::uint32_t request_kind, std::string_view url
-  ) const -> bool;
+  ) const noexcept -> bool;
 };
 
 // The routes of a resource provider, which owns their strings.
@@ -65,7 +68,7 @@ struct RouteTable {
   [[nodiscard]] auto matches(
     std::uint32_t kind, std::string_view requested_url,
     std::string_view resolved_url
-  ) const -> bool;
+  ) const noexcept -> bool;
 };
 
 struct RewriteRuleTable {
