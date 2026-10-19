@@ -258,7 +258,7 @@ auto percentile(std::vector<double> values, double fraction) -> double {
 }
 void measure(
   mln_runtime runtime, mln_map map, Host& host, size_t burst, bool awaited,
-  bool images, int repetitions
+  bool images, int repetitions, uint32_t image_size = 8
 ) {
   std::vector<double> submission;
   std::vector<double> completion;
@@ -266,11 +266,11 @@ void measure(
   double submit_allocs = 0;
   uint64_t frames = 0;
   const auto live = mln::core::lease_runtime(runtime);
-  std::array<uint8_t, 8 * 8 * 4> pixels{};
+  std::vector<uint8_t> pixels(image_size * image_size * 4);
   auto image = mln_premultiplied_rgba8_image_default();
-  image.width = 8;
-  image.height = 8;
-  image.stride = 32;
+  image.width = image_size;
+  image.height = image_size;
+  image.stride = image_size * 4;
   image.pixels = pixels.data();
   image.byte_length = pixels.size();
   for (int rep = -5; rep < repetitions; ++rep) {
@@ -324,8 +324,9 @@ void measure(
   }
   std::printf(
     "%s,%s,%zu,%d,%.0f,%.0f,%.0f,%.0f,%.2f,%.2f,%.3f\n",
-    images ? "image" : "property", awaited ? "awaited" : "discarded", burst,
-    repetitions, percentile(submission, .5), percentile(submission, .95),
+    images ? (image_size == 8 ? "image" : "image-256") : "property",
+    awaited ? "awaited" : "discarded", burst, repetitions,
+    percentile(submission, .5), percentile(submission, .95),
     percentile(completion, .5), percentile(completion, .95),
     submit_allocs / (repetitions * burst), total_allocs / (repetitions * burst),
     static_cast<double>(frames) / repetitions
@@ -395,6 +396,8 @@ int main(int argc, char** argv) {
         measure(runtime, map, host, burst, awaited, false, repetitions);
     for (const auto awaited : {true, false})
       measure(runtime, map, host, 64, awaited, true, repetitions);
+    for (const auto awaited : {true, false})
+      measure(runtime, map, host, 1, awaited, true, repetitions, 256);
   }
   auto released = Done{};
   check(mln_map_release(map, &released.descriptor, nullptr));

@@ -122,8 +122,12 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_y_count);
 
   // Replacing an image replaces its metadata too, back to the defaults.
+  image.stride = 8;
+  image.pixels = packed;
+  image.byte_length = sizeof(packed);
   set_image(map, "marker", &image, NULL);
   probe = read_image(runtime, map, "marker");
+  TEST_ASSERT_EQUAL_MEMORY(packed, probe.pixels, sizeof(packed));
   TEST_ASSERT_EQUAL_FLOAT(1.0f, info->pixel_ratio);
   TEST_ASSERT_FALSE(info->sdf);
   TEST_ASSERT_EQUAL_HEX32(0, info->fields);

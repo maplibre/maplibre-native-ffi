@@ -1376,9 +1376,16 @@ auto validate_custom_mvt_vector_source_options(
 auto to_native_premultiplied_rgba8_image(
   const mln_premultiplied_rgba8_image& image
 ) -> mln::PremultipliedImage {
-  auto result = mln::PremultipliedImage{mln::Size{image.width, image.height}};
-  const auto output_stride = result.stride();
   const auto row_bytes = static_cast<size_t>(image.width) * 4U;
+  auto result = mln::PremultipliedImage{
+    mln::Size{image.width, image.height},
+    std::make_unique_for_overwrite<uint8_t[]>(row_bytes * image.height)
+  };
+  if (image.stride == row_bytes) {
+    std::memcpy(result.data.get(), image.pixels, result.bytes());
+    return result;
+  }
+  const auto output_stride = result.stride();
   const auto input = std::span<const uint8_t>{image.pixels, image.byte_length};
   const auto output = std::span<uint8_t>{result.data.get(), result.bytes()};
   for (auto row = uint32_t{0}; row < image.height; ++row) {

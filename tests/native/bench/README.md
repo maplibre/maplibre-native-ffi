@@ -24,7 +24,8 @@ Completion latency starts at that call and ends at its callback, including the
 time behind the gate and earlier commands. A discarded command has no callback;
 its completion column ends at the runtime barrier that fences the burst.
 
-The image case replaces 64 warm image IDs with 8 × 8 RGBA images. It measures
+The image case replaces 64 warm image IDs with 8 × 8 RGBA images. The image-256
+case replaces one warm ID with a 256 × 256 RGBA image. These cases measure
 submission copies and command transport, without tile layout or image loading.
 
 The executable replaces `operator new` and `operator new[]`. Submission counts
