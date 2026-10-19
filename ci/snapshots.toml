@@ -86,7 +86,6 @@ shared = [
   "!.clang-tidy",
   "!.clangd",
   "!.gitignore",
-  "!.devcontainer/**",
   "!.github/ISSUE_TEMPLATE/**",
   "!.github/dependabot.yml",
   "!.github/FUNDING.yml",

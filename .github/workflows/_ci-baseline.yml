@@ -29,7 +29,6 @@ jobs:
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           gradle: false
       - run: mise run ci:generate-workflow --check
-      - run: mise run ci:generate-devcontainer-tools --check
       - run: mise run ci:test
       - run: mise run --force //bindings/dart:ffigen
       - run: mise run --force //bindings/dotnet:generate

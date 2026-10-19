@@ -67,8 +67,7 @@ mise bootstrap --yes --skip files
 
 Language-specific tools are declared by their binding, example, or docs project.
 Mise installs them automatically when a namespaced project task runs, so the
-initial bootstrap stays focused on tools used across the repository. The
-published devcontainer image bakes the complete tool union for fast startup.
+initial bootstrap stays focused on tools used across the repository.
 
 Run the headless Zig readback example:
 

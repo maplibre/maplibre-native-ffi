@@ -12,7 +12,6 @@
     ".github/workflows/ci.yml",
     ".github/workflows/ci-*.yml",
     ".github/workflows/_ci-*.yml",
-    ".devcontainer/mise.toml",
     "**/*-lock.yaml",
     "**/*.lock.yaml",
     "**/*-lock.yml",

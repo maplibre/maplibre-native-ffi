@@ -155,7 +155,6 @@ def target_job(row: dict) -> dict:
 def hygiene_job() -> dict:
     commands = [
         "mise run ci:generate-workflow --check",
-        "mise run ci:generate-devcontainer-tools --check",
         "mise run ci:test",
         "mise run --force //bindings/dart:ffigen",
         "mise run --force //bindings/dotnet:generate",

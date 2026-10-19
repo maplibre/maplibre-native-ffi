@@ -33,5 +33,3 @@ bindings/openharmony/library/libs/
 bindings/openharmony/library/include/
 bindings/openharmony/library/BuildProfile.ets
 .kotlin
-.devcontainer/mise-oci/
-.devcontainer/mise-oci.tar
