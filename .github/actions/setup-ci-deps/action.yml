@@ -352,7 +352,8 @@ runs:
       id: toolchain-key
       shell: bash
       run: |
-        prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        # DO NOT MERGE: force a toolchain cache miss so Windows reinstalls Flutter.
+        prefix="toolchains-v1-flutter-cachebust-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
         echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
 
