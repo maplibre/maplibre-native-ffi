@@ -15,6 +15,7 @@ const BuildOptions = struct {
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
@@ -94,6 +95,7 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath,
     system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub const DependencyOptions = struct {
@@ -104,6 +106,7 @@ pub const DependencyOptions = struct {
     dependency_include_dirs: []const std.Build.LazyPath = &.{},
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub const RenderBackendLinkOptions = struct {
@@ -210,6 +213,7 @@ pub const TranslateCModuleOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     c_macros: []const CMacro = &.{},
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Build.Module {
@@ -218,6 +222,7 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         .c_source_file = options.root_source_file,
         .target = options.target,
         .optimize = options.optimize,
+        .libc_file = options.libc_file,
     });
     addTranslateCIncludePaths(&translator, options.include_dirs);
     addPlatformSystemHeaderPaths(b, &translator, options.target, options.system_root);
@@ -263,6 +268,7 @@ pub const RenderBackendTranslateCOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: RenderBackendTranslateCOptions) void {
@@ -273,6 +279,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
             .system_root = options.system_root,
+            .libc_file = options.libc_file,
         }));
     }
     if (options.render_backend == .opengl and (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)) {
@@ -282,6 +289,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
             .system_root = options.system_root,
+            .libc_file = options.libc_file,
         }));
     }
 }
@@ -427,6 +435,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"dependency-include-dir": []const std.Build.LazyPath,
     @"dependency-library-dir": []const std.Build.LazyPath,
     @"system-root": ?std.Build.LazyPath,
+    @"target-libc": ?std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -436,6 +445,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"dependency-include-dir" = options.dependency_include_dirs,
         .@"dependency-library-dir" = options.dependency_library_dirs,
         .@"system-root" = options.system_root,
+        .@"target-libc" = options.libc_file,
     };
 }
 
@@ -456,6 +466,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     };
 }
 
@@ -464,6 +475,7 @@ pub const IncludeOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 /// Configures the raw C declarations without linking maplibre-native-c.
@@ -476,6 +488,7 @@ pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, opti
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     }));
 }
 
@@ -492,6 +505,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .optimize = options.optimize,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     });
     const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
     const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
@@ -540,6 +554,7 @@ fn addMaplibreNativeDocs(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     include_dirs: []const std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
 ) void {
     const docs_module = b.createModule(.{
         .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
@@ -550,12 +565,14 @@ fn addMaplibreNativeDocs(
         .include_dirs = include_dirs,
         .target = target,
         .optimize = optimize,
+        .libc_file = libc_file,
     });
 
     const doc_compile = b.addObject(.{
         .name = "maplibre_native_ffi_docs",
         .root_module = docs_module,
     });
+    doc_compile.setLibCFile(libc_file);
     const install_docs = b.addInstallDirectory(.{
         .source_dir = doc_compile.getEmittedDocs(),
         .install_dir = .prefix,
@@ -574,6 +591,7 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
         }),
         .use_lld = if (isAppleMobile(options.target)) false else null,
     });
+    tests.setLibCFile(options.libc_file);
     if (isAppleMobile(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
@@ -591,6 +609,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     });
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
@@ -670,6 +689,9 @@ pub fn build(b: *std.Build) void {
     else
         b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    // Zig 0.17 also passes a global --libc to the host configurer and tools.
+    // Keep the cross SDK on target compilations and C translation instead.
+    const libc_file = b.option(std.Build.LazyPath, "target-libc", "Libc paths for the target platform");
 
     const include_dirs_from_cli = b.option(
         []const std.Build.LazyPath,
@@ -682,6 +704,7 @@ pub fn build(b: *std.Build) void {
         target,
         optimize,
         include_dirs_from_cli orelse defaultDocIncludeDirs(b),
+        libc_file,
     );
 
     const required_native_install_dir = native_install_dir orelse return;
@@ -698,6 +721,7 @@ pub fn build(b: *std.Build) void {
         .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
         .system_root = system_root,
+        .libc_file = libc_file,
     };
 
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);

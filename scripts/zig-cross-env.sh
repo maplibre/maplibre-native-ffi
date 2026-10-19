@@ -50,7 +50,7 @@ if [[ -n "$apple_sdk" ]]; then
   zig_cross_args=(
     -Dtarget="$zig_target"
     -Dsystem-root="$sdk_path"
-    --libc "$zig_libc"
+    -Dtarget-libc="$zig_libc"
   )
 fi
 
@@ -118,7 +118,7 @@ case "$1" in
     zig_cross_args=(
       -Dsystem-root="$ndk_sysroot"
       -Ddependency-library-dir="$zig_crt_dir"
-      --libc "$zig_libc"
+      -Dtarget-libc="$zig_libc"
     )
     ;;
 esac
