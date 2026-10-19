@@ -991,7 +991,7 @@ final class Status extends _Enum {
   /// The object is valid but not currently in a state that permits the call.
   static const invalidState = Status.fromRawValue(-2);
 
-  /// The handle is thread-affine and the call was made from the wrong thread.
+  /// The handle is thread-affine and the call came from the wrong thread.
   static const wrongThread = Status.fromRawValue(-3);
 
   /// The entry point or requested behavior is unavailable in this build.
@@ -1009,7 +1009,7 @@ final class Status extends _Enum {
   /// The render target or graphics receiver was irreversibly lost.
   static const targetLost = Status.fromRawValue(-8);
 
-  /// A nonblocking acquisition or service call has no result yet.
+  /// A nonblocking drain or acquisition has nothing to return yet.
   static const notReady = Status.fromRawValue(-9);
 
   /// A call named an ID with no live object behind it.
@@ -1437,9 +1437,13 @@ final class RenderFrameResult extends _Value {
   /// with `mln_map_snapshot.latest_render_update_generation` to find the first
   /// frame that includes a command.
   final BigInt mapUpdateGeneration;
+
+  /// The session's extent generation when the demand reached its result. See
+  /// `mln_render_session_snapshot.extent_generation`.
   final BigInt extentGeneration;
 
-  /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+  /// Position of the frame among the frames that the session rendered, counting
+  /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
   final BigInt frameGeneration;
 
   /// Whether the map asked for another frame while it rendered this one, as
@@ -1711,7 +1715,7 @@ final class AnimationOptions extends _Value {
 final class LatLng extends _Value {
   const LatLng(this.latitude, this.longitude);
 
-  /// Latitude in degrees. Input latitude must be finite and within \[-90, 90\].
+  /// Latitude in degrees, finite and within \[-90, 90\] on input.
   final double latitude;
 
   /// Longitude in degrees. Input longitude must be finite.
@@ -2246,9 +2250,8 @@ final class RuntimeEvent {
   final BigInt generation;
 
   /// Secondary event detail whose meaning type selects. Depending on type it
-  /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
-  /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
-  /// meaning.
+  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+  /// 0. See `mln_runtime_event_type` for the per-type meaning.
   final int code;
 
   /// Byte offset of this event's message inside
@@ -3065,7 +3068,7 @@ final class VulkanContextDescriptor extends _Value {
   /// Queue family index for graphics_queue. Must support graphics commands.
   final int graphicsQueueFamilyIndex;
 
-  /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
+  /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
   final NativePointer getInstanceProcAddr;
 
   /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
@@ -3390,7 +3393,7 @@ final class FeatureStateSelector extends _Value {
   /// Optional source layer ID. Required for vector-source disambiguation.
   final String? sourceLayerId;
 
-  /// Optional feature ID string. Required by set/get and optional for remove.
+  /// Optional feature ID. Required by set and get, optional for remove.
   final String? featureId;
 
   /// Optional state key. Used only by remove and requires feature_id.
@@ -4005,15 +4008,38 @@ final class RenderSessionSnapshot extends _Value {
 
   /// Logical extent, including a resize the driver has not applied yet.
   final LogicalExtent extent;
+
+  /// Increases when the session's lifecycle state, target, or applied extent
+  /// changes. An acquired texture frame reports the value it rendered under.
   final BigInt generation;
+
+  /// Generation of the latest map render update that the session has seen.
   final BigInt mapUpdateGeneration;
+
+  /// Map render update generation that the latest rendered frame drew. Zero
+  /// before the first frame after attachment or a target replacement.
   final BigInt renderedUpdateGeneration;
+
+  /// Starts at one and increases each time the driver applies a resize.
   final BigInt extentGeneration;
+
+  /// Frame generation of the latest rendered frame, zero before the first.
   final BigInt frameGeneration;
+
+  /// Token of the demand whose terminal result the session queued last.
   final BigInt latestDemandToken;
+
+  /// Accepted demands that have no terminal result yet.
   final int pendingDemandCount;
+
+  /// Acquired frames that the host has not released or disposed.
   final int acquiredFrameCount;
+
+  /// False once attachment fails or the session is abandoned.
   final bool targetReady;
+
+  /// True when a map update or an accepted resize arrived after the latest
+  /// rendered frame.
   final bool pendingChanges;
 
   @override

@@ -137,10 +137,12 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * warning.
    */
   mln_logical_extent extent;
-  /** Physical image width in device pixels. Must be positive. Defaults to 256.
+  /**
+   * Physical image width in device pixels. Must be positive. Defaults to 256.
    */
   uint32_t physical_width MLN_BINDING("default=256");
-  /** Physical image height in device pixels. Must be positive. Defaults to 256.
+  /**
+   * Physical image height in device pixels. Must be positive. Defaults to 256.
    */
   uint32_t physical_height MLN_BINDING("default=256");
   /** Borrowed Vulkan context. All handles are required. */

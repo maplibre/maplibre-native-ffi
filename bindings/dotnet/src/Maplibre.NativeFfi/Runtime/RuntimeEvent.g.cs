@@ -25,9 +25,8 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="Code">
 /// Secondary event detail whose meaning type selects. Depending on type it
-/// carries an <c>mln_camera_change_mode</c>, an <c>mln_status</c>, a MapLibre
-/// Native error ordinal, or 0. See <c>mln_runtime_event_type</c> for the
-/// per-type meaning.
+/// carries an <c>mln_camera_change_mode</c>, a MapLibre Native error ordinal,
+/// or 0. See <c>mln_runtime_event_type</c> for the per-type meaning.
 /// </param>
 /// <param name="Payload">
 /// Typed payload selected by payload_type.

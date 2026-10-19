@@ -4,13 +4,15 @@
  *
  * Handles are opaque 64-bit ids. Each handle remains distinguishable from
  * every later handle after release. A handle is released once the call that
- * ends it, such as a release, close, destroy, or
- * dispose, accepts it. Passing a released handle reports
- * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
- * handle, a handle of another type, or a value this library never issued,
- * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
- * its diagnostic names the case. Handle values are safe to copy, compare,
- * hash, and move between threads, and carry no ownership on their own.
+ * ends it, such as a release, close, destroy, or dispose, accepts it. Passing a
+ * released handle reports MLN_STATUS_INVALID_STATE. Passing an invalid handle,
+ * which is the null handle, a handle of another type, or a value this library
+ * never issued, reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no
+ * effect, and its diagnostic names the case.
+ * mln_resource_request_wait_until_retired() is the one exception: it reports
+ * MLN_STATUS_OK for any nonnull handle that names no live request. Handle
+ * values are safe to copy, compare, hash, and move between threads, and carry
+ * no ownership on their own.
  *
  * Hosts must pass handles back as issued, without decoding or synthesizing
  * them.
@@ -57,8 +59,7 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_INVALID_ARGUMENT = -1,
   /** The object is valid but not currently in a state that permits the call. */
   MLN_STATUS_INVALID_STATE = -2,
-  /** The handle is thread-affine and the call was made from the wrong thread.
-   */
+  /** The handle is thread-affine and the call came from the wrong thread. */
   MLN_STATUS_WRONG_THREAD = -3,
   /** The entry point or requested behavior is unavailable in this build. */
   MLN_STATUS_UNSUPPORTED = -4,
@@ -70,7 +71,7 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_BUSY = -7,
   /** The render target or graphics receiver was irreversibly lost. */
   MLN_STATUS_TARGET_LOST = -8,
-  /** A nonblocking acquisition or service call has no result yet. */
+  /** A nonblocking drain or acquisition has nothing to return yet. */
   MLN_STATUS_NOT_READY = -9,
   /** A call named an ID with no live object behind it. */
   MLN_STATUS_NOT_FOUND = -10,
@@ -85,10 +86,9 @@ typedef enum mln_status : int32_t {
  * Every status-returning function takes a nullable mln_diagnostic* as its last
  * parameter, out_diagnostic. The caller sets size to sizeof(mln_diagnostic).
  * The function writes message as null-terminated UTF-8, truncated to fit. The
- * message is empty when the function returns MLN_STATUS_OK, or
- * MLN_STATUS_NOT_READY from a drain with nothing queued, and describes the
- * failure otherwise. It writes no more than size bytes of the struct. A null
- * out_diagnostic discards the message.
+ * message is empty when the function returns MLN_STATUS_OK or
+ * MLN_STATUS_NOT_READY, and describes the failure otherwise. It writes no more
+ * than size bytes of the struct. A null out_diagnostic discards the message.
  *
  * Asynchronous failures carry their diagnostic in the completion instead.
  */
@@ -110,8 +110,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
  *
  * This value names no object of any type. Status-returning functions reject
  * it. Void release functions accept it as a no-op. Output handle parameters
- * that create or
- * acquire ownership require `*out_handle` to equal it on entry.
+ * that create or acquire ownership require `*out_handle` to equal it on entry.
  */
 #define MLN_HANDLE_NULL ((uint64_t)0)
 
@@ -122,8 +121,8 @@ typedef uint64_t mln_runtime MLN_BINDING(
 );
 /** A map, which holds map state independent of any render target. */
 typedef uint64_t mln_map MLN_BINDING(
-  "kind=handle;release=mln_map_release;parent=mln_runtime;dispose=mln_map_"
-  "dispose"
+  "kind=handle;release=mln_map_release;parent=mln_runtime;"
+  "dispose=mln_map_dispose"
 );
 /** A standalone projection of a map's transform state at its creation. */
 typedef uint64_t mln_map_projection MLN_BINDING(

@@ -223,8 +223,7 @@ typedef struct mln_vulkan_context_descriptor {
   void* graphics_queue;
   /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;
-  /** PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
-   */
+  /** PFN_vkGetInstanceProcAddr for the loader that created the instance. */
   void* get_instance_proc_addr;
   /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
   void* get_device_proc_addr;
@@ -354,7 +353,8 @@ typedef enum mln_webgl_context_kind : uint32_t {
 typedef struct mln_webgl_context_descriptor {
   /** One mln_webgl_context_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_webgl_context_kind");
-  /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
+  /**
+   * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
    */
   int32_t context;
   /**

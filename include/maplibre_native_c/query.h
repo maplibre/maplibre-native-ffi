@@ -100,7 +100,8 @@ typedef enum MLN_BINDING(
 typedef struct mln_source_feature_query_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_source_feature_query_option_field");
-  /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
+  /**
+   * Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
    */
   const mln_buffer_view* source_layer_ids MLN_BINDING(
     "length=source_layer_id_count;mask=fields;"

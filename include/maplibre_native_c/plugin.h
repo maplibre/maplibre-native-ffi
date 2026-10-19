@@ -1,5 +1,5 @@
 /**
- * @file plugin.h
+ * @file maplibre_native_c/plugin.h
  * Layer plugin registration.
  *
  * Native plugins register style layer types through mln_plugin_register_v1().

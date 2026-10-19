@@ -969,7 +969,7 @@ pub const FeatureStateSelector = struct {
     source_id: []const u8 = &.{},
     /// Optional source layer ID. Required for vector-source disambiguation.
     source_layer_id: ?[]const u8 = null,
-    /// Optional feature ID string. Required by set/get and optional for remove.
+    /// Optional feature ID. Required by set and get, optional for remove.
     feature_id: ?[]const u8 = null,
     /// Optional state key. Used only by remove and requires feature_id.
     state_key: ?[]const u8 = null,
@@ -1475,8 +1475,7 @@ pub const ImageStretch = struct {
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const LatLng = struct {
-    /// Latitude in degrees. Input latitude must be finite and within \[-90,
-    /// 90\].
+    /// Latitude in degrees, finite and within \[-90, 90\] on input.
     latitude: f64 = std.mem.zeroes(f64),
     /// Longitude in degrees. Input longitude must be finite.
     longitude: f64 = std.mem.zeroes(f64),
@@ -3031,8 +3030,12 @@ pub const RenderFrameResult = struct {
     /// compare it with `mln_map_snapshot.latest_render_update_generation` to
     /// find the first frame that includes a command.
     map_update_generation: u64 = std.mem.zeroes(u64),
+    /// The session's extent generation when the demand reached its result. See
+    /// `mln_render_session_snapshot.extent_generation`.
     extent_generation: u64 = std.mem.zeroes(u64),
-    /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+    /// Position of the frame among the frames that the session rendered,
+    /// counting from one. Zero unless disposition is
+    /// `MLN_RENDER_RESULT_RENDERED`.
     frame_generation: u64 = std.mem.zeroes(u64),
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing paint transition. Set only when disposition is
@@ -3218,15 +3221,28 @@ pub const RenderSessionSnapshot = struct {
     latest_result: RenderResult = std.mem.zeroes(RenderResult),
     /// Logical extent, including a resize the driver has not applied yet.
     extent: LogicalExtent = .{},
+    /// Increases when the session's lifecycle state, target, or applied extent
+    /// changes. An acquired texture frame reports the value it rendered under.
     generation: u64 = std.mem.zeroes(u64),
+    /// Generation of the latest map render update that the session has seen.
     map_update_generation: u64 = std.mem.zeroes(u64),
+    /// Map render update generation that the latest rendered frame drew. Zero
+    /// before the first frame after attachment or a target replacement.
     rendered_update_generation: u64 = std.mem.zeroes(u64),
+    /// Starts at one and increases each time the driver applies a resize.
     extent_generation: u64 = std.mem.zeroes(u64),
+    /// Frame generation of the latest rendered frame, zero before the first.
     frame_generation: u64 = std.mem.zeroes(u64),
+    /// Token of the demand whose terminal result the session queued last.
     latest_demand_token: u64 = std.mem.zeroes(u64),
+    /// Accepted demands that have no terminal result yet.
     pending_demand_count: u32 = std.mem.zeroes(u32),
+    /// Acquired frames that the host has not released or disposed.
     acquired_frame_count: u32 = std.mem.zeroes(u32),
+    /// False once attachment fails or the session is abandoned.
     target_ready: bool = std.mem.zeroes(bool),
+    /// True when a map update or an accepted resize arrived after the latest
+    /// rendered frame.
     pending_changes: bool = std.mem.zeroes(bool),
     pub fn toNative(self: RenderSessionSnapshot) c.mln_render_session_snapshot {
         var raw = std.mem.zeroes(c.mln_render_session_snapshot);
@@ -3952,9 +3968,8 @@ pub const RuntimeEvent = struct {
     /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
     generation: u64 = std.mem.zeroes(u64),
     /// Secondary event detail whose meaning type selects. Depending on type it
-    /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
-    /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
-    /// meaning.
+    /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+    /// 0. See `mln_runtime_event_type` for the per-type meaning.
     code: i32 = std.mem.zeroes(i32),
     /// Typed payload selected by payload_type.
     payload: RuntimeEventPayload = .{ .unknown = 0 },
@@ -4454,7 +4469,7 @@ pub const SourceFeatureQueryOptions = struct {
 pub const Status = enum(i32) {
     /// A call named an ID with no live object behind it.
     not_found = -10,
-    /// A nonblocking acquisition or service call has no result yet.
+    /// A nonblocking drain or acquisition has nothing to return yet.
     not_ready = -9,
     /// The render target or graphics receiver was irreversibly lost.
     target_lost = -8,
@@ -4466,7 +4481,7 @@ pub const Status = enum(i32) {
     native_error = -5,
     /// The entry point or requested behavior is unavailable in this build.
     unsupported = -4,
-    /// The handle is thread-affine and the call was made from the wrong thread.
+    /// The handle is thread-affine and the call came from the wrong thread.
     wrong_thread = -3,
     /// The object is valid but not currently in a state that permits the call.
     invalid_state = -2,
@@ -5372,8 +5387,7 @@ pub const VulkanContextDescriptor = struct {
     graphics_queue: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Queue family index for graphics_queue. Must support graphics commands.
     graphics_queue_family_index: u32 = std.mem.zeroes(u32),
-    /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan
-    /// handles.
+    /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
     get_instance_proc_addr: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
     get_device_proc_addr: ?*anyopaque = std.mem.zeroes(?*anyopaque),
@@ -7336,7 +7350,8 @@ pub fn renderFrameBatchRelease(batch: RenderFrameBatch) status.Error!void {
     return call.direct("mln_render_frame_batch_release", .close, batch, void, null, .{});
 }
 
-/// Irreversibly ends session work and disposes of its graphics objects.
+/// Irreversibly ends session work and destroys the session's graphics objects
+/// where that is safe.
 ///
 /// See `mln_render_session_abandon` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

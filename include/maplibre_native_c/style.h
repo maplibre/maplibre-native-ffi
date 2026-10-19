@@ -6,9 +6,9 @@
  * structs, and image pixels before returning and applies them in runtime
  * submission order. Each function lists submission and completion failures
  * separately. Its completion reports committed, superseded, failed, or
- * cancelled disposition. Committed completions carry the map snapshot
- * generation they published, so a caller can fence a later
- * mln_map_get_snapshot() on it.
+ * cancelled disposition. A command that ran, whether it committed or failed,
+ * completes with the map snapshot generation that it published, so a caller
+ * can fence a later mln_map_get_snapshot() on it.
  *
  * Every query is ordered. It copies its inputs before returning and observes
  * all commands accepted earlier by the runtime. Its completion borrows the
@@ -313,13 +313,13 @@ typedef struct mln_style_source_info {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_SIZE");
   /** Vector tile encoding, for a vector source. */
   uint32_t vector_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;enum=mln_style_"
-    "vector_tile_encoding"
+    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;"
+    "enum=mln_style_vector_tile_encoding"
   );
   /** DEM raster encoding, when inline TileJSON sets one. */
   uint32_t raster_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;enum=mln_style_"
-    "raster_dem_encoding"
+    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;"
+    "enum=mln_style_raster_dem_encoding"
   );
 } mln_style_source_info;
 
@@ -357,8 +357,8 @@ typedef struct mln_style_tile_source_options {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION");
   /** One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ. */
   uint32_t scheme MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;enum=mln_style_tile_"
-    "scheme"
+    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;"
+    "enum=mln_style_tile_scheme"
   );
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS");
@@ -367,13 +367,13 @@ typedef struct mln_style_tile_source_options {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE");
   /** One of mln_style_vector_tile_encoding. Defaults to MVT. */
   uint32_t vector_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;enum=mln_"
-    "style_vector_tile_encoding"
+    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;"
+    "enum=mln_style_vector_tile_encoding"
   );
   /** One of mln_style_raster_dem_encoding. Defaults to Mapbox. */
   uint32_t raster_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;enum=mln_"
-    "style_raster_dem_encoding"
+    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;"
+    "enum=mln_style_raster_dem_encoding"
   );
 } mln_style_tile_source_options;
 
@@ -574,13 +574,13 @@ typedef struct mln_style_image_options {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_CONTENT");
   /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
   uint32_t text_fit_width MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;enum=mln_style_"
-    "image_text_fit"
+    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;"
+    "enum=mln_style_image_text_fit"
   );
   /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
   uint32_t text_fit_height MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;enum=mln_style_"
-    "image_text_fit"
+    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;"
+    "enum=mln_style_image_text_fit"
   );
   /** Sprite pixel ratio. Defaults to 1. */
   float pixel_ratio
@@ -618,13 +618,13 @@ typedef struct mln_style_image_info {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
   /** How the image fits text horizontally, when it sets this. */
   uint32_t text_fit_width MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;enum=mln_style_image_"
-    "text_fit"
+    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;"
+    "enum=mln_style_image_text_fit"
   );
   /** How the image fits text vertically, when it sets this. */
   uint32_t text_fit_height MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;enum=mln_style_"
-    "image_text_fit"
+    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;"
+    "enum=mln_style_image_text_fit"
   );
   /** Sprite pixel ratio. */
   float pixel_ratio;

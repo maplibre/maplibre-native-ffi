@@ -22,7 +22,7 @@ public sealed record FeatureStateSelector
     public string? SourceLayerId { get; set; }
 
     /// <summary>
-    /// Optional feature ID string. Required by set/get and optional for remove.
+    /// Optional feature ID. Required by set and get, optional for remove.
     /// </summary>
     public string? FeatureId { get; set; }
 

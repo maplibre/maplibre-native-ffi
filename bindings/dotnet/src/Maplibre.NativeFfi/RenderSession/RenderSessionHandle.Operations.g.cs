@@ -70,7 +70,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Irreversibly ends session work and disposes of its graphics objects.
+    /// Irreversibly ends session work and destroys the session's graphics
+    /// objects where that is safe.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_abandon</c> in the <see

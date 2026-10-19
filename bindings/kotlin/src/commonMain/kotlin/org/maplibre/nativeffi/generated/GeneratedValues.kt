@@ -1267,7 +1267,7 @@ public data class Status(public val rawValue: Int) {
     public val INVALID_ARGUMENT: Status = Status(-1)
     /** The object is valid but not currently in a state that permits the call. */
     public val INVALID_STATE: Status = Status(-2)
-    /** The handle is thread-affine and the call was made from the wrong thread. */
+    /** The handle is thread-affine and the call came from the wrong thread. */
     public val WRONG_THREAD: Status = Status(-3)
     /** The entry point or requested behavior is unavailable in this build. */
     public val UNSUPPORTED: Status = Status(-4)
@@ -1279,7 +1279,7 @@ public data class Status(public val rawValue: Int) {
     public val BUSY: Status = Status(-7)
     /** The render target or graphics receiver was irreversibly lost. */
     public val TARGET_LOST: Status = Status(-8)
-    /** A nonblocking acquisition or service call has no result yet. */
+    /** A nonblocking drain or acquisition has nothing to return yet. */
     public val NOT_READY: Status = Status(-9)
     /** A call named an ID with no live object behind it. */
     public val NOT_FOUND: Status = Status(-10)
@@ -1867,8 +1867,15 @@ public data class RenderFrameResult(
    * command.
    */
   public val mapUpdateGeneration: ULong = 0uL,
+  /**
+   * The session's extent generation when the demand reached its result. See
+   * `mln_render_session_snapshot.extent_generation`.
+   */
   public val extentGeneration: ULong = 0uL,
-  /** Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`. */
+  /**
+   * Position of the frame among the frames that the session rendered, counting from one. Zero
+   * unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+   */
   public val frameGeneration: ULong = 0uL,
   /**
    * Whether the map asked for another frame while it rendered this one, as during an ongoing paint
@@ -2172,7 +2179,7 @@ public data class AnimationOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class LatLng(
-  /** Latitude in degrees. Input latitude must be finite and within &#91;-90, 90&#93;. */
+  /** Latitude in degrees, finite and within &#91;-90, 90&#93; on input. */
   public val latitude: Double = 0.0,
   /** Longitude in degrees. Input longitude must be finite. */
   public val longitude: Double = 0.0,
@@ -3101,7 +3108,7 @@ public data class VulkanContextDescriptor(
   public val graphicsQueue: NativePointer,
   /** Queue family index for graphics_queue. Must support graphics commands. */
   public val graphicsQueueFamilyIndex: UInt = 0u,
-  /** PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles. */
+  /** PFN_vkGetInstanceProcAddr for the loader that created the instance. */
   public val getInstanceProcAddr: NativePointer,
   /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
   public val getDeviceProcAddr: NativePointer,
@@ -3482,8 +3489,8 @@ public data class RuntimeEvent(
   public val generation: ULong = 0uL,
   /**
    * Secondary event detail whose meaning type selects. Depending on type it carries an
-   * `mln_camera_change_mode`, an `mln_status`, a MapLibre Native error ordinal, or 0. See
-   * `mln_runtime_event_type` for the per-type meaning.
+   * `mln_camera_change_mode`, a MapLibre Native error ordinal, or 0. See `mln_runtime_event_type`
+   * for the per-type meaning.
    */
   public val code: Int = 0,
   /** Typed payload selected by payload_type. */
@@ -3525,7 +3532,7 @@ public data class FeatureStateSelector(
   public val sourceId: String = "",
   /** Optional source layer ID. Required for vector-source disambiguation. */
   public val sourceLayerId: String? = null,
-  /** Optional feature ID string. Required by set/get and optional for remove. */
+  /** Optional feature ID. Required by set and get, optional for remove. */
   public val featureId: String? = null,
   /** Optional state key. Used only by remove and requires feature_id. */
   public val stateKey: String? = null,
@@ -3738,15 +3745,31 @@ public data class RenderSessionSnapshot(
   public val latestResult: RenderResult = RenderResult(0u),
   /** Logical extent, including a resize the driver has not applied yet. */
   public val extent: LogicalExtent = LogicalExtent(),
+  /**
+   * Increases when the session's lifecycle state, target, or applied extent changes. An acquired
+   * texture frame reports the value it rendered under.
+   */
   public val generation: ULong = 0uL,
+  /** Generation of the latest map render update that the session has seen. */
   public val mapUpdateGeneration: ULong = 0uL,
+  /**
+   * Map render update generation that the latest rendered frame drew. Zero before the first frame
+   * after attachment or a target replacement.
+   */
   public val renderedUpdateGeneration: ULong = 0uL,
+  /** Starts at one and increases each time the driver applies a resize. */
   public val extentGeneration: ULong = 0uL,
+  /** Frame generation of the latest rendered frame, zero before the first. */
   public val frameGeneration: ULong = 0uL,
+  /** Token of the demand whose terminal result the session queued last. */
   public val latestDemandToken: ULong = 0uL,
+  /** Accepted demands that have no terminal result yet. */
   public val pendingDemandCount: UInt = 0u,
+  /** Acquired frames that the host has not released or disposed. */
   public val acquiredFrameCount: UInt = 0u,
+  /** False once attachment fails or the session is abandoned. */
   public val targetReady: Boolean = false,
+  /** True when a map update or an accepted resize arrived after the latest rendered frame. */
   public val pendingChanges: Boolean = false,
 )
 

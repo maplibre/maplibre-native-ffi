@@ -224,8 +224,7 @@ typedef struct mln_edge_insets {
 
 /** Geographic coordinate in degrees used by map and projection APIs. */
 typedef struct mln_lat_lng {
-  /** Latitude in degrees. Input latitude must be finite and within [-90, 90].
-   */
+  /** Latitude in degrees, finite and within [-90, 90] on input. */
   double latitude;
   /** Longitude in degrees. Input longitude must be finite. */
   double longitude;
@@ -532,8 +531,7 @@ typedef struct mln_feature_state_selector {
   /** Optional source layer ID. Required for vector-source disambiguation. */
   mln_buffer_view source_layer_id
     MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID");
-  /** Optional feature ID string. Required by set/get and optional for remove.
-   */
+  /** Optional feature ID. Required by set and get, optional for remove. */
   mln_buffer_view feature_id
     MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_FEATURE_ID");
   /** Optional state key. Used only by remove and requires feature_id. */
@@ -928,18 +926,18 @@ typedef struct mln_map_viewport_options {
   uint32_t fields MLN_BINDING("enum=mln_map_viewport_option_field");
   /** One of mln_north_orientation. */
   uint32_t north_orientation MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;enum=mln_north_"
-    "orientation"
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;"
+    "enum=mln_north_orientation"
   );
   /** One of mln_constrain_mode. */
   uint32_t constrain_mode MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;enum=mln_constrain_"
-    "mode"
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;"
+    "enum=mln_constrain_mode"
   );
   /** One of mln_viewport_mode. */
   uint32_t viewport_mode MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;enum=mln_viewport_"
-    "mode"
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;"
+    "enum=mln_viewport_mode"
   );
   mln_edge_insets frustum_offset
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
@@ -1077,9 +1075,9 @@ MLN_API mln_status mln_map_get_snapshot(
  * each submit this command with the target's width and height when the call
  * is accepted. An attach that then fails, or a replacement that the driver
  * then refuses, leaves the map at the size that the target named. While a
- * render session is attached, size the map through the session; a direct map
- * resize to a different extent leaves the session waiting for an update that
- * the map never publishes. The completion reports terminal disposition and
+ * render session is attached, a direct map resize completes with
+ * MLN_STATUS_INVALID_STATE; size the map through the session instead.
+ * The completion reports terminal disposition and
  * the snapshot generation that the resize published. A resize that a later
  * one replaces before it runs completes as superseded, including a resize
  * that an attach replaces. A resize to the map's current width and
@@ -1106,17 +1104,19 @@ MLN_API mln_status mln_map_resize(
 /**
  * Requests a repaint for a continuous map.
  *
- * Continuous maps also invalidate automatically when style data, resources,
- * camera, or transitions change. Ask attached render targets to process the
- * latest update when mln_runtime_drain_events() reports
- * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. That type is the map's only
- * invalidation report, so select it in the event mask of every rendered map.
- * Coalesce notifications into a pending frame for the latest state. Several
- * mutations can share a notification, and asynchronous work or transitions
- * can publish further updates after a mutation returns.
- * Repaint requests do not produce
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED events.
+ * A continuous map also publishes a render update on its own when style data,
+ * resources, the camera, or a transition changes. A host learns of each update
+ * in one of two ways:
+ *
+ * - A host that keeps a frame demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE
+ *   pending, and arms the next one as each result arrives, renders every
+ *   update as the map publishes it. It needs no runtime event to do so.
+ * - Any other host selects MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE in
+ *   the map's event mask and requests a render-if-needed frame when
+ *   mln_runtime_drain_events() reports it. Several mutations can share one
+ *   event, and asynchronous work or transitions can publish further updates
+ *   after a mutation completes, so the host coalesces events into one pending
+ *   frame for the latest state.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
@@ -1273,8 +1273,8 @@ MLN_API mln_status mln_map_remove_feature_state(
  * mln_render_session_service_driver_work() on its graphics thread. Any demand
  * may complete the image, but only with a fully loaded frame that rendered
  * the update this request published or a later one; a frame of an earlier
- * update never does.
- * That frame may be acquired or read back after the completion runs.
+ * update never does. That frame may be acquired or read back after the
+ * completion runs.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
@@ -1322,9 +1322,9 @@ MLN_API mln_status mln_map_release(
  *
  * Disposal of an eligible live handle allocates no memory and starts no thread.
  * Retirement releases callback state and resources on their required threads.
- * Attached sessions retain the map until they detach or retire.
- * A successful call consumes the handle before returning. A failed
- * call retains caller ownership.
+ * Attached sessions retain the map until they detach or retire. A successful
+ * call consumes the handle before returning. A failed call retains caller
+ * ownership.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
@@ -1439,11 +1439,9 @@ MLN_API mln_status mln_map_get_style_url(
  * Select every event type the host reads. These types carry state a host
  * reaches no other way:
  *
- * - MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE is the map's only
- *   invalidation report. See mln_map_request_repaint().
- * - MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED and
- *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED report observer completion
- *   in addition to the still-image completion.
+ * - MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE reports new render
+ *   state to a host that keeps no frame demand with
+ *   MLN_FRAME_DEMAND_WAIT_FOR_UPDATE pending. See mln_map_request_repaint().
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *

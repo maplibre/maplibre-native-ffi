@@ -1182,9 +1182,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
   public var generation: UInt64
   /// Secondary event detail whose meaning type selects. Depending on type it
-  /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
-  /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
-  /// meaning.
+  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+  /// 0. See `mln_runtime_event_type` for the per-type meaning.
   public var code: Int32
   /// Typed payload selected by payload_type.
   public var payload: RuntimeEventPayload

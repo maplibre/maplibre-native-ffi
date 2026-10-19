@@ -39,7 +39,7 @@ public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let invalidArgument: Status = .init(rawValue: -1)
   /// The object is valid but not currently in a state that permits the call.
   public static let invalidState: Status = .init(rawValue: -2)
-  /// The handle is thread-affine and the call was made from the wrong thread.
+  /// The handle is thread-affine and the call came from the wrong thread.
   public static let wrongThread: Status = .init(rawValue: -3)
   /// The entry point or requested behavior is unavailable in this build.
   public static let unsupported: Status = .init(rawValue: -4)
@@ -51,7 +51,7 @@ public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let busy: Status = .init(rawValue: -7)
   /// The render target or graphics receiver was irreversibly lost.
   public static let targetLost: Status = .init(rawValue: -8)
-  /// A nonblocking acquisition or service call has no result yet.
+  /// A nonblocking drain or acquisition has nothing to return yet.
   public static let notReady: Status = .init(rawValue: -9)
   /// A call named an ID with no live object behind it.
   public static let notFound: Status = .init(rawValue: -10)

@@ -30,18 +30,17 @@ typedef void (*mln_wake_callback)(void* user_data);
  * as one that drains its queue. On the graphics thread, a callback may also
  * service its own caller-driver session inline. A service of that session that
  * already runs further up the stack returns MLN_STATUS_BUSY, and the running
- * service takes the new work. Inline service may recurse when max_work limits
- * service or when several sessions share a graphics thread. Hosts using either
- * policy schedule service after the callback returns.
+ * service takes the new work. Inline service nests when max_work limits service
+ * or when several sessions share a graphics thread, so a host that does either
+ * schedules service to run after the callback returns.
  *
  * The callback must not destroy the object that owns the wake. Native code
  * calls release_user_data after all callback invocations have returned. It may
  * run on any thread that invoked callback and must not wait for another thread.
  *
  * A descriptor whose callback is null disables waking, and a disabled wake
- * must not carry release_user_data.
- * When the owning API permits an omitted wake, the receiver services its queue
- * or driver on its own schedule instead.
+ * must not carry release_user_data. When the owning API permits a disabled
+ * wake, the receiver services its queue or driver on its own schedule instead.
  */
 typedef struct mln_wake {
   mln_wake_callback callback MLN_BINDING("nullable=true");

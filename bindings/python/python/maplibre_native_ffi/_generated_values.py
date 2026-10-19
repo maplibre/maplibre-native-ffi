@@ -1725,7 +1725,7 @@ class FeatureStateSelector:
     """Optional source layer ID. Required for vector-source disambiguation."""
 
     feature_id: str | None = None
-    """Optional feature ID string. Required by set/get and optional for remove."""
+    """Optional feature ID. Required by set and get, optional for remove."""
 
     state_key: str | None = None
     """Optional state key. Used only by remove and requires feature_id."""
@@ -2035,9 +2035,7 @@ class LatLng:
     """
 
     latitude: float
-    """Latitude in degrees. Input latitude must be finite and within \\[-90,
-    90\\].
-    """
+    """Latitude in degrees, finite and within \\[-90, 90\\] on input."""
 
     longitude: float
     """Longitude in degrees. Input longitude must be finite."""
@@ -3125,9 +3123,15 @@ class RenderFrameResult:
     """
 
     extent_generation: int
+    """The session's extent generation when the demand reached its result. See
+    `mln_render_session_snapshot.extent_generation`.
+    """
 
     frame_generation: int
-    """Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`."""
+    """Position of the frame among the frames that the session rendered,
+    counting from one. Zero unless disposition is
+    `MLN_RENDER_RESULT_RENDERED`.
+    """
 
     needs_repaint: bool
     """Whether the map asked for another frame while it rendered this one, as
@@ -3254,24 +3258,40 @@ class RenderSessionSnapshot:
     """Logical extent, including a resize the driver has not applied yet."""
 
     generation: int
+    """Increases when the session's lifecycle state, target, or applied extent
+    changes. An acquired texture frame reports the value it rendered under.
+    """
 
     map_update_generation: int
+    """Generation of the latest map render update that the session has seen."""
 
     rendered_update_generation: int
+    """Map render update generation that the latest rendered frame drew. Zero
+    before the first frame after attachment or a target replacement.
+    """
 
     extent_generation: int
+    """Starts at one and increases each time the driver applies a resize."""
 
     frame_generation: int
+    """Frame generation of the latest rendered frame, zero before the first."""
 
     latest_demand_token: int
+    """Token of the demand whose terminal result the session queued last."""
 
     pending_demand_count: int
+    """Accepted demands that have no terminal result yet."""
 
     acquired_frame_count: int
+    """Acquired frames that the host has not released or disposed."""
 
     target_ready: bool
+    """False once attachment fails or the session is abandoned."""
 
     pending_changes: bool
+    """True when a map update or an accepted resize arrived after the latest
+    rendered frame.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3648,9 +3668,8 @@ class RuntimeEvent:
 
     code: int
     """Secondary event detail whose meaning type selects. Depending on type it
-    carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
-    error ordinal, or 0. See `mln_runtime_event_type` for the per-type
-    meaning.
+    carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+    0. See `mln_runtime_event_type` for the per-type meaning.
     """
 
     payload: (
@@ -4517,7 +4536,7 @@ class VulkanContextDescriptor:
     """Queue family index for graphics_queue. Must support graphics commands."""
 
     get_instance_proc_addr: int
-    """PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles."""
+    """PFN_vkGetInstanceProcAddr for the loader that created the instance."""
 
     get_device_proc_addr: int
     """PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device."""

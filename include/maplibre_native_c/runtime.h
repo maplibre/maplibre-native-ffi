@@ -107,9 +107,7 @@ typedef struct mln_offline_region_status {
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
  *
- * Value 22 is retired and no version reuses it. It reported the end of a
- * camera transition, which mln_animation_options.end_handler reports to the
- * command that started the transition.
+ * Value 22 is retired and stays unused.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -147,8 +145,7 @@ typedef enum mln_runtime_event_type : uint32_t {
  * mln_runtime_set_event_mask() reads the bits in
  * MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and ignores the rest. Both entry
  * points accept MLN_RUNTIME_EVENT_MASK_ALL and reject bits outside it. A host
- * that reads a
- * mask, sets one bit, and writes it back keeps every other bit.
+ * that reads a mask, sets one bit, and writes it back keeps every other bit.
  */
 typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
   /** Selects no event type. */
@@ -230,8 +227,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
 /**
  * Source kinds used by mln_runtime_event.source_type.
  *
- * Value 2 is retired and no version reuses it. It named a projection source,
- * and projection calls are synchronous and emit no events.
+ * Value 2 is retired and stays unused.
  */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
@@ -241,12 +237,7 @@ typedef enum mln_runtime_event_source_type : uint32_t {
 /**
  * Payload kinds used by mln_runtime_event.payload_type.
  *
- * Values 3, 8, and 9 are retired and no version reuses them. Value 3 was a
- * style-image-missing payload whose only content was the image ID that the
- * event message carries. Value 8 was an offline-operation completion payload,
- * and one-shot work reports its outcome through a completion. Value 9 carried
- * the identity of a camera transition that ended, and
- * mln_animation_options.end_handler reports that end.
+ * Values 3, 8, and 9 are retired and stay unused.
  */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
@@ -525,9 +516,8 @@ typedef union mln_runtime_event_payload {
  * Events have a fixed stride and hold no pointers, so a host can copy a whole
  * batch with one memory copy.
  *
- * Step through an array of these by
- * mln_event_batch_view.event_size rather than by the size of this
- * struct: a later version may add a member to
+ * Step through an array of these by mln_event_batch_view.event_size rather
+ * than by the size of this struct: a later version may add a member to
  * mln_runtime_event_payload and widen the stride. Every field below, payload
  * included, keeps its offset across versions.
  */
@@ -562,8 +552,8 @@ typedef struct mln_runtime_event {
   uint64_t generation;
   /**
    * Secondary event detail whose meaning type selects. Depending on type it
-   * carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
-   * ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
+   * carries an mln_camera_change_mode, a MapLibre Native error ordinal, or 0.
+   * See mln_runtime_event_type for the per-type meaning.
    */
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
@@ -740,11 +730,9 @@ typedef struct mln_http_header_rule {
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
-  /** Replacement URL. Null or empty keeps the original URL. Copied on return.
-   */
+  /** Replacement URL, copied on return. Null or empty keeps the original. */
   const char* url MLN_BINDING("nullable=true");
-  /** C API-managed callback context. Callback implementations leave unchanged.
-   */
+  /** C API-managed callback context, which callbacks leave unchanged. */
   void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_resource_transform_response MLN_BINDING("kind=callback_response");
 
@@ -834,8 +822,7 @@ typedef struct mln_resource_transform {
 
 typedef struct mln_http_header_transform_response {
   uint32_t size;
-  /** C API-managed callback context. Callback implementations leave unchanged.
-   */
+  /** C API-managed callback context, which callbacks leave unchanged. */
   void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_http_header_transform_response MLN_BINDING("kind=callback_response");
 
@@ -1357,14 +1344,13 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * Releasing a handled request that is neither completed nor cancelled fails it
  * with an MLN_RESOURCE_ERROR_REASON_OTHER error, so MapLibre never waits on a
  * request its provider dropped. That failure reaches the map asynchronously.
- * A request handle is not a child of its runtime, whether the
- * provider still holds it or its failure is still queued, so it never makes
+ * A request handle is not a child of its runtime, whether the provider still
+ * holds it or its failure is still queued, so it never makes
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
- * Passing
- * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
+ * Passing MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
  * released. A released handle reports MLN_STATUS_INVALID_STATE from every
- * other request entry point except wait_until_retired, including from a copy
- * another thread holds.
+ * other request entry point except mln_resource_request_wait_until_retired(),
+ * including from a copy another thread holds.
  */
 MLN_API void mln_resource_request_release(
   mln_resource_request_handle handle
@@ -1380,7 +1366,8 @@ MLN_API void mln_resource_request_release(
  * responsible for retiring the request.
  *
  * Returns:
- * - MLN_STATUS_OK once the request is retired, including when it already was.
+ * - MLN_STATUS_OK once the request is retired. A handle that names no live
+ *   request, including a value this library never issued, counts as retired.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is MLN_HANDLE_NULL.
  */
 MLN_API mln_status mln_resource_request_wait_until_retired(
@@ -1588,27 +1575,26 @@ MLN_API mln_status mln_runtime_barrier(
  * accepted but has not completed. Resource request handles are not children:
  * one that a provider still holds, or has released with its failure still
  * queued, leaves this call free to succeed. A successful call consumes the
- * public handle before returning.
- * Previously accepted work and native teardown continue in submission order;
- * callback user data remains native-owned until its release callback runs.
- * This function may be called from any thread.
+ * public handle before returning. Previously accepted work and native teardown
+ * continue in submission order; callback user data remains native-owned until
+ * its release callback runs. This function may be called from any thread.
  *
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown, has finished and the runtime's threads and
- * resources are gone. The completion MUST NOT block. This runtime's retirement
+ * resources are gone. The completion must not block. This runtime's retirement
  * touches no library state after the callback returns. A host that outlives
  * its runtimes may pass a discarding completion.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
  * graphics calls have ended as described below. Native work may continue until
- * the operating system ends the process. Once exit
- * begins, native code dispatches no further callback that the host registered
- * through this API, release callbacks included. A callback that native code
- * dispatched before exit began may still start or be running after it. A
- * completion or release callback that is still pending when exit begins never
- * runs, so code that runs after exit begins MUST NOT wait for one. Plugin code
- * is native code, not a host callback in this sense; see plugin.h.
+ * the operating system ends the process. Once exit begins, native code
+ * dispatches no further callback that the host registered through this API,
+ * release callbacks included. A callback that native code dispatched before
+ * exit began may still start or be running after it. A completion or release
+ * callback that is still pending when exit begins never runs, so code that
+ * runs after exit begins must not wait for one. Plugin code is native code,
+ * not a host callback in this sense; see plugin.h.
  *
  * When exit begins depends on the platform. On Windows, it begins when the
  * operating system ends the process's other threads, after every exit handler
@@ -1619,7 +1605,7 @@ MLN_API mln_status mln_runtime_barrier(
  * process that ends without running exit handlers, such as through _exit(),
  * ends native threads with it.
  *
- * A host that tears down state its callbacks use before exit begins MUST stop
+ * A host that tears down state its callbacks use before exit begins must stop
  * native callbacks into that state first. That covers a language runtime that
  * shuts down before the C runtime's exit handlers run, such as an interpreter
  * that finalizes first; on Windows, every exit handler and static destructor
@@ -1627,9 +1613,9 @@ MLN_API mln_status mln_runtime_barrier(
  * after the library's exit handler. Releasing each runtime and waiting for its
  * release completion stops its callbacks.
  *
- * Before the process calls exit() or returns from main, the host MUST end the
- * graphics calls of every render session it attached. To end
- * them, abandon the session, or detach it and wait for the detach completion.
+ * Before the process calls exit() or returns from main, the host must end the
+ * graphics calls of every render session it attached. To end them, abandon
+ * the session, or detach it and wait for the detach completion.
  * A host that drives a session on its own graphics thread stops driver service
  * first. Abandon returns once the session's in-flight driver call has ended,
  * so an exit path can end a session that is mid-frame. A disposed session's
@@ -1654,9 +1640,9 @@ MLN_API mln_status mln_runtime_release(
  *
  * Disposal of an eligible live handle allocates no memory and starts no thread.
  * Retirement releases callback state and resources on their required threads.
- * A successful call consumes the handle before returning. A failed
- * call retains caller ownership. Retirement waits for live and pending children
- * and accepted work. Existing children retain their own cleanup obligations;
+ * A successful call consumes the handle before returning. A failed call
+ * retains caller ownership. Retirement waits for live and pending children and
+ * accepted work. Existing children retain their own cleanup obligations;
  * dispose or release them to let the runtime finish retiring.
  *
  * Returns:
@@ -1674,16 +1660,16 @@ MLN_API mln_status mln_runtime_dispose(
  *
  * The drain transfers every event that the queue holds, in queue order. Events
  * that arrive later enter the next batch, and the event wake fires again when
- * the first of them arrives. The returned handle owns the event
- * records and their message arena. Later drains and runtime destruction leave
- * the batch readable. Release each batch with mln_event_batch_release().
+ * the first of them arrives. The returned handle owns the event records and
+ * their message arena. Later drains and runtime destruction leave the batch
+ * readable. Release each batch with mln_event_batch_release().
  *
  * This queue operation may be called from any thread. Concurrent drains are
  * serialized and each event enters exactly one returned batch.
  *
  * Unselected events reach no batch and raise no wake. A runtime whose release
- * has begun no longer drains; events it already queued are
- * discarded with the runtime.
+ * has begun no longer drains; events it already queued are discarded with the
+ * runtime.
  *
  * Returns:
  * - MLN_STATUS_OK when a batch holding at least one event is published in

@@ -1147,7 +1147,7 @@ pub struct FeatureStateSelector {
     pub source_id: String,
     /// Optional source layer ID. Required for vector-source disambiguation.
     pub source_layer_id: Option<String>,
-    /// Optional feature ID string. Required by set/get and optional for remove.
+    /// Optional feature ID. Required by set and get, optional for remove.
     pub feature_id: Option<String>,
     /// Optional state key. Used only by remove and requires feature_id.
     pub state_key: Option<String>,
@@ -1830,8 +1830,7 @@ impl FromNative<sys::mln_image_stretch> for ImageStretch {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct LatLng {
-    /// Latitude in degrees. Input latitude must be finite and within \[-90,
-    /// 90\].
+    /// Latitude in degrees, finite and within \[-90, 90\] on input.
     pub latitude: f64,
     /// Longitude in degrees. Input longitude must be finite.
     pub longitude: f64,
@@ -3771,8 +3770,12 @@ pub struct RenderFrameResult {
     /// compare it with `mln_map_snapshot.latest_render_update_generation` to
     /// find the first frame that includes a command.
     pub map_update_generation: u64,
+    /// The session's extent generation when the demand reached its result. See
+    /// `mln_render_session_snapshot.extent_generation`.
     pub extent_generation: u64,
-    /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+    /// Position of the frame among the frames that the session rendered,
+    /// counting from one. Zero unless disposition is
+    /// `MLN_RENDER_RESULT_RENDERED`.
     pub frame_generation: u64,
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing paint transition. Set only when disposition is
@@ -3978,15 +3981,28 @@ pub struct RenderSessionSnapshot {
     pub latest_result: RenderResult,
     /// Logical extent, including a resize the driver has not applied yet.
     pub extent: LogicalExtent,
+    /// Increases when the session's lifecycle state, target, or applied extent
+    /// changes. An acquired texture frame reports the value it rendered under.
     pub generation: u64,
+    /// Generation of the latest map render update that the session has seen.
     pub map_update_generation: u64,
+    /// Map render update generation that the latest rendered frame drew. Zero
+    /// before the first frame after attachment or a target replacement.
     pub rendered_update_generation: u64,
+    /// Starts at one and increases each time the driver applies a resize.
     pub extent_generation: u64,
+    /// Frame generation of the latest rendered frame, zero before the first.
     pub frame_generation: u64,
+    /// Token of the demand whose terminal result the session queued last.
     pub latest_demand_token: u64,
+    /// Accepted demands that have no terminal result yet.
     pub pending_demand_count: u32,
+    /// Acquired frames that the host has not released or disposed.
     pub acquired_frame_count: u32,
+    /// False once attachment fails or the session is abandoned.
     pub target_ready: bool,
+    /// True when a map update or an accepted resize arrived after the latest
+    /// rendered frame.
     pub pending_changes: bool,
 }
 impl RenderSessionSnapshot {
@@ -4914,9 +4930,8 @@ pub struct RuntimeEvent {
     /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
     pub generation: u64,
     /// Secondary event detail whose meaning type selects. Depending on type it
-    /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
-    /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
-    /// meaning.
+    /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+    /// 0. See `mln_runtime_event_type` for the per-type meaning.
     pub code: i32,
     /// Typed payload selected by payload_type.
     pub payload: RuntimeEventPayload,
@@ -5465,7 +5480,7 @@ pub enum Status: i32 {
     InvalidArgument = -1,
     /// The object is valid but not currently in a state that permits the call.
     InvalidState = -2,
-    /// The handle is thread-affine and the call was made from the wrong thread.
+    /// The handle is thread-affine and the call came from the wrong thread.
     WrongThread = -3,
     /// The entry point or requested behavior is unavailable in this build.
     Unsupported = -4,
@@ -5477,7 +5492,7 @@ pub enum Status: i32 {
     Busy = -7,
     /// The render target or graphics receiver was irreversibly lost.
     TargetLost = -8,
-    /// A nonblocking acquisition or service call has no result yet.
+    /// A nonblocking drain or acquisition has nothing to return yet.
     NotReady = -9,
     /// A call named an ID with no live object behind it.
     NotFound = -10,
@@ -6459,8 +6474,7 @@ pub struct VulkanContextDescriptor {
     pub graphics_queue: *mut std::ffi::c_void,
     /// Queue family index for graphics_queue. Must support graphics commands.
     pub graphics_queue_family_index: u32,
-    /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan
-    /// handles.
+    /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
     pub get_instance_proc_addr: *mut std::ffi::c_void,
     /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
     pub get_device_proc_addr: *mut std::ffi::c_void,

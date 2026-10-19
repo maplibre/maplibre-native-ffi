@@ -187,8 +187,11 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// with `mln_map_snapshot.latest_render_update_generation` to find the first
   /// frame that includes a command.
   public var mapUpdateGeneration: UInt64
+  /// The session's extent generation when the demand reached its result. See
+  /// `mln_render_session_snapshot.extent_generation`.
   public var extentGeneration: UInt64
-  /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
+  /// Position of the frame among the frames that the session rendered, counting
+  /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
   public var frameGeneration: UInt64
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing paint transition. Set only when disposition is
@@ -292,15 +295,28 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var latestResult: RenderResult
   /// Logical extent, including a resize the driver has not applied yet.
   public var extent: LogicalExtent
+  /// Increases when the session's lifecycle state, target, or applied extent
+  /// changes. An acquired texture frame reports the value it rendered under.
   public var generation: UInt64
+  /// Generation of the latest map render update that the session has seen.
   public var mapUpdateGeneration: UInt64
+  /// Map render update generation that the latest rendered frame drew. Zero
+  /// before the first frame after attachment or a target replacement.
   public var renderedUpdateGeneration: UInt64
+  /// Starts at one and increases each time the driver applies a resize.
   public var extentGeneration: UInt64
+  /// Frame generation of the latest rendered frame, zero before the first.
   public var frameGeneration: UInt64
+  /// Token of the demand whose terminal result the session queued last.
   public var latestDemandToken: UInt64
+  /// Accepted demands that have no terminal result yet.
   public var pendingDemandCount: UInt32
+  /// Acquired frames that the host has not released or disposed.
   public var acquiredFrameCount: UInt32
+  /// False once attachment fails or the session is abandoned.
   public var targetReady: Bool
+  /// True when a map update or an accepted resize arrived after the latest
+  /// rendered frame.
   public var pendingChanges: Bool
   public static var `default`: Self {
     Self(raw: mln_render_session_snapshot())

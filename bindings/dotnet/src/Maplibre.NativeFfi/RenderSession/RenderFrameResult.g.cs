@@ -19,8 +19,13 @@ namespace Maplibre.NativeFfi;
 /// with <c>mln_map_snapshot.latest_render_update_generation</c> to find the
 /// first frame that includes a command.
 /// </param>
+/// <param name="ExtentGeneration">
+/// The session's extent generation when the demand reached its result. See
+/// <c>mln_render_session_snapshot.extent_generation</c>.
+/// </param>
 /// <param name="FrameGeneration">
-/// Zero unless disposition is <c>MLN_RENDER_RESULT_RENDERED</c>.
+/// Position of the frame among the frames that the session rendered, counting
+/// from one. Zero unless disposition is <c>MLN_RENDER_RESULT_RENDERED</c>.
 /// </param>
 /// <param name="NeedsRepaint">
 /// Whether the map asked for another frame while it rendered this one, as

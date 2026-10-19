@@ -775,7 +775,7 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   public var sourceId: String
   /// Optional source layer ID. Required for vector-source disambiguation.
   public var sourceLayerId: String?
-  /// Optional feature ID string. Required by set/get and optional for remove.
+  /// Optional feature ID. Required by set and get, optional for remove.
   public var featureId: String?
   /// Optional state key. Used only by remove and requires feature_id.
   public var stateKey: String?
@@ -952,7 +952,7 @@ public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LatLng: Equatable, Hashable, Sendable {
-  /// Latitude in degrees. Input latitude must be finite and within \[-90, 90\].
+  /// Latitude in degrees, finite and within \[-90, 90\] on input.
   public var latitude: Double
   /// Longitude in degrees. Input longitude must be finite.
   public var longitude: Double

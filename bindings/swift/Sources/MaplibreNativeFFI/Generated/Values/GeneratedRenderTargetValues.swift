@@ -555,7 +555,7 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   public var graphicsQueue: NativePointer
   /// Queue family index for graphics_queue. Must support graphics commands.
   public var graphicsQueueFamilyIndex: UInt32
-  /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
+  /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
   public var getInstanceProcAddr: NativePointer
   /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
   public var getDeviceProcAddr: NativePointer

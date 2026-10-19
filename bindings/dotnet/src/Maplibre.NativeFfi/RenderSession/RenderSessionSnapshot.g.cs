@@ -21,6 +21,39 @@ namespace Maplibre.NativeFfi;
 /// <param name="Extent">
 /// Logical extent, including a resize the driver has not applied yet.
 /// </param>
+/// <param name="Generation">
+/// Increases when the session's lifecycle state, target, or applied extent
+/// changes. An acquired texture frame reports the value it rendered under.
+/// </param>
+/// <param name="MapUpdateGeneration">
+/// Generation of the latest map render update that the session has seen.
+/// </param>
+/// <param name="RenderedUpdateGeneration">
+/// Map render update generation that the latest rendered frame drew. Zero
+/// before the first frame after attachment or a target replacement.
+/// </param>
+/// <param name="ExtentGeneration">
+/// Starts at one and increases each time the driver applies a resize.
+/// </param>
+/// <param name="FrameGeneration">
+/// Frame generation of the latest rendered frame, zero before the first.
+/// </param>
+/// <param name="LatestDemandToken">
+/// Token of the demand whose terminal result the session queued last.
+/// </param>
+/// <param name="PendingDemandCount">
+/// Accepted demands that have no terminal result yet.
+/// </param>
+/// <param name="AcquiredFrameCount">
+/// Acquired frames that the host has not released or disposed.
+/// </param>
+/// <param name="TargetReady">
+/// False once attachment fails or the session is abandoned.
+/// </param>
+/// <param name="PendingChanges">
+/// True when a map update or an accepted resize arrived after the latest
+/// rendered frame.
+/// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     RenderDriverKind Driver,

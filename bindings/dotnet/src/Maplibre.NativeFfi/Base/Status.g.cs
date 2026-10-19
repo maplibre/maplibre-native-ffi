@@ -23,7 +23,7 @@ public enum Status : int
     InvalidState = -2,
 
     /// <summary>
-    /// The handle is thread-affine and the call was made from the wrong thread.
+    /// The handle is thread-affine and the call came from the wrong thread.
     /// </summary>
     WrongThread = -3,
 
@@ -53,7 +53,7 @@ public enum Status : int
     TargetLost = -8,
 
     /// <summary>
-    /// A nonblocking acquisition or service call has no result yet.
+    /// A nonblocking drain or acquisition has nothing to return yet.
     /// </summary>
     NotReady = -9,
 

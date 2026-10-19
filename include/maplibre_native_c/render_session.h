@@ -6,7 +6,10 @@
 #ifndef MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 #define MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 
+#ifndef __cplusplus
 #include <stdbool.h>
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -155,8 +158,15 @@ typedef struct mln_render_frame_result {
    * that includes a command.
    */
   uint64_t map_update_generation;
+  /**
+   * The session's extent generation when the demand reached its result. See
+   * mln_render_session_snapshot.extent_generation.
+   */
   uint64_t extent_generation;
-  /** Zero unless disposition is MLN_RENDER_RESULT_RENDERED. */
+  /**
+   * Position of the frame among the frames that the session rendered, counting
+   * from one. Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
+   */
   uint64_t frame_generation;
   /**
    * Whether the map asked for another frame while it rendered this one, as
@@ -207,15 +217,34 @@ typedef struct mln_render_session_snapshot {
   uint32_t latest_result MLN_BINDING("enum=mln_render_result");
   /** Logical extent, including a resize the driver has not applied yet. */
   mln_logical_extent extent;
+  /**
+   * Increases when the session's lifecycle state, target, or applied extent
+   * changes. An acquired texture frame reports the value it rendered under.
+   */
   uint64_t generation;
+  /** Generation of the latest map render update that the session has seen. */
   uint64_t map_update_generation;
+  /**
+   * Map render update generation that the latest rendered frame drew. Zero
+   * before the first frame after attachment or a target replacement.
+   */
   uint64_t rendered_update_generation;
+  /** Starts at one and increases each time the driver applies a resize. */
   uint64_t extent_generation;
+  /** Frame generation of the latest rendered frame, zero before the first. */
   uint64_t frame_generation;
+  /** Token of the demand whose terminal result the session queued last. */
   uint64_t latest_demand_token;
+  /** Accepted demands that have no terminal result yet. */
   uint32_t pending_demand_count;
+  /** Acquired frames that the host has not released or disposed. */
   uint32_t acquired_frame_count;
+  /** False once attachment fails or the session is abandoned. */
   bool target_ready;
+  /**
+   * True when a map update or an accepted resize arrived after the latest
+   * rendered frame.
+   */
   bool pending_changes;
 } mln_render_session_snapshot;
 
@@ -306,8 +335,8 @@ MLN_API mln_status mln_render_session_request_frame(
  *   *out_batch.
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
  *   *out_batch is left unchanged, no batch is allocated, the diagnostic
- *   message is empty, and the caller retries after the next demand. Bindings
- *   return their language's empty form instead of an error.
+ *   message is empty, and the caller drains again after the next frame wake.
+ *   Bindings return their language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released.
@@ -656,7 +685,8 @@ MLN_API mln_status mln_render_session_detach(
 ) MLN_NOEXCEPT;
 
 /**
- * Irreversibly ends session work and disposes of its graphics objects.
+ * Irreversibly ends session work and destroys the session's graphics objects
+ * where that is safe.
  *
  * For a core-worker session, the call waits for in-flight driver work to end
  * and prevents later graphics calls. For a caller-graphics-thread session,

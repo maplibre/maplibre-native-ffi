@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Irreversibly ends session work and disposes of its graphics objects.
+  /// Irreversibly ends session work and destroys the session's graphics objects
+  /// where that is safe.
   ///
   /// See `mln_render_session_abandon` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

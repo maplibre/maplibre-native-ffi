@@ -1049,7 +1049,7 @@ const (
 	StatusInvalidArgument Status = Status(C.MLN_STATUS_INVALID_ARGUMENT)
 	// The object is valid but not currently in a state that permits the call.
 	StatusInvalidState Status = Status(C.MLN_STATUS_INVALID_STATE)
-	// The handle is thread-affine and the call was made from the wrong thread.
+	// The handle is thread-affine and the call came from the wrong thread.
 	StatusWrongThread Status = Status(C.MLN_STATUS_WRONG_THREAD)
 	// The entry point or requested behavior is unavailable in this build.
 	StatusUnsupported Status = Status(C.MLN_STATUS_UNSUPPORTED)
@@ -1061,7 +1061,7 @@ const (
 	StatusBusy Status = Status(C.MLN_STATUS_BUSY)
 	// The render target or graphics receiver was irreversibly lost.
 	StatusTargetLost Status = Status(C.MLN_STATUS_TARGET_LOST)
-	// A nonblocking acquisition or service call has no result yet.
+	// A nonblocking drain or acquisition has nothing to return yet.
 	StatusNotReady Status = Status(C.MLN_STATUS_NOT_READY)
 	// A call named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
@@ -2012,7 +2012,7 @@ type FeatureStateSelector struct {
 	SourceId string
 	// Optional source layer ID. Required for vector-source disambiguation.
 	SourceLayerId *string
-	// Optional feature ID string. Required by set/get and optional for remove.
+	// Optional feature ID. Required by set and get, optional for remove.
 	FeatureId *string
 	// Optional state key. Used only by remove and requires feature_id.
 	StateKey *string
@@ -2373,7 +2373,7 @@ func nativeImageStretch(input ImageStretch, arena *bindingArena) C.mln_image_str
 // See mln_lat_lng in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type LatLng struct {
-	// Latitude in degrees. Input latitude must be finite and within [-90, 90].
+	// Latitude in degrees, finite and within [-90, 90] on input.
 	Latitude float64
 	// Longitude in degrees. Input longitude must be finite.
 	Longitude float64
@@ -3519,8 +3519,11 @@ type RenderFrameResult struct {
 	// mln_map_snapshot.latest_render_update_generation to find the first frame that
 	// includes a command.
 	MapUpdateGeneration uint64
-	ExtentGeneration    uint64
-	// Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
+	// The session's extent generation when the demand reached its result. See
+	// mln_render_session_snapshot.extent_generation.
+	ExtentGeneration uint64
+	// Position of the frame among the frames that the session rendered, counting
+	// from one. Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
 	FrameGeneration uint64
 	// Whether the map asked for another frame while it rendered this one, as during
 	// an ongoing paint transition. Set only when disposition is
@@ -3629,17 +3632,30 @@ type RenderSessionSnapshot struct {
 	// Most recent terminal mln_render_result value.
 	LatestResult RenderResult
 	// Logical extent, including a resize the driver has not applied yet.
-	Extent                   LogicalExtent
-	Generation               uint64
-	MapUpdateGeneration      uint64
+	Extent LogicalExtent
+	// Increases when the session's lifecycle state, target, or applied extent
+	// changes. An acquired texture frame reports the value it rendered under.
+	Generation uint64
+	// Generation of the latest map render update that the session has seen.
+	MapUpdateGeneration uint64
+	// Map render update generation that the latest rendered frame drew. Zero before
+	// the first frame after attachment or a target replacement.
 	RenderedUpdateGeneration uint64
-	ExtentGeneration         uint64
-	FrameGeneration          uint64
-	LatestDemandToken        uint64
-	PendingDemandCount       uint32
-	AcquiredFrameCount       uint32
-	TargetReady              bool
-	PendingChanges           bool
+	// Starts at one and increases each time the driver applies a resize.
+	ExtentGeneration uint64
+	// Frame generation of the latest rendered frame, zero before the first.
+	FrameGeneration uint64
+	// Token of the demand whose terminal result the session queued last.
+	LatestDemandToken uint64
+	// Accepted demands that have no terminal result yet.
+	PendingDemandCount uint32
+	// Acquired frames that the host has not released or disposed.
+	AcquiredFrameCount uint32
+	// False once attachment fails or the session is abandoned.
+	TargetReady bool
+	// True when a map update or an accepted resize arrived after the latest
+	// rendered frame.
+	PendingChanges bool
 }
 
 func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionSnapshot {
@@ -4068,8 +4084,8 @@ type RuntimeEvent struct {
 	// MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
 	Generation uint64
 	// Secondary event detail whose meaning type selects. Depending on type it
-	// carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
-	// ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
+	// carries an mln_camera_change_mode, a MapLibre Native error ordinal, or 0. See
+	// mln_runtime_event_type for the per-type meaning.
 	Code int32
 	// Typed payload selected by payload_type.
 	Payload RuntimeEventPayload
@@ -5037,7 +5053,7 @@ type VulkanContextDescriptor struct {
 	GraphicsQueue uintptr
 	// Queue family index for graphics_queue. Must support graphics commands.
 	GraphicsQueueFamilyIndex uint32
-	// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
+	// PFN_vkGetInstanceProcAddr for the loader that created the instance.
 	GetInstanceProcAddr uintptr
 	// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
 	GetDeviceProcAddr uintptr
@@ -7885,7 +7901,8 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 	return err
 }
 
-// Abandon irreversibly ends session work and disposes of its graphics objects.
+// Abandon irreversibly ends session work and destroys the session's graphics
+// objects where that is safe.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
