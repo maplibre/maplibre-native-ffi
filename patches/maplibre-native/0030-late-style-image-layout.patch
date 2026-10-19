@@ -1,5 +1,5 @@
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
-index f45d7506c..c84e09142 100644
+index f45d750..720e73c 100644
 --- a/src/mln/renderer/image_manager.cpp
 +++ b/src/mln/renderer/image_manager.cpp
 @@ -49,8 +49,14 @@ void ImageManager::addImage(Immutable<style::Image::Impl> image_) {
@@ -30,8 +30,8 @@ index f45d7506c..c84e09142 100644
  void ImageManager::notifyIfMissingImageAdded() {
      std::scoped_lock readWriteLock(rwLock);
  
-+    // All additions are available before layout restarts. A synchronous requestor
-+    // can remove itself (or another requestor) while handling this notification.
++    // Relayout once all of this update's images are added. A synchronous relayout
++    // can remove requestors from the set, so take them one at a time.
 +    while (!imageRequestorsToRelayout.empty()) {
 +        auto it = imageRequestorsToRelayout.begin();
 +        auto* requestor = *it;
@@ -43,7 +43,7 @@ index f45d7506c..c84e09142 100644
          ImageRequestor& requestor = *it->first;
          if (!requestor.hasPendingRequests()) {
 diff --git a/src/mln/renderer/image_manager.hpp b/src/mln/renderer/image_manager.hpp
-index d31787d6f..b8003637f 100644
+index d31787d..b800363 100644
 --- a/src/mln/renderer/image_manager.hpp
 +++ b/src/mln/renderer/image_manager.hpp
 @@ -68,6 +68,7 @@ private:
@@ -63,78 +63,34 @@ index d31787d6f..b8003637f 100644
                                     ImageMap patterns,
                                     ImageVersionMap versionMap,
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index 999ae01a5..3c37b69f6 100644
+index 999ae01..3e1ef42 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
-@@ -283,6 +283,9 @@ void GeometryTile::reset() {
-     // after clearing the tile's pending status.
-     loaded = false;
- 
-+    layers.reset();
-+    globalState.reset();
-+
-     // Reset the worker to the `NeedsParse` state.
-     ++correlationID;
-     worker.self().invoke(&GeometryTileWorker::reset, correlationID);
-@@ -294,21 +297,14 @@ std::unique_ptr<TileRenderData> GeometryTile::createRenderData() {
-     return std::make_unique<GeometryTileRenderData>(layoutResult, atlasTextures);
+@@ -331,6 +331,22 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
+                          correlationID);
  }
  
--void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& layers,
--                             std::shared_ptr<const GlobalStateMap> globalState) {
-+void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& layers_,
-+                             std::shared_ptr<const GlobalStateMap> globalState_) {
-     MLN_TRACE_FUNC();
- 
--    // Mark the tile as pending again if it was complete before to prevent
--    // signaling a complete state despite pending parse operations.
--    if (!pending) {
--        pending = true;
--        observer->onTileAction(id, sourceID, TileOperation::StartParse);
--    }
--
-     std::vector<Immutable<LayerProperties>> impls;
--    impls.reserve(layers.size());
-+    impls.reserve(layers_.size());
- 
--    for (const auto& layer : layers) {
-+    for (const auto& layer : layers_) {
-         MLN_TRACE_ZONE(layer);
-         MLN_ZONE_STR(layer->baseImpl->id);
-         // Skip irrelevant layers.
-@@ -323,10 +319,28 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
-         impls.push_back(layer);
-     }
- 
-+    layers = std::move(impls);
-+    globalState = std::move(globalState_);
-+    onRequestedImageAdded();
-+}
-+
 +void GeometryTile::onRequestedImageAdded() {
 +    MLN_TRACE_FUNC();
 +
-+    if (obsolete || !layers) {
++    if (obsolete) {
 +        return;
 +    }
 +
-+    // Keep in-flight results pending until the layout with the added images arrives.
 +    if (!pending) {
 +        pending = true;
 +        observer->onTileAction(id, sourceID, TileOperation::StartParse);
 +    }
 +
-     ++correlationID;
-     worker.self().invoke(&GeometryTileWorker::setLayers,
--                         std::move(impls),
--                         std::move(globalState),
-+                         *layers,
-+                         globalState,
-                          imageManager->getAvailableImages(),
-                          correlationID);
- }
++    ++correlationID;
++    worker.self().invoke(&GeometryTileWorker::setAvailableImages, imageManager->getAvailableImages(), correlationID);
++}
++
+ void GeometryTile::setShowCollisionBoxes(const bool showCollisionBoxes_) {
+     MLN_TRACE_FUNC();
+ 
 diff --git a/src/mln/tile/geometry_tile.hpp b/src/mln/tile/geometry_tile.hpp
-index b3f3fcd7f..b09ac4c3c 100644
+index b3f3fcd..72d6142 100644
 --- a/src/mln/tile/geometry_tile.hpp
 +++ b/src/mln/tile/geometry_tile.hpp
 @@ -45,6 +45,7 @@ public:
@@ -145,17 +101,58 @@ index b3f3fcd7f..b09ac4c3c 100644
      void onGlyphsAvailable(GlyphMap, HBShapeRequests) override;
      void onImagesAvailable(ImageMap, ImageMap, ImageVersionMap versionMap, uint64_t imageCorrelationID) override;
  
-@@ -126,6 +127,8 @@ private:
-     const std::shared_ptr<GlyphManager> glyphManager;
-     const std::shared_ptr<ImageManager> imageManager;
+diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
+index 885d618..963bf91 100644
+--- a/src/mln/tile/geometry_tile_worker.cpp
++++ b/src/mln/tile/geometry_tile_worker.cpp
+@@ -191,6 +191,33 @@ void GeometryTileWorker::setLayers(std::vector<Immutable<LayerProperties>> layer
+     }
+ }
  
-+    std::optional<std::vector<Immutable<style::LayerProperties>>> layers;
-+    std::shared_ptr<const GlobalStateMap> globalState;
-     uint64_t correlationID = 0;
++void GeometryTileWorker::setAvailableImages(Immutable<std::set<std::string>> availableImages_,
++                                            uint64_t correlationID_) {
++    MLN_TRACE_FUNC();
++
++    try {
++        availableImages = std::move(availableImages_);
++        correlationID = correlationID_;
++
++        switch (state) {
++            case Idle:
++                parse();
++                coalesce();
++                break;
++
++            case Coalescing:
++            case NeedsSymbolLayout:
++                state = NeedsParse;
++                break;
++
++            case NeedsParse:
++                break;
++        }
++    } catch (...) {
++        parent.invoke(&GeometryTile::onError, std::current_exception(), correlationID);
++    }
++}
++
+ void GeometryTileWorker::reset(uint64_t correlationID_) {
+     layers = std::nullopt;
+     data = std::nullopt;
+diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
+index d488206..079d6ff 100644
+--- a/src/mln/tile/geometry_tile_worker.hpp
++++ b/src/mln/tile/geometry_tile_worker.hpp
+@@ -59,6 +59,7 @@ public:
+     void setData(std::unique_ptr<const GeometryTileData>,
+                  Immutable<std::set<std::string>> availableImages,
+                  uint64_t correlationID);
++    void setAvailableImages(Immutable<std::set<std::string>> availableImages, uint64_t correlationID);
+     void reset(uint64_t correlationID_);
+     void setShowCollisionBoxes(bool showCollisionBoxes_, uint64_t correlationID_);
  
-     std::shared_ptr<LayoutResult> layoutResult;
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 15575f3b5..021454575 100644
+index 15575f3..3ef23f3 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -2563,3 +2563,109 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
@@ -171,7 +168,7 @@ index 15575f3b5..021454575 100644
 +    test.map.getStyle().loadJSON(R"({
 +        "version": 8,
 +        "sources": {"point": {"type": "geojson", "data": {"type": "Point", "coordinates": [-90, 40]}}},
-+        "layers": [{"id": "circle", "type": "circle", "source": "point"}]
++        "layers": [{"id": "symbol", "type": "symbol", "source": "point", "layout": {"icon-image": "marker"}}]
 +    })");
 +    test.map.jumpTo(CameraOptions().withCenter(LatLng{40, -90}).withZoom(3));
 +    size_t parses = 0;
@@ -268,90 +265,3 @@ index 15575f3b5..021454575 100644
 +                             return std::string(synchronous ? "Synchronous" : "Asynchronous") +
 +                                    (withText ? "WithText" : "IconOnly");
 +                         });
-diff --git a/test/renderer/image_manager.test.cpp b/test/renderer/image_manager.test.cpp
-index 237ff5d0f..5be505e07 100644
---- a/test/renderer/image_manager.test.cpp
-+++ b/test/renderer/image_manager.test.cpp
-@@ -105,6 +105,13 @@ public:
-         if (imagesAvailable && imageCorrelationID == imageCorrelationID_) imagesAvailable(icons, patterns, versionMap);
-     }
- 
-+    void onRequestedImageAdded() final {
-+        ++relayouts;
-+        if (relayout) relayout();
-+    }
-+
-+    size_t relayouts = 0;
-+    std::function<void()> relayout;
-     std::function<void(ImageMap, ImageMap, ImageVersionMap)> imagesAvailable;
-     uint64_t imageCorrelationID = 0;
- };
-@@ -451,3 +458,68 @@ TEST(ImageManager, MixedDependenciesRetainProvidedImages) {
-     }
-     EXPECT_NE(imageManager->getImage("sprite"), nullptr);
- }
-+
-+TEST(ImageManager, LateImagesRelayoutOnlyCompletedRequestors) {
-+    util::RunLoop runLoop;
-+    auto imageManager = ImageManager::create();
-+    StubImageManagerObserver observer;
-+    imageManager->setObserver(&observer);
-+    imageManager->setLoaded(true);
-+
-+    for (const auto type : {ImageType::Icon, ImageType::Pattern}) {
-+        StubImageRequestor completed(imageManager);
-+        StubImageRequestor pending(imageManager);
-+        StubImageRequestor unrelated(imageManager);
-+        const ImageDependencies dependencies{{"one", type}, {"two", type}};
-+        imageManager->getImages(completed, {dependencies, 0});
-+        runLoop.runOnce();
-+        imageManager->notifyIfMissingImageAdded();
-+
-+        auto pendingDependencies = dependencies;
-+        pendingDependencies.emplace("three", type);
-+        imageManager->getImages(pending, {pendingDependencies, 0});
-+        ASSERT_TRUE(pending.hasPendingRequests());
-+        size_t delivered = 0;
-+        pending.imagesAvailable = [&](ImageMap icons, ImageMap patterns, ImageVersionMap) {
-+            delivered = icons.size() + patterns.size();
-+        };
-+        imageManager->addImage(makeMutable<style::Image::Impl>("one", PremultipliedImage({16, 16}), 1.0f));
-+        imageManager->addImage(makeMutable<style::Image::Impl>("two", PremultipliedImage({16, 16}), 1.0f));
-+        // Synchronous layout re-requests its images inside the callback.
-+        completed.relayout = [&] { imageManager->getImages(completed, {dependencies, 0}); };
-+        imageManager->notifyIfMissingImageAdded();
-+        EXPECT_EQ(completed.relayouts, 1u);
-+        EXPECT_EQ(pending.relayouts, 0u);
-+        EXPECT_EQ(unrelated.relayouts, 0u);
-+        EXPECT_EQ(delivered, 0u);
-+
-+        // done() has run, but delivery still waits for notifyIfMissingImageAdded.
-+        runLoop.runOnce();
-+        ASSERT_FALSE(pending.hasPendingRequests());
-+        imageManager->addImage(makeMutable<style::Image::Impl>("three", PremultipliedImage({16, 16}), 1.0f));
-+        imageManager->notifyIfMissingImageAdded();
-+        EXPECT_EQ(delivered, 3u);
-+        EXPECT_EQ(pending.relayouts, 0u);
-+        EXPECT_EQ(completed.relayouts, 1u);
-+
-+        imageManager->removeImage("one");
-+        imageManager->removeImage("two");
-+        imageManager->removeImage("three");
-+    }
-+}
-+
-+TEST(ImageManager, ReleasedRequestorCancelsQueuedRelayout) {
-+    util::RunLoop runLoop;
-+    auto imageManager = ImageManager::create();
-+    StubImageManagerObserver observer;
-+    imageManager->setObserver(&observer);
-+    imageManager->setLoaded(true);
-+    StubImageRequestor requestor(imageManager);
-+    imageManager->getImages(requestor, {ImageDependencies{{"one", ImageType::Icon}}, 0});
-+    runLoop.runOnce();
-+    imageManager->notifyIfMissingImageAdded();
-+    imageManager->addImage(makeMutable<style::Image::Impl>("one", PremultipliedImage({16, 16}), 1.0f));
-+    imageManager->removeRequestor(requestor);
-+    imageManager->notifyIfMissingImageAdded();
-+    EXPECT_EQ(requestor.relayouts, 0u);
-+}
