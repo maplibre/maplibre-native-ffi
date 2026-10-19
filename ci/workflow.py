@@ -176,7 +176,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
                 f"mise run //bindings/swift:build {preset}",
-                f"mise run //bindings/zig:build {preset}",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -186,7 +185,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
-                f"mise run //bindings/zig:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -199,7 +197,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
                 f"mise run //bindings/swift:build {preset}",
-                f"mise run //bindings/zig:build {preset}",
             ]
         )
     elif target_platform == "tvos-simulator":
@@ -207,7 +204,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
-                f"mise run //bindings/zig:test {preset}",
             ]
         )
     elif target_platform in DESKTOP or target_platform == "emscripten":
