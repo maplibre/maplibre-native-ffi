@@ -3213,7 +3213,9 @@ fn generated_input_mln_http_header_rule<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_http_header_rule> {
     let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
-    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.kinds = value
+        .getattr("kinds")?
+        .extract::<sys::mln_resource_kind_mask>()?;
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
@@ -3897,7 +3899,9 @@ fn generated_input_mln_resource_rewrite_rule<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_resource_rewrite_rule> {
     let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
-    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.kinds = value
+        .getattr("kinds")?
+        .extract::<sys::mln_resource_kind_mask>()?;
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
@@ -3916,7 +3920,9 @@ fn generated_input_mln_resource_route<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_resource_route> {
     let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
-    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    raw.kinds = value
+        .getattr("kinds")?
+        .extract::<sys::mln_resource_kind_mask>()?;
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;

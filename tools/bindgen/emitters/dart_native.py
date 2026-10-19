@@ -4,8 +4,7 @@ The output holds only the forms the binding uses: one `@Native` external per C
 function, a `Struct` or `Union` per record, a top-level integer constant per
 C enum constant, and a `NativeFunction` typedef per callback typedef. Handle
 typedefs alias their integer carrier, and a fixed-size array field sits inline
-as an `@Array`. The handwritten `native_abi.dart` declares the macros that the
-binding reads, and the library re-exports it.
+as an `@Array`.
 """
 
 from __future__ import annotations
@@ -207,7 +206,6 @@ def generate(bound: BoundApi) -> str:
         "library;\n\n"
         "import 'dart:ffi';\n\n"
         "import 'native_asset.dart';\n\n"
-        "export 'native_abi.dart';\n\n"
         + handles
         + "\n"
         + callbacks

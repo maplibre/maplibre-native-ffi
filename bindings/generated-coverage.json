@@ -125,6 +125,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RenderingStats.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceErrorReason.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceKind.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceKindMask.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceLoadingMethod.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs",

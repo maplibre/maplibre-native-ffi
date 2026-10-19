@@ -112,8 +112,9 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderRule: Equatable, Hashable, Sendable {
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  public var kind: UInt32
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  public var kinds: ResourceKindMask
   /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
@@ -126,12 +127,12 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kind: UInt32 = 0,
+    kinds: ResourceKindMask = .init(rawValue: 0),
     flags: UrlMatchFlags = .init(rawValue: 0),
     url: String = "",
     headers: [HttpHeader] = []
   ) {
-    self.kind = kind
+    self.kinds = kinds
     self.flags = flags
     self.url = url
     self.headers = headers
@@ -141,7 +142,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
     raw: mln_http_header_rule,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kind = raw.kind
+    kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
     url = try NativeString.copyCString(raw.url)
     headers = try NativeInputArena.copyArray(
@@ -152,7 +153,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
     var raw = mln_http_header_rule()
-    raw.kind = kind
+    raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = try arena.cString(url)
     raw.headers = try arena
@@ -460,6 +461,31 @@ public struct ResourceKind: RawRepresentable, NativeOpenValue, Equatable,
   public static let spriteImage: ResourceKind = .init(rawValue: 5)
   public static let spriteJson: ResourceKind = .init(rawValue: 6)
   public static let image: ResourceKind = .init(rawValue: 7)
+}
+
+/// The resource kinds that a route or rule matches, one bit per
+/// `mln_resource_kind` value.
+///
+/// See `mln_resource_kind_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// Matches every resource kind.
+  public static let any: ResourceKindMask = []
+  public static let unknown: ResourceKindMask = .init(rawValue: 1)
+  public static let style: ResourceKindMask = .init(rawValue: 2)
+  public static let source: ResourceKindMask = .init(rawValue: 4)
+  public static let tile: ResourceKindMask = .init(rawValue: 8)
+  public static let glyphs: ResourceKindMask = .init(rawValue: 16)
+  public static let spriteImage: ResourceKindMask = .init(rawValue: 32)
+  public static let spriteJson: ResourceKindMask = .init(rawValue: 64)
+  public static let image: ResourceKindMask = .init(rawValue: 128)
 }
 
 public struct ResourceLoadingMethod: RawRepresentable, NativeOpenValue,
@@ -938,8 +964,9 @@ public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
 /// See `mln_resource_rewrite_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  public var kind: UInt32
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  public var kinds: ResourceKindMask
   /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
@@ -951,12 +978,12 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kind: UInt32 = 0,
+    kinds: ResourceKindMask = .init(rawValue: 0),
     flags: UrlMatchFlags = .init(rawValue: 0),
     url: String = "",
     replacementUrl: String? = nil
   ) {
-    self.kind = kind
+    self.kinds = kinds
     self.flags = flags
     self.url = url
     self.replacementUrl = replacementUrl
@@ -966,7 +993,7 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
     raw: mln_resource_rewrite_rule,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kind = raw.kind
+    kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
     url = try NativeString.copyCString(raw.url)
     replacementUrl = raw.replacement_url == nil ? nil : try NativeString
@@ -977,7 +1004,7 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
     -> mln_resource_rewrite_rule
   {
     var raw = mln_resource_rewrite_rule()
-    raw.kind = kind
+    raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = try arena.cString(url)
     raw.replacement_url = try replacementUrl.map { try arena.cString($0) }
@@ -990,8 +1017,9 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRoute: Equatable, Hashable, Sendable {
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  public var kind: UInt32
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  public var kinds: ResourceKindMask
   /// A bitwise OR of `mln_url_match_flags` values.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
@@ -1001,11 +1029,11 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kind: UInt32 = 0,
+    kinds: ResourceKindMask = .init(rawValue: 0),
     flags: UrlMatchFlags = .init(rawValue: 0),
     url: String = ""
   ) {
-    self.kind = kind
+    self.kinds = kinds
     self.flags = flags
     self.url = url
   }
@@ -1014,14 +1042,14 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     raw: mln_resource_route,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kind = raw.kind
+    kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
     url = try NativeString.copyCString(raw.url)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
     var raw = mln_resource_route()
-    raw.kind = kind
+    raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = try arena.cString(url)
     return raw

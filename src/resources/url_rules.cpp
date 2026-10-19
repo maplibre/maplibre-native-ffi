@@ -14,6 +14,16 @@ constexpr auto known_url_match_flags =
   static_cast<std::uint32_t>(MLN_URL_MATCH_GLOB) |
   static_cast<std::uint32_t>(MLN_URL_MATCH_REQUESTED_URL);
 
+constexpr auto known_resource_kinds =
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_UNKNOWN) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_STYLE) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SOURCE) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_TILE) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_GLYPHS) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SPRITE_JSON) |
+  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_IMAGE);
+
 auto literal_span(
   std::string_view pattern, std::size_t index, char candidate
 ) noexcept -> std::size_t {
@@ -38,10 +48,13 @@ auto reject(const char* what, std::size_t index, const char* reason)
 // Checks the members that routes and rules share. allowed names the flags
 // that this kind of entry accepts.
 auto check_pattern(
-  const char* what, std::size_t index, std::uint32_t flags,
+  const char* what, std::size_t index, std::uint32_t kinds, std::uint32_t flags,
   std::uint32_t allowed, const char* url
 ) -> mln_status {
   if (url == nullptr) return reject(what, index, "has a null url");
+  if ((kinds & ~known_resource_kinds) != 0) {
+    return reject(what, index, "has unknown kind bits");
+  }
   if ((flags & ~known_url_match_flags) != 0) {
     return reject(what, index, "has unknown flag bits");
   }
@@ -138,7 +151,8 @@ auto url_matches(
 auto UrlPattern::matches(
   std::uint32_t request_kind, std::string_view candidate
 ) const noexcept -> bool {
-  return matches_kind(kind, request_kind) && url_matches(flags, url, candidate);
+  return matches_kind(kinds, request_kind) &&
+         url_matches(flags, url, candidate);
 }
 
 auto RouteTable::matches(
@@ -169,10 +183,10 @@ auto copy_routes(
   for (std::size_t index = 0; index < count; ++index) {
     const auto& route = routes[index];
     const auto status = check_pattern(
-      "route", index, route.flags, known_url_match_flags, route.url
+      "route", index, route.kinds, route.flags, known_url_match_flags, route.url
     );
     if (status != MLN_STATUS_OK) return status;
-    out.routes.push_back({route.kind, route.flags, route.url});
+    out.routes.push_back({route.kinds, route.flags, route.url});
   }
   return MLN_STATUS_OK;
 }
@@ -190,12 +204,13 @@ auto copy_rewrite_rules(
   for (std::size_t index = 0; index < count; ++index) {
     const auto& rule = rules[index];
     const auto status = check_pattern(
-      "rewrite rule", index, rule.flags, MLN_URL_MATCH_GLOB, rule.url
+      "rewrite rule", index, rule.kinds, rule.flags, MLN_URL_MATCH_GLOB,
+      rule.url
     );
     if (status != MLN_STATUS_OK) return status;
     out.rules.push_back(
       RewriteRuleTable::Rule{
-        .pattern = {rule.kind, rule.flags, rule.url},
+        .pattern = {rule.kinds, rule.flags, rule.url},
         .replacement_url = rule.replacement_url == nullptr
                              ? std::nullopt
                              : std::optional<std::string>{rule.replacement_url},
@@ -217,7 +232,7 @@ auto copy_header_rules(
   for (std::size_t index = 0; index < count; ++index) {
     const auto& rule = rules[index];
     const auto status = check_pattern(
-      "header rule", index, rule.flags, MLN_URL_MATCH_GLOB, rule.url
+      "header rule", index, rule.kinds, rule.flags, MLN_URL_MATCH_GLOB, rule.url
     );
     if (status != MLN_STATUS_OK) return status;
     if (rule.headers == nullptr && rule.header_count != 0) {
@@ -226,7 +241,7 @@ auto copy_header_rules(
       );
     }
     auto copied = HeaderRuleTable::Rule{
-      .pattern = {rule.kind, rule.flags, rule.url},
+      .pattern = {rule.kinds, rule.flags, rule.url},
       .headers = {},
     };
     copied.headers.reserve(rule.header_count);

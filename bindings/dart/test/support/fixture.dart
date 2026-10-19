@@ -153,7 +153,7 @@ ResourceProvider routedProvider(
 
 /// A route that claims one style URL.
 ResourceRoute styleRoute(String url) =>
-    ResourceRoute(kind: ResourceKind.style.rawValue, url: url);
+    ResourceRoute(kinds: ResourceKindMask.style, url: url);
 
 ResourceResponse get emptyStyleResponse => ResourceResponse(
   status: ResourceResponseStatus.ok,

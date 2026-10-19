@@ -808,6 +808,28 @@ const (
 	ResourceKindImage       ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_IMAGE)
 )
 
+// ResourceKindMask corresponds to mln_resource_kind_mask. The resource kinds
+// that a route or rule matches, one bit per mln_resource_kind value.
+//
+// See mln_resource_kind_mask in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceKindMask uint32
+
+const (
+	// Matches every resource kind.
+	ResourceKindMaskAny         ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_ANY)
+	ResourceKindMaskUnknown     ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_UNKNOWN)
+	ResourceKindMaskStyle       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_STYLE)
+	ResourceKindMaskSource      ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SOURCE)
+	ResourceKindMaskTile        ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_TILE)
+	ResourceKindMaskGlyphs      ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_GLYPHS)
+	ResourceKindMaskSpriteImage ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE)
+	ResourceKindMaskSpriteJson  ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_JSON)
+	ResourceKindMaskImage       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_IMAGE)
+)
+
+func (value ResourceKindMask) Has(flags ResourceKindMask) bool { return value&flags == flags }
+
 type ResourceLoadingMethod uint32
 
 const (
@@ -2216,8 +2238,9 @@ func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
 // See mln_http_header_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeaderRule struct {
-	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
-	Kind uint32
+	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+	// unknown bit.
+	Kinds ResourceKindMask
 	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
@@ -2229,7 +2252,7 @@ type HttpHeaderRule struct {
 
 func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_header_rule {
 	raw := C.mln_http_header_rule{}
-	raw.kind = C.uint32_t(input.Kind)
+	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
 	raw.url = arena.cstring(input.Url)
 	{
@@ -3940,8 +3963,9 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 // See mln_resource_rewrite_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRewriteRule struct {
-	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
-	Kind uint32
+	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+	// unknown bit.
+	Kinds ResourceKindMask
 	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
@@ -3952,7 +3976,7 @@ type ResourceRewriteRule struct {
 
 func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C.mln_resource_rewrite_rule {
 	raw := C.mln_resource_rewrite_rule{}
-	raw.kind = C.uint32_t(input.Kind)
+	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
 	raw.url = arena.cstring(input.Url)
 	if input.ReplacementUrl != nil {
@@ -3967,8 +3991,9 @@ func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C
 // See mln_resource_route in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRoute struct {
-	// One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY.
-	Kind uint32
+	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+	// unknown bit.
+	Kinds ResourceKindMask
 	// A bitwise OR of mln_url_match_flags values.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
@@ -3977,7 +4002,7 @@ type ResourceRoute struct {
 
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
 	raw := C.mln_resource_route{}
-	raw.kind = C.uint32_t(input.Kind)
+	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
 	raw.url = arena.cstring(input.Url)
 	return raw

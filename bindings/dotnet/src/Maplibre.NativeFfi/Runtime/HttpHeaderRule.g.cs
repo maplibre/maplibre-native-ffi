@@ -11,18 +11,24 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct HttpHeaderRule
 {
-    public HttpHeaderRule(uint Kind, UrlMatchFlags Flags, string Url, HttpHeader[] Headers)
+    public HttpHeaderRule(
+        ResourceKindMask Kinds,
+        UrlMatchFlags Flags,
+        string Url,
+        HttpHeader[] Headers
+    )
     {
-        this.Kind = Kind;
+        this.Kinds = Kinds;
         this.Flags = Flags;
         this.Url = Url;
         this.Headers = Headers;
     }
 
     /// <summary>
-    /// One of <c>mln_resource_kind</c>, or <c>MLN_RESOURCE_KIND_ANY</c>.
+    /// A bitwise OR of <c>mln_resource_kind_mask</c> values. Registration
+    /// rejects an unknown bit.
     /// </summary>
-    public uint Kind { get; init; }
+    public ResourceKindMask Kinds { get; init; }
 
     /// <summary>
     /// A bitwise OR of <c>mln_url_match_flags</c> values other than

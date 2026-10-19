@@ -7,8 +7,6 @@ import 'dart:ffi';
 
 import 'native_asset.dart';
 
-export 'native_abi.dart';
-
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_batch = Uint64;
 typedef mln_delivery_queue = Uint64;
@@ -439,7 +437,7 @@ final class mln_http_header extends Struct {
 
 final class mln_http_header_rule extends Struct {
   @Uint32()
-  external int kind;
+  external int kinds;
   @Uint32()
   external int flags;
   external Pointer<Char> url;
@@ -1082,7 +1080,7 @@ final class mln_resource_response extends Struct {
 
 final class mln_resource_rewrite_rule extends Struct {
   @Uint32()
-  external int kind;
+  external int kinds;
   @Uint32()
   external int flags;
   external Pointer<Char> url;
@@ -1091,7 +1089,7 @@ final class mln_resource_rewrite_rule extends Struct {
 
 final class mln_resource_route extends Struct {
   @Uint32()
-  external int kind;
+  external int kinds;
   @Uint32()
   external int flags;
   external Pointer<Char> url;
@@ -1889,6 +1887,17 @@ const MLN_RESOURCE_KIND_GLYPHS = 4;
 const MLN_RESOURCE_KIND_SPRITE_IMAGE = 5;
 const MLN_RESOURCE_KIND_SPRITE_JSON = 6;
 const MLN_RESOURCE_KIND_IMAGE = 7;
+
+// mln_resource_kind_mask
+const MLN_RESOURCE_KIND_MASK_ANY = 0;
+const MLN_RESOURCE_KIND_MASK_UNKNOWN = 1;
+const MLN_RESOURCE_KIND_MASK_STYLE = 2;
+const MLN_RESOURCE_KIND_MASK_SOURCE = 4;
+const MLN_RESOURCE_KIND_MASK_TILE = 8;
+const MLN_RESOURCE_KIND_MASK_GLYPHS = 16;
+const MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 32;
+const MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 64;
+const MLN_RESOURCE_KIND_MASK_IMAGE = 128;
 
 // mln_resource_loading_method
 const MLN_RESOURCE_LOADING_METHOD_ALL = 0;

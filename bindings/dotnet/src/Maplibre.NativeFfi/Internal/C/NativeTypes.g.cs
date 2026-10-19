@@ -277,7 +277,7 @@ internal unsafe struct mln_http_header
 
 internal unsafe struct mln_http_header_rule
 {
-    public uint kind;
+    public uint kinds;
     public uint flags;
     public sbyte* url;
     public mln_http_header* headers;
@@ -792,7 +792,7 @@ internal unsafe struct mln_resource_response
 
 internal unsafe struct mln_resource_rewrite_rule
 {
-    public uint kind;
+    public uint kinds;
     public uint flags;
     public sbyte* url;
     public sbyte* replacement_url;
@@ -800,7 +800,7 @@ internal unsafe struct mln_resource_rewrite_rule
 
 internal unsafe struct mln_resource_route
 {
-    public uint kind;
+    public uint kinds;
     public uint flags;
     public sbyte* url;
 }
@@ -1599,6 +1599,19 @@ internal enum mln_resource_kind : uint
     MLN_RESOURCE_KIND_SPRITE_IMAGE = 5,
     MLN_RESOURCE_KIND_SPRITE_JSON = 6,
     MLN_RESOURCE_KIND_IMAGE = 7,
+}
+
+internal enum mln_resource_kind_mask : uint
+{
+    MLN_RESOURCE_KIND_MASK_ANY = 0,
+    MLN_RESOURCE_KIND_MASK_UNKNOWN = 1,
+    MLN_RESOURCE_KIND_MASK_STYLE = 2,
+    MLN_RESOURCE_KIND_MASK_SOURCE = 4,
+    MLN_RESOURCE_KIND_MASK_TILE = 8,
+    MLN_RESOURCE_KIND_MASK_GLYPHS = 16,
+    MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 32,
+    MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 64,
+    MLN_RESOURCE_KIND_MASK_IMAGE = 128,
 }
 
 internal enum mln_resource_loading_method : uint

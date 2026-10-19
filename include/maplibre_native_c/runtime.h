@@ -615,8 +615,25 @@ typedef struct mln_event_batch_view {
   size_t messages_size;
 } mln_event_batch_view;
 
-/** Rule and route kind that matches every resource kind. */
-#define MLN_RESOURCE_KIND_ANY UINT32_MAX
+/**
+ * The resource kinds that a route or rule matches, one bit per
+ * mln_resource_kind value.
+ *
+ * MLN_RESOURCE_KIND_MASK_ANY holds no bit and matches every kind, so a route
+ * or rule that leaves kinds at zero applies to every request.
+ */
+typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
+  /** Matches every resource kind. */
+  MLN_RESOURCE_KIND_MASK_ANY = 0U,
+  MLN_RESOURCE_KIND_MASK_UNKNOWN = 1U << MLN_RESOURCE_KIND_UNKNOWN,
+  MLN_RESOURCE_KIND_MASK_STYLE = 1U << MLN_RESOURCE_KIND_STYLE,
+  MLN_RESOURCE_KIND_MASK_SOURCE = 1U << MLN_RESOURCE_KIND_SOURCE,
+  MLN_RESOURCE_KIND_MASK_TILE = 1U << MLN_RESOURCE_KIND_TILE,
+  MLN_RESOURCE_KIND_MASK_GLYPHS = 1U << MLN_RESOURCE_KIND_GLYPHS,
+  MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 1U << MLN_RESOURCE_KIND_SPRITE_IMAGE,
+  MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 1U << MLN_RESOURCE_KIND_SPRITE_JSON,
+  MLN_RESOURCE_KIND_MASK_IMAGE = 1U << MLN_RESOURCE_KIND_IMAGE,
+} mln_resource_kind_mask;
 
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
@@ -652,13 +669,17 @@ typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
 /**
  * One request pattern that a resource provider claims.
  *
- * A route matches a request whose kind equals kind, or any request when kind is
- * MLN_RESOURCE_KIND_ANY, and whose URL matches url as flags select. With no
- * flags the route compares mln_resource_request.resolved_url exactly.
+ * A route matches a request whose kind has its bit in kinds, or any request
+ * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose URL matches url as flags
+ * select. With no flags the route compares mln_resource_request.resolved_url
+ * exactly.
  */
 typedef struct mln_resource_route {
-  /** One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY. */
-  uint32_t kind;
+  /**
+   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+   * unknown bit.
+   */
+  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
@@ -668,13 +689,16 @@ typedef struct mln_resource_route {
 /**
  * One rule of a native resource transform.
  *
- * A rule matches a request whose kind equals kind, or any request when kind is
- * MLN_RESOURCE_KIND_ANY, and whose URL matches url as flags select. The first
- * matching rule rewrites the URL.
+ * A rule matches a request whose kind has its bit in kinds, or any request
+ * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose URL matches url as flags
+ * select. The first matching rule rewrites the URL.
  */
 typedef struct mln_resource_rewrite_rule {
-  /** One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY. */
-  uint32_t kind;
+  /**
+   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+   * unknown bit.
+   */
+  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
   /** A bitwise OR of mln_url_match_flags values other than REQUESTED_URL. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
@@ -692,13 +716,16 @@ typedef struct mln_http_header {
 /**
  * One rule of a native HTTP header transform.
  *
- * A rule matches a request whose kind equals kind, or any request when kind is
- * MLN_RESOURCE_KIND_ANY, and whose transformed URL matches url as flags select.
- * The first matching rule supplies all its headers.
+ * A rule matches a request whose kind has its bit in kinds, or any request
+ * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose transformed URL matches
+ * url as flags select. The first matching rule supplies all its headers.
  */
 typedef struct mln_http_header_rule {
-  /** One of mln_resource_kind, or MLN_RESOURCE_KIND_ANY. */
-  uint32_t kind;
+  /**
+   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
+   * unknown bit.
+   */
+  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
   /** A bitwise OR of mln_url_match_flags values other than REQUESTED_URL. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */

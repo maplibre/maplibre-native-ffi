@@ -258,6 +258,16 @@ pub const MLN_RESOURCE_KIND_GLYPHS: mln_resource_kind = 4;
 pub const MLN_RESOURCE_KIND_SPRITE_IMAGE: mln_resource_kind = 5;
 pub const MLN_RESOURCE_KIND_SPRITE_JSON: mln_resource_kind = 6;
 pub const MLN_RESOURCE_KIND_IMAGE: mln_resource_kind = 7;
+pub type mln_resource_kind_mask = u32;
+pub const MLN_RESOURCE_KIND_MASK_ANY: mln_resource_kind_mask = 0;
+pub const MLN_RESOURCE_KIND_MASK_UNKNOWN: mln_resource_kind_mask = 1;
+pub const MLN_RESOURCE_KIND_MASK_STYLE: mln_resource_kind_mask = 2;
+pub const MLN_RESOURCE_KIND_MASK_SOURCE: mln_resource_kind_mask = 4;
+pub const MLN_RESOURCE_KIND_MASK_TILE: mln_resource_kind_mask = 8;
+pub const MLN_RESOURCE_KIND_MASK_GLYPHS: mln_resource_kind_mask = 16;
+pub const MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE: mln_resource_kind_mask = 32;
+pub const MLN_RESOURCE_KIND_MASK_SPRITE_JSON: mln_resource_kind_mask = 64;
+pub const MLN_RESOURCE_KIND_MASK_IMAGE: mln_resource_kind_mask = 128;
 pub type mln_resource_loading_method = u32;
 pub const MLN_RESOURCE_LOADING_METHOD_ALL: mln_resource_loading_method = 0;
 pub const MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY: mln_resource_loading_method = 1;
@@ -698,7 +708,7 @@ pub struct mln_http_header {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_http_header_rule {
-    pub kind: u32,
+    pub kinds: u32,
     pub flags: u32,
     pub url: *const std::ffi::c_char,
     pub headers: *const mln_http_header,
@@ -1188,7 +1198,7 @@ pub struct mln_resource_response {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_rewrite_rule {
-    pub kind: u32,
+    pub kinds: u32,
     pub flags: u32,
     pub url: *const std::ffi::c_char,
     pub replacement_url: *const std::ffi::c_char,
@@ -1196,7 +1206,7 @@ pub struct mln_resource_rewrite_rule {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_route {
-    pub kind: u32,
+    pub kinds: u32,
     pub flags: u32,
     pub url: *const std::ffi::c_char,
 }

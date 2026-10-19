@@ -2825,7 +2825,7 @@ Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
   Arena arena,
 ) {
   final result = arena<raw.mln_http_header_rule>();
-  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
+  result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
   result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
   result.ref.headers = arena<raw.mln_http_header>(
@@ -2925,7 +2925,7 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
   Arena arena,
 ) {
   final result = arena<raw.mln_resource_route>();
-  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
+  result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
   result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
   return result;
@@ -2974,7 +2974,7 @@ Pointer<raw.mln_resource_rewrite_rule> _writeResourceRewriteRule(
   Arena arena,
 ) {
   final result = arena<raw.mln_resource_rewrite_rule>();
-  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
+  result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
   result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
   result.ref.replacement_url = value.replacementUrl == null

@@ -63,7 +63,6 @@ static void resource_transform_with_zero_size(void* descriptor) {
 }
 
 static const mln_resource_rewrite_rule unused_rewrite_rule = {
-  .kind = MLN_RESOURCE_KIND_ANY,
   .url = "http://127.0.0.1/unused",
 };
 
@@ -137,7 +136,6 @@ static void header_transform_with_zero_size(void* descriptor) {
 }
 
 static const mln_http_header_rule unused_header_rule = {
-  .kind = MLN_RESOURCE_KIND_ANY,
   .url = "http://127.0.0.1/unused",
 };
 

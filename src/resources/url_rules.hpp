@@ -25,16 +25,18 @@ namespace mln::core {
   std::uint32_t flags, std::string_view url, std::string_view candidate
 ) noexcept -> bool;
 
-// Whether a rule or route of kind applies to a request of request_kind.
+// Whether a rule or route with the kinds mask applies to a request of
+// request_kind.
 [[nodiscard]] constexpr auto matches_kind(
-  std::uint32_t kind, std::uint32_t request_kind
+  std::uint32_t kinds, std::uint32_t request_kind
 ) noexcept -> bool {
-  return kind == MLN_RESOURCE_KIND_ANY || kind == request_kind;
+  return kinds == MLN_RESOURCE_KIND_MASK_ANY ||
+         (request_kind < 32U && ((kinds >> request_kind) & 1U) != 0);
 }
 
 // One copied route, rule, or header rule pattern.
 struct UrlPattern {
-  std::uint32_t kind = 0;
+  std::uint32_t kinds = MLN_RESOURCE_KIND_MASK_ANY;
   std::uint32_t flags = 0;
   std::string url;
 

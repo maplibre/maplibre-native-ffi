@@ -9,8 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_resource_rewrite_rule</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Kind">
-/// One of <c>mln_resource_kind</c>, or <c>MLN_RESOURCE_KIND_ANY</c>.
+/// <param name="Kinds">
+/// A bitwise OR of <c>mln_resource_kind_mask</c> values. Registration rejects
+/// an unknown bit.
 /// </param>
 /// <param name="Flags">
 /// A bitwise OR of <c>mln_url_match_flags</c> values other than REQUESTED_URL.
@@ -22,7 +23,7 @@ namespace Maplibre.NativeFfi;
 /// The replacement URL, or null to leave a matching URL unchanged.
 /// </param>
 public readonly partial record struct ResourceRewriteRule(
-    uint Kind,
+    ResourceKindMask Kinds,
     UrlMatchFlags Flags,
     string Url,
     string? ReplacementUrl

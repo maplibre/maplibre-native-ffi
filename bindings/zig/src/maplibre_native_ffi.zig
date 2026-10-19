@@ -1326,8 +1326,9 @@ pub const HttpHeader = struct {
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderRule = struct {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
     /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
@@ -1337,7 +1338,7 @@ pub const HttpHeaderRule = struct {
     headers: []const HttpHeader = &.{},
     pub fn toNative(self: HttpHeaderRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header_rule {
         var raw = std.mem.zeroes(c.mln_http_header_rule);
-        raw.kind = self.kind;
+        raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = try marshal.cString(allocator, self.url);
         raw.headers = blk: {
@@ -1351,7 +1352,7 @@ pub const HttpHeaderRule = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header_rule) status.Error!HttpHeaderRule {
         return .{
-            .kind = raw.kind,
+            .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
             .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
             .headers = blk: {
@@ -3467,6 +3468,31 @@ pub const ResourceKind = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// The resource kinds that a route or rule matches, one bit per
+/// `mln_resource_kind` value.
+///
+/// See `mln_resource_kind_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceKindMask = struct {
+    unknown: bool = false,
+    style: bool = false,
+    source: bool = false,
+    tile: bool = false,
+    glyphs: bool = false,
+    sprite_image: bool = false,
+    sprite_json: bool = false,
+    image: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
+    pub const any = fromNative(0);
+};
+
 pub const ResourceLoadingMethod = enum(u32) {
     network_only = 2,
     cache_only = 1,
@@ -3779,8 +3805,9 @@ pub const ResourceResponseStatus = enum(u32) {
 /// See `mln_resource_rewrite_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRewriteRule = struct {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
     /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
@@ -3790,7 +3817,7 @@ pub const ResourceRewriteRule = struct {
     pub fn toNative(self: ResourceRewriteRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_rewrite_rule {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_rewrite_rule);
-        raw.kind = self.kind;
+        raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = try marshal.cString(allocator, self.url);
         raw.replacement_url = if (self.replacement_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
@@ -3799,7 +3826,7 @@ pub const ResourceRewriteRule = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_rewrite_rule) status.Error!ResourceRewriteRule {
         return .{
-            .kind = raw.kind,
+            .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
             .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
             .replacement_url = if (raw.replacement_url == null) null else try allocator.dupe(u8, std.mem.span(raw.replacement_url orelse return error.NativeError)),
@@ -3812,8 +3839,9 @@ pub const ResourceRewriteRule = struct {
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRoute = struct {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    kind: u32 = std.mem.zeroes(u32),
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
     /// A bitwise OR of `mln_url_match_flags` values.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
@@ -3821,7 +3849,7 @@ pub const ResourceRoute = struct {
     pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_route);
-        raw.kind = self.kind;
+        raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = try marshal.cString(allocator, self.url);
         return raw;
@@ -3829,7 +3857,7 @@ pub const ResourceRoute = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_route) status.Error!ResourceRoute {
         return .{
-            .kind = raw.kind,
+            .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
             .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
         };

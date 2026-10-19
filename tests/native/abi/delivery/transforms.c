@@ -54,21 +54,18 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_rewrite_rule rules[] = {
-    {.kind = MLN_RESOURCE_KIND_ANY, .url = "custom://first"},
-    {.kind = MLN_RESOURCE_KIND_ANY,
-     .flags = MLN_URL_MATCH_REQUESTED_URL,
-     .url = "custom://second"},
+    {.url = "custom://first"},
+    {.flags = MLN_URL_MATCH_REQUESTED_URL, .url = "custom://second"},
   };
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, rules, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "rewrite rule 1"));
 
   const mln_resource_rewrite_rule unknown_flag = {
-    .kind = MLN_RESOURCE_KIND_ANY,
     .flags = 1U << 31U,
     .url = "custom://unknown",
   };
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, &unknown_flag, 1, NULL));
-  const mln_resource_rewrite_rule null_url = {.kind = MLN_RESOURCE_KIND_ANY};
+  const mln_resource_rewrite_rule null_url = {.url = NULL};
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, NULL, 1, NULL));
   // An empty table is a transform that rewrites nothing.
@@ -87,7 +84,6 @@ static void rule_registrations_reject_an_invalid_rule(void) {
     .name = "Authorization", .value = "secret-token\r\n"
   };
   const mln_http_header_rule header_rule = {
-    .kind = MLN_RESOURCE_KIND_ANY,
     .url = "custom://headers",
     .headers = &header,
     .header_count = 1,
@@ -107,7 +103,6 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   TEST_ASSERT_NULL(strstr(diagnostic.message, "secret-token"));
 
   const mln_http_header_rule null_headers = {
-    .kind = MLN_RESOURCE_KIND_ANY,
     .url = "custom://headers",
     .header_count = 1,
   };
@@ -158,18 +153,16 @@ static void the_first_matching_rewrite_rule_decides(void) {
 
   mln_resource_rewrite_rule rules[] = {
     // Another kind: no match.
-    {.kind = MLN_RESOURCE_KIND_TILE,
+    {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
      .url = copy_string(original),
      .replacement_url = copy_string("http://127.0.0.1:1/tile.json")},
-    {.kind = MLN_RESOURCE_KIND_STYLE,
+    {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
      .url = copy_string(original),
      .replacement_url = copy_string(rewritten)},
     // Kept URLs match here first and stay unchanged.
-    {.kind = MLN_RESOURCE_KIND_ANY,
-     .flags = MLN_URL_MATCH_GLOB,
+    {.flags = MLN_URL_MATCH_GLOB,
      .url = copy_string("http://127.0.0.1:*/kept*")},
-    {.kind = MLN_RESOURCE_KIND_ANY,
-     .flags = MLN_URL_MATCH_GLOB,
+    {.flags = MLN_URL_MATCH_GLOB,
      .url = copy_string("**"),
      .replacement_url = copy_string("http://127.0.0.1:1/never.json")},
   };
@@ -222,18 +215,17 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
     {.name = copy_string("X-Second"), .value = copy_string("second")},
   };
   mln_http_header_rule rules[] = {
-    {.kind = MLN_RESOURCE_KIND_TILE,
+    {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = copy_string("**"),
      .headers = second,
      .header_count = 2},
-    {.kind = MLN_RESOURCE_KIND_STYLE,
+    {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = copy_string("http://127.0.0.1:*/**"),
      .headers = first,
      .header_count = 2},
-    {.kind = MLN_RESOURCE_KIND_ANY,
-     .flags = MLN_URL_MATCH_GLOB,
+    {.flags = MLN_URL_MATCH_GLOB,
      .url = copy_string("**"),
      .headers = second,
      .header_count = 2},

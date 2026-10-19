@@ -351,12 +351,14 @@ static void invalid_routes_are_rejected(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_route routes[] = {
-    {.kind = MLN_RESOURCE_KIND_ANY, .url = "custom://first"},
-    {.kind = MLN_RESOURCE_KIND_ANY, .flags = 1U << 31U, .url = "**"},
+    {.url = "custom://first"},
+    {.flags = 1U << 31U, .url = "**"},
   };
   MLN_TEST_INVALID(submit_routes(runtime, routes, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
-  const mln_resource_route null_url = {.kind = MLN_RESOURCE_KIND_ANY};
+  const mln_resource_route unknown_kind = {.kinds = 1U << 31U, .url = "**"};
+  MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
+  const mln_resource_route null_url = {.url = NULL};
   MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_routes(runtime, NULL, 1, NULL));
   MLN_TEST_OK(submit_routes(runtime, routes, 1, NULL));
@@ -406,8 +408,10 @@ static void routes_filter_a_callback_provider(void) {
   atomic_store(&calls, 0);
   const mln_resource_route routes[] = {
     // Another kind: claims nothing here.
-    {.kind = MLN_RESOURCE_KIND_TILE, .flags = MLN_URL_MATCH_GLOB, .url = "**"},
-    {.kind = MLN_RESOURCE_KIND_STYLE,
+    {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
+     .flags = MLN_URL_MATCH_GLOB,
+     .url = "**"},
+    {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = "http://127.0.0.1:*/routed/**"},
   };
@@ -452,7 +456,6 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_route route = {
-    .kind = MLN_RESOURCE_KIND_ANY,
     .flags = MLN_URL_MATCH_GLOB,
     .url = "custom://routed/**",
   };

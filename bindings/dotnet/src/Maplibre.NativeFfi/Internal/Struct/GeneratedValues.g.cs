@@ -790,7 +790,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Url, "HttpHeaderRule.Url must not be null.");
         var native = new mln_http_header_rule();
-        native.kind = value.Kind;
+        native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.CString(value.Url);
         native.headers = scope.Array<mln_http_header, HttpHeader>(
@@ -2276,7 +2276,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Url, "ResourceRewriteRule.Url must not be null.");
         var native = new mln_resource_rewrite_rule();
-        native.kind = value.Kind;
+        native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.CString(value.Url);
         native.replacement_url = value.ReplacementUrl is null
@@ -2292,7 +2292,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Url, "ResourceRoute.Url must not be null.");
         var native = new mln_resource_route();
-        native.kind = value.Kind;
+        native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.CString(value.Url);
         return native;

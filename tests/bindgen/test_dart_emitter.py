@@ -76,8 +76,7 @@ class DartEmitterTests(unittest.TestCase):
             (root / "maplibre_native_c.g.dart").write_text(
                 dart_native.generate(compile_api(api))
             )
-            for name in ("native_abi.dart", "native_asset.dart"):
-                shutil.copy(BINDING / "lib/src/internal/c" / name, root)
+            shutil.copy(BINDING / "lib/src/internal/c/native_asset.dart", root)
             for path in (FIXTURES / "probes/dart").glob("*.dart"):
                 shutil.copy(path, root)
             dart_tool.run(

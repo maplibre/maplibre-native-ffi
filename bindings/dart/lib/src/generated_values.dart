@@ -751,6 +751,28 @@ final class ResourceKind extends _Enum {
   static const image = ResourceKind.fromRawValue(7);
 }
 
+/// The resource kinds that a route or rule matches, one bit per
+/// `mln_resource_kind` value.
+///
+/// See `mln_resource_kind_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceKindMask extends _Flags<ResourceKindMask> {
+  const ResourceKindMask.fromRawValue(super.rawValue);
+
+  /// Matches every resource kind.
+  static const any = ResourceKindMask.fromRawValue(0);
+  static const unknown = ResourceKindMask.fromRawValue(1);
+  static const style = ResourceKindMask.fromRawValue(2);
+  static const source = ResourceKindMask.fromRawValue(4);
+  static const tile = ResourceKindMask.fromRawValue(8);
+  static const glyphs = ResourceKindMask.fromRawValue(16);
+  static const spriteImage = ResourceKindMask.fromRawValue(32);
+  static const spriteJson = ResourceKindMask.fromRawValue(64);
+  static const image = ResourceKindMask.fromRawValue(128);
+  @override
+  ResourceKindMask _of(int rawValue) => ResourceKindMask.fromRawValue(rawValue);
+}
+
 final class ResourceLoadingMethod extends _Enum {
   const ResourceLoadingMethod.fromRawValue(super.rawValue);
   static const all = ResourceLoadingMethod.fromRawValue(0);
@@ -4459,14 +4481,15 @@ final class HttpHeader extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class HttpHeaderRule extends _Value {
   HttpHeaderRule({
-    this.kind = 0,
+    this.kinds = const ResourceKindMask.fromRawValue(0),
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
     required List<HttpHeader> headers,
   }) : headers = List.unmodifiable(headers);
 
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  final int kind;
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  final ResourceKindMask kinds;
 
   /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
   final UrlMatchFlags flags;
@@ -4479,7 +4502,7 @@ final class HttpHeaderRule extends _Value {
   final List<HttpHeader> headers;
 
   @override
-  List<Object?> get _members => [kind, flags, url, headers];
+  List<Object?> get _members => [kinds, flags, url, headers];
 }
 
 /// HTTP header transform state: a callback, or native header rules.
@@ -4581,13 +4604,14 @@ typedef ResourceProviderCallback =
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRoute extends _Value {
   const ResourceRoute({
-    this.kind = 0,
+    this.kinds = const ResourceKindMask.fromRawValue(0),
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
   });
 
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  final int kind;
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  final ResourceKindMask kinds;
 
   /// A bitwise OR of `mln_url_match_flags` values.
   final UrlMatchFlags flags;
@@ -4596,7 +4620,7 @@ final class ResourceRoute extends _Value {
   final String url;
 
   @override
-  List<Object?> get _members => [kind, flags, url];
+  List<Object?> get _members => [kinds, flags, url];
 }
 
 /// Resource provider state.
@@ -4622,14 +4646,15 @@ final class ResourceProvider {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRewriteRule extends _Value {
   const ResourceRewriteRule({
-    this.kind = 0,
+    this.kinds = const ResourceKindMask.fromRawValue(0),
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
     this.replacementUrl,
   });
 
-  /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-  final int kind;
+  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+  /// unknown bit.
+  final ResourceKindMask kinds;
 
   /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
   final UrlMatchFlags flags;
@@ -4641,7 +4666,7 @@ final class ResourceRewriteRule extends _Value {
   final String? replacementUrl;
 
   @override
-  List<Object?> get _members => [kind, flags, url, replacementUrl];
+  List<Object?> get _members => [kinds, flags, url, replacementUrl];
 }
 
 /// Resource transform state: a callback, or native rewrite rules.

@@ -4,8 +4,6 @@
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
-    as raw;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show CallbackPortLifecycleProbe, singleCallbackPortProbeForTesting;
 import 'package:test/test.dart';
@@ -20,7 +18,6 @@ void main() {
       provider: routedProvider(
         [
           ResourceRoute(
-            kind: raw.MLN_RESOURCE_KIND_ANY,
             flags: UrlMatchFlags.glob,
             url: 'custom://routed-*.json',
           ),
@@ -64,7 +61,6 @@ void main() {
       () => fixture.runtime.setResourceProvider(
         routedProvider([
           ResourceRoute(
-            kind: raw.MLN_RESOURCE_KIND_ANY,
             flags: const UrlMatchFlags.fromRawValue(1 << 31),
             url: '**',
           ),

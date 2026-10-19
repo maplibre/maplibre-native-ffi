@@ -781,6 +781,25 @@ class ResourceKind(UnknownIntEnum):
     IMAGE = 7
 
 
+class ResourceKindMask(IntFlag):
+    """The resource kinds that a route or rule matches, one bit per
+    `mln_resource_kind` value.
+
+    See `mln_resource_kind_mask` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    ANY = 0
+    UNKNOWN = 1
+    STYLE = 2
+    SOURCE = 4
+    TILE = 8
+    GLYPHS = 16
+    SPRITE_IMAGE = 32
+    SPRITE_JSON = 64
+    IMAGE = 128
+
+
 class ResourceLoadingMethod(UnknownIntEnum):
     ALL = 0
     CACHE_ONLY = 1
@@ -1914,8 +1933,10 @@ class HttpHeaderRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kind: int
-    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+    kinds: ResourceKindMask
+    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    unknown bit.
+    """
 
     flags: UrlMatchFlags
     """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
@@ -1931,7 +1952,7 @@ class HttpHeaderRule:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kind=raw["kind"],
+            kinds=ResourceKindMask(raw["kinds"]),
             flags=UrlMatchFlags(raw["flags"]),
             url=raw["url"],
             headers=tuple(HttpHeader._from_native(item) for item in raw["headers"]),
@@ -3527,8 +3548,10 @@ class ResourceRewriteRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kind: int
-    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+    kinds: ResourceKindMask
+    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    unknown bit.
+    """
 
     flags: UrlMatchFlags
     """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
@@ -3542,7 +3565,7 @@ class ResourceRewriteRule:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kind=raw["kind"],
+            kinds=ResourceKindMask(raw["kinds"]),
             flags=UrlMatchFlags(raw["flags"]),
             url=raw["url"],
             replacement_url=raw["replacement_url"],
@@ -3557,8 +3580,10 @@ class ResourceRoute:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kind: int
-    """One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`."""
+    kinds: ResourceKindMask
+    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    unknown bit.
+    """
 
     flags: UrlMatchFlags
     """A bitwise OR of `mln_url_match_flags` values."""
@@ -3568,7 +3593,11 @@ class ResourceRoute:
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(kind=raw["kind"], flags=UrlMatchFlags(raw["flags"]), url=raw["url"])
+        return cls(
+            kinds=ResourceKindMask(raw["kinds"]),
+            flags=UrlMatchFlags(raw["flags"]),
+            url=raw["url"],
+        )
 
 
 @dataclass(frozen=True, slots=True)

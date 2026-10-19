@@ -30,10 +30,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
   await runtime.setResourceProvider(
     ResourceProvider(
       routes: [
-        ResourceRoute(
-          kind: ResourceKind.style.rawValue,
-          url: 'liveness://style',
-        ),
+        ResourceRoute(kinds: ResourceKindMask.style, url: 'liveness://style'),
       ],
       callback: (_, request) => request.close(),
     ),

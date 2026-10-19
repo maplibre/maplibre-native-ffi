@@ -1596,8 +1596,9 @@ impl ToNative<sys::mln_http_header> for HttpHeader {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct HttpHeaderRule {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    pub kind: u32,
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    pub kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
@@ -1609,7 +1610,7 @@ pub struct HttpHeaderRule {
 impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_http_header_rule> {
         let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
-        raw.kind = self.kind;
+        raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
         raw.headers = convert::array(&self.headers, arena)?;
@@ -4296,6 +4297,26 @@ pub enum ResourceKind: u32 {
 } Unrecognized
 }
 
+native_flags! {
+/// The resource kinds that a route or rule matches, one bit per
+/// `mln_resource_kind` value.
+///
+/// See `mln_resource_kind_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceKindMask: u32 {
+    /// Matches every resource kind.
+    const ANY = 0;
+    const UNKNOWN = 1;
+    const STYLE = 2;
+    const SOURCE = 4;
+    const TILE = 8;
+    const GLYPHS = 16;
+    const SPRITE_IMAGE = 32;
+    const SPRITE_JSON = 64;
+    const IMAGE = 128;
+}
+}
+
 native_enum! {
 pub enum ResourceLoadingMethod: u32 {
     All = 0,
@@ -4689,8 +4710,9 @@ pub enum ResourceResponseStatus: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRewriteRule {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    pub kind: u32,
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    pub kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
@@ -4701,7 +4723,7 @@ pub struct ResourceRewriteRule {
 impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_rewrite_rule> {
         let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
-        raw.kind = self.kind;
+        raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
         raw.replacement_url = to_native(&self.replacement_url, arena)?;
@@ -4715,8 +4737,9 @@ impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRoute {
-    /// One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`.
-    pub kind: u32,
+    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
+    /// unknown bit.
+    pub kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
@@ -4725,7 +4748,7 @@ pub struct ResourceRoute {
 impl ToNative<sys::mln_resource_route> for ResourceRoute {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_route> {
         let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
-        raw.kind = self.kind;
+        raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
         Ok(raw)

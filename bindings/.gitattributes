@@ -124,6 +124,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/RenderingStats.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceErrorReason.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceKind.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceKindMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceLoadingMethod.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs linguist-generated=true

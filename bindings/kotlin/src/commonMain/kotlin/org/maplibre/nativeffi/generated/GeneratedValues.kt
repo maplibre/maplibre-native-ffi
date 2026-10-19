@@ -983,6 +983,36 @@ public data class ResourceKind(public val rawValue: UInt) {
   }
 }
 
+/**
+ * The resource kinds that a route or rule matches, one bit per `mln_resource_kind` value.
+ *
+ * See `mln_resource_kind_mask` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceKindMask(public val rawValue: UInt) {
+  public infix fun or(other: ResourceKindMask): ResourceKindMask =
+    ResourceKindMask(rawValue or other.rawValue)
+
+  public infix fun and(other: ResourceKindMask): ResourceKindMask =
+    ResourceKindMask(rawValue and other.rawValue)
+
+  public operator fun contains(other: ResourceKindMask): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** Matches every resource kind. */
+    public val ANY: ResourceKindMask = ResourceKindMask(0u)
+    public val UNKNOWN: ResourceKindMask = ResourceKindMask(1u)
+    public val STYLE: ResourceKindMask = ResourceKindMask(2u)
+    public val SOURCE: ResourceKindMask = ResourceKindMask(4u)
+    public val TILE: ResourceKindMask = ResourceKindMask(8u)
+    public val GLYPHS: ResourceKindMask = ResourceKindMask(16u)
+    public val SPRITE_IMAGE: ResourceKindMask = ResourceKindMask(32u)
+    public val SPRITE_JSON: ResourceKindMask = ResourceKindMask(64u)
+    public val IMAGE: ResourceKindMask = ResourceKindMask(128u)
+  }
+}
+
 public data class ResourceLoadingMethod(public val rawValue: UInt) {
   public companion object {
     public val ALL: ResourceLoadingMethod = ResourceLoadingMethod(0u)
@@ -3946,8 +3976,8 @@ public data class HttpHeader(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderRule(
-  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
-  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an unknown bit. */
+  public val kinds: ResourceKindMask = ResourceKindMask(0u),
   /** A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL. */
   public val flags: UrlMatchFlags = UrlMatchFlags(0u),
   /** The URL or glob pattern to compare. */
@@ -4026,8 +4056,8 @@ public data class ResourceRequest(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRoute(
-  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
-  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an unknown bit. */
+  public val kinds: ResourceKindMask = ResourceKindMask(0u),
   /** A bitwise OR of `mln_url_match_flags` values. */
   public val flags: UrlMatchFlags = UrlMatchFlags(0u),
   /** The URL or glob pattern to compare. */
@@ -4041,8 +4071,8 @@ public data class ResourceRoute(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRewriteRule(
-  /** One of `mln_resource_kind`, or `MLN_RESOURCE_KIND_ANY`. */
-  public val kind: UInt = 0u,
+  /** A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an unknown bit. */
+  public val kinds: ResourceKindMask = ResourceKindMask(0u),
   /** A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL. */
   public val flags: UrlMatchFlags = UrlMatchFlags(0u),
   /** The URL or glob pattern to compare. */

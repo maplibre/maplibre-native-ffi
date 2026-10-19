@@ -1867,7 +1867,7 @@ internal fun NativeArena.writeOfflineGeometryRegionDefinition(
 ): Long = allocate(w(40, 48), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
 internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
-  writeU32(target, value.kind)
+  writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
   writeAddress(target + 8, cString(value.url))
   writeAddress(
@@ -1881,7 +1881,7 @@ internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
   allocate(w(20, 32), w(4, 8)).also { putHttpHeaderRule(it, value) }
 
 internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
-  writeU32(target, value.kind)
+  writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
   writeAddress(target + 8, cString(value.url))
 }
@@ -1890,7 +1890,7 @@ internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
   allocate(w(12, 16), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
-  writeU32(target, value.kind)
+  writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
   writeAddress(target + 8, cString(value.url))
   writeAddress(target + w(12, 16), value.replacementUrl?.let { cString(it) } ?: 0L)

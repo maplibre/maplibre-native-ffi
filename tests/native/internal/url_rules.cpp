@@ -4,6 +4,7 @@
 // the matchers directly.
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 #include "resources/url_rules.hpp"
@@ -80,20 +81,25 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
   return table;
 }
 
-// A route compares the resolved URL unless it asks for the requested one, and
-// MLN_RESOURCE_KIND_ANY covers every kind.
+// A route compares the resolved URL unless it asks for the requested one. A
+// route with kind bits matches only those kinds, and one without any matches
+// every kind.
 void routes_compare_the_url_their_flags_select() {
   constexpr auto alias = std::string_view{"maplibre://maps/style"};
   const auto resolved = table_of({
-    .kind = MLN_RESOURCE_KIND_STYLE,
+    .kinds = MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE,
     .flags = MLN_URL_MATCH_FLAGS_NONE,
     .url = "https://maps.localhost/style.json",
   });
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url));
+  TEST_ASSERT_TRUE(
+    resolved.matches(MLN_RESOURCE_KIND_SOURCE, alias, style_url)
+  );
   TEST_ASSERT_FALSE(resolved.matches(MLN_RESOURCE_KIND_TILE, alias, style_url));
+  // A kind past the mask's width never matches a route that names kinds.
+  TEST_ASSERT_FALSE(resolved.matches(UINT32_MAX, alias, style_url));
 
   const auto requested = table_of({
-    .kind = MLN_RESOURCE_KIND_ANY,
     .flags = MLN_URL_MATCH_REQUESTED_URL,
     .url = "maplibre://maps/style",
   });
@@ -103,7 +109,6 @@ void routes_compare_the_url_their_flags_select() {
   );
 
   const auto requested_glob = table_of({
-    .kind = MLN_RESOURCE_KIND_ANY,
     .flags = MLN_URL_MATCH_REQUESTED_URL | MLN_URL_MATCH_GLOB,
     .url = "maplibre://**",
   });
