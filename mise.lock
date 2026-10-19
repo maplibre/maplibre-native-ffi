@@ -778,59 +778,52 @@ url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/3849249
 provenance = "github-attestations"
 
 [[tools."conda:doxygen"]]
-version = "1.13.2"
+version = "1.18.0"
 backend = "conda:doxygen"
 
 [tools."conda:doxygen".options]
 channel = "conda-forge"
 
 [tools."conda:doxygen"."platforms.linux-arm64"]
-checksum = "sha256:671fc9849fcdb9138daf2ab6b2d45b0650055ba1496cda19c415f57cabc381b8"
-url = "https://conda.anaconda.org/conda-forge/linux-aarch64/doxygen-1.13.2-h5e0f5ae_0.conda"
+checksum = "sha256:22845330574b7a2c84e0aa88b3ec8cbaab927dbc55195677c89ca65e00b04174"
+url = "https://conda.anaconda.org/conda-forge/linux-aarch64/doxygen-1.18.0-py310hfa0866d_0.conda"
 conda_deps = [
-    "libgcc-16.2.0-h205dda4_7",
-    "libstdcxx-16.2.0-hef695bb_7",
     "libiconv-1.18-h1ea5142_3",
+    "libstdcxx-16.2.0-hef695bb_7",
+    "libgcc-16.2.0-h205dda4_7",
     "_openmp_mutex-4.5-20_gnu",
     "libgomp-16.2.0-h8acb6b2_7",
 ]
 
 [tools."conda:doxygen"."platforms.linux-x64"]
-checksum = "sha256:349c4c872357b4a533e127b2ade8533796e8e062abc2cd685756a1a063ae1e35"
-url = "https://conda.anaconda.org/conda-forge/linux-64/doxygen-1.13.2-h8e693c7_0.conda"
+checksum = "sha256:aa8efe84767d1f628f439749df5bd1d369cad6ef1a6cc2922ffc75238e62f07a"
+url = "https://conda.anaconda.org/conda-forge/linux-64/doxygen-1.18.0-py310hb664d3d_0.conda"
 conda_deps = [
+    "libiconv-1.18-h0cb94f2_3",
     "libgcc-16.2.0-ha9f2e26_7",
     "libstdcxx-16.2.0-h934c35e_7",
-    "libiconv-1.18-h0cb94f2_3",
     "_openmp_mutex-4.5-20_gnu",
     "libgomp-16.2.0-he0feb66_7",
 ]
 
 [tools."conda:doxygen"."platforms.macos-arm64"]
-checksum = "sha256:2327ad4e6214accc1e71aea371aee9b9fed864ec36c20f829fd1cb71d4c85202"
-url = "https://conda.anaconda.org/conda-forge/osx-arm64/doxygen-1.13.2-h493aca8_0.conda"
+checksum = "sha256:b7c2aa55df787bea73a0736525d666334f46d3cb60f500cc96f721baed991b26"
+url = "https://conda.anaconda.org/conda-forge/osx-arm64/doxygen-1.18.0-py310h3226bdb_0.conda"
 conda_deps = [
-    "libcxx-23.1.3-h55c6f16_0",
     "libiconv-1.18-he4c29f2_3",
+    "libcxx-23.1.3-h55c6f16_0",
 ]
 
 [tools."conda:doxygen"."platforms.windows-x64"]
-checksum = "sha256:7a0fd40fd704e97a8f6533a081ba29579766d7a60bcb8e5de76679b066c4a72e"
-url = "https://conda.anaconda.org/conda-forge/win-64/doxygen-1.13.2-hbf3f430_0.conda"
+checksum = "sha256:de32cca941f0561791996493c096a7c6f83e4dda455f49e82e26d5558a3c83ce"
+url = "https://conda.anaconda.org/conda-forge/win-64/doxygen-1.18.0-py312pl5321h3ecd741_0.conda"
 conda_deps = [
     "libiconv-1.18-hc1393d2_3",
-    "ucrt-10.0.26100.0-h57928b3_0",
     "vc-14.5-ha367084_41",
     "vc14_runtime-14.51.36247-habf1de7_41",
     "vcomp14-14.51.36247-habf1de7_41",
+    "ucrt-10.0.26100.0-h57928b3_0",
 ]
-
-[[tools."conda:doxygen"]]
-version = "1.18.0"
-backend = "conda:doxygen"
-
-[tools."conda:doxygen".options]
-channel = "conda-forge"
 
 [[tools."conda:libxml2"]]
 version = "2.13.9"
