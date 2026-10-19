@@ -8,12 +8,17 @@
 # cc-rs, through ring's build script, passes the four-component LLVM triple
 # x86_64-unknown-linux-gnu, which zig reads as os="unknown". The target below is
 # the intended one, so incoming target flags are dropped.
+#
+# rustc links aarch64-unknown-linux-gnu binaries, including build scripts on an
+# ARM64 host, with -Wl,--fix-cortex-a53-843419, which the zig driver rejects.
+# Those links produce only host build tools, so the flag is dropped.
 args=""
 quote() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --target=*) shift; continue ;;
     --target | -target) shift 2; continue ;;
+    -Wl,--fix-cortex-a53-843419) shift; continue ;;
   esac
   args="$args '$(quote "$1")'"
   shift
