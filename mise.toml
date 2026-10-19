@@ -118,7 +118,7 @@ sccache = "{{vars.sccache_version}}"
 
 # SwiftFormat is a standalone repository formatter and does not require the
 # Swift compiler.
-swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
+"github:nicklockwood/SwiftFormat" = { version = "{{vars.swiftformat_version}}", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
