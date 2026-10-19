@@ -1020,3 +1020,613 @@ public extension MapHandle {
     }
   }
 }
+
+public extension MapHandleDiscarding {
+  func addCustomGeometrySource(
+    sourceId bindingArg0: String,
+    options bindingArg1: CustomGeometrySourceOptions
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_custom_geometry_source") { raw, arena, diagnostic in
+        try mln_map_add_custom_geometry_source(
+          raw,
+          arena.view(bindingArg0),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addCustomMvtVectorSource(
+    sourceId bindingArg0: String,
+    options bindingArg1: CustomMvtVectorSourceOptions
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_custom_mvt_vector_source") { raw, arena, diagnostic in
+        try mln_map_add_custom_mvt_vector_source(
+          raw,
+          arena.view(bindingArg0),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addGeojsonSourceData(
+    sourceId bindingArg0: String,
+    data bindingArg1: GeojsonSourceDataHandle
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_geojson_source_data") { raw, arena, diagnostic in
+        try mln_map_add_geojson_source_data(
+          raw,
+          arena.view(bindingArg0),
+          arena.borrow(bindingArg1.handle),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addGeojsonSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String,
+    options bindingArg2: GeojsonSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_geojson_source_url") { raw, arena, diagnostic in
+        try mln_map_add_geojson_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addImageSourceImage(
+    sourceId bindingArg0: String,
+    coordinates bindingArg1: [LatLng],
+    image bindingArg3: PremultipliedRgba8Image
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_image_source_image") { raw, arena, diagnostic in
+        try mln_map_add_image_source_image(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { $0.nativeValue() }),
+          NativeInputArena.count(bindingArg1.count),
+          arena.store(bindingArg3.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addImageSourceUrl(
+    sourceId bindingArg0: String,
+    coordinates bindingArg1: [LatLng],
+    url bindingArg3: String
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_image_source_url") { raw, arena, diagnostic in
+        try mln_map_add_image_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { $0.nativeValue() }),
+          NativeInputArena.count(bindingArg1.count),
+          arena.view(bindingArg3),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addRasterDemSourceTiles(
+    sourceId bindingArg0: String,
+    tiles bindingArg1: [String],
+    options bindingArg3: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_raster_dem_source_tiles") { raw, arena, diagnostic in
+        try mln_map_add_raster_dem_source_tiles(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { arena.view($0) }),
+          NativeInputArena.count(bindingArg1.count),
+          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addRasterDemSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String,
+    options bindingArg2: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_raster_dem_source_url") { raw, arena, diagnostic in
+        try mln_map_add_raster_dem_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addRasterSourceTiles(
+    sourceId bindingArg0: String,
+    tiles bindingArg1: [String],
+    options bindingArg3: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_raster_source_tiles") { raw, arena, diagnostic in
+        try mln_map_add_raster_source_tiles(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { arena.view($0) }),
+          NativeInputArena.count(bindingArg1.count),
+          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addRasterSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String,
+    options bindingArg2: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_raster_source_url") { raw, arena, diagnostic in
+        try mln_map_add_raster_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addStyleLayerJson(
+    layerJson bindingArg0: Data,
+    beforeLayerId bindingArg1: String? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_style_layer_json") { raw, arena, diagnostic in
+        mln_map_add_style_layer_json(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addStyleSourceJson(
+    sourceId bindingArg0: String,
+    sourceJson bindingArg1: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_style_source_json") { raw, arena, diagnostic in
+        mln_map_add_style_source_json(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addVectorSourceTiles(
+    sourceId bindingArg0: String,
+    tiles bindingArg1: [String],
+    options bindingArg3: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_vector_source_tiles") { raw, arena, diagnostic in
+        try mln_map_add_vector_source_tiles(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { arena.view($0) }),
+          NativeInputArena.count(bindingArg1.count),
+          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func addVectorSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String,
+    options bindingArg2: StyleTileSourceOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_add_vector_source_url") { raw, arena, diagnostic in
+        try mln_map_add_vector_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func invalidateCustomGeometrySourceRegion(
+    sourceId bindingArg0: String,
+    bounds bindingArg1: LatLngBounds
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_invalidate_custom_geometry_source_region") { raw, arena, diagnostic in
+        mln_map_invalidate_custom_geometry_source_region(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func invalidateCustomGeometrySourceTile(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, diagnostic in
+        mln_map_invalidate_custom_geometry_source_tile(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func invalidateCustomMvtVectorSourceTile(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, diagnostic in
+        mln_map_invalidate_custom_mvt_vector_source_tile(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func moveStyleLayer(
+    layerId bindingArg0: String,
+    beforeLayerId bindingArg1: String? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_move_style_layer") { raw, arena, diagnostic in
+        mln_map_move_style_layer(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func removeStyleImage(imageId bindingArg0: String) throws {
+    try owner
+      .nativeDiscard("mln_map_remove_style_image") { raw, arena, diagnostic in
+        mln_map_remove_style_image(
+          raw,
+          arena.view(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func removeStyleLayer(layerId bindingArg0: String) throws {
+    try owner
+      .nativeDiscard("mln_map_remove_style_layer") { raw, arena, diagnostic in
+        mln_map_remove_style_layer(
+          raw,
+          arena.view(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func removeStyleSource(sourceId bindingArg0: String) throws {
+    try owner
+      .nativeDiscard("mln_map_remove_style_source") { raw, arena, diagnostic in
+        mln_map_remove_style_source(
+          raw,
+          arena.view(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setCustomGeometrySourceTileData(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId,
+    data bindingArg2: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_custom_geometry_source_tile_data") { raw, arena, diagnostic in
+        mln_map_set_custom_geometry_source_tile_data(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          arena.view(bindingArg2),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setCustomMvtVectorSourceTileData(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId,
+    data bindingArg2: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, diagnostic in
+        mln_map_set_custom_mvt_vector_source_tile_data(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          arena.view(bindingArg2),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setCustomMvtVectorSourceTileError(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId,
+    message bindingArg2: String
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, diagnostic in
+        mln_map_set_custom_mvt_vector_source_tile_error(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          arena.view(bindingArg2),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setGeojsonSourceData(
+    sourceId bindingArg0: String,
+    data bindingArg1: GeojsonSourceDataHandle
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_geojson_source_data") { raw, arena, diagnostic in
+        try mln_map_set_geojson_source_data(
+          raw,
+          arena.view(bindingArg0),
+          arena.borrow(bindingArg1.handle),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setGeojsonSourceSynchronousTiling(
+    sourceId bindingArg0: String,
+    enabled bindingArg1: Bool
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, diagnostic in
+        mln_map_set_geojson_source_synchronous_tiling(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setGeojsonSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_geojson_source_url") { raw, arena, diagnostic in
+        mln_map_set_geojson_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setGlobalStateProperty(
+    propertyName bindingArg0: String,
+    value bindingArg1: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_global_state_property") { raw, arena, diagnostic in
+        mln_map_set_global_state_property(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setImageSourceCoordinates(
+    sourceId bindingArg0: String,
+    coordinates bindingArg1: [LatLng]
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_image_source_coordinates") { raw, arena, diagnostic in
+        try mln_map_set_image_source_coordinates(
+          raw,
+          arena.view(bindingArg0),
+          arena.array(bindingArg1.map { $0.nativeValue() }),
+          NativeInputArena.count(bindingArg1.count),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setImageSourceImage(
+    sourceId bindingArg0: String,
+    image bindingArg1: PremultipliedRgba8Image
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_image_source_image") { raw, arena, diagnostic in
+        try mln_map_set_image_source_image(
+          raw,
+          arena.view(bindingArg0),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setImageSourceUrl(
+    sourceId bindingArg0: String,
+    url bindingArg1: String
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_image_source_url") { raw, arena, diagnostic in
+        mln_map_set_image_source_url(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleImage(
+    imageId bindingArg0: String,
+    image bindingArg1: PremultipliedRgba8Image,
+    options bindingArg2: StyleImageOptions? = nil
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_image") { raw, arena, diagnostic in
+        try mln_map_set_style_image(
+          raw,
+          arena.view(bindingArg0),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleLayerProperty(
+    layerId bindingArg0: String,
+    propertyName bindingArg1: String,
+    value bindingArg2: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_layer_property") { raw, arena, diagnostic in
+        mln_map_set_style_layer_property(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          arena.view(bindingArg2),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleLightJson(lightJson bindingArg0: Data) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_light_json") { raw, arena, diagnostic in
+        mln_map_set_style_light_json(
+          raw,
+          arena.view(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleLightProperty(
+    propertyName bindingArg0: String,
+    value bindingArg1: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_light_property") { raw, arena, diagnostic in
+        mln_map_set_style_light_property(
+          raw,
+          arena.view(bindingArg0),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleSourceVolatile(
+    sourceId bindingArg0: String,
+    isVolatile bindingArg1: Bool
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_source_volatile") { raw, arena, diagnostic in
+        mln_map_set_style_source_volatile(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleTransitionOptions(
+    options bindingArg0: StyleTransitionOptions
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_transition_options") { raw, arena, diagnostic in
+        mln_map_set_style_transition_options(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+}

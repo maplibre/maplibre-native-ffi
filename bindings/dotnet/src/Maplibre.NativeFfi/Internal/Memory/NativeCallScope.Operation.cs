@@ -69,6 +69,12 @@ internal sealed unsafe partial class NativeCallScope
         CancellationToken cancellationToken
     ) => Accepted(NativeCompletion.SubmitCommand(submit, cancellationToken));
 
+    internal void Discard(CompletionSubmit submit)
+    {
+        NativeCall.Check(submit(null, NativeCall.Diagnostic));
+        Accept(registrations is null ? null : owner?.CallbackOwner);
+    }
+
     internal Task Run(CompletionSubmit submit, CancellationToken cancellationToken) =>
         Accepted(NativeCompletion.Submit(submit, static _ => true, cancellationToken));
 

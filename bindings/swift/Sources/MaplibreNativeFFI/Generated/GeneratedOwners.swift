@@ -326,3 +326,17 @@ public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
       .requireLive()
   }
 }
+
+public struct MapHandleDiscarding { let owner: MapHandle }
+public extension MapHandle {
+  var discarding: MapHandleDiscarding {
+    MapHandleDiscarding(owner: self)
+  }
+}
+
+public struct RenderSessionHandleDiscarding { let owner: RenderSessionHandle }
+public extension RenderSessionHandle {
+  var discarding: RenderSessionHandleDiscarding {
+    RenderSessionHandleDiscarding(owner: self)
+  }
+}

@@ -959,57 +959,6 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: LatLngBounds._from_native(value),
         )
 
-    def lat_lng_for_pixel(self, point: ScreenPoint) -> Future[LatLng]:
-        """Starts an ordered conversion from a screen point to a geographic
-        coordinate.
-
-        See `mln_map_lat_lng_for_pixel` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.lat_lng_for_pixel(point),
-            lambda value: LatLng._from_native(value),
-        )
-
-    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> Future[LatLng]:
-        """Starts an ordered conversion from a screen point to an unwrapped
-        geographic coordinate.
-
-        See `mln_map_lat_lng_for_pixel_unwrapped` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.lat_lng_for_pixel_unwrapped(point),
-            lambda value: LatLng._from_native(value),
-        )
-
-    def lat_lngs_for_pixels(
-        self, points: tuple[ScreenPoint, ...]
-    ) -> Future[tuple[LatLng, ...]]:
-        """Starts an ordered conversion of copied screen points to coordinates.
-
-        See `mln_map_lat_lngs_for_pixels` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.lat_lngs_for_pixels(points),
-            lambda value: tuple(LatLng._from_native(item) for item in value),
-        )
-
-    def lat_lngs_for_pixels_unwrapped(
-        self, points: tuple[ScreenPoint, ...]
-    ) -> Future[tuple[LatLng, ...]]:
-        """Starts an ordered conversion of copied screen points to unwrapped
-        coordinates.
-
-        See `mln_map_lat_lngs_for_pixels_unwrapped` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.lat_lngs_for_pixels_unwrapped(points),
-            lambda value: tuple(LatLng._from_native(item) for item in value),
-        )
-
     def list_style_layers(self) -> Future[tuple[StyleLayerInfo, ...]]:
         """Starts an ordered query of every style layer in style order.
 
@@ -1032,15 +981,6 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(StyleSourceInfo._from_native(item) for item in value),
         )
 
-    def meters_per_pixel_at_latitude(self, latitude: float) -> Future[float]:
-        """Starts an ordered query of meters per logical pixel at a latitude and
-        the current map zoom. The completion borrows one double.
-
-        See `mln_map_meters_per_pixel_at_latitude` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native.meters_per_pixel_at_latitude(latitude)
-
     def move_style_layer(
         self, layer_id: str, before_layer_id: str | None = None
     ) -> Future[CommandCompletion]:
@@ -1050,31 +990,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.move_style_layer(layer_id, before_layer_id)
-
-    def pixel_for_lat_lng(self, coordinate: LatLng) -> Future[ScreenPoint]:
-        """Starts an ordered conversion from a geographic coordinate to a screen
-        point.
-
-        See `mln_map_pixel_for_lat_lng` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.pixel_for_lat_lng(coordinate),
-            lambda value: ScreenPoint._from_native(value),
-        )
-
-    def pixels_for_lat_lngs(
-        self, coordinates: tuple[LatLng, ...]
-    ) -> Future[tuple[ScreenPoint, ...]]:
-        """Starts an ordered conversion of copied coordinates to screen points.
-
-        See `mln_map_pixels_for_lat_lngs` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.pixels_for_lat_lngs(coordinates),
-            lambda value: tuple(ScreenPoint._from_native(item) for item in value),
-        )
 
     def close(self) -> Future[None]:
         """Releases a map after synchronous state preflight.
@@ -1424,6 +1339,10 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.update_camera(update)
 
+    @property
+    def discarding(self) -> MapHandleDiscarding:
+        return MapHandleDiscarding(self)
+
 
 class _MapProjectionHandleOperations(GeneratedOperations):
     _native: _native._MapProjectionHandle
@@ -1460,6 +1379,32 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return LatLng._from_native(self._native.lat_lng_for_pixel_unwrapped(point))
 
+    def lat_lngs_for_pixels(
+        self, points: tuple[ScreenPoint, ...]
+    ) -> tuple[LatLng, ...]:
+        """Converts screen points to geographic coordinates.
+
+        See `mln_map_projection_lat_lngs_for_pixels` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            LatLng._from_native(item)
+            for item in self._native.lat_lngs_for_pixels(points)
+        )
+
+    def lat_lngs_for_pixels_unwrapped(
+        self, points: tuple[ScreenPoint, ...]
+    ) -> tuple[LatLng, ...]:
+        """Converts screen points to unwrapped geographic coordinates.
+
+        See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            LatLng._from_native(item)
+            for item in self._native.lat_lngs_for_pixels_unwrapped(points)
+        )
+
     def meters_per_pixel_at_latitude(self, latitude: float) -> float:
         """Reads the ground distance covered by one logical map pixel at a
         latitude for the helper camera zoom.
@@ -1476,6 +1421,19 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return ScreenPoint._from_native(self._native.pixel_for_lat_lng(coordinate))
+
+    def pixels_for_lat_lngs(
+        self, coordinates: tuple[LatLng, ...]
+    ) -> tuple[ScreenPoint, ...]:
+        """Converts geographic coordinates to screen points.
+
+        See `mln_map_projection_pixels_for_lat_lngs` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            ScreenPoint._from_native(item)
+            for item in self._native.pixels_for_lat_lngs(coordinates)
+        )
 
     def set_camera(self, camera: CameraOptions | None = None) -> None:
         """Applies a camera update to a standalone projection.
@@ -1827,6 +1785,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
         return self._native.set_webgpu_surface_target(descriptor)
+
+    @property
+    def discarding(self) -> RenderSessionHandleDiscarding:
+        return RenderSessionHandleDiscarding(self)
 
 
 class _ResourceRequestHandleOperations(GeneratedOperations):
@@ -2303,3 +2265,601 @@ def supported_render_backend_mask() -> RenderBackendFlag:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
     return RenderBackendFlag(_native.supported_render_backend_mask())
+
+
+class MapHandleDiscarding:
+    __slots__ = ("_owner",)
+
+    def __init__(self, owner: _MapHandleOperations):
+        self._owner = owner
+
+    @property
+    def _native(self) -> _native._MapHandle:
+        return self._owner._native
+
+    def add_custom_geometry_source(
+        self, source_id: str, options: CustomGeometrySourceOptions | None = None
+    ) -> None:
+        """Adds a custom geometry source.
+
+        See `mln_map_add_custom_geometry_source` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_custom_geometry_source(source_id, options)
+
+    def add_custom_mvt_vector_source(
+        self, source_id: str, options: CustomMvtVectorSourceOptions | None = None
+    ) -> None:
+        """Adds a custom MVT vector source.
+
+        See `mln_map_add_custom_mvt_vector_source` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_custom_mvt_vector_source(source_id, options)
+
+    def add_geojson_source_data(
+        self, source_id: str, data: GeojsonSourceDataHandle
+    ) -> None:
+        """Adds a GeoJSON source with prepared inline data.
+
+        See `mln_map_add_geojson_source_data` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_geojson_source_data(source_id, data._native)
+
+    def add_geojson_source_url(
+        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
+    ) -> None:
+        """Adds a GeoJSON source with URL data.
+
+        See `mln_map_add_geojson_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_geojson_source_url(source_id, url, options)
+
+    def add_image_source_image(
+        self,
+        source_id: str,
+        coordinates: tuple[LatLng, ...],
+        image: PremultipliedRgba8Image | None = None,
+    ) -> None:
+        """Adds an image source with inline image pixels.
+
+        See `mln_map_add_image_source_image` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_image_source_image(
+            source_id, coordinates, image
+        )
+
+    def add_image_source_url(
+        self, source_id: str, coordinates: tuple[LatLng, ...], url: str
+    ) -> None:
+        """Adds an image source that loads its image from a URL.
+
+        See `mln_map_add_image_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_image_source_url(source_id, coordinates, url)
+
+    def add_raster_dem_source_tiles(
+        self,
+        source_id: str,
+        tiles: tuple[str, ...],
+        options: StyleTileSourceOptions | None = None,
+    ) -> None:
+        """Adds a raster DEM source with inline tile URLs.
+
+        See `mln_map_add_raster_dem_source_tiles` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_raster_dem_source_tiles(
+            source_id, tiles, options
+        )
+
+    def add_raster_dem_source_url(
+        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
+    ) -> None:
+        """Adds a raster DEM source with a TileJSON URL.
+
+        See `mln_map_add_raster_dem_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_raster_dem_source_url(source_id, url, options)
+
+    def add_raster_source_tiles(
+        self,
+        source_id: str,
+        tiles: tuple[str, ...],
+        options: StyleTileSourceOptions | None = None,
+    ) -> None:
+        """Adds a raster source with inline tile URLs.
+
+        See `mln_map_add_raster_source_tiles` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_raster_source_tiles(source_id, tiles, options)
+
+    def add_raster_source_url(
+        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
+    ) -> None:
+        """Adds a raster source with a TileJSON URL.
+
+        See `mln_map_add_raster_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_raster_source_url(source_id, url, options)
+
+    def add_style_layer_json(
+        self, layer_json: bytes, before_layer_id: str | None = None
+    ) -> None:
+        """Adds one style layer from a full style-spec layer JSON object.
+
+        See `mln_map_add_style_layer_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_style_layer_json(layer_json, before_layer_id)
+
+    def add_style_source_json(self, source_id: str, source_json: bytes) -> None:
+        """Adds one style source from a style-spec source JSON object.
+
+        See `mln_map_add_style_source_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_style_source_json(source_id, source_json)
+
+    def add_vector_source_tiles(
+        self,
+        source_id: str,
+        tiles: tuple[str, ...],
+        options: StyleTileSourceOptions | None = None,
+    ) -> None:
+        """Adds a vector source with inline tile URLs.
+
+        See `mln_map_add_vector_source_tiles` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_vector_source_tiles(source_id, tiles, options)
+
+    def add_vector_source_url(
+        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
+    ) -> None:
+        """Adds a vector source with a TileJSON URL.
+
+        See `mln_map_add_vector_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_add_vector_source_url(source_id, url, options)
+
+    def apply_camera_delta(self, delta: CameraDelta | None = None) -> None:
+        """Submits one atomic relative camera update.
+
+        See `mln_map_apply_camera_delta` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_apply_camera_delta(delta)
+
+    def begin_command_group(self) -> None:
+        """Begins a command group, which holds this map's render updates until
+        the group ends.
+
+        See `mln_map_begin_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_begin_command_group()
+
+    def cancel_camera_transition(self, transition_id: int) -> None:
+        """Cancels the camera transitions of the commands whose animation
+        carried transition_id, and leaves every other transition running.
+
+        See `mln_map_cancel_camera_transition` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_cancel_camera_transition(transition_id)
+
+    def cancel_transitions(self) -> None:
+        """Cancels the camera transitions running when this command commits.
+
+        See `mln_map_cancel_transitions` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_cancel_transitions()
+
+    def dump_debug_logs(self) -> None:
+        """Submits an ordered debug-log command.
+
+        See `mln_map_dump_debug_logs` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_dump_debug_logs()
+
+    def end_command_group(self) -> None:
+        """Ends the innermost command group that `mln_map_begin_command_group()`
+        began.
+
+        See `mln_map_end_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_end_command_group()
+
+    def invalidate_custom_geometry_source_region(
+        self, source_id: str, bounds: LatLngBounds
+    ) -> None:
+        """Invalidates custom geometry source data inside one geographic region.
+
+        See `mln_map_invalidate_custom_geometry_source_region` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_invalidate_custom_geometry_source_region(
+            source_id, bounds
+        )
+
+    def invalidate_custom_geometry_source_tile(
+        self, source_id: str, tile_id: CanonicalTileId
+    ) -> None:
+        """Invalidates custom geometry source data for one canonical tile.
+
+        See `mln_map_invalidate_custom_geometry_source_tile` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_invalidate_custom_geometry_source_tile(
+            source_id, tile_id
+        )
+
+    def invalidate_custom_mvt_vector_source_tile(
+        self, source_id: str, tile_id: CanonicalTileId
+    ) -> None:
+        """Invalidates custom MVT vector source data for one canonical tile.
+
+        See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_invalidate_custom_mvt_vector_source_tile(
+            source_id, tile_id
+        )
+
+    def move_style_layer(
+        self, layer_id: str, before_layer_id: str | None = None
+    ) -> None:
+        """Moves one style layer before another layer or to the top.
+
+        See `mln_map_move_style_layer` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_move_style_layer(layer_id, before_layer_id)
+
+    def remove_feature_state(self, selector: FeatureStateSelector) -> None:
+        """Removes per-feature state from this map.
+
+        See `mln_map_remove_feature_state` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_remove_feature_state(selector)
+
+    def remove_style_image(self, image_id: str) -> None:
+        """Removes one runtime style image by ID.
+
+        See `mln_map_remove_style_image` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_remove_style_image(image_id)
+
+    def remove_style_layer(self, layer_id: str) -> None:
+        """Removes one style layer by ID.
+
+        See `mln_map_remove_style_layer` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_remove_style_layer(layer_id)
+
+    def remove_style_source(self, source_id: str) -> None:
+        """Removes one style source by ID.
+
+        See `mln_map_remove_style_source` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_remove_style_source(source_id)
+
+    def request_repaint(self) -> None:
+        """Requests a repaint for a continuous map.
+
+        See `mln_map_request_repaint` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_request_repaint()
+
+    def resize(self, extent: LogicalExtent) -> None:
+        """Submits the sole post-creation logical extent update.
+
+        See `mln_map_resize` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_resize(extent)
+
+    def set_bounds(self, options: BoundOptions | None = None) -> None:
+        """Submits a copied camera-constraint command.
+
+        See `mln_map_set_bounds` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_bounds(options)
+
+    def set_custom_geometry_source_tile_data(
+        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+    ) -> None:
+        """Sets custom geometry source data for one canonical tile.
+
+        See `mln_map_set_custom_geometry_source_tile_data` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_custom_geometry_source_tile_data(
+            source_id, tile_id, data
+        )
+
+    def set_custom_mvt_vector_source_tile_data(
+        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+    ) -> None:
+        """Sets custom MVT vector source data for one canonical tile.
+
+        See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_custom_mvt_vector_source_tile_data(
+            source_id, tile_id, data
+        )
+
+    def set_custom_mvt_vector_source_tile_error(
+        self, source_id: str, tile_id: CanonicalTileId, message: str
+    ) -> None:
+        """Reports a custom MVT vector source error for one canonical tile.
+
+        See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_custom_mvt_vector_source_tile_error(
+            source_id, tile_id, message
+        )
+
+    def set_debug_options(self, options: MapDebugOption) -> None:
+        """Submits a debug-overlay command.
+
+        See `mln_map_set_debug_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_debug_options(options)
+
+    def set_event_mask(self, mask: RuntimeEventMask) -> None:
+        """Selects which map-originated event types this map queues.
+
+        See `mln_map_set_event_mask` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_set_event_mask(mask)
+
+    def set_feature_state(
+        self, selector: FeatureStateSelector, input_state: bytes
+    ) -> None:
+        """Submits a copied per-feature-state command.
+
+        See `mln_map_set_feature_state` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_set_feature_state(selector, input_state)
+
+    def set_free_camera_options(self, options: FreeCameraOptions | None = None) -> None:
+        """Submits a copied free-camera command.
+
+        See `mln_map_set_free_camera_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_free_camera_options(options)
+
+    def set_geojson_source_data(
+        self, source_id: str, data: GeojsonSourceDataHandle
+    ) -> None:
+        """Updates one GeoJSON source with prepared inline data.
+
+        See `mln_map_set_geojson_source_data` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_geojson_source_data(source_id, data._native)
+
+    def set_geojson_source_synchronous_tiling(
+        self, source_id: str, enabled: bool
+    ) -> None:
+        """Overrides one GeoJSON source's synchronous tiling at runtime.
+
+        See `mln_map_set_geojson_source_synchronous_tiling` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_geojson_source_synchronous_tiling(
+            source_id, enabled
+        )
+
+    def set_geojson_source_url(self, source_id: str, url: str) -> None:
+        """Updates one GeoJSON source to load data from a URL.
+
+        See `mln_map_set_geojson_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_geojson_source_url(source_id, url)
+
+    def set_global_state_property(self, property_name: str, value: bytes) -> None:
+        """Submits a global-state JSON value. JSON null restores the style
+        default.
+
+        See `mln_map_set_global_state_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_global_state_property(property_name, value)
+
+    def set_image_source_coordinates(
+        self, source_id: str, coordinates: tuple[LatLng, ...]
+    ) -> None:
+        """Updates image source coordinates.
+
+        See `mln_map_set_image_source_coordinates` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_image_source_coordinates(
+            source_id, coordinates
+        )
+
+    def set_image_source_image(
+        self, source_id: str, image: PremultipliedRgba8Image | None = None
+    ) -> None:
+        """Updates an image source with inline image pixels.
+
+        See `mln_map_set_image_source_image` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_image_source_image(source_id, image)
+
+    def set_image_source_url(self, source_id: str, url: str) -> None:
+        """Updates an image source to load its image from a URL.
+
+        See `mln_map_set_image_source_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_image_source_url(source_id, url)
+
+    def set_projection_mode(self, mode: ProjectionMode | None = None) -> None:
+        """Submits copied axonometric rendering option fields.
+
+        See `mln_map_set_projection_mode` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_projection_mode(mode)
+
+    def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
+        """Submits a rendering-stats visibility command.
+
+        See `mln_map_set_rendering_stats_view_enabled` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_rendering_stats_view_enabled(enabled)
+
+    def set_style_image(
+        self,
+        image_id: str,
+        image: PremultipliedRgba8Image | None = None,
+        options: StyleImageOptions | None = None,
+    ) -> None:
+        """Sets one runtime style image.
+
+        See `mln_map_set_style_image` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_image(image_id, image, options)
+
+    def set_style_json(self, json: bytes) -> None:
+        """Queues an inline style JSON command.
+
+        See `mln_map_set_style_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_set_style_json(json)
+
+    def set_style_layer_property(
+        self, layer_id: str, property_name: str, value: bytes
+    ) -> None:
+        """Sets one layer property using its MapLibre style-spec property name.
+
+        See `mln_map_set_style_layer_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_layer_property(
+            layer_id, property_name, value
+        )
+
+    def set_style_light_json(self, light_json: bytes) -> None:
+        """Sets the style light from a style-spec light JSON object.
+
+        See `mln_map_set_style_light_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_light_json(light_json)
+
+    def set_style_light_property(self, property_name: str, value: bytes) -> None:
+        """Sets one style light property using its MapLibre style-spec property
+        name.
+
+        See `mln_map_set_style_light_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_light_property(property_name, value)
+
+    def set_style_source_volatile(self, source_id: str, is_volatile: bool) -> None:
+        """Sets whether one style source stores fetched tiles in the persistent
+        cache.
+
+        See `mln_map_set_style_source_volatile` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_source_volatile(source_id, is_volatile)
+
+    def set_style_transition_options(
+        self, options: StyleTransitionOptions | None = None
+    ) -> None:
+        """Sets the style's global transition options.
+
+        See `mln_map_set_style_transition_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_transition_options(options)
+
+    def set_style_url(self, url: str) -> None:
+        """Queues a style URL command.
+
+        See `mln_map_set_style_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native._discard_set_style_url(url)
+
+    def set_tile_options(self, options: MapTileOptions | None = None) -> None:
+        """Submits a copied tile-options command.
+
+        See `mln_map_set_tile_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_tile_options(options)
+
+    def set_viewport_options(self, options: MapViewportOptions | None = None) -> None:
+        """Submits a copied viewport-options command.
+
+        See `mln_map_set_viewport_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_viewport_options(options)
+
+    def update_camera(self, update: CameraUpdate | None = None) -> None:
+        """Submits one atomic camera update.
+
+        See `mln_map_update_camera` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_update_camera(update)
+
+
+class RenderSessionHandleDiscarding:
+    __slots__ = ("_owner",)
+
+    def __init__(self, owner: _RenderSessionHandleOperations):
+        self._owner = owner
+
+    @property
+    def _native(self) -> _native._RenderSessionHandle:
+        return self._owner._native
+
+    def resize(self, extent: LogicalExtent) -> None:
+        """Starts an ordered logical resize, which also resizes the map. On a
+        continuous map, the completion runs after the map's viewport takes
+        the new extent and the selected driver applies it. A static or tile
+        map publishes a render update only for a still image, so on those
+        maps the driver applies the extent without waiting for the map's
+        viewport, and the next still image renders at the new extent.
+
+        See `mln_render_session_resize` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native._discard_resize(extent)

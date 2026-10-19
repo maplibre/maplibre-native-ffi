@@ -27,6 +27,22 @@ mln_status session_open(const listener *events, void *native_window,
 
 
 class ConventionTests(unittest.TestCase):
+    def test_completion_nullability_follows_execution(self):
+        for execution, result in (
+            ("command", ""),
+            ("operation", ""),
+            ("lifecycle", ""),
+            ("query", ";result=double"),
+        ):
+            with self.subTest(execution=execution):
+                api = parse(f"""BIND("execution={execution}{result}")
+mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_diagnostic *out_diagnostic);
+""")
+                with self.assertRaisesRegex(
+                    ModelError, "nullable is not allowed on a completion"
+                ):
+                    validate(api)
+
     def test_versioned_values_and_commands_need_no_annotation(self):
         api = parse(groups=("conventions",))
         validate(api)

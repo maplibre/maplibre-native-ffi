@@ -55,8 +55,8 @@ function with no handle parameter names the subsystem or record that it belongs
 to: `mln_log_set_callback`, `mln_network_get_status`,
 `mln_camera_options_default`. A computation from one record names the record and
 its result, as in `mln_logical_extent_physical_size`. A coordinate conversion
-names its result and its input, as in `mln_map_pixel_for_lat_lng`, and a
-function that reports a fixed fact of the library is a noun, as in
+names its result and its input, as in `mln_map_projection_pixel_for_lat_lng`,
+and a function that reports a fixed fact of the library is a noun, as in
 `mln_c_version`.
 
 ## Follow the ABI rules
@@ -147,25 +147,26 @@ values, such as `direction=in` and `shape=none`, and the semantic layer supplies
 the rest: `lifetime=completion` for an array completion result, and
 `consumes=always` for a release that returns void.
 
-| Declaration                         | Default                                                                                    |
-| ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| Function without a completion       | `execution=immediate`                                                                      |
-| `execution=event_batch`             | `absent_on=MLN_STATUS_NOT_READY`                                                           |
-| Completion function                 | `result=void`; a value result has `shape=value` and is `borrowed`, or `owned` for a handle |
-| Parameter                           | `direction=in`; an output pointer to a handle is `owned`                                   |
-| Pointer                             | `ownership=borrowed`, except a callback                                                    |
-| Pointer to a record                 | `length=1`                                                                                 |
-| Character pointer                   | `length=nul;encoding=utf8`                                                                 |
-| Buffer view or pointer to one       | `encoding=utf8`                                                                            |
-| `void*`                             | `kind=context` in a callback signature, `kind=native_pointer` elsewhere                    |
-| Value                               | `lifetime=owner` for a context, `lifetime=call` otherwise                                  |
-| First struct member `uint32_t size` | `kind=size;default=sizeof`                                                                 |
-| Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`           |
-| `kind=reserved` member              | `default=0`                                                                                |
-| Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                     |
-| Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
-| Callback registration               | `user_data` names its one `kind=context` member                                            |
-| Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
+| Declaration                         | Default                                                                                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Function without a completion       | `execution=immediate`                                                                                 |
+| `execution=event_batch`             | `absent_on=MLN_STATUS_NOT_READY`                                                                      |
+| Completion function                 | `result=void`; a value result has `shape=value` and is `borrowed`, or `owned` for a handle            |
+| Command completion                  | Discardable; a null completion discards the outcome. Other completion functions require a completion. |
+| Parameter                           | `direction=in`; an output pointer to a handle is `owned`                                              |
+| Pointer                             | `ownership=borrowed`, except a callback                                                               |
+| Pointer to a record                 | `length=1`                                                                                            |
+| Character pointer                   | `length=nul;encoding=utf8`                                                                            |
+| Buffer view or pointer to one       | `encoding=utf8`                                                                                       |
+| `void*`                             | `kind=context` in a callback signature, `kind=native_pointer` elsewhere                               |
+| Value                               | `lifetime=owner` for a context, `lifetime=call` otherwise                                             |
+| First struct member `uint32_t size` | `kind=size;default=sizeof`                                                                            |
+| Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`                      |
+| `kind=reserved` member              | `default=0`                                                                                           |
+| Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                                |
+| Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                             |
+| Callback registration               | `user_data` names its one `kind=context` member                                                       |
+| Record typedef                      | `default` names the one function that takes no arguments and returns the record                       |
 
 `STRUCT_SIZE_FIELD` in `schema.py` names the size member, because other structs
 begin with an unrelated `uint32_t` member. A struct whose size member has
@@ -252,6 +253,10 @@ states the threads that it runs on.
 An annotation that names another declaration, such as `reentry_calls`,
 `complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
 the schema reports the name that does not resolve.
+
+A caller-sized output array uses `direction=out;length=<count>`. The count must
+also size an input array of the same call. Bindings allocate one output element
+per input element and return the copied outputs as a list.
 
 ## Document a declaration
 

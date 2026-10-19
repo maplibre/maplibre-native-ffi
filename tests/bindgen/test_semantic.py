@@ -737,12 +737,14 @@ mln_status read_flags(
         model = bind(
             self.parse("""
 mln_status copy_values(
+  const double *values BIND("length=count"),
   double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
         output = model.operations[0].outputs[0].value
         self.assertEqual((output.kind, output.length), ("array", "count"))
+        self.assertEqual(model.operations[0].outputs[0].sized_by, "values")
 
     def test_callback_signature_and_retirement_form_one_registration(self):
         source = """

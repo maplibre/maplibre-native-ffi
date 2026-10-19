@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi.generated
 
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -498,5 +499,20 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           diagnostic,
         ),
       )
+    }
+
+  public val discarding: RenderSessionDiscarding
+    get() = RenderSessionDiscarding(this)
+}
+
+@JvmInline
+public value class RenderSessionDiscarding
+internal constructor(private val owner: GeneratedRenderSessionOperations) {
+  private val binding
+    get() = owner.binding
+
+  public fun resize(extent: LogicalExtent): Unit =
+    nativeDiscard(owner, binding, "mln_render_session_resize") {
+      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 }

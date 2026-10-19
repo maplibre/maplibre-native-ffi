@@ -566,57 +566,10 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_lat_lng_for_pixel =
-    Ffm.downcall(
-      "mln_map_lat_lng_for_pixel",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_screen_point,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_lat_lng_for_pixel_unwrapped =
-    Ffm.downcall(
-      "mln_map_lat_lng_for_pixel_unwrapped",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_screen_point,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_lat_lngs_for_pixels =
-    Ffm.downcall(
-      "mln_map_lat_lngs_for_pixels",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_lat_lngs_for_pixels_unwrapped =
-    Ffm.downcall(
-      "mln_map_lat_lngs_for_pixels_unwrapped",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_list_style_layers =
     Ffm.downcall("mln_map_list_style_layers", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_list_style_sources =
     Ffm.downcall("mln_map_list_style_sources", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_meters_per_pixel_at_latitude =
-    Ffm.downcall(
-      "mln_map_meters_per_pixel_at_latitude",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_DOUBLE,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_move_style_layer =
     Ffm.downcall(
       "mln_map_move_style_layer",
@@ -628,25 +581,6 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_map_options_default = Ffm.downcall("mln_map_options_default", mln_map_options)
-  private val mln_map_pixel_for_lat_lng =
-    Ffm.downcall(
-      "mln_map_pixel_for_lat_lng",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_lat_lng,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_pixels_for_lat_lngs =
-    Ffm.downcall(
-      "mln_map_pixels_for_lat_lngs",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_projection_close =
     Ffm.downcall("mln_map_projection_close", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
@@ -669,6 +603,26 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_projection_lat_lngs_for_pixels =
+    Ffm.downcall(
+      "mln_map_projection_lat_lngs_for_pixels",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_projection_lat_lngs_for_pixels_unwrapped =
+    Ffm.downcall(
+      "mln_map_projection_lat_lngs_for_pixels_unwrapped",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_projection_meters_per_pixel_at_latitude =
     Ffm.downcall(
       "mln_map_projection_meters_per_pixel_at_latitude",
@@ -684,6 +638,16 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       mln_lat_lng,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_projection_pixels_for_lat_lngs =
+    Ffm.downcall(
+      "mln_map_projection_pixels_for_lat_lngs",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2306,71 +2270,11 @@ internal actual object C {
     mln_map_lat_lng_bounds_for_camera_unwrapped.invokeExact(map, camera, completion, outDiagnostic)
       as Int
 
-  actual fun mln_map_lat_lng_for_pixel(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_lat_lng_for_pixel.invokeExact(
-      map,
-      Ffm.value(point, mln_screen_point),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_lat_lng_for_pixel_unwrapped(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_lat_lng_for_pixel_unwrapped.invokeExact(
-      map,
-      Ffm.value(point, mln_screen_point),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_lat_lngs_for_pixels(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_lat_lngs_for_pixels.invokeExact(map, points, pointCount, completion, outDiagnostic)
-      as Int
-
-  actual fun mln_map_lat_lngs_for_pixels_unwrapped(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_lat_lngs_for_pixels_unwrapped.invokeExact(
-      map,
-      points,
-      pointCount,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_list_style_layers.invokeExact(map, completion, outDiagnostic) as Int
 
   actual fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_list_style_sources.invokeExact(map, completion, outDiagnostic) as Int
-
-  actual fun mln_map_meters_per_pixel_at_latitude(
-    map: Long,
-    latitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_meters_per_pixel_at_latitude.invokeExact(map, latitude, completion, outDiagnostic)
-      as Int
 
   actual fun mln_map_move_style_layer(
     map: Long,
@@ -2390,34 +2294,6 @@ internal actual object C {
   actual fun mln_map_options_default(returned: Long) {
     mln_map_options_default.invokeExact(Ffm.into(returned, mln_map_options)) as MemorySegment
   }
-
-  actual fun mln_map_pixel_for_lat_lng(
-    map: Long,
-    coordinate: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_pixel_for_lat_lng.invokeExact(
-      map,
-      Ffm.value(coordinate, mln_lat_lng),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_pixels_for_lat_lngs(
-    map: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_pixels_for_lat_lngs.invokeExact(
-      map,
-      coordinates,
-      coordinateCount,
-      completion,
-      outDiagnostic,
-    ) as Int
 
   actual fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int =
     mln_map_projection_close.invokeExact(projection, outDiagnostic) as Int
@@ -2454,6 +2330,36 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
+  actual fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_lat_lngs_for_pixels.invokeExact(
+      projection,
+      points,
+      pointCount,
+      outCoordinates,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_lat_lngs_for_pixels_unwrapped.invokeExact(
+      projection,
+      points,
+      pointCount,
+      outCoordinates,
+      outDiagnostic,
+    ) as Int
+
   actual fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -2477,6 +2383,21 @@ internal actual object C {
       projection,
       Ffm.value(coordinate, mln_lat_lng),
       outPoint,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_pixels_for_lat_lngs.invokeExact(
+      projection,
+      coordinates,
+      coordinateCount,
+      outPoints,
       outDiagnostic,
     ) as Int
 

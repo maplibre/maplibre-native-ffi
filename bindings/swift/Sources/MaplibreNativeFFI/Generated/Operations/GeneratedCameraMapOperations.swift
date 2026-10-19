@@ -187,150 +187,6 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered conversion from a screen point to a geographic
-  /// coordinate.
-  ///
-  /// See `mln_map_lat_lng_for_pixel` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngForPixel(point bindingArg0: ScreenPoint) async throws -> LatLng {
-    try await nativeStart(
-      "mln_map_lat_lng_for_pixel",
-      copying: LatLng.init(raw:)
-    ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel(
-      raw,
-      bindingArg0.nativeValue(),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Starts an ordered conversion from a screen point to an unwrapped
-  /// geographic
-  /// coordinate.
-  ///
-  /// See `mln_map_lat_lng_for_pixel_unwrapped` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngForPixelUnwrapped(point bindingArg0: ScreenPoint) async throws
-    -> LatLng
-  {
-    try await nativeStart(
-      "mln_map_lat_lng_for_pixel_unwrapped",
-      copying: LatLng.init(raw:)
-    ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel_unwrapped(
-      raw,
-      bindingArg0.nativeValue(),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Starts an ordered conversion of copied screen points to coordinates.
-  ///
-  /// See `mln_map_lat_lngs_for_pixels` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngsForPixels(points bindingArg0: [ScreenPoint]) async throws
-    -> [LatLng]
-  {
-    try await nativeStart(
-      "mln_map_lat_lngs_for_pixels",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_lat_lng.self
-      ).map { LatLng(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in try mln_map_lat_lngs_for_pixels(
-      raw,
-      arena.array(bindingArg0.map { $0.nativeValue() }),
-      NativeInputArena.count(bindingArg0.count),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Starts an ordered conversion of copied screen points to unwrapped
-  /// coordinates.
-  ///
-  /// See `mln_map_lat_lngs_for_pixels_unwrapped` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngsForPixelsUnwrapped(points bindingArg0: [ScreenPoint]) async throws
-    -> [LatLng]
-  {
-    try await nativeStart(
-      "mln_map_lat_lngs_for_pixels_unwrapped",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_lat_lng.self
-      ).map { LatLng(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in
-      try mln_map_lat_lngs_for_pixels_unwrapped(
-        raw,
-        arena.array(bindingArg0.map { $0.nativeValue() }),
-        NativeInputArena.count(bindingArg0.count),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Starts an ordered query of meters per logical pixel at a latitude and the
-  /// current map zoom. The completion borrows one double.
-  ///
-  /// See `mln_map_meters_per_pixel_at_latitude` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func metersPerPixelAtLatitude(latitude bindingArg0: Double) async throws
-    -> Double
-  {
-    try await nativeStart(
-      "mln_map_meters_per_pixel_at_latitude",
-      convert: { result in try NativeCompletion.value(result, as: Double.self) }
-    ) { raw, _, completion, diagnostic in mln_map_meters_per_pixel_at_latitude(
-      raw,
-      bindingArg0,
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Starts an ordered conversion from a geographic coordinate to a screen
-  /// point.
-  ///
-  /// See `mln_map_pixel_for_lat_lng` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func pixelForLatLng(coordinate bindingArg0: LatLng) async throws
-    -> ScreenPoint
-  {
-    try await nativeStart(
-      "mln_map_pixel_for_lat_lng",
-      copying: ScreenPoint.init(raw:)
-    ) { raw, _, completion, diagnostic in mln_map_pixel_for_lat_lng(
-      raw,
-      bindingArg0.nativeValue(),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Starts an ordered conversion of copied coordinates to screen points.
-  ///
-  /// See `mln_map_pixels_for_lat_lngs` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func pixelsForLatLngs(coordinates bindingArg0: [LatLng]) async throws
-    -> [ScreenPoint]
-  {
-    try await nativeStart(
-      "mln_map_pixels_for_lat_lngs",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_screen_point.self
-      ).map { ScreenPoint(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in try mln_map_pixels_for_lat_lngs(
-      raw,
-      arena.array(bindingArg0.map { $0.nativeValue() }),
-      NativeInputArena.count(bindingArg0.count),
-      completion,
-      diagnostic
-    ) }
-  }
-
   /// Submits a copied camera-constraint command.
   ///
   /// See `mln_map_set_bounds` in the
@@ -473,5 +329,149 @@ public extension MapHandle {
         diagnostic
       )
     }
+  }
+}
+
+public extension MapHandleDiscarding {
+  func applyCameraDelta(delta bindingArg0: CameraDelta) throws {
+    try owner
+      .nativeDiscard("mln_map_apply_camera_delta") { raw, arena, diagnostic in
+        try mln_map_apply_camera_delta(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func cancelCameraTransition(transitionId bindingArg0: UInt64) throws {
+    try owner
+      .nativeDiscard("mln_map_cancel_camera_transition") { raw, _, diagnostic in
+        mln_map_cancel_camera_transition(
+          raw,
+          bindingArg0,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func cancelTransitions() throws {
+    try owner
+      .nativeDiscard("mln_map_cancel_transitions") { raw, _, diagnostic in
+        mln_map_cancel_transitions(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func dumpDebugLogs() throws {
+    try owner
+      .nativeDiscard("mln_map_dump_debug_logs") { raw, _, diagnostic in
+        mln_map_dump_debug_logs(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setBounds(options bindingArg0: BoundOptions) throws {
+    try owner
+      .nativeDiscard("mln_map_set_bounds") { raw, arena, diagnostic in
+        mln_map_set_bounds(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setDebugOptions(options bindingArg0: MapDebugOption) throws {
+    try owner
+      .nativeDiscard("mln_map_set_debug_options") { raw, _, diagnostic in
+        mln_map_set_debug_options(
+          raw,
+          bindingArg0.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) throws {
+    try owner
+      .nativeDiscard("mln_map_set_free_camera_options") { raw, arena, diagnostic in
+        mln_map_set_free_camera_options(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setProjectionMode(mode bindingArg0: ProjectionMode) throws {
+    try owner
+      .nativeDiscard("mln_map_set_projection_mode") { raw, arena, diagnostic in
+        mln_map_set_projection_mode(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) throws {
+    try owner
+      .nativeDiscard("mln_map_set_rendering_stats_view_enabled") { raw, _, diagnostic in
+        mln_map_set_rendering_stats_view_enabled(
+          raw,
+          bindingArg0,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setTileOptions(options bindingArg0: MapTileOptions) throws {
+    try owner
+      .nativeDiscard("mln_map_set_tile_options") { raw, arena, diagnostic in
+        mln_map_set_tile_options(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setViewportOptions(options bindingArg0: MapViewportOptions) throws {
+    try owner
+      .nativeDiscard("mln_map_set_viewport_options") { raw, arena, diagnostic in
+        mln_map_set_viewport_options(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func updateCamera(update bindingArg0: CameraUpdate) throws {
+    try owner
+      .nativeDiscard("mln_map_update_camera") { raw, arena, diagnostic in
+        try mln_map_update_camera(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
   }
 }

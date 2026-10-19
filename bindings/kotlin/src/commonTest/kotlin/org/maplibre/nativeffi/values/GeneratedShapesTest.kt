@@ -37,6 +37,28 @@ import org.maplibre.nativeffi.withMap
  */
 class GeneratedShapesTest {
   @Test
+  fun synchronousCallsFillCallerSizedOutputsInInputOrder(): Unit = runSuspendTest {
+    withMap {
+      val projection = map.createProjection()
+      try {
+        val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0), LatLng(-12.0, -30.0))
+        val points = projection.pixelsForLatLngs(coordinates)
+        assertEquals(coordinates.map(projection::pixelForLatLng), points)
+        assertEquals(points.map(projection::latLngForPixel), projection.latLngsForPixels(points))
+        assertEquals(
+          points.map(projection::latLngForPixelUnwrapped),
+          projection.latLngsForPixelsUnwrapped(points),
+        )
+        assertEquals(emptyList(), projection.pixelsForLatLngs(emptyList()))
+        assertEquals(emptyList(), projection.latLngsForPixels(emptyList()))
+        assertEquals(emptyList(), projection.latLngsForPixelsUnwrapped(emptyList()))
+      } finally {
+        projection.close()
+      }
+    }
+  }
+
+  @Test
   fun submittingAnUnknownUnionVariantUsesTheBindingError() {
     NativeArena().use { arena ->
       val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))
@@ -176,13 +198,10 @@ class GeneratedShapesTest {
         .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(10.0, 20.0), zoom = 3.0)))
         .awaitCommitted()
       val coordinates = mutableListOf(LatLng(10.0, 20.0), LatLng(12.0, 21.0))
-      val pending = map.pixelsForLatLngs(coordinates)
+      val expected = map.cameraForLatLngs(coordinates.toList(), null).awaitWithin("the camera fit")
+      val pending = map.cameraForLatLngs(coordinates, null)
       coordinates.clear()
-      val pixels = pending.awaitWithin("the conversion")
-      assertEquals(2, pixels.size)
-      val roundTrip = map.latLngsForPixels(pixels).awaitWithin("the inverse conversion")
-      assertEquals(10.0, roundTrip[0].latitude, 1e-8)
-      assertEquals(21.0, roundTrip[1].longitude, 1e-8)
+      assertEquals(expected, pending.awaitWithin("the copied camera fit"))
 
       val style = EMPTY_STYLE_JSON.encodeToByteArray()
       val loading = map.setStyleJson(style)

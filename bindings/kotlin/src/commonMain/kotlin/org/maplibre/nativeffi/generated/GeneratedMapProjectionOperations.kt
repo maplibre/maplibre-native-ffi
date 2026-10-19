@@ -69,6 +69,48 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
     }
 
   /**
+   * Converts screen points to geographic coordinates.
+   *
+   * See `mln_map_projection_lat_lngs_for_pixels` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> =
+    nativeCall(this, binding, "mln_map_projection_lat_lngs_for_pixels", Access.READ) {
+      val out = allocate(points.size.toLong() * 16, 8)
+      check(
+        C.mln_map_projection_lat_lngs_for_pixels(
+          handle,
+          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
+          points.size.toLong(),
+          out,
+          diagnostic,
+        ),
+      )
+      List(points.size) { index -> readLatLng(out + index.toLong() * 16) }
+    }
+
+  /**
+   * Converts screen points to unwrapped geographic coordinates.
+   *
+   * See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> =
+    nativeCall(this, binding, "mln_map_projection_lat_lngs_for_pixels_unwrapped", Access.READ) {
+      val out = allocate(points.size.toLong() * 16, 8)
+      check(
+        C.mln_map_projection_lat_lngs_for_pixels_unwrapped(
+          handle,
+          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
+          points.size.toLong(),
+          out,
+          diagnostic,
+        ),
+      )
+      List(points.size) { index -> readLatLng(out + index.toLong() * 16) }
+    }
+
+  /**
    * Reads the ground distance covered by one logical map pixel at a latitude for the helper camera
    * zoom.
    *
@@ -95,6 +137,27 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
         C.mln_map_projection_pixel_for_lat_lng(handle, writeLatLng(coordinate), out, diagnostic),
       )
       readScreenPoint(out)
+    }
+
+  /**
+   * Converts geographic coordinates to screen points.
+   *
+   * See `mln_map_projection_pixels_for_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> =
+    nativeCall(this, binding, "mln_map_projection_pixels_for_lat_lngs", Access.READ) {
+      val out = allocate(coordinates.size.toLong() * 16, 8)
+      check(
+        C.mln_map_projection_pixels_for_lat_lngs(
+          handle,
+          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
+          coordinates.size.toLong(),
+          out,
+          diagnostic,
+        ),
+      )
+      List(coordinates.size) { index -> readScreenPoint(out + index.toLong() * 16) }
     }
 
   /**

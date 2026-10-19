@@ -1472,8 +1472,6 @@ pub const ImageStretch = struct {
 };
 
 /// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller. Copied result, owned by the caller. Copied
-/// result, owned by the caller. Copied result, owned by the caller. Copied
 /// result, owned by the caller.
 ///
 /// See `mln_lat_lng` in the
@@ -4367,8 +4365,7 @@ pub const ScreenLineString = struct {
     }
 };
 
-/// Screen-space point in logical map pixels. Copied result, owned by the
-/// caller. Copied result, owned by the caller.
+/// Screen-space point in logical map pixels.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6637,40 +6634,6 @@ pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map,
     return call.submit("mln_map_lat_lng_bounds_for_camera_unwrapped", .lease, map, call.value(LatLngBounds, c.mln_lat_lng_bounds), allocator, diagnostic, .{camera});
 }
 
-/// Starts an ordered conversion from a screen point to a geographic coordinate.
-///
-/// See `mln_map_lat_lng_for_pixel` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapLatLngForPixel(map: Map, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLng) {
-    return call.submit("mln_map_lat_lng_for_pixel", .lease, map, call.value(LatLng, c.mln_lat_lng), null, diagnostic, .{point});
-}
-
-/// Starts an ordered conversion from a screen point to an unwrapped geographic
-/// coordinate.
-///
-/// See `mln_map_lat_lng_for_pixel_unwrapped` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLng) {
-    return call.submit("mln_map_lat_lng_for_pixel_unwrapped", .lease, map, call.value(LatLng, c.mln_lat_lng), null, diagnostic, .{point});
-}
-
-/// Starts an ordered conversion of copied screen points to coordinates.
-///
-/// See `mln_map_lat_lngs_for_pixels` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
-    return call.submit("mln_map_lat_lngs_for_pixels", .lease, map, call.slice(LatLng, c.mln_lat_lng), allocator, diagnostic, .{ points, points.len });
-}
-
-/// Starts an ordered conversion of copied screen points to unwrapped
-/// coordinates.
-///
-/// See `mln_map_lat_lngs_for_pixels_unwrapped` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
-    return call.submit("mln_map_lat_lngs_for_pixels_unwrapped", .lease, map, call.slice(LatLng, c.mln_lat_lng), allocator, diagnostic, .{ points, points.len });
-}
-
 /// Starts an ordered query of every style layer in style order.
 ///
 /// See `mln_map_list_style_layers` in the
@@ -6687,15 +6650,6 @@ pub fn mapListStyleSources(allocator: std.mem.Allocator, map: Map, diagnostic: ?
     return call.submit("mln_map_list_style_sources", .lease, map, call.slice(StyleSourceInfo, c.mln_style_source_info), allocator, diagnostic, .{});
 }
 
-/// Starts an ordered query of meters per logical pixel at a latitude and the
-/// current map zoom. The completion borrows one double.
-///
-/// See `mln_map_meters_per_pixel_at_latitude` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(f64) {
-    return call.submit("mln_map_meters_per_pixel_at_latitude", .lease, map, call.value(f64, f64), null, diagnostic, .{latitude});
-}
-
 /// Moves one style layer before another layer or to the top.
 ///
 /// See `mln_map_move_style_layer` in the
@@ -6710,22 +6664,6 @@ pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]con
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn mapOptionsDefault() status.Error!MapOptions {
     return call.direct("mln_map_options_default", .none, {}, MapOptions, null, .{});
-}
-
-/// Starts an ordered conversion from a geographic coordinate to a screen point.
-///
-/// See `mln_map_pixel_for_lat_lng` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapPixelForLatLng(map: Map, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(ScreenPoint) {
-    return call.submit("mln_map_pixel_for_lat_lng", .lease, map, call.value(ScreenPoint, c.mln_screen_point), null, diagnostic, .{coordinate});
-}
-
-/// Starts an ordered conversion of copied coordinates to screen points.
-///
-/// See `mln_map_pixels_for_lat_lngs` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const ScreenPoint)) {
-    return call.submit("mln_map_pixels_for_lat_lngs", .lease, map, call.slice(ScreenPoint, c.mln_screen_point), allocator, diagnostic, .{ coordinates, coordinates.len });
 }
 
 /// Closes a standalone projection.
@@ -6760,6 +6698,22 @@ pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: Sc
     return call.invoke("mln_map_projection_lat_lng_for_pixel_unwrapped", .lease, projection, null, diagnostic, .{ point, call.out(LatLng) });
 }
 
+/// Converts screen points to geographic coordinates.
+///
+/// See `mln_map_projection_lat_lngs_for_pixels` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionLatLngsForPixels(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
+    return call.invoke("mln_map_projection_lat_lngs_for_pixels", .borrow, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
+}
+
+/// Converts screen points to unwrapped geographic coordinates.
+///
+/// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
+    return call.invoke("mln_map_projection_lat_lngs_for_pixels_unwrapped", .borrow, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
+}
+
 /// Reads the ground distance covered by one logical map pixel at a latitude for
 /// the helper camera zoom.
 ///
@@ -6775,6 +6729,14 @@ pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ScreenPoint {
     return call.invoke("mln_map_projection_pixel_for_lat_lng", .lease, projection, null, diagnostic, .{ coordinate, call.out(ScreenPoint) });
+}
+
+/// Converts geographic coordinates to screen points.
+///
+/// See `mln_map_projection_pixels_for_lat_lngs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const ScreenPoint) {
+    return call.invoke("mln_map_projection_pixels_for_lat_lngs", .borrow, projection, allocator, diagnostic, .{ coordinates, coordinates.len, call.outArray(ScreenPoint, call.len(coordinates)) });
 }
 
 /// Applies a camera update to a standalone projection.
@@ -7873,4 +7835,311 @@ pub fn webgpuOwnedTextureDescriptorDefault() status.Error!WebgpuOwnedTextureDesc
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn webgpuSurfaceDescriptorDefault() status.Error!WebgpuSurfaceDescriptor {
     return call.direct("mln_webgpu_surface_descriptor_default", .none, {}, WebgpuSurfaceDescriptor, null, .{});
+}
+
+pub const MapDiscarding = struct {
+    receiver: Map,
+    pub fn addCustomGeometrySource(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_custom_geometry_source", .lease, map, allocator, diagnostic, .{ source_id, options });
+    }
+
+    pub fn addCustomMvtVectorSource(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, options: CustomMvtVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_custom_mvt_vector_source", .lease, map, allocator, diagnostic, .{ source_id, options });
+    }
+
+    pub fn addGeojsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeojsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_geojson_source_data", .lease, map, null, diagnostic, .{ source_id, data });
+    }
+
+    pub fn addGeojsonSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?GeojsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_geojson_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
+    }
+
+    pub fn addImageSourceImage(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_image_source_image", .lease, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
+    }
+
+    pub fn addImageSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_image_source_url", .lease, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
+    }
+
+    pub fn addRasterDemSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_raster_dem_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
+    }
+
+    pub fn addRasterDemSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_raster_dem_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
+    }
+
+    pub fn addRasterSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_raster_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
+    }
+
+    pub fn addRasterSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_raster_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
+    }
+
+    pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_style_layer_json", .lease, map, null, diagnostic, .{ layer_json, before_layer_id });
+    }
+
+    pub fn addStyleSourceJson(self: MapDiscarding, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_style_source_json", .lease, map, null, diagnostic, .{ source_id, source_json });
+    }
+
+    pub fn addVectorSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_vector_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
+    }
+
+    pub fn addVectorSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_vector_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
+    }
+
+    pub fn applyCameraDelta(self: MapDiscarding, allocator: std.mem.Allocator, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_apply_camera_delta", .lease, map, allocator, diagnostic, .{delta});
+    }
+
+    pub fn beginCommandGroup(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_begin_command_group", .lease, map, null, diagnostic, .{});
+    }
+
+    pub fn cancelCameraTransition(self: MapDiscarding, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_cancel_camera_transition", .lease, map, null, diagnostic, .{transition_id});
+    }
+
+    pub fn cancelTransitions(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_cancel_transitions", .lease, map, null, diagnostic, .{});
+    }
+
+    pub fn dumpDebugLogs(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_dump_debug_logs", .lease, map, null, diagnostic, .{});
+    }
+
+    pub fn endCommandGroup(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_end_command_group", .lease, map, null, diagnostic, .{});
+    }
+
+    pub fn invalidateCustomGeometrySourceRegion(self: MapDiscarding, source_id: []const u8, bounds: LatLngBounds, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_invalidate_custom_geometry_source_region", .lease, map, null, diagnostic, .{ source_id, bounds });
+    }
+
+    pub fn invalidateCustomGeometrySourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_invalidate_custom_geometry_source_tile", .lease, map, null, diagnostic, .{ source_id, tile_id });
+    }
+
+    pub fn invalidateCustomMvtVectorSourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_invalidate_custom_mvt_vector_source_tile", .lease, map, null, diagnostic, .{ source_id, tile_id });
+    }
+
+    pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_move_style_layer", .lease, map, null, diagnostic, .{ layer_id, before_layer_id });
+    }
+
+    pub fn removeFeatureState(self: MapDiscarding, allocator: std.mem.Allocator, selector: FeatureStateSelector, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_remove_feature_state", .lease, map, allocator, diagnostic, .{selector});
+    }
+
+    pub fn removeStyleImage(self: MapDiscarding, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_remove_style_image", .lease, map, null, diagnostic, .{image_id});
+    }
+
+    pub fn removeStyleLayer(self: MapDiscarding, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_remove_style_layer", .lease, map, null, diagnostic, .{layer_id});
+    }
+
+    pub fn removeStyleSource(self: MapDiscarding, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_remove_style_source", .lease, map, null, diagnostic, .{source_id});
+    }
+
+    pub fn requestRepaint(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_request_repaint", .lease, map, null, diagnostic, .{});
+    }
+
+    pub fn resize(self: MapDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_resize", .lease, map, null, diagnostic, .{extent});
+    }
+
+    pub fn setBounds(self: MapDiscarding, allocator: std.mem.Allocator, options: BoundOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_bounds", .lease, map, allocator, diagnostic, .{options});
+    }
+
+    pub fn setCustomGeometrySourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_custom_geometry_source_tile_data", .lease, map, null, diagnostic, .{ source_id, tile_id, data });
+    }
+
+    pub fn setCustomMvtVectorSourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_custom_mvt_vector_source_tile_data", .lease, map, null, diagnostic, .{ source_id, tile_id, data });
+    }
+
+    pub fn setCustomMvtVectorSourceTileError(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_custom_mvt_vector_source_tile_error", .lease, map, null, diagnostic, .{ source_id, tile_id, message });
+    }
+
+    pub fn setDebugOptions(self: MapDiscarding, options: MapDebugOption, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_debug_options", .lease, map, null, diagnostic, .{options});
+    }
+
+    pub fn setEventMask(self: MapDiscarding, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_event_mask", .lease, map, null, diagnostic, .{mask});
+    }
+
+    pub fn setFeatureState(self: MapDiscarding, allocator: std.mem.Allocator, selector: FeatureStateSelector, state: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_feature_state", .lease, map, allocator, diagnostic, .{ selector, state });
+    }
+
+    pub fn setFreeCameraOptions(self: MapDiscarding, allocator: std.mem.Allocator, options: FreeCameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_free_camera_options", .lease, map, allocator, diagnostic, .{options});
+    }
+
+    pub fn setGeojsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeojsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_geojson_source_data", .lease, map, null, diagnostic, .{ source_id, data });
+    }
+
+    pub fn setGeojsonSourceSynchronousTiling(self: MapDiscarding, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_geojson_source_synchronous_tiling", .lease, map, null, diagnostic, .{ source_id, enabled });
+    }
+
+    pub fn setGeojsonSourceUrl(self: MapDiscarding, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_geojson_source_url", .lease, map, null, diagnostic, .{ source_id, url });
+    }
+
+    pub fn setGlobalStateProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_global_state_property", .lease, map, null, diagnostic, .{ property_name, value });
+    }
+
+    pub fn setImageSourceCoordinates(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_image_source_coordinates", .lease, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len });
+    }
+
+    pub fn setImageSourceImage(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_image_source_image", .lease, map, allocator, diagnostic, .{ source_id, image });
+    }
+
+    pub fn setImageSourceUrl(self: MapDiscarding, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_image_source_url", .lease, map, null, diagnostic, .{ source_id, url });
+    }
+
+    pub fn setProjectionMode(self: MapDiscarding, allocator: std.mem.Allocator, mode: ProjectionMode, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_projection_mode", .lease, map, allocator, diagnostic, .{mode});
+    }
+
+    pub fn setRenderingStatsViewEnabled(self: MapDiscarding, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_rendering_stats_view_enabled", .lease, map, null, diagnostic, .{enabled});
+    }
+
+    pub fn setStyleImage(self: MapDiscarding, allocator: std.mem.Allocator, image_id: []const u8, image: PremultipliedRgba8Image, options: ?StyleImageOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_image", .lease, map, allocator, diagnostic, .{ image_id, image, options });
+    }
+
+    pub fn setStyleJson(self: MapDiscarding, json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_json", .lease, map, null, diagnostic, .{json});
+    }
+
+    pub fn setStyleLayerProperty(self: MapDiscarding, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_layer_property", .lease, map, null, diagnostic, .{ layer_id, property_name, value });
+    }
+
+    pub fn setStyleLightJson(self: MapDiscarding, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_light_json", .lease, map, null, diagnostic, .{light_json});
+    }
+
+    pub fn setStyleLightProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_light_property", .lease, map, null, diagnostic, .{ property_name, value });
+    }
+
+    pub fn setStyleSourceVolatile(self: MapDiscarding, source_id: []const u8, is_volatile: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_source_volatile", .lease, map, null, diagnostic, .{ source_id, is_volatile });
+    }
+
+    pub fn setStyleTransitionOptions(self: MapDiscarding, allocator: std.mem.Allocator, options: StyleTransitionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_transition_options", .lease, map, allocator, diagnostic, .{options});
+    }
+
+    pub fn setStyleUrl(self: MapDiscarding, allocator: std.mem.Allocator, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_url", .lease, map, allocator, diagnostic, .{call.cString(url)});
+    }
+
+    pub fn setTileOptions(self: MapDiscarding, allocator: std.mem.Allocator, options: MapTileOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_tile_options", .lease, map, allocator, diagnostic, .{options});
+    }
+
+    pub fn setViewportOptions(self: MapDiscarding, allocator: std.mem.Allocator, options: MapViewportOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_viewport_options", .lease, map, allocator, diagnostic, .{options});
+    }
+
+    pub fn updateCamera(self: MapDiscarding, allocator: std.mem.Allocator, update: CameraUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_update_camera", .lease, map, allocator, diagnostic, .{update});
+    }
+};
+
+pub const RenderSessionDiscarding = struct {
+    receiver: RenderSession,
+    pub fn resize(self: RenderSessionDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const session = self.receiver;
+        return call.discard("mln_render_session_resize", .lease, session, null, diagnostic, .{extent});
+    }
+};
+
+pub fn Discarding(comptime Handle: type) type {
+    if (Handle == Map) return MapDiscarding;
+    if (Handle == RenderSession) return RenderSessionDiscarding;
+    @compileError("handle has no commands");
 }

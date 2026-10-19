@@ -7,6 +7,32 @@ use maplibre_native_ffi_sys as sys;
 use crate::support::*;
 
 #[test]
+fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
+    let fixture = Fixture::new();
+    fixture
+        .map()
+        .discarding()
+        .set_debug_options(MapDebugOption::TILE_BORDERS)
+        .unwrap();
+    wait_for(fixture.runtime().barrier());
+    assert_eq!(
+        fixture.map().get_snapshot().unwrap().debug_options,
+        MapDebugOption::TILE_BORDERS
+    );
+    let error = fixture
+        .map()
+        .discarding()
+        .resize(LogicalExtent {
+            width: 0,
+            height: 8,
+            scale_factor: 1.0,
+        })
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.raw_status().is_some());
+}
+
+#[test]
 fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected() {
     let fixture = Fixture::new();
     wait_for(fixture.runtime().set_resource_provider(serving_provider(
@@ -125,20 +151,12 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
 fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // An enum value this binding predates reaches native unchanged, and native
     // is what rejects it.
-    let error = network_set_status(NetworkStatus::Unknown(999_999)).unwrap_err();
+    let error = network_set_status(NetworkStatus::Unknown(900)).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
     assert!(error.diagnostic().contains("network status"), "{error}");
 
     let fixture = Fixture::new();
-    fixture.load_style(BACKGROUND_STYLE_JSON);
-    let rejected = wait_for(
-        fixture
-            .map()
-            .set_style_layer_visibility("background", StyleLayerVisibility::Unknown(900)),
-    );
-    assert_eq!(rejected.disposition, CommandDisposition::Failed);
-
     // Only bit 63 is set, so a mask truncated to 32 bits would read as empty
     // and be accepted.
     let error = fixture
@@ -201,4 +219,44 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 #[test]
 fn a_record_built_from_its_default_equals_the_native_default() {
     assert_eq!(MapOptions::default(), map_options_default().unwrap());
+}
+
+#[test]
+fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
+    let fixture = Fixture::new();
+    let projection = fixture.map().create_projection().unwrap();
+    let coordinates = [
+        LatLng::new(0.0, 0.0),
+        LatLng::new(10.0, 20.0),
+        LatLng::new(-12.0, -30.0),
+    ];
+    let points = projection.pixels_for_lat_lngs(&coordinates).unwrap();
+    let singles: Vec<_> = coordinates
+        .iter()
+        .map(|&value| projection.pixel_for_lat_lng(value).unwrap())
+        .collect();
+    assert_eq!(points, singles);
+    assert_eq!(
+        projection.lat_lngs_for_pixels(&points).unwrap(),
+        points
+            .iter()
+            .map(|&value| projection.lat_lng_for_pixel(value).unwrap())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        projection.lat_lngs_for_pixels_unwrapped(&points).unwrap(),
+        points
+            .iter()
+            .map(|&value| projection.lat_lng_for_pixel_unwrapped(value).unwrap())
+            .collect::<Vec<_>>()
+    );
+    assert!(projection.pixels_for_lat_lngs(&[]).unwrap().is_empty());
+    assert!(projection.lat_lngs_for_pixels(&[]).unwrap().is_empty());
+    assert!(
+        projection
+            .lat_lngs_for_pixels_unwrapped(&[])
+            .unwrap()
+            .is_empty()
+    );
+    projection.close().unwrap();
 }

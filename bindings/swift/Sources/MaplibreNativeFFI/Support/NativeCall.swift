@@ -86,6 +86,10 @@ extension NativeReceiver {
     try nativeInvoke(operation, access, call) { () }
   }
 
+  func nativeDiscard(_ operation: String, _ call: NativeStatusCall) throws {
+    try nativeInvoke(operation, .live, call)
+  }
+
   /// Calls a status-returning function like `nativeInvoke`, except that
   /// `absent` reports that native published no output, and returns nil.
   func nativeInvoke<T>(

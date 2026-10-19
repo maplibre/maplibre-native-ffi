@@ -710,4 +710,31 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             cancellationToken
         );
     }
+
+    public DiscardingCommands Discarding => new(this);
+
+    public readonly struct DiscardingCommands
+    {
+        private readonly RenderSessionHandle owner;
+
+        internal DiscardingCommands(RenderSessionHandle owner)
+        {
+            this.owner = owner;
+        }
+
+        public void Resize(LogicalExtent extent)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_render_session_resize");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_resize(
+                        receiverHandle,
+                        NativeLogicalExtent(extent),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+    }
 }

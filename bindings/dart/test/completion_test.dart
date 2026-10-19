@@ -18,6 +18,23 @@ import 'support/fixture.dart';
 
 void main() {
   test(
+    'discarded commands are fenced and synchronous rejection throws',
+    () async {
+      final fixture = await openRuntime();
+      final map = await fixture.openMap();
+      map.discarding.setDebugOptions(MapDebugOption.tileBorders);
+      await within(fixture.runtime.barrier(), 'discard barrier');
+      expect(map.getSnapshot().debugOptions, MapDebugOption.tileBorders);
+      expect(
+        () => map.discarding.resize(
+          const LogicalExtent(width: 0, height: 8, scaleFactor: 1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
+
+  test(
     'a completion delivers once and disposes a value that fails to convert',
     () async {
       final fixture = await openRuntime();

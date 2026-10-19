@@ -31,6 +31,7 @@
 "COMP-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
 "COMP-04" = "bindings/go/completion_test.go::TestFailedCommandDispositionIsData"
 "COMP-05" = "bindings/go/completion_test.go::TestAwaitEndsWithItsContext"
+"COMP-06" = "bindings/go/completion_test.go::TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError"
 "CB-01" = "bindings/go/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"
 "CB-02" = "bindings/go/callbacks_test.go::TestCallbackDoesNotKeepItsReceiverAlive"
 "CB-03" = "bindings/go/callbacks_test.go::TestCallbackAdmissionPolicy"
@@ -49,6 +50,7 @@
 "VAL-05" = "bindings/go/values_test.go::TestArrayInputsAreCopiedAtSubmission"
 "VAL-06" = { na = "A Go struct has no constructor: its zero value is zero in every field, and DefaultMapOptions returns a copy of the native default" }
 "VAL-07" = "bindings/go/completion_test.go::TestArrayCompletionIsReadAtItsValueSize"
+"VAL-08" = "bindings/go/values_test.go::TestSynchronousCallsFillCallerSizedOutputsInInputOrder"
 "VIEW-01" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
 "REND-01" = "bindings/go/render_test.go::TestOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/go/render_test.go::TestCallerDriverIsServicedFromAGoroutine"

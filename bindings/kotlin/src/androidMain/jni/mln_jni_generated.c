@@ -998,50 +998,6 @@ static jint mln_map_lat_lng_bounds_for_camera_unwrapped_jni(
   );
 }
 
-static jint mln_map_lat_lng_for_pixel_jni(
-  JNIEnv* env, jclass type, jlong map, jlong point, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_lat_lng_for_pixel(
-    (mln_map)map, MLN_JNI_RECORD(mln_screen_point, point),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_lat_lng_for_pixel_unwrapped_jni(
-  JNIEnv* env, jclass type, jlong map, jlong point, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_lat_lng_for_pixel_unwrapped(
-    (mln_map)map, MLN_JNI_RECORD(mln_screen_point, point),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_lat_lngs_for_pixels_jni(
-  JNIEnv* env, jclass type, jlong map, jlong points, jlong point_count,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_lat_lngs_for_pixels(
-    (mln_map)map, MLN_JNI_POINTER(const mln_screen_point*, points),
-    (size_t)point_count, MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_lat_lngs_for_pixels_unwrapped_jni(
-  JNIEnv* env, jclass type, jlong map, jlong points, jlong point_count,
-  jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_lat_lngs_for_pixels_unwrapped(
-    (mln_map)map, MLN_JNI_POINTER(const mln_screen_point*, points),
-    (size_t)point_count, MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_list_style_layers_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
@@ -1056,17 +1012,6 @@ static jint mln_map_list_style_sources_jni(
 ) {
   return (jint)mln_map_list_style_sources(
     (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_meters_per_pixel_at_latitude_jni(
-  JNIEnv* env, jclass type, jlong map, jdouble latitude, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_meters_per_pixel_at_latitude(
-    (mln_map)map, (double)latitude,
-    MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -1091,29 +1036,6 @@ static void mln_map_options_default_jni(
   JNIEnv* env, jclass type, jlong returned
 ) {
   mln_map_options_default_critical(returned);
-}
-
-static jint mln_map_pixel_for_lat_lng_jni(
-  JNIEnv* env, jclass type, jlong map, jlong coordinate, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_pixel_for_lat_lng(
-    (mln_map)map, MLN_JNI_RECORD(mln_lat_lng, coordinate),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_pixels_for_lat_lngs_jni(
-  JNIEnv* env, jclass type, jlong map, jlong coordinates,
-  jlong coordinate_count, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_pixels_for_lat_lngs(
-    (mln_map)map, MLN_JNI_POINTER(const mln_lat_lng*, coordinates),
-    (size_t)coordinate_count,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
 }
 
 static jint mln_map_projection_close_jni(
@@ -1158,6 +1080,30 @@ static jint mln_map_projection_lat_lng_for_pixel_unwrapped_jni(
   );
 }
 
+static jint mln_map_projection_lat_lngs_for_pixels_jni(
+  JNIEnv* env, jclass type, jlong projection, jlong points, jlong point_count,
+  jlong out_coordinates, jlong out_diagnostic
+) {
+  return (jint)mln_map_projection_lat_lngs_for_pixels(
+    (mln_map_projection)projection,
+    MLN_JNI_POINTER(const mln_screen_point*, points), (size_t)point_count,
+    MLN_JNI_POINTER(mln_lat_lng*, out_coordinates),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_projection_lat_lngs_for_pixels_unwrapped_jni(
+  JNIEnv* env, jclass type, jlong projection, jlong points, jlong point_count,
+  jlong out_coordinates, jlong out_diagnostic
+) {
+  return (jint)mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    (mln_map_projection)projection,
+    MLN_JNI_POINTER(const mln_screen_point*, points), (size_t)point_count,
+    MLN_JNI_POINTER(mln_lat_lng*, out_coordinates),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_projection_meters_per_pixel_at_latitude_jni(
   JNIEnv* env, jclass type, jlong projection, jdouble latitude,
   jlong out_meters_per_pixel, jlong out_diagnostic
@@ -1176,6 +1122,18 @@ static jint mln_map_projection_pixel_for_lat_lng_jni(
   return (jint)mln_map_projection_pixel_for_lat_lng(
     (mln_map_projection)projection, MLN_JNI_RECORD(mln_lat_lng, coordinate),
     MLN_JNI_POINTER(mln_screen_point*, out_point),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_projection_pixels_for_lat_lngs_jni(
+  JNIEnv* env, jclass type, jlong projection, jlong coordinates,
+  jlong coordinate_count, jlong out_points, jlong out_diagnostic
+) {
+  return (jint)mln_map_projection_pixels_for_lat_lngs(
+    (mln_map_projection)projection,
+    MLN_JNI_POINTER(const mln_lat_lng*, coordinates), (size_t)coordinate_count,
+    MLN_JNI_POINTER(mln_screen_point*, out_points),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2805,25 +2763,11 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
   {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_unwrapped_jni},
-  {"mln_map_lat_lng_for_pixel", "(JJJJ)I",
-   (void*)mln_map_lat_lng_for_pixel_jni},
-  {"mln_map_lat_lng_for_pixel_unwrapped", "(JJJJ)I",
-   (void*)mln_map_lat_lng_for_pixel_unwrapped_jni},
-  {"mln_map_lat_lngs_for_pixels", "(JJJJJ)I",
-   (void*)mln_map_lat_lngs_for_pixels_jni},
-  {"mln_map_lat_lngs_for_pixels_unwrapped", "(JJJJJ)I",
-   (void*)mln_map_lat_lngs_for_pixels_unwrapped_jni},
   {"mln_map_list_style_layers", "(JJJ)I", (void*)mln_map_list_style_layers_jni},
   {"mln_map_list_style_sources", "(JJJ)I",
    (void*)mln_map_list_style_sources_jni},
-  {"mln_map_meters_per_pixel_at_latitude", "(JDJJ)I",
-   (void*)mln_map_meters_per_pixel_at_latitude_jni},
   {"mln_map_move_style_layer", "(JJJJJ)I", (void*)mln_map_move_style_layer_jni},
   {"mln_map_options_default", "(J)V", (void*)mln_map_options_default_jni},
-  {"mln_map_pixel_for_lat_lng", "(JJJJ)I",
-   (void*)mln_map_pixel_for_lat_lng_jni},
-  {"mln_map_pixels_for_lat_lngs", "(JJJJJ)I",
-   (void*)mln_map_pixels_for_lat_lngs_jni},
   {"mln_map_projection_close", "(JJ)I", (void*)mln_map_projection_close_jni},
   {"mln_map_projection_get_camera", "(JJJ)I",
    (void*)mln_map_projection_get_camera_jni},
@@ -2831,10 +2775,16 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_projection_lat_lng_for_pixel_jni},
   {"mln_map_projection_lat_lng_for_pixel_unwrapped", "(JJJJ)I",
    (void*)mln_map_projection_lat_lng_for_pixel_unwrapped_jni},
+  {"mln_map_projection_lat_lngs_for_pixels", "(JJJJJ)I",
+   (void*)mln_map_projection_lat_lngs_for_pixels_jni},
+  {"mln_map_projection_lat_lngs_for_pixels_unwrapped", "(JJJJJ)I",
+   (void*)mln_map_projection_lat_lngs_for_pixels_unwrapped_jni},
   {"mln_map_projection_meters_per_pixel_at_latitude", "(JDJJ)I",
    (void*)mln_map_projection_meters_per_pixel_at_latitude_jni},
   {"mln_map_projection_pixel_for_lat_lng", "(JJJJ)I",
    (void*)mln_map_projection_pixel_for_lat_lng_jni},
+  {"mln_map_projection_pixels_for_lat_lngs", "(JJJJJ)I",
+   (void*)mln_map_projection_pixels_for_lat_lngs_jni},
   {"mln_map_projection_set_camera", "(JJJ)I",
    (void*)mln_map_projection_set_camera_jni},
   {"mln_map_projection_set_visible_coordinates", "(JJJJJ)I",
@@ -3249,25 +3199,11 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
   {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_unwrapped_jni},
-  {"mln_map_lat_lng_for_pixel", "(JJJJ)I",
-   (void*)mln_map_lat_lng_for_pixel_jni},
-  {"mln_map_lat_lng_for_pixel_unwrapped", "(JJJJ)I",
-   (void*)mln_map_lat_lng_for_pixel_unwrapped_jni},
-  {"mln_map_lat_lngs_for_pixels", "(JJJJJ)I",
-   (void*)mln_map_lat_lngs_for_pixels_jni},
-  {"mln_map_lat_lngs_for_pixels_unwrapped", "(JJJJJ)I",
-   (void*)mln_map_lat_lngs_for_pixels_unwrapped_jni},
   {"mln_map_list_style_layers", "(JJJ)I", (void*)mln_map_list_style_layers_jni},
   {"mln_map_list_style_sources", "(JJJ)I",
    (void*)mln_map_list_style_sources_jni},
-  {"mln_map_meters_per_pixel_at_latitude", "(JDJJ)I",
-   (void*)mln_map_meters_per_pixel_at_latitude_jni},
   {"mln_map_move_style_layer", "(JJJJJ)I", (void*)mln_map_move_style_layer_jni},
   {"mln_map_options_default", "(J)V", (void*)mln_map_options_default_critical},
-  {"mln_map_pixel_for_lat_lng", "(JJJJ)I",
-   (void*)mln_map_pixel_for_lat_lng_jni},
-  {"mln_map_pixels_for_lat_lngs", "(JJJJJ)I",
-   (void*)mln_map_pixels_for_lat_lngs_jni},
   {"mln_map_projection_close", "(JJ)I", (void*)mln_map_projection_close_jni},
   {"mln_map_projection_get_camera", "(JJJ)I",
    (void*)mln_map_projection_get_camera_jni},
@@ -3275,10 +3211,16 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_projection_lat_lng_for_pixel_jni},
   {"mln_map_projection_lat_lng_for_pixel_unwrapped", "(JJJJ)I",
    (void*)mln_map_projection_lat_lng_for_pixel_unwrapped_jni},
+  {"mln_map_projection_lat_lngs_for_pixels", "(JJJJJ)I",
+   (void*)mln_map_projection_lat_lngs_for_pixels_jni},
+  {"mln_map_projection_lat_lngs_for_pixels_unwrapped", "(JJJJJ)I",
+   (void*)mln_map_projection_lat_lngs_for_pixels_unwrapped_jni},
   {"mln_map_projection_meters_per_pixel_at_latitude", "(JDJJ)I",
    (void*)mln_map_projection_meters_per_pixel_at_latitude_jni},
   {"mln_map_projection_pixel_for_lat_lng", "(JJJJ)I",
    (void*)mln_map_projection_pixel_for_lat_lng_jni},
+  {"mln_map_projection_pixels_for_lat_lngs", "(JJJJJ)I",
+   (void*)mln_map_projection_pixels_for_lat_lngs_jni},
   {"mln_map_projection_set_camera", "(JJJ)I",
    (void*)mln_map_projection_set_camera_jni},
   {"mln_map_projection_set_visible_coordinates", "(JJJJJ)I",

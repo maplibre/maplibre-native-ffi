@@ -70,6 +70,10 @@ pub fn Handle(comptime name: []const u8, comptime public: []const u8, comptime d
         /// match this handle.
         raw: u64,
 
+        pub fn discarding(self: Self) @import("maplibre_native_ffi.zig").Discarding(Self) {
+            return .{ .receiver = self };
+        }
+
         fn lock() void {
             std.Io.Threaded.mutexLock(&mutex);
         }

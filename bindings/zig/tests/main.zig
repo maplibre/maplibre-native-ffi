@@ -9,6 +9,12 @@ comptime {
         const value = @field(maplibre.generated, decl.name);
         if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
     }
+    for (.{ maplibre.MapDiscarding, maplibre.RenderSessionDiscarding }) |View| {
+        for (@typeInfo(View).@"struct".decls) |decl| {
+            const value = @field(View, decl.name);
+            if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
+        }
+    }
     _ = @import("generated_workflows.zig");
     _ = @import("diagnostics.zig");
     _ = @import("lifecycle.zig");

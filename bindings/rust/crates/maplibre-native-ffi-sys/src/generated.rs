@@ -2160,32 +2160,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_lat_lng_for_pixel(
-        map: mln_map,
-        point: mln_screen_point,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_lat_lng_for_pixel_unwrapped(
-        map: mln_map,
-        point: mln_screen_point,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_lat_lngs_for_pixels(
-        map: mln_map,
-        points: *const mln_screen_point,
-        point_count: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_lat_lngs_for_pixels_unwrapped(
-        map: mln_map,
-        points: *const mln_screen_point,
-        point_count: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_list_style_layers(
         map: mln_map,
         completion: *const mln_completion,
@@ -2193,12 +2167,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_list_style_sources(
         map: mln_map,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_meters_per_pixel_at_latitude(
-        map: mln_map,
-        latitude: f64,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2210,19 +2178,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_options_default() -> mln_map_options;
-    pub fn mln_map_pixel_for_lat_lng(
-        map: mln_map,
-        coordinate: mln_lat_lng,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_pixels_for_lat_lngs(
-        map: mln_map,
-        coordinates: *const mln_lat_lng,
-        coordinate_count: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_projection_close(
         projection: mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
@@ -2244,6 +2199,20 @@ unsafe extern "C" {
         out_coordinate: *mut mln_lat_lng,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_projection_lat_lngs_for_pixels(
+        projection: mln_map_projection,
+        points: *const mln_screen_point,
+        point_count: usize,
+        out_coordinates: *mut mln_lat_lng,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_lat_lngs_for_pixels_unwrapped(
+        projection: mln_map_projection,
+        points: *const mln_screen_point,
+        point_count: usize,
+        out_coordinates: *mut mln_lat_lng,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_projection_meters_per_pixel_at_latitude(
         projection: mln_map_projection,
         latitude: f64,
@@ -2254,6 +2223,13 @@ unsafe extern "C" {
         projection: mln_map_projection,
         coordinate: mln_lat_lng,
         out_point: *mut mln_screen_point,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_pixels_for_lat_lngs(
+        projection: mln_map_projection,
+        coordinates: *const mln_lat_lng,
+        coordinate_count: usize,
+        out_points: *mut mln_screen_point,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_set_camera(

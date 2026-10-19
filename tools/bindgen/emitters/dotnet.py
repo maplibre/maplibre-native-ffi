@@ -21,6 +21,7 @@ from tools.bindgen.semantic import (
     DefaultSupport,
     HandlePlan,
     OperationPlan,
+    discarding_variants,
     enum_member_prefix,
     output_member,
     public_stem,
@@ -92,6 +93,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
             value.length not in (None, "1")
             and not (value.length == "nul" and value.encoding == "utf8")
             and planned.direction != "in"
+            and not planned.sized_by
         ):
             return f"parameter {parameter.name} requires counted-buffer conversion"
     return None
@@ -257,7 +259,9 @@ def completion_query(
     raise Unsupported(f"result {native!r} with shape {shape!r} needs a conversion rule")
 
 
-def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[str]]:
+def emit_operation(
+    plan: OperationPlan, bound: BoundApi, *, discard=False
+) -> tuple[str, str, set[str]]:
     api = bound.source
     owners = {name: owner_name(handle) for name, handle in bound.handles.items()}
     if plan.receiver:
@@ -289,7 +293,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     if receiver and receiver not in owners and not plan.scoped_receiver:
         raise Unsupported(f"receiver {receiver} requires its generated owner")
     static = receiver_parameter is None
-    owner_expression = "null" if static else "this"
+    owner_expression = "null" if static else "owner" if discard else "this"
     factory = (
         plan.owned_outputs[0].handle.native
         if static and len(plan.owned_outputs) == 1
@@ -417,7 +421,24 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         output = outputs_by_name.get(parameter.name)
         output_plan = output.value.element if output else None
         is_output = output is not None
-        if (
+        if output and output.sized_by:
+            value = output.value
+            element = value.element
+            values.supported(value)
+            scoped = True
+            count = f"{camel(output.sized_by)}.Length"
+            raw = values.raw_type(element)
+            prologue.append(f"var {name} = scope.OutputArray<{raw}>({count});")
+            if element.kind == "record" and any(
+                f.role == "size" for f in element.fields
+            ):
+                prologue.append(
+                    f"for (var index = 0; index < {count}; index++) {name}[index].{member('size')} = (uint)sizeof({raw});"
+                )
+            args.append(name)
+            outputs.append((values.public_type(value), values.copy(value, name, count)))
+            continue
+        elif (
             asynchronous
             and is_output
             and parameter.name not in {owner.parameter for owner in plan.owned_outputs}
@@ -642,6 +663,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     # request open.
     claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
     prologue = entry + prologue + claim
+    if discard:
+        prologue.insert(0, "var receiverHandle = owner.Handle;")
+        args[0] = "receiverHandle"
     arguments = ", ".join(args)
     prefix = bound.handles[factory].prefix + "_" if factory else None
     name = pascal(
@@ -819,9 +843,10 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         if result is not None:
             body.append(f"return {result};")
     else:
-        parameters.append("CancellationToken cancellationToken = default")
-        name += "Async"
-        if execution == "command":
+        if discard:
+            result_type = "void"
+            call = f"scope.Discard({submission(function, arguments)});"
+        elif execution == "command":
             if plan.result is not None:
                 raise Unsupported(
                     "command carries a typed payload that needs its own conversion"
@@ -835,7 +860,10 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             result_type = value_type if value_type == "Task" else f"Task<{value_type}>"
             copy = f", {copy}" if copy else ""
             call = f"scope.{helper}({submission(function, arguments)}{copy}, cancellationToken);"
-        body = prologue + [f"return {call}"]
+        if not discard:
+            parameters.append("CancellationToken cancellationToken = default")
+            name += "Async"
+        body = prologue + [call if discard else f"return {call}"]
     return (
         owner_class,
         method(f"{modifiers} {result_type} {name}({', '.join(parameters)})", body),
@@ -845,6 +873,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
 
 def emit(api: Api | BoundApi) -> Emission:
     methods: dict[str, list[str]] = defaultdict(list)
+    discards: dict[str, list[str]] = defaultdict(list)
     records: dict[str, set[str]] = defaultdict(set)
     supported = []
     bound = compile_api(api)
@@ -875,6 +904,9 @@ def emit(api: Api | BoundApi) -> Emission:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
         methods[owner].append(doc(bound, function.name, "    ") + emitted)
+        if plan.receiver and plan.completion and plan.completion.discardable:
+            _, discarded, _ = emit_operation(plan, bound, discard=True)
+            discards[owner].append(discarded)
         records[owner].update(used_records)
         supported.append(function.name)
         owner_headers.setdefault(owner, function.location.path)
@@ -1028,6 +1060,15 @@ def emit(api: Api | BoundApi) -> Emission:
     )
     values = Values(bound)
     for owner, body in sorted(methods.items()):
+        if owner in discards:
+            body.append(
+                "    public DiscardingCommands Discarding => new(this);\n"
+                "    public readonly struct DiscardingCommands\n    {\n"
+                f"        private readonly {owner} owner;\n"
+                f"        internal DiscardingCommands({owner} owner) {{ this.owner = owner; }}\n"
+                + "\n".join(discards[owner])
+                + "    }\n"
+            )
         directory = owner_directories[owner]
         handle_types = {
             owners[native]: raw_handle(bound.handles[native])
@@ -1168,6 +1209,7 @@ def coverage(api: Api | BoundApi) -> dict:
     result = emit(bound)
     return {
         "generated": list(result.functions),
+        "discarding": discarding_variants(bound, result.functions),
         "support": view_support(bound, result.functions),
         "unsupported": result.unsupported,
     }

@@ -19,6 +19,20 @@ def _live_native_futures() -> int:
     return sum(isinstance(value, NativeFuture) for value in gc.get_objects())
 
 
+def test_discarded_commands_are_fenced_and_sync_rejection_raises(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    assert (
+        map_handle.discarding.set_debug_options(mln.MapDebugOption.TILE_BORDERS) is None
+    )
+    result(harness.runtime.barrier())
+    assert map_handle.get_snapshot().debug_options == mln.MapDebugOption.TILE_BORDERS
+    with pytest.raises(mln.InvalidArgumentError):
+        map_handle.discarding.resize(
+            mln.LogicalExtent(width=0, height=8, scale_factor=1)
+        )
+
+
 def test_a_rejected_submission_frees_its_future(map_handle: mln.MapHandle) -> None:
     before = _live_native_futures()
     for _ in range(3):

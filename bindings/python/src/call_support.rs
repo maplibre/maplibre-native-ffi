@@ -79,6 +79,15 @@ impl<'py> GeneratedCall<'py> {
         )
     }
 
+    unsafe fn discard(
+        &mut self,
+        submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
+    ) -> PyResult<Py<PyAny>> {
+        // SAFETY: the caller upholds the native call contract.
+        unsafe { self.status(|diagnostic| submit(std::ptr::null(), diagnostic)) }?;
+        Ok(self.py.None())
+    }
+
     /// Submits an operation whose completion `convert` copies.
     unsafe fn complete<C>(
         &mut self,

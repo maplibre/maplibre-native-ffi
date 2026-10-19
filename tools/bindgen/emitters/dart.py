@@ -10,7 +10,13 @@ from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
-from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_support
+from tools.bindgen.semantic import (
+    BoundApi,
+    OperationPlan,
+    discarding_variants,
+    output_member,
+    view_support,
+)
 
 from .dart_values import (
     Unsupported,
@@ -54,7 +60,9 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
-def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
+def lower_function(
+    plan: OperationPlan, values: Values, *, discard=False
+) -> tuple[str, str]:
     function = plan.function
     if plan.consumes == "always" and (
         plan.completion or function.return_type.kind != "void"
@@ -155,7 +163,27 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             )
             continue
         if parameter.name in outputs:
-            output = outputs[parameter.name].value
+            output_plan = outputs[parameter.name]
+            output = output_plan.value
+            if output_plan.sized_by:
+                values.check(output)
+                count = f"{camel(output_plan.sized_by)}.length"
+                element = output.element
+                setup.append(f"final {local} = arena<{values.ffi(element)}>({count});")
+                if element.kind == "record":
+                    if element.default:
+                        setup.append(
+                            f"for (var index = 0; index < {count}; index++) {{ {local}[index] = raw.{element.default}(); }}"
+                        )
+                    elif any(f.role == "size" for f in element.fields):
+                        setup.append(
+                            f"for (var index = 0; index < {count}; index++) {{ {local}[index].size = sizeOf<{values.ffi(element)}>(); }}"
+                        )
+                args.append(local)
+                returns.append(
+                    (values.public(output), values.copy(output, local, count))
+                )
+                continue
             if output.kind != "reference" or not output.element:
                 raise Unsupported("output needs one initialized native storage value")
             output = output.element
@@ -330,6 +358,8 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             body.append(f"return {result};")
         return owner, f"  {public} {name}({', '.join(signature)}) {method_body(body)}\n"
     start = f"(arena, completion) {block(setup + [f'return {call};'])}"
+    if discard:
+        return owner, f"  void {name}({', '.join(signature)}) => _discard({start});\n"
     if returns:
         if (
             len(returns) != 1
@@ -471,6 +501,9 @@ def lower(api: Api | BoundApi):
             values.used.update(local_values.used)
             values.results.update(local_values.results)
             methods[owner].append(body)
+            if plan.receiver and plan.completion and plan.completion.discardable:
+                _, discarded = lower_function(plan, local_values, discard=True)
+                methods[owner + "Discarding"].append(discarded)
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
                 port_owners.add(owner)
@@ -531,6 +564,17 @@ def render_owner(native, handle, bodies, bound, ports):
         )
     fields.append(f"  final NativeHandleState<{native_type}> _state;")
     fields.append(f"  {native_type} get _handle => _state.handle;")
+    commands = [
+        p
+        for p in bound.operations
+        if p.completion
+        and p.completion.discardable
+        and any(i.name == p.receiver and i.value.native == native for i in p.inputs)
+    ]
+    if commands:
+        fields.append(
+            f"  {public}Discarding get discarding => {public}Discarding._(this);"
+        )
     parameters.append(f"{native_type} handle")
     return (
         f"/// Issued `{native}` handle id.\n"
@@ -616,6 +660,19 @@ def generate(api: Api | BoundApi) -> str:
     ]
     chunks.extend(methods.get("Globals", []))
     for native, handle in sorted(bound.public_handles.items()):
+        if discarded := methods.get(native + "Discarding"):
+            public, native_type = owner_names(handle)
+            chunks.append(
+                f"extension type {public}Discarding._({public} _owner) {{\n"
+                f"  {native_type} get _handle => _owner._handle;\n"
+                + (
+                    "  _NativeCallbackPorts get _callbackPorts => _owner._callbackPorts;\n"
+                    if native in values.port_owners
+                    else ""
+                )
+                + "".join(discarded)
+                + "}\n"
+            )
         chunks.append(
             render_owner(
                 native,
@@ -683,6 +740,7 @@ def coverage(api: Api | BoundApi):
                     unsupported.pop(plan.name, None)
     return {
         "generated": generated,
+        "discarding": discarding_variants(bound, generated),
         "native_rules": rules,
         "support": view_support(bound, generated),
         "unsupported": unsupported,

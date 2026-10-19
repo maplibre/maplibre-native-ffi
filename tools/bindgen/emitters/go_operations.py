@@ -94,7 +94,7 @@ def copier(values, value):
     return f"func(raw C.{value.native}) {values.type(value)} {{ return {values.copy(value, 'raw')} }}"
 
 
-def operation(plan, values):
+def operation(plan, values, *, discard=False):
     if plan.role == "support":
         raise ModelError(
             [f"{plan.name}: support relationship is emitted with its owner or value"]
@@ -174,6 +174,18 @@ def operation(plan, values):
         value = element(p.value)
         values.require(value)
         local = labels[p.name]
+        if p.sized_by:
+            count = f"len({labels[p.sized_by]})"
+            raw_type = values.c_type(value.element)
+            setup.append(f"{local} := make([]{raw_type}, {count})")
+            for member in value.element.fields:
+                if member.role == "size":
+                    setup.append(
+                        f"for index := range {local} {{ {local}[index].{member.name} = {values.c_type(member.value)}(unsafe.Sizeof({local}[index])) }}"
+                    )
+            arguments[p.name] = f"unsafe.SliceData({local})"
+            outputs.append((p, value, local))
+            continue
         setup.append(
             f"{local} := C.{value.default}()"
             if value.default
@@ -198,7 +210,12 @@ def operation(plan, values):
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
         output_types.append(values.type(value))
-        if value.kind == "handle":
+        if p.sized_by:
+            copied = values.copy(value.element, "item")
+            conversions.append(
+                f"func() {values.type(value)} {{ result := make({values.type(value)}, len({local})); for index, item := range {local} {{ result[index] = {copied} }}; return result }}()"
+            )
+        elif value.kind == "handle":
             adopted = f"adopted{len(adoptions)}" if len(outputs) > 1 else "adopted"
             adoptions.append(
                 f"{adopted} := adopt{values.owner(value.native)}(uint64({local}), {parent_of(owned.get(p.name))})"
@@ -268,8 +285,9 @@ def operation(plan, values):
                 convert = f"completionOf({copier(values, content)})"
                 if result.nullable:
                     convert = f"completionNullable({convert})"
-        output_types.append(f"*Future[{completion_type}]")
-        conversions.append("future")
+        if not discard:
+            output_types.append(f"*Future[{completion_type}]")
+            conversions.append("future")
     elif (
         not outputs
         and plan.function.return_type.canonical != "void"
@@ -327,7 +345,9 @@ def operation(plan, values):
         return f"func (receiver *{values.owner(handle.native)}) {method}({', '.join(signature)}) error {{\n{body}\n}}\n"
     if plan.completion:
         start = f"func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
-        if outputs:
+        if discard:
+            invocation = f"return callDiscard({target}, {start})"
+        elif outputs:
             result_closure = (
                 f"func(arena *bindingArena, future *Future[{completion_type}]) {returned} {{\n"
                 + "".join(line + "\n" for line in adoptions)
@@ -377,6 +397,9 @@ def operation(plan, values):
         else None
     )
     receiver_signature = f"(receiver *{receiver_type}) " if receiver else ""
+    if discard:
+        receiver_signature = f"(view {receiver_type}Discarding) "
+        setup.insert(0, "receiver := view.owner")
     results = f"({returned}, error)" if returned else "error"
     body = "".join(line + "\n" for line in setup) + invocation
     return (

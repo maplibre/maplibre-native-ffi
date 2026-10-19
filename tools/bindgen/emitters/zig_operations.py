@@ -131,7 +131,7 @@ def copier(plan, values):
     return copy, public
 
 
-def operation(plan, values):
+def operation(plan, values, *, discard=False):
     function = plan.function
     if plan.consumes == "always" and function.return_type.kind != "void":
         raise failure(
@@ -194,6 +194,13 @@ def operation(plan, values):
             public = owned(values, value)
             needs_allocator |= dynamic(value)
             results.append((label, public))
+            output = next(p for p in plan.outputs if p.name == name)
+            if output.sized_by:
+                source = names[output.sized_by]
+                arguments.append(
+                    f"call.outArray({values.public(value.element)}, call.len({source}))"
+                )
+                continue
             sized = value.kind == "record" and any(
                 field.role == "size" for field in value.fields
             )
@@ -242,7 +249,10 @@ def operation(plan, values):
         allocator = "allocator" if needs_allocator else "null"
         submit = f"call.submit({head}, {copy}, {allocator}, {diagnostic}, {args})"
         future = f"completion.Future({value_type})"
-        if results:
+        if discard:
+            return_type = "void"
+            body = [f"return call.discard({head}, {allocator}, {diagnostic}, {args});"]
+        elif results:
             fields = ", ".join(f"{label}: {typ}" for label, typ in results)
             return_type = f"struct {{ {fields}, ready: {future} }}"
             picks = (
@@ -309,8 +319,20 @@ def operation(plan, values):
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
         signature.append(DIAGNOSTIC_PARAMETER)
+    method = camel(plan.name.removeprefix("mln_"))
+    if discard:
+        method = camel(plan.member)
+        receiver_parameter = next(
+            i
+            for i, p in enumerate(signature)
+            if p.startswith(names[receiver_name] + ":")
+        )
+        receiver_type = signature[receiver_parameter].split(": ", 1)[1]
+        signature.pop(receiver_parameter)
+        signature.insert(0, f"self: {receiver_type}Discarding")
+        body.insert(0, f"const {receiver} = self.receiver;")
     code = (
-        f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(signature)}) status.Error!{return_type} {{\n    "
+        f"pub fn {method}({', '.join(signature)}) status.Error!{return_type} {{\n    "
         + "\n    ".join(body)
         + "\n}\n"
     )

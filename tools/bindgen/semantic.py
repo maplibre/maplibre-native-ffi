@@ -74,6 +74,7 @@ class CompletionPlan:
     immediate_owners: tuple[OwnedOutputPlan, ...]
     result_owned: bool
     result_owner: OwnedOutputPlan | None = None
+    discardable: bool = False
 
 
 @dataclass(frozen=True)
@@ -228,6 +229,8 @@ class ParameterPlan:
     value: ValuePlan
     direction: str
     consumes: str | None = None
+    # The input array whose length sizes this caller-allocated output array.
+    sized_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -532,6 +535,19 @@ def view_support(bound: BoundApi, generated: Iterable[str]) -> dict[str, dict]:
 def output_member(name: str) -> str:
     """An output parameter's public member name: its name without `out_`."""
     return name.removeprefix("out_")
+
+
+def discarding_variants(bound: BoundApi, generated: Iterable[str]) -> list[str]:
+    """The commands that a binding also exposes through discarding views."""
+    generated = set(generated)
+    return [
+        plan.name
+        for plan in bound.operations
+        if plan.name in generated
+        and plan.receiver
+        and plan.completion
+        and plan.completion.discardable
+    ]
 
 
 def public_stem(native: str) -> str:
@@ -1031,7 +1047,22 @@ class Binder:
             )
             direction = metadata.get("direction", "in")
             plan = ParameterPlan(
-                parameter.name, value, direction, metadata.get("consumes")
+                parameter.name,
+                value,
+                direction,
+                metadata.get("consumes"),
+                next(
+                    (
+                        input_.name
+                        for input_ in reversed(function.parameters)
+                        if input_.metadata.get("direction", "in") == "in"
+                        and input_.metadata.get("length") == value.length
+                        and input_.type.kind == "pointer"
+                    ),
+                    None,
+                )
+                if direction == "out" and value.kind == "array"
+                else None,
             )
 
             def validate_input_lifetime(item, parameter_name=parameter.name):
@@ -1245,6 +1276,7 @@ class Binder:
                 tuple(owners),
                 bool(result and result.ownership == "owned"),
                 result_owner=result_owner,
+                discardable=metadata["execution"] == "command",
             )
         consumes = metadata.get("consumes")
         for handle in self.handles.values():

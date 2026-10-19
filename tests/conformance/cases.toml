@@ -23,6 +23,7 @@
 "COMP-03" = "Dropping the future of a creation retires the object it creates"
 "COMP-04" = "A failed command disposition arrives as data, not as an error"
 "COMP-05" = "Waiting on a completion can time out or be cancelled in the language's idiom"
+"COMP-06" = "A discarded command applies its change and a runtime barrier fences it; a synchronously rejected discarded command raises the binding's error"
 
 # Callbacks
 "CB-01" = "A callback registration is rooted while native holds it and released when native releases it, including when the registration is rejected"
@@ -45,6 +46,7 @@
 "VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
 "VAL-06" = "A record built from its constructor defaults equals the native default"
 "VAL-07" = "An array completion is read at the result's value_size stride, and a stride narrower than the element is rejected"
+"VAL-08" = "A synchronous call fills a caller-sized output array in input order"
 
 # Views and rendering
 "VIEW-01" = "A borrowed view expires with its scope, and its owner refuses to close while it is borrowed"

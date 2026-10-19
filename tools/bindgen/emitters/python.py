@@ -20,6 +20,7 @@ from tools.bindgen.semantic import (
     DisposeSupport,
     HandlePlan,
     OperationPlan,
+    discarding_variants,
     output_member,
     support_relation,
     view_support,
@@ -148,7 +149,7 @@ def owned_native(value, expression, callbacks=False):
 
 
 def operation(
-    plan: OperationPlan, values: Values
+    plan: OperationPlan, values: Values, *, discard=False
 ) -> tuple[str, str, str, str, str | None]:
     function = plan.function
     if plan.role == "support":
@@ -380,6 +381,30 @@ def operation(
             pass
         else:
             values.supported(value)
+        if output.sized_by:
+            element = value.element
+            native = (
+                scalar_type(element)
+                if element.kind == "scalar"
+                else "sys::" + element.native
+            )
+            count = arguments[value.length]
+            init = (
+                f"unsafe {{ sys::{element.default}() }}"
+                if element.default
+                else "unsafe { std::mem::zeroed() }"
+            )
+            setup.append(
+                f"        let mut {output.name}: Vec<{native}> = (0..{count}).map(|_| {init}).collect();"
+            )
+            for field in element.fields:
+                if field.role == "size":
+                    setup.append(
+                        f"        for value in &mut {output.name} {{ value.size = std::mem::size_of::<{native}>() as _; }}"
+                    )
+            arguments[output.name] = f"{output.name}.as_mut_ptr()"
+            outputs.append((output.name, value))
+            continue
         native = (
             scalar_type(value) if value.kind == "scalar" else "sys::" + value.native
         )
@@ -397,9 +422,21 @@ def operation(
                     )
         arguments[output.name] = f"&mut {output.name}"
         outputs.append((output.name, value))
+
+    def copy_output(output, value):
+        if value.kind == "array" and any(
+            p.name == output and p.sized_by for p in plan.outputs
+        ):
+            copied = values.copy(value.element, "*element")
+            return f"generated_list(py, &{output}, |element| {ok(copied)})?"
+        return values.copy(value, output)
+
     if plan.completion:
         arguments[plan.completion.parameter] = "completion"
-        if plan.execution == "command":
+        if discard:
+            native_result = public_result = "None"
+            helper, converter = "discard", None
+        elif plan.execution == "command":
             native_result = public_result = "Future[CommandCompletion]"
             helper, converter = "command", None
         else:
@@ -409,7 +446,7 @@ def operation(
                 f"Future[{public_result}]",
             )
             helper = "complete"
-        discard = None
+        disposer = None
         if (
             plan.result
             and plan.result.kind == "handle"
@@ -417,7 +454,7 @@ def operation(
         ):
             helper = "complete_owned"
             values.disposed.add(plan.result.native)
-            discard = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
+            disposer = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         # The converters run outside the native call's unsafe contract.
         body = [
@@ -437,14 +474,14 @@ def operation(
             ),
             *(
                 [
-                    f"        let discard: unsafe fn(&sys::mln_completion_result) = {discard};"
+                    f"        let discard: unsafe fn(&sys::mln_completion_result) = {disposer};"
                 ]
-                if discard
+                if disposer
                 else []
             ),
             f"        unsafe {{ call.{helper}(|completion, diagnostic| {call}"
             + (", convert" if converter else "")
-            + (", discard" if discard else "")
+            + (", discard" if disposer else "")
             + ") }",
         ]
         expression = f"self._native.{name}({', '.join(python_arguments)})"
@@ -604,14 +641,14 @@ def operation(
                     raise unsupported(
                         function, "absence requires an owned handle output"
                     )
-                body.append(f"        {ok(values.copy(value, output))}")
+                body.append(f"        {ok(copy_output(output, value))}")
                 public_result = values.type(value)
                 expression = values.facade_copy(value, expression)
         else:
             body.append("        let dict = PyDict::new(py);")
             for output, value in outputs:
                 body.append(
-                    f'        dict.set_item("{output_member(output)}", {values.copy(value, output)})?;'
+                    f'        dict.set_item("{output_member(output)}", {copy_output(output, value)})?;'
                 )
             body.append("        Ok(dict.into_any().unbind())")
             product_name = public_name(function.name) + "Result"
@@ -672,7 +709,7 @@ def operation(
     body = compact(body)
     rust_arguments = ", ".join(["&self", "py: Python<'_>", *rust_parameters])
     rust = f"""    #[pyo3(signature = ({", ".join(native_signature)}))]
-    fn {name}({rust_arguments}) -> PyResult<Py<PyAny>> {{
+    fn {"_discard_" if discard else ""}{name}({rust_arguments}) -> PyResult<Py<PyAny>> {{
 {chr(10).join(body)}
     }}
 """
@@ -705,6 +742,12 @@ def operation(
     facade = f"""    def {name}({signature}) -> {public_result}:
 {documentation}{facade_setup}        return {expression}
 """
+    if discard:
+        facade = facade.replace(
+            f"self._native.{name}(", f"self._native._discard_{name}("
+        )
+        stub = f"    def _discard_{name}({', '.join(['self', *native_stub_parameters])}) -> None: ...\n"
+        return owner, rust, facade, stub, product
     stub = f"    def {name}({', '.join(['self', *native_stub_parameters])}) -> {native_result}: ...\n"
     if not receiver:
         rust = (
@@ -824,6 +867,7 @@ impl {owner} {{
 def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str]]:
     rust, facade, stubs = defaultdict(list), defaultdict(list), defaultdict(list)
     generated, errors, records = [], {}, set()
+    discards = defaultdict(list)
     bound = compile_api(api)
     api = bound.source
     OWNERS.clear()
@@ -866,6 +910,13 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         rust[owner].append(native)
         facade[owner].append(public)
         stubs[owner].append(stub)
+        if plan.receiver and plan.completion and plan.completion.discardable:
+            _, discarded_native, discarded_public, discarded_stub, _ = operation(
+                plan, values, discard=True
+            )
+            rust[owner].append(discarded_native)
+            stubs[owner].append(discarded_stub)
+            discards[owner].append(discarded_public)
         generated.append(function.name)
         if record:
             records.add(record)
@@ -975,6 +1026,10 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         files["python/maplibre_native_ffi/_native.pyi"] = files[
             "python/maplibre_native_ffi/_native.pyi"
         ].replace(f": {owner}", f": _{owner}")
+    for owner in discards:
+        facade[owner].append(
+            f"    @property\n    def discarding(self) -> {owner}Discarding:\n        return {owner}Discarding(self)\n"
+        )
     imports = "\n".join(
         f"from ._generated_values import {public_name(record)}"
         for record in sorted(values.records | values.enums)
@@ -991,6 +1046,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] += "\n".join(
         facade.get("", [])
+    )
+    files["python/maplibre_native_ffi/_generated_operations.py"] += "\n".join(
+        f"class {owner}Discarding:\n    __slots__ = ('_owner',)\n\n    def __init__(self, owner: _{owner}Operations):\n        self._owner = owner\n\n    @property\n    def _native(self) -> _native._{owner}:\n        return self._owner._native\n\n"
+        + "\n".join(methods)
+        for owner, methods in discards.items()
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
         f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Callable\nfrom ._enum import UnknownIntEnum\n'
@@ -1054,6 +1114,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         and plan.receiver is None
         and plan.scoped_receiver is None
     )
+    public_globals.extend(f"{owner}Discarding" for owner in discards)
     public_owners = {
         "_generated_owners": list(OWNERS.values()) + list(scope_owners.values())
     }
@@ -1097,4 +1158,9 @@ def coverage(api: Api | BoundApi) -> dict:
         for plan in bound.operations
         if plan.support and plan.name not in errors
     } | view_support(bound, generated)
-    return {"generated": generated, "support": support, "unsupported": errors}
+    return {
+        "generated": generated,
+        "discarding": discarding_variants(bound, generated),
+        "support": support,
+        "unsupported": errors,
+    }

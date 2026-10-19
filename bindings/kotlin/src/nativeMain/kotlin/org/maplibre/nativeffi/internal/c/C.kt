@@ -1042,62 +1042,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_lat_lng_for_pixel(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_lat_lng_for_pixel(
-      map.toULong(),
-      point.toCPointer<mln_screen_point>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_lat_lng_for_pixel_unwrapped(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_lat_lng_for_pixel_unwrapped(
-      map.toULong(),
-      point.toCPointer<mln_screen_point>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_lat_lngs_for_pixels(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_lat_lngs_for_pixels(
-      map.toULong(),
-      points.toCPointer(),
-      pointCount.convert(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_lat_lngs_for_pixels_unwrapped(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_lat_lngs_for_pixels_unwrapped(
-      map.toULong(),
-      points.toCPointer(),
-      pointCount.convert(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_list_style_layers(
       map.toULong(),
@@ -1108,19 +1052,6 @@ internal actual object C {
   actual fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_list_style_sources(
       map.toULong(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_meters_per_pixel_at_latitude(
-    map: Long,
-    latitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_meters_per_pixel_at_latitude(
-      map.toULong(),
-      latitude,
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1145,34 +1076,6 @@ internal actual object C {
       .mln_map_options_default()
       .place(returned.toCPointer()!!)
   }
-
-  actual fun mln_map_pixel_for_lat_lng(
-    map: Long,
-    coordinate: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_pixel_for_lat_lng(
-      map.toULong(),
-      coordinate.toCPointer<mln_lat_lng>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_pixels_for_lat_lngs(
-    map: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_pixels_for_lat_lngs(
-      map.toULong(),
-      coordinates.toCPointer(),
-      coordinateCount.convert(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
 
   actual fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_close(
@@ -1217,6 +1120,36 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_lat_lngs_for_pixels(
+      projection.toULong(),
+      points.toCPointer(),
+      pointCount.convert(),
+      outCoordinates.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_lat_lngs_for_pixels_unwrapped(
+      projection.toULong(),
+      points.toCPointer(),
+      pointCount.convert(),
+      outCoordinates.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -1240,6 +1173,21 @@ internal actual object C {
       projection.toULong(),
       coordinate.toCPointer<mln_lat_lng>()!!.pointed.readValue(),
       outPoint.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_pixels_for_lat_lngs(
+      projection.toULong(),
+      coordinates.toCPointer(),
+      coordinateCount.convert(),
+      outPoints.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

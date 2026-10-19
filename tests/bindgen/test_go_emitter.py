@@ -42,6 +42,7 @@ class GoEmitterTests(unittest.TestCase):
                             "mln_probe_read_level",
                             "mln_probe_roundtrip",
                         ],
+                        "discarding": [],
                         "support": {},
                         "unsupported": {},
                     },

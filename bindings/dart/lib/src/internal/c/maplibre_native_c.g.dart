@@ -3351,70 +3351,6 @@ external int mln_map_lat_lng_bounds_for_camera_unwrapped(
 );
 
 @Native<
-  Int32 Function(
-    mln_map,
-    mln_screen_point,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_lat_lng_for_pixel(
-  int map,
-  mln_screen_point point,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_screen_point,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_lat_lng_for_pixel_unwrapped(
-  int map,
-  mln_screen_point point,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_screen_point>,
-    Size,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_lat_lngs_for_pixels(
-  int map,
-  Pointer<mln_screen_point> points,
-  int point_count,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_screen_point>,
-    Size,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_lat_lngs_for_pixels_unwrapped(
-  int map,
-  Pointer<mln_screen_point> points,
-  int point_count,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_list_style_layers(
@@ -3428,21 +3364,6 @@ external int mln_map_list_style_layers(
 >()
 external int mln_map_list_style_sources(
   int map,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_meters_per_pixel_at_latitude(
-  int map,
-  double latitude,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3466,38 +3387,6 @@ external int mln_map_move_style_layer(
 
 @Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_lat_lng,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_pixel_for_lat_lng(
-  int map,
-  mln_lat_lng coordinate,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_lat_lng>,
-    Size,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_pixels_for_lat_lngs(
-  int map,
-  Pointer<mln_lat_lng> coordinates,
-  int coordinate_count,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<Int32 Function(mln_map_projection, Pointer<mln_diagnostic>)>()
 external int mln_map_projection_close(
@@ -3551,6 +3440,40 @@ external int mln_map_projection_lat_lng_for_pixel_unwrapped(
 @Native<
   Int32 Function(
     mln_map_projection,
+    Pointer<mln_screen_point>,
+    Size,
+    Pointer<mln_lat_lng>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_lat_lngs_for_pixels(
+  int projection,
+  Pointer<mln_screen_point> points,
+  int point_count,
+  Pointer<mln_lat_lng> out_coordinates,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map_projection,
+    Pointer<mln_screen_point>,
+    Size,
+    Pointer<mln_lat_lng>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  int projection,
+  Pointer<mln_screen_point> points,
+  int point_count,
+  Pointer<mln_lat_lng> out_coordinates,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map_projection,
     Double,
     Pointer<Double>,
     Pointer<mln_diagnostic>,
@@ -3575,6 +3498,23 @@ external int mln_map_projection_pixel_for_lat_lng(
   int projection,
   mln_lat_lng coordinate,
   Pointer<mln_screen_point> out_point,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map_projection,
+    Pointer<mln_lat_lng>,
+    Size,
+    Pointer<mln_screen_point>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_pixels_for_lat_lngs(
+  int projection,
+  Pointer<mln_lat_lng> coordinates,
+  int coordinate_count,
+  Pointer<mln_screen_point> out_points,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

@@ -5,7 +5,7 @@ import re
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import view_support
+from tools.bindgen.semantic import discarding_variants, view_support
 
 GO_KEYWORDS = {
     "break",
@@ -113,9 +113,30 @@ def lower(api):
         if record.default:
             used_support.add(record.default)
     for plan in bound.operations:
+        if (
+            plan.name in generated
+            and plan.receiver
+            and plan.completion
+            and plan.completion.discardable
+        ):
+            from .go_operations import operation
+
+            operations.append(operation(plan, values, discard=True))
         if plan.role == "support" and plan.name in used_support:
             generated.append(plan.name)
             unsupported.pop(plan.name, None)
+    command_owners = {
+        values.owner(p.value.native)
+        for plan in bound.operations
+        if plan.name in generated and plan.completion and plan.completion.discardable
+        for p in plan.inputs
+        if p.name == plan.receiver
+    }
+    for owner in sorted(command_owners):
+        owners.append(
+            f"type {owner}Discarding struct {{ owner *{owner} }}\n"
+            f"func (receiver *{owner}) Discarding() {owner}Discarding {{ return {owner}Discarding{{receiver}} }}\n"
+        )
     return (
         values.sources() + "\n" + "\n".join(owners + operations + go),
         header,
@@ -130,6 +151,7 @@ def coverage(api):
     _, _, _, generated, unsupported = lower(bound)
     return {
         "generated": sorted(generated),
+        "discarding": discarding_variants(bound, generated),
         "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

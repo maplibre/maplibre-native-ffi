@@ -191,7 +191,7 @@ def outputs_signature(plan, values):
     for parameter in plan.outputs:
         value = parameter.value.unwrapped
         values.check(value)
-        if value.kind not in {"scalar", "enum", "record", "buffer"}:
+        if value.kind not in {"scalar", "enum", "record", "buffer", "array"}:
             raise Unsupported("output parameter requires copied value storage")
         fields.append((identifier(output_member(parameter.name)), value))
     values.multiple[result_name] = fields
@@ -263,8 +263,23 @@ def call_arguments(plan, values):
     return result
 
 
-def output_storage(value, values):
+def output_storage(value, values, count=None):
     """Allocate one output and decode it after the call: (allocation, decoded)."""
+    if value.kind == "array" and count is not None:
+        element = value.element
+        size = values.element_size(element)
+        align = values.element_align(element)
+        allocation = f"allocate({count}.toLong() * {size}, {align})"
+        size_field = next((f for f in element.fields if f.role == "size"), None)
+        if size_field:
+            write = values.write_scalar(
+                size_field.value,
+                values.at("item", element, size_field.name),
+                f"{size}.toUInt()",
+            )
+            allocation += f".also {{ base -> repeat({count}) {{ index -> val item = base + index.toLong() * {size}; {write} }} }}"
+        decoded = values.decode(element, f"{{out}} + index.toLong() * {size}")
+        return allocation, f"List({count}) {{ index -> {decoded} }}"
     if value.kind == "record" or (
         value.kind == "buffer" and value.buffer_form == "view"
     ):
@@ -353,7 +368,7 @@ def completion_decode(value, values):
     return "{ result -> " + expression + " }"
 
 
-def operation(plan, values, native):
+def operation(plan, values, native, *, discard=False):
     """The common Kotlin method for [plan]."""
     from . import kotlin_callbacks
 
@@ -374,9 +389,12 @@ def operation(plan, values, native):
     arguments = call_arguments(plan, values) + ["completion"]
     body = encodings(plan) + native.checked(plan.function, arguments)
     head = f"  public fun {method}({declaration(params)}): Deferred<{result_type}> ="
-    owners = receiver_arguments(plan)
+    owners = "owner, binding" if discard else receiver_arguments(plan)
     callbacks = ", bindingCallbacks" if plan.registrations else ""
-    if plan.execution == "command":
+    if discard:
+        head = f"  public fun {method}({declaration(params)}): Unit ="
+        helper = f'nativeDiscard({owners}, "{plan.name}"{callbacks})'
+    elif plan.execution == "command":
         helper = f'nativeCommand({owners}, "{plan.name}"{callbacks})'
     elif result is None:
         helper = f'nativeUnit({owners}, "{plan.name}"{callbacks})'
@@ -390,7 +408,9 @@ def immediate(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, decoded = [], None
     if plan.outputs:
-        allocation, decoded = output_storage(result, values)
+        output = plan.outputs[0]
+        count = f"{parameter_name(output.sized_by)}.size" if output.sized_by else None
+        allocation, decoded = output_storage(result, values, count)
         setup.append(f"val out = {allocation}")
         arguments.append("out")
         decoded = decoded.replace("{out}", "out")
@@ -419,7 +439,9 @@ def multiple_outputs(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, copied = [], []
     for index, (field, value) in enumerate(values.multiple[result_type]):
-        allocation, decoded = output_storage(value, values)
+        output = plan.outputs[index]
+        count = f"{parameter_name(output.sized_by)}.size" if output.sized_by else None
+        allocation, decoded = output_storage(value, values, count)
         setup.append(f"val out{index} = {allocation}")
         arguments.append(f"out{index}")
         copied.append(f"{field} = " + decoded.replace("{out}", f"out{index}"))

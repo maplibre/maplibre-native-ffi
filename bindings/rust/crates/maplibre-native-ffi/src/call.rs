@@ -111,6 +111,15 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         Ok(future)
     }
 
+    pub(crate) fn discard(
+        mut self,
+        submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
+    ) -> Result<()> {
+        maplibre_core::check(|diagnostic| submit(self.native, std::ptr::null(), diagnostic))?;
+        self.arena.accept_registrations();
+        Ok(())
+    }
+
     pub(crate) fn complete<T: Send + 'static>(
         mut self,
         submit: impl FnOnce(H, *const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,

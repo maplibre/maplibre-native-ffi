@@ -235,11 +235,11 @@ mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_dia
 
     def test_counted_output_is_not_treated_as_one_scalar(self):
         api = self.parse("""
-mln_status mln_map_samples(mln_map map, unsigned count,
+mln_status mln_map_samples(mln_map map, const double *values BIND("length=count"), unsigned count,
   double *samples BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
 """)
         for emitter in (dotnet, dart, kotlin):
-            self.assertEqual(emitter.coverage(api)["generated"], [])
+            self.assertIn("mln_map_samples", emitter.coverage(api)["generated"])
 
     def test_dotnet_record_pointer_count_cannot_be_erased(self):
         source = """

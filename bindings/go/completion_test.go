@@ -9,6 +9,24 @@ import (
 	"testing"
 )
 
+func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
+	f := newFixture(t)
+	if err := f.m.Discarding().SetDebugOptions(MapDebugOptionTileBorders); err != nil {
+		t.Fatal(err)
+	}
+	await(t, submitted(f.runtime.Barrier()))
+	snapshot, err := f.m.GetSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.DebugOptions != MapDebugOptionTileBorders {
+		t.Fatalf("debug options = %v", snapshot.DebugOptions)
+	}
+	if err := f.m.Discarding().Resize(LogicalExtent{Width: 0, Height: 8, ScaleFactor: 1}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Resize = %v, want ErrInvalidArgument", err)
+	}
+}
+
 // The first terminal result wins, and a later one is ignored. A value that
 // fails to convert, whether by error or by panic, fails the future instead of
 // unwinding into native, and an owned value that a failed conversion adopted

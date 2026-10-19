@@ -230,6 +230,18 @@ internal fun nativeCommand(
     }
   }
 
+internal fun nativeDiscard(
+  owner: Any?,
+  state: OwnerState?,
+  name: String,
+  callbacks: CallbackOwner? = null,
+  body: NativeCall.() -> Unit,
+) {
+  receive(owner, state, name, Access.LIVE) { handle ->
+    NativeCall(handle).use { call -> run(call, 0L, callbacks, body) }
+  }
+}
+
 /**
  * Submits a C operation whose completion carries a new owned handle: [adopt] wraps it, [dispose]
  * releases one nobody adopted, and [drop] releases a wrapper whose caller stopped waiting.

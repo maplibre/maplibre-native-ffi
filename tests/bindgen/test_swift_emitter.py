@@ -26,6 +26,7 @@ class SwiftEmitterTests(unittest.TestCase):
         clang = require_tool(self, "clang")
         header = protocol_header(
             groups=(
+                "caller_sized_output",
                 "values",
                 "defaults",
                 "keywords",

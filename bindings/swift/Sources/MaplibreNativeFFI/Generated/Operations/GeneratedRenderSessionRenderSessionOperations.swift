@@ -272,3 +272,17 @@ public extension RenderSessionHandle {
     } result: { value0 }
   }
 }
+
+public extension RenderSessionHandleDiscarding {
+  func resize(extent bindingArg0: LogicalExtent) throws {
+    try owner
+      .nativeDiscard("mln_render_session_resize") { raw, _, diagnostic in
+        mln_render_session_resize(
+          raw,
+          bindingArg0.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+}

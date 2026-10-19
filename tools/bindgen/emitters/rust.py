@@ -7,7 +7,12 @@ from dataclasses import replace
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.semantic import BoundApi, OperationPlan, view_support
+from tools.bindgen.semantic import (
+    BoundApi,
+    OperationPlan,
+    discarding_variants,
+    view_support,
+)
 
 from ..model import Api, CType
 
@@ -242,7 +247,7 @@ def reads_receiver(plan: OperationPlan) -> bool:
     )
 
 
-def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
+def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, str]:
     from .rust_dynamic_values import decode, dynamic, encode
 
     function = plan.function
@@ -487,7 +492,35 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             uses_call = True
             args.append(local)
         elif parameter.name in output_plans:
-            value = output_plans[parameter.name].value
+            output = output_plans[parameter.name]
+            value = output.value
+            if output.sized_by:
+                element = value.element
+                value_types.add(element, "out")
+                raw_type = SCALARS.get(ctype(pointee), "sys::" + ctype(pointee))
+                initial = (
+                    f"unsafe {{ sys::{element.default}() }}"
+                    if element.default
+                    else "unsafe { std::mem::zeroed() }"
+                )
+                prelude.append(
+                    f"let mut {local}: Vec<{raw_type}> = (0..{lengths[value.length]}).map(|_| {initial}).collect();"
+                )
+                if element.kind == "record" and any(
+                    field.role == "size" for field in element.fields
+                ):
+                    prelude.append(
+                        f"for value in &mut {local} {{ value.size = std::mem::size_of::<{raw_type}>() as _; }}"
+                    )
+                args.append(f"{local}.as_mut_ptr()")
+                copied = decode(value_types, element, "item")
+                outputs.append(
+                    (
+                        f"Vec<{value_types.public(element)}>",
+                        f"{local}.into_iter().map(|item| Ok({copied})).collect::<Result<Vec<_>>>()?",
+                    )
+                )
+                continue
             if value.kind == "reference":
                 value = value.element
             if value.kind == "handle":
@@ -584,7 +617,10 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
                 ]
                 public = f"Option<{public}>"
     else:
-        if execution == "command":
+        if discard:
+            completed = "()"
+            expression = f"call.discard({closure} {native})"
+        elif execution == "command":
             if plan.result is not None:
                 raise Unsupported("command receipt cannot discard a value payload")
             completed = "NativeFuture<CommandCompletion>"
@@ -633,8 +669,9 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         ]
     else:
         operation_name = f'"{function.name}"'
+        receiver_self = "self.0" if discard else "self"
         body = [
-            f"let {mutable}call = self.inner.{'read' if read else 'call'}({operation_name})?;"
+            f"let {mutable}call = {receiver_self}.inner.{'read' if read else 'call'}({operation_name})?;"
             if receiver
             else f"let {mutable}call = Call::global({operation_name})?;"
         ]
@@ -722,6 +759,26 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
                 else ""
             )
         )
+        commands = [
+            p
+            for p in bound.operations
+            if p.name in generated
+            and p.completion
+            and p.completion.discardable
+            and any(i.name == p.receiver and i.value.native == native for i in p.inputs)
+        ]
+        if commands:
+            owner = rust_owners.owner_name(native)
+            view = f"{owner}Discarding"
+            files[f"{root}/{module}.rs"] += (
+                f"\npub struct {view}<'a>(&'a {owner});\n"
+                f"impl {owner} {{ pub fn discarding(&self) -> {view}<'_> {{ {view}(self) }} }}\n"
+                f"impl {view}<'_> {{\n"
+                + "\n".join(
+                    operation(p, value_types, discard=True)[1] for p in commands
+                )
+                + "}\n"
+            )
     modules = [rust_owners.module_name(native) for native in owners]
     if global_body := chunks.pop("global", []):
         files[f"{root}/global.rs"] = (
@@ -760,6 +817,7 @@ def coverage(api: Api | BoundApi) -> dict:
     _, generated, unsupported = lower(bound)
     return {
         "generated": generated,
+        "discarding": discarding_variants(bound, generated),
         "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

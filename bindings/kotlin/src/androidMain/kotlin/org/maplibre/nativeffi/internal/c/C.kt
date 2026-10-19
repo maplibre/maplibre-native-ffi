@@ -632,40 +632,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_lat_lng_for_pixel(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_lat_lng_for_pixel_unwrapped(
-    map: Long,
-    point: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_lat_lngs_for_pixels(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_lat_lngs_for_pixels_unwrapped(
-    map: Long,
-    points: Long,
-    pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_list_style_layers(
     map: Long,
     completion: Long,
@@ -680,14 +646,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_meters_per_pixel_at_latitude(
-    map: Long,
-    latitude: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_move_style_layer(
     map: Long,
     layerId: Long,
@@ -697,23 +655,6 @@ internal actual object C {
   ): Int
 
   @CriticalNative @JvmStatic actual external fun mln_map_options_default(returned: Long): Unit
-
-  @JvmStatic
-  actual external fun mln_map_pixel_for_lat_lng(
-    map: Long,
-    coordinate: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_pixels_for_lat_lngs(
-    map: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   @JvmStatic
   actual external fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int
@@ -742,6 +683,24 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -754,6 +713,15 @@ internal actual object C {
     projection: Long,
     coordinate: Long,
     outPoint: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
     outDiagnostic: Long,
   ): Int
 

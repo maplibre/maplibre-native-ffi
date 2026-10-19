@@ -1826,8 +1826,6 @@ impl FromNative<sys::mln_image_stretch> for ImageStretch {
 }
 
 /// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller. Copied result, owned by the caller. Copied
-/// result, owned by the caller. Copied result, owned by the caller. Copied
 /// result, owned by the caller.
 ///
 /// See `mln_lat_lng` in the
@@ -5354,8 +5352,7 @@ impl FromNative<sys::mln_screen_line_string> for ScreenLineString {
     }
 }
 
-/// Screen-space point in logical map pixels. Copied result, owned by the
-/// caller. Copied result, owned by the caller.
+/// Screen-space point in logical map pixels.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

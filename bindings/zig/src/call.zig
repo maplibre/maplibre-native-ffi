@@ -52,6 +52,15 @@ pub fn out(comptime T: type) Output(T, false, .none) {
     return .{};
 }
 
+pub fn outArray(comptime T: type, count: usize) struct {
+    const Value = marshal.OwnedValue([]const T);
+    const array_element = T;
+    const retains: Parent = .none;
+    count: usize,
+} {
+    return .{ .count = count };
+}
+
 /// Receives an output record whose `size` field native reads first.
 pub fn sizedOut(comptime T: type) Output(T, true, .none) {
     return .{};
@@ -104,7 +113,10 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
         types[index] = if (isHandle(field.type))
             field.type.Lease
         else if (isOutput(field.type))
-            @typeInfo(Param(function, offset + index)).pointer.child
+            if (@hasDecl(field.type, "array_element"))
+                []@typeInfo(Param(function, offset + index)).pointer.child
+            else
+                @typeInfo(Param(function, offset + index)).pointer.child
         else
             void;
     }
@@ -276,9 +288,19 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                     self.leased = index + 1;
                     native[offset + index] = self.held[index].native;
                 } else if (comptime isOutput(field.type)) {
-                    self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
-                    if (field.type.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
-                    native[offset + index] = &self.held[index];
+                    if (comptime @hasDecl(field.type, "array_element")) {
+                        const Element = @typeInfo(Parameter).pointer.child;
+                        self.held[index] = try self.inputAllocator().alloc(Element, input.count);
+                        for (self.held[index]) |*item| {
+                            item.* = std.mem.zeroes(Element);
+                            if (comptime @typeInfo(Element) == .@"struct" and @hasField(Element, "size")) item.size = @sizeOf(Element);
+                        }
+                        native[offset + index] = self.held[index].ptr;
+                    } else {
+                        self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
+                        if (field.type.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
+                        native[offset + index] = &self.held[index];
+                    }
                 } else {
                     native[offset + index] = try self.encode(Parameter, input);
                 }
@@ -357,6 +379,15 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].type.Value {
             const Step = fields[index].type;
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
+            if (comptime @hasDecl(Step, "array_element")) {
+                var arena = std.heap.ArenaAllocator.init(allocator);
+                errdefer arena.deinit();
+                const values = try arena.allocator().alloc(Step.array_element, self.held[index].len);
+                for (values, self.held[index]) |*decoded, native_value| {
+                    decoded.* = try marshal.decode(Step.array_element, native_value, .{ .allocator = arena.allocator() });
+                }
+                return .{ .arena = arena, .value = values };
+            }
             return marshal.decode(Step.Value, self.held[index], .{
                 .allocator = if (Allocator == std.mem.Allocator) allocator else null,
                 .parent = self.parent(Step.retains),
@@ -533,6 +564,25 @@ pub fn submit(
     if (Outputs(@TypeOf(args)) == void) return ready;
     errdefer ready.deinit();
     return .{ .outputs = try op.outputs(allocator), .ready = ready };
+}
+
+pub fn discard(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!void {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
+    const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
+    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    defer op.end();
+    const native = try op.arguments(args);
+    try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
+    op.receiver.succeed(&op.roots);
+    op.settled = true;
 }
 
 // Copy completion values before native reuses their storage.

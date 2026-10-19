@@ -14,6 +14,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapDebugOption
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.OfflineRegionDownloadState
 import org.maplibre.nativeffi.pendingCompletionsForTesting
@@ -23,6 +25,18 @@ import org.maplibre.nativeffi.withMap
 
 /** How a native completion reaches Kotlin as a Deferred. */
 class CompletionTest {
+  @Test
+  fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows(): Unit = runSuspendTest {
+    withMap {
+      map.discarding.setDebugOptions(MapDebugOption.TILE_BORDERS)
+      runtime.barrier().await()
+      assertEquals(MapDebugOption.TILE_BORDERS, map.getSnapshot().debugOptions)
+      assertFailsWith<InvalidArgumentException> {
+        map.discarding.resize(LogicalExtent(0u, 8u, 1.0))
+      }
+    }
+  }
+
   @Test
   fun aSubmissionNativeRejectsLeavesNoCompletionBehind(): Unit = runSuspendTest {
     withMap {

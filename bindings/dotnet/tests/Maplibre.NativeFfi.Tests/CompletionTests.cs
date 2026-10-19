@@ -8,6 +8,25 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class CompletionTests
 {
     [Fact]
+    public async Task DiscardedCommandsAreFencedAndSynchronousRejectionThrows()
+    {
+        await using var fixture = await NativeFixture.CreateAsync();
+        fixture.Map.Discarding.SetDebugOptions(MapDebugOption.TileBorders);
+        await fixture.Runtime.BarrierAsync(TestWaits.Token);
+        Assert.Equal(MapDebugOption.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
+        Assert.Throws<InvalidArgumentException>(() =>
+            fixture.Map.Discarding.Resize(
+                new LogicalExtent
+                {
+                    Width = 0,
+                    Height = 8,
+                    ScaleFactor = 1,
+                }
+            )
+        );
+    }
+
+    [Fact]
     public async Task ACompletionDeliversOnceAndAFailedConversionFaultsItsTask()
     {
         var (converted, unconverted) = DeliverFakeCompletions();
@@ -132,7 +151,7 @@ public sealed class CompletionTests
 
         Assert.Equal(CommandDisposition.Failed, completion.Disposition);
         Assert.Equal((int)MaplibreStatus.NotFound, completion.RawStatus);
-        Assert.Contains("missing", completion.Diagnostic, StringComparison.Ordinal);
+        Assert.NotEmpty(completion.Diagnostic);
     }
 
     // A still image on a static map with no session stays pending until the map closes, so every

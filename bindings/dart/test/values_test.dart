@@ -11,6 +11,31 @@ import 'support/fixture.dart';
 const _featureCollection = '{"type":"FeatureCollection","features":[]}';
 
 void main() {
+  test(
+    'a synchronous call fills a caller-sized output array in input order',
+    () async {
+      final fixture = await openRuntime();
+      final map = await fixture.openMap();
+      final projection = map.createProjection();
+      addTearDown(projection.close);
+      const coordinates = [LatLng(0, 0), LatLng(10, 20), LatLng(-12, -30)];
+      final points = projection.pixelsForLatLngs(coordinates);
+      expect(points, [
+        for (final coordinate in coordinates)
+          projection.pixelForLatLng(coordinate),
+      ]);
+      expect(projection.latLngsForPixels(points), [
+        for (final point in points) projection.latLngForPixel(point),
+      ]);
+      expect(projection.latLngsForPixelsUnwrapped(points), [
+        for (final point in points) projection.latLngForPixelUnwrapped(point),
+      ]);
+      expect(projection.pixelsForLatLngs([]), isEmpty);
+      expect(projection.latLngsForPixels([]), isEmpty);
+      expect(projection.latLngsForPixelsUnwrapped([]), isEmpty);
+    },
+  );
+
   test('strings cross as NUL-terminated and explicit-length views', () async {
     // The C API reads a path to its NUL, so a path with an embedded NUL is
     // rejected before it crosses.
@@ -101,16 +126,11 @@ void main() {
   test('an array input is copied when the call submits it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openStyledMap();
-    final points = [const ScreenPoint(0, 0), const ScreenPoint(10, 10)];
-    final expected = [
-      for (final point in points) await map.latLngForPixel(point),
-    ];
-
-    final converted = map.latLngsForPixels(points);
-    points
-      ..clear()
-      ..add(const ScreenPoint(5, 5));
-    expect(await converted, expected);
+    final coordinates = [const LatLng(10, 20), const LatLng(12, 21)];
+    final expected = await map.cameraForLatLngs(List.of(coordinates));
+    final pending = map.cameraForLatLngs(coordinates);
+    coordinates.clear();
+    expect(await pending, expected);
   });
 
   // A constructor's defaults come from the header's field annotations, so

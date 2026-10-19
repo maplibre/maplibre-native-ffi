@@ -9,7 +9,13 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
-from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_support
+from tools.bindgen.semantic import (
+    BoundApi,
+    OperationPlan,
+    discarding_variants,
+    output_member,
+    view_support,
+)
 
 SCALARS = {
     "double": "Double",
@@ -66,7 +72,9 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     return docs.line_comment(bound.doc(native), indent)
 
 
-def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
+def operation(
+    plan: OperationPlan, value_types, *, discard=False
+) -> tuple[str, str | None]:
     from .swift_dynamic_values import dynamic
     from .swift_ownership import owner_name
 
@@ -217,6 +225,16 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     if plan.scoped_receiver:
         target = f'owner: self, "{function.name}"'
     signature = f"{modifier}func {method}({', '.join(declarations)})"
+    if discard:
+        call = native_call(
+            function, *["nil" if arg == "completion" else arg for arg in args]
+        )
+        if "try " in call:
+            call = "try " + call
+        return (
+            f"{signature} throws {{\n  try owner.nativeDiscard({target}) {{ raw, arena, diagnostic in {call} }}\n}}\n",
+            owner + "Discarding",
+        )
     if outputs and completion:
         if len(outputs) != 1 or len(plan.completion.immediate_owners) != 1:
             raise unsupported(
@@ -384,6 +402,29 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         capture, storage, types = [], [], []
         for index, output in enumerate(outputs):
             value = output_plans[output.name]
+            output_plan = next(p for p in plan.outputs if p.name == output.name)
+            if output_plan.sized_by:
+                value_types.add(value)
+                element = value.element
+                raw = SCALARS.get(
+                    native(output.type.pointee), native(output.type.pointee)
+                )
+                initial = f"{element.default}()" if element.default else f"{raw}()"
+                count = lengths[value.length]
+                storage.append(
+                    f"  var value{index}: [{raw}] = Array(repeating: {initial}, count: {count})"
+                )
+                for field in element.fields:
+                    if field.role == "size":
+                        storage.append(
+                            f"  for item in value{index}.indices {{ value{index}[item].size = UInt32(MemoryLayout<{raw}>.size) }}"
+                        )
+                types.append(value_types.public(value))
+                copied = value_types.copy(element, "item")
+                capture.append(
+                    f"{'try ' if 'try ' in copied else ''}value{index}.map {{ item in {copied} }}"
+                )
+                continue
             if value.kind == "reference":
                 value = value.element
             value_types.add(value)
@@ -512,6 +553,9 @@ def lower(
             stem = Path(function.location.path).stem
             path = f"Generated/Operations/Generated{name(stem)}{owner}Operations.swift"
             chunks[path].append(chunk)
+            if plan.receiver and plan.completion and plan.completion.discardable:
+                discarded, view = operation(plan, value_types, discard=True)
+                chunks[path].append((view, discarded))
             if stem in SUBMODULES:
                 imports[path].add(SUBMODULES[stem])
             generated.append(function.name)
@@ -521,6 +565,20 @@ def lower(
     from .swift_ownership import owner_declarations
 
     chunks["Generated/GeneratedOwners.swift"].append(owner_declarations(bound))
+    from .swift_ownership import owner_name
+
+    command_owners = {
+        owner_name(bound.handles[p.value.native])
+        for plan in bound.operations
+        if plan.name in generated and plan.completion and plan.completion.discardable
+        for p in plan.inputs
+        if p.name == plan.receiver
+    }
+    for owner in sorted(command_owners):
+        chunks["Generated/GeneratedOwners.swift"].append(
+            f"public struct {owner}Discarding {{ let owner: {owner} }}\n"
+            f"public extension {owner} {{ var discarding: {owner}Discarding {{ {owner}Discarding(owner: self) }} }}\n"
+        )
     declarations = {
         item.name: item for item in (*api.typedefs, *api.records, *api.enums)
     }
@@ -579,6 +637,7 @@ def coverage(api: Api | BoundApi) -> dict:
     _, _, generated, failures = lower(bound)
     return {
         "generated": generated,
+        "discarding": discarding_variants(bound, generated),
         "support": view_support(bound, generated),
         "unsupported": failures,
     }

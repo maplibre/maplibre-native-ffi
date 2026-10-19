@@ -3,6 +3,16 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
+test "discarded commands are fenced and synchronous rejection returns an error" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    try fixture.map.discarding().setDebugOptions(.{ .tile_borders = true }, null);
+    try support.resolve(try maplibre.runtimeBarrier(fixture.runtime, null));
+    const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
+    try testing.expect(snapshot.debug_options.tile_borders);
+    try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8, .scale_factor = 1 }, null));
+}
+
 test "generated owners preserve rejected release and copied event snapshots" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();

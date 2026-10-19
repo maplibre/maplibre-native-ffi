@@ -36,6 +36,22 @@ private final class HeldCompletion: @unchecked Sendable {
 
 private struct ConversionFailure: Error {}
 
+@Test func discardedCommandsAreFencedAndSynchronousRejectionThrows(
+) async throws {
+  try await withMapFixture { fixture in
+    try fixture.map.discarding.setDebugOptions(options: .tileBorders)
+    try await fixture.runtime.barrier()
+    #expect(try fixture.map.getSnapshot().debugOptions == .tileBorders)
+    #expect(throws: MaplibreError.self) {
+      try fixture.map.discarding.resize(extent: LogicalExtent(
+        width: 0,
+        height: 8,
+        scaleFactor: 1
+      ))
+    }
+  }
+}
+
 /// A completion delivers its value to the one waiter exactly once, and when
 /// the conversion of a delivered value fails, the waiter gets the conversion's
 /// error and the bridge state, with everything the converter holds, is freed

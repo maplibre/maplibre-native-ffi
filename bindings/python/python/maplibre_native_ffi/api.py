@@ -1,6 +1,8 @@
 """Generated from the C headers by tools/bindgen. Do not edit."""
 
 from ._generated_operations import (
+    MapHandleDiscarding,
+    RenderSessionHandleDiscarding,
     android_init,
     c_version,
     geojson_source_data_create,
@@ -299,6 +301,7 @@ __all__ = [
     "LogicalExtent",
     "MapDebugOption",
     "MapHandle",
+    "MapHandleDiscarding",
     "MapMode",
     "MapOptions",
     "MapProjectionHandle",
@@ -358,6 +361,7 @@ __all__ = [
     "RenderSessionCapabilities",
     "RenderSessionCapabilityFlag",
     "RenderSessionHandle",
+    "RenderSessionHandleDiscarding",
     "RenderSessionSnapshot",
     "RenderSessionState",
     "RenderedFeatureQueryOptionField",

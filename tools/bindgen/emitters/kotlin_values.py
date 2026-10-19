@@ -234,7 +234,7 @@ class Values:
         if value.kind == "array" and value.element:
             if value.item_buffer:
                 self.item_buffers[value.element.native] = value.item_buffer
-            if value.element.kind not in {"record", "buffer"}:
+            if value.element.kind not in {"record", "buffer", "scalar", "enum"}:
                 raise Unsupported("array element needs a Kotlin storage rule")
             self.check(value.element)
             return
@@ -517,11 +517,15 @@ class Values:
     def element_size(self, element):
         if element.kind == "buffer":
             return "2 * NativeMemory.addressSize"
+        if element.kind in {"scalar", "enum"}:
+            return width_expression(self.abi.size(element.ctype))
         return self.size(element.native)
 
     def element_align(self, element):
         if element.kind == "buffer":
             return "NativeMemory.addressSize"
+        if element.kind in {"scalar", "enum"}:
+            return width_expression(self.abi.align(element.ctype))
         return self.align(element.native)
 
     def at(self, base, record, field):

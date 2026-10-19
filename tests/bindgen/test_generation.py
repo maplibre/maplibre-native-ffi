@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import parse, protocol_groups
+from support import parse, protocol_groups, real_api
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import (
@@ -38,6 +38,19 @@ PROTOCOL_GAPS = {
 
 
 class GenerationTests(unittest.TestCase):
+    def test_only_commands_have_discarding_variants(self):
+        bound = compile_api(real_api())
+        commands = {p.name for p in bound.operations if p.execution == "command"}
+        self.assertTrue(commands)
+        for plan in bound.operations:
+            if plan.completion:
+                self.assertEqual(plan.completion.discardable, plan.name in commands)
+        for emitter in EMITTERS:
+            with self.subTest(emitter=emitter.__name__):
+                coverage = emitter.coverage(bound)
+                self.assertEqual(set(coverage["discarding"]), commands)
+                self.assertLessEqual(commands, set(coverage["generated"]))
+
     def parse(self, source, *, owned_map=False):
         api = parse(
             source,
@@ -46,6 +59,41 @@ class GenerationTests(unittest.TestCase):
         )
         validate(api)
         return api
+
+    def test_caller_sized_outputs_share_the_input_array_count(self):
+        api = parse(groups=("caller_sized_output",))
+        validate(api)
+        bound = compile_api(api)
+        for plan in bound.operations:
+            output = plan.outputs[0]
+            self.assertEqual(output.value.kind, "array")
+            self.assertEqual(output.value.length, "point_count")
+            self.assertEqual(output.sized_by, "points")
+        for emitter in EMITTERS:
+            with self.subTest(emitter=emitter.__name__):
+                self.assertEqual(emitter.coverage(bound)["unsupported"], {})
+                self.rendered(emitter, bound)
+
+    def test_output_array_requires_a_counted_input_array(self):
+        for length, direction in (
+            ("point_count", "out"),
+            ("nul", "out"),
+            ("point_count", "inout"),
+        ):
+            with (
+                self.subTest(length=length, direction=direction),
+                self.assertRaisesRegex(ModelError, "output array length"),
+            ):
+                self.parse(f"""
+mln_status mln_probe_batch(unsigned point_count, double *out_values BIND("direction={direction};length={length}"), mln_diagnostic *out_diagnostic);
+""")
+
+    def test_output_array_cannot_take_its_count_from_a_byte_buffer(self):
+        with self.assertRaisesRegex(ModelError, "output array length"):
+            self.parse("""
+mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes"), unsigned count,
+  double *out_values BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
+""")
 
     def test_every_protocol_shape_generates_or_reports_its_gap(self):
         for group in protocol_groups():

@@ -161,6 +161,12 @@ func bindingDo(target bindingTarget, call func(arena *bindingArena, raw uint64, 
 	return err
 }
 
+func callDiscard(target bindingTarget, call func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32) error {
+	return bindingDo(target, func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return call(arena, raw, nil, diagnostic)
+	})
+}
+
 func bindingGet[T any](target bindingTarget, call func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32, result func(arena *bindingArena) T) (T, error) {
 	return bindingCall(func() T {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) T {

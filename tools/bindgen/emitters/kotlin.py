@@ -8,7 +8,7 @@ the C functions and upcall stubs that common code uses (see kotlin_native).
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import Api
-from tools.bindgen.semantic import BoundApi, view_support
+from tools.bindgen.semantic import BoundApi, discarding_variants, view_support
 
 from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
@@ -27,6 +27,7 @@ PLATFORMS = {"jvmMain": "jvm", "nativeMain": "native", "androidMain": "android"}
 JNI = "src/androidMain/jni/mln_jni_generated.c"
 
 OPERATION_IMPORTS = """\
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -122,6 +123,23 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 + "\n".join(bodies)
                 + "}\n"
             )
+            commands = [p for p in plans if p.completion and p.completion.discardable]
+            if commands:
+                view = f"{family}Discarding"
+                source = source.removesuffix("}\n") + (
+                    f"  public val discarding: {view} get() = {view}(this)\n}}\n\n"
+                    f"@JvmInline\npublic value class {view} internal constructor(private val owner: {class_name}) {{\n"
+                    f"  private val binding get() = owner.binding\n"
+                    + (
+                        "  private val bindingCallbacks get() = owner.bindingCallbacks\n"
+                        if any(p.registrations for p in commands)
+                        else ""
+                    )
+                    + "\n".join(
+                        operation(p, values, native, discard=True) for p in commands
+                    )
+                    + "}\n"
+                )
         else:
             class_name = "GeneratedApi"
             source = (
@@ -167,6 +185,7 @@ def coverage(api: Api | BoundApi) -> dict:
     generated = [function.name for function in functions]
     return {
         "generated": generated,
+        "discarding": discarding_variants(bound, generated),
         "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

@@ -1471,121 +1471,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts an ordered conversion from a screen point to a geographic
-    /// coordinate.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_lat_lng_for_pixel</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<LatLng> LatLngForPixelAsync(
-        ScreenPoint point,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lng_for_pixel");
-        return scope.Query<mln_lat_lng, LatLng>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_lat_lng_for_pixel(
-                    Handle,
-                    NativeScreenPoint(point),
-                    completion,
-                    diagnostic
-                ),
-            CopyLatLng,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered conversion from a screen point to an unwrapped
-    /// geographic coordinate.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_lat_lng_for_pixel_unwrapped</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<LatLng> LatLngForPixelUnwrappedAsync(
-        ScreenPoint point,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lng_for_pixel_unwrapped");
-        return scope.Query<mln_lat_lng, LatLng>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_lat_lng_for_pixel_unwrapped(
-                    Handle,
-                    NativeScreenPoint(point),
-                    completion,
-                    diagnostic
-                ),
-            CopyLatLng,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered conversion of copied screen points to coordinates.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_lat_lngs_for_pixels</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<LatLng[]> LatLngsForPixelsAsync(
-        ScreenPoint[] points,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lngs_for_pixels");
-        return scope.QueryArray<mln_lat_lng, LatLng>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_lat_lngs_for_pixels(
-                    Handle,
-                    scope.Array<mln_screen_point, ScreenPoint>(
-                        points,
-                        item => NativeScreenPoint(item)
-                    ),
-                    checked((nuint)points.Length),
-                    completion,
-                    diagnostic
-                ),
-            CopyLatLng,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered conversion of copied screen points to unwrapped
-    /// coordinates.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_lat_lngs_for_pixels_unwrapped</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<LatLng[]> LatLngsForPixelsUnwrappedAsync(
-        ScreenPoint[] points,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lngs_for_pixels_unwrapped");
-        return scope.QueryArray<mln_lat_lng, LatLng>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_lat_lngs_for_pixels_unwrapped(
-                    Handle,
-                    scope.Array<mln_screen_point, ScreenPoint>(
-                        points,
-                        item => NativeScreenPoint(item)
-                    ),
-                    checked((nuint)points.Length),
-                    completion,
-                    diagnostic
-                ),
-            CopyLatLng,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Starts an ordered query of every style layer in style order.
     /// </summary>
     /// <remarks>
@@ -1626,33 +1511,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts an ordered query of meters per logical pixel at a latitude and
-    /// the current map zoom. The completion borrows one double.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_meters_per_pixel_at_latitude</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<double> MetersPerPixelAtLatitudeAsync(
-        double latitude,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_meters_per_pixel_at_latitude");
-        return scope.Query<double, double>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_meters_per_pixel_at_latitude(
-                    Handle,
-                    latitude,
-                    completion,
-                    diagnostic
-                ),
-            static value => value,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Moves one style layer before another layer or to the top.
     /// </summary>
     /// <remarks>
@@ -1675,60 +1533,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     completion,
                     diagnostic
                 ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered conversion from a geographic coordinate to a screen
-    /// point.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_pixel_for_lat_lng</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<ScreenPoint> PixelForLatLngAsync(
-        LatLng coordinate,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_pixel_for_lat_lng");
-        return scope.Query<mln_screen_point, ScreenPoint>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_pixel_for_lat_lng(
-                    Handle,
-                    NativeLatLng(coordinate),
-                    completion,
-                    diagnostic
-                ),
-            CopyScreenPoint,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered conversion of copied coordinates to screen points.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_pixels_for_lat_lngs</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<ScreenPoint[]> PixelsForLatLngsAsync(
-        LatLng[] coordinates,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_pixels_for_lat_lngs");
-        return scope.QueryArray<mln_screen_point, ScreenPoint>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_pixels_for_lat_lngs(
-                    Handle,
-                    scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                    checked((nuint)coordinates.Length),
-                    completion,
-                    diagnostic
-                ),
-            CopyScreenPoint,
             cancellationToken
         );
     }
@@ -2664,5 +2468,995 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 ),
             cancellationToken
         );
+    }
+
+    public DiscardingCommands Discarding => new(this);
+
+    public readonly struct DiscardingCommands
+    {
+        private readonly MapHandle owner;
+
+        internal DiscardingCommands(MapHandle owner)
+        {
+            this.owner = owner;
+        }
+
+        public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_custom_geometry_source");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_custom_geometry_source(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Value(NativeCustomGeometrySourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddCustomMvtVectorSource(string sourceId, CustomMvtVectorSourceOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_custom_mvt_vector_source");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_custom_mvt_vector_source(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Value(NativeCustomMvtVectorSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_geojson_source_data");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_geojson_source_data(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Use(data),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddGeojsonSourceUrl(string sourceId, string url, GeojsonSourceOptions? options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_geojson_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_geojson_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        options is null
+                            ? null
+                            : scope.Value(NativeGeojsonSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddImageSourceImage(
+            string sourceId,
+            LatLng[] coordinates,
+            PremultipliedRgba8Image image
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_image_source_image");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_image_source_image(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                        checked((nuint)coordinates.Length),
+                        scope.Value(NativePremultipliedRgba8Image(image, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddImageSourceUrl(string sourceId, LatLng[] coordinates, string url)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_image_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_image_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                        checked((nuint)coordinates.Length),
+                        scope.Utf8(url),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddRasterDemSourceTiles(
+            string sourceId,
+            string[] tiles,
+            StyleTileSourceOptions? options
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_raster_dem_source_tiles");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_raster_dem_source_tiles(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                        checked((nuint)tiles.Length),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddRasterDemSourceUrl(
+            string sourceId,
+            string url,
+            StyleTileSourceOptions? options
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_raster_dem_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_raster_dem_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddRasterSourceTiles(
+            string sourceId,
+            string[] tiles,
+            StyleTileSourceOptions? options
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_raster_source_tiles");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_raster_source_tiles(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                        checked((nuint)tiles.Length),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddRasterSourceUrl(string sourceId, string url, StyleTileSourceOptions? options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_raster_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_raster_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_style_layer_json");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_style_layer_json(
+                        receiverHandle,
+                        scope.Buffer(layerJson),
+                        scope.Utf8(beforeLayerId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_style_source_json");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_style_source_json(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Buffer(sourceJson),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddVectorSourceTiles(
+            string sourceId,
+            string[] tiles,
+            StyleTileSourceOptions? options
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_vector_source_tiles");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_vector_source_tiles(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                        checked((nuint)tiles.Length),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void AddVectorSourceUrl(string sourceId, string url, StyleTileSourceOptions? options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_add_vector_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_vector_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleTileSourceOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void ApplyCameraDelta(CameraDelta delta)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_apply_camera_delta");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_apply_camera_delta(
+                        receiverHandle,
+                        scope.Value(NativeCameraDelta(delta, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void BeginCommandGroup()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_begin_command_group");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_begin_command_group(
+                        receiverHandle,
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void CancelCameraTransition(ulong transitionId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_cancel_camera_transition");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_cancel_camera_transition(
+                        receiverHandle,
+                        transitionId,
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void CancelTransitions()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_cancel_transitions");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_cancel_transitions(receiverHandle, completion, diagnostic)
+            );
+        }
+
+        public void DumpDebugLogs()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_dump_debug_logs");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_dump_debug_logs(receiverHandle, completion, diagnostic)
+            );
+        }
+
+        public void EndCommandGroup()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_end_command_group");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_end_command_group(receiverHandle, completion, diagnostic)
+            );
+        }
+
+        public void InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_invalidate_custom_geometry_source_region"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_geometry_source_region(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeLatLngBounds(bounds),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_invalidate_custom_geometry_source_tile"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void InvalidateCustomMvtVectorSourceTile(string sourceId, CanonicalTileId tileId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_invalidate_custom_mvt_vector_source_tile"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void MoveStyleLayer(string layerId, string beforeLayerId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_move_style_layer");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_move_style_layer(
+                        receiverHandle,
+                        scope.Utf8(layerId),
+                        scope.Utf8(beforeLayerId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void RemoveFeatureState(FeatureStateSelector selector)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_remove_feature_state");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_feature_state(
+                        receiverHandle,
+                        scope.Value(NativeFeatureStateSelector(selector, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void RemoveStyleImage(string imageId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_remove_style_image");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_image(
+                        receiverHandle,
+                        scope.Utf8(imageId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void RemoveStyleLayer(string layerId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_remove_style_layer");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_layer(
+                        receiverHandle,
+                        scope.Utf8(layerId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void RemoveStyleSource(string sourceId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_remove_style_source");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_source(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void RequestRepaint()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_request_repaint");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_request_repaint(receiverHandle, completion, diagnostic)
+            );
+        }
+
+        public void Resize(LogicalExtent extent)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_resize");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_resize(
+                        receiverHandle,
+                        NativeLogicalExtent(extent),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetBounds(BoundOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_bounds");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_bounds(
+                        receiverHandle,
+                        scope.Value(NativeBoundOptions(options)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetCustomGeometrySourceTileData(
+            string sourceId,
+            CanonicalTileId tileId,
+            byte[] data
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_set_custom_geometry_source_tile_data"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_geometry_source_tile_data(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        scope.Buffer(data),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetCustomMvtVectorSourceTileData(
+            string sourceId,
+            CanonicalTileId tileId,
+            byte[] data
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_set_custom_mvt_vector_source_tile_data"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        scope.Buffer(data),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetCustomMvtVectorSourceTileError(
+            string sourceId,
+            CanonicalTileId tileId,
+            string message
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_set_custom_mvt_vector_source_tile_error"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        scope.Utf8(message),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetDebugOptions(MapDebugOption options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_debug_options");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_debug_options(
+                        receiverHandle,
+                        (uint)options,
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetEventMask(RuntimeEventMask mask)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_event_mask");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_event_mask(
+                        receiverHandle,
+                        (ulong)mask,
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetFeatureState(FeatureStateSelector selector, byte[] state)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_feature_state");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_feature_state(
+                        receiverHandle,
+                        scope.Value(NativeFeatureStateSelector(selector, scope)),
+                        scope.Buffer(state),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetFreeCameraOptions(FreeCameraOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_free_camera_options");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_free_camera_options(
+                        receiverHandle,
+                        scope.Value(NativeFreeCameraOptions(options)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_geojson_source_data");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_data(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Use(data),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetGeojsonSourceSynchronousTiling(string sourceId, bool enabled)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_set_geojson_source_synchronous_tiling"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        (byte)(enabled ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetGeojsonSourceUrl(string sourceId, string url)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_geojson_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetGlobalStateProperty(string propertyName, byte[] value)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_global_state_property");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_global_state_property(
+                        receiverHandle,
+                        scope.Utf8(propertyName),
+                        scope.Buffer(value),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetImageSourceCoordinates(string sourceId, LatLng[] coordinates)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_coordinates");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_image_source_coordinates(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                        checked((nuint)coordinates.Length),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_image");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_image_source_image(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Value(NativePremultipliedRgba8Image(image, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetImageSourceUrl(string sourceId, string url)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_image_source_url(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        scope.Utf8(url),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetProjectionMode(ProjectionMode mode)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_projection_mode");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_projection_mode(
+                        receiverHandle,
+                        scope.Value(NativeProjectionMode(mode)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetRenderingStatsViewEnabled(bool enabled)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(
+                owner,
+                "mln_map_set_rendering_stats_view_enabled"
+            );
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_rendering_stats_view_enabled(
+                        receiverHandle,
+                        (byte)(enabled ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleImage(
+            string imageId,
+            PremultipliedRgba8Image image,
+            StyleImageOptions? options
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_image");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_image(
+                        receiverHandle,
+                        scope.Utf8(imageId),
+                        scope.Value(NativePremultipliedRgba8Image(image, scope)),
+                        options is null
+                            ? null
+                            : scope.Value(NativeStyleImageOptions(options, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleJson(byte[] json)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_json");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_json(
+                        receiverHandle,
+                        scope.Buffer(json),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleLayerProperty(string layerId, string propertyName, byte[] value)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_layer_property");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_layer_property(
+                        receiverHandle,
+                        scope.Utf8(layerId),
+                        scope.Utf8(propertyName),
+                        scope.Buffer(value),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleLightJson(byte[] lightJson)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_light_json");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_light_json(
+                        receiverHandle,
+                        scope.Buffer(lightJson),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleLightProperty(string propertyName, byte[] value)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_light_property");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_light_property(
+                        receiverHandle,
+                        scope.Utf8(propertyName),
+                        scope.Buffer(value),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleSourceVolatile(string sourceId, bool isVolatile)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_source_volatile");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_source_volatile(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        (byte)(isVolatile ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleTransitionOptions(StyleTransitionOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_transition_options");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_transition_options(
+                        receiverHandle,
+                        scope.Value(NativeStyleTransitionOptions(options)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetStyleUrl(string url)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_style_url");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_url(
+                        receiverHandle,
+                        scope.CStringArgument(url),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetTileOptions(MapTileOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_tile_options");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_tile_options(
+                        receiverHandle,
+                        scope.Value(NativeMapTileOptions(options)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetViewportOptions(MapViewportOptions options)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_set_viewport_options");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_viewport_options(
+                        receiverHandle,
+                        scope.Value(NativeMapViewportOptions(options)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void UpdateCamera(CameraUpdate update)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner, "mln_map_update_camera");
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_update_camera(
+                        receiverHandle,
+                        scope.Value(NativeCameraUpdate(update, scope)),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
     }
 }

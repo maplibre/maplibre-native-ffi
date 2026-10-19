@@ -39,6 +39,9 @@ final class _CompletionValue<T> {
 Future<CommandCompletion> _command(_NativeStart start) =>
     _startCommand(_withArena(start));
 
+void _discard(_NativeStart start) =>
+    withNativeArena((arena) => _check(start(arena, nullptr)));
+
 Future<void> _run(_NativeStart start) =>
     startNativeCompletion(start: _withArena(start), decode: (_) {});
 

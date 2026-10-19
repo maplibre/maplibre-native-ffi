@@ -267,3 +267,112 @@ public extension MapHandle {
     }
   }
 }
+
+public extension MapHandleDiscarding {
+  func beginCommandGroup() throws {
+    try owner
+      .nativeDiscard("mln_map_begin_command_group") { raw, _, diagnostic in
+        mln_map_begin_command_group(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func endCommandGroup() throws {
+    try owner
+      .nativeDiscard("mln_map_end_command_group") { raw, _, diagnostic in
+        mln_map_end_command_group(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func removeFeatureState(selector bindingArg0: FeatureStateSelector) throws {
+    try owner
+      .nativeDiscard("mln_map_remove_feature_state") { raw, arena, diagnostic in
+        try mln_map_remove_feature_state(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func requestRepaint() throws {
+    try owner
+      .nativeDiscard("mln_map_request_repaint") { raw, _, diagnostic in
+        mln_map_request_repaint(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func resize(extent bindingArg0: LogicalExtent) throws {
+    try owner
+      .nativeDiscard("mln_map_resize") { raw, _, diagnostic in mln_map_resize(
+        raw,
+        bindingArg0.nativeValue(),
+        nil,
+        diagnostic
+      ) }
+  }
+
+  func setEventMask(mask bindingArg0: RuntimeEventMask) throws {
+    try owner
+      .nativeDiscard("mln_map_set_event_mask") { raw, _, diagnostic in
+        mln_map_set_event_mask(
+          raw,
+          bindingArg0.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setFeatureState(
+    selector bindingArg0: FeatureStateSelector,
+    state bindingArg1: Data
+  ) throws {
+    try owner
+      .nativeDiscard("mln_map_set_feature_state") { raw, arena, diagnostic in
+        try mln_map_set_feature_state(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          arena.view(bindingArg1),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleJson(json bindingArg0: Data) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_json") { raw, arena, diagnostic in
+        mln_map_set_style_json(
+          raw,
+          arena.view(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setStyleUrl(url bindingArg0: String) throws {
+    try owner
+      .nativeDiscard("mln_map_set_style_url") { raw, arena, diagnostic in
+        try mln_map_set_style_url(
+          raw,
+          arena.cString(bindingArg0),
+          nil,
+          diagnostic
+        )
+      }
+  }
+}

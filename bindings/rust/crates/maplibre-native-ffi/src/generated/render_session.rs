@@ -608,3 +608,28 @@ impl RenderSessionHandle {
         )
     }
 }
+
+pub struct RenderSessionHandleDiscarding<'a>(&'a RenderSessionHandle);
+impl RenderSessionHandle {
+    pub fn discarding(&self) -> RenderSessionHandleDiscarding<'_> {
+        RenderSessionHandleDiscarding(self)
+    }
+}
+impl RenderSessionHandleDiscarding<'_> {
+    /// Starts an ordered logical resize, which also resizes the map. On a
+    /// continuous map, the completion runs after the map's viewport takes the
+    /// new extent and the selected driver applies it. A static or tile map
+    /// publishes a render update only for a still image, so on those maps the
+    /// driver applies the extent without waiting for the map's viewport, and
+    /// the next still image renders at the new extent.
+    ///
+    /// See `mln_render_session_resize` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn resize(&self, extent: LogicalExtent) -> Result<()> {
+        let mut call = self.0.inner.call("mln_render_session_resize")?;
+        let extent = call.input(&extent)?;
+        call.discard(|session, completion, out_diagnostic| unsafe {
+            sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
+        })
+    }
+}

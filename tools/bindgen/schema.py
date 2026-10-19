@@ -44,7 +44,8 @@ ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # ownership=value, encoding=utf8, and reentry=allow, so a header never writes
 # them; an absent nullable or handle_access means false or live. The semantic
 # layer in semantic.py supplies the remaining values: lifetime=completion for an
-# array completion result, and consumes=always for a release that returns void.
+# array completion result, consumes=always for a release that returns void, and
+# discardable completions for commands.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -654,6 +655,12 @@ def validate(api: Api) -> None:
                 for parameter in function.parameters
                 if is_completion(parameter.type)
             ]
+            for parameter in completion_parameters:
+                if "nullable" in parameter.metadata:
+                    errors.append(
+                        f"{context}: completion nullability follows execution; "
+                        "nullable is not allowed on a completion parameter"
+                    )
             if len(completion_parameters) != 1 or not is_completion(
                 function.parameters[-1].type
             ):
@@ -759,6 +766,32 @@ def validate(api: Api) -> None:
                 and parameter.metadata["length"] != "1"
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
+            if (
+                parameter.metadata.get("direction") in {"out", "inout"}
+                and parameter.metadata.get("length") not in {None, "1"}
+                and (
+                    parameter.metadata.get("direction") != "out"
+                    or parameter.type.pointee is None
+                    or parameter.type.pointee.kind == "pointer"
+                    or not any(
+                        input_.metadata.get("direction", "in") == "in"
+                        and input_.type.kind == "pointer"
+                        and input_.type.pointee is not None
+                        and input_.metadata.get("encoding") is None
+                        and input_.metadata.get("length")
+                        == parameter.metadata["length"]
+                        and parameter.metadata["length"] in parameters
+                        and parameters[parameter.metadata["length"]].metadata.get(
+                            "direction", "in"
+                        )
+                        == "in"
+                        for input_ in function.parameters
+                    )
+                )
+            ):
+                errors.append(
+                    f"{pcontext}: output array length must name an input array's count"
+                )
     for record in api.records:
         context = f"{record.location}: {record.name}"
         errors.extend(
