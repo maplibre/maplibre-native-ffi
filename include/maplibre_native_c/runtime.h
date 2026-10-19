@@ -1134,19 +1134,23 @@ typedef struct mln_resource_request_cancel_handler {
  */
 typedef struct mln_resource_provider {
   uint32_t size;
-  /** Required in callback mode; null in queue mode. */
+  /**
+   * Decides each request that the routes leave to the provider.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data exactly once for each accepted registration,
    * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned. Null in queue mode.
+   * and every in-flight callback has returned.
    *
    * It may run on a runtime, worker, network, or closing thread, and never runs
    * for a rejected registration. Another thread may retire an accepted
    * registration before its registration function returns, so the caller
    * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected.
+   * when the registration is rejected. Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**

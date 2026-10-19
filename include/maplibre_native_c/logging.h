@@ -78,15 +78,19 @@ typedef uint32_t (*mln_log_callback)(
  */
 typedef struct mln_log_handler {
   uint32_t size;
-  /** Required in callback mode; null in queue mode. */
+  /**
+   * Receives each record.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_log_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data after the final callback returns, when the
-   * handler is replaced or cleared. Null in queue mode.
+   * handler is replaced or cleared.
    *
    * It runs on the thread that replaces or clears the handler, and must not
-   * call this C API or MapLibre Native APIs.
+   * call this C API or MapLibre Native APIs. Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**

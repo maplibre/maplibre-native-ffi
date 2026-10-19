@@ -1939,7 +1939,7 @@ pub enum LogEvent: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 #[derive(Clone, Default)]
 pub struct LogHandler {
-    /// Required in callback mode; null in queue mode.
+    /// Receives each record.
     pub callback: Option<
         std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>,
     >,
@@ -4338,7 +4338,7 @@ pub enum ResourcePriority: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct ResourceProvider {
-    /// Required in callback mode; null in queue mode.
+    /// Decides each request that the routes leave to the provider.
     pub callback: Option<
         std::sync::Arc<
             dyn Fn(ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision

@@ -42,7 +42,7 @@ auto copy_result(
 
 auto CompletionSink::deliver(
   mln_status status, std::uint32_t disposition, std::uint64_t generation,
-  const std::string& diagnostic, const void* value, std::size_t value_count,
+  std::string_view diagnostic, const void* value, std::size_t value_count,
   std::uint32_t value_size, const delivery::CompletionCapture* capture
 ) const noexcept -> void {
   const auto result = mln_completion_result{
@@ -56,6 +56,8 @@ auto CompletionSink::deliver(
     .value = value,
     .value_count = value_count,
   };
+  if (delivered_) return;
+  delivered_ = true;
   if (process_exiting()) return;
   if (queue_ != nullptr) {
     deliver_queued(result, capture);
@@ -244,7 +246,12 @@ auto Completion::deliver(Delivery delivery) noexcept -> void {
   try {
     delivery(sink_);
   } catch (...) {
-    // Completion delivery cannot reopen terminal native work.
+    // Completion delivery cannot reopen terminal native work, but a delivery
+    // that threw before reaching the sink still owes the host its result.
+    sink_.deliver(
+      MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, 0,
+      "the completion result could not be delivered", nullptr, 0, 0, nullptr
+    );
   }
   release();
 }

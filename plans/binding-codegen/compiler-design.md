@@ -36,10 +36,11 @@ category.
 `include/binding-interfaces.toml` separates the public C interface from the
 native binding-runtime interface. Clang resolves the include closure of both
 entrypoints, and a declaration outside both closures fails validation. Shared
-includes keep their public classification. Runtime adapters are compiler inputs
-that the coverage report lists separately from public operations. External
-plugin ABI types keep their C names and canonical types, because a plugin
-authoring emitter would need its own ownership contract.
+includes keep their public classification. Delivery protocol operations and the
+binding support in `binding_support.h` are compiler inputs that the coverage
+report lists separately from public operations. External plugin ABI types keep
+their C names and canonical types, because a plugin authoring emitter would need
+its own ownership contract.
 
 The parser uses the configured Clang driver's builtin headers and the selected
 system SDK. Cross-target extraction requires that target's include paths and
@@ -122,17 +123,18 @@ host waiting, and leaves accepted native ownership in place.
 
 ## Native capture
 
-Dart is the one binding that cannot run host code on a MapLibre thread, so its
-completions and deferred callbacks go through native capture. The native
-callback adapter uses static capture functions that `native_capture.py`
-generates for each reachable completion value. A measuring pass computes
-checked, aligned storage, and then one allocation holds the record and all
-copied payload bytes. A writing pass copies each borrowed byte once and rewrites
-pointers into that allocation. The generated dispatcher selects a compiled
-copier by a type identifier, which is a deterministic hash of the native type
-and its ownership. Nested arrays and union variants follow the same recursive
-rules as the other bindings, and the bindings with direct callbacks keep their
-immediate capture path.
+A host that cannot run code on a MapLibre thread sets a delivery queue in place
+of a registration's callback, and native code copies each completion result, log
+record, or resource request into a queued delivery. Dart is the binding that
+does this. The copies use static capture functions that `native_capture.py`
+generates for each reachable completion value and delivery record. A measuring
+pass computes checked, aligned storage, and then one allocation holds the record
+and all copied payload bytes. A writing pass copies each borrowed byte once and
+rewrites pointers into that allocation. The generated dispatcher selects a
+compiled copier by a type identifier, which is a deterministic hash of the
+native type and its ownership. Nested arrays and union variants follow the same
+recursive rules as the other bindings, and the bindings with direct callbacks
+keep their immediate capture path.
 
 Owned handle results stay owned by the native record until the Dart decoder
 constructs a host owner and adopts the record. Discarded records and failed
@@ -191,13 +193,13 @@ separately, so a wake inside attachment options uses the same acceptance and
 quiescence transaction as a top-level registration. Callback plans identify
 their context parameter explicitly.
 
-Native callback adapters declare their callback signature, context record, and
-invoked callback protocol operations, and the compiler checks these
-relationships. A backend credits a callback-only setter through an adapter only
-when its emitted descriptor factory installs that adapter. Native release owns
-the retained arenas and adopted queue handles of an adapter, even after the
-receiving isolate exits. Release messages use unique registration identifiers,
-so a reused allocation address cannot retire a newer host root.
+A callback typedef that declares `delivery=` names the delivery type that
+carries a copy of its arguments, and a registration that holds a
+`kind=delivery_queue` member may name a queue in place of that callback. The
+compiler checks that each delivery record mirrors its callback's arguments. In
+queue mode a registration's retirement arrives as a final RETIRED delivery in
+place of `release_user_data`, so the receiving runtime releases its host root
+only after the last delivery for that registration.
 
 ## Callback scope and reentry
 
@@ -238,12 +240,6 @@ message arena of its batch. Bindings check slice bounds before decoding and copy
 items using the declared stride. Encoded character and byte pointers resolve as
 buffers that keep their declared UTF-8, JSON, or bytes representation. Strided
 and arena-backed records support output copies, and input use fails compilation.
-
-Adapter record `projection` metadata identifies the public value copied into an
-adapter queue. Validation checks that every source field except the ABI size and
-reserved storage keeps its name and C type. `ValuePlan.projection` provides the
-public enums, presence groups, and buffer contracts to the generated adapter
-decoder.
 
 `handle_access=issued` keeps access to an issued generation identifier for
 quiescence waits after owner release, and other operations require a live owner.

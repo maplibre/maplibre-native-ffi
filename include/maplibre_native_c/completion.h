@@ -92,12 +92,18 @@ typedef void (*mln_completion_callback)(
  */
 typedef struct mln_completion {
   uint32_t size;
-  /** Required in callback mode; null in queue mode. */
+  /**
+   * Receives the terminal result.
+   *
+   * Required in callback mode; null in queue mode.
+   */
   mln_completion_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the completing thread after the completion
-   * returns. Null in queue mode.
+   * returns.
+   *
+   * Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**

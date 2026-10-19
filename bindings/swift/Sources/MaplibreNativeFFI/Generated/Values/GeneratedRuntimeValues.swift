@@ -518,7 +518,7 @@ public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
-  /// Required in callback mode; null in queue mode.
+  /// Decides each request that the routes leave to the provider.
   public var callback: (@Sendable (ResourceRequest,
                                    ResourceRequestHandle) throws
       -> ResourceProviderDecision)?

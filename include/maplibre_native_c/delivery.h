@@ -198,13 +198,13 @@ MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when a batch holding at least one delivery is published in
  *   *out_batch.
  * - MLN_STATUS_NOT_READY when no delivery is queued. This is not an error:
- *   *out_batch is left unchanged, and the caller drains again after the next
- *   wake.
+ *   *out_batch is left unchanged, no batch is allocated, and the caller drains
+ *   again after the next wake.
  * - MLN_STATUS_INVALID_ARGUMENT when queue is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when the batch could not be allocated. The
- *   deliveries stay queued.
+ *   deliveries stay queued, and the wake fires again so the receiver retries.
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_delivery_queue_drain(

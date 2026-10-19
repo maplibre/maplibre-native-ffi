@@ -58,9 +58,8 @@ internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
  */
 internal fun denyingProvider(
   serve: (ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ -> null },
-): ResourceProvider = ResourceProvider { request, handle ->
-  serve(request, handle) ?: handle.deny()
-}
+): ResourceProvider =
+  ResourceProvider(callback = { request, handle -> serve(request, handle) ?: handle.deny() })
 
 /** Completes this request with the fixture's NOT_FOUND error and releases it. */
 internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {

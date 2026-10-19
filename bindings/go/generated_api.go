@@ -2423,7 +2423,7 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 // See mln_log_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 type LogHandler struct {
-	// Required in callback mode; null in queue mode.
+	// Receives each record.
 	Callback func(LogSeverity, LogEvent, int64, string) uint32
 }
 
@@ -3797,7 +3797,7 @@ func copyRenderingStats(raw C.mln_rendering_stats) RenderingStats {
 type ResourceProvider struct {
 	// The requests that reach the provider; empty to claim every request.
 	Routes []ResourceRoute
-	// Required in callback mode; null in queue mode.
+	// Decides each request that the routes leave to the provider.
 	Callback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 }
 

@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 
 #include "completion/completion.hpp"
@@ -125,6 +126,21 @@ void acceptance_and_resolution_race_once() {
   }
 }
 
+// A delivery that throws before it reaches the sink still reports one result,
+// a native error, and then releases the user data.
+void a_throwing_delivery_reports_a_native_error() {
+  auto probe = CompletionProbe{};
+  auto completion = accepted(descriptor_for(probe));
+  completion->accept();
+  completion->resolve([](const mln::core::CompletionSink&) {
+    throw std::runtime_error{"delivery failed before the sink"};
+  });
+  TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
+  TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
+  TEST_ASSERT_EQUAL_INT(2, probe.phase.load());
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, probe.status.load());
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -132,4 +148,5 @@ MLN_TEST_GROUP {
   RUN_TEST(rejection_leaves_the_user_data);
   RUN_TEST(abandonment_reports_cancelled);
   RUN_TEST(acceptance_and_resolution_race_once);
+  RUN_TEST(a_throwing_delivery_reports_a_native_error);
 }

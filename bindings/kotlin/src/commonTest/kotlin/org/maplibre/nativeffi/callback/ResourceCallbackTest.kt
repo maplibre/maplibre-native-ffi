@@ -197,7 +197,7 @@ class ResourceCallbackTest {
       ) {
         runtime
           .setResourceTransform(
-            ResourceTransform { _, url, _ -> if (url == STYLE_URL) throw thrown },
+            ResourceTransform(callback = { _, url, _ -> if (url == STYLE_URL) throw thrown }),
           )
           .awaitWithin("the transform")
         map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -233,21 +233,24 @@ class ResourceCallbackTest {
   fun aTransformResponseRefusesUseAfterItsCallbackAndFromAnotherThread(): Unit = runSuspendTest {
     val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()
     var escaped: ResourceTransformResponse? = null
-    val transform = ResourceTransform { _, url, response ->
-      if (url != STYLE_URL || outcome.isCompleted) return@ResourceTransform
-      escaped = response
-      var fromAnotherThread: Throwable? = null
-      runOnBackgroundThread {
-        fromAnotherThread =
-          runCatching { GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL) }
+    val transform =
+      ResourceTransform(
+        callback = { _, url, response ->
+          if (url != STYLE_URL || outcome.isCompleted) return@ResourceTransform
+          escaped = response
+          var fromAnotherThread: Throwable? = null
+          runOnBackgroundThread {
+            fromAnotherThread =
+              runCatching { GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL) }
+                .exceptionOrNull()
+          }
+          val inside = runCatching {
+            GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL)
+          }
             .exceptionOrNull()
-      }
-      val inside = runCatching {
-        GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL)
-      }
-        .exceptionOrNull()
-      outcome.complete(inside to fromAnotherThread)
-    }
+          outcome.complete(inside to fromAnotherThread)
+        },
+      )
     // The provider passes the style through to the online source, which applies the transform.
     withMap(
       provider =

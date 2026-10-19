@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include "delivery/delivery_queue.hpp"
 #include "maplibre_native_c/completion.h"
@@ -29,7 +30,7 @@ class CompletionSink final {
   // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed.
   auto deliver(
     mln_status status, std::uint32_t disposition, std::uint64_t generation,
-    const std::string& diagnostic, const void* value, std::size_t value_count,
+    std::string_view diagnostic, const void* value, std::size_t value_count,
     std::uint32_t value_size, const delivery::CompletionCapture* capture
   ) const noexcept -> void;
 
@@ -54,6 +55,9 @@ class CompletionSink final {
   // Preallocated at acceptance, so a result that cannot be copied still
   // reaches the queue. Delivery consumes it at most once.
   mutable delivery::ItemPtr fallback_;
+  // Set by the first deliver(), so a delivery that throws afterwards does not
+  // report a second result.
+  mutable bool delivered_ = false;
 };
 
 class Completion final {

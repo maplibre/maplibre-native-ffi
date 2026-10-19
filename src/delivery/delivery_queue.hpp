@@ -143,11 +143,22 @@ class DeliveryQueueState final {
   // During process exit the item is dropped without disposal and this
   // reports true.
   [[nodiscard]] auto push(ItemPtr& item) noexcept -> bool;
+  // Appends like push() but leaves the wake to the caller: needs_wake reports
+  // whether the queue was empty, and the caller calls rewake() later from a
+  // context where host code may run.
+  [[nodiscard]] auto push_without_wake(ItemPtr& item, bool& needs_wake) noexcept
+    -> bool;
 
   // Moves every queued item into out, in push order, after reserving room in
   // out and views. Allocation failure throws and leaves the items queued.
   auto drain(std::vector<ItemPtr>& out, std::vector<mln_delivery>& views)
     -> void;
+  // Whether nothing is queued, so a drain can return without allocating.
+  [[nodiscard]] auto empty() noexcept -> bool;
+  // Wakes the receiver when deliveries are queued. Pushes wake only on the
+  // empty-to-nonempty transition, so a drain that fails after that wake calls
+  // this to keep them from being stranded.
+  auto rewake() noexcept -> void;
 
   // Refuses later pushes, stops the wake, and discards queued items.
   auto close() noexcept -> void;

@@ -33,8 +33,8 @@ the existing callback scheduler.
 
 A typed result contract identifies owned handles independently from the borrowed
 storage that contains their numeric IDs. Map creation delivers an owned handle
-through its completion, so a failed adapter copy or an abandoned host future
-disposes that handle.
+through its completion, so a delivery copy that fails or an abandoned host
+future disposes that handle.
 
 A generated capture owns all transferred resources until the binding adopts
 them. Destroying an unclaimed capture disposes its resources. Conversion uses a

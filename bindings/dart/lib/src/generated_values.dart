@@ -2504,7 +2504,7 @@ typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 final class LogHandler {
   const LogHandler({required this.callback});
 
-  /// Required in callback mode; null in queue mode.
+  /// Receives each record.
   final LogCallback callback;
 }
 
@@ -4633,7 +4633,7 @@ final class ResourceProvider {
     List<ResourceRoute> routes = const [],
   }) : routes = List.unmodifiable(routes);
 
-  /// Required in callback mode; null in queue mode.
+  /// Decides each request that the routes leave to the provider.
   final ResourceProviderCallback callback;
 
   /// The requests that reach the provider; empty to claim every request.

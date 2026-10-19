@@ -4165,7 +4165,7 @@ internal constructor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogHandler(
-  /** Required in callback mode; null in queue mode. */
+  /** Receives each record. */
   public val callback: LogCallback,
 )
 
@@ -4271,7 +4271,7 @@ public typealias HttpHeaderTransformCallback =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceProvider(
-  /** Required in callback mode; null in queue mode. */
+  /** Decides each request that the routes leave to the provider. */
   public val callback: ResourceProviderCallback,
   /** The requests that reach the provider; empty to claim every request. */
   public val routes: List<ResourceRoute> = emptyList(),

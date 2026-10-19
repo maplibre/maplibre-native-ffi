@@ -39,7 +39,7 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
 /// See `mln_log_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
-  /// Required in callback mode; null in queue mode.
+  /// Receives each record.
   public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
     -> UInt32)?
   public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,

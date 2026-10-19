@@ -127,13 +127,18 @@ VOID = CType("void", "void", "void")
 
 
 def completion_result_type(bound):
-    """The result pointer that the completion registration's callback receives."""
-    completion = bound.values.get(COMPLETION)
-    if completion is None or completion.registration is None:
+    """The result pointer that the completion registration's callback receives.
+
+    Operations take a completion descriptor without exposing it as a value,
+    so this reads the callback typedef that the descriptor's callback names.
+    """
+    descriptor = bound.source.records_by_name.get(COMPLETION)
+    if descriptor is None:
         return None
-    for member in completion.registration.callbacks:
-        field = next(f for f in completion.fields if f.name == member)
-        callback = bound.callbacks[field.value.native]
+    for field in descriptor.fields:
+        callback = bound.callbacks.get(field.type.declaration or "")
+        if callback is None:
+            continue
         for parameter in callback.parameters:
             if parameter.name != callback.context:
                 return parameter.value.ctype

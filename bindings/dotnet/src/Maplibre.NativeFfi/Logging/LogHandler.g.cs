@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Callback">
-/// Required in callback mode; null in queue mode.
+/// Receives each record.
 /// </param>
 public readonly partial record struct LogHandler(
     Func<LogSeverity, LogEvent, long, string, uint>? Callback

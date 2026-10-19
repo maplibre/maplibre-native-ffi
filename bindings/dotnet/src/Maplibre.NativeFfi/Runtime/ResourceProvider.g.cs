@@ -21,7 +21,7 @@ public readonly record struct ResourceProvider
     }
 
     /// <summary>
-    /// Required in callback mode; null in queue mode.
+    /// Decides each request that the routes leave to the provider.
     /// </summary>
     public Func<
         ResourceRequest,

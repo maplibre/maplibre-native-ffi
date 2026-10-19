@@ -3103,7 +3103,9 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"cameraTransitionHandlerCallback", "(JJ)V", NULL},
 };
 
-static void mln_jni_completion(void* userData, void* result) {
+static void mln_jni_completion(
+  void* userData, const mln_completion_result* result
+) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(result)}
   };

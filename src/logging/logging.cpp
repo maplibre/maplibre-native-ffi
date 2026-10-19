@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -11,6 +12,7 @@
 #include "delivery/delivery_queue.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
+#include "execution/retirement.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
@@ -58,15 +60,79 @@ class CallbackLogObserver final : public mln::Log::Observer {
   mln_user_data_release release_user_data_ = nullptr;
 };
 
+// Wakes a log handler's delivery queue from a lane thread. MapLibre records
+// logs and replaces observers while holding its global log mutex, so a wake
+// from there would run host code under that mutex and deadlock a host whose
+// wake logs, or waits on a thread that logs. The relay node needs no
+// allocation to submit, and a pending submission keeps the relay alive.
+class LogWakeRelay final : public std::enable_shared_from_this<LogWakeRelay> {
+ public:
+  explicit LogWakeRelay(
+    std::shared_ptr<mln::delivery::DeliveryQueueState> queue
+  ) noexcept
+      : queue_(std::move(queue)) {
+    task_.run = &LogWakeRelay::run;
+    task_.context = this;
+  }
+
+  LogWakeRelay(const LogWakeRelay&) = delete;
+  LogWakeRelay(LogWakeRelay&&) = delete;
+  auto operator=(const LogWakeRelay&) -> LogWakeRelay& = delete;
+  auto operator=(LogWakeRelay&&) -> LogWakeRelay& = delete;
+  ~LogWakeRelay() = default;
+
+  // Reserves the lane before a queue log handler is published, so a later
+  // request never has to start a thread under the log mutex. Throws
+  // std::system_error when the thread cannot be created.
+  static auto reserve_lane() -> void { static_cast<void>(lane()); }
+
+  [[nodiscard]] auto queue() const noexcept
+    -> const std::shared_ptr<mln::delivery::DeliveryQueueState>& {
+    return queue_;
+  }
+
+  // Asks the lane to wake the queue. Requests made while one is pending
+  // coalesce into it.
+  auto request() noexcept -> void {
+    const auto lock = std::scoped_lock{mutex_};
+    if (pending_ != nullptr) return;
+    pending_ = shared_from_this();
+    lane().submit(task_);
+  }
+
+ private:
+  static auto lane() -> mln::core::RetirementLane& {
+    static auto* lane = new mln::core::RetirementLane{};
+    return *lane;
+  }
+
+  static auto run(mln::core::RetirementTask* task) noexcept -> void {
+    auto* relay = static_cast<LogWakeRelay*>(task->context);
+    auto self = std::shared_ptr<LogWakeRelay>{};
+    {
+      const auto lock = std::scoped_lock{relay->mutex_};
+      self = std::move(relay->pending_);
+    }
+    // A request after this point submits the node again, which the lane
+    // allows once it has called run.
+    self->queue_->rewake();
+  }
+
+  std::shared_ptr<mln::delivery::DeliveryQueueState> queue_;
+  mln::core::RetirementTask task_;
+  std::mutex mutex_;
+  std::shared_ptr<LogWakeRelay> pending_;
+};
+
 // Copies each record into a delivery queue. A record the queue refuses goes to
 // the platform logger.
 class QueueLogObserver final : public mln::Log::Observer {
  public:
   QueueLogObserver(
-    std::shared_ptr<mln::delivery::DeliveryQueueState> queue, void* user_data,
+    std::shared_ptr<LogWakeRelay> relay, void* user_data,
     mln::delivery::ItemPtr retired
   ) noexcept
-      : queue_(std::move(queue)),
+      : relay_(std::move(relay)),
         user_data_(user_data),
         retired_(std::move(retired)) {}
 
@@ -76,13 +142,14 @@ class QueueLogObserver final : public mln::Log::Observer {
   auto operator=(QueueLogObserver&&) -> QueueLogObserver& = delete;
 
   // Retirement follows the handler's final record, where callback mode runs
-  // release_user_data.
+  // release_user_data. A replacement destroys this observer under the log
+  // mutex, so the wake goes through the relay too.
   ~QueueLogObserver() override {
     if (mln::core::process_exiting()) {
       mln::delivery::forget_item(std::move(retired_));
       return;
     }
-    static_cast<void>(queue_->push(retired_));
+    push(retired_);
   }
 
   auto onRecord(
@@ -107,14 +174,21 @@ class QueueLogObserver final : public mln::Log::Observer {
             mln::delivery::capture_mln_log_delivery(arena, record);
         }
       );
-      return queue_->push(item);
+      return push(item);
     } catch (...) {
       return false;
     }
   }
 
  private:
-  std::shared_ptr<mln::delivery::DeliveryQueueState> queue_;
+  auto push(mln::delivery::ItemPtr& item) noexcept -> bool {
+    auto needs_wake = false;
+    if (!relay_->queue()->push_without_wake(item, needs_wake)) return false;
+    if (needs_wake) relay_->request();
+    return true;
+  }
+
+  std::shared_ptr<LogWakeRelay> relay_;
   void* user_data_ = nullptr;
   mln::delivery::ItemPtr retired_;
 };
@@ -153,8 +227,9 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
     }
     auto queue = mln::delivery::resolve_delivery_queue(handler->queue);
     if (queue == nullptr) return recorded_handle_fault_status();
+    LogWakeRelay::reserve_lane();
     auto observer = std::make_unique<QueueLogObserver>(
-      std::move(queue), handler->user_data,
+      std::make_shared<LogWakeRelay>(std::move(queue)), handler->user_data,
       mln::delivery::make_light_item(
         MLN_DELIVERY_TYPE_RETIRED, handler->user_data
       )

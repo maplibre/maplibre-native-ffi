@@ -232,8 +232,9 @@ final class DeliveryQueue implements Finalizable {
             output,
             nativeDiagnostic,
           );
-          if (status == raw.MLN_STATUS_NOT_READY) return 0;
-          checkNativeCall(status);
+          // A failed drain leaves the deliveries queued and wakes this port
+          // again, so the next wake message retries.
+          if (status != nativeStatusOk) return 0;
           return output.value;
         });
         if (batch == 0) return;
