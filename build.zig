@@ -16,6 +16,7 @@ const BuildOptions = struct {
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath,
     libc_file: ?std.Build.LazyPath,
+    zig_lib_dir: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
@@ -582,6 +583,13 @@ fn addMaplibreNativeDocs(
     docs_step.dependOn(&install_docs.step);
 }
 
+fn appleMobileZigLibDir(b: *std.Build) std.Build.LazyPath {
+    const prepare = b.addSystemCommand(&.{"python3"});
+    prepare.addFileArg(b.path("scripts/prepare-zig-apple-stdlib.py"));
+    prepare.addDirectoryArg(.zig_lib);
+    return prepare.addOutputDirectoryArg("zig-lib");
+}
+
 fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Build.LazyPath) *std.Build.Step.Compile {
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -590,6 +598,7 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
             .optimize = options.optimize,
         }),
         .use_lld = if (isAppleMobile(options.target)) false else null,
+        .zig_lib_dir = options.zig_lib_dir,
     });
     tests.setLibCFile(options.libc_file);
     if (isAppleMobile(options.target)) {
@@ -722,6 +731,7 @@ pub fn build(b: *std.Build) void {
         .render_backend = backend,
         .system_root = system_root,
         .libc_file = libc_file,
+        .zig_lib_dir = if (isAppleMobile(target)) appleMobileZigLibDir(b) else null,
     };
 
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);
