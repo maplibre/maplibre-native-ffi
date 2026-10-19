@@ -242,7 +242,7 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
 }
 
 unsafe extern "C" {
-    // Binding-internal export from maplibre_native_c/callback_adapter.h,
+    // Binding-internal export from maplibre_native_c/binding_support.h,
     // which the sys crate does not bind.
     fn mln_adapter_render_session_abandon_at_exit(
         session: sys::mln_render_session,

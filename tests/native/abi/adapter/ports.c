@@ -3,6 +3,7 @@
 // messages without a Dart VM. A message is an integer, or an array of integers
 // and native pointers in the Dart_CObject layout of native API version 2.
 
+#include "maplibre_native_c/binding_support.h"
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
 #include "support/test_support.h"

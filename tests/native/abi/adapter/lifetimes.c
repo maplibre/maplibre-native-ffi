@@ -1,6 +1,7 @@
 // Adapter owners that end native lifetimes for a host: arenas and owner
 // tokens.
 
+#include "maplibre_native_c/binding_support.h"
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
 #include "support/test_support.h"

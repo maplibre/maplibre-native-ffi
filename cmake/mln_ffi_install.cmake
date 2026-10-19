@@ -300,9 +300,9 @@ function(mln_ffi_install_c_api_library target)
     FILES "${PROJECT_SOURCE_DIR}/include/maplibre_native_c.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  # The callback adapter headers are binding-internal support that bindings in
-  # this repository read from the source tree. Keep these exclusions in sync
-  # with the Apple framework's in cmake/mln_ffi_apple_framework.cmake, with the
+  # binding_support.h is binding-internal support that bindings in this
+  # repository read from the source tree. Keep this exclusion in sync with the
+  # Apple framework's in cmake/mln_ffi_apple_framework.cmake, with the
   # header-skew checks in bindings/dart/hook/build.dart and
   # bindings/rust/crates/maplibre-native-ffi-sys/build.rs, and with EXCLUDE in
   # docs/doxygen/Doxyfile.
@@ -312,8 +312,7 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
     FILES_MATCHING
     PATTERN "*.h"
-    PATTERN "callback_adapter.h" EXCLUDE
-    PATTERN "callback_capture_generated.h" EXCLUDE)
+    PATTERN "binding_support.h" EXCLUDE)
   # plugin.h includes MapLibre Native's plugin API from upstream's path.
   install(
     FILES

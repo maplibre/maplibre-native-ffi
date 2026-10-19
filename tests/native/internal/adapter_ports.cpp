@@ -12,6 +12,7 @@
 #include "internal/support/allocation_faults.hpp"
 #include "internal/support/checks.hpp"
 #include "maplibre_native_c.h"
+#include "maplibre_native_c/binding_support.h"
 #include "maplibre_native_c/callback_adapter.h"
 #include "runtime/runtime.hpp"
 #include "support/harness.h"

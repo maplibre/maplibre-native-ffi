@@ -19,6 +19,13 @@ schedules UI work on its own event loop. A wake callback announces work that is
 ready; it must return promptly without blocking or waiting for the receiver.
 Each callback's API reference states its threading and reentry rules.
 
+Some hosts, such as Dart isolates and JavaScript engines, receive a call from a
+native thread only after the callback has returned. The
+[callback adapter](/maplibre-native-ffi/reference/c/callback__adapter_8h.html)
+copies borrowed payloads, answers synchronous callbacks in native code, and
+delivers the copies to the host's own event loop. It sits outside the umbrella
+header, so a host that needs it includes it directly.
+
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
 runtime options and shutdown. The
 [creation guide](/maplibre-native-ffi/guides/create-a-map/) shows the first

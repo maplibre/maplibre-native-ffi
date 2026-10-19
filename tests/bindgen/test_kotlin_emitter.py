@@ -83,6 +83,7 @@ class KotlinLayoutTests(unittest.TestCase):
                         "maplibre_native_c.h",
                         "maplibre_native_c/plugin.h",
                         "maplibre_native_c/callback_adapter.h",
+                        "maplibre_native_c/binding_support.h",
                     ),
                     layout_assertions(api, width),
                     width,

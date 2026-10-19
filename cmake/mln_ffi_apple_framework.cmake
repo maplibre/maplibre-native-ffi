@@ -83,8 +83,7 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     COMPONENT "${component}"
     FILES_MATCHING
     PATTERN "*.h"
-    PATTERN "callback_adapter.h" EXCLUDE
-    PATTERN "callback_capture_generated.h" EXCLUDE)
+    PATTERN "binding_support.h" EXCLUDE)
   install(
     FILES "${MLN_FFI_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
     DESTINATION "${content}/Headers/mln/plugin"

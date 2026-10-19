@@ -16,7 +16,7 @@
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
-#include "maplibre_native_c/callback_adapter.h"
+#include "maplibre_native_c/binding_support.h"
 #include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"

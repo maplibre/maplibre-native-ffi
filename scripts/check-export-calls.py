@@ -28,9 +28,9 @@ SUITE_DIR = ROOT / "tests/native"
 # The internal suite's cases and helpers.
 EXCLUDED_DIRS = ("internal",)
 TEST_SUFFIXES = {".c", ".cpp", ".h", ".hpp", ".m", ".mm"}
-# Adapter entry points serve generated bindings rather than hosts, so the
-# report counts them separately.
-ADAPTER_HEADER = "callback_adapter.h"
+# Adapter and binding support entry points serve hosts and generated bindings
+# rather than map workflows, so the report counts them separately.
+ADAPTER_HEADERS = {"callback_adapter.h", "binding_support.h"}
 
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 LINE_COMMENT = re.compile(r"//[^\n]*")
@@ -186,8 +186,8 @@ def main() -> int:
     removed = [name for name in dict.fromkeys(baseline) if name not in exported]
     duplicates = sorted({name for name in baseline if baseline.count(name) > 1})
 
-    adapter = sum(1 for name in uncalled if exported[name] == ADAPTER_HEADER)
-    total_adapter = sum(1 for header in exported.values() if header == ADAPTER_HEADER)
+    adapter = sum(1 for name in uncalled if exported[name] in ADAPTER_HEADERS)
+    total_adapter = sum(1 for header in exported.values() if header in ADAPTER_HEADERS)
     print(
         f"{len(uncalled) - adapter} of {len(exported) - total_adapter} exported "
         f"non-adapter functions and {adapter} of {total_adapter} adapter "

@@ -24,6 +24,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "maplibre_native_c/binding_support.h"
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
 
