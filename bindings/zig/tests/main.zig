@@ -5,13 +5,13 @@ const maplibre = @import("maplibre_native_ffi");
 // test calls.
 comptime {
     @setEvalBranchQuota(100000);
-    for (@typeInfo(maplibre.generated).@"struct".decls) |decl| {
-        const value = @field(maplibre.generated, decl.name);
+    for (@typeInfo(maplibre.generated).@"struct".decl_names) |decl| {
+        const value = @field(maplibre.generated, decl);
         if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
     }
     for (.{ maplibre.MapDiscarding, maplibre.RenderSessionDiscarding }) |View| {
-        for (@typeInfo(View).@"struct".decls) |decl| {
-            const value = @field(View, decl.name);
+        for (@typeInfo(View).@"struct".decl_names) |decl| {
+            const value = @field(View, decl);
             if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
         }
     }

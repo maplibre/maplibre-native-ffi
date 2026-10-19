@@ -106,7 +106,10 @@ pub fn Future(comptime T: type) type {
         /// operation.
         pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             status.begin(diagnostic);
-            errdefer |err| status.fail(diagnostic, err);
+            return status.propagate(diagnostic, self.waitInner(diagnostic));
+        }
+
+        fn waitInner(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             const state = self.state orelse {
                 status.record(diagnostic, null, "Future is closed");
                 return error.InvalidState;

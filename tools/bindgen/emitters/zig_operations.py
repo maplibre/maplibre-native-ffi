@@ -11,11 +11,9 @@ from dataclasses import replace
 from ..semantic import output_member
 from .zig import (
     DIAGNOSTIC_PARAMETER,
-    DIAGNOSTIC_PREAMBLE,
     camel,
     failure,
     identifier,
-    status_call,
 )
 from .zig_dynamic_values import dynamic
 
@@ -341,28 +339,13 @@ def operation(plan, values, *, discard=False):
 
 def view_operation(plan, values):
     view = plan.view
-    functions = values.bound.source.functions_by_name
-    begin = status_call(functions[view.begin], ["lease.native", "&token"])
-    get = status_call(plan.function, ["lease.native", "&raw"])
-    preamble = "\n    ".join(DIAGNOSTIC_PREAMBLE)
     value = view.output.value.element
     values.add(value)
     handle_type = values.public(
         next(p.value for p in plan.inputs if p.name == plan.receiver)
     )
     typ = values.public(value)
-    code = f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result, {DIAGNOSTIC_PARAMETER}) anyerror!Result {{
-    {preamble}
-    try callback.check("{plan.name}", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    {begin}
-    defer c.{view.end}(token);
-    var raw: c.{value.native} = std.mem.zeroes(c.{value.native});
-    raw.size = @sizeOf(c.{value.native});
-    {get}
-    return use(context, {typ}.fromNative(raw));
+    return f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result, {DIAGNOSTIC_PARAMETER}) anyerror!Result {{
+    return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, Result, handle, context, use, diagnostic);
 }}
 '''
-    return code

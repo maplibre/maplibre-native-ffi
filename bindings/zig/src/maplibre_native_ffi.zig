@@ -5902,18 +5902,7 @@ pub fn acquiredFrameDispose(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diag
 /// See `mln_acquired_frame_get_metal_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), MetalTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_acquired_frame_get_metal_texture", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_acquired_frame_view_end(token);
-    var raw: c.mln_metal_texture_frame = std.mem.zeroes(c.mln_metal_texture_frame);
-    raw.size = @sizeOf(c.mln_metal_texture_frame);
-    try status.call(c.mln_acquired_frame_get_metal_texture, .{ lease.native, &raw }, diagnostic);
-    return use(context, MetalTextureFrame.fromNative(raw));
+    return call.scopedView("mln_acquired_frame_get_metal_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", MetalTextureFrame, Result, handle, context, use, diagnostic);
 }
 
 /// Copies OpenGL-native metadata from an acquired frame.
@@ -5921,18 +5910,7 @@ pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame
 /// See `mln_acquired_frame_get_opengl_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), OpenglTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_acquired_frame_get_opengl_texture", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_acquired_frame_view_end(token);
-    var raw: c.mln_opengl_texture_frame = std.mem.zeroes(c.mln_opengl_texture_frame);
-    raw.size = @sizeOf(c.mln_opengl_texture_frame);
-    try status.call(c.mln_acquired_frame_get_opengl_texture, .{ lease.native, &raw }, diagnostic);
-    return use(context, OpenglTextureFrame.fromNative(raw));
+    return call.scopedView("mln_acquired_frame_get_opengl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenglTextureFrame, Result, handle, context, use, diagnostic);
 }
 
 /// Copies the producer synchronization for an acquired texture frame.
@@ -5940,18 +5918,7 @@ pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFram
 /// See `mln_acquired_frame_get_producer_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), GpuSync) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_acquired_frame_get_producer_sync", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_acquired_frame_view_end(token);
-    var raw: c.mln_gpu_sync = std.mem.zeroes(c.mln_gpu_sync);
-    raw.size = @sizeOf(c.mln_gpu_sync);
-    try status.call(c.mln_acquired_frame_get_producer_sync, .{ lease.native, &raw }, diagnostic);
-    return use(context, GpuSync.fromNative(raw));
+    return call.scopedView("mln_acquired_frame_get_producer_sync", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", GpuSync, Result, handle, context, use, diagnostic);
 }
 
 /// Copies common metadata for an acquired frame.
@@ -5967,18 +5934,7 @@ pub fn acquiredFrameGetResult(frame: AcquiredFrame, diagnostic: ?*diagnostics.Di
 /// See `mln_acquired_frame_get_vulkan_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), VulkanTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_acquired_frame_get_vulkan_texture", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_acquired_frame_view_end(token);
-    var raw: c.mln_vulkan_texture_frame = std.mem.zeroes(c.mln_vulkan_texture_frame);
-    raw.size = @sizeOf(c.mln_vulkan_texture_frame);
-    try status.call(c.mln_acquired_frame_get_vulkan_texture, .{ lease.native, &raw }, diagnostic);
-    return use(context, VulkanTextureFrame.fromNative(raw));
+    return call.scopedView("mln_acquired_frame_get_vulkan_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", VulkanTextureFrame, Result, handle, context, use, diagnostic);
 }
 
 /// Copies WebGPU-native metadata from an acquired frame.
@@ -5986,18 +5942,7 @@ pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFram
 /// See `mln_acquired_frame_get_webgpu_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), WebgpuTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_acquired_frame_get_webgpu_texture", handle.raw);
-    const lease = try handle.borrow(diagnostic);
-    defer lease.release();
-    var token: ?*anyopaque = null;
-    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_acquired_frame_view_end(token);
-    var raw: c.mln_webgpu_texture_frame = std.mem.zeroes(c.mln_webgpu_texture_frame);
-    raw.size = @sizeOf(c.mln_webgpu_texture_frame);
-    try status.call(c.mln_acquired_frame_get_webgpu_texture, .{ lease.native, &raw }, diagnostic);
-    return use(context, WebgpuTextureFrame.fromNative(raw));
+    return call.scopedView("mln_acquired_frame_get_webgpu_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", WebgpuTextureFrame, Result, handle, context, use, diagnostic);
 }
 
 /// Releases an acquired frame after optional consumer GPU work.

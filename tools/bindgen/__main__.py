@@ -213,6 +213,12 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         "--quiet",
         str(staging / "bindings/swift/Sources/MaplibreNativeFFI/Generated"),
     )
+    # Dart formats staged files with the binding package's language version.
+    dart_config = Path("bindings/dart/.dart_tool/package_config.json")
+    if (ROOT / dart_config).exists():
+        target = staging / dart_config
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / dart_config).read_bytes())
     run_tool("dart", "format", *staged(".dart"), cwd=ROOT / "bindings/dart", quiet=True)
     run_tool(
         "env",

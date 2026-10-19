@@ -34,6 +34,9 @@ harness_flags=(
   -sPROXY_TO_PTHREAD
   # The fixtures create their own OffscreenCanvas.
   "-sOFFSCREENCANVASES_TO_PTHREAD=''"
+  # wasm-ld implements ELF --wrap=foo as __wrap_foo / __real_foo. Wrap `main`
+  # so the C shim can force-exit after Rust 1.99's harness returns.
+  "-Wl,--wrap=main"
   "$proxy_main_object"
 )
 

@@ -75,7 +75,7 @@ pub fn Handle(comptime name: []const u8, comptime public: []const u8, comptime d
         }
 
         fn lock() void {
-            std.Io.Threaded.mutexLock(&mutex);
+            std.Io.Threaded.mutexLockUncancelable(&mutex);
         }
         fn unlock() void {
             std.Io.Threaded.mutexUnlock(&mutex);

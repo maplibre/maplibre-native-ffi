@@ -2,14 +2,20 @@
     .name = .zig_map,
     .version = "0.16.0",
     .dependencies = .{
+        // Pinned to the mitchellh/zig-objc#36 head for Zig 0.17 support.
+        // Move this back to an upstream main commit once #36 merges.
         .zig_objc = .{
-            .url = "git+https://github.com/mitchellh/zig-objc.git#c8de82ff80281215ad92900866dab7103a8efa8b",
-            .hash = "zig_objc-0.0.0-Ir_Sp9gsAQCPAJc0oF5xoWePHWP6Y6tCphDeyNUThJoi",
+            .url = "https://github.com/mitchellh/zig-objc/archive/3352c12a868f8787ab71bf2ca6eab9fcfb635c52.tar.gz",
+            .hash = "zig_objc-0.0.0-Ir_Sp_4tAQDXtPi51nW_jD9LOEzBvU9lofwO9Pzi6IB4",
         },
         .maplibre_native_ffi = .{ .path = "../.." },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.17.x#cfac21f3199b2b02ce3fd7db652aa456421fe4ab",
+            .hash = "translate_c-2.0.2-Q_BUWvBNBwDnyehSiuAJmdFcMYHYGA-Jc3KiYdrV2Dqx",
+        },
         .zigglgen = .{
-            .url = "git+https://github.com/castholm/zigglgen.git#7e55ad15655fc4d602ed3bcbe7fb487592063156",
-            .hash = "zigglgen-0.5.0-ziggltzDLwA0Gk0Pj6QMij1j6Z_jkvGEtGKBM6-YlI_s",
+            .url = "git+https://github.com/castholm/zigglgen.git#38bfc858ce2182fcb9d5d1819210f97beb4a19d3",
+            .hash = "zigglgen-0.5.1-ziggliTOLwAZfmk4DG9VLmHGE2BexC4o_O5yZKW37vfl",
         },
         .sdl = .{
             .url = "git+https://github.com/castholm/SDL.git#1b67d371a531ecb0499d4b80a865631c299f472a",

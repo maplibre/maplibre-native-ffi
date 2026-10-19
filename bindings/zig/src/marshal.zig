@@ -33,7 +33,7 @@ pub fn CallbackFunction(comptime T: type) type {
 }
 
 pub fn CallbackArg(comptime T: type, comptime index: usize) type {
-    return @typeInfo(CallbackFunction(T)).@"fn".params[index].type.?;
+    return @typeInfo(CallbackFunction(T)).@"fn".param_types[index].?;
 }
 
 pub fn CallbackResult(comptime T: type) type {
@@ -42,7 +42,7 @@ pub fn CallbackResult(comptime T: type) type {
 
 pub fn cString(allocator: std.mem.Allocator, bytes: []const u8) status.Error![*:0]const u8 {
     if (std.mem.indexOfScalar(u8, bytes, 0) != null) return error.InvalidString;
-    return (try allocator.dupeZ(u8, bytes)).ptr;
+    return (try allocator.dupeSentinel(u8, bytes, 0)).ptr;
 }
 
 pub fn store(allocator: std.mem.Allocator, value: anytype) status.Error!*const @TypeOf(value) {
@@ -104,10 +104,10 @@ pub fn EnumMethods(comptime T: type) type {
     const Raw = @typeInfo(T).@"enum".tag_type;
     return struct {
         pub fn fromNative(raw: Raw) T {
-            return @enumFromInt(raw);
+            return @fromBackingInt(raw);
         }
         pub fn toNative(self: T) Raw {
-            return @intFromEnum(self);
+            return @backingInt(self);
         }
     };
 }
@@ -119,7 +119,7 @@ pub fn EnumMethods(comptime T: type) type {
 /// not name.
 pub fn FlagMethods(comptime T: type) type {
     const Raw = @FieldType(T, "unknown_bits");
-    const flags = @typeInfo(T).@"struct".fields[0..T.native_bits.len];
+    const flags = @typeInfo(T).@"struct".field_names[0..T.native_bits.len];
     const known = blk: {
         var mask: Raw = 0;
         for (T.native_bits) |bit| mask |= bit;
@@ -128,13 +128,13 @@ pub fn FlagMethods(comptime T: type) type {
     return struct {
         pub fn fromNative(raw: Raw) T {
             var result: T = .{ .unknown_bits = raw & ~known };
-            inline for (flags, T.native_bits) |flag, bit| @field(result, flag.name) = raw & bit != 0;
+            inline for (flags, T.native_bits) |flag, bit| @field(result, flag) = raw & bit != 0;
             return result;
         }
         pub fn toNative(self: T) Raw {
             var raw = self.unknown_bits;
             inline for (flags, T.native_bits) |flag, bit| {
-                if (@field(self, flag.name)) raw |= bit;
+                if (@field(self, flag)) raw |= bit;
             }
             return raw;
         }
@@ -188,7 +188,7 @@ pub fn decode(comptime T: type, raw: anytype, context: Decode) status.Error!T {
         .@"struct", .@"enum", .@"union" => {
             if (@hasDecl(T, "native_name")) return T.adopt(raw, context.parent);
             if (@hasDecl(T, "fromNative")) {
-                return switch (@typeInfo(@TypeOf(T.fromNative)).@"fn".params.len) {
+                return switch (@typeInfo(@TypeOf(T.fromNative)).@"fn".param_types.len) {
                     1 => T.fromNative(raw),
                     else => try T.fromNative(context.alloc(), raw),
                 };

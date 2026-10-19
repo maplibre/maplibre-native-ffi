@@ -44,8 +44,8 @@ fn an_owned_texture_session_renders_a_frame_the_binding_reads_back() {
         frame.info.stride as usize * frame.info.height as usize
     );
     for row in frame.data.chunks_exact(frame.info.stride as usize) {
-        for pixel in row[..32 * 4].chunks_exact(4) {
-            assert_eq!(pixel, BACKGROUND_RGBA);
+        for pixel in row[..32 * 4].as_chunks::<4>().0 {
+            assert_eq!(*pixel, BACKGROUND_RGBA);
         }
     }
     session.close();

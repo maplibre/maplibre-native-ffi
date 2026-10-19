@@ -42,9 +42,9 @@ pub fn cString(bytes: []const u8) CString {
 
 fn Output(comptime T: type, comptime sized: bool, comptime parent: Parent) type {
     return struct {
-        const Value = T;
-        const sets_size = sized;
-        const retains = parent;
+        pub const Value = T;
+        pub const sets_size = sized;
+        pub const retains = parent;
     };
 }
 
@@ -53,9 +53,9 @@ pub fn out(comptime T: type) Output(T, false, .none) {
 }
 
 pub fn outArray(comptime T: type, count: usize) struct {
-    const Value = marshal.OwnedValue([]const T);
-    const array_element = T;
-    const retains: Parent = .none;
+    pub const Value = marshal.OwnedValue([]const T);
+    pub const array_element = T;
+    pub const retains: Parent = .none;
     count: usize,
 } {
     return .{ .count = count };
@@ -87,46 +87,46 @@ fn isHandle(comptime T: type) bool {
 }
 
 fn Param(comptime function: anytype, comptime index: usize) type {
-    return @typeInfo(@TypeOf(function)).@"fn".params[index].type.?;
+    return @typeInfo(@TypeOf(function)).@"fn".param_types[index].?;
 }
 
-fn argumentFields(comptime Args: type) []const std.builtin.Type.StructField {
-    return @typeInfo(Args).@"struct".fields;
+fn argumentTypes(comptime Args: type) []const type {
+    return @typeInfo(Args).@"struct".field_types;
 }
 
 fn Outputs(comptime Args: type) type {
     var types: []const type = &.{};
-    for (argumentFields(Args)) |field| {
-        if (isOutput(field.type)) types = types ++ .{field.type.Value};
+    for (argumentTypes(Args)) |Field| {
+        if (isOutput(Field)) types = types ++ .{Field.Value};
     }
     return switch (types.len) {
         0 => void,
         1 => types[0],
-        else => std.meta.Tuple(types),
+        else => @Tuple(types),
     };
 }
 
 fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type) type {
-    const fields = argumentFields(Args);
+    const fields = argumentTypes(Args);
     var types: [fields.len]type = undefined;
-    for (fields, 0..) |field, index| {
-        types[index] = if (isHandle(field.type))
-            field.type.Lease
-        else if (isOutput(field.type))
-            if (@hasDecl(field.type, "array_element"))
+    for (fields, 0..) |Field, index| {
+        types[index] = if (isHandle(Field))
+            Field.Lease
+        else if (isOutput(Field))
+            if (@hasDecl(Field, "array_element"))
                 []@typeInfo(Param(function, offset + index)).pointer.child
             else
                 @typeInfo(Param(function, offset + index)).pointer.child
         else
             void;
     }
-    return std.meta.Tuple(&types);
+    return @Tuple(&types);
 }
 
 fn Native(comptime function: anytype, comptime count: usize) type {
     var types: [count]type = undefined;
     for (0..count) |index| types[index] = Param(function, index);
-    return std.meta.Tuple(&types);
+    return @Tuple(&types);
 }
 
 fn Receiver(comptime access: Access, comptime T: type) type {
@@ -225,7 +225,7 @@ fn Receiver(comptime access: Access, comptime T: type) type {
 fn Operation(comptime name: []const u8, comptime access: Access, comptime ReceiverType: type, comptime Allocator: type, comptime Args: type) type {
     const function = @field(c, name);
     const offset: usize = if (access == .none) 0 else 1;
-    const fields = argumentFields(Args);
+    const fields = argumentTypes(Args);
     return struct {
         const Self = @This();
         const Hold = Receiver(access, ReceiverType);
@@ -256,8 +256,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         /// Releases what the call holds. A call that failed before it settled
         /// rolls back its receiver and releases its roots unaccepted.
         fn end(self: *Self) void {
-            inline for (fields, 0..) |field, index| {
-                if (comptime isHandle(field.type)) {
+            inline for (fields, 0..) |Field, index| {
+                if (comptime isHandle(Field)) {
                     if (index < self.leased) self.held[index].release();
                 }
             }
@@ -280,15 +280,15 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             } else if (offset == 1) {
                 native[0] = self.receiver.native();
             }
-            inline for (fields, 0..) |field, index| {
+            inline for (fields, 0..) |Field, index| {
                 const Parameter = Param(function, offset + index);
-                const input = @field(args, field.name);
-                if (comptime isHandle(field.type)) {
+                const input = args[index];
+                if (comptime isHandle(Field)) {
                     self.held[index] = try input.lease(self.diagnostic);
                     self.leased = index + 1;
                     native[offset + index] = self.held[index].native;
-                } else if (comptime isOutput(field.type)) {
-                    if (comptime @hasDecl(field.type, "array_element")) {
+                } else if (comptime isOutput(Field)) {
+                    if (comptime @hasDecl(Field, "array_element")) {
                         const Element = @typeInfo(Parameter).pointer.child;
                         self.held[index] = try self.inputAllocator().alloc(Element, input.count);
                         for (self.held[index]) |*item| {
@@ -298,7 +298,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                         native[offset + index] = self.held[index].ptr;
                     } else {
                         self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
-                        if (field.type.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
+                        if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
                         native[offset + index] = &self.held[index];
                     }
                 } else {
@@ -319,13 +319,13 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             }
             if (Target == c.mln_buffer_view and Input == []const u8) return marshal.view(input);
             switch (@typeInfo(Target)) {
-                .pointer => |pointer| return self.encodePointer(Target, pointer.child, pointer.is_const, input),
+                .pointer => |pointer| return self.encodePointer(Target, pointer.child, pointer.attrs.@"const", input),
                 .int => if (@typeInfo(Input) == .int) return std.math.cast(Target, input) orelse error.InvalidArgument,
                 else => {},
             }
             switch (@typeInfo(Input)) {
                 .@"struct", .@"enum", .@"union" => if (@hasDecl(Input, "toNative")) {
-                    return switch (@typeInfo(@TypeOf(Input.toNative)).@"fn".params.len) {
+                    return switch (@typeInfo(@TypeOf(Input.toNative)).@"fn".param_types.len) {
                         1 => self.encode(Target, input.toNative()),
                         else => try input.toNative(self.inputAllocator(), &self.roots),
                     };
@@ -376,8 +376,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             };
         }
 
-        fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].type.Value {
-            const Step = fields[index].type;
+        fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].Value {
+            const Step = fields[index];
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
             if (comptime @hasDecl(Step, "array_element")) {
                 var arena = std.heap.ArenaAllocator.init(allocator);
@@ -398,8 +398,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
 
 fn outputIndices(comptime Args: type) []const usize {
     var indices: []const usize = &.{};
-    for (argumentFields(Args), 0..) |field, index| {
-        if (isOutput(field.type)) indices = indices ++ .{index};
+    for (argumentTypes(Args), 0..) |Field, index| {
+        if (isOutput(Field)) indices = indices ++ .{index};
     }
     return indices;
 }
@@ -421,7 +421,17 @@ pub fn invoke(
     args: anytype,
 ) Error!Outputs(@TypeOf(args)) {
     status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
+    return status.propagate(diagnostic, invokeInner(name, access, receiver, allocator, diagnostic, args));
+}
+
+fn invokeInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Outputs(@TypeOf(args)));
     defer op.end();
@@ -444,7 +454,18 @@ pub fn invokeUnless(
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
     status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
+    return status.propagate(diagnostic, invokeUnlessInner(name, access, receiver, allocator, diagnostic, absent, args));
+}
+
+fn invokeUnlessInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    comptime absent: i32,
+    args: anytype,
+) Error!?Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     // Only a closing call finds its receiver closed, and a close has no output.
     var op = (try Op.begin(receiver, allocator, diagnostic)).?;
@@ -470,7 +491,17 @@ pub fn invokeDeclinable(
     args: anytype,
 ) Error!bool {
     status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
+    return status.propagate(diagnostic, invokeDeclinableInner(name, access, receiver, allocator, diagnostic, args));
+}
+
+fn invokeDeclinableInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!bool {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
     // Only a closing call finds its receiver closed, and a close declines nothing.
@@ -537,7 +568,18 @@ pub fn submit(
     args: anytype,
 ) Error!Submitted(Copy, @TypeOf(args)) {
     status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
+    return status.propagate(diagnostic, submitInner(name, access, receiver, Copy, allocator, diagnostic, args));
+}
+
+fn submitInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    comptime Copy: type,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!Submitted(Copy, @TypeOf(args)) {
     const Allocator = @TypeOf(allocator);
     const Op = Operation(name, access, @TypeOf(receiver), Allocator, @TypeOf(args));
     var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Submitted(Copy, @TypeOf(args)));
@@ -575,7 +617,17 @@ pub fn discard(
     args: anytype,
 ) Error!void {
     status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
+    return status.propagate(diagnostic, discardInner(name, access, receiver, allocator, diagnostic, args));
+}
+
+fn discardInner(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!void {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     var op = (try Op.begin(receiver, allocator, diagnostic)).?;
     defer op.end();
@@ -583,6 +635,45 @@ pub fn discard(
     try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
     op.receiver.succeed(&op.roots);
     op.settled = true;
+}
+
+pub fn scopedView(
+    comptime name: []const u8,
+    comptime begin: []const u8,
+    comptime end: []const u8,
+    comptime Value: type,
+    comptime Result: type,
+    receiver: anytype,
+    context: anytype,
+    comptime use: *const fn (@TypeOf(context), Value) anyerror!Result,
+    diagnostic: ?*Diagnostic,
+) anyerror!Result {
+    status.begin(diagnostic);
+    return status.propagate(diagnostic, scopedViewInner(name, begin, end, Value, Result, receiver, context, use, diagnostic));
+}
+
+fn scopedViewInner(
+    comptime name: []const u8,
+    comptime begin: []const u8,
+    comptime end: []const u8,
+    comptime Value: type,
+    comptime Result: type,
+    receiver: anytype,
+    context: anytype,
+    comptime use: *const fn (@TypeOf(context), Value) anyerror!Result,
+    diagnostic: ?*Diagnostic,
+) anyerror!Result {
+    try callback.check(name, receiver.raw);
+    const lease = try receiver.borrow(diagnostic);
+    defer lease.release();
+    var token: ?*anyopaque = null;
+    try status.call(@field(c, begin), .{ lease.native, &token }, diagnostic);
+    defer @field(c, end)(token);
+    const Raw = @typeInfo(Param(@field(c, name), 1)).pointer.child;
+    var raw: Raw = std.mem.zeroes(Raw);
+    raw.size = @sizeOf(Raw);
+    try status.call(@field(c, name), .{ lease.native, &raw }, diagnostic);
+    return use(context, Value.fromNative(raw));
 }
 
 // Copy completion values before native reuses their storage.

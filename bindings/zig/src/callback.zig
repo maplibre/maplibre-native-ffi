@@ -164,7 +164,7 @@ var finalizer_tail: ?*Finalizer = null;
 
 pub fn initialize() status.Error!void {
     if (@import("builtin").target.os.tag == .emscripten) return;
-    std.Io.Threaded.mutexLock(&finalizer_mutex);
+    std.Io.Threaded.mutexLockUncancelable(&finalizer_mutex);
     defer std.Io.Threaded.mutexUnlock(&finalizer_mutex);
     if (finalizer_started) return;
     const worker = std.Thread.spawn(.{}, runFinalizers, .{}) catch return error.OutOfMemory;
@@ -173,7 +173,7 @@ pub fn initialize() status.Error!void {
 }
 fn runFinalizers() void {
     while (true) {
-        std.Io.Threaded.mutexLock(&finalizer_mutex);
+        std.Io.Threaded.mutexLockUncancelable(&finalizer_mutex);
         while (finalizer_head == null) finalizer_ready.waitUncancelable(finalizer_io.io(), &finalizer_mutex);
         const task = finalizer_head.?;
         finalizer_head = task.next;
@@ -197,7 +197,7 @@ pub fn finalize(task: *Finalizer) void {
         }.run, task, 0);
         return;
     }
-    std.Io.Threaded.mutexLock(&finalizer_mutex);
+    std.Io.Threaded.mutexLockUncancelable(&finalizer_mutex);
     if (finalizer_tail) |tail| tail.next = task else finalizer_head = task;
     finalizer_tail = task;
     task.next = null;

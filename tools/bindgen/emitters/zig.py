@@ -43,10 +43,6 @@ def failure(decl: Function | Record, reason: str) -> ModelError:
 
 
 DIAGNOSTIC_PARAMETER = "diagnostic: ?*diagnostics.Diagnostic"
-DIAGNOSTIC_PREAMBLE = [
-    "status.begin(diagnostic);",
-    "errdefer |err| status.fail(diagnostic, err);",
-]
 
 
 def status_call(

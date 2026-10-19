@@ -32,10 +32,9 @@ fn sdlLibrary(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const library = sdl.artifact("SDL3");
     if (options.target.result.os.tag == .macos) {
         if (options.system_root) |system_root| {
-            const system_root_path = system_root.getPath(b);
-            library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
-            library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
-            library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
+            library.root_module.addSystemIncludePath(system_root.path(b, b.pathJoin(&.{ "usr", "include" })));
+            library.root_module.addLibraryPath(system_root.path(b, b.pathJoin(&.{ "usr", "lib" })));
+            library.root_module.addSystemFrameworkPath(system_root.path(b, b.pathJoin(&.{ "System", "Library", "Frameworks" })));
         }
     }
     return library;
@@ -150,6 +149,6 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run Zig map example");
     const zig_map = addZigMapExample(b, options);
     const run_zig_map = b.addRunArtifact(zig_map);
-    if (b.args) |args| run_zig_map.addArgs(args);
+    run_zig_map.addPassthruArgs();
     run_step.dependOn(&run_zig_map.step);
 }

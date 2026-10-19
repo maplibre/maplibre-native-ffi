@@ -10,7 +10,7 @@ const support = @import("fixture.zig");
 // Host strings cross as views. Native rejects NUL in paths before a C-string
 // consumer reads them, while other views preserve NUL.
 test "host strings use views and native-lent strings decode" {
-    const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".params[1].type.?;
+    const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[1].?;
     var raw_request = std.mem.zeroes(RawRequest);
     raw_request.resolved_url = "custom://native-lent/é";
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
@@ -70,7 +70,7 @@ test "optional fields and masks round-trip through presence bits" {
 // record size the binding was built with, and a payload tag the binding does
 // not know decodes as `.unknown` with its raw value.
 test "a strided event batch with an unknown payload arm decodes without loss" {
-    const RawBatch = @typeInfo(@TypeOf(maplibre.EventBatchView.fromNative)).@"fn".params[1].type.?;
+    const RawBatch = @typeInfo(@TypeOf(maplibre.EventBatchView.fromNative)).@"fn".param_types[1].?;
     const RawEvent = @typeInfo(@FieldType(RawBatch, "events")).pointer.child;
     const Record = extern struct { event: RawEvent, newer_fields: [24]u8 };
 
@@ -83,7 +83,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     records[0].event.message_offset = 0;
     records[0].event.message_size = 6;
     records[0].newer_fields = @splat(0xa5);
-    records[1].event.type = @intFromEnum(maplibre.RuntimeEventType.map_style_loaded);
+    records[1].event.type = @backingInt(maplibre.RuntimeEventType.map_style_loaded);
     records[1].event.message_offset = 7;
     records[1].event.message_size = 6;
     var raw = std.mem.zeroes(RawBatch);
@@ -98,7 +98,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     defer arena.deinit();
     const view = try maplibre.EventBatchView.fromNative(arena.allocator(), raw);
     try testing.expectEqual(@as(usize, 2), view.events.len);
-    try testing.expectEqual(@as(u32, 999), @intFromEnum(view.events[0].type));
+    try testing.expectEqual(@as(u32, 999), @backingInt(view.events[0].type));
     try testing.expectEqual(@as(u64, 0xfeed_0000_0000_0001), view.events[0].source);
     try testing.expectEqual(@as(u64, 0x1_0000_0002), view.events[0].generation);
     try testing.expectEqual(@as(u32, 77), view.events[0].payload.unknown);
@@ -116,7 +116,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     defer fixture.destroy();
     try fixture.loadStyle();
 
-    try testing.expectError(error.InvalidArgument, maplibre.networkSetStatus(@enumFromInt(900), null));
+    try testing.expectError(error.InvalidArgument, maplibre.networkSetStatus(@fromBackingInt(900), null));
 
     // Cancelling the identifier ends only the ease that carries it, so the
     // identifier crossed whole both times. The end handler sits two records

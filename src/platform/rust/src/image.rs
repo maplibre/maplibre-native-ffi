@@ -93,7 +93,7 @@ fn decode_image(encoded: &[u8]) -> Result<MlnRustDecodedImage, String> {
 }
 
 fn premultiply_rgba(data: &mut [u8]) {
-    for pixel in data.chunks_exact_mut(4) {
+    for pixel in data.as_chunks_mut::<4>().0 {
         let alpha = u16::from(pixel[3]);
         pixel[0] = premultiply_channel(pixel[0], alpha);
         pixel[1] = premultiply_channel(pixel[1], alpha);

@@ -16,7 +16,7 @@ pub const Latch = struct {
     }
 
     pub fn wait(self: *Latch) void {
-        std.Io.Threaded.mutexLock(&self.gate);
+        std.Io.Threaded.mutexLockUncancelable(&self.gate);
         std.Io.Threaded.mutexUnlock(&self.gate);
     }
 };

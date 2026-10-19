@@ -52,7 +52,7 @@ pub fn waitDriver() void {
 /// Returns the code of an app event, or null for any other SDL event.
 pub fn codeOf(event: *const c.SDL_Event) ?Code {
     if (event.type != event_type) return null;
-    return @enumFromInt(event.user.code);
+    return @fromBackingInt(event.user.code);
 }
 
 /// A wake that pushes an app event with `code` from any native thread.
@@ -69,18 +69,18 @@ pub fn pushAfter(code: Code, delay_ms: u32) void {
 
 fn contextFor(code: Code) ?*anyopaque {
     // The code travels in the context pointer, offset so it is never null.
-    return @ptrFromInt(@as(usize, @intCast(@intFromEnum(code))) + 1);
+    return @ptrFromInt(@as(usize, @intCast(@backingInt(code))) + 1);
 }
 
 fn codeFor(context: ?*anyopaque) Code {
-    return @enumFromInt(@as(i32, @intCast(@intFromPtr(context) - 1)));
+    return @fromBackingInt(@as(i32, @intCast(@intFromPtr(context) - 1)));
 }
 
 /// Pushes an app event with `code` from any thread.
 pub fn push(code: Code) void {
     var event = std.mem.zeroes(c.SDL_Event);
     event.user.type = event_type;
-    event.user.code = @intFromEnum(code);
+    event.user.code = @backingInt(code);
     // A native queue wakes again only after its next drain, so a lost push
     // stalls the loop. SDL's queue holds far more events than these wakes post.
     if (!c.SDL_PushEvent(&event)) {

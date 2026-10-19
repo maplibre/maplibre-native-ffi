@@ -37,14 +37,21 @@ pub fn begin(diagnostic: ?*diagnostics.Diagnostic) void {
 }
 
 /// Records a binding error into `diagnostic` unless the failing step already
-/// recorded details. Generated functions run it from `errdefer`, so an error
-/// from a host callback passes through without a message.
+/// recorded details. An error from a host callback passes through without a
+/// message.
 pub fn fail(diagnostic: ?*diagnostics.Diagnostic, err: anyerror) void {
     const target = diagnostic orelse return;
     if (target.recorded) return;
-    inline for (@typeInfo(Error).error_set.?) |binding_error| {
-        if (err == @field(anyerror, binding_error.name)) return record(target, null, bindingMessage(err));
+    inline for (@typeInfo(Error).error_set.error_names.?) |binding_error| {
+        if (err == @field(anyerror, binding_error)) return record(target, null, bindingMessage(err));
     }
+}
+
+pub fn propagate(diagnostic: ?*diagnostics.Diagnostic, result: anytype) @TypeOf(result) {
+    return result catch |err| {
+        fail(diagnostic, err);
+        return err;
+    };
 }
 
 /// Copies `message`, truncated to the buffer, and `raw_status` into
@@ -198,7 +205,7 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
     try std.testing.expectEqualStrings("unknown", diagnostic.message());
 
-    record(&diagnostic, -1, "x" ** 8192);
+    record(&diagnostic, -1, &@as([8192]u8, @splat('x')));
     try std.testing.expectEqual(diagnostic.native.message.len - 1, diagnostic.message().len);
     begin(&diagnostic);
     try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);

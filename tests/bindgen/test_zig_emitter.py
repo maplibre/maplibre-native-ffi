@@ -1,14 +1,12 @@
 """Test generated Zig with the handwritten runtime against a C implementation."""
 
 import shutil
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from support import (
     FIXTURES,
-    PROTOCOLS_STUB,
     ROOT,
     parse_sources,
     protocol_header,
@@ -49,31 +47,15 @@ class ZigEmitterTests(unittest.TestCase):
             for path in (BINDING / "src").glob("*.zig"):
                 if not (source / path.name).exists() and path.name != "c.zig":
                     shutil.copy(path, source / path.name)
-            # translate-c stands in for the build's C module. It spins when
-            # stdout is a pipe, so it writes to a file.
-            with (source / "c_api.zig").open("w") as translated:
-                result = subprocess.run(
-                    [zig_tool.executable, "translate-c", str(root / "api.h")],
-                    cwd=root,
-                    env=zig_tool.env,
-                    stdout=translated,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=120,
-                    check=False,
-                )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            (source / "c.zig").write_text('pub const raw = @import("c_api.zig");\n')
+            shutil.copy(ROOT / "build.zig.zon", root)
+            shutil.copy(FIXTURES / "probes/zig/build.zig", root)
+            (source / "c.zig").write_text('pub const raw = @import("c_api");\n')
             shutil.copy(FIXTURES / "probes/zig/probe_test.zig", source)
             zig_tool.run(
                 self,
+                "build",
                 "test",
-                str(source / "probe_test.zig"),
-                str(PROTOCOLS_STUB),
-                f"-I{FIXTURES}",
-                "-lc",
-                "--test-filter",
-                "generated",
+                f"-Dfixture-dir={FIXTURES}",
                 cwd=root,
                 timeout=300,
                 output=root / "zig-test.log",
