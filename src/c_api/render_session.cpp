@@ -28,7 +28,7 @@ auto mln_render_session_attach_options_default() noexcept
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
     .requested_texture_ring_depth = 1,
-    .reserved = 0,
+    .producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE,
     .frame_wake = mln_wake{},
     .driver_work_wake = mln_wake{},
     .queue_lock = mln_queue_lock{},

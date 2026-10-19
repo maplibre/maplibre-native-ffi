@@ -3,6 +3,10 @@
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
 
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+#include <EGL/egl.h>
+#endif
+
 #include "support/frames.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
@@ -228,6 +232,128 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
+  bool borrowed
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    runtime, map, mln_test_red_background_style_json
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_opengl_fence_texture(
+      map, &fixture, borrowed
+    ),
+    mln_test_graphics_last_error()
+  );
+  void* (*fence_sync)(unsigned, unsigned) =
+    (void* (*)(unsigned, unsigned))eglGetProcAddress("glFenceSync");
+  void (*wait_sync)(void*, unsigned, uint64_t) =
+    (void (*)(void*, unsigned, uint64_t))eglGetProcAddress("glWaitSync");
+  unsigned char (*is_sync)(void*) =
+    (unsigned char (*)(void*))eglGetProcAddress("glIsSync");
+  void (*delete_sync)(void*) =
+    (void (*)(void*))eglGetProcAddress("glDeleteSync");
+  void (*flush)(void) = (void (*)(void))eglGetProcAddress("glFlush");
+  void (*finish)(void) = (void (*)(void))eglGetProcAddress("glFinish");
+  TEST_ASSERT_NOT_NULL(fence_sync);
+  TEST_ASSERT_NOT_NULL(wait_sync);
+  TEST_ASSERT_NOT_NULL(is_sync);
+  TEST_ASSERT_NOT_NULL(delete_sync);
+  TEST_ASSERT_NOT_NULL(flush);
+  TEST_ASSERT_NOT_NULL(finish);
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+  );
+  mln_acquired_frame first = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
+  mln_gpu_sync producer = mln_gpu_sync_default();
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
+  TEST_ASSERT_EQUAL_UINT64(0, producer.value);
+  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.object));
+  wait_sync((void*)(uintptr_t)producer.object, 0, UINT64_MAX);
+  uint32_t first_slot = UINT32_MAX;
+  TEST_ASSERT_NOT_EQUAL_UINT64(
+    0, mln_test_frame_texture_handle(first, &first_slot)
+  );
+  if (borrowed) {
+    expect_texture_color(
+      mln_test_render_fixture_texture(&fixture, first_slot), red,
+      "the fence-protected first texture"
+    );
+  } else {
+    MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
+  }
+
+  // An invalid fence keeps the frame handle available for a valid release.
+  mln_gpu_sync consumer = {
+    .size = sizeof(consumer), .kind = MLN_GPU_SYNC_OPENGL_FENCE
+  };
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_acquired_frame_release(first, &consumer, MLN_TEST_DIAGNOSTIC)
+  );
+  consumer.object = (uint64_t)(uintptr_t)fence_sync(0x9117, 0);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, consumer.object);
+  flush();
+  MLN_TEST_OK(mln_acquired_frame_release(first, &consumer, NULL));
+  first = MLN_HANDLE_NULL;
+
+  paint_background_blue(runtime, map);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+  );
+  mln_acquired_frame second = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
+  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.object));
+  wait_sync((void*)(uintptr_t)producer.object, 0, UINT64_MAX);
+  uint32_t second_slot = UINT32_MAX;
+  TEST_ASSERT_NOT_EQUAL_UINT64(
+    0, mln_test_frame_texture_handle(second, &second_slot)
+  );
+  TEST_ASSERT_EQUAL_UINT32(first_slot, second_slot);
+  if (borrowed) {
+    expect_texture_color(
+      mln_test_render_fixture_texture(&fixture, second_slot), blue,
+      "the reused texture after the consumer fence"
+    );
+  } else {
+    MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
+  }
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
+  );
+  // Retirement borrows the host's consumer fence and leaves deletion to it.
+  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)consumer.object));
+  delete_sync((void*)(uintptr_t)consumer.object);
+  finish();
+  mln_test_render_release_frame(&second);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_FALSE(is_sync((void*)(uintptr_t)producer.object));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void borrowed_opengl_frames_support_gpu_fences(void) {
+  shared_opengl_fences_order_frame_reads_and_slot_reuse(true);
+}
+
+static void owned_opengl_frames_support_gpu_fences(void) {
+  shared_opengl_fences_order_frame_reads_and_slot_reuse(false);
+}
+#endif
+
 // A surface presents the frames it renders and reads none back. A resize
 // reaches the host's surface, so the next frame, which presents nothing,
 // renders at the new extent.
@@ -326,6 +452,10 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+  RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
+  RUN_TEST(owned_opengl_frames_support_gpu_fences);
+#endif
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(a_surface_replacement_can_change_the_scale_factor);

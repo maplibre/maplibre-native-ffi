@@ -440,7 +440,10 @@ public data class GpuSyncKind(public val rawValue: UInt) {
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)
     /** VkSemaphore plus a timeline value. */
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(2u)
-    /** GLsync, used only by a caller-graphics-thread driver. */
+    /**
+     * GLsync in the shared EGL or WGL context's share group, used only by a caller-graphics-thread
+     * driver. value is zero and object is nonzero.
+     */
     public val OPENGL_FENCE: GpuSyncKind = GpuSyncKind(3u)
     /** A backend-defined WebGPU completion token. */
     public val WEBGPU_TOKEN: GpuSyncKind = GpuSyncKind(4u)
@@ -2845,6 +2848,13 @@ public data class RenderSessionAttachOptions(
    * borrowed and other targets ignore this value. Defaults to 1.
    */
   public val requestedTextureRingDepth: UInt = 1u,
+  /**
+   * Producer synchronization for acquired texture frames. Defaults to `MLN_GPU_SYNC_CPU_COMPLETE`.
+   * `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target and a
+   * caller-graphics-thread driver. Other targets support only CPU completion and fail an
+   * unsupported request.
+   */
+  public val producerSyncKind: GpuSyncKind = GpuSyncKind(0u),
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   public val frameWake: Wake = Wake(),
   /** Wakes the graphics receiver when caller-driver work is available. */

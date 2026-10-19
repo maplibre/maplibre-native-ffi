@@ -44,6 +44,9 @@ static void report(const char* what) {
 // Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
 // attaches a fixture on the graphics object of another.
 static mln_test_graphics* shared_graphics = NULL;
+#if defined(HOST_OPENGL)
+static bool attach_fence_sync = false;
+#endif
 
 static void host_state_free(host_state* state) {
   if (state->owns_graphics) {
@@ -213,8 +216,10 @@ bool mln_test_backend_attach(
     mln_opengl_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
+  mln_render_session_attach_options attach = *options;
+  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
   *out_status = mln_map_attach_opengl_owned_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
   return true;
@@ -354,8 +359,10 @@ static bool attach_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
+  mln_render_session_attach_options attach = *options;
+  if (attach_fence_sync) attach.producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
   *out_status = mln_map_attach_opengl_borrowed_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
   return true;
@@ -421,6 +428,20 @@ bool mln_test_render_fixture_create_borrowed_ring(
   attach_ring_depth = 1;
   return attached;
 }
+
+#if defined(HOST_OPENGL)
+bool mln_test_render_fixture_create_opengl_fence_texture(
+  mln_map map, mln_test_render_fixture* fixture, bool borrowed
+) {
+  attach_fence_sync = true;
+  const bool attached = borrowed ? mln_test_render_fixture_create_borrowed_ring(
+                                     map, fixture, 1, MLN_TEST_PRESET_DRIVER
+                                   )
+                                 : mln_test_render_fixture_create(map, fixture);
+  attach_fence_sync = false;
+  return attached;
+}
+#endif
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(

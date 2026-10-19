@@ -90,6 +90,16 @@ resource loads and animated camera changes may require later frames. Texture
 frames require producer synchronization before host reads and consumer
 synchronization before the session reuses them.
 
+CPU completion is the default: the producer finishes its GPU writes before
+publishing a texture frame, and the host finishes its reads before releasing it.
+Shared OpenGL texture targets on EGL and WGL also accept fence synchronization,
+selected at attachment. The producer flushes a fence after rendering, and the
+host waits in a context of the same share group before reading. A consumer fence
+lets the session order slot reuse after the host's reads without waiting on the
+CPU. The session owns producer fences; the host owns consumer fences. The
+[render target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
+states their lifetimes and context requirements.
+
 The host keeps graphics resources alive through attachment and teardown. Normal
 shutdown detaches the session before destroying those resources. Abandon handles
 a target that can no longer be serviced and may retain graphics resources until

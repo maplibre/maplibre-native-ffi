@@ -359,7 +359,8 @@ const (
 	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
 	// VkSemaphore plus a timeline value.
 	GpuSyncKindVulkanTimelineSemaphore GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
-	// GLsync, used only by a caller-graphics-thread driver.
+	// GLsync in the shared EGL or WGL context's share group, used only by a
+	// caller-graphics-thread driver. value is zero and object is nonzero.
 	GpuSyncKindOpenglFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
 	// A backend-defined WebGPU completion token.
 	GpuSyncKindWebgpuToken GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
@@ -3567,6 +3568,11 @@ type RenderSessionAttachOptions struct {
 	// ring's depth is its texture count, so borrowed and other targets ignore this
 	// value. Defaults to 1.
 	RequestedTextureRingDepth uint32
+	// Producer synchronization for acquired texture frames. Defaults to
+	// MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or
+	// WGL texture target and a caller-graphics-thread driver. Other targets support
+	// only CPU completion and fail an unsupported request.
+	ProducerSyncKind GpuSyncKind
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake
 	// Wakes the graphics receiver when caller-driver work is available.
@@ -3581,6 +3587,7 @@ func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) Ren
 	var result RenderSessionAttachOptions
 	result.Driver = RenderDriverKind(raw.driver)
 	result.RequestedTextureRingDepth = uint32(raw.requested_texture_ring_depth)
+	result.ProducerSyncKind = GpuSyncKind(raw.producer_sync_kind)
 	return result
 }
 
@@ -3589,6 +3596,7 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.driver = C.uint32_t(input.Driver)
 	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
+	raw.producer_sync_kind = C.uint32_t(input.ProducerSyncKind)
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
 	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)

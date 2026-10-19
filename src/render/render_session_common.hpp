@@ -291,6 +291,9 @@ class TextureSessionBackend {
     return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
                                                   : MLN_STATUS_UNSUPPORTED;
   }
+  virtual auto producer_sync() const -> mln_gpu_sync {
+    return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
+  }
   // Records the backend metadata a host reads back from an acquired frame.
   // Runs on the driver thread, right after the render, for the slot the
   // backend still has selected, so it may touch graphics state; acquisition
@@ -778,6 +781,8 @@ struct mln_render_session_object
   // Set before attach by a backend whose driver takes queue_lock. Attach
   // rejects an enabled lock on any other backend.
   bool accepts_queue_lock = false;
+  // Selected by an attachment that supports GPU producer synchronization.
+  uint32_t producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
   bool scheduler_service_queued = false;

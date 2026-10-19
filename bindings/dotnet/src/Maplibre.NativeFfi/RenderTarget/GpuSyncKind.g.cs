@@ -29,7 +29,8 @@ public enum GpuSyncKind : uint
     VulkanTimelineSemaphore = 2,
 
     /// <summary>
-    /// GLsync, used only by a caller-graphics-thread driver.
+    /// GLsync in the shared EGL or WGL context's share group, used only by a
+    /// caller-graphics-thread driver. value is zero and object is nonzero.
     /// </summary>
     OpenglFence = 3,
 

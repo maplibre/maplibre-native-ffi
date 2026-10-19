@@ -422,7 +422,9 @@ MLN_API mln_status mln_acquired_frame_get_result(
  * The synchronization states when the producer's GPU writes to the frame's
  * texture are complete, for frames of session-owned and borrowed rings alike.
  * The host waits on it before it reads the texture. See mln_gpu_sync_kind for
- * what each kind promises.
+ * what each kind promises. Attachment selects the producer kind through
+ * mln_render_session_attach_options.producer_sync_kind; acquisition never
+ * changes it.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -453,7 +455,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or
- *   consumer_completion is undersized.
+ *   consumer_completion is undersized, or an OpenGL fence has a zero object
+ *   or a nonzero value.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
  *   active.

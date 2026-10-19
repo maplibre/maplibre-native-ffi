@@ -1291,7 +1291,8 @@ pub const GpuSync = struct {
 pub const GpuSyncKind = enum(u32) {
     /// A backend-defined WebGPU completion token.
     webgpu_token = 4,
-    /// GLsync, used only by a caller-graphics-thread driver.
+    /// GLsync in the shared EGL or WGL context's share group, used only by a
+    /// caller-graphics-thread driver. value is zero and object is nonzero.
     opengl_fence = 3,
     /// VkSemaphore plus a timeline value.
     vulkan_timeline_semaphore = 2,
@@ -3121,6 +3122,12 @@ pub const RenderSessionAttachOptions = struct {
     /// texture ring's depth is its texture count, so borrowed and other targets
     /// ignore this value. Defaults to 1.
     requested_texture_ring_depth: u32 = 1,
+    /// Producer synchronization for acquired texture frames. Defaults to
+    /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
+    /// shared EGL or WGL texture target and a caller-graphics-thread driver.
+    /// Other targets support only CPU completion and fail an unsupported
+    /// request.
+    producer_sync_kind: GpuSyncKind = std.mem.zeroes(GpuSyncKind),
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     frame_wake: Wake = .{},
     /// Wakes the graphics receiver when caller-driver work is available.
@@ -3134,6 +3141,7 @@ pub const RenderSessionAttachOptions = struct {
         raw.size = @sizeOf(c.mln_render_session_attach_options);
         raw.driver = self.driver.toNative();
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
+        raw.producer_sync_kind = self.producer_sync_kind.toNative();
         raw.frame_wake = try self.frame_wake.toNative(allocator, roots);
         raw.driver_work_wake = try self.driver_work_wake.toNative(allocator, roots);
         raw.queue_lock = try self.queue_lock.toNative(allocator, roots);
@@ -3145,6 +3153,7 @@ pub const RenderSessionAttachOptions = struct {
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
             .requested_texture_ring_depth = raw.requested_texture_ring_depth,
+            .producer_sync_kind = GpuSyncKind.fromNative(raw.producer_sync_kind),
             .frame_wake = .{},
             .driver_work_wake = .{},
             .queue_lock = .{},

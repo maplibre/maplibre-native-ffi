@@ -1827,6 +1827,7 @@ internal static unsafe class GeneratedValues
         new(
             (RenderDriverKind)value.driver,
             value.requested_texture_ring_depth,
+            (GpuSyncKind)value.producer_sync_kind,
             default,
             default,
             default
@@ -1841,6 +1842,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_render_session_attach_options);
         native.driver = (uint)value.Driver;
         native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
+        native.producer_sync_kind = (uint)value.ProducerSyncKind;
         native.frame_wake = NativeWake(value.FrameWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
         native.queue_lock = NativeQueueLock(value.QueueLock, scope);

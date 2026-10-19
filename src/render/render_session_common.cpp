@@ -1466,6 +1466,10 @@ auto validate_render_session_attach_request(
     set_thread_error("render driver kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (options->producer_sync_kind > MLN_GPU_SYNC_WEBGPU_TOKEN) {
+    set_thread_error("producer synchronization kind is invalid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   return MLN_STATUS_OK;
 }
 
@@ -1485,6 +1489,10 @@ auto start_attach_render_session(
   );
   if (request_status != MLN_STATUS_OK) {
     return request_status;
+  }
+  if (options->producer_sync_kind != session->producer_sync_kind) {
+    set_thread_error("render target does not support this producer sync kind");
+    return MLN_STATUS_UNSUPPORTED;
   }
   if (capabilities.size < sizeof(mln_render_session_capabilities)) {
     set_thread_error("render session capabilities size is too small");
@@ -3018,6 +3026,8 @@ auto run_frame_demand(
     auto disposition = MLN_RENDER_RESULT_NO_UPDATE;
     auto needs_repaint = false;
     auto metadata = std::any{};
+    auto producer_sync =
+      mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
     // One backend scope spans the render and the frame's metadata, so the
     // scopes they open themselves nest in it and activate the backend once.
     auto scope = std::optional<mln::gfx::BackendScope>{};
@@ -3080,6 +3090,7 @@ auto run_frame_demand(
           publish_frame_result(session, result);
           return;
         }
+        producer_sync = session->texture.backend->producer_sync();
       }
       scope.reset();
       const auto lock = std::scoped_lock{session->control_mutex};
@@ -3087,6 +3098,7 @@ auto run_frame_demand(
       if (selected_slot) {
         auto& slot = session->texture.slots[*selected_slot];
         slot.result = result;
+        slot.producer_sync = producer_sync;
         // A frame without its metadata cannot be acquired, so its slot stays
         // unavailable rather than hold back the newer frames behind it, and the
         // next demand renders into it first.
@@ -3601,6 +3613,13 @@ auto acquired_frame_release(
       : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
   if (copied.size < sizeof(mln_gpu_sync)) {
     set_thread_error("mln_gpu_sync.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    copied.kind == MLN_GPU_SYNC_OPENGL_FENCE &&
+    (copied.object == 0 || copied.value != 0)
+  ) {
+    set_thread_error("OpenGL fence must have a nonzero object and zero value");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(frame);

@@ -1,9 +1,11 @@
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -289,6 +291,39 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
+  auto supports_fence_sync() -> bool {
+    if (
+      context_.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED ||
+      context_.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
+    )
+      return false;
+    auto guard = mln::gfx::BackendScope{*this};
+    for (const auto* name :
+         {"glFenceSync", "glWaitSync", "glDeleteSync", "glIsSync"}) {
+      if (getExtensionFunctionPointer(name) == nullptr) return false;
+    }
+    auto major = mln::platform::GLint{};
+    auto minor = mln::platform::GLint{};
+    mln::platform::glGetIntegerv(GL_MAJOR_VERSION, &major);
+    mln::platform::glGetIntegerv(GL_MINOR_VERSION, &minor);
+    const auto* version =
+      reinterpret_cast<const char*>(mln::platform::glGetString(GL_VERSION));
+    const auto gles =
+      version != nullptr &&
+      std::string_view{version}.find("OpenGL ES") != std::string_view::npos;
+    if (major > 3 || (major == 3 && (gles || minor >= 2))) return true;
+    auto count = mln::platform::GLint{};
+    mln::platform::glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+    for (auto index = mln::platform::GLint{}; index < count; ++index) {
+      const auto* extension = reinterpret_cast<const char*>(
+        mln::platform::glGetStringi(GL_EXTENSIONS, static_cast<uint32_t>(index))
+      );
+      if (extension != nullptr && std::string_view{extension} == "GL_ARB_sync")
+        return true;
+    }
+    return false;
+  }
+
   void set_borrowed_textures(const OpenGLBorrowedTarget& target) {
     borrowed_textures_ = borrowed_texture_names(target);
     // setSize() drops the selected renderable unconditionally, and the reset
@@ -498,14 +533,84 @@ class OpenGLTextureSessionBackend final
  public:
   OpenGLTextureSessionBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    std::size_t ring_depth, uint32_t producer_sync_kind
   )
-      : backend_(descriptor, size, ring_depth) {}
+      : backend_(descriptor, size, ring_depth),
+        producer_sync_kind_(producer_sync_kind) {}
 
   OpenGLTextureSessionBackend(
-    const OpenGLBorrowedTarget& target, mln::Size size
+    const OpenGLBorrowedTarget& target, mln::Size size,
+    uint32_t producer_sync_kind
   )
-      : backend_(target, size) {}
+      : backend_(target, size), producer_sync_kind_(producer_sync_kind) {}
+
+  ~OpenGLTextureSessionBackend() noexcept override {
+    try {
+      if (has_producer_fences_) {
+        auto guard = mln::gfx::BackendScope{backend_};
+        for (auto fence : producer_fences_) {
+          if (fence != nullptr) mln::platform::glDeleteSync(fence);
+        }
+      }
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("destroying OpenGL producer fences failed");
+    }
+  }
+
+  auto initialize_sync() -> mln_status {
+    fence_sync_supported_ = backend_.supports_fence_sync();
+    if (
+      producer_sync_kind_ == MLN_GPU_SYNC_OPENGL_FENCE && !fence_sync_supported_
+    ) {
+      mln::core::set_thread_error(
+        "OpenGL context does not support shared GLsync objects"
+      );
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool override {
+    return kind == MLN_GPU_SYNC_CPU_COMPLETE ||
+           (kind == MLN_GPU_SYNC_OPENGL_FENCE && fence_sync_supported_);
+  }
+
+  auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
+    if (sync.kind == MLN_GPU_SYNC_CPU_COMPLETE) return MLN_STATUS_OK;
+    if (!supports_consumer_sync(static_cast<mln_gpu_sync_kind>(sync.kind)))
+      return MLN_STATUS_UNSUPPORTED;
+    try {
+      auto guard = mln::gfx::BackendScope{backend_};
+      auto* fence = reinterpret_cast<mln::platform::GLsync>(
+        static_cast<uintptr_t>(sync.object)
+      );
+      if (mln::platform::glIsSync(fence) == GL_FALSE) {
+        mln::core::set_thread_error(
+          "consumer fence is not in the session share group"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      mln::platform::glWaitSync(fence, 0, GL_TIMEOUT_IGNORED);
+      if (mln::platform::glGetError() != GL_NO_ERROR) {
+        mln::core::set_thread_error(
+          "waiting for the consumer OpenGL fence failed"
+        );
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      return MLN_STATUS_OK;
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error(
+        "waiting for the consumer OpenGL fence failed"
+      );
+    }
+    return MLN_STATUS_TARGET_LOST;
+  }
+
+  auto producer_sync() const -> mln_gpu_sync override { return producer_sync_; }
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
@@ -535,16 +640,31 @@ class OpenGLTextureSessionBackend final
   auto record_frame_metadata(
     const mln::core::RenderFrameMetadata& frame, std::any& out_metadata
   ) -> mln_status override {
-    // CPU-complete producer synchronization requires all preceding writes to
-    // finish before the texture name is published. The flush runs here, on the
-    // driver thread, rather than on the host thread that acquires the frame.
     auto guard = mln::gfx::BackendScope{backend_};
     const auto texture = backend_.texture();
     if (texture == 0) {
       mln::core::set_thread_error("rendered OpenGL texture is not available");
       return MLN_STATUS_NOT_READY;
     }
-    backend_.finish_rendering();
+    if (producer_sync_kind_ == MLN_GPU_SYNC_OPENGL_FENCE) {
+      auto& fence = producer_fences_.at(frame.slot);
+      if (fence != nullptr) mln::platform::glDeleteSync(fence);
+      fence = mln::platform::glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      if (fence == nullptr) {
+        mln::core::set_thread_error(
+          "creating the producer OpenGL fence failed"
+        );
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      has_producer_fences_ = true;
+      mln::platform::glFlush();
+      producer_sync_ = mln_gpu_sync{
+        sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPENGL_FENCE,
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence)), 0
+      };
+    } else {
+      backend_.finish_rendering();
+    }
     // The host chose a borrowed texture's format, which the session cannot
     // query before OpenGL ES 3.1.
     const auto owned = !backend_.renders_borrowed_textures();
@@ -567,6 +687,14 @@ class OpenGLTextureSessionBackend final
 
  private:
   OpenGLTextureBackend backend_;
+  uint32_t producer_sync_kind_;
+  mln_gpu_sync producer_sync_{
+    sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0
+  };
+  std::array<mln::platform::GLsync, mln::core::max_texture_ring_depth>
+    producer_fences_{};
+  bool has_producer_fences_ = false;
+  bool fence_sync_supported_ = false;
 };
 
 }  // namespace
@@ -604,6 +732,14 @@ auto opengl_owned_texture_attach_start(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Owned;
+  if (
+    options != nullptr &&
+    descriptor->context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED &&
+    descriptor->context.platform != MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
+    options->producer_sync_kind == MLN_GPU_SYNC_OPENGL_FENCE
+  ) {
+    session->producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
+  }
   auto copied = *descriptor;
   const auto private_target =
     copied.context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
@@ -633,11 +769,13 @@ auto opengl_owned_texture_attach_start(
           return context_status;
         }
       }
-      target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
+      auto backend = std::make_unique<OpenGLTextureSessionBackend>(
         copied, mln::Size{target.physical_width, target.physical_height},
-        ring_depth
+        ring_depth, target.producer_sync_kind
       );
-      return MLN_STATUS_OK;
+      const auto status = backend->initialize_sync();
+      target.texture.backend = std::move(backend);
+      return status;
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
@@ -695,13 +833,23 @@ auto opengl_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
+  if (
+    options != nullptr &&
+    descriptor->context.platform != MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
+    options->producer_sync_kind == MLN_GPU_SYNC_OPENGL_FENCE
+  ) {
+    session->producer_sync_kind = MLN_GPU_SYNC_OPENGL_FENCE;
+  }
   session->initialize_backend = [target = OpenGLBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
-    live.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-      target, mln::Size{live.physical_width, live.physical_height}
+    auto backend = std::make_unique<OpenGLTextureSessionBackend>(
+      target, mln::Size{live.physical_width, live.physical_height},
+      live.producer_sync_kind
     );
-    return MLN_STATUS_OK;
+    const auto status = backend->initialize_sync();
+    live.texture.backend = std::move(backend);
+    return status;
   };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),

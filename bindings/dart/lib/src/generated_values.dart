@@ -330,7 +330,8 @@ final class GpuSyncKind extends _Enum {
   /// VkSemaphore plus a timeline value.
   static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(2);
 
-  /// GLsync, used only by a caller-graphics-thread driver.
+  /// GLsync in the shared EGL or WGL context's share group, used only by a
+  /// caller-graphics-thread driver. value is zero and object is nonzero.
   static const openglFence = GpuSyncKind.fromRawValue(3);
 
   /// A backend-defined WebGPU completion token.
@@ -2683,6 +2684,7 @@ final class RenderSessionAttachOptions extends _Value {
   const RenderSessionAttachOptions({
     this.driver = RenderDriverKind.callerGraphicsThread,
     this.requestedTextureRingDepth = 1,
+    this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
     this.frameWake = const Wake(),
     this.driverWorkWake = const Wake(),
   });
@@ -2697,6 +2699,12 @@ final class RenderSessionAttachOptions extends _Value {
   /// ignore this value. Defaults to 1.
   final int requestedTextureRingDepth;
 
+  /// Producer synchronization for acquired texture frames. Defaults to
+  /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared
+  /// EGL or WGL texture target and a caller-graphics-thread driver. Other
+  /// targets support only CPU completion and fail an unsupported request.
+  final GpuSyncKind producerSyncKind;
+
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   final Wake frameWake;
 
@@ -2707,6 +2715,7 @@ final class RenderSessionAttachOptions extends _Value {
   List<Object?> get _members => [
     driver,
     requestedTextureRingDepth,
+    producerSyncKind,
     frameWake,
     driverWorkWake,
   ];

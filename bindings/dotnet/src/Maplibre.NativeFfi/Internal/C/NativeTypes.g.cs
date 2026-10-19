@@ -654,7 +654,7 @@ internal unsafe struct mln_render_session_attach_options
     public uint size;
     public uint driver;
     public uint requested_texture_ring_depth;
-    public uint reserved;
+    public uint producer_sync_kind;
     public mln_wake frame_wake;
     public mln_wake driver_work_wake;
     public mln_queue_lock queue_lock;

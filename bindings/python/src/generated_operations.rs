@@ -1503,6 +1503,10 @@ fn generated_copy_mln_render_session_attach_options(
         "requested_texture_ring_depth",
         generated_value(py, value.requested_texture_ring_depth)?,
     )?;
+    dict.set_item(
+        "producer_sync_kind",
+        generated_value(py, value.producer_sync_kind)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3759,13 +3763,15 @@ fn generated_input_mln_render_session_attach_options<'py>(
     let mut raw: sys::mln_render_session_attach_options =
         unsafe { sys::mln_render_session_attach_options_default() };
     raw.size = std::mem::size_of::<sys::mln_render_session_attach_options>() as _;
-    raw.reserved = 0;
     raw.driver = value
         .getattr("driver")?
         .extract::<sys::mln_render_driver_kind>()?;
     raw.requested_texture_ring_depth = value
         .getattr("requested_texture_ring_depth")?
         .extract::<u32>()?;
+    raw.producer_sync_kind = value
+        .getattr("producer_sync_kind")?
+        .extract::<sys::mln_gpu_sync_kind>()?;
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
     raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;

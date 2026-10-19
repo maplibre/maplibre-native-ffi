@@ -903,7 +903,7 @@ final class mln_render_session_attach_options extends Struct {
   @Uint32()
   external int requested_texture_ring_depth;
   @Uint32()
-  external int reserved;
+  external int producer_sync_kind;
   external mln_wake frame_wake;
   external mln_wake driver_work_wake;
   external mln_queue_lock queue_lock;

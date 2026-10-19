@@ -3894,7 +3894,7 @@ internal val mln_render_session_attach_options: GroupLayout =
     JAVA_INT.withName("size"),
     JAVA_INT.withName("driver"),
     JAVA_INT.withName("requested_texture_ring_depth"),
-    JAVA_INT.withName("reserved"),
+    JAVA_INT.withName("producer_sync_kind"),
     mln_wake.withName("frame_wake"),
     mln_wake.withName("driver_work_wake"),
     mln_queue_lock.withName("queue_lock"),

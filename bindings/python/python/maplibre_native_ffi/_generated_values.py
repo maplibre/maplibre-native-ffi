@@ -3160,6 +3160,14 @@ class RenderSessionAttachOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
+    producer_sync_kind: GpuSyncKind
+    """Producer synchronization for acquired texture frames. Defaults to
+    `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
+    shared EGL or WGL texture target and a caller-graphics-thread driver.
+    Other targets support only CPU completion and fail an unsupported
+    request.
+    """
+
     driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD
     """One `mln_render_driver_kind` value. Defaults to
     `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
@@ -3189,6 +3197,7 @@ class RenderSessionAttachOptions:
         return cls(
             driver=RenderDriverKind(raw["driver"]),
             requested_texture_ring_depth=raw["requested_texture_ring_depth"],
+            producer_sync_kind=GpuSyncKind(raw["producer_sync_kind"]),
             frame_wake=Wake(),
             driver_work_wake=Wake(),
             queue_lock=QueueLock(),

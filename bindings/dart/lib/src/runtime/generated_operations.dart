@@ -1300,6 +1300,7 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
     0,
     4294967295,
   );
+  result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
   result.ref.frame_wake = registrations
       .add(_prepareWake(value.frameWake, registrations.ports))
       .ref;
@@ -1314,6 +1315,7 @@ RenderSessionAttachOptions _readRenderSessionAttachOptions(
 ) => RenderSessionAttachOptions(
   driver: RenderDriverKind.fromRawValue(source.driver),
   requestedTextureRingDepth: source.requested_texture_ring_depth,
+  producerSyncKind: GpuSyncKind.fromRawValue(source.producer_sync_kind),
   frameWake: const Wake(),
   driverWorkWake: const Wake(),
 );

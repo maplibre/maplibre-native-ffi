@@ -559,8 +559,8 @@ mln_render_session_attach_options_default_holds_its_annotated_values(void) {
     "mln_render_session_attach_options.requested_texture_ring_depth"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.reserved,
-    "mln_render_session_attach_options.reserved"
+    (uint64_t)0, (uint64_t)value.producer_sync_kind,
+    "mln_render_session_attach_options.producer_sync_kind"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.frame_wake.callback == NULL,

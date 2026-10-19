@@ -19,6 +19,12 @@ namespace Maplibre.NativeFfi;
 /// ring's depth is its texture count, so borrowed and other targets ignore this
 /// value. Defaults to 1.
 /// </param>
+/// <param name="ProducerSyncKind">
+/// Producer synchronization for acquired texture frames. Defaults to
+/// <c>MLN_GPU_SYNC_CPU_COMPLETE</c>. <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires
+/// a shared EGL or WGL texture target and a caller-graphics-thread driver.
+/// Other targets support only CPU completion and fail an unsupported request.
+/// </param>
 /// <param name="FrameWake">
 /// Wakes the receiver when the frame-result queue becomes nonempty.
 /// </param>
@@ -33,13 +39,14 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct RenderSessionAttachOptions(
     RenderDriverKind Driver,
     uint RequestedTextureRingDepth,
+    GpuSyncKind ProducerSyncKind,
     Wake FrameWake,
     Wake DriverWorkWake,
     QueueLock QueueLock
 )
 {
     public RenderSessionAttachOptions()
-        : this(RenderDriverKind.CallerGraphicsThread, 1, default!, default!, default!) { }
+        : this(RenderDriverKind.CallerGraphicsThread, 1, default, default!, default!, default!) { }
 
     public static RenderSessionAttachOptions Default
     {

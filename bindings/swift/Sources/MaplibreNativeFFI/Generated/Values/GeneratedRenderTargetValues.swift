@@ -135,7 +135,8 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
   public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 1)
   /// VkSemaphore plus a timeline value.
   public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 2)
-  /// GLsync, used only by a caller-graphics-thread driver.
+  /// GLsync in the shared EGL or WGL context's share group, used only by a
+  /// caller-graphics-thread driver. value is zero and object is nonzero.
   public static let openglFence: GpuSyncKind = .init(rawValue: 3)
   /// A backend-defined WebGPU completion token.
   public static let webgpuToken: GpuSyncKind = .init(rawValue: 4)
@@ -421,6 +422,11 @@ public struct RenderSessionAttachOptions: Sendable {
   /// texture ring's depth is its texture count, so borrowed and other targets
   /// ignore this value. Defaults to 1.
   public var requestedTextureRingDepth: UInt32
+  /// Producer synchronization for acquired texture frames. Defaults to
+  /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared
+  /// EGL or WGL texture target and a caller-graphics-thread driver. Other
+  /// targets support only CPU completion and fail an unsupported request.
+  public var producerSyncKind: GpuSyncKind
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
   /// Wakes the graphics receiver when caller-driver work is available.
@@ -437,12 +443,15 @@ public struct RenderSessionAttachOptions: Sendable {
     driver: RenderDriverKind = RenderSessionAttachOptions.default.driver,
     requestedTextureRingDepth: UInt32 = RenderSessionAttachOptions.default
       .requestedTextureRingDepth,
+    producerSyncKind: GpuSyncKind = RenderSessionAttachOptions.default
+      .producerSyncKind,
     frameWake: Wake = RenderSessionAttachOptions.default.frameWake,
     driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake,
     queueLock: QueueLock = RenderSessionAttachOptions.default.queueLock
   ) {
     self.driver = driver
     self.requestedTextureRingDepth = requestedTextureRingDepth
+    self.producerSyncKind = producerSyncKind
     self.frameWake = frameWake
     self.driverWorkWake = driverWorkWake
     self.queueLock = queueLock
@@ -454,6 +463,7 @@ public struct RenderSessionAttachOptions: Sendable {
   ) throws {
     driver = RenderDriverKind(rawValue: raw.driver)
     requestedTextureRingDepth = raw.requested_texture_ring_depth
+    producerSyncKind = GpuSyncKind(rawValue: raw.producer_sync_kind)
     frameWake = Wake()
     driverWorkWake = Wake()
     queueLock = QueueLock()
@@ -466,6 +476,7 @@ public struct RenderSessionAttachOptions: Sendable {
     raw.size = UInt32(MemoryLayout<mln_render_session_attach_options>.size)
     raw.driver = driver.rawValue
     raw.requested_texture_ring_depth = requestedTextureRingDepth
+    raw.producer_sync_kind = producerSyncKind.rawValue
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
     raw.queue_lock = try queueLock.nativeValue(arena: arena)

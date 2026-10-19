@@ -123,7 +123,13 @@ typedef struct mln_render_session_attach_options {
    * ignore this value. Defaults to 1.
    */
   uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
-  uint32_t reserved MLN_BINDING("kind=reserved");
+  /**
+   * Producer synchronization for acquired texture frames. Defaults to
+   * MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared
+   * EGL or WGL texture target and a caller-graphics-thread driver. Other
+   * targets support only CPU completion and fail an unsupported request.
+   */
+  uint32_t producer_sync_kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
   /** Wakes the graphics receiver when caller-driver work is available. */
@@ -172,7 +178,32 @@ typedef enum mln_gpu_sync_kind : uint32_t {
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
   /** VkSemaphore plus a timeline value. */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
-  /** GLsync, used only by a caller-graphics-thread driver. */
+  /**
+   * GLsync in the shared EGL or WGL context's share group, used only by a
+   * caller-graphics-thread driver. value is zero and object is nonzero.
+   *
+   * The producer inserts glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) and
+   * calls glFlush before publishing the frame. Before reading the texture,
+   * the host queues glWaitSync(object, 0, GL_TIMEOUT_IGNORED) in a context in
+   * that share group and binds the texture again. A CPU read instead waits
+   * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
+   *
+   * The session owns producer fences. The host borrows one until it releases
+   * or disposes the acquired frame and must never delete it. A view scope
+   * extends that borrowing. The session deletes fences on slot reuse or
+   * normal detach while its context is current.
+   *
+   * The host owns consumer fences. It inserts a fence after its reads and
+   * calls glFlush in the context that inserted it before releasing the frame.
+   * The driver queues glWaitSync before reusing the slot. The host keeps the
+   * fence alive until a later session barrier or detach completes, then
+   * deletes it in a context of the share group.
+   *
+   * Target loss invalidates frame access. Abandon performs no graphics
+   * cleanup and may retain producer fences until process exit. After abandon,
+   * the host may delete its consumer fences in a surviving share-group
+   * context, but must finish its GPU reads before destroying borrowed textures.
+   */
   MLN_GPU_SYNC_OPENGL_FENCE = 3U,
   /** A backend-defined WebGPU completion token. */
   MLN_GPU_SYNC_WEBGPU_TOKEN = 4U,
@@ -181,8 +212,9 @@ typedef enum mln_gpu_sync_kind : uint32_t {
 /**
  * Backend synchronization copied by frame access and release calls.
  *
- * object is retained only for Metal. Vulkan, OpenGL, and WebGPU objects remain
- * borrowed until a later session barrier or detach completes.
+ * object is retained only for Metal. Vulkan and WebGPU objects remain borrowed
+ * until a later session barrier or detach completes. OpenGL ownership and
+ * lifetimes follow MLN_GPU_SYNC_OPENGL_FENCE.
  */
 typedef struct mln_gpu_sync {
   uint32_t size;

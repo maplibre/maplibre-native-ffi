@@ -43,6 +43,13 @@ bool mln_test_render_fixture_create_borrowed_ring(
   mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
 );
 
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+// Attaches a shared OpenGL texture target with fence producer synchronization.
+bool mln_test_render_fixture_create_opengl_fence_texture(
+  mln_map map, mln_test_render_fixture* fixture, bool borrowed
+);
+#endif
+
 // The texture at `index` of a borrowed fixture's ring, or null past its end.
 mln_test_graphics_texture* mln_test_render_fixture_texture(
   const mln_test_render_fixture* fixture, size_t index

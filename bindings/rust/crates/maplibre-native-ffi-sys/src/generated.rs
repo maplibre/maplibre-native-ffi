@@ -1068,7 +1068,7 @@ pub struct mln_render_session_attach_options {
     pub size: u32,
     pub driver: u32,
     pub requested_texture_ring_depth: u32,
-    pub reserved: u32,
+    pub producer_sync_kind: u32,
     pub frame_wake: mln_wake,
     pub driver_work_wake: mln_wake,
     pub queue_lock: mln_queue_lock,

@@ -1569,7 +1569,8 @@ pub enum GpuSyncKind: u32 {
     MetalSharedEvent = 1,
     /// VkSemaphore plus a timeline value.
     VulkanTimelineSemaphore = 2,
-    /// GLsync, used only by a caller-graphics-thread driver.
+    /// GLsync in the shared EGL or WGL context's share group, used only by a
+    /// caller-graphics-thread driver. value is zero and object is nonzero.
     OpenglFence = 3,
     /// A backend-defined WebGPU completion token.
     WebgpuToken = 4,
@@ -3881,6 +3882,12 @@ pub struct RenderSessionAttachOptions {
     /// texture ring's depth is its texture count, so borrowed and other targets
     /// ignore this value. Defaults to 1.
     pub requested_texture_ring_depth: u32,
+    /// Producer synchronization for acquired texture frames. Defaults to
+    /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
+    /// shared EGL or WGL texture target and a caller-graphics-thread driver.
+    /// Other targets support only CPU completion and fail an unsupported
+    /// request.
+    pub producer_sync_kind: GpuSyncKind,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,
     /// Wakes the graphics receiver when caller-driver work is available.
@@ -3902,6 +3909,7 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
         raw.size = std::mem::size_of::<sys::mln_render_session_attach_options>() as _;
         raw.driver = to_native(&self.driver, arena)?;
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
+        raw.producer_sync_kind = to_native(&self.producer_sync_kind, arena)?;
         raw.frame_wake = to_native(&self.frame_wake, arena)?;
         raw.driver_work_wake = to_native(&self.driver_work_wake, arena)?;
         raw.queue_lock = to_native(&self.queue_lock, arena)?;
@@ -3913,6 +3921,7 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
         Ok(Self {
             driver: unsafe { from_native(raw.driver) }?,
             requested_texture_ring_depth: raw.requested_texture_ring_depth,
+            producer_sync_kind: unsafe { from_native(raw.producer_sync_kind) }?,
             frame_wake: Default::default(),
             driver_work_wake: Default::default(),
             queue_lock: Default::default(),
