@@ -131,10 +131,15 @@ The Native regression covers symbols and circles at fractional and overzoomed
 camera zooms. Upstream:
 [maplibre-native#4704](https://github.com/maplibre/maplibre-native/pull/4704).
 
-`0030-late-style-image-layout.patch` rebuilds tile layout when an image is added
-after the tile requested it. This lets asynchronous image registration show
-icons on existing tiles. Native pixel regressions cover late registration with
-synchronous and asynchronous GeoJSON, with and without text. Upstream:
+`0030-late-style-image-layout.patch` rebuilds layout only for tiles that
+requested an image while it was missing. Additions preserve unrelated tiles and
+their caches, and pending image requests receive the image through normal
+delivery. The patch retains Native pixel regressions for synchronous and
+asynchronous GeoJSON, with and without text, and adds layout, cache, and
+requestor regressions. The C API regression in
+`tests/native/abi/style/late_image_layout.c` checks parse events and pixels for
+data-driven icons and patterns with synchronous and asynchronous GeoJSON.
+Upstream:
 [maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
