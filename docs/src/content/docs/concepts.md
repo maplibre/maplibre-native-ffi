@@ -20,11 +20,13 @@ ready; it must return promptly without blocking or waiting for the receiver.
 Each callback's API reference states its threading and reentry rules.
 
 Some hosts, such as Dart isolates and JavaScript engines, receive a call from a
-native thread only after the callback has returned. The
-[callback adapter](/maplibre-native-ffi/reference/c/callback__adapter_8h.html)
-copies borrowed payloads, answers synchronous callbacks in native code, and
-delivers the copies to the host's own event loop. It sits outside the umbrella
-header, so a host that needs it includes it directly.
+native thread only after the callback has returned. Such a host sets a
+[delivery queue](/maplibre-native-ffi/reference/c/delivery_8h.html) in place of
+the callback of a completion, the log handler, or a resource provider. Native
+code then answers any decision itself, copies the payload into the queue, and
+wakes the host, which drains the copies on its own event loop. Transforms must
+answer inside the call, so they take native rules instead of a callback, and a
+resource provider takes routes that choose which requests reach it.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
 runtime options and shutdown. The

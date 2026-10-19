@@ -172,10 +172,14 @@ begin with an unrelated `uint32_t` member. A struct whose size member has
 another name annotates it `kind=size`. `protocol.py` names the protocol types
 that every handwritten runtime is written against: the status enum, the
 diagnostic, the completion and its result, and the buffer view. It also names
-`MLN_STATUS_NOT_READY`, which reports a drain with nothing queued. No other rule
-reads a declaration's name.
+`MLN_STATUS_NOT_READY`, which reports a drain with nothing queued, and the queue
+delivery types: the delivery queue and batch handles, one delivery, its payload
+union, and the batch view. A function that takes or returns a delivery queue or
+batch belongs to the delivery protocol, which each binding runtime drives
+itself, so the generator treats it, and every type that only it reaches, as a
+runtime export with no public member. No other rule reads a declaration's name.
 
-Eight keys state what a C shape cannot:
+Nine keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -184,6 +188,14 @@ Eight keys state what a C shape cannot:
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or
   array members.
+- `delivery=` on a callback typedef names the `mln_delivery_type` constant whose
+  `mln_delivery_payload` variant carries a copy of the callback's arguments. The
+  variant's record mirrors the arguments other than the context, in order, by
+  name and C type: a pointer becomes a `lifetime=owner` pointer that the
+  delivery owns, and a handle stays the same handle. A registration whose
+  callback declares a delivery can name a queue in place of the callback, so a
+  host that cannot run code on a native thread receives the copy after draining.
+  The schema rejects the key on a `synchronous=true` callback.
 - `synchronous=true` on a callback typedef says that native code relies on the
   callback's work being done when it returns, as with the queue lock's
   callbacks. A binding runs the callback on the calling thread and never
@@ -228,7 +240,10 @@ Eight keys state what a C shape cannot:
   that receiver with the registration.
 
 Every callback registration is a struct with `kind=callback_registration`, which
-a function takes by pointer.
+a function takes by pointer. A registration may hold one `mln_delivery_queue`
+member marked `kind=delivery_queue`, which a binding runtime sets in place of
+the callback; it is a control role, so no binding exposes it. The registration's
+callback must be the protocol completion callback or declare `delivery=`.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment
@@ -265,15 +280,15 @@ constant carry their summary without the link, which their type carries.
 
 ## Where each rule lives
 
-| Change                                              | Module              |
-| --------------------------------------------------- | ------------------- |
-| Header extraction and attribute parsing             | `frontend.py`       |
-| Summaries, reference links, and comment escaping    | `docs.py`           |
-| Conventions, accepted attributes, and signatures    | `schema.py`         |
-| Value shapes, presence, and ownership relationships | `semantic.py`       |
-| Native copies for deferred callbacks and results    | `native_capture.py` |
-| The value type that each completion delivers        | `native_results.py` |
-| Language syntax and runtime calls                   | `emitters/`         |
+| Change                                                    | Module              |
+| --------------------------------------------------------- | ------------------- |
+| Header extraction and attribute parsing                   | `frontend.py`       |
+| Summaries, reference links, and comment escaping          | `docs.py`           |
+| Conventions, accepted attributes, and signatures          | `schema.py`         |
+| Value shapes, presence, and ownership relationships       | `semantic.py`       |
+| Native copies for queue deliveries and completion results | `native_capture.py` |
+| The value type that each completion delivers              | `native_results.py` |
+| Language syntax and runtime calls                         | `emitters/`         |
 
 Resolve a new relationship once in `semantic.py` and let every emitter consume
 the plan. Emitters choose syntax and report the shapes that they cannot lower;
@@ -292,17 +307,17 @@ or callback that returns a registration.
 The plan also names each public member once, and an emitter only converts its
 case and escapes keywords:
 
-| Plan field              | Rule                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------- |
-| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                              |
-| `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
-| `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
-| `MaskFlag.member`       | The flag constant without its enum's shared prefix                                          |
-| `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
-| `OperationPlan.status`  | Whether the function returns the status enum                                                |
-| `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs        |
-| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                   |
-| `FieldPlan.initial`     | The field's `default=`, resolved to a typed value and enum member, or none for zero         |
+| Plan field              | Rule                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                                              |
+| `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                                 |
+| `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                                 |
+| `MaskFlag.member`       | The flag constant without its enum's shared prefix                                                          |
+| `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release, delivery queue |
+| `OperationPlan.status`  | Whether the function returns the status enum                                                                |
+| `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs                        |
+| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                                   |
+| `FieldPlan.initial`     | The field's `default=`, resolved to a typed value and enum member, or none for zero                         |
 
 `native_results.py` writes `src/completion/completion_result_generated.inc`,
 which specializes `CompletionResult` for each completion function other than a

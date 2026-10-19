@@ -42,6 +42,21 @@ Read the structured payload according to its type.
 
 <Code code={region(handleEvents, "payload")} lang="c" title="handle-events.c" />
 
+## Receive callbacks on the host loop
+
+A host whose runtime cannot run code on a native thread, such as a JavaScript
+engine, receives completions, log records, and resource requests through a
+delivery queue. It creates one queue with a wake, and sets that queue in place
+of the callback of each completion, the log handler, and a resource provider.
+
+The wake follows the event wake's rules. In Node-API, the wake calls
+`napi_call_threadsafe_function`, and the JavaScript side drains the queue until
+it is empty. Each drain returns an owned batch, in push order. Take each
+handle that the host keeps, such as a created map or a resource request, from
+the batch before releasing it; the batch disposes what the host leaves. The
+[delivery reference](/maplibre-native-ffi/reference/c/delivery_8h.html) lists
+the delivery types and their payloads.
+
 ## React to changes
 
 A style-loaded event means that the style parsed and its sources exist. Add
