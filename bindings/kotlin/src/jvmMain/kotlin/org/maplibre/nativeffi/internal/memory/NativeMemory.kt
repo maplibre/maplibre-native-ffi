@@ -49,6 +49,10 @@ internal actual object NativeMemory {
     freeMemory.invoke(address)
   }
 
+  actual fun clear(address: Long, size: Long) {
+    memory.asSlice(address, size).fill(0)
+  }
+
   actual fun allocateUninitialized(size: Long): Long {
     val address = malloc.invokeExact(maxOf(size, 1L)) as Long
     if (address == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")
@@ -87,6 +91,8 @@ internal actual object NativeMemory {
 
   actual fun putBytes(address: Long, value: ByteArray) =
     MemorySegment.copy(value, 0, memory, JAVA_BYTE, address, value.size)
+
+  actual fun putUtf8(address: Long, value: String): Long = putUtf8(address, value, 0x3f)
 
   actual fun stringLength(address: Long): Long = strlen.invokeExact(address) as Long
 }

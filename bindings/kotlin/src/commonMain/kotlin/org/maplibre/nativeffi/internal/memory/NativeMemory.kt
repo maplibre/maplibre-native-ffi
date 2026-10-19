@@ -19,6 +19,8 @@ internal expect object NativeMemory {
 
   fun free(address: Long)
 
+  fun clear(address: Long, size: Long)
+
   fun getByte(address: Long): Byte
 
   fun putByte(address: Long, value: Byte)
@@ -47,6 +49,9 @@ internal expect object NativeMemory {
   fun getBytes(address: Long, count: Int): ByteArray
 
   fun putBytes(address: Long, value: ByteArray)
+
+  /** Writes UTF-8 into capacity for three bytes per UTF-16 code unit, returning its byte length. */
+  fun putUtf8(address: Long, value: String): Long
 
   /** The length of the NUL-terminated string at [address], without its terminator. */
   fun stringLength(address: Long): Long

@@ -124,6 +124,10 @@ static void mln_jni_free(jlong address) {
   free(MLN_JNI_POINTER(void*, address));
 }
 
+static void mln_jni_clear(jlong address, jlong size) {
+  memset(MLN_JNI_POINTER(void*, address), 0, (size_t)size);
+}
+
 // Defines the getter and setter of one primitive Java type.
 #define MLN_JNI_ACCESSORS(name, java_type)                          \
   static java_type mln_jni_get_##name(jlong at) {                   \
@@ -169,6 +173,45 @@ static jlong mln_jni_string_length(jlong address) {
   return (jlong)strlen(MLN_JNI_POINTER(const char*, address));
 }
 
+static jlong mln_jni_put_utf8(
+  JNIEnv* env, jclass type, jlong address, jstring value
+) {
+  (void)type;
+  const jsize length = (*env)->GetStringLength(env, value);
+  const jchar* text = (*env)->GetStringCritical(env, value, NULL);
+  if (text == NULL) return 0;
+  uint8_t* output = MLN_JNI_POINTER(uint8_t*, address);
+  uint8_t* start = output;
+  for (jsize i = 0; i < length; ++i) {
+    uint32_t code = text[i];
+    if (
+      code >= 0xd800 && code <= 0xdbff && i + 1 < length &&
+      text[i + 1] >= 0xdc00 && text[i + 1] <= 0xdfff
+    ) {
+      code = 0x10000 + ((code - 0xd800) << 10) + text[++i] - 0xdc00;
+    } else if (code >= 0xd800 && code <= 0xdfff) {
+      code = '?';
+    }
+    if (code < 0x80) {
+      *output++ = (uint8_t)code;
+    } else if (code < 0x800) {
+      *output++ = (uint8_t)(0xc0 | (code >> 6));
+      *output++ = (uint8_t)(0x80 | (code & 0x3f));
+    } else if (code < 0x10000) {
+      *output++ = (uint8_t)(0xe0 | (code >> 12));
+      *output++ = (uint8_t)(0x80 | ((code >> 6) & 0x3f));
+      *output++ = (uint8_t)(0x80 | (code & 0x3f));
+    } else {
+      *output++ = (uint8_t)(0xf0 | (code >> 18));
+      *output++ = (uint8_t)(0x80 | ((code >> 12) & 0x3f));
+      *output++ = (uint8_t)(0x80 | ((code >> 6) & 0x3f));
+      *output++ = (uint8_t)(0x80 | (code & 0x3f));
+    }
+  }
+  (*env)->ReleaseStringCritical(env, value, text);
+  return (jlong)(output - start);
+}
+
 // API 24-25 ignore CriticalNative, so their entry points retain the JNI prefix.
 #define MLN_JNI_FALLBACK(result, name, parameters, arguments) \
   static result name##_jni parameters {                       \
@@ -186,6 +229,10 @@ MLN_JNI_FALLBACK(
 )
 MLN_JNI_FALLBACK(
   void, mln_jni_free, (JNIEnv * env, jclass type, jlong address), (address)
+)
+MLN_JNI_FALLBACK(
+  void, mln_jni_clear, (JNIEnv * env, jclass type, jlong address, jlong size),
+  (address, size)
 )
 MLN_JNI_FALLBACK(
   jlong, mln_jni_string_length, (JNIEnv * env, jclass type, jlong address),
@@ -212,6 +259,7 @@ MLN_JNI_ACCESSOR_FALLBACK(double, jdouble)
     {"allocateUninitializedNative", "(J)J",                          \
      (void*)mln_jni_allocate_uninitialized##suffix},                 \
     {"free", "(J)V", (void*)mln_jni_free##suffix},                   \
+    {"clear", "(JJ)V", (void*)mln_jni_clear##suffix},                \
     {"getByte", "(J)B", (void*)mln_jni_get_byte##suffix},            \
     {"putByte", "(JB)V", (void*)mln_jni_put_byte##suffix},           \
     {"getShort", "(J)S", (void*)mln_jni_get_short##suffix},          \
@@ -226,7 +274,8 @@ MLN_JNI_ACCESSOR_FALLBACK(double, jdouble)
     {"putDouble", "(JD)V", (void*)mln_jni_put_double##suffix},       \
     {"stringLength", "(J)J", (void*)mln_jni_string_length##suffix},  \
     {"getBytes", "(JI)[B", (void*)mln_jni_get_bytes},                \
-    {"putBytes", "(J[B)V", (void*)mln_jni_put_bytes},
+    {"putBytes", "(J[B)V", (void*)mln_jni_put_bytes},                \
+    {"putUtf8", "(JLjava/lang/String;)J", (void*)mln_jni_put_utf8},
 
 static const JNINativeMethod mln_jni_memory_methods[] = {
   MLN_JNI_MEMORY_METHODS(_jni)

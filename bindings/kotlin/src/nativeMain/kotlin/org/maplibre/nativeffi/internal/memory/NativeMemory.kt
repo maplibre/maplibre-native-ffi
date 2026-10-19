@@ -24,6 +24,7 @@ import kotlinx.cinterop.value
 import platform.posix.calloc
 import platform.posix.malloc
 import platform.posix.memcpy
+import platform.posix.memset
 import platform.posix.strlen
 
 /** Native memory through C pointers. */
@@ -36,6 +37,10 @@ internal actual object NativeMemory {
     }
 
   actual fun free(address: Long) = platform.posix.free(address.toCPointer<ByteVar>())
+
+  actual fun clear(address: Long, size: Long) {
+    memset(address.toCPointer<ByteVar>(), 0, size.convert())
+  }
 
   actual fun allocateUninitialized(size: Long): Long =
     malloc(maxOf(size, 1L).convert()).toLong().also {
@@ -87,6 +92,8 @@ internal actual object NativeMemory {
     if (value.isEmpty()) return
     value.usePinned { memcpy(at<ByteVar>(address), it.addressOf(0), value.size.convert()) }
   }
+
+  actual fun putUtf8(address: Long, value: String): Long = putUtf8(address, value, 0xfffd)
 
   actual fun stringLength(address: Long): Long = strlen(at<ByteVar>(address)).toLong()
 }

@@ -9,6 +9,21 @@ internal open class NativeArena : AutoCloseable {
   private var blockCount = 0
   private var cursor = 0L
   private var limit = 0L
+  private var scratch: ArenaScratch? = null
+  private var scratchChecked = false
+  private var largeUsed = false
+
+  private fun scratch(): ArenaScratch? {
+    if (!scratchChecked) {
+      scratchChecked = true
+      val candidate = threadArenaScratch()
+      if (!candidate.leased) {
+        candidate.leased = true
+        scratch = candidate
+      }
+    }
+    return scratch
+  }
 
   fun allocate(size: Int, alignment: Int = 8): Long = allocate(size.toLong(), alignment)
 
@@ -21,7 +36,10 @@ internal open class NativeArena : AutoCloseable {
       return start
     }
     if (size > BLOCK_SIZE / 4) return block(maxOf(size, 1L))
-    val block = block(BLOCK_SIZE)
+    val block =
+      if (cursor == 0L)
+        scratch()?.small?.address?.also { NativeMemory.clear(it, BLOCK_SIZE) } ?: block(BLOCK_SIZE)
+      else block(BLOCK_SIZE)
     cursor = block + size
     limit = block + BLOCK_SIZE
     return block
@@ -44,20 +62,28 @@ internal open class NativeArena : AutoCloseable {
 
   /** Copies [value] and returns its address, which is valid even when [value] is empty. */
   fun bytes(value: ByteArray): Long =
-    (if (value.size > BLOCK_SIZE / 4) block(value.size.toLong(), false)
-      else allocate(maxOf(value.size, 1), 1))
+    (if (value.size > BLOCK_SIZE / 4) byteBlock(value.size) else allocate(maxOf(value.size, 1), 1))
       .also {
         if (value.isNotEmpty()) NativeMemory.putBytes(it, value)
       }
 
+  private fun byteBlock(size: Int): Long {
+    if (!largeUsed && size <= 1024 * 1024) {
+      scratch()?.let {
+        largeUsed = true
+        return it.large(size)
+      }
+    }
+    return block(size.toLong(), false)
+  }
+
   /** Copies [value] as NUL-terminated UTF-8, refusing an embedded NUL that C would truncate at. */
   fun cString(value: String): Long {
     Status.requireArgument('\u0000' !in value) { "text contains an embedded NUL" }
-    val encoded = value.encodeToByteArray()
-    val size = encoded.size.toLong() + 1
+    val size = value.length.toLong() * 3 + 1
     return (if (size > BLOCK_SIZE / 4) block(size, false) else allocate(size, 1)).also {
-      NativeMemory.putBytes(it, encoded)
-      NativeMemory.putByte(it + encoded.size, 0)
+      val length = NativeMemory.putUtf8(it, value)
+      NativeMemory.putByte(it + length, 0)
     }
   }
 
@@ -67,12 +93,19 @@ internal open class NativeArena : AutoCloseable {
     writeSize(address + NativeMemory.addressSize, value.size.toULong())
   }
 
-  fun putView(address: Long, value: String?) = putView(address, value?.encodeToByteArray())
+  fun putView(address: Long, value: String?) {
+    if (value == null) return
+    val capacity = maxOf(value.length.toLong() * 3, 1L)
+    val data = if (capacity > BLOCK_SIZE / 4) block(capacity, false) else allocate(capacity, 1)
+    writeAddress(address, data)
+    writeSize(address + NativeMemory.addressSize, NativeMemory.putUtf8(data, value).toULong())
+  }
 
   fun view(value: ByteArray?): Long =
     allocate(2 * NativeMemory.addressSize, NativeMemory.addressSize).also { putView(it, value) }
 
-  fun view(value: String?): Long = view(value?.encodeToByteArray())
+  fun view(value: String?): Long =
+    allocate(2 * NativeMemory.addressSize, NativeMemory.addressSize).also { putView(it, value) }
 
   inline fun <T> array(items: List<T>, size: Int, alignment: Int, write: (Long, T) -> Unit): Long {
     // Two Int factors cannot overflow a Long product.
@@ -88,6 +121,10 @@ internal open class NativeArena : AutoCloseable {
     blockCount = 0
     cursor = 0L
     limit = 0L
+    largeUsed = false
+    scratch?.leased = false
+    scratch = null
+    scratchChecked = false
   }
 
   private companion object {

@@ -18,6 +18,8 @@ internal actual object NativeMemory {
 
   @CriticalNative @JvmStatic actual external fun free(address: Long)
 
+  @CriticalNative @JvmStatic actual external fun clear(address: Long, size: Long)
+
   actual fun allocateUninitialized(size: Long): Long =
     allocateUninitializedNative(size).also {
       if (it == 0L) throw OutOfMemoryError("cannot allocate $size bytes of native memory")
@@ -52,6 +54,8 @@ internal actual object NativeMemory {
   @JvmStatic actual external fun getBytes(address: Long, count: Int): ByteArray
 
   @JvmStatic actual external fun putBytes(address: Long, value: ByteArray)
+
+  @JvmStatic actual external fun putUtf8(address: Long, value: String): Long
 
   @CriticalNative @JvmStatic actual external fun stringLength(address: Long): Long
 

@@ -135,8 +135,11 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
 
   override fun close() {
     try {
-      scope?.close()
-      super.close()
+      try {
+        scope?.close()
+      } finally {
+        super.close()
+      }
     } finally {
       arguments?.forEach { bindingKeepAlive(it) }
     }
