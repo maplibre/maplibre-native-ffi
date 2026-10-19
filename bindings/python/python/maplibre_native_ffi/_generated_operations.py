@@ -2276,14 +2276,11 @@ def supported_render_backend_mask() -> RenderBackendFlag:
 
 
 class MapHandleDiscarding:
-    __slots__ = ("_owner",)
+    __slots__ = ("_native",)
+    _native: _native._MapHandle
 
     def __init__(self, owner: _MapHandleOperations):
-        self._owner = owner
-
-    @property
-    def _native(self) -> _native._MapHandle:
-        return self._owner._native
+        self._native = owner._native
 
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions | None = None
@@ -2850,14 +2847,11 @@ class MapHandleDiscarding:
 
 
 class RenderSessionHandleDiscarding:
-    __slots__ = ("_owner",)
+    __slots__ = ("_native",)
+    _native: _native._RenderSessionHandle
 
     def __init__(self, owner: _RenderSessionHandleOperations):
-        self._owner = owner
-
-    @property
-    def _native(self) -> _native._RenderSessionHandle:
-        return self._owner._native
+        self._native = owner._native
 
     def resize(self, extent: LogicalExtent) -> None:
         """Starts an ordered logical resize, which also resizes the map. On a

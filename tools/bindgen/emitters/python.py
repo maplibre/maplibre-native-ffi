@@ -1048,7 +1048,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         facade.get("", [])
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] += "\n".join(
-        f"class {owner}Discarding:\n    __slots__ = ('_owner',)\n\n    def __init__(self, owner: _{owner}Operations):\n        self._owner = owner\n\n    @property\n    def _native(self) -> _native._{owner}:\n        return self._owner._native\n\n"
+        f"class {owner}Discarding:\n    __slots__ = ('_native',)\n    _native: _native._{owner}\n\n    def __init__(self, owner: _{owner}Operations):\n        self._native = owner._native\n\n"
         + "\n".join(methods)
         for owner, methods in discards.items()
     )
