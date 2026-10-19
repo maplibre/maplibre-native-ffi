@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -213,13 +214,17 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         "--quiet",
         str(staging / "bindings/swift/Sources/MaplibreNativeFFI/Generated"),
     )
-    # Dart formats staged files with the binding package's language version.
-    dart_config = Path("bindings/dart/.dart_tool/package_config.json")
-    if (ROOT / dart_config).exists():
-        target = staging / dart_config
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes((ROOT / dart_config).read_bytes())
-    run_tool("dart", "format", *staged(".dart"), cwd=ROOT / "bindings/dart", quiet=True)
+    # Dart formats staged files with the binding package's minimum language
+    # version, read from its pubspec so the output never depends on whether
+    # `dart pub get` has run.
+    run_tool(
+        "dart",
+        "format",
+        f"--language-version={dart_language_version()}",
+        *staged(".dart"),
+        cwd=ROOT / "bindings/dart",
+        quiet=True,
+    )
     run_tool(
         "env",
         "MLN_FFI_DPRINT_SCOPED_TOOLS=1",
@@ -232,6 +237,15 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
     )
     run_tool("zig", "fmt", *staged(".zig"), cwd=ROOT / "bindings/zig", quiet=True)
     return {path: (staging / path).read_text() for path in outputs}
+
+
+def dart_language_version() -> str:
+    """Returns the major.minor floor of the Dart binding's SDK constraint."""
+    pubspec = (ROOT / "bindings/dart/pubspec.yaml").read_text()
+    match = re.search(r"^\s+sdk:\s*['\"]?[\^>=]*\s*(\d+)\.(\d+)", pubspec, re.MULTILINE)
+    if match is None:
+        raise SystemExit("bindings/dart/pubspec.yaml names no SDK constraint")
+    return f"{match[1]}.{match[2]}"
 
 
 CONFLICT_MARKERS = ("<<<<<<<", "|||||||", "=======", ">>>>>>>")
