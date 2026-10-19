@@ -19,8 +19,8 @@ function(mln_ffi_apple_is_simulator out_var)
   endif()
 endfunction()
 
-# The SDK that CMAKE_OSX_SYSROOT names, as a path. A Linux host cross-building
-# with xtool already sets a path, and a Mac names the SDK for xcrun to find.
+# The SDK that CMAKE_OSX_SYSROOT names, as a path. CMake may already store an
+# absolute SDK path; otherwise a Mac names the SDK for xcrun to find.
 function(mln_ffi_apple_sdk_path out_var)
   if(IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
     set(${out_var} "${CMAKE_OSX_SYSROOT}" PARENT_SCOPE)

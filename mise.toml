@@ -94,7 +94,6 @@ shellcheck_version = "0.11.0"
 swift_version = "6.3.1"
 swiftformat_version = "0.64.0"
 uv_version = "0.13.1"
-xtool_version = "1.22.2"
 zig_version = "0.16.0"
 
 [tools]

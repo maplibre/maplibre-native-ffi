@@ -30,7 +30,8 @@ before implementing or reviewing a binding.
 Install the platform prerequisites:
 
 - On macOS Apple Silicon, install Homebrew and Xcode 26.0.1. Mise bootstrap
-  installs the required Homebrew packages.
+  installs the required Homebrew packages. The macOS, iOS, tvOS, and Mac
+  Catalyst presets compile on that host.
 - On Linux, mise bootstrap installs the development libraries through apt on
   Ubuntu and dnf on Fedora. On other distributions, install the packages
   analogous to those listed in `mise.linux.toml`. The Linux presets compile with
