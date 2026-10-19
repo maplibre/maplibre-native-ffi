@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -16,13 +15,13 @@ namespace mln::core {
 
 // A glob compiled into a linear NFA. Each candidate byte visits each token
 // once, so work is O(pattern length * candidate length). Scratch storage is
-// allocated at registration and serialized for concurrent resource threads.
+// reused per thread, so concurrent matches share no writable storage.
 class CompiledGlob {
  public:
   explicit CompiledGlob(std::string_view pattern);
   [[nodiscard]] auto matches(
     std::string_view candidate, std::size_t* steps = nullptr
-  ) const noexcept -> bool;
+  ) const -> bool;
 
  private:
   enum class Kind : std::uint8_t { Literal, Any, Segment, Spanning };
@@ -31,8 +30,6 @@ class CompiledGlob {
     char literal = 0;
   };
   std::vector<Token> tokens_;
-  mutable std::mutex mutex_;
-  mutable std::vector<std::uint8_t> states_;
 };
 
 // Whether a rule or route with the kinds mask applies to a request of
@@ -52,7 +49,7 @@ struct UrlPattern {
 
   [[nodiscard]] auto matches(
     std::uint32_t request_kind, std::string_view url
-  ) const noexcept -> bool;
+  ) const -> bool;
 };
 
 // The routes of a resource provider, which owns their strings.
@@ -68,7 +65,7 @@ struct RouteTable {
   [[nodiscard]] auto matches(
     std::uint32_t kind, std::string_view requested_url,
     std::string_view resolved_url
-  ) const noexcept -> bool;
+  ) const -> bool;
 };
 
 struct RewriteRuleTable {
@@ -105,10 +102,10 @@ auto copy_header_rules(
 auto rewrite_rules_callback(
   void* user_data, std::uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
-) noexcept -> mln_status;
+) -> mln_status;
 auto header_rules_callback(
   void* user_data, std::uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response
-) noexcept -> mln_status;
+) -> mln_status;
 
 }  // namespace mln::core

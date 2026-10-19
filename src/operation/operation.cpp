@@ -85,6 +85,14 @@ auto create_completion_operation(
                         ? make_command_completion(descriptor, out.completion)
                         : make_completion(descriptor, out.completion);
   if (status != MLN_STATUS_OK) return status;
+  return create_completion_operation(out.completion, std::move(deliver), out);
+}
+
+auto create_completion_operation(
+  std::shared_ptr<Completion> completion, CompletionOperation::Delivery deliver,
+  CompletionOperation& out
+) -> mln_status {
+  out.completion = std::move(completion);
   try {
     out.operation = std::make_shared<OperationObject>(
       [completion = out.completion, deliver = std::move(deliver)](
@@ -114,6 +122,20 @@ auto create_completion_operation(
       const std::shared_ptr<Completion>& completion, mln_status status,
       std::string diagnostic, std::any
     ) { valueless.complete(completion, status, std::move(diagnostic)); },
+    out
+  );
+}
+
+auto create_completion_operation(
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless,
+  CompletionOperation& out
+) -> mln_status {
+  return create_completion_operation(
+    std::move(completion),
+    [valueless](
+      const std::shared_ptr<Completion>& state, mln_status status,
+      std::string diagnostic, std::any
+    ) { valueless.complete(state, status, std::move(diagnostic)); },
     out
   );
 }

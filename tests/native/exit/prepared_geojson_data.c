@@ -27,7 +27,7 @@ int main(void) {
       (void)fprintf(stderr, "preparation failed: %s\n", diagnostic.message);
       return 1;
     }
-    mln_geojson_source_data_destroy(data);
+    mln_geojson_source_data_release(data);
   }
   return 0;
 }

@@ -3,6 +3,35 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
+static void host_string_views_reject_nul_and_null_data_with_a_length(void) {
+  const mln_buffer_view invalid[] = {
+    MLN_BUFFER_LITERAL("before\0after"),
+    {.data = NULL, .size = 1},
+  };
+  for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
+       ++index) {
+    mln_runtime runtime = MLN_HANDLE_NULL;
+    mln_runtime_options options = mln_runtime_options_default();
+    options.asset_path = invalid[index];
+    MLN_TEST_INVALID(mln_runtime_create(&options, &runtime, NULL));
+    options.asset_path = (mln_buffer_view){0};
+    options.cache_path = invalid[index];
+    MLN_TEST_INVALID(mln_runtime_create(&options, &runtime, NULL));
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
+  }
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
+       ++index) {
+    MLN_TEST_INVALID(mln_map_set_style_url(map, invalid[index], NULL, NULL));
+    MLN_TEST_INVALID(
+      mln_runtime_merge_offline_regions(runtime, invalid[index], NULL, NULL)
+    );
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // The browser and OpenHarmony have no asset directory on disk. Android reads
 // its packaged assets only for a path under /android_asset/, so a directory on
 // disk resolves there as it does on the desktop and simulator targets.
@@ -37,10 +66,17 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
   *separator = '\0';
 
   mln_runtime_options options = mln_runtime_options_default();
-  options.asset_path = directory;
+  options.asset_path =
+    (mln_buffer_view){.data = directory, .size = strlen(directory)};
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
+  const size_t url_size = strlen(url);
+  url[url_size] = '!';
+  url[url_size + 1] = '\0';
+  MLN_TEST_AWAIT_OK(mln_map_set_style_url(
+    map, (mln_buffer_view){.data = url, .size = url_size},
+    &completion.descriptor, NULL
+  ));
   TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -50,6 +86,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
 #endif
 
 MLN_TEST_GROUP {
+  RUN_TEST(host_string_views_reject_nul_and_null_data_with_a_length);
 #if !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
   RUN_TEST(an_asset_style_resolves_under_the_runtime_asset_path);
 #endif

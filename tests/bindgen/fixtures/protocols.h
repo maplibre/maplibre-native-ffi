@@ -354,17 +354,14 @@ mln_status mln_map_set_label(
 
 #ifdef MLN_PROTOCOL_PLAN_NAMES
 // Names that the semantic plan derives once for every binding: a handle whose
-// operations begin with a prefix other than its type name, a record whose field
+// operations begin with its type name, a record whose field
 // order is its meaning, and a mask flag whose record name shares no prefix with
 // its bit constants.
-typedef uint64_t mln_pass_handle BIND(
-  "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
-);
-void mln_pass_close(mln_pass_handle pass);
-mln_status mln_pass_redeem(
-  mln_pass_handle pass, mln_diagnostic* out_diagnostic
-);
-mln_status mln_pass_stamp(mln_pass_handle pass, mln_diagnostic* out_diagnostic);
+typedef uint64_t mln_pass
+  BIND("kind=handle;release=mln_pass_close;dispose=mln_pass_close");
+void mln_pass_close(mln_pass pass);
+mln_status mln_pass_redeem(mln_pass pass, mln_diagnostic* out_diagnostic);
+mln_status mln_pass_stamp(mln_pass pass, mln_diagnostic* out_diagnostic);
 typedef struct mln_point {
   double x;
   double y;
@@ -382,8 +379,7 @@ typedef struct mln_frame_window {
   double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
 } mln_frame_window;
 mln_status mln_pass_set_window(
-  mln_pass_handle pass, const mln_frame_window* window,
-  mln_diagnostic* out_diagnostic
+  mln_pass pass, const mln_frame_window* window, mln_diagnostic* out_diagnostic
 );
 #endif
 

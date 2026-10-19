@@ -391,7 +391,15 @@ def response_declaration(values, value):
             elif parameter.value.kind == "buffer":
                 public = "&str" if parameter.value.encoding == "utf8" else "&[u8]"
                 signature.append(f"{local}: {public}")
-                args.append(encode(values, parameter.value, local))
+                if (
+                    parameter.value.buffer_form == "view"
+                    or parameter.value.length == "nul"
+                ) and "let arena = &mut InputArena::default();" not in setup:
+                    setup.insert(0, "let arena = &mut InputArena::default();")
+                setup.append(
+                    f"let native_{local} = {encode(values, parameter.value, local)};"
+                )
+                args.append(f"native_{local}")
             else:
                 raise Unsupported(
                     f"response parameter {method_name}.{parameter.name} requires conversion"

@@ -16,8 +16,8 @@ test "copied handles share one close and close twice safely" {
     const projection = try maplibre.mapCreateProjection(fixture.map, null);
     const projection_copy = projection;
 
-    try maplibre.mapProjectionClose(projection, null);
-    try maplibre.mapProjectionClose(projection_copy, null);
+    try maplibre.mapProjectionRelease(projection, null);
+    try maplibre.mapProjectionRelease(projection_copy, null);
     try testing.expectError(error.InvalidState, maplibre.mapProjectionGetCamera(projection_copy, null));
 
     try fixture.closeMap();
@@ -121,8 +121,8 @@ test "prepared GeoJSON data outlives its release through submitted installs" {
     const data = try maplibre.geojsonSourceDataCreate(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null, null);
     const first = try maplibre.mapAddGeojsonSourceData(fixture.map, "first", data, null);
     const second = try maplibre.mapAddGeojsonSourceData(fixture.map, "second", data, null);
-    try maplibre.geojsonSourceDataDestroy(data);
-    try maplibre.geojsonSourceDataDestroy(data);
+    try maplibre.geojsonSourceDataRelease(data);
+    try maplibre.geojsonSourceDataRelease(data);
     try support.expectCommitted(first);
     try support.expectCommitted(second);
     var sources = try support.resolve(try maplibre.mapListStyleSources(testing.allocator, fixture.map, null));

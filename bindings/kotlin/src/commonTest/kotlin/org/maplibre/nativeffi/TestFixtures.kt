@@ -17,8 +17,8 @@ import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.ResourceErrorReason
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
-import org.maplibre.nativeffi.generated.ResourceRequest
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
+import org.maplibre.nativeffi.generated.ResourceRequestInfo
 import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
 import org.maplibre.nativeffi.generated.RuntimeEvent
@@ -57,7 +57,9 @@ internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
  * null for the rest.
  */
 internal fun denyingProvider(
-  serve: (ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ -> null },
+  serve: (ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ ->
+    null
+  },
 ): ResourceProvider =
   ResourceProvider(callback = { request, handle -> serve(request, handle) ?: handle.deny() })
 

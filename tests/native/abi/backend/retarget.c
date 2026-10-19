@@ -327,7 +327,8 @@ static mln_status acquire(
 
 static void release(mln_acquired_frame* frame) {
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
+  MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
+  *frame = MLN_HANDLE_NULL;
 }
 
 // A replacement is refused while the host holds a frame of the ring, because

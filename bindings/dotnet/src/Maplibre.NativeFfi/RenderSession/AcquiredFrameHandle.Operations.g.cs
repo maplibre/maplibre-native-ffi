@@ -254,7 +254,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         state.Release(
             (live, diagnostic) =>
                 NativeMethods.mln_acquired_frame_release(
-                    &live,
+                    live,
                     scope.Value(NativeGpuSync(consumerCompletion)),
                     diagnostic
                 )

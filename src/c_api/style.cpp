@@ -12,6 +12,7 @@
 
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
@@ -133,7 +134,10 @@ auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
     return false;
   }
   for (size_t index = 0; index < tile_count; ++index) {
-    if (!valid_non_empty_view(tiles[index], "tile URL")) {
+    if (
+      !valid_non_empty_view(tiles[index], "tile URL") ||
+      !mln::core::validate_c_string_view(tiles[index], "tile URL")
+    ) {
       return false;
     }
   }
@@ -217,15 +221,14 @@ auto mln_style_transition_options_default(void) noexcept
   return mln::core::style_transition_options_default();
 }
 auto mln_map_set_style_url(
-  mln_map map, const char* url, const mln_completion* completion,
+  mln_map map, mln_buffer_view url, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (url == nullptr) {
-      mln::core::set_thread_error("url must not be null");
+    if (!mln::core::validate_c_string_view(url, "url")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    auto owned = std::string{url};
+    auto owned = mln::core::string_from_view(url);
     return mln::core::submit_map_command(
       map,
       [owned = std::move(owned)](mln::core::MapObject& live) -> mln_status {
@@ -365,6 +368,7 @@ auto mln_map_list_style_sources(
       if (                                                                   \
         !valid_non_empty_view(source_id, "source_id") ||                     \
         !valid_non_empty_view(url, "url") ||                                 \
+        !mln::core::validate_c_string_view(url, "url") ||                    \
         mln::core::validate_tile_source_options(options, KIND) !=            \
           MLN_STATUS_OK                                                      \
       ) {                                                                    \
@@ -439,6 +443,7 @@ auto mln_map_add_geojson_source_url(
     if (
       !valid_non_empty_view(source_id, "source_id") ||
       !valid_non_empty_view(url, "url") ||
+      !mln::core::validate_c_string_view(url, "url") ||
       mln::core::validate_geojson_source_options(options) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -470,9 +475,9 @@ auto mln_geojson_source_data_create(
   });
 }
 
-auto mln_geojson_source_data_destroy(mln_geojson_source_data data) noexcept
+auto mln_geojson_source_data_release(mln_geojson_source_data data) noexcept
   -> void {
-  mln::core::geojson_source_data_destroy(data);
+  mln::core::geojson_source_data_release(data);
 }
 
 auto mln_map_add_geojson_source_data(
@@ -511,7 +516,8 @@ auto mln_map_set_geojson_source_url(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(source_id, "source_id") ||
-      !valid_non_empty_view(url, "url")
+      !valid_non_empty_view(url, "url") ||
+      !mln::core::validate_c_string_view(url, "url")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -877,6 +883,7 @@ auto mln_map_add_image_source_url(
     if (
       !valid_non_empty_view(source_id, "source_id") ||
       !valid_non_empty_view(url, "url") ||
+      !mln::core::validate_c_string_view(url, "url") ||
       mln::core::validate_image_source_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK
@@ -942,7 +949,8 @@ auto mln_map_set_image_source_url(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(source_id, "source_id") ||
-      !valid_non_empty_view(url, "url")
+      !valid_non_empty_view(url, "url") ||
+      !mln::core::validate_c_string_view(url, "url")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }

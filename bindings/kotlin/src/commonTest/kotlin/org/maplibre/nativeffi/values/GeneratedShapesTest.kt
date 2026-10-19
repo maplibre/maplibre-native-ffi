@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
+import org.maplibre.nativeffi.internal.memory.readCString
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.withMap
@@ -72,10 +73,14 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt(): Unit = runSuspendTest {
+  fun hostStringsUseViewsAndNativeLentStringsDecode(): Unit = runSuspendTest {
+    NativeArena().use { arena ->
+      assertEquals("native-lent é", readCString(arena.cString("native-lent é")))
+    }
     withMap {
-      // A URL crosses as a NUL-terminated string, which cannot hold a NUL.
-      assertFailsWith<InvalidArgumentException> { map.setStyleUrl("custom://a\u0000b") }
+      // Native rejects an embedded NUL in the URL view before a C-string consumer.
+      val error = assertFailsWith<InvalidArgumentException> { map.setStyleUrl("custom://a\u0000b") }
+      assertNotNull(error.nativeStatusCode)
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = "a\u0000b")

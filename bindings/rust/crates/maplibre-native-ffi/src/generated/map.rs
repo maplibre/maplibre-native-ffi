@@ -1921,7 +1921,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_url(&self, url: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call("mln_map_set_style_url")?;
-        let url = call.input(url)?;
+        let url = call.input(&url)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_url(map, url, completion, out_diagnostic)
         })
@@ -2991,7 +2991,7 @@ impl MapHandleDiscarding<'_> {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_url(&self, url: &str) -> Result<()> {
         let mut call = self.0.inner.call("mln_map_set_style_url")?;
-        let url = call.input(url)?;
+        let url = call.input(&url)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_url(map, url, completion, out_diagnostic)
         })

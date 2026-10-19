@@ -17,8 +17,8 @@ static const char inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
 static uint32_t pass_through_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)user_data;
   (void)request;
@@ -161,8 +161,8 @@ static void submit_provider_from_thread(void* user_data) {
 }
 
 static uint32_t recording_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)request;
   (void)handle;
@@ -213,12 +213,12 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
 
 typedef struct dropped_request_probe {
   atomic_bool release_inline;
-  _Atomic mln_resource_request_handle handle;
+  _Atomic mln_resource_request handle;
 } dropped_request_probe;
 
 static uint32_t claim_and_drop_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)request;
   dropped_request_probe* probe = user_data;
@@ -287,8 +287,8 @@ static void releasing_a_request_inside_its_callback_then_claiming_fails_it(
 }
 
 static uint32_t release_then_unknown_decision_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)user_data;
   (void)request;
@@ -380,7 +380,7 @@ static void a_held_request_does_not_hold_its_runtime_open(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 
-  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  const mln_resource_request handle = atomic_load(&probe.handle);
   mln_resource_request_release(handle);
   MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
 }
@@ -445,8 +445,8 @@ typedef struct inline_release_provider_state {
 } inline_release_provider_state;
 
 static uint32_t inline_release_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   inline_release_provider_state* state = user_data;
   const mln_resource_response response =
@@ -493,7 +493,7 @@ typedef struct cancel_probe {
   atomic_int register_status;
   atomic_bool register_reported_cancelled;
   atomic_bool rejected_invalid_handlers;
-  _Atomic mln_resource_request_handle handle;
+  _Atomic mln_resource_request handle;
 } cancel_probe;
 
 static void count_cancel(void* user_data) {
@@ -517,7 +517,7 @@ static void count_cancel_release(void* user_data) {
 // Each invalid handler fails without taking the request's one registration
 // or releasing its user data.
 static bool rejects_invalid_cancel_handlers(
-  mln_resource_request_handle handle, cancel_probe* probe
+  mln_resource_request handle, cancel_probe* probe
 ) {
   mln_resource_request_cancel_handler undersized =
     cancel_handler(count_cancel, probe, count_cancel_release);
@@ -542,8 +542,8 @@ static bool rejects_invalid_cancel_handlers(
 }
 
 static uint32_t cancel_probe_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)request;
   cancel_probe* probe = user_data;
@@ -598,7 +598,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.cancel_count, 1));
-  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  const mln_resource_request handle = atomic_load(&probe.handle);
   // The context retires as the callback returns, before the request does.
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.release_count, 1));
   TEST_ASSERT_FALSE(atomic_load(&probe.released_before_cancel));
@@ -636,7 +636,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 // A registration that arrives after cancellation stores nothing and reports
 // the cancellation through out_cancelled instead of invoking the callback.
 typedef struct cancelled_poll {
-  mln_resource_request_handle handle;
+  mln_resource_request handle;
   bool cancelled;
   mln_status status;
 } cancelled_poll;
@@ -656,7 +656,7 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = start_cancel_probe_request(runtime, &probe);
   mln_test_destroy_map(map);
-  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  const mln_resource_request handle = atomic_load(&probe.handle);
 
   cancelled_poll poll = {.handle = handle, .status = MLN_STATUS_OK};
   TEST_ASSERT_TRUE(mln_test_await(
@@ -692,7 +692,7 @@ static void cancel_callback_may_release_the_request(void) {
 
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.cancel_count, 1));
-  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  const mln_resource_request handle = atomic_load(&probe.handle);
   MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
   const mln_resource_request_cancel_handler unreleased =
@@ -805,27 +805,27 @@ static const tile_answer_case tile_answer_cases[] = {
   {"not found",
    {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-    .error_message = "tile not found"},
+    .error_message = MLN_BUFFER_LITERAL("tile not found")},
    true},
   {"a server error",
    {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_SERVER,
-    .error_message = "tile server error"},
+    .error_message = MLN_BUFFER_LITERAL("tile server error")},
    false},
   {"a connection error",
    {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_CONNECTION,
-    .error_message = "tile connection error"},
+    .error_message = MLN_BUFFER_LITERAL("tile connection error")},
    false},
   {"a rate limit",
    {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
-    .error_message = "tile rate limit"},
+    .error_message = MLN_BUFFER_LITERAL("tile rate limit")},
    false},
   {"another error",
    {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-    .error_message = "tile other error"},
+    .error_message = MLN_BUFFER_LITERAL("tile other error")},
    false},
 };
 
@@ -882,7 +882,7 @@ static void a_style_error_reaches_the_loading_failure(void) {
        {
          .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
          .error_reason = MLN_RESOURCE_ERROR_REASON_SERVER,
-         .error_message = "the style server is down",
+         .error_message = MLN_BUFFER_LITERAL("the style server is down"),
        }},
     {.url = "custom://undescribed.json",
      .response =
@@ -947,7 +947,7 @@ static mln_resource_response cacheable_style(bool must_revalidate) {
     .must_revalidate = must_revalidate,
     .modified_unix_ms = style_modified_unix_ms,
     .expires_unix_ms = style_expired_unix_ms,
-    .etag = "\"v1\"",
+    .etag = MLN_BUFFER_LITERAL("\"v1\""),
   };
 }
 
@@ -1030,6 +1030,14 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   const mln_test_provider_request* revalidation =
     mln_test_provider_request_at(provider, cached_style_url, 1);
   expect_revalidation_of_cached_style(revalidation, false);
+  const mln_resource_response invalid_etag = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
+    .etag = MLN_BUFFER_LITERAL("before\0after"),
+  };
+  MLN_TEST_INVALID(
+    mln_resource_request_complete(revalidation->handle, &invalid_etag, NULL)
+  );
   const mln_resource_response not_modified = {
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
@@ -1046,8 +1054,8 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
 
 #if !defined(__EMSCRIPTEN__)
 static uint32_t hand_back_inline(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)request;
   atomic_int* status = user_data;
@@ -1093,7 +1101,7 @@ static void a_callback_request_can_pass_through_inline_or_later(void) {
         dropped_request_claimed, &probe, mln_test_deadline_default(),
         "the provider to claim the request"
       ));
-      const mln_resource_request_handle handle = atomic_load(&probe.handle);
+      const mln_resource_request handle = atomic_load(&probe.handle);
       MLN_TEST_OK(mln_resource_request_pass_through(handle, NULL));
       mln_resource_request_release(handle);
     }

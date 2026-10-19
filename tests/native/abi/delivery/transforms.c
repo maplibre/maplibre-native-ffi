@@ -21,12 +21,12 @@
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-static char* copy_string(const char* text) {
-  const size_t size = strlen(text) + 1;
+static mln_buffer_view copy_view(const char* text) {
+  const size_t size = strlen(text);
   char* copy = malloc(size);
   TEST_ASSERT_NOT_NULL(copy);
   memcpy(copy, text, size);
-  return copy;
+  return (mln_buffer_view){.data = copy, .size = size};
 }
 
 static mln_status submit_rewrite_rules(
@@ -54,10 +54,11 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_rewrite_rule rules[] = {
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = "custom://first"},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+     .url = MLN_BUFFER_LITERAL("custom://first")},
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
      .flags = 1U << 1U,
-     .url = "custom://second"},
+     .url = MLN_BUFFER_LITERAL("custom://second")},
   };
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, rules, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "rewrite rule 1"));
@@ -65,11 +66,12 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   const mln_resource_rewrite_rule unknown_flag = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = 1U << 31U,
-    .url = "custom://unknown",
+    .url = MLN_BUFFER_LITERAL("custom://unknown"),
   };
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, &unknown_flag, 1, NULL));
   const mln_resource_rewrite_rule null_url = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = NULL
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = (mln_buffer_view){.data = NULL, .size = 1}
   };
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, NULL, 1, NULL));
@@ -86,11 +88,12 @@ static void rule_registrations_reject_an_invalid_rule(void) {
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   // A diagnostic for a rejected header never carries its value.
   const mln_http_header header = {
-    .name = "Authorization", .value = "secret-token\r\n"
+    .name = MLN_BUFFER_LITERAL("Authorization"),
+    .value = MLN_BUFFER_LITERAL("secret-token\r\n")
   };
   const mln_http_header_rule header_rule = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = "custom://headers",
+    .url = MLN_BUFFER_LITERAL("custom://headers"),
     .headers = &header,
     .header_count = 1,
   };
@@ -110,7 +113,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
 
   const mln_http_header_rule null_headers = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = "custom://headers",
+    .url = MLN_BUFFER_LITERAL("custom://headers"),
     .header_count = 1,
   };
   const mln_http_header_transform null_headers_transform = {
@@ -161,26 +164,26 @@ static void the_first_matching_rewrite_rule_decides(void) {
   mln_resource_rewrite_rule rules[] = {
     // Another kind: no match.
     {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
-     .url = copy_string(original),
-     .replacement_url = copy_string("http://127.0.0.1:1/tile.json")},
+     .url = copy_view(original),
+     .replacement_url = copy_view("http://127.0.0.1:1/tile.json")},
     {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
-     .url = copy_string(original),
-     .replacement_url = copy_string(rewritten)},
+     .url = copy_view(original),
+     .replacement_url = copy_view(rewritten)},
     // Kept URLs match here first and stay unchanged.
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = copy_string("http://127.0.0.1:*/kept*")},
+     .url = copy_view("http://127.0.0.1:*/kept*")},
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = copy_string("**"),
-     .replacement_url = copy_string("http://127.0.0.1:1/never.json")},
+     .url = copy_view("**"),
+     .replacement_url = copy_view("http://127.0.0.1:1/never.json")},
   };
   const size_t count = sizeof(rules) / sizeof(rules[0]);
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(submit_rewrite_rules(runtime, rules, count, NULL));
   for (size_t index = 0; index < count; index += 1) {
-    free((char*)rules[index].url);
-    free((char*)rules[index].replacement_url);
+    free((char*)rules[index].url.data);
+    free((char*)rules[index].replacement_url.data);
     rules[index] = (mln_resource_rewrite_rule){0};
   }
 
@@ -216,27 +219,27 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
   mln_test_http_server_url(server, "/style.json", url, sizeof(url));
 
   mln_http_header first[] = {
-    {.name = copy_string("X-Token"), .value = copy_string("first")},
-    {.name = copy_string("X-Extra"), .value = copy_string("extra")},
+    {.name = copy_view("X-Token"), .value = copy_view("first")},
+    {.name = copy_view("X-Extra"), .value = copy_view("extra")},
   };
   mln_http_header second[] = {
-    {.name = copy_string("X-Token"), .value = copy_string("second")},
-    {.name = copy_string("X-Second"), .value = copy_string("second")},
+    {.name = copy_view("X-Token"), .value = copy_view("second")},
+    {.name = copy_view("X-Second"), .value = copy_view("second")},
   };
   mln_http_header_rule rules[] = {
     {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = copy_string("**"),
+     .url = copy_view("**"),
      .headers = second,
      .header_count = 2},
     {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = copy_string("http://127.0.0.1:*/**"),
+     .url = copy_view("http://127.0.0.1:*/**"),
      .headers = first,
      .header_count = 2},
     {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = copy_string("**"),
+     .url = copy_view("**"),
      .headers = second,
      .header_count = 2},
   };
@@ -248,13 +251,13 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &transform));
   for (size_t index = 0; index < 2; index += 1) {
-    free((char*)first[index].name);
-    free((char*)first[index].value);
-    free((char*)second[index].name);
-    free((char*)second[index].value);
+    free((char*)first[index].name.data);
+    free((char*)first[index].value.data);
+    free((char*)second[index].name.data);
+    free((char*)second[index].value.data);
   }
   for (size_t index = 0; index < sizeof(rules) / sizeof(rules[0]); index += 1) {
-    free((char*)rules[index].url);
+    free((char*)rules[index].url.data);
   }
   memset(first, 0, sizeof(first));
   memset(second, 0, sizeof(second));

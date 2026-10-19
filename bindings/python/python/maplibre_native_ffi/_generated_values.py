@@ -806,7 +806,7 @@ class ResourceProviderDecision(UnknownIntEnum):
 
 
 class ResourceRequestField(IntFlag):
-    """Field mask values for `mln_resource_request`.
+    """Field mask values for `mln_resource_request_info`.
 
     See `mln_resource_request_field` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3413,7 +3413,7 @@ class ResourceProvider:
     """
 
     callback: (
-        Callable[[ResourceRequest, ResourceRequestHandle], ResourceProviderDecision]
+        Callable[[ResourceRequestInfo, ResourceRequestHandle], ResourceProviderDecision]
         | None
     ) = None
     routes: tuple[ResourceRoute, ...] = ()
@@ -3423,7 +3423,7 @@ class ResourceProvider:
         callback = self.callback
         assert callback is not None
         return callback(
-            ResourceRequest._from_native(request),
+            ResourceRequestInfo._from_native(request),
             _wrap_response(handle, "ResourceRequestHandle"),
         )
 
@@ -3448,7 +3448,18 @@ class ResourceRange:
 
 
 @dataclass(frozen=True, slots=True)
-class ResourceRequest:
+class ResourceRequestCancelHandler:
+    """Cancel callback state for one handled resource request.
+
+    See `mln_resource_request_cancel_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    callback: Callable[[], None] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceRequestInfo:
     kind: ResourceKind
 
     loading_method: ResourceLoadingMethod
@@ -3497,17 +3508,6 @@ class ResourceRequest:
             prior_etag=raw["prior_etag"],
             prior_data=raw["prior_data"],
         )
-
-
-@dataclass(frozen=True, slots=True)
-class ResourceRequestCancelHandler:
-    """Cancel callback state for one handled resource request.
-
-    See `mln_resource_request_cancel_handler` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    callback: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -3570,7 +3570,7 @@ class ResourceRewriteRule:
     """The resource kinds to match."""
 
     replacement_url: str | None = None
-    """The replacement URL, or null to keep the URL and stop the search."""
+    """The replacement URL, or empty to keep the URL and stop the search."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3835,9 +3835,9 @@ class RuntimeOptions:
     """
 
     asset_path: str | None = None
-    """Directory root for asset:// URLs. Copied during runtime creation. Null or
-    empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
-    owned by the caller.
+    """Directory root for asset:// URLs. Copied during runtime creation. Empty
+    selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
+    by the caller.
     """
 
     cache_path: str | None = None

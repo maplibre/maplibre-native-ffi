@@ -134,6 +134,56 @@ auto RuntimeExecutor::invoke_retirement(RetirementTask& task) noexcept -> void {
   retirement_wake_->send();
 }
 
+auto RuntimeExecutor::enqueue(ExecutorTask& task, bool notice) -> void {
+  const auto lock = std::scoped_lock{mutex_};
+  auto* loop = run_loop();
+  if (loop == nullptr || stopping_) {
+    throw std::runtime_error{"runtime executor is not running"};
+  }
+  if (!work_scheduled_ && (!notice || !draining_)) {
+    loop->invoke([this] { drain_work(); });
+    work_scheduled_ = true;
+  }
+  (notice ? notices_ : work_queue_).push(task);
+}
+
+auto RuntimeExecutor::flush_notices() noexcept -> void {
+  for (;;) {
+    ExecutorTask* task;
+    {
+      const auto lock = std::scoped_lock{mutex_};
+      task = notices_.pop();
+    }
+    if (!task) return;
+    task->run(task);
+  }
+}
+
+auto RuntimeExecutor::drain_work() noexcept -> void {
+  // A submission during this burst schedules the next run-loop task at once,
+  // ahead of renderer mailbox messages submitted after it.
+  auto burst = ExecutorQueue{};
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    burst = std::exchange(work_queue_, {});
+    work_scheduled_ = false;
+    draining_ = true;
+  }
+  while (auto* task = burst.pop()) {
+    if (!task->command) flush_notices();
+    auto pooled = [task]() -> mln_status {
+      task->run(task);
+      return MLN_STATUS_OK;
+    };
+    static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
+  }
+  flush_notices();
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    draining_ = false;
+  }
+}
+
 auto RuntimeExecutor::retire(RetirementTask& completion) noexcept -> void {
   assert(finalization_->worker.is_current());
   const auto lock = std::scoped_lock{mutex_};
@@ -150,13 +200,18 @@ auto RuntimeExecutor::retire(RetirementTask& completion) noexcept -> void {
 auto RuntimeExecutor::drain_retirement() noexcept -> void {
   for (;;) {
     RetirementTask* task;
+    bool stopping;
     {
       const auto lock = std::scoped_lock{mutex_};
       task = retirement_queue_.pop();
-      if (task == nullptr) {
-        if (stopping_) run_loop_.load()->stop();
-        return;
+      stopping = stopping_;
+    }
+    if (!task) {
+      if (stopping) {
+        drain_work();
+        run_loop_.load()->stop();
       }
+      return;
     }
     run_retirement_task(task);
   }

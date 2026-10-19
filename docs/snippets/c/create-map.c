@@ -2,6 +2,7 @@
 // map's life, and closing the two in order.
 
 #include <maplibre_native_c.h>
+#include <string.h>
 
 static void events_ready(void* user_data) {
   // Called from any native thread: schedule a drain on the host receiver and
@@ -14,7 +15,8 @@ mln_status open_runtime(
 ) {
   // #region runtime
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path = cache_path;
+  options.cache_path =
+    (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
   options.event_wake.callback = events_ready;
   options.event_wake.user_data = receiver;
   return mln_runtime_create(&options, out_runtime, NULL);

@@ -80,7 +80,7 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
       1e-6, coordinates[index].longitude, round_trip[index].longitude
     );
   }
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -102,7 +102,7 @@ static void empty_batches_convert_to_empty_results(void) {
   MLN_TEST_OK(mln_map_projection_lat_lngs_for_pixels_unwrapped(
     projection, NULL, 0, NULL, NULL
   ));
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

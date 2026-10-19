@@ -1876,7 +1876,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setStyleUrl(url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_url") {
-      check(C.mln_map_set_style_url(handle, cString(url), completion, diagnostic))
+      check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
 
   /**
@@ -2559,7 +2559,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
 
   public fun setStyleUrl(url: String): Unit =
     nativeDiscard(owner, binding, "mln_map_set_style_url") {
-      check(C.mln_map_set_style_url(handle, cString(url), completion, diagnostic))
+      check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
 
   public fun setTileOptions(options: MapTileOptions): Unit =

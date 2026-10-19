@@ -1486,7 +1486,10 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
     raw: mln_offline_geometry_region_definition,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    styleUrl = try NativeString.copyCString(raw.style_url)
+    styleUrl = try NativeString.copyUTF8(
+      data: raw.style_url.data,
+      size: raw.style_url.size
+    )
     geometry = try NativeString.copyData(
       data: raw.geometry.data,
       size: raw.geometry.size
@@ -1501,7 +1504,7 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
     -> mln_offline_geometry_region_definition
   {
     var raw = mln_offline_geometry_region_definition()
-    raw.style_url = try arena.cString(styleUrl)
+    raw.style_url = arena.view(styleUrl)
     raw.geometry = arena.view(geometry)
     raw.min_zoom = minZoom
     raw.max_zoom = maxZoom
@@ -1687,7 +1690,10 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
     raw: mln_offline_tile_pyramid_region_definition,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    styleUrl = try NativeString.copyCString(raw.style_url)
+    styleUrl = try NativeString.copyUTF8(
+      data: raw.style_url.data,
+      size: raw.style_url.size
+    )
     bounds = LatLngBounds(raw: raw.bounds)
     minZoom = raw.min_zoom
     maxZoom = raw.max_zoom
@@ -1699,7 +1705,7 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
     -> mln_offline_tile_pyramid_region_definition
   {
     var raw = mln_offline_tile_pyramid_region_definition()
-    raw.style_url = try arena.cString(styleUrl)
+    raw.style_url = arena.view(styleUrl)
     raw.bounds = bounds.nativeValue()
     raw.min_zoom = minZoom
     raw.max_zoom = maxZoom

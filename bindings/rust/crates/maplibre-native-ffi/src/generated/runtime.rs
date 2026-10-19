@@ -256,7 +256,7 @@ impl RuntimeHandle {
         side_database_path: &str,
     ) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
         let mut call = self.inner.call("mln_runtime_merge_offline_regions")?;
-        let side_database_path = call.input(side_database_path)?;
+        let side_database_path = call.input(&side_database_path)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_merge_offline_regions(

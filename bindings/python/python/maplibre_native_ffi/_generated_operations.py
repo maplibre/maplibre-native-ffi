@@ -294,7 +294,7 @@ class _GeojsonSourceDataHandleOperations(GeneratedOperations):
     def close(self) -> None:
         """Releases prepared GeoJSON source data.
 
-        See `mln_geojson_source_data_destroy` in the
+        See `mln_geojson_source_data_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.close()
@@ -1347,14 +1347,6 @@ class _MapHandleOperations(GeneratedOperations):
 class _MapProjectionHandleOperations(GeneratedOperations):
     _native: _native._MapProjectionHandle
 
-    def close(self) -> None:
-        """Closes a standalone projection.
-
-        See `mln_map_projection_close` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return self._native.close()
-
     def get_camera(self) -> CameraOptions:
         """Copies the projection camera into out_camera.
 
@@ -1434,6 +1426,14 @@ class _MapProjectionHandleOperations(GeneratedOperations):
             ScreenPoint._from_native(item)
             for item in self._native.pixels_for_lat_lngs(coordinates)
         )
+
+    def close(self) -> None:
+        """Releases a standalone projection.
+
+        See `mln_map_projection_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return self._native.close()
 
     def set_camera(self, camera: CameraOptions | None = None) -> None:
         """Applies a camera update to a standalone projection.
@@ -1539,18 +1539,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return _adopt_value(
             self._native.create_projection(), "MapProjectionHandle", None
         )
-
-    def close(self) -> None:
-        """Retires a detached or abandoned session handle. The call is CPU-only
-        and may run on any native thread, including from one of the session's
-        own completions. If an abandonment is still in progress on another
-        thread, this waits for it to finish before consuming the session
-        owner.
-
-        See `mln_render_session_destroy` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.close()
 
     def detach(self) -> Future[None]:
         """Starts normal graphics-owner teardown and map detachment.
@@ -1665,6 +1653,18 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.reduce_memory_use()
+
+    def close(self) -> None:
+        """Retires a detached or abandoned session handle. The call is CPU-only
+        and may run on any native thread, including from one of the session's
+        own completions. If an abandonment is still in progress on another
+        thread, this waits for it to finish before consuming the session
+        owner.
+
+        See `mln_render_session_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native.close()
 
     def request_frame(self, demand: FrameDemand | None = None) -> None:
         """Requests a frame without waiting. Every accepted demand produces one

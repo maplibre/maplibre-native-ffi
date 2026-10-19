@@ -2617,9 +2617,10 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
   final bytesbytes = nativeBufferView(value.bytes, arena);
   result.ref.bytes = bytesbytes.data.cast();
   result.ref.byte_count = bytesbytes.size;
-  result.ref.error_message = value.errorMessage == null
-      ? nullptr
-      : nativeUtf8CString(value.errorMessage!, arena).pointer.cast<Char>();
+  result.ref.error_message = nativeStringView(
+    (value.errorMessage ?? ''),
+    arena,
+  ).value;
   result.ref.must_revalidate = value.mustRevalidate;
   if (value.modifiedUnixMs != null) {
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_MODIFIED;
@@ -2629,9 +2630,7 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_EXPIRES;
     result.ref.expires_unix_ms = value.expiresUnixMs!;
   }
-  result.ref.etag = value.etag == null
-      ? nullptr
-      : nativeUtf8CString(value.etag!, arena).pointer.cast<Char>();
+  result.ref.etag = nativeStringView((value.etag ?? ''), arena).value;
   if (value.retryAfterUnixMs != null) {
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
@@ -2685,12 +2684,14 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
-  result.ref.asset_path = value.assetPath == null
-      ? nullptr
-      : nativeUtf8CString(value.assetPath!, arena).pointer.cast<Char>();
-  result.ref.cache_path = value.cachePath == null
-      ? nullptr
-      : nativeUtf8CString(value.cachePath!, arena).pointer.cast<Char>();
+  result.ref.asset_path = nativeStringView(
+    (value.assetPath ?? ''),
+    arena,
+  ).value;
+  result.ref.cache_path = nativeStringView(
+    (value.cachePath ?? ''),
+    arena,
+  ).value;
   result.ref.event_mask = value.eventMask.rawValue;
   result.ref.event_wake = registrations
       .add(_prepareWake(value.eventWake, registrations.ports))
@@ -2700,12 +2701,12 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 
 RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
     RuntimeOptions(
-      assetPath: source.asset_path == nullptr
+      assetPath: source.asset_path.size == 0
           ? null
-          : source.asset_path.cast<Utf8>().toDartString(),
-      cachePath: source.cache_path == nullptr
+          : utf8.decode(_copyBufferView(source.asset_path)),
+      cachePath: source.cache_path.size == 0
           ? null
-          : source.cache_path.cast<Utf8>().toDartString(),
+          : utf8.decode(_copyBufferView(source.cache_path)),
       eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
       eventWake: const Wake(),
     );
@@ -2716,10 +2717,7 @@ _writeOfflineTilePyramidRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_tile_pyramid_region_definition>();
-  result.ref.style_url = nativeUtf8CString(
-    value.styleUrl,
-    arena,
-  ).pointer.cast<Char>();
+  result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
   result.ref.bounds = _writeLatLngBounds(value.bounds, arena).ref;
   result.ref.min_zoom = value.minZoom;
   result.ref.max_zoom = value.maxZoom;
@@ -2731,7 +2729,7 @@ _writeOfflineTilePyramidRegionDefinition(
 OfflineTilePyramidRegionDefinition _readOfflineTilePyramidRegionDefinition(
   raw.mln_offline_tile_pyramid_region_definition source,
 ) => OfflineTilePyramidRegionDefinition(
-  styleUrl: source.style_url.cast<Utf8>().toDartString(),
+  styleUrl: utf8.decode(_copyBufferView(source.style_url)),
   bounds: _readLatLngBounds(source.bounds),
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
@@ -2745,10 +2743,7 @@ _writeOfflineGeometryRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_geometry_region_definition>();
-  result.ref.style_url = nativeUtf8CString(
-    value.styleUrl,
-    arena,
-  ).pointer.cast<Char>();
+  result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
   result.ref.geometry = nativeBufferView(value.geometry, arena);
   result.ref.min_zoom = value.minZoom;
   result.ref.max_zoom = value.maxZoom;
@@ -2760,7 +2755,7 @@ _writeOfflineGeometryRegionDefinition(
 OfflineGeometryRegionDefinition _readOfflineGeometryRegionDefinition(
   raw.mln_offline_geometry_region_definition source,
 ) => OfflineGeometryRegionDefinition(
-  styleUrl: source.style_url.cast<Utf8>().toDartString(),
+  styleUrl: utf8.decode(_copyBufferView(source.style_url)),
   geometry: _copyBufferView(source.geometry),
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
@@ -2814,8 +2809,8 @@ OfflineRegionInfo _readOfflineRegionInfo(raw.mln_offline_region_info source) =>
 
 Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
   final result = arena<raw.mln_http_header>();
-  result.ref.name = nativeUtf8CString(value.name, arena).pointer.cast<Char>();
-  result.ref.value = nativeUtf8CString(value.value, arena).pointer.cast<Char>();
+  result.ref.name = nativeStringView(value.name, arena).value;
+  result.ref.value = nativeStringView(value.value, arena).value;
   return result;
 }
 
@@ -2826,7 +2821,7 @@ Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
   final result = arena<raw.mln_http_header_rule>();
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
+  result.ref.url = nativeStringView(value.url, arena).value;
   result.ref.headers = arena<raw.mln_http_header>(
     value.headers.isEmpty ? 1 : value.headers.length,
   );
@@ -2867,37 +2862,38 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
 ResourceRange _readResourceRange(raw.mln_resource_range source) =>
     ResourceRange(uint64FromNative(source.start), uint64FromNative(source.end));
 
-ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
-    ResourceRequest(
-      requestedUrl: source.requested_url == nullptr
-          ? null
-          : source.requested_url.cast<Utf8>().toDartString(),
-      resolvedUrl: source.resolved_url == nullptr
-          ? null
-          : source.resolved_url.cast<Utf8>().toDartString(),
-      kind: ResourceKind.fromRawValue(source.kind),
-      loadingMethod: ResourceLoadingMethod.fromRawValue(source.loading_method),
-      priority: ResourcePriority.fromRawValue(source.priority),
-      usage: ResourceUsage.fromRawValue(source.usage),
-      storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
-      range: (source.fields & raw.MLN_RESOURCE_REQUEST_RANGE) != 0
-          ? _readResourceRange(source.range)
-          : null,
-      priorModifiedUnixMs:
-          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0
-          ? source.prior_modified_unix_ms
-          : null,
-      priorExpiresUnixMs:
-          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0
-          ? source.prior_expires_unix_ms
-          : null,
-      priorEtag: source.prior_etag == nullptr
-          ? null
-          : source.prior_etag.cast<Utf8>().toDartString(),
-      priorData: Uint8List.fromList(
-        source.prior_data.cast<Uint8>().asTypedList(source.prior_data_size),
-      ),
-    );
+ResourceRequestInfo _readResourceRequestInfo(
+  raw.mln_resource_request_info source,
+) => ResourceRequestInfo(
+  requestedUrl: source.requested_url == nullptr
+      ? null
+      : source.requested_url.cast<Utf8>().toDartString(),
+  resolvedUrl: source.resolved_url == nullptr
+      ? null
+      : source.resolved_url.cast<Utf8>().toDartString(),
+  kind: ResourceKind.fromRawValue(source.kind),
+  loadingMethod: ResourceLoadingMethod.fromRawValue(source.loading_method),
+  priority: ResourcePriority.fromRawValue(source.priority),
+  usage: ResourceUsage.fromRawValue(source.usage),
+  storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
+  range: (source.fields & raw.MLN_RESOURCE_REQUEST_RANGE) != 0
+      ? _readResourceRange(source.range)
+      : null,
+  priorModifiedUnixMs:
+      (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0
+      ? source.prior_modified_unix_ms
+      : null,
+  priorExpiresUnixMs:
+      (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0
+      ? source.prior_expires_unix_ms
+      : null,
+  priorEtag: source.prior_etag == nullptr
+      ? null
+      : source.prior_etag.cast<Utf8>().toDartString(),
+  priorData: Uint8List.fromList(
+    source.prior_data.cast<Uint8>().asTypedList(source.prior_data_size),
+  ),
+);
 
 void _deliverResourceProviderCallback(
   ResourceProviderCallback callback,
@@ -2912,7 +2908,7 @@ void _deliverResourceProviderCallback(
     final adopted = owner = ResourceRequestHandle._(
       NativeResourceRequest(payload.handle),
     );
-    callback(_readResourceRequest(payload.request.ref), adopted);
+    callback(_readResourceRequestInfo(payload.request.ref), adopted);
   } catch (_) {
     owner?.close();
     rethrow;
@@ -2926,7 +2922,7 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
   final result = arena<raw.mln_resource_route>();
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
+  result.ref.url = nativeStringView(value.url, arena).value;
   result.ref.url_stage = value.urlStage.rawValue;
   return result;
 }
@@ -2976,10 +2972,11 @@ Pointer<raw.mln_resource_rewrite_rule> _writeResourceRewriteRule(
   final result = arena<raw.mln_resource_rewrite_rule>();
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
-  result.ref.replacement_url = value.replacementUrl == null
-      ? nullptr
-      : nativeUtf8CString(value.replacementUrl!, arena).pointer.cast<Char>();
+  result.ref.url = nativeStringView(value.url, arena).value;
+  result.ref.replacement_url = nativeStringView(
+    (value.replacementUrl ?? ''),
+    arena,
+  ).value;
   return result;
 }
 
@@ -3230,7 +3227,7 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
     outData.value,
     () => GeojsonSourceDataHandle._(NativeGeojsonSourceData(outData.value)),
     (handle) {
-      raw.mln_geojson_source_data_destroy(handle);
+      raw.mln_geojson_source_data_release(handle);
     },
   );
 });
@@ -3872,14 +3869,13 @@ final class AcquiredFrameHandle implements Finalizable {
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void release(GpuSync consumerCompletion) => _state.close(
-    (handle) => withNativeArena((arena) {
-      final receiverPointer = arena<Uint64>()..value = handle.raw;
-      return raw.mln_acquired_frame_release(
-        receiverPointer,
+    (handle) => withNativeArena(
+      (arena) => raw.mln_acquired_frame_release(
+        handle.raw,
         _writeGpuSync(consumerCompletion, arena),
         nativeDiagnostic,
-      );
-    }),
+      ),
+    ),
   );
 }
 
@@ -3932,6 +3928,11 @@ final class EventBatchHandle implements Finalizable {
 extension type const NativeGeojsonSourceData(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_geojson_source_data` handle.
+///
+/// Prepared GeoJSON data that sources retain independently of its handle.
+///
+/// See `mln_geojson_source_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class GeojsonSourceDataHandle implements Finalizable {
   GeojsonSourceDataHandle._(NativeGeojsonSourceData handle)
     : _state = NativeHandleState(handle, 'GeojsonSourceDataHandle');
@@ -3949,10 +3950,10 @@ final class GeojsonSourceDataHandle implements Finalizable {
 
   /// Releases prepared GeoJSON source data.
   ///
-  /// See `mln_geojson_source_data_destroy` in the
+  /// See `mln_geojson_source_data_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   void close() => _state.close((handle) {
-    raw.mln_geojson_source_data_destroy(handle.raw);
+    raw.mln_geojson_source_data_release(handle.raw);
     return nativeStatusOk;
   });
 }
@@ -4568,7 +4569,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
   void setStyleUrl(String url) => _discard(
     (arena, completion) => raw.mln_map_set_style_url(
       _handle.raw,
-      nativeUtf8CString(url, arena).pointer.cast<Char>(),
+      nativeStringView(url, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -5464,7 +5465,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       outProjection.value,
       () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
       (handle) {
-        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
+        _check(raw.mln_map_projection_release(handle, nativeDiagnostic));
       },
     );
   });
@@ -6304,7 +6305,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   Future<CommandCompletion> setStyleUrl(String url) => _command(
     (arena, completion) => raw.mln_map_set_style_url(
       _handle.raw,
-      nativeUtf8CString(url, arena).pointer.cast<Char>(),
+      nativeStringView(url, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -6378,14 +6379,6 @@ final class MapProjectionHandle implements Finalizable {
   /// It stays readable after close, so events drained later still match
   /// this handle.
   BigInt get id => uint64FromNative(_state.handleId);
-
-  /// Closes a standalone projection.
-  ///
-  /// See `mln_map_projection_close` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  void close() => _state.close(
-    (handle) => raw.mln_map_projection_close(handle.raw, nativeDiagnostic),
-  );
 
   /// Copies the projection camera into out_camera.
   ///
@@ -6565,6 +6558,14 @@ final class MapProjectionHandle implements Finalizable {
           ),
         );
       });
+
+  /// Releases a standalone projection.
+  ///
+  /// See `mln_map_projection_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  void close() => _state.close(
+    (handle) => raw.mln_map_projection_release(handle.raw, nativeDiagnostic),
+  );
 
   /// Applies a camera update to a standalone projection.
   ///
@@ -6798,21 +6799,10 @@ final class RenderSessionHandle implements Finalizable {
       outProjection.value,
       () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
       (handle) {
-        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
+        _check(raw.mln_map_projection_release(handle, nativeDiagnostic));
       },
     );
   });
-
-  /// Retires a detached or abandoned session handle. The call is CPU-only and
-  /// may run on any native thread, including from one of the session's own
-  /// completions. If an abandonment is still in progress on another thread,
-  /// this waits for it to finish before consuming the session owner.
-  ///
-  /// See `mln_render_session_destroy` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void close() => _state.close(
-    (handle) => raw.mln_render_session_destroy(handle.raw, nativeDiagnostic),
-  );
 
   /// Starts normal graphics-owner teardown and map detachment.
   ///
@@ -7004,6 +6994,17 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
+  /// Retires a detached or abandoned session handle. The call is CPU-only and
+  /// may run on any native thread, including from one of the session's own
+  /// completions. If an abandonment is still in progress on another thread,
+  /// this waits for it to finish before consuming the session owner.
+  ///
+  /// See `mln_render_session_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  void close() => _state.close(
+    (handle) => raw.mln_render_session_release(handle.raw, nativeDiagnostic),
+  );
+
   /// Requests a frame without waiting. Every accepted demand produces one
   /// terminal result record. Caller-driver sessions require service on the
   /// graphics thread. Core-worker sessions need no host service.
@@ -7187,14 +7188,14 @@ final class RenderSessionHandle implements Finalizable {
       );
 }
 
-/// Issued `mln_resource_request_handle` handle id.
+/// Issued `mln_resource_request` handle id.
 extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 
-/// Owner of one native `mln_resource_request_handle` handle.
+/// Owner of one native `mln_resource_request` handle.
 ///
 /// A resource request that a resource provider handles.
 ///
-/// See `mln_resource_request_handle` in the
+/// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   ResourceRequestHandle._(NativeResourceRequest handle)
@@ -7533,7 +7534,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     _resultOfflineRegionInfo,
     (arena, completion) => raw.mln_runtime_merge_offline_regions(
       _handle.raw,
-      nativeUtf8CString(sideDatabasePath, arena).pointer.cast<Char>(),
+      nativeStringView(sideDatabasePath, arena).value,
       completion,
       nativeDiagnostic,
     ),

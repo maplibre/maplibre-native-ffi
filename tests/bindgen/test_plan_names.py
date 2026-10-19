@@ -19,7 +19,7 @@ class PlanNameTests(unittest.TestCase):
     def test_members_strip_the_declared_handle_prefix(self):
         bound = self.bind()
         operations = bound.operations_by_name
-        self.assertEqual(bound.handles["mln_pass_handle"].stem, "pass")
+        self.assertEqual(bound.handles["mln_pass"].stem, "pass")
         self.assertEqual(
             {
                 name: operations[name].member
@@ -49,23 +49,23 @@ class PlanNameTests(unittest.TestCase):
         ):
             self.bind(
                 'typedef struct mln_span { const char *text; } mln_span BIND("fields=ordered");\n'
-                "mln_status mln_pass_span(mln_pass_handle pass, mln_span span, mln_diagnostic *out_diagnostic);\n"
+                "mln_status mln_pass_span(mln_pass pass, mln_span span, mln_diagnostic *out_diagnostic);\n"
             )
 
-    def test_a_prefix_names_handle_operations_only(self):
-        with self.assertRaisesRegex(ModelError, "prefix names a handle's operations"):
+    def test_an_operation_prefix_override_is_rejected(self):
+        with self.assertRaisesRegex(ModelError, "unknown metadata key"):
             self.bind(
                 'typedef struct mln_box { double side; } mln_box BIND("prefix=mln_cube");\n'
             )
 
     def test_only_a_leading_handle_is_the_receiver(self):
         operation = self.bind(
-            "mln_status mln_pass_after(int count, mln_pass_handle pass, mln_diagnostic *out_diagnostic);\n"
+            "mln_status mln_pass_after(int count, mln_pass pass, mln_diagnostic *out_diagnostic);\n"
         ).operations_by_name["mln_pass_after"]
         self.assertEqual((operation.receiver, operation.member), (None, "pass_after"))
 
     def test_a_marshalled_input_lasts_for_the_call(self):
-        source = "mln_status mln_pass_note(mln_pass_handle pass, const char *text{}, mln_diagnostic *out_diagnostic);\n"
+        source = "mln_status mln_pass_note(mln_pass pass, const char *text{}, mln_diagnostic *out_diagnostic);\n"
         bind(parse(source.format(""), groups=("plan_names",)), require_complete=True)
         with self.assertRaisesRegex(
             ModelError, "retained input requires a lifetime contract"

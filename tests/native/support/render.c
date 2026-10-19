@@ -211,7 +211,7 @@ bool mln_test_render_fixture_create_with_driver(
       (void)mln_render_session_abandon(
         fixture->session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
-      (void)mln_render_session_destroy(fixture->session, MLN_TEST_DIAGNOSTIC);
+      (void)mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC);
     }
     mln_test_backend_destroy(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};
@@ -275,7 +275,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
       }
       mln_test_completion_destroy(&detach);
       MLN_TEST_OK(
-        mln_render_session_destroy(fixture->session, MLN_TEST_DIAGNOSTIC)
+        mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC)
       );
     } else {
       MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, liveness);
@@ -298,7 +298,7 @@ bool mln_test_render_reclaim_thread_sessions(void) {
       (void)mln_render_session_abandon(
         entry.session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
-      (void)mln_render_session_destroy(entry.session, MLN_TEST_DIAGNOSTIC);
+      (void)mln_render_session_release(entry.session, MLN_TEST_DIAGNOSTIC);
     }
     mln_test_backend_destroy(entry.backend_state);
     reclaimed = true;

@@ -170,7 +170,7 @@ func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
 	if err != nil {
 		t.Fatal(err)
 	}
-	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision {
 		stdruntime.KeepAlive(host)
 		return ResourceProviderDecisionPassThrough
 	}})))
@@ -282,7 +282,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 
 	await(t, submitted(f.runtime.ClearResourceTransform()))
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision {
 		panic("provider failed")
 	}})))
 	if _, err := f.m.SetStyleUrl("custom://unserved.json"); err != nil {
@@ -360,7 +360,7 @@ func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) err
 func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan *ResourceRequestHandle, 1)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequest, request *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
 		offer(requests, request)
 		return ResourceProviderDecisionHandle
 	}})))
@@ -383,7 +383,7 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 func TestProviderDecisionFollowsTheRequestHandle(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if *request.RequestedUrl == "custom://answered.json" {
 			if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)}); err != nil {
 				failures.add("Complete: %v", err)
@@ -429,7 +429,7 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 		{Kinds: ResourceKindMaskStyle, Url: "custom://routed/style.json"},
 		allKindsRoute,
 	}
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
 		offer(requests, routed{*request.RequestedUrl, request.Kind})
 		if *request.RequestedUrl != "custom://routed/style.json" {
 			return deny(request, handle)
@@ -554,7 +554,7 @@ func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
 func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan *ResourceRequestHandle, 2)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequest, request *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
 		offer(requests, request)
 		return ResourceProviderDecisionHandle
 	}})))
@@ -611,7 +611,7 @@ func TestProviderPassesADeferredRequestToNativeLoading(t *testing.T) {
 	f := newFixture(t)
 	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
 	requests := make(chan *ResourceRequestHandle, 1)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
 		offer(requests, handle)
 		return ResourceProviderDecisionHandle
 	}})))

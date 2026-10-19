@@ -12,8 +12,8 @@ bool asset_store_find(
 );
 
 static uint32_t serve_bundled_asset(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   // #region match
   const asset_store* store = user_data;
@@ -57,9 +57,7 @@ static void abort_pending_fetch(void* user_data) {
 // Registers the abort hook for a request the provider retained. MapLibre runs
 // the hook on one of its threads when the map stops wanting the resource. A
 // request that was cancelled before the registration reports that instead.
-void watch_for_cancellation(
-  mln_resource_request_handle handle, pending_fetch* fetch
-) {
+void watch_for_cancellation(mln_resource_request handle, pending_fetch* fetch) {
   const mln_resource_request_cancel_handler handler = {
     .size = sizeof(handler),
     .callback = abort_pending_fetch,
@@ -84,7 +82,8 @@ mln_status install_provider(
   const mln_resource_route route = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = MLN_URL_MATCH_GLOB,
-    .url = "app://**",
+    .url =
+      (mln_buffer_view){.data = "app://**", .size = sizeof("app://**") - 1},
   };
   const mln_resource_provider provider = {
     .size = sizeof(provider),
@@ -100,7 +99,7 @@ mln_status install_provider(
 // #endregion install
 
 // #region pass-through
-mln_status resume_native_loading(mln_resource_request_handle handle) {
+mln_status resume_native_loading(mln_resource_request handle) {
   const mln_status status = mln_resource_request_pass_through(handle, NULL);
   if (status == MLN_STATUS_OK) mln_resource_request_release(handle);
   return status;

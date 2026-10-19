@@ -165,8 +165,8 @@ impl AcquiredFrameHandle {
         self.inner.close(|frame| {
             let mut call = Call::new(frame, None);
             let consumer_completion = call.reference(&consumer_completion)?;
-            call.status(|mut frame, out_diagnostic| unsafe {
-                sys::mln_acquired_frame_release(&mut frame, consumer_completion, out_diagnostic)
+            call.status(|frame, out_diagnostic| unsafe {
+                sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)
             })
         })
     }

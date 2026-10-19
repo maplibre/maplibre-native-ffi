@@ -81,7 +81,7 @@ static mln_status submit_projection(
     call->session, call->null_output ? NULL : &projection, diagnostic
   );
   if (status == MLN_STATUS_OK) {
-    MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+    MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   }
   return status;
 }
@@ -141,8 +141,8 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   mln_map_projection after = create_session_projection(&fixture);
   expect_center(after, 12.0, 34.0, 3.0);
   expect_center(before, 0.0, 0.0, 0.0);
-  MLN_TEST_OK(mln_map_projection_close(before, NULL));
-  MLN_TEST_OK(mln_map_projection_close(after, NULL));
+  MLN_TEST_OK(mln_map_projection_release(before, NULL));
+  MLN_TEST_OK(mln_map_projection_release(after, NULL));
 
   // Back to the origin, so it lies at the center of the resized target.
   update.camera.center.latitude = 0.0;
@@ -175,7 +175,7 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
   expect_pixel(projection, 16.0, 8.0);
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 }
 
 // Requests render-if-needed demands that wait for a map update until one
@@ -247,7 +247,7 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   render_through_update(&fixture, snapshot.latest_render_update_generation);
   mln_map_projection projection = create_session_projection(&fixture);
   expect_center(projection, -21.0, 43.0, 2.0);
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);

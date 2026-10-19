@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include <mln/util/run_loop.hpp>
@@ -17,6 +18,36 @@
 #include "execution/worker_thread.hpp"
 
 namespace mln::core {
+
+struct ExecutorTask {
+  ExecutorTask* next = nullptr;
+  void (*run)(ExecutorTask*) noexcept = nullptr;
+  bool command = false;
+};
+
+class ExecutorQueue {
+ public:
+  auto push(ExecutorTask& task) noexcept -> void {
+    if (last_)
+      last_->next = &task;
+    else
+      first_ = &task;
+    last_ = &task;
+  }
+  auto pop() noexcept -> ExecutorTask* {
+    auto* task = first_;
+    if (task) {
+      first_ = task->next;
+      if (!first_) last_ = nullptr;
+      task->next = nullptr;
+    }
+    return task;
+  }
+
+ private:
+  ExecutorTask* first_ = nullptr;
+  ExecutorTask* last_ = nullptr;
+};
 
 class RuntimeExecutor {
  public:
@@ -46,20 +77,40 @@ class RuntimeExecutor {
 
   template <typename Function>
   auto invoke(Function&& function) -> void {
-    auto* loop = run_loop();
-    if (loop == nullptr) {
-      throw std::runtime_error{"runtime executor is not running"};
-    }
-    loop->invoke([work = std::forward<Function>(function)]() mutable -> void {
-      auto pooled = [&work]() -> mln_status {
-        std::invoke(std::move(work));
-        return MLN_STATUS_OK;
-      };
-      static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
-    });
+    auto task = make_task(std::forward<Function>(function));
+    enqueue(*task);
+    static_cast<void>(task.release());
   }
 
+  template <typename Function>
+  auto invoke_notice(Function&& function) -> void {
+    auto task = make_task(std::forward<Function>(function));
+    enqueue(*task, true);
+    static_cast<void>(task.release());
+  }
+
+  auto enqueue(ExecutorTask& task, bool notice = false) -> void;
+
  private:
+  template <typename Function>
+  struct Task : ExecutorTask {
+    explicit Task(Function function) : work(std::move(function)) {
+      run = [](ExecutorTask* base) noexcept {
+        auto owner = std::unique_ptr<Task>{static_cast<Task*>(base)};
+        try {
+          std::invoke(std::move(owner->work));
+        } catch (...) {
+        }
+      };
+    }
+    Function work;
+  };
+  template <typename Function>
+  static auto make_task(Function&& function) {
+    return std::make_unique<Task<std::decay_t<Function>>>(
+      std::forward<Function>(function)
+    );
+  }
   std::mutex mutex_;
   std::condition_variable started_;
   struct Finalization;
@@ -70,6 +121,12 @@ class RuntimeExecutor {
   bool stopping_ = false;
   RetirementQueue retirement_queue_;
   RetirementWake* retirement_wake_ = nullptr;
+  ExecutorQueue work_queue_;
+  ExecutorQueue notices_;
+  bool work_scheduled_ = false;
+  bool draining_ = false;
+  auto drain_work() noexcept -> void;
+  auto flush_notices() noexcept -> void;
   auto drain_retirement() noexcept -> void;
 };
 

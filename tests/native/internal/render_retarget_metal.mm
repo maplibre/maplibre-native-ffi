@@ -41,7 +41,7 @@ void discard(mln_test_completion& completion) {
   mln_test_completion_destroy(&completion);
 }
 
-// Detaches and destroys the session on every exit path, and reports the first
+// Detaches and releases the session on every exit path, and reports the first
 // failure the caller saw, or its own.
 auto teardown(mln_render_session session, const char* failure) -> const char* {
   auto detach = mln_test_completion_default(0);
@@ -55,10 +55,10 @@ auto teardown(mln_render_session session, const char* failure) -> const char* {
     failure = "the session detach failed";
   }
   if (
-    mln_render_session_destroy(session, nullptr) != MLN_STATUS_OK &&
+    mln_render_session_release(session, nullptr) != MLN_STATUS_OK &&
     failure == nullptr
   ) {
-    failure = "the session destroy was rejected";
+    failure = "the session release was rejected";
   }
   return failure;
 }

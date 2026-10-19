@@ -86,19 +86,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Retires a detached or abandoned session handle. The call is CPU-only and may run on any native
-   * thread, including from one of the session's own completions. If an abandonment is still in
-   * progress on another thread, this waits for it to finish before consuming the session owner.
-   *
-   * See `mln_render_session_destroy` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  public fun destroy(): Unit =
-    nativeClose(this, binding, "mln_render_session_destroy") {
-      check(C.mln_render_session_destroy(handle, diagnostic))
-    }
-
-  /**
    * Starts normal graphics-owner teardown and map detachment.
    *
    * See `mln_render_session_detach` in the
@@ -303,6 +290,19 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun reduceMemoryUse(): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_reduce_memory_use") {
       check(C.mln_render_session_reduce_memory_use(handle, completion, diagnostic))
+    }
+
+  /**
+   * Retires a detached or abandoned session handle. The call is CPU-only and may run on any native
+   * thread, including from one of the session's own completions. If an abandonment is still in
+   * progress on another thread, this waits for it to finish before consuming the session owner.
+   *
+   * See `mln_render_session_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   */
+  public fun release(): Unit =
+    nativeClose(this, binding, "mln_render_session_release") {
+      check(C.mln_render_session_release(handle, diagnostic))
     }
 
   /**

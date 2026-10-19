@@ -29,6 +29,6 @@ internal constructor(
     get() = binding.issued().toULong()
 
   public override fun close() {
-    destroy()
+    release()
   }
 }

@@ -89,24 +89,6 @@ public extension RenderSessionHandle {
     } result: { try MapProjectionHandle(adopting: value0) }
   }
 
-  /// Retires a detached or abandoned session handle. The call is CPU-only and
-  /// may
-  /// run on any native thread, including from one of the session's own
-  /// completions. If an abandonment is still in progress on another thread,
-  /// this
-  /// waits for it to finish before consuming the session owner.
-  ///
-  /// See `mln_render_session_destroy` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func close() throws {
-    try nativeClose("mln_render_session_destroy") { raw, diagnostic in
-      mln_render_session_destroy(
-        raw,
-        diagnostic
-      )
-    }
-  }
-
   /// Starts normal graphics-owner teardown and map detachment.
   ///
   /// See `mln_render_session_detach` in the
@@ -206,6 +188,24 @@ public extension RenderSessionHandle {
       mln_render_session_reduce_memory_use(
         raw,
         completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Retires a detached or abandoned session handle. The call is CPU-only and
+  /// may
+  /// run on any native thread, including from one of the session's own
+  /// completions. If an abandonment is still in progress on another thread,
+  /// this
+  /// waits for it to finish before consuming the session owner.
+  ///
+  /// See `mln_render_session_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  func close() throws {
+    try nativeClose("mln_render_session_release") { raw, diagnostic in
+      mln_render_session_release(
+        raw,
         diagnostic
       )
     }

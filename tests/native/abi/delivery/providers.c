@@ -63,11 +63,11 @@ static void the_host_completes_a_drained_request(void) {
   const mln_resource_request_delivery* request = NULL;
   const mln_delivery_batch batch = await_request(queue.handle, &tag, &request);
   TEST_ASSERT_EQUAL_UINT32(
-    sizeof(mln_resource_request), request->request->size
+    sizeof(mln_resource_request_info), request->request->size
   );
   TEST_ASSERT_EQUAL_STRING(style_url, request->request->requested_url);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, request->request->kind);
-  const mln_resource_request_handle handle = request->handle;
+  const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
 
@@ -126,7 +126,7 @@ static void complete_from_wake(void* user_data) {
           (const mln_delivery*)((const unsigned char*)view.deliveries +
                                 index * view.delivery_size);
         if (delivery->type != MLN_DELIVERY_TYPE_RESOURCE_REQUEST) continue;
-        const mln_resource_request_handle handle =
+        const mln_resource_request handle =
           delivery->payload.resource_request.handle;
         if (mln_delivery_batch_take(batch, index, NULL) != MLN_STATUS_OK) {
           continue;
@@ -174,7 +174,7 @@ static void a_request_completed_before_handle_returns_loads(void) {
 static bool request_cancelled(void* context) {
   bool cancelled = false;
   return mln_resource_request_is_cancelled(
-           *(const mln_resource_request_handle*)context, &cancelled, NULL
+           *(const mln_resource_request*)context, &cancelled, NULL
          ) == MLN_STATUS_OK &&
          cancelled;
 }
@@ -198,7 +198,7 @@ static void a_request_cancelled_before_the_drain_reports_it(void) {
 
   const mln_resource_request_delivery* request = NULL;
   const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
-  mln_resource_request_handle handle = request->handle;
+  mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
   TEST_ASSERT_TRUE(mln_test_await(
@@ -352,21 +352,29 @@ static void invalid_routes_are_rejected(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_route routes[] = {
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = "custom://first"},
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL, .flags = 1U << 31U, .url = "**"},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+     .url = MLN_BUFFER_LITERAL("custom://first")},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+     .flags = 1U << 31U,
+     .url = MLN_BUFFER_LITERAL("**")},
   };
   MLN_TEST_INVALID(submit_routes(runtime, routes, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
-  const mln_resource_route unknown_kind = {.kinds = 1U << 31U, .url = "**"};
+  const mln_resource_route unknown_kind = {
+    .kinds = 1U << 31U, .url = MLN_BUFFER_LITERAL("**")
+  };
   MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
-  const mln_resource_route zero_kinds = {.url = "**"};
+  const mln_resource_route zero_kinds = {.url = MLN_BUFFER_LITERAL("**")};
   MLN_TEST_INVALID(submit_routes(runtime, &zero_kinds, 1, NULL));
   const mln_resource_route invalid_stage = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = "**", .url_stage = UINT32_MAX
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = MLN_BUFFER_LITERAL("**"),
+    .url_stage = UINT32_MAX
   };
   MLN_TEST_INVALID(submit_routes(runtime, &invalid_stage, 1, NULL));
   const mln_resource_route null_url = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = NULL
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = (mln_buffer_view){.data = NULL, .size = 1}
   };
   MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_routes(runtime, NULL, 1, NULL));
@@ -376,8 +384,8 @@ static void invalid_routes_are_rejected(void) {
 
 // A callback provider that answers every request it sees with an empty style.
 static uint32_t answer_with_style(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)request;
   atomic_fetch_add((atomic_int*)user_data, 1);
@@ -419,10 +427,10 @@ static void routes_filter_a_callback_provider(void) {
     // Another kind: claims nothing here.
     {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = "**"},
+     .url = MLN_BUFFER_LITERAL("**")},
     {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
-     .url = "http://127.0.0.1:*/routed/**"},
+     .url = MLN_BUFFER_LITERAL("http://127.0.0.1:*/routed/**")},
   };
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
@@ -467,7 +475,7 @@ static void routes_filter_a_queue_provider(void) {
   const mln_resource_route route = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = MLN_URL_MATCH_GLOB,
-    .url = "custom://routed/**",
+    .url = MLN_BUFFER_LITERAL("custom://routed/**"),
   };
   mln_resource_provider provider = queue_provider(queue.handle, NULL);
   provider.routes = &route;
@@ -485,7 +493,7 @@ static void routes_filter_a_queue_provider(void) {
   TEST_ASSERT_EQUAL_STRING(
     "custom://routed/style.json", request->request->requested_url
   );
-  const mln_resource_request_handle handle = request->handle;
+  const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
   const mln_resource_response response = style_response();
@@ -524,8 +532,9 @@ static void a_drained_request_can_pass_through_once(void) {
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   const mln_resource_rewrite_rule rule = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = original,
-    .replacement_url = rewritten,
+    .url = (mln_buffer_view){.data = original, .size = strlen(original)},
+    .replacement_url =
+      (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
   };
   const mln_resource_transform transform = {
     .size = sizeof(mln_resource_transform),
@@ -537,7 +546,7 @@ static void a_drained_request_can_pass_through_once(void) {
   MLN_TEST_OK(mln_test_map_set_style_url(map, original));
   const mln_resource_request_delivery* request = NULL;
   const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
-  const mln_resource_request_handle handle = request->handle;
+  const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
   TEST_ASSERT_EQUAL_INT(

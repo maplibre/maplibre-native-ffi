@@ -133,12 +133,12 @@ mln_status binding_mln_http_header_transform_callback(
   return result;
 }
 extern uint32_t mlnGo_mln_resource_provider_callback(
-  void* user_data, mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, mln_resource_request_info* request,
+  mln_resource_request handle
 );
 uint32_t binding_mln_resource_provider_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
@@ -150,7 +150,7 @@ uint32_t binding_mln_resource_provider_callback(
   binding_policy policy = {NULL, operations, 5, (uint64_t)(uintptr_t)handle};
   binding_policy_enter(&policy);
   uint32_t result = mlnGo_mln_resource_provider_callback(
-    (void*)user_data, (mln_resource_request*)request, handle
+    (void*)user_data, (mln_resource_request_info*)request, handle
   );
   binding_policy_leave(&policy);
   return result;

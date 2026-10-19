@@ -4,19 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapProjectionHandle {
-  /// Closes a standalone projection.
-  ///
-  /// See `mln_map_projection_close` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func close() throws {
-    try nativeClose("mln_map_projection_close") { raw, diagnostic in
-      mln_map_projection_close(
-        raw,
-        diagnostic
-      )
-    }
-  }
-
   /// Copies the projection camera into out_camera.
   ///
   /// See `mln_map_projection_get_camera` in the
@@ -162,6 +149,19 @@ public extension MapProjectionHandle {
         diagnostic
       )
     } result: { value0.map { item in ScreenPoint(raw: item) } }
+  }
+
+  /// Releases a standalone projection.
+  ///
+  /// See `mln_map_projection_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func close() throws {
+    try nativeClose("mln_map_projection_release") { raw, diagnostic in
+      mln_map_projection_release(
+        raw,
+        diagnostic
+      )
+    }
   }
 
   /// Applies a camera update to a standalone projection.

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,6 +16,12 @@
 namespace mln::core {
 
 class Completion;
+
+struct CompletionRetirement {
+  std::shared_ptr<void> owner;
+  std::uint64_t sequence = 0;
+  void (*run)(const std::shared_ptr<void>&, std::uint64_t) noexcept = nullptr;
+};
 
 // Where one completion's terminal result goes: the host's callback, or a
 // delivery queue. make_completion() makes the only sinks that deliver, so a
@@ -41,6 +48,13 @@ class CompletionSink final {
   friend class Completion;
   friend auto make_completion(
     const mln_completion* descriptor, std::shared_ptr<Completion>& out
+  ) -> mln_status;
+  friend auto make_completion(
+    const mln_completion* descriptor, std::optional<Completion>& out
+  ) -> mln_status;
+
+  friend auto make_completion_sink(
+    const mln_completion*, CompletionSink&, delivery::ItemPtr&
   ) -> mln_status;
 
   auto deliver_queued(
@@ -70,7 +84,7 @@ class Completion final {
   auto revoke() noexcept -> void;
   // Installed before acceptance. Retirement covers both native work and the
   // delivery to the sink plus release, including cancellation on abandonment.
-  auto set_retirement_callback(std::function<void()> callback) noexcept -> void;
+  auto set_retirement_callback(CompletionRetirement callback) noexcept -> void;
   auto retire_work() noexcept -> void;
   template <typename Function>
   auto resolve(Function&& delivery) noexcept -> void {
@@ -103,13 +117,16 @@ class Completion final {
   bool delivered_ = false;
   std::atomic<State> state_ = State::Created;
   std::atomic_uint retirement_parts_ = 2;
-  std::function<void()> retirement_callback_;
+  CompletionRetirement retirement_callback_;
 };
 
 // Validates a completion descriptor and constructs the Completion that
 // delivers to its callback or queue.
 auto make_completion(
   const mln_completion* descriptor, std::shared_ptr<Completion>& out
+) -> mln_status;
+auto make_completion(
+  const mln_completion* descriptor, std::optional<Completion>& out
 ) -> mln_status;
 // As make_completion(), except that a null descriptor succeeds with a null
 // Completion, which complete_command() discards.
@@ -130,6 +147,10 @@ auto complete_failure(
   std::string diagnostic = {}
 ) noexcept -> void;
 
+auto complete_command(
+  Completion* completion, std::uint32_t disposition, mln_status status,
+  std::uint64_t generation = 0, std::string diagnostic = {}
+) noexcept -> void;
 auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
   mln_status status, std::uint64_t generation = 0, std::string diagnostic = {}

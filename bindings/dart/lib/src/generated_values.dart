@@ -784,7 +784,7 @@ final class ResourceProviderDecision extends _Enum {
   static const handle = ResourceProviderDecision.fromRawValue(1);
 }
 
-/// Field mask values for `mln_resource_request`.
+/// Field mask values for `mln_resource_request_info`.
 ///
 /// See `mln_resource_request_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4324,9 +4324,9 @@ final class RuntimeOptions extends _Value {
     this.eventWake = const Wake(),
   });
 
-  /// Directory root for asset:// URLs. Copied during runtime creation. Null or
-  /// empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
-  /// owned by the caller.
+  /// Directory root for asset:// URLs. Copied during runtime creation. Empty
+  /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
+  /// by the caller.
   final String? assetPath;
 
   /// Cache database path. Copied during runtime creation. Copied text, owned by
@@ -4552,8 +4552,8 @@ final class ResourceRange extends _Value {
   List<Object?> get _members => [start, end];
 }
 
-final class ResourceRequest extends _Value {
-  ResourceRequest({
+final class ResourceRequestInfo extends _Value {
+  ResourceRequestInfo({
     this.requestedUrl,
     this.resolvedUrl,
     this.kind = const ResourceKind.fromRawValue(0),
@@ -4614,7 +4614,7 @@ final class ResourceRequest extends _Value {
 /// See `mln_resource_provider_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceProviderCallback =
-    void Function(ResourceRequest, ResourceRequestHandle);
+    void Function(ResourceRequestInfo, ResourceRequestHandle);
 
 /// One request pattern that a resource provider claims.
 ///
@@ -4682,7 +4682,7 @@ final class ResourceRewriteRule extends _Value {
   /// The URL or glob pattern to compare.
   final String url;
 
-  /// The replacement URL, or null to keep the URL and stop the search.
+  /// The replacement URL, or empty to keep the URL and stop the search.
   final String? replacementUrl;
 
   @override

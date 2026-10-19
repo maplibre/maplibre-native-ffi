@@ -33,7 +33,7 @@ fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
 }
 
 #[test]
-fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected() {
+fn host_strings_use_views_and_native_lent_strings_decode() {
     let fixture = Fixture::new();
     wait_for(fixture.runtime().set_resource_provider(serving_provider(
         "custom://style.json",
@@ -51,8 +51,8 @@ fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected(
         BACKGROUND_STYLE_JSON.as_bytes()
     );
 
-    // A style URL crosses NUL-terminated, and the provider that serves it
-    // sees exactly that URL.
+    // A style URL crosses as a view, and the native-lent provider request
+    // decodes to exactly that URL.
     fixture.map().set_style_url("custom://style.json").unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     assert_eq!(
@@ -60,14 +60,13 @@ fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected(
         "custom://style.json"
     );
 
-    // A terminated string cannot carry a NUL, so the binding rejects it before
-    // any native call.
+    // Native rejects a NUL in a URL before it reaches a C-string consumer.
     let error = fixture
         .map()
         .set_style_url("custom://style\0.json")
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), None);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
     assert!(error.diagnostic().contains("embedded NUL"), "{error}");
 }
 
@@ -258,5 +257,5 @@ fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
             .unwrap()
             .is_empty()
     );
-    projection.close().unwrap();
+    projection.release().unwrap();
 }

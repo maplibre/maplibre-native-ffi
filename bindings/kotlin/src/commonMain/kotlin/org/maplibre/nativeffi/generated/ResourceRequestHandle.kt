@@ -6,14 +6,14 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 /**
  * A resource request that a resource provider handles.
  *
- * See `mln_resource_request_handle` in the
+ * See `mln_resource_request` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class ResourceRequestHandle
 internal constructor(
   handle: Long,
-  dispose: (Long) -> Unit = GeneratedOwnerDisposal::resourceRequestHandle,
-) : GeneratedResourceRequestHandleOperations(), AutoCloseable {
+  dispose: (Long) -> Unit = GeneratedOwnerDisposal::resourceRequest,
+) : GeneratedResourceRequestOperations(), AutoCloseable {
   internal override val binding =
     DecisionOwnerState(
       "ResourceRequestHandle",

@@ -41,6 +41,7 @@
 #include "completion/completion_result.hpp"
 #include "delivery/delivery_queue.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/worker_thread.hpp"
 #include "geojson/geojson.hpp"
@@ -259,8 +260,9 @@ auto valid_coordinate(const mln_lat_lng& coordinate) -> bool {
 auto validate_tile_pyramid_definition(
   const mln_offline_tile_pyramid_region_definition& definition
 ) -> mln_status {
-  if (definition.style_url == nullptr) {
-    mln::core::set_thread_error("offline region style_url must not be null");
+  if (!mln::core::validate_c_string_view(
+        definition.style_url, "offline region style_url"
+      )) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
@@ -291,8 +293,9 @@ auto validate_tile_pyramid_definition(
 auto validate_geometry_definition(
   const mln_offline_geometry_region_definition& definition
 ) -> mln_status {
-  if (definition.style_url == nullptr) {
-    mln::core::set_thread_error("offline region style_url must not be null");
+  if (!mln::core::validate_c_string_view(
+        definition.style_url, "offline region style_url"
+      )) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
@@ -356,7 +359,7 @@ auto to_native_offline_region_definition(
         {tile.bounds.northeast.latitude, tile.bounds.northeast.longitude}
       );
       return mln::OfflineTilePyramidRegionDefinition{
-        std::string{tile.style_url},
+        mln::core::string_from_view(tile.style_url),
         bounds,
         tile.min_zoom,
         tile.max_zoom,
@@ -373,7 +376,7 @@ auto to_native_offline_region_definition(
         );
       }
       return mln::OfflineGeometryRegionDefinition{
-        std::string{geometry.style_url},
+        mln::core::string_from_view(geometry.style_url),
         std::move(native_geometry.value()),
         geometry.min_zoom,
         geometry.max_zoom,
@@ -518,7 +521,8 @@ auto fill_region_info(
   switch (data.definition_type) {
     case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
       definition.data.tile_pyramid = mln_offline_tile_pyramid_region_definition{
-        .style_url = data.style_url.c_str(),
+        .style_url =
+          {.data = data.style_url.data(), .size = data.style_url.size()},
         .bounds = data.bounds,
         .min_zoom = data.min_zoom,
         .max_zoom = data.max_zoom,
@@ -532,7 +536,8 @@ auto fill_region_info(
         return MLN_STATUS_NATIVE_ERROR;
       }
       definition.data.geometry = mln_offline_geometry_region_definition{
-        .style_url = data.style_url.c_str(),
+        .style_url =
+          {.data = data.style_url.data(), .size = data.style_url.size()},
         .geometry =
           {.data = data.geometry.data(), .size = data.geometry.size()},
         .min_zoom = data.min_zoom,
@@ -823,11 +828,41 @@ namespace {
 auto mark_runtime_disposal_ready(RuntimeObject& runtime) noexcept -> bool {
   if (
     !runtime.disposal_requested || !runtime.disposal_drained ||
-    runtime.disposal_scheduled || !runtime.pending_submissions.empty()
+    runtime.disposal_scheduled || !runtime.pending_submissions.empty() ||
+    !runtime.pending_commands.empty()
   )
     return false;
   runtime.disposal_scheduled = true;
   return true;
+}
+
+auto earliest_submission(const RuntimeObject& runtime) noexcept -> uint64_t {
+  auto sequence = std::numeric_limits<uint64_t>::max();
+  if (!runtime.pending_commands.empty())
+    sequence = runtime.pending_commands.front().sequence;
+  if (!runtime.pending_submissions.empty())
+    sequence = std::min(sequence, *runtime.pending_submissions.begin());
+  return sequence;
+}
+
+auto erase_pending_submission(
+  RuntimeObject& runtime, uint64_t sequence
+) noexcept -> void {
+  auto& commands = runtime.pending_commands;
+  if (!commands.empty() && commands.front().sequence == sequence) {
+    commands.pop_front();
+  } else if (runtime.pending_submissions.erase(sequence) == 0) {
+    // Rejected publication can retire a later command before the worker drains.
+    const auto pending = std::lower_bound(
+      commands.begin(), commands.end(), sequence,
+      [](const auto& command, uint64_t value) {
+        return command.sequence < value;
+      }
+    );
+    if (pending != commands.end() && pending->sequence == sequence)
+      pending->retired = true;
+  }
+  while (!commands.empty() && commands.front().retired) commands.pop_front();
 }
 
 // Called with terminal_mutex held.
@@ -836,8 +871,7 @@ auto take_ready_runtime_barrier(RuntimeObject& runtime)
   const auto pending = runtime.pending_barriers.begin();
   if (
     pending == runtime.pending_barriers.end() ||
-    (!runtime.pending_submissions.empty() &&
-     *runtime.pending_submissions.begin() < pending->first)
+    (earliest_submission(runtime) < pending->first)
   ) {
     return {};
   }
@@ -853,7 +887,7 @@ auto erase_tracked_submission(
   auto barrier = std::shared_ptr<OperationObject>{};
   {
     const std::scoped_lock lock(runtime->terminal_mutex);
-    runtime->pending_submissions.erase(sequence);
+    erase_pending_submission(*runtime, sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
     if (!runtime->pending_barriers.empty()) {
       barrier = take_ready_runtime_barrier(*runtime);
@@ -870,7 +904,7 @@ auto erase_runtime_barrier(
   {
     const std::scoped_lock lock(runtime->terminal_mutex);
     runtime->pending_barriers.erase(sequence);
-    runtime->pending_submissions.erase(sequence);
+    erase_pending_submission(*runtime, sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
   if (dispose) runtime->executor.invoke_retirement(runtime->disposal_task);
@@ -909,73 +943,68 @@ auto finish_runtime_submission(
   }
 }
 
-auto submit_runtime_command(
-  const std::shared_ptr<RuntimeObject>& runtime,
-  std::function<void(uint64_t)> function,
-  const std::shared_ptr<Completion>& completion,
+auto run_runtime_command_task(RuntimeCommandTask& task) noexcept -> void {
+  try {
+    task.work(task);
+  } catch (...) {
+    // The command implementation reports its own terminal failure event.
+  }
+  task.clear_work(task);
+  task.lease.reset();
+  if (task.completion)
+    task.completion->retire_work();
+  else
+    finish_runtime_submission(task.runtime, task.sequence);
+}
+
+auto submit_runtime_command_task(
+  const std::shared_ptr<RuntimeObject>& runtime, RuntimeCommandTask& task,
   std::atomic<uint64_t>* latest_submission
 ) -> mln_status {
   if (runtime == nullptr) {
     set_thread_error("runtime must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto commit_lock = std::unique_lock{runtime->submission_mutex};
+  if (!runtime->control.acquire()) {
+    set_thread_error("runtime is closing");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  task.runtime = runtime;
+  task.lease = ControlLease{&runtime->control};
   {
-    auto commit_lock = std::unique_lock{runtime->submission_mutex};
-    if (!runtime->control.acquire()) {
-      set_thread_error("runtime is closing");
-      return MLN_STATUS_INVALID_STATE;
+    const auto lock = std::scoped_lock{runtime->terminal_mutex};
+    task.sequence = runtime->next_submission_sequence;
+    runtime->pending_commands.push_back({task.sequence});
+    ++runtime->next_submission_sequence;
+  }
+  const auto sequence = task.sequence;
+  auto superseded = uint64_t{0};
+  if (latest_submission) superseded = latest_submission->exchange(sequence);
+  if (task.completion) {
+    task.completion->set_retirement_callback({
+      .owner = runtime,
+      .sequence = sequence,
+      .run = [](const std::shared_ptr<void>& owner, uint64_t value) noexcept {
+        finish_runtime_submission(
+          std::static_pointer_cast<RuntimeObject>(owner), value
+        );
+      },
+    });
+    task.completion->accept();
+  }
+  try {
+    runtime->executor.enqueue(task);
+  } catch (...) {
+    if (task.completion) task.completion->revoke();
+    if (latest_submission) {
+      auto expected = sequence;
+      latest_submission->compare_exchange_strong(expected, superseded);
     }
-    auto lease = ControlLease{&runtime->control};
-    const auto next_sequence = runtime->next_submission_sequence;
-    auto retired = std::function<void()>{};
-    if (completion) {
-      retired = [runtime, next_sequence]() noexcept {
-        finish_runtime_submission(runtime, next_sequence);
-      };
-    }
-    const auto sequence = track_runtime_submission(*runtime);
-    auto superseded = uint64_t{0};
-    if (latest_submission != nullptr) {
-      superseded = latest_submission->exchange(sequence);
-    }
-    if (completion) {
-      completion->set_retirement_callback(std::move(retired));
-      completion->accept();
-    }
-    try {
-      runtime->executor.invoke(
-        [runtime, completion, lease = std::move(lease), sequence,
-         function = std::move(function)]() mutable -> void {
-          static_cast<void>(lease);
-          try {
-            std::invoke(std::move(function), sequence);
-          } catch (...) {
-            // The command implementation reports its own terminal failure
-            // event.
-          }
-          // Retire command-owned state before barriers observe the submission
-          // as terminal.
-          function = {};
-          lease.reset();
-          if (completion)
-            completion->retire_work();
-          else
-            finish_runtime_submission(runtime, sequence);
-        }
-      );
-    } catch (...) {
-      if (completion) completion->revoke();
-      // A rejected submission supersedes nothing, so the earlier accepted one
-      // stays latest unless a newer submission already replaced it.
-      if (latest_submission != nullptr) {
-        auto expected = sequence;
-        latest_submission->compare_exchange_strong(expected, superseded);
-      }
-      commit_lock.unlock();
-      finish_runtime_submission(runtime, sequence);
-      set_thread_error("runtime command submission failed");
-      return MLN_STATUS_NATIVE_ERROR;
-    }
+    commit_lock.unlock();
+    finish_runtime_submission(runtime, sequence);
+    set_thread_error("runtime command submission failed");
+    return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
 }
@@ -996,14 +1025,22 @@ auto submit_runtime_operation(
   auto lease = ControlLease{&runtime->control};
   // Construct the observer before inserting tracking that needs rollback.
   const auto sequence = runtime->next_submission_sequence;
-  auto retired = std::function<void()>{[runtime, sequence]() noexcept {
-    finish_runtime_submission(runtime, sequence);
-  }};
+  auto retired = CompletionRetirement{
+    .owner = runtime,
+    .sequence = sequence,
+    .run = [](const std::shared_ptr<void>& owner, uint64_t value) noexcept {
+      finish_runtime_submission(
+        std::static_pointer_cast<RuntimeObject>(owner), value
+      );
+    },
+  };
   auto terminal = OperationObject::TerminalCallback{};
   if (completion) {
     terminal = [completion]() noexcept { completion->retire_work(); };
   } else {
-    terminal = std::move(retired);
+    terminal = [runtime, sequence]() noexcept {
+      finish_runtime_submission(runtime, sequence);
+    };
   }
   static_cast<void>(track_runtime_submission(*runtime));
   operation->set_terminal_callback(std::move(terminal), true);
@@ -1089,17 +1126,19 @@ auto create_runtime(
     );
     return MLN_STATUS_WRONG_THREAD;
   }
+  if (
+    !validate_c_string_view(options->asset_path, "asset_path") ||
+    !validate_c_string_view(options->cache_path, "cache_path")
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   watch_process_exit();
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
   RuntimeCreationGuard result;
   result.runtime = std::make_shared<RuntimeObject>();
-  auto asset_path = options->asset_path == nullptr
-                      ? std::string{}
-                      : std::string{options->asset_path};
-  auto cache_path = options->cache_path == nullptr
-                      ? std::string{}
-                      : std::string{options->cache_path};
+  auto asset_path = string_from_view(options->asset_path);
+  auto cache_path = string_from_view(options->cache_path);
   const auto event_mask = options->event_mask;
 
   auto runtime = result.runtime;
@@ -1307,7 +1346,7 @@ auto set_resource_transform(
 }
 
 auto resource_transform_response_set_url(
-  mln_resource_transform_response* response, const char* url, size_t url_size
+  mln_resource_transform_response* response, mln_buffer_view url
 ) -> mln_status {
   if (response == nullptr) {
     set_thread_error("resource transform response must not be null");
@@ -1317,12 +1356,7 @@ auto resource_transform_response_set_url(
     set_thread_error("mln_resource_transform_response.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (url == nullptr && url_size != 0) {
-    set_thread_error("resource transform response URL must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url_size != 0 && std::memchr(url, '\0', url_size) != nullptr) {
-    set_thread_error("resource transform response URL contains embedded NUL");
+  if (!validate_c_string_view(url, "resource transform response URL")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto* const replacement_url = static_cast<std::string*>(response->context);
@@ -1333,14 +1367,16 @@ auto resource_transform_response_set_url(
     );
     return MLN_STATUS_INVALID_STATE;
   }
-  if (url_size == 0) {
+  if (url.size == 0) {
     replacement_url->clear();
-    response->url = nullptr;
+    response->url = {};
     return MLN_STATUS_OK;
   }
 
-  replacement_url->assign(url, url_size);
-  response->url = replacement_url->c_str();
+  replacement_url->assign(static_cast<const char*>(url.data), url.size);
+  response->url = {
+    .data = replacement_url->data(), .size = replacement_url->size()
+  };
   return MLN_STATUS_OK;
 }
 
@@ -1533,12 +1569,14 @@ auto is_valid_utf8(const char* value, std::size_t size) -> bool {
 auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
 ) -> mln_status {
-  if (name == nullptr && name_size != 0) {
-    set_thread_error("HTTP header name must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (value == nullptr && value_size != 0) {
-    set_thread_error("HTTP header value must not be null");
+  if (
+    !validate_c_string_view(
+      {.data = name, .size = name_size}, "HTTP header name"
+    ) ||
+    !validate_c_string_view(
+      {.data = value, .size = value_size}, "HTTP header value"
+    )
+  ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto is_field_name_character = [](unsigned char character) -> bool {
@@ -1611,8 +1649,8 @@ auto validate_http_header(
 }
 
 auto http_header_transform_response_set(
-  mln_http_header_transform_response* response, const char* name,
-  size_t name_size, const char* value, size_t value_size
+  mln_http_header_transform_response* response, mln_buffer_view name,
+  mln_buffer_view value
 ) -> mln_status {
   if (response == nullptr) {
     set_thread_error("HTTP header transform response must not be null");
@@ -1622,12 +1660,14 @@ auto http_header_transform_response_set(
     set_thread_error("mln_http_header_transform_response.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto validation =
-    validate_http_header(name, name_size, value, value_size);
+  const auto validation = validate_http_header(
+    static_cast<const char*>(name.data), name.size,
+    static_cast<const char*>(value.data), value.size
+  );
   if (validation != MLN_STATUS_OK) {
     return validation;
   }
-  const auto name_view = std::string_view{name, name_size};
+  const auto name_view = string_view_from_view(name);
 
   auto* const headers = static_cast<HttpHeaders*>(response->context);
   if (headers == nullptr) {
@@ -1644,7 +1684,7 @@ auto http_header_transform_response_set(
     });
   auto copied = HttpHeader{
     std::string{name_view},
-    value_size == 0 ? std::string{} : std::string{value, value_size},
+    value.size == 0 ? std::string{} : string_from_view(value),
   };
   if (existing == headers->end()) {
     headers->push_back(std::move(copied));
@@ -2031,13 +2071,12 @@ namespace {
 // Opening the side database blocks, so it happens on the calling thread rather
 // than on the runtime worker. A failure then reaches the caller as the call's
 // own diagnostic.
-auto validate_offline_side_database_path(const char* side_database_path)
+auto validate_offline_side_database_path(mln_buffer_view side_database_path)
   -> mln_status {
-  if (side_database_path == nullptr) {
-    set_thread_error("side_database_path must not be null");
+  if (!validate_c_string_view(side_database_path, "side_database_path")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto path = std::string{side_database_path};
+  const auto path = mln::core::string_from_view(side_database_path);
   std::error_code filesystem_error;
   if (
     path.empty() || path.front() == ':' || path.compare(0, 5, "file:") == 0 ||
@@ -2062,7 +2101,7 @@ auto validate_offline_side_database_path(const char* side_database_path)
 }  // namespace
 
 auto offline_regions_merge_database_start(
-  mln_runtime runtime, const char* side_database_path,
+  mln_runtime runtime, mln_buffer_view side_database_path,
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
@@ -2075,7 +2114,7 @@ auto offline_regions_merge_database_start(
 
   return submit_offline_operation(
     live, present_regions<&mln_runtime_merge_offline_regions>, completion,
-    [path = std::string{side_database_path}](
+    [path = mln::core::string_from_view(side_database_path)](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
       database->mergeOfflineRegions(
@@ -2474,8 +2513,8 @@ auto discard_queued_request(mln::delivery::DeliveryItem& item) noexcept
 }
 
 auto queued_provider_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) noexcept -> uint32_t {
   auto& provider = *static_cast<QueuedProvider*>(user_data);
   const auto arguments = mln_resource_request_delivery{
@@ -2669,9 +2708,15 @@ auto runtime_barrier_start(
   }
   auto lease = ControlLease{&live->control};
   sequence = live->next_submission_sequence++;
-  auto retired = std::function<void()>{[live, sequence]() noexcept {
-    erase_runtime_barrier(live, sequence);
-  }};
+  auto retired = CompletionRetirement{
+    .owner = live,
+    .sequence = sequence,
+    .run = [](const std::shared_ptr<void>& owner, uint64_t value) noexcept {
+      erase_runtime_barrier(
+        std::static_pointer_cast<RuntimeObject>(owner), value
+      );
+    },
+  };
   state->set_terminal_callback(
     [completion_state]() noexcept -> void { completion_state->retire_work(); },
     true
@@ -3010,18 +3055,20 @@ auto invoke_resource_transform(
 
   auto response = mln_resource_transform_response{
     .size = sizeof(mln_resource_transform_response),
-    .url = nullptr,
+    .url = {},
     .context = &out_replacement_url,
   };
   try {
     const auto status = registration->callback(
       registration->context->user_data(), kind, url, &response
     );
-    if (
-      status == MLN_STATUS_OK && response.url != nullptr &&
-      *response.url != '\0'
-    ) {
-      out_replacement_url = response.url;
+    if (status == MLN_STATUS_OK && response.url.size != 0) {
+      if (!validate_c_string_view(
+            response.url, "resource transform response URL"
+          )) {
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      out_replacement_url = string_from_view(response.url);
     }
     return status;
   } catch (...) {

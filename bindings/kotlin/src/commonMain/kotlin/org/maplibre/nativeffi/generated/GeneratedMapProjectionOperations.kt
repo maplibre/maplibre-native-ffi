@@ -10,17 +10,6 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
   internal abstract val binding: HandleStateCore
 
   /**
-   * Closes a standalone projection.
-   *
-   * See `mln_map_projection_close` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun close(): Unit =
-    nativeClose(this, binding, "mln_map_projection_close") {
-      check(C.mln_map_projection_close(handle, diagnostic))
-    }
-
-  /**
    * Copies the projection camera into out_camera.
    *
    * See `mln_map_projection_get_camera` in the
@@ -158,6 +147,17 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
         ),
       )
       List(coordinates.size) { index -> readScreenPoint(out + index.toLong() * 16) }
+    }
+
+  /**
+   * Releases a standalone projection.
+   *
+   * See `mln_map_projection_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun release(): Unit =
+    nativeClose(this, binding, "mln_map_projection_release") {
+      check(C.mln_map_projection_release(handle, diagnostic))
     }
 
   /**

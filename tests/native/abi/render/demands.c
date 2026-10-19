@@ -459,7 +459,7 @@ static bool still_completed_under_keepalive(void* context) {
       mln_render_session_acquire_frame(wait->fixture->session, &frame, NULL) ==
       MLN_STATUS_OK) {
       wait->failed |=
-        mln_acquired_frame_release(&frame, NULL, NULL) != MLN_STATUS_OK;
+        mln_acquired_frame_release(frame, NULL, NULL) != MLN_STATUS_OK;
       frame = MLN_HANDLE_NULL;
     }
   }

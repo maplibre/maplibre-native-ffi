@@ -83,8 +83,8 @@ public sealed class ResourceProviderTests
         await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
         using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
-        // A response the binding cannot convert leaves the request open for another answer.
-        Assert.Throws<ArgumentException>(() =>
+        // Native rejects a malformed etag while the request stays open for another answer.
+        Assert.Throws<InvalidArgumentException>(() =>
             handle.Complete(
                 new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
             )
@@ -167,7 +167,7 @@ public sealed class ResourceProviderTests
     [Fact]
     public unsafe void AProviderExceptionIsContainedAndPassesTheRequestThrough()
     {
-        ResourceRequest? copied = null;
+        ResourceRequestInfo? copied = null;
         ResourceRequestHandle? escaped = null;
         var thrown = new FormatException("Host callback failed.");
         var reports = new List<CallbackExceptionEventArgs>();
@@ -197,9 +197,9 @@ public sealed class ResourceProviderTests
             scope
         );
         var bytes = scope.Buffer([1, 2, 3]);
-        var request = new mln_resource_request
+        var request = new mln_resource_request_info
         {
-            size = (uint)sizeof(mln_resource_request),
+            size = (uint)sizeof(mln_resource_request_info),
             fields = mln_resource_request_field.MLN_RESOURCE_REQUEST_RANGE,
             requested_url = scope.CString(StyleUrl),
             resolved_url = scope.CString("provider-test://resolved/é"),

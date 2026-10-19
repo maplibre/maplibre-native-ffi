@@ -12,8 +12,8 @@
 auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
   return mln_runtime_options{
     .size = sizeof(mln_runtime_options),
-    .asset_path = nullptr,
-    .cache_path = nullptr,
+    .asset_path = {},
+    .cache_path = {},
     .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
     .event_wake = mln_wake{
       .callback = nullptr,
@@ -51,7 +51,7 @@ auto mln_runtime_clear_resource_provider(
 }
 
 auto mln_resource_request_complete(
-  mln_resource_request_handle handle, const mln_resource_response* response,
+  mln_resource_request handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -60,7 +60,7 @@ auto mln_resource_request_complete(
 }
 
 auto mln_resource_request_pass_through(
-  mln_resource_request_handle handle, mln_diagnostic* out_diagnostic
+  mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::pass_through_resource_request(handle);
@@ -68,7 +68,7 @@ auto mln_resource_request_pass_through(
 }
 
 auto mln_resource_request_is_cancelled(
-  mln_resource_request_handle handle, bool* out_cancelled,
+  mln_resource_request handle, bool* out_cancelled,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -77,7 +77,7 @@ auto mln_resource_request_is_cancelled(
 }
 
 auto mln_resource_request_set_cancel_callback(
-  mln_resource_request_handle handle,
+  mln_resource_request handle,
   const mln_resource_request_cancel_handler* handler, bool* out_cancelled,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -89,14 +89,14 @@ auto mln_resource_request_set_cancel_callback(
 }
 
 auto mln_resource_request_wait_until_retired(
-  mln_resource_request_handle handle, mln_diagnostic* out_diagnostic
+  mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::wait_for_resource_request_retired(handle);
   });
 }
 
-auto mln_resource_request_release(mln_resource_request_handle handle) noexcept
+auto mln_resource_request_release(mln_resource_request handle) noexcept
   -> void {
   mln::core::release_resource_request(handle);
 }
@@ -111,13 +111,11 @@ auto mln_runtime_set_resource_transform(
 }
 
 auto mln_resource_transform_response_set_url(
-  mln_resource_transform_response* response, const char* url, size_t url_size,
+  mln_resource_transform_response* response, mln_buffer_view url,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::resource_transform_response_set_url(
-      response, url, url_size
-    );
+    return mln::core::resource_transform_response_set_url(response, url);
   });
 }
 
@@ -140,14 +138,11 @@ auto mln_runtime_set_http_header_transform(
 }
 
 auto mln_http_header_transform_response_set_header(
-  mln_http_header_transform_response* response, const char* name,
-  size_t name_size, const char* value, size_t value_size,
-  mln_diagnostic* out_diagnostic
+  mln_http_header_transform_response* response, mln_buffer_view name,
+  mln_buffer_view value, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::http_header_transform_response_set(
-      response, name, name_size, value, value_size
-    );
+    return mln::core::http_header_transform_response_set(response, name, value);
   });
 }
 
@@ -213,7 +208,7 @@ auto mln_runtime_list_offline_regions(
 }
 
 auto mln_runtime_merge_offline_regions(
-  mln_runtime runtime, const char* side_database_path,
+  mln_runtime runtime, mln_buffer_view side_database_path,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

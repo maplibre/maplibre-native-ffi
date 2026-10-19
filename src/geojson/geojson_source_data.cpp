@@ -526,7 +526,7 @@ auto geojson_source_data_create(
   return MLN_STATUS_OK;
 }
 
-auto geojson_source_data_destroy(mln_geojson_source_data data) -> void {
+auto geojson_source_data_release(mln_geojson_source_data data) -> void {
   if (data == MLN_HANDLE_NULL) {
     return;
   }

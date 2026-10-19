@@ -16,6 +16,7 @@
 
 #include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
 
 namespace mln {
 class Map;
@@ -201,10 +202,50 @@ auto deliver_style_result(
   }
 }
 
-auto submit_map_command(
-  mln_map map, std::function<mln_status(MapObject&)> work,
-  const mln_completion* completion
+struct MapCommandTask : RuntimeCommandTask {
+  std::shared_ptr<MapObject> map;
+  ControlLease map_lease;
+  std::optional<Completion> embedded_completion;
+  mln_status (*map_work)(MapCommandTask&) = nullptr;
+};
+
+auto execute_map_command(MapCommandTask& task) -> void;
+auto submit_map_command_task(
+  mln_map map, MapCommandTask& task, const mln_completion* completion
 ) -> mln_status;
+
+template <typename Work>
+auto submit_map_command(
+  mln_map map, Work work, const mln_completion* completion
+) -> mln_status {
+  struct Task final : MapCommandTask {
+    explicit Task(Work work) : work(std::move(work)) {
+      command = true;
+      run = [](ExecutorTask* base) noexcept {
+        auto owner = std::unique_ptr<Task>{static_cast<Task*>(base)};
+        run_runtime_command_task(*owner);
+      };
+      RuntimeCommandTask::work = [](RuntimeCommandTask& base) {
+        execute_map_command(static_cast<Task&>(base));
+      };
+      map_work = [](MapCommandTask& base) {
+        auto& self = static_cast<Task&>(base);
+        return std::invoke(std::move(*self.work), *self.map);
+      };
+      clear_work = [](RuntimeCommandTask& base) noexcept {
+        auto& self = static_cast<Task&>(base);
+        self.work.reset();
+        self.map_lease.reset();
+        self.map.reset();
+      };
+    }
+    std::optional<Work> work;
+  };
+  auto task = std::make_unique<Task>(std::move(work));
+  const auto status = submit_map_command_task(map, *task, completion);
+  if (status == MLN_STATUS_OK) static_cast<void>(task.release());
+  return status;
+}
 auto start_style_operation(
   mln_map map, StyleDelivery delivery, StyleWork work,
   const mln_completion* completion
@@ -485,7 +526,7 @@ auto map_projection_create_from_transform(
 
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status;
-auto map_projection_close(mln_map_projection projection) -> mln_status;
+auto map_projection_release(mln_map_projection projection) -> mln_status;
 auto map_projection_get_camera(
   mln_map_projection projection, mln_camera_options* out_camera
 ) -> mln_status;

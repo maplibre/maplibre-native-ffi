@@ -366,7 +366,7 @@ public sealed unsafe partial class RuntimeHandle
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_merge_offline_regions(
                     Handle,
-                    scope.CStringArgument(sideDatabasePath),
+                    scope.Utf8(sideDatabasePath),
                     completion,
                     diagnostic
                 ),

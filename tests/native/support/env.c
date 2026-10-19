@@ -219,7 +219,10 @@ mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json) {
 
 mln_status mln_test_map_set_style_url(mln_map map, const char* url) {
   const mln_completion completion = mln_test_discard_completion();
-  return mln_map_set_style_url(map, url, &completion, MLN_TEST_DIAGNOSTIC);
+  return mln_map_set_style_url(
+    map, (mln_buffer_view){.data = url, .size = url == NULL ? 1 : strlen(url)},
+    &completion, MLN_TEST_DIAGNOSTIC
+  );
 }
 
 mln_map mln_test_create_map_with_options(

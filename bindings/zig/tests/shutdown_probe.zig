@@ -12,7 +12,7 @@ fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: 
 
 fn ignoreWake(_: ?*anyopaque) maplibre.Error!void {}
 
-fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequest, _: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     return .pass_through;
 }
 

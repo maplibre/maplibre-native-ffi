@@ -35,7 +35,7 @@ const ProviderProbe = struct {
     runtime: maplibre.Runtime,
     calls: std.atomic.Value(usize) = .init(0),
     releases: std.atomic.Value(usize) = .init(0),
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         const self: *@This() = @ptrCast(@alignCast(context.?));
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
@@ -62,7 +62,7 @@ test "generated provider inline completion and close retain decision ownership" 
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
     try fixture.setProvider(.{ .context = &probe, .callback = ProviderProbe.provide, .release_context = ProviderProbe.release });
-    try (try support.resolve(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "binding-test://style", null))).statusError();
+    try (try support.resolve(try maplibre.mapSetStyleUrl(fixture.map, "binding-test://style", null))).statusError();
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
     try support.resolve(try maplibre.runtimeClearResourceProvider(fixture.runtime, null));

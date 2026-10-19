@@ -214,7 +214,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(88, 96),
+          w(88, 104),
         ) {
           readOfflineRegionInfo(it)
         }
@@ -239,19 +239,14 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(88, 96),
+          w(88, 104),
         ) {
           readOfflineRegionInfo(it)
         }
       },
     ) {
       check(
-        C.mln_runtime_merge_offline_regions(
-          handle,
-          cString(sideDatabasePath),
-          completion,
-          diagnostic,
-        ),
+        C.mln_runtime_merge_offline_regions(handle, view(sideDatabasePath), completion, diagnostic),
       )
     }
 

@@ -170,7 +170,11 @@ void advance_still_image(still_image_job* job) {
       .size = sizeof(mln_completion),
       .callback = ignore_completion,
     };
-    job->status = mln_map_set_style_url(job->map, job->style_url, &style, NULL);
+    job->status = mln_map_set_style_url(
+      job->map,
+      (mln_buffer_view){.data = job->style_url, .size = strlen(job->style_url)},
+      &style, NULL
+    );
     if (job->status == MLN_STATUS_OK) {
       const mln_completion still = {
         .size = sizeof(mln_completion),

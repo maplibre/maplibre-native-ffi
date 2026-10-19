@@ -117,7 +117,7 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
   // worker meanwhile, which a frame does not wait for.
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);
-  mln_geojson_source_data_destroy(first);
+  mln_geojson_source_data_release(first);
   first = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return first_index.expired(); },
@@ -130,7 +130,7 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
     "the second data's tiles"
   ));
 
-  mln_geojson_source_data_destroy(second);
+  mln_geojson_source_data_release(second);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -147,7 +147,7 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
   const auto map = mln_test_create_map(runtime);
   const auto first = prepare(POINT_COLLECTION("first"), nullptr);
   add_drawn_source(runtime, map, first);
-  mln_geojson_source_data_destroy(first);
+  mln_geojson_source_data_release(first);
 
   auto fixture = mln_test_render_fixture{};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
@@ -162,7 +162,7 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
   sync.hold(SyncPoint::GeoJsonTileSlice);
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);
-  mln_geojson_source_data_destroy(second);
+  mln_geojson_source_data_release(second);
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return holds_the_name(fixture, "second"); },
     "the second data's tiles while its worker is parked"

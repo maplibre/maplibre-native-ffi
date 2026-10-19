@@ -112,7 +112,7 @@ static void attach_and_destroy_here(void* context) {
     .size = sizeof(mln_render_abandon_result)
   };
   run->abandon_status = mln_render_session_abandon(session, &abandoned, NULL);
-  run->destroy_status = mln_render_session_destroy(session, NULL);
+  run->destroy_status = mln_render_session_release(session, NULL);
 }
 
 static void destroy_on_main_thread_leaves_unstarted_worker(void) {

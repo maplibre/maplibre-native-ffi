@@ -50,7 +50,6 @@ class HandlePlan:
     finalize: tuple[str, ...] = ()
     view_begin: str | None = None
     view_end: str | None = None
-    prefix: str = ""
     # Whether the handle is a root whose release is a lifecycle operation that
     # reports retirement through its completion, so a host can wait for it.
     observable_root_release: bool = False
@@ -58,7 +57,7 @@ class HandlePlan:
     @property
     def stem(self) -> str:
         """The handle's public name: its operation prefix without `mln_`."""
-        return public_stem(self.prefix or self.native)
+        return public_stem(self.native)
 
 
 @dataclass(frozen=True)
@@ -667,7 +666,6 @@ class Binder:
                 ),
                 view_begin=typedef.metadata.get("view_begin"),
                 view_end=typedef.metadata.get("view_end"),
-                prefix=typedef.metadata.get("prefix", name),
                 observable_root_release=self.observable_root_release(typedef),
             )
             for name, typedef in self.typedefs.items()
@@ -795,7 +793,7 @@ class Binder:
                 if key in {"encoding", "ownership", "lifetime", "enum", "tag"}
             }
             child_name = type_name(pointee)
-            if metadata.get("direction") in {"out", "inout"}:
+            if metadata.get("direction") == "out":
                 if pointee.kind != "pointer" and metadata.get("length") not in {
                     None,
                     "1",
@@ -1385,10 +1383,7 @@ class Binder:
             and not isinstance(support, DeliverySupport)
         ) or isinstance(support, DefaultSupport):
             self.returned |= self.copied(
-                (
-                    *outputs,
-                    *(p for p in inputs if p.direction == "inout"),
-                ),
+                outputs,
                 result,
                 context,
                 isinstance(support, DefaultSupport),
@@ -1483,9 +1478,8 @@ class Binder:
         if receiver is not None:
             parameter = next(p for p in function.parameters if p.name == receiver)
             owner = type_name(parameter.type.pointee or parameter.type)
-            prefix = self.handles[owner].prefix if owner in self.handles else owner
-            if function.name.startswith(prefix + "_"):
-                return function.name.removeprefix(prefix + "_")
+            if function.name.startswith(owner + "_"):
+                return function.name.removeprefix(owner + "_")
         return public_stem(function.name)
 
     def response(self, name: str) -> CallbackResponsePlan:
@@ -1505,7 +1499,7 @@ class Binder:
             and any(
                 p.type.pointee
                 and type_name(p.type.pointee) == name
-                and p.metadata.get("direction") in {"out", "inout"}
+                and p.metadata.get("direction") == "out"
                 for p in t.parameters
             )
         )

@@ -63,7 +63,7 @@ static void resource_transform_with_zero_size(void* descriptor) {
 }
 
 static const mln_resource_rewrite_rule unused_rewrite_rule = {
-  .url = "http://127.0.0.1/unused",
+  .url = MLN_BUFFER_LITERAL("http://127.0.0.1/unused"),
 };
 
 // A callback transform takes no rules; a rules transform has no callback.
@@ -104,15 +104,22 @@ static void a_replacement_url_needs_a_transform_invocation(void) {
     .size = sizeof(mln_resource_transform_response),
   };
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_resource_transform_response_set_url(
-                                &response, "http://127.0.0.1/", 17, NULL
-                              )
+    MLN_STATUS_INVALID_STATE,
+    mln_resource_transform_response_set_url(
+      &response, (mln_buffer_view){.data = "http://127.0.0.1/", .size = 17},
+      NULL
+    )
   );
-  MLN_TEST_INVALID(mln_resource_transform_response_set_url(NULL, "x", 1, NULL));
+  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
+    NULL, (mln_buffer_view){.data = "x", .size = 1}, NULL
+  ));
+  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
+    &response, MLN_BUFFER_LITERAL("custom://before\0after"), NULL
+  ));
   response.size = 0;
-  MLN_TEST_INVALID(
-    mln_resource_transform_response_set_url(&response, "x", 1, NULL)
-  );
+  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
+    &response, (mln_buffer_view){.data = "x", .size = 1}, NULL
+  ));
 }
 
 static mln_status submit_header_transform(
@@ -136,7 +143,7 @@ static void header_transform_with_zero_size(void* descriptor) {
 }
 
 static const mln_http_header_rule unused_header_rule = {
-  .url = "http://127.0.0.1/unused",
+  .url = MLN_BUFFER_LITERAL("http://127.0.0.1/unused"),
 };
 
 static void header_transform_with_rules(void* descriptor) {
@@ -197,6 +204,8 @@ static const header_case refused_headers[] = {
   {"a value that is not UTF-8", "Authorization", 13, invalid_utf8,
    sizeof(invalid_utf8)},
   {"a null name", NULL, 1, "value", 5},
+  {"a name with NUL", "X-\0Name", 7, "value", 5},
+  {"a value with NUL", "X-Name", 6, "before\0after", 12},
 };
 
 static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
@@ -204,9 +213,11 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
     .size = sizeof(mln_http_header_transform_response),
   };
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_http_header_transform_response_set_header(
-                                &response, "X-Test", 6, "value", 5, NULL
-                              )
+    MLN_STATUS_INVALID_STATE,
+    mln_http_header_transform_response_set_header(
+      &response, (mln_buffer_view){.data = "X-Test", .size = 6},
+      (mln_buffer_view){.data = "value", .size = 5}, NULL
+    )
   );
   for (size_t index = 0;
        index < sizeof(refused_headers) / sizeof(refused_headers[0]);
@@ -215,7 +226,8 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT,
       mln_http_header_transform_response_set_header(
-        &response, row->name, row->name_size, row->value, row->value_size, NULL
+        &response, (mln_buffer_view){.data = row->name, .size = row->name_size},
+        (mln_buffer_view){.data = row->value, .size = row->value_size}, NULL
       ),
       row->label
     );
@@ -249,7 +261,8 @@ static mln_status rewrite_a_to_b(
     return MLN_STATUS_NATIVE_ERROR;
   }
   return mln_resource_transform_response_set_url(
-    out_response, rewritten, (size_t)written, NULL
+    out_response, (mln_buffer_view){.data = rewritten, .size = (size_t)written},
+    NULL
   );
 }
 
@@ -445,8 +458,10 @@ static mln_status add_token(
   atomic_fetch_add(&transform->calls, 1);
   atomic_store(&transform->last_kind, kind);
   return mln_http_header_transform_response_set_header(
-    out_response, token_header, sizeof(token_header) - 1, token_value,
-    sizeof(token_value) - 1, NULL
+    out_response,
+    (mln_buffer_view){.data = token_header, .size = sizeof(token_header) - 1},
+    (mln_buffer_view){.data = token_value, .size = sizeof(token_value) - 1},
+    NULL
   );
 }
 

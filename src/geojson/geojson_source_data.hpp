@@ -46,6 +46,6 @@ auto geojson_source_data_create(
   mln_buffer_view data, const mln_geojson_source_options* options,
   mln_geojson_source_data* out_data
 ) -> mln_status;
-auto geojson_source_data_destroy(mln_geojson_source_data data) -> void;
+auto geojson_source_data_release(mln_geojson_source_data data) -> void;
 
 }  // namespace mln::core

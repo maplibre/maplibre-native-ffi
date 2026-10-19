@@ -639,7 +639,7 @@ void a_destroy_that_races_dispose_finds_the_handle_released() {
   sync_points.hold(SyncPoint::RenderDestroyLeased);
   auto destroyed = std::atomic_int{MLN_STATUS_OK};
   auto destroyer = std::thread{[&] {
-    destroyed = mln_render_session_destroy(fixture.session, nullptr);
+    destroyed = mln_render_session_release(fixture.session, nullptr);
   }};
   TEST_ASSERT_TRUE(
     sync_points.wait_for_hits(SyncPoint::RenderDestroyLeased, 1)
@@ -786,7 +786,7 @@ void borrowed_views_survive_sibling_frame_disposal() {
     mln::core::RenderDriverWork{
       .execute = {},
       .abandon = [id = session->self, &reentrant_destroy_status] {
-        reentrant_destroy_status = mln_render_session_destroy(id, nullptr);
+        reentrant_destroy_status = mln_render_session_release(id, nullptr);
       },
     }
   );
@@ -801,7 +801,7 @@ void borrowed_views_survive_sibling_frame_disposal() {
   );
   auto sync = mln_gpu_sync_default();
   MLN_TEST_STATUS(
-    MLN_STATUS_BUSY, mln_acquired_frame_release(&frame_id, &sync, nullptr)
+    MLN_STATUS_BUSY, mln_acquired_frame_release(frame_id, &sync, nullptr)
   );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_map_dispose(map, nullptr);
@@ -830,10 +830,10 @@ void borrowed_views_survive_sibling_frame_disposal() {
     mln_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
-  MLN_TEST_OK(mln_acquired_frame_release(&frame_id, &sync, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(frame_id, &sync, nullptr));
   MLN_TEST_OK(mln_render_session_abandon(session->self, &result, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    return mln_render_session_destroy(session->self, nullptr);
+    return mln_render_session_release(session->self, nullptr);
   });
   TEST_ASSERT_EQUAL_INT_MESSAGE(
     MLN_STATUS_BUSY, reentrant_destroy_status.load(),

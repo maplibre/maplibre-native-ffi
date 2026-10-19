@@ -123,7 +123,7 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
 
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_destroy(fixture.session, MLN_TEST_DIAGNOSTIC)
+    mln_render_session_release(fixture.session, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL(strstr(
     mln_test_last_error(),
@@ -234,7 +234,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   MLN_TEST_INVALID_STATE(
     mln_render_session_reduce_memory_use(detached, &discard, NULL)
   );
-  MLN_TEST_INVALID_STATE(mln_render_session_destroy(detached, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_session_release(detached, NULL));
   MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &discard, NULL)
   );

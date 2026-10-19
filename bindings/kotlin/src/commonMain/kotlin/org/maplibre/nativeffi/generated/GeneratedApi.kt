@@ -228,15 +228,11 @@ public object GeneratedApi {
       response.bindingAddress,
       "mln_http_header_transform_response_set_header",
     ) {
-      val nameUtf8 = name.encodeToByteArray()
-      val valueUtf8 = value.encodeToByteArray()
       check(
         C.mln_http_header_transform_response_set_header(
           handle,
-          bytes(nameUtf8),
-          nameUtf8.size.toLong(),
-          bytes(valueUtf8),
-          valueUtf8.size.toLong(),
+          view(name),
+          view(value),
           diagnostic,
         ),
       )
@@ -590,15 +586,7 @@ public object GeneratedApi {
       response.bindingAddress,
       "mln_resource_transform_response_set_url",
     ) {
-      val urlUtf8 = url.encodeToByteArray()
-      check(
-        C.mln_resource_transform_response_set_url(
-          handle,
-          bytes(urlUtf8),
-          urlUtf8.size.toLong(),
-          diagnostic,
-        ),
-      )
+      check(C.mln_resource_transform_response_set_url(handle, view(url), diagnostic))
     }
 
   /**
@@ -628,7 +616,7 @@ public object GeneratedApi {
    */
   public fun runtimeOptionsDefault(): RuntimeOptions =
     nativeCall(null, null, "mln_runtime_options_default") {
-      val out = sized(w(40, 56), 8)
+      val out = sized(w(48, 72), 8)
       C.mln_runtime_options_default(out)
       readRuntimeOptions(out)
     }

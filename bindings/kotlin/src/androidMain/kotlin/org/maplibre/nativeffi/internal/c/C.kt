@@ -115,7 +115,7 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic actual external fun mln_geojson_source_data_destroy(data: Long): Unit
+  @JvmStatic actual external fun mln_geojson_source_data_release(data: Long): Unit
 
   @CriticalNative
   @JvmStatic
@@ -127,9 +127,7 @@ internal actual object C {
   actual external fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
-    nameSize: Long,
     value: Long,
-    valueSize: Long,
     outDiagnostic: Long,
   ): Int
 
@@ -657,9 +655,6 @@ internal actual object C {
   @CriticalNative @JvmStatic actual external fun mln_map_options_default(returned: Long): Unit
 
   @JvmStatic
-  actual external fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int
-
-  @JvmStatic
   actual external fun mln_map_projection_get_camera(
     projection: Long,
     outCamera: Long,
@@ -724,6 +719,9 @@ internal actual object C {
     outPoints: Long,
     outDiagnostic: Long,
   ): Int
+
+  @JvmStatic
+  actual external fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int
 
   @JvmStatic
   actual external fun mln_map_projection_set_camera(
@@ -1146,8 +1144,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic actual external fun mln_render_session_destroy(session: Long, outDiagnostic: Long): Int
-
   @JvmStatic
   actual external fun mln_render_session_detach(
     session: Long,
@@ -1230,6 +1226,8 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int
+
+  @JvmStatic actual external fun mln_render_session_release(session: Long, outDiagnostic: Long): Int
 
   @JvmStatic
   actual external fun mln_render_session_request_frame(
@@ -1371,7 +1369,6 @@ internal actual object C {
   actual external fun mln_resource_transform_response_set_url(
     response: Long,
     url: Long,
-    urlSize: Long,
     outDiagnostic: Long,
   ): Int
 

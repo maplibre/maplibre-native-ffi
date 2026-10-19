@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -19,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "completion/completion.hpp"
 #include "execution/control_state.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/runtime_executor.hpp"
@@ -342,6 +344,13 @@ struct RuntimeObject {
   std::mutex submission_mutex;
   std::mutex terminal_mutex;
   uint64_t next_submission_sequence = 1;
+  // Commands normally retire from the front. Rejected publication and
+  // abandonment can retire a later entry while an earlier delivery is pending.
+  struct PendingCommand {
+    uint64_t sequence;
+    bool retired = false;
+  };
+  std::deque<PendingCommand> pending_commands;
   std::set<uint64_t> pending_submissions;
   std::map<uint64_t, std::shared_ptr<mln::core::OperationObject>>
     pending_barriers;
@@ -392,7 +401,7 @@ auto set_resource_transform(
   const mln_completion* completion
 ) -> mln_status;
 auto resource_transform_response_set_url(
-  mln_resource_transform_response* response, const char* url, size_t url_size
+  mln_resource_transform_response* response, mln_buffer_view url
 ) -> mln_status;
 auto clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion
@@ -405,8 +414,8 @@ auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
 ) -> mln_status;
 auto http_header_transform_response_set(
-  mln_http_header_transform_response* response, const char* name,
-  size_t name_size, const char* value, size_t value_size
+  mln_http_header_transform_response* response, mln_buffer_view name,
+  mln_buffer_view value
 ) -> mln_status;
 auto clear_http_header_transform(
   mln_runtime runtime, const mln_completion* completion
@@ -437,7 +446,7 @@ auto offline_regions_list_start(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
 auto offline_regions_merge_database_start(
-  mln_runtime runtime, const char* side_database_path,
+  mln_runtime runtime, mln_buffer_view side_database_path,
   const mln_completion* completion
 ) -> mln_status;
 auto offline_region_update_metadata_start(
@@ -479,12 +488,53 @@ auto track_runtime_submission(RuntimeObject& runtime) -> uint64_t;
 auto finish_runtime_submission(
   const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
 ) noexcept -> void;
-auto submit_runtime_command(
-  const std::shared_ptr<RuntimeObject>& runtime,
-  std::function<void(uint64_t)> function,
-  const std::shared_ptr<Completion>& completion,
+struct RuntimeCommandTask : ExecutorTask {
+  std::shared_ptr<RuntimeObject> runtime;
+  ControlLease lease;
+  Completion* completion = nullptr;
+  std::shared_ptr<Completion> retained_completion;
+  uint64_t sequence = 0;
+  void (*work)(RuntimeCommandTask&) = nullptr;
+  void (*clear_work)(RuntimeCommandTask&) noexcept = nullptr;
+};
+
+auto run_runtime_command_task(RuntimeCommandTask& task) noexcept -> void;
+auto submit_runtime_command_task(
+  const std::shared_ptr<RuntimeObject>& runtime, RuntimeCommandTask& task,
   std::atomic<uint64_t>* latest_submission = nullptr
 ) -> mln_status;
+
+template <typename Function>
+auto submit_runtime_command(
+  const std::shared_ptr<RuntimeObject>& runtime, Function function,
+  const std::shared_ptr<Completion>& completion,
+  std::atomic<uint64_t>* latest_submission = nullptr
+) -> mln_status {
+  struct Task final : RuntimeCommandTask {
+    explicit Task(Function function) : function(std::move(function)) {
+      command = true;
+      run = [](ExecutorTask* base) noexcept {
+        auto owner = std::unique_ptr<Task>{static_cast<Task*>(base)};
+        run_runtime_command_task(*owner);
+      };
+      work = [](RuntimeCommandTask& base) {
+        auto& self = static_cast<Task&>(base);
+        std::invoke(std::move(*self.function), self.sequence);
+      };
+      clear_work = [](RuntimeCommandTask& base) noexcept {
+        static_cast<Task&>(base).function.reset();
+      };
+    }
+    std::optional<Function> function;
+  };
+  auto task = std::make_unique<Task>(std::move(function));
+  task->retained_completion = completion;
+  task->completion = completion.get();
+  const auto status =
+    submit_runtime_command_task(runtime, *task, latest_submission);
+  if (status == MLN_STATUS_OK) static_cast<void>(task.release());
+  return status;
+}
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,

@@ -845,7 +845,7 @@ const (
 )
 
 // ResourceRequestField corresponds to mln_resource_request_field. Field mask
-// values for mln_resource_request.
+// values for mln_resource_request_info.
 //
 // See mln_resource_request_field in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -2229,8 +2229,8 @@ type HttpHeader struct {
 
 func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
 	raw := C.mln_http_header{}
-	raw.name = arena.cstring(input.Name)
-	raw.value = arena.cstring(input.Value)
+	raw.name = C.mln_buffer_view{data: arena.bytes([]byte(input.Name)), size: C.size_t(len(input.Name))}
+	raw.value = C.mln_buffer_view{data: arena.bytes([]byte(input.Value)), size: C.size_t(len(input.Value))}
 	return raw
 }
 
@@ -2255,7 +2255,7 @@ func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_
 	raw := C.mln_http_header_rule{}
 	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
-	raw.url = arena.cstring(input.Url)
+	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	{
 		raw.headers = (*C.mln_http_header)(arena.array(len(input.Headers), unsafe.Sizeof(*raw.headers)))
 		items := unsafe.Slice(raw.headers, len(input.Headers))
@@ -2876,7 +2876,7 @@ type OfflineGeometryRegionDefinition struct {
 
 func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_definition) OfflineGeometryRegionDefinition {
 	var result OfflineGeometryRegionDefinition
-	result.StyleUrl = C.GoString(raw.style_url)
+	result.StyleUrl = bindingString(raw.style_url.data, uint64(raw.style_url.size))
 	result.Geometry = bindingBytes(raw.geometry.data, uint64(raw.geometry.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
@@ -2887,7 +2887,7 @@ func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_defin
 
 func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition, arena *bindingArena) C.mln_offline_geometry_region_definition {
 	raw := C.mln_offline_geometry_region_definition{}
-	raw.style_url = arena.cstring(input.StyleUrl)
+	raw.style_url = C.mln_buffer_view{data: arena.bytes([]byte(input.StyleUrl)), size: C.size_t(len(input.StyleUrl))}
 	raw.geometry = C.mln_buffer_view{data: arena.bytes(input.Geometry), size: C.size_t(len(input.Geometry))}
 	raw.min_zoom = C.double(input.MinZoom)
 	raw.max_zoom = C.double(input.MaxZoom)
@@ -3009,7 +3009,7 @@ type OfflineTilePyramidRegionDefinition struct {
 
 func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_region_definition) OfflineTilePyramidRegionDefinition {
 	var result OfflineTilePyramidRegionDefinition
-	result.StyleUrl = C.GoString(raw.style_url)
+	result.StyleUrl = bindingString(raw.style_url.data, uint64(raw.style_url.size))
 	result.Bounds = copyLatLngBounds(raw.bounds)
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
@@ -3020,7 +3020,7 @@ func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_regio
 
 func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefinition, arena *bindingArena) C.mln_offline_tile_pyramid_region_definition {
 	raw := C.mln_offline_tile_pyramid_region_definition{}
-	raw.style_url = arena.cstring(input.StyleUrl)
+	raw.style_url = C.mln_buffer_view{data: arena.bytes([]byte(input.StyleUrl)), size: C.size_t(len(input.StyleUrl))}
 	raw.bounds = nativeLatLngBounds(input.Bounds, arena)
 	raw.min_zoom = C.double(input.MinZoom)
 	raw.max_zoom = C.double(input.MaxZoom)
@@ -3817,7 +3817,7 @@ type ResourceProvider struct {
 	// The requests that reach the provider; empty to claim every request.
 	Routes []ResourceRoute
 	// Decides each request that the routes leave to the provider.
-	Callback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
+	Callback func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision
 }
 
 func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_resource_provider {
@@ -3860,7 +3860,28 @@ func copyResourceRange(raw C.mln_resource_range) ResourceRange {
 	return result
 }
 
-type ResourceRequest struct {
+// ResourceRequestCancelHandler corresponds to
+// mln_resource_request_cancel_handler. Cancel callback state for one handled
+// resource request.
+//
+// See mln_resource_request_cancel_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRequestCancelHandler struct{ Callback func() }
+
+func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, arena *bindingArena) C.mln_resource_request_cancel_handler {
+	raw := C.mln_resource_request_cancel_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, arena.identity)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Callback != nil {
+			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
+		}
+	}
+	return raw
+}
+
+type ResourceRequestInfo struct {
 	// URL entering the network layer, before tile server normalization. Copied
 	// text, owned by the caller.
 	RequestedUrl *string
@@ -3881,8 +3902,8 @@ type ResourceRequest struct {
 	PriorData []byte
 }
 
-func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
-	var result ResourceRequest
+func copyResourceRequestInfo(raw C.mln_resource_request_info) ResourceRequestInfo {
+	var result ResourceRequestInfo
 	result.RequestedUrl = func() *string {
 		if raw.requested_url == nil {
 			return nil
@@ -3916,27 +3937,6 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	return result
 }
 
-// ResourceRequestCancelHandler corresponds to
-// mln_resource_request_cancel_handler. Cancel callback state for one handled
-// resource request.
-//
-// See mln_resource_request_cancel_handler in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceRequestCancelHandler struct{ Callback func() }
-
-func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, arena *bindingArena) C.mln_resource_request_cancel_handler {
-	raw := C.mln_resource_request_cancel_handler{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	if input.Callback != nil {
-		raw.user_data = arena.register(input, arena.identity)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release)
-		if input.Callback != nil {
-			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
-		}
-	}
-	return raw
-}
-
 // ResourceResponse corresponds to mln_resource_response. A resource provider's
 // answer to one request.
 //
@@ -3964,13 +3964,13 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	raw.bytes = (*C.uint8_t)(arena.bytes(input.Bytes))
 	raw.byte_count = bindingCountLike(raw.byte_count, len(input.Bytes))
 	if input.ErrorMessage != nil {
-		raw.error_message = arena.cstring((*input.ErrorMessage))
+		raw.error_message = C.mln_buffer_view{data: arena.bytes([]byte((*input.ErrorMessage))), size: C.size_t(len((*input.ErrorMessage)))}
 	}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
 	if input.Etag != nil {
-		raw.etag = arena.cstring((*input.Etag))
+		raw.etag = C.mln_buffer_view{data: arena.bytes([]byte((*input.Etag))), size: C.size_t(len((*input.Etag)))}
 	}
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
 	return raw
@@ -3988,7 +3988,7 @@ type ResourceRewriteRule struct {
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
 	Url string
-	// The replacement URL, or null to keep the URL and stop the search.
+	// The replacement URL, or empty to keep the URL and stop the search.
 	ReplacementUrl *string
 }
 
@@ -3996,9 +3996,9 @@ func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C
 	raw := C.mln_resource_rewrite_rule{}
 	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
-	raw.url = arena.cstring(input.Url)
+	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	if input.ReplacementUrl != nil {
-		raw.replacement_url = arena.cstring((*input.ReplacementUrl))
+		raw.replacement_url = C.mln_buffer_view{data: arena.bytes([]byte((*input.ReplacementUrl))), size: C.size_t(len((*input.ReplacementUrl)))}
 	}
 	return raw
 }
@@ -4027,7 +4027,7 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 	raw := C.mln_resource_route{}
 	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
-	raw.url = arena.cstring(input.Url)
+	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	raw.url_stage = C.uint32_t(input.UrlStage)
 	return raw
 }
@@ -4251,9 +4251,9 @@ func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEven
 // See mln_runtime_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeOptions struct {
-	// Directory root for asset:// URLs. Copied during runtime creation. Null or
-	// empty selects /android_asset on Android and . elsewhere. Copied text, owned
-	// by the caller.
+	// Directory root for asset:// URLs. Copied during runtime creation. Empty
+	// selects /android_asset on Android and . elsewhere. Copied text, owned by the
+	// caller.
 	AssetPath *string
 	// Cache database path. Copied during runtime creation. Copied text, owned by
 	// the caller.
@@ -4268,17 +4268,17 @@ type RuntimeOptions struct {
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 	var result RuntimeOptions
 	result.AssetPath = func() *string {
-		if raw.asset_path == nil {
+		if raw.asset_path.size == 0 {
 			return nil
 		}
-		value := C.GoString(raw.asset_path)
+		value := bindingString(raw.asset_path.data, uint64(raw.asset_path.size))
 		return &value
 	}()
 	result.CachePath = func() *string {
-		if raw.cache_path == nil {
+		if raw.cache_path.size == 0 {
 			return nil
 		}
-		value := C.GoString(raw.cache_path)
+		value := bindingString(raw.cache_path.data, uint64(raw.cache_path.size))
 		return &value
 	}()
 	result.EventMask = RuntimeEventMask(raw.event_mask)
@@ -4289,10 +4289,10 @@ func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runti
 	raw := C.mln_runtime_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.AssetPath != nil {
-		raw.asset_path = arena.cstring((*input.AssetPath))
+		raw.asset_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.AssetPath))), size: C.size_t(len((*input.AssetPath)))}
 	}
 	if input.CachePath != nil {
-		raw.cache_path = arena.cstring((*input.CachePath))
+		raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.CachePath))), size: C.size_t(len((*input.CachePath)))}
 	}
 	raw.event_mask = C.uint64_t(input.EventMask)
 	raw.event_wake = nativeWake(input.EventWake, arena)
@@ -6003,10 +6003,15 @@ func (handle *EventBatchHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// GeojsonSourceDataHandle corresponds to mln_geojson_source_data. Prepared
+// GeoJSON data that sources retain independently of its handle.
+//
+// See mln_geojson_source_data in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type GeojsonSourceDataHandle struct{ *bindingOwner }
 
 func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
-	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
+	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
@@ -6046,7 +6051,7 @@ func (handle *MapHandle) owner() *bindingOwner {
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
-	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", func(raw uint64) { C.mln_map_projection_close(C.mln_map_projection(raw), nil) })}
+	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw), nil) })}
 	return owner
 }
 
@@ -6098,15 +6103,15 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
-// ResourceRequestHandle corresponds to mln_resource_request_handle. A resource
-// request that a resource provider handles.
+// ResourceRequestHandle corresponds to mln_resource_request. A resource request
+// that a resource provider handles.
 //
-// See mln_resource_request_handle in the C API reference:
+// See mln_resource_request in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
-	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request_handle(raw)) })}
+	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request(raw)) })}
 	return owner
 }
 
@@ -6247,8 +6252,7 @@ func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextu
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_acquired_frame_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		handle := C.mln_acquired_frame(raw)
-		return int32(C.mln_acquired_frame_release(&handle, bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
+		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
 	})
 }
 
@@ -6316,11 +6320,11 @@ func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*Geojs
 
 // Close releases prepared GeoJSON source data.
 //
-// See mln_geojson_source_data_destroy in the C API reference:
+// See mln_geojson_source_data_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *GeojsonSourceDataHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_geojson_source_data_destroy), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw))
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_geojson_source_data_release), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw))
 		return struct{}{}
 	})
 	return err
@@ -6333,7 +6337,7 @@ func (receiver *GeojsonSourceDataHandle) Close() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *HttpHeaderTransformResponseScope) SetHeader(name string, value string) error {
 	return bindingDo(receiver.target(C.binding_operation_mln_http_header_transform_response_set_header), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_http_header_transform_response_set_header(receiver.native, (*C.char)(arena.bytes([]byte(name))), bindingCount[C.size_t](len(name)), (*C.char)(arena.bytes([]byte(value))), bindingCount[C.size_t](len(value)), diagnostic))
+		return int32(C.mln_http_header_transform_response_set_header(receiver.native, bindingView(name, arena), bindingView(value, arena), diagnostic))
 	})
 }
 
@@ -7139,16 +7143,6 @@ func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string)
 	}, completionCommand)
 }
 
-// Close closes a standalone projection.
-//
-// See mln_map_projection_close in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_map_projection_close), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_close(C.mln_map_projection(raw), diagnostic))
-	})
-}
-
 // GetCamera copies the projection camera into out_camera.
 //
 // See mln_map_projection_get_camera in the C API reference:
@@ -7272,6 +7266,16 @@ func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]S
 			}
 			return result
 		}()
+	})
+}
+
+// Close releases a standalone projection.
+//
+// See mln_map_projection_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) Close() error {
+	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_map_projection_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_release(C.mln_map_projection(raw), diagnostic))
 	})
 }
 
@@ -7639,7 +7643,7 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_url(C.mln_map(raw), arena.cstring(url), completion, diagnostic))
+		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7828,19 +7832,6 @@ func (receiver *RenderSessionHandle) CreateProjection() (*MapProjectionHandle, e
 	})
 }
 
-// Close retires a detached or abandoned session handle. The call is CPU-only
-// and may run on any native thread, including from one of the session's own
-// completions. If an abandonment is still in progress on another thread, this
-// waits for it to finish before consuming the session owner.
-//
-// See mln_render_session_destroy in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_render_session_destroy), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_destroy(C.mln_render_session(raw), diagnostic))
-	})
-}
-
 // Detach starts normal graphics-owner teardown and map detachment.
 //
 // See mln_render_session_detach in the C API reference:
@@ -7958,6 +7949,19 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_reduce_memory_use), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
 	}, completionUnit)
+}
+
+// Close retires a detached or abandoned session handle. The call is CPU-only
+// and may run on any native thread, including from one of the session's own
+// completions. If an abandonment is still in progress on another thread, this
+// waits for it to finish before consuming the session owner.
+//
+// See mln_render_session_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) Close() error {
+	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_render_session_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_release(C.mln_render_session(raw), diagnostic))
+	})
 }
 
 // RequestFrame requests a frame without waiting. Every accepted demand produces
@@ -8126,7 +8130,7 @@ func RenderedQueryGeometryPoint(point ScreenPoint) (RenderedQueryGeometry, error
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error {
 	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_complete(C.mln_resource_request_handle(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
+		return int32(C.mln_resource_request_complete(C.mln_resource_request(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
 	})
 }
 
@@ -8138,7 +8142,7 @@ func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error
 func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 	var outCancelled C.bool
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_is_cancelled), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_is_cancelled(C.mln_resource_request_handle(raw), &outCancelled, diagnostic))
+		return int32(C.mln_resource_request_is_cancelled(C.mln_resource_request(raw), &outCancelled, diagnostic))
 	}, func(arena *bindingArena) bool {
 		return bool(outCancelled)
 	})
@@ -8151,7 +8155,7 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) PassThrough() error {
 	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_pass_through), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_pass_through(C.mln_resource_request_handle(raw), diagnostic))
+		return int32(C.mln_resource_request_pass_through(C.mln_resource_request(raw), diagnostic))
 	})
 }
 
@@ -8171,7 +8175,7 @@ func (receiver *ResourceRequestHandle) Close() error {
 func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequestCancelHandler) (bool, error) {
 	var outCancelled C.bool
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_set_cancel_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), bindingStore(nativeResourceRequestCancelHandler(handler, arena), arena), &outCancelled, diagnostic))
+		return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request(raw), bindingStore(nativeResourceRequestCancelHandler(handler, arena), arena), &outCancelled, diagnostic))
 	}, func(arena *bindingArena) bool {
 		if bool(outCancelled) {
 			arena.decline()
@@ -8189,7 +8193,7 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) WaitUntilRetired() error {
 	return bindingDo(bindingIssued(receiver.owner(), C.binding_operation_mln_resource_request_wait_until_retired), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_wait_until_retired(C.mln_resource_request_handle(raw), diagnostic))
+		return int32(C.mln_resource_request_wait_until_retired(C.mln_resource_request(raw), diagnostic))
 	})
 }
 
@@ -8200,7 +8204,7 @@ func (receiver *ResourceRequestHandle) WaitUntilRetired() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
 	return bindingDo(receiver.target(C.binding_operation_mln_resource_transform_response_set_url), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_transform_response_set_url(receiver.native, (*C.char)(arena.bytes([]byte(url))), bindingCount[C.size_t](len(url)), diagnostic))
+		return int32(C.mln_resource_transform_response_set_url(receiver.native, bindingView(url, arena), diagnostic))
 	})
 }
 
@@ -8367,7 +8371,7 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_merge_offline_regions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), arena.cstring(sideDatabasePath), completion, diagnostic))
+		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), bindingView(sideDatabasePath, arena), completion, diagnostic))
 	}, completionListOf(copyOfflineRegionInfo))
 }
 
@@ -8870,7 +8874,7 @@ func (view MapHandleDiscarding) SetStyleTransitionOptions(options StyleTransitio
 func (view MapHandleDiscarding) SetStyleUrl(url string) error {
 	receiver := view.owner
 	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_url(C.mln_map(raw), arena.cstring(url), completion, diagnostic))
+		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))
 	})
 }
 
@@ -9096,7 +9100,7 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 }
 
 //export mlnGo_mln_resource_provider_callback
-func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request, native_handle C.mln_resource_request_handle) (result C.uint32_t) {
+func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request_info, native_handle C.mln_resource_request) (result C.uint32_t) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	result = C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
@@ -9116,7 +9120,7 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.uint32_t(callbacks.Callback(copyResourceRequest((*native_request)), request))
+	result = C.uint32_t(callbacks.Callback(copyResourceRequestInfo((*native_request)), request))
 	return
 }
 

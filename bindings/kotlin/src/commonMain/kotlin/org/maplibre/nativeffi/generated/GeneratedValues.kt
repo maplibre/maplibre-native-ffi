@@ -1026,7 +1026,7 @@ public data class ResourceProviderDecision(public val rawValue: UInt) {
 }
 
 /**
- * Field mask values for `mln_resource_request`.
+ * Field mask values for `mln_resource_request_info`.
  *
  * See `mln_resource_request_field` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2948,7 +2948,7 @@ public data class RenderedQueryGeometry(
  */
 public data class RuntimeOptions(
   /**
-   * Directory root for asset:// URLs. Copied during runtime creation. Null or empty selects
+   * Directory root for asset:// URLs. Copied during runtime creation. Empty selects
    * `/android_asset` on Android and `.` elsewhere. Copied text, owned by the caller.
    */
   public val assetPath: String? = null,
@@ -4023,7 +4023,7 @@ public data class ResourceRange(
   public val end: ULong = 0uL,
 )
 
-public data class ResourceRequest(
+public data class ResourceRequestInfo(
   /**
    * URL entering the network layer, before tile server normalization. Copied text, owned by the
    * caller.
@@ -4065,7 +4065,7 @@ public data class ResourceRequest(
 
   override fun equals(other: Any?): Boolean =
     this === other ||
-      other is ResourceRequest && contentFields().contentDeepEquals(other.contentFields())
+      other is ResourceRequestInfo && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
@@ -4100,7 +4100,7 @@ public data class ResourceRewriteRule(
   public val flags: UrlMatchFlags = UrlMatchFlags(0u),
   /** The URL or glob pattern to compare. */
   public val url: String = "",
-  /** The replacement URL, or null to keep the URL and stop the search. */
+  /** The replacement URL, or empty to keep the URL and stop the search. */
   public val replacementUrl: String? = null,
 )
 
@@ -4307,7 +4307,7 @@ public data class ResourceProvider(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias ResourceProviderCallback =
-  (request: ResourceRequest, handle: ResourceRequestHandle) -> ResourceProviderDecision
+  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
 /**
  * Resource transform state: a callback, or native rewrite rules.

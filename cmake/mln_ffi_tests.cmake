@@ -582,6 +582,11 @@ function(mln_ffi_add_native_tests)
   mln_native_add_abi_suite(abi_sources)
   mln_native_add_internal_suite(internal_sources)
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+     AND MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+    add_subdirectory(tests/native/bench)
+  endif()
+
   if(EMSCRIPTEN)
     mln_native_add_browser_abi_shards()
     mln_native_add_browser_test(native-internal/browser

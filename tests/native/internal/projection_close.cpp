@@ -64,7 +64,7 @@ void close_waits_for_a_running_conversion() {
     sync.wait_for_hits(SyncPoint::ProjectionCallRunning, calls + 1);
   auto close_status = std::atomic_int{-1};
   auto close = std::thread([&] {
-    close_status = mln_map_projection_close(projection, nullptr);
+    close_status = mln_map_projection_release(projection, nullptr);
     mln_test_pulse();
   });
   const auto waited = sync.wait_for_hits(SyncPoint::ProjectionCloseWaits, 1);
@@ -98,7 +98,7 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   const auto leased = sync.wait_for_hits(SyncPoint::ProjectionCallLeased, 1);
   // No call holds the call lock, so the close retires and destroys the
   // projection without waiting.
-  const auto close_status = mln_map_projection_close(projection, nullptr);
+  const auto close_status = mln_map_projection_release(projection, nullptr);
   const auto close_waits = sync.hits(SyncPoint::ProjectionCloseWaits);
   sync.release(SyncPoint::ProjectionCallLeased);
   conversion.thread.join();

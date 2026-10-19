@@ -25,4 +25,8 @@ internal constructor(
    */
   public val id: ULong
     get() = binding.issued().toULong()
+
+  public override fun close() {
+    release()
+  }
 }

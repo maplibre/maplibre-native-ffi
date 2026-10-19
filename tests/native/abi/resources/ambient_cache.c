@@ -124,7 +124,7 @@ static void ambient_cache_changes_reach_the_next_request(void) {
        .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
        .bytes = (const uint8_t*)cached_style_json,
        .byte_count = sizeof(cached_style_json) - 1,
-       .etag = "\"ambient\"",
+       .etag = MLN_BUFFER_LITERAL("\"ambient\""),
        // Fresh until 2100, so only a cache change makes it stale.
        .expires_unix_ms = 4102444800000,
      }},
@@ -178,7 +178,7 @@ static void revalidation_keeps_omitted_cache_validators(void) {
         .byte_count = sizeof(cached_style_json) - 1,
         .modified_unix_ms = 1700000000000,
         .expires_unix_ms = 4102444800000,
-        .etag = "\"validator\""},
+        .etag = MLN_BUFFER_LITERAL("\"validator\"")},
      .has_later_response = true,
      .later_response = {
        .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
@@ -244,7 +244,9 @@ static void touch_shared_cache(void* argument) {
   (void)mln_test_wait_for_count(&probe->started, thread->index);
 
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path = probe->cache_path;
+  options.cache_path = (mln_buffer_view){
+    .data = probe->cache_path, .size = strlen(probe->cache_path)
+  };
   mln_runtime runtime = MLN_HANDLE_NULL;
   thread->create_status = mln_runtime_create(&options, &runtime, NULL);
   mln_test_completion operation = mln_test_completion_default(0);

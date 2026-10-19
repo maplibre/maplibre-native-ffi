@@ -162,7 +162,7 @@ pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)
 
 /// Answers every request with a not-found error, so no test reaches the
 /// network by accident.
-fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequest, request: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     try maplibre.resourceRequestComplete(std.heap.smp_allocator, request, .{
         .status = .@"error",
         .error_reason = .not_found,
@@ -409,7 +409,7 @@ pub const OwnedTexture = struct {
         self.session = attachment.session;
         errdefer {
             _ = maplibre.renderSessionAbandon(self.session, null) catch {};
-            maplibre.renderSessionDestroy(self.session, null) catch {};
+            maplibre.renderSessionRelease(self.session, null) catch {};
         }
         try self.resolve(attachment.ready);
         return self;
@@ -424,7 +424,7 @@ pub const OwnedTexture = struct {
                 std.log.err("render session detach failed: {s}", .{@errorName(err)});
                 _ = maplibre.renderSessionAbandon(self.session, null) catch {};
             };
-            maplibre.renderSessionDestroy(self.session, null) catch |err| {
+            maplibre.renderSessionRelease(self.session, null) catch |err| {
                 std.log.err("render session destroy failed: {s}", .{@errorName(err)});
                 self.session.deinit();
             };

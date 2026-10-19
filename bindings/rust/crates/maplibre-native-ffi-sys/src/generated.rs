@@ -700,15 +700,15 @@ pub struct mln_gpu_sync {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_http_header {
-    pub name: *const std::ffi::c_char,
-    pub value: *const std::ffi::c_char,
+    pub name: mln_buffer_view,
+    pub value: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_http_header_rule {
     pub kinds: u32,
     pub flags: u32,
-    pub url: *const std::ffi::c_char,
+    pub url: mln_buffer_view,
     pub headers: *const mln_http_header,
     pub header_count: usize,
 }
@@ -872,7 +872,7 @@ pub struct mln_metal_texture_frame {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_geometry_region_definition {
-    pub style_url: *const std::ffi::c_char,
+    pub style_url: mln_buffer_view,
     pub geometry: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -916,7 +916,7 @@ pub struct mln_offline_region_status {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_tile_pyramid_region_definition {
-    pub style_url: *const std::ffi::c_char,
+    pub style_url: mln_buffer_view,
     pub bounds: mln_lat_lng_bounds,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -1151,7 +1151,15 @@ pub struct mln_resource_range {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_resource_request {
+pub struct mln_resource_request_cancel_handler {
+    pub size: u32,
+    pub callback: mln_resource_request_cancel_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_resource_request_info {
     pub size: u32,
     pub fields: u32,
     pub requested_url: *const std::ffi::c_char,
@@ -1170,14 +1178,6 @@ pub struct mln_resource_request {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_resource_request_cancel_handler {
-    pub size: u32,
-    pub callback: mln_resource_request_cancel_callback,
-    pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_user_data_release,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_response {
     pub size: u32,
     pub fields: u32,
@@ -1185,11 +1185,11 @@ pub struct mln_resource_response {
     pub error_reason: u32,
     pub bytes: *const u8,
     pub byte_count: usize,
-    pub error_message: *const std::ffi::c_char,
+    pub error_message: mln_buffer_view,
     pub must_revalidate: bool,
     pub modified_unix_ms: i64,
     pub expires_unix_ms: i64,
-    pub etag: *const std::ffi::c_char,
+    pub etag: mln_buffer_view,
     pub retry_after_unix_ms: i64,
 }
 #[repr(C)]
@@ -1197,15 +1197,15 @@ pub struct mln_resource_response {
 pub struct mln_resource_rewrite_rule {
     pub kinds: u32,
     pub flags: u32,
-    pub url: *const std::ffi::c_char,
-    pub replacement_url: *const std::ffi::c_char,
+    pub url: mln_buffer_view,
+    pub replacement_url: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_route {
     pub kinds: u32,
     pub flags: u32,
-    pub url: *const std::ffi::c_char,
+    pub url: mln_buffer_view,
     pub url_stage: u32,
 }
 #[repr(C)]
@@ -1222,7 +1222,7 @@ pub struct mln_resource_transform {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_transform_response {
     pub size: u32,
-    pub url: *const std::ffi::c_char,
+    pub url: mln_buffer_view,
     pub context: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -1289,8 +1289,8 @@ pub struct mln_runtime_event_tile_action {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_options {
     pub size: u32,
-    pub asset_path: *const std::ffi::c_char,
-    pub cache_path: *const std::ffi::c_char,
+    pub asset_path: mln_buffer_view,
+    pub cache_path: mln_buffer_view,
     pub event_mask: u64,
     pub event_wake: mln_wake,
 }
@@ -1642,15 +1642,15 @@ pub struct mln_render_session(pub u64);
 pub type mln_resource_provider_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
-        request: *const mln_resource_request,
-        handle: mln_resource_request_handle,
+        request: *const mln_resource_request_info,
+        handle: mln_resource_request,
     ) -> u32,
 >;
-pub type mln_resource_request_cancel_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_resource_request_handle(pub u64);
+pub struct mln_resource_request(pub u64);
+pub type mln_resource_request_cancel_callback =
+    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_resource_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
@@ -1674,7 +1674,7 @@ native_handles!(
     mln_map_projection,
     mln_render_frame_batch,
     mln_render_session,
-    mln_resource_request_handle,
+    mln_resource_request,
     mln_runtime
 );
 
@@ -1714,7 +1714,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_release(
-        frame: *mut mln_acquired_frame,
+        frame: mln_acquired_frame,
         consumer_completion: *const mln_gpu_sync,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -1752,15 +1752,13 @@ unsafe extern "C" {
         out_data: *mut mln_geojson_source_data,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_geojson_source_data_destroy(data: mln_geojson_source_data);
+    pub fn mln_geojson_source_data_release(data: mln_geojson_source_data);
     pub fn mln_geojson_source_options_default() -> mln_geojson_source_options;
     pub fn mln_gpu_sync_default() -> mln_gpu_sync;
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
-        name: *const std::ffi::c_char,
-        name_size: usize,
-        value: *const std::ffi::c_char,
-        value_size: usize,
+        name: mln_buffer_view,
+        value: mln_buffer_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_lat_lng_for_projected_meters(
@@ -2181,10 +2179,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_options_default() -> mln_map_options;
-    pub fn mln_map_projection_close(
-        projection: mln_map_projection,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_projection_get_camera(
         projection: mln_map_projection,
         out_camera: *mut mln_camera_options,
@@ -2233,6 +2227,10 @@ unsafe extern "C" {
         coordinates: *const mln_lat_lng,
         coordinate_count: usize,
         out_points: *mut mln_screen_point,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_release(
+        projection: mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_set_camera(
@@ -2465,7 +2463,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_set_style_url(
         map: mln_map,
-        url: *const std::ffi::c_char,
+        url: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2541,10 +2539,6 @@ unsafe extern "C" {
         out_projection: *mut mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_destroy(
-        session: mln_render_session,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_session_detach(
         session: mln_render_session,
         completion: *const mln_completion,
@@ -2606,6 +2600,10 @@ unsafe extern "C" {
     pub fn mln_render_session_reduce_memory_use(
         session: mln_render_session,
         completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_release(
+        session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_request_frame(
@@ -2683,34 +2681,33 @@ unsafe extern "C" {
         point: mln_screen_point,
     ) -> mln_rendered_query_geometry;
     pub fn mln_resource_request_complete(
-        handle: mln_resource_request_handle,
+        handle: mln_resource_request,
         response: *const mln_resource_response,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_request_is_cancelled(
-        handle: mln_resource_request_handle,
+        handle: mln_resource_request,
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_request_pass_through(
-        handle: mln_resource_request_handle,
+        handle: mln_resource_request,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_resource_request_release(handle: mln_resource_request_handle);
+    pub fn mln_resource_request_release(handle: mln_resource_request);
     pub fn mln_resource_request_set_cancel_callback(
-        handle: mln_resource_request_handle,
+        handle: mln_resource_request,
         handler: *const mln_resource_request_cancel_handler,
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_request_wait_until_retired(
-        handle: mln_resource_request_handle,
+        handle: mln_resource_request,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_transform_response_set_url(
         response: *mut mln_resource_transform_response,
-        url: *const std::ffi::c_char,
-        url_size: usize,
+        url: mln_buffer_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_runtime_barrier(
@@ -2797,7 +2794,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_runtime_merge_offline_regions(
         runtime: mln_runtime,
-        side_database_path: *const std::ffi::c_char,
+        side_database_path: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

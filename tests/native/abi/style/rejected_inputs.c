@@ -402,7 +402,7 @@ static void empty_views_are_rejected_at_submission(void) {
                      )
   );
 
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

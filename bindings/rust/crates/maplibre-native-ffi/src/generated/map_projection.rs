@@ -8,23 +8,10 @@ native_owner! {
     ///
     /// See `mln_map_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_projection_close(raw, out_diagnostic) });
+    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_projection_release(raw, out_diagnostic) });
 }
 
 impl MapProjectionHandle {
-    /// Closes a standalone projection.
-    ///
-    /// See `mln_map_projection_close` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn close(&self) -> Result<()> {
-        self.inner.close(|projection| {
-            let mut call = Call::new(projection, None);
-            call.status(|projection, out_diagnostic| unsafe {
-                sys::mln_map_projection_close(projection, out_diagnostic)
-            })
-        })
-    }
-
     /// Copies the projection camera into out_camera.
     ///
     /// See `mln_map_projection_get_camera` in the
@@ -197,6 +184,19 @@ impl MapProjectionHandle {
             .into_iter()
             .map(|item| Ok(unsafe { from_native(item) }?))
             .collect::<Result<Vec<_>>>()?)
+    }
+
+    /// Releases a standalone projection.
+    ///
+    /// See `mln_map_projection_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn release(&self) -> Result<()> {
+        self.inner.close(|projection| {
+            let mut call = Call::new(projection, None);
+            call.status(|projection, out_diagnostic| unsafe {
+                sys::mln_map_projection_release(projection, out_diagnostic)
+            })
+        })
     }
 
     /// Applies a camera update to a standalone projection.

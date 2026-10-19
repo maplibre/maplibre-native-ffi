@@ -722,7 +722,7 @@ def coverage(api: Api | BoundApi):
             responses = {
                 parameter.value.element.native
                 for parameter in callback.parameters
-                if parameter.direction in {"out", "inout"} and parameter.value.element
+                if parameter.direction == "out" and parameter.value.element
             }
             for plan in bound.operations:
                 receiver = next(

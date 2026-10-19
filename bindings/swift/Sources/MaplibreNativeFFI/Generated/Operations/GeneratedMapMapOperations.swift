@@ -258,9 +258,9 @@ public extension MapHandle {
   @discardableResult
   func setStyleUrl(url bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand("mln_map_set_style_url") { raw, arena, completion, diagnostic in
-      try mln_map_set_style_url(
+      mln_map_set_style_url(
         raw,
-        arena.cString(bindingArg0),
+        arena.view(bindingArg0),
         completion,
         diagnostic
       )
@@ -367,9 +367,9 @@ public extension MapHandleDiscarding {
   func setStyleUrl(url bindingArg0: String) throws {
     try owner
       .nativeDiscard("mln_map_set_style_url") { raw, arena, diagnostic in
-        try mln_map_set_style_url(
+        mln_map_set_style_url(
           raw,
-          arena.cString(bindingArg0),
+          arena.view(bindingArg0),
           nil,
           diagnostic
         )

@@ -452,7 +452,6 @@ mln_status configure(const settings *options, const hook *events, const request 
         )
         for rejected in (
             'mln_status inspect(settings *out_settings BIND("direction=out"), mln_diagnostic *out_diagnostic);',
-            'mln_status refresh(settings *options BIND("direction=inout"), mln_diagnostic *out_diagnostic);',
             (
                 'BIND("execution=query;result=settings")\n'
                 "mln_status mln_map_settings(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);"
@@ -623,7 +622,7 @@ mln_status capture(payload *out BIND("direction=out"), mln_diagnostic *out_diagn
         source = """
 typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=callback_response");
 typedef void (*answer)(reply *out BIND("direction=out"));
-mln_status reply_set(reply *response BIND("direction=inout"), int value, mln_diagnostic *out_diagnostic);
+mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         response = api.values["reply"].response
@@ -875,7 +874,7 @@ BIND("execution=lifecycle") mln_status attach(
 typedef unsigned long frame BIND("kind=handle;release=release_frame");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
 mln_status release_frame(
-  frame *value BIND("direction=inout;consumes=success"), const sync *consumer, mln_diagnostic *out_diagnostic);
+  frame value BIND("consumes=success"), const sync *consumer, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )

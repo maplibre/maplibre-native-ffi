@@ -318,7 +318,7 @@ def emit_operation(
         and function.name == handle_plan.release
         and handle_plan.release_inputs
     ):
-        declarations, arguments = [], ["&live"]
+        declarations, arguments = [], ["live"]
         for parameter in plan.inputs:
             if parameter.name == plan.receiver:
                 continue
@@ -668,7 +668,7 @@ def emit_operation(
         prologue.insert(0, "var receiverHandle = owner.Handle;")
         args[0] = "receiverHandle"
     arguments = ", ".join(args)
-    prefix = bound.handles[factory].prefix + "_" if factory else None
+    prefix = bound.handles[factory].native + "_" if factory else None
     name = pascal(
         function.name.removeprefix(prefix)
         if prefix and function.name.startswith(prefix)

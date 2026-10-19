@@ -680,8 +680,8 @@ static void a_still_image_reports_that_it_finished(void) {
 // Answers every request with a not-found error, so every resource the library
 // asks for fails without reaching the network.
 static uint32_t deny_every_request(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)user_data;
   (void)request;
@@ -689,7 +689,8 @@ static uint32_t deny_every_request(
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-    .error_message = denied_message,
+    .error_message =
+      (mln_buffer_view){.data = denied_message, .size = strlen(denied_message)},
   };
   (void)mln_resource_request_complete(handle, &response, NULL);
   mln_resource_request_release(handle);
@@ -773,7 +774,10 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .style_url = offline_style_url,
+      .style_url =
+        (mln_buffer_view){
+          .data = offline_style_url, .size = strlen(offline_style_url)
+        },
       .bounds =
         {
           .southwest = {.latitude = 1.0, .longitude = 2.0},

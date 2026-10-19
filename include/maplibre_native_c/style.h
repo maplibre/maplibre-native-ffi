@@ -78,11 +78,6 @@ MLN_API mln_status mln_map_get_global_state(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-typedef uint64_t mln_geojson_source_data MLN_BINDING(
-  "kind=handle;release=mln_geojson_source_data_destroy;"
-  "dispose=mln_geojson_source_data_destroy"
-);
-
 /** Style source type values returned by source metadata queries. */
 typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0,
@@ -859,12 +854,12 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * the diagnostic names the constraint.
  *
  * The prepared data is immutable and independent of any map or runtime.
- * Preparation, installation, and destruction may happen on different threads.
+ * Preparation, installation, and release may happen on different threads.
  *
  * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
- * handle the host releases with mln_geojson_source_data_destroy(). Installing
+ * handle the host releases with mln_geojson_source_data_release(). Installing
  * the data borrows the handle, so one prepared handle may be installed on any
- * number of sources and destroyed at any time afterward.
+ * number of sources and released at any time afterward.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -885,10 +880,10 @@ MLN_API mln_status mln_geojson_source_data_create(
  * Releases prepared GeoJSON source data.
  *
  * Callable from any thread. A null or already-released handle is a no-op.
- * Sources the data was installed on keep their own reference, so destroying
- * the handle never invalidates a source.
+ * Sources the data was installed on keep their own reference, so releasing
+ * the handle preserves each source.
  */
-MLN_API void mln_geojson_source_data_destroy(
+MLN_API void mln_geojson_source_data_release(
   mln_geojson_source_data data
 ) MLN_NOEXCEPT;
 

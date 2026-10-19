@@ -2387,7 +2387,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_url(
                     Handle,
-                    scope.CStringArgument(url),
+                    scope.Utf8(url),
                     completion,
                     diagnostic
                 ),
@@ -3407,7 +3407,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_url(
                         receiverHandle,
-                        scope.CStringArgument(url),
+                        scope.Utf8(url),
                         completion,
                         diagnostic
                     )

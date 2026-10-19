@@ -7,16 +7,24 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-// A C string field rejects an embedded NUL before any native call, while an
-// explicit-length buffer carries the NUL to native unchanged.
-test "strings cross as terminated and explicit-length views" {
+// Host strings cross as views. Native rejects NUL in paths before a C-string
+// consumer reads them, while other views preserve NUL.
+test "host strings use views and native-lent strings decode" {
+    const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".params[1].type.?;
+    var raw_request = std.mem.zeroes(RawRequest);
+    raw_request.resolved_url = "custom://native-lent/é";
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const request = try maplibre.ResourceRequestInfo.fromNative(arena.allocator(), raw_request);
+    try testing.expectEqualStrings("custom://native-lent/é", request.resolved_url.?);
+
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
     options.value.asset_path = "asset\x00path";
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidString, maplibre.runtimeCreate(testing.allocator, options.value, &diagnostic));
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try testing.expectEqualStrings("the string contains a NUL byte", diagnostic.message());
+    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(testing.allocator, options.value, &diagnostic));
+    try testing.expect(diagnostic.raw_status != null);
+    try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -162,7 +170,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     const projection = try maplibre.mapCreateProjection(fixture.map, null);
-    defer maplibre.mapProjectionClose(projection, null) catch unreachable;
+    defer maplibre.mapProjectionRelease(projection, null) catch unreachable;
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
     defer points.deinit();

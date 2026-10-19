@@ -339,7 +339,8 @@ static const void* mln_delivery_copy_case_offline_region_info_value(
   values[0].id = 1;
   values[0].definition.size = sizeof(values[0].definition);
   values[0].definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
-  values[0].definition.data.tile_pyramid.style_url = text_2;
+  values[0].definition.data.tile_pyramid.style_url.data = text_2;
+  values[0].definition.data.tile_pyramid.style_url.size = sizeof(text_2) - 1;
   values[0].definition.data.tile_pyramid.bounds.southwest.latitude = 3.5;
   values[0].definition.data.tile_pyramid.bounds.southwest.longitude = 4.5;
   values[0].definition.data.tile_pyramid.bounds.northeast.latitude = 5.5;
@@ -353,7 +354,8 @@ static const void* mln_delivery_copy_case_offline_region_info_value(
   values[1].id = 11;
   values[1].definition.size = sizeof(values[1].definition);
   values[1].definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
-  values[1].definition.data.tile_pyramid.style_url = text_12;
+  values[1].definition.data.tile_pyramid.style_url.data = text_12;
+  values[1].definition.data.tile_pyramid.style_url.size = sizeof(text_12) - 1;
   values[1].definition.data.tile_pyramid.bounds.southwest.latitude = 13.5;
   values[1].definition.data.tile_pyramid.bounds.southwest.longitude = 14.5;
   values[1].definition.data.tile_pyramid.bounds.northeast.latitude = 15.5;
@@ -383,7 +385,7 @@ static bool mln_delivery_copy_case_offline_region_info_matches(
       copy[index].definition.type != MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
     )
       return false;
-    if (!mln_delivery_copy_case_string(
+    if (!mln_delivery_copy_case_view(
           copy[index].definition.data.tile_pyramid.style_url,
           source[index].definition.data.tile_pyramid.style_url
         ))

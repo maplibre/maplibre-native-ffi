@@ -52,9 +52,13 @@ pub const EventBatch = owner.Handle("mln_event_batch", "EventBatch", struct {
         c.mln_event_batch_release(raw);
     }
 }.dispose);
+/// Prepared GeoJSON data that sources retain independently of its handle.
+///
+/// See `mln_geojson_source_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", "GeojsonSourceData", struct {
     fn dispose(raw: u64) status.Error!void {
-        c.mln_geojson_source_data_destroy(raw);
+        c.mln_geojson_source_data_release(raw);
     }
 }.dispose);
 /// A map, which holds map state independent of any render target.
@@ -72,7 +76,7 @@ pub const Map = owner.Handle("mln_map", "Map", struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const MapProjection = owner.Handle("mln_map_projection", "MapProjection", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.call(c.mln_map_projection_close, .{raw}, null);
+        try status.call(c.mln_map_projection_release, .{raw}, null);
     }
 }.dispose);
 /// An owned batch of frame results from one drain.
@@ -95,9 +99,9 @@ pub const RenderSession = owner.Handle("mln_render_session", "RenderSession", st
 }.dispose);
 /// A resource request that a resource provider handles.
 ///
-/// See `mln_resource_request_handle` in the
+/// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", "ResourceRequestHandle", struct {
+pub const ResourceRequest = owner.Handle("mln_resource_request", "ResourceRequest", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_resource_request_release(raw);
     }
@@ -1310,17 +1314,18 @@ pub const HttpHeader = struct {
     name: []const u8 = &.{},
     value: []const u8 = &.{},
     pub fn toNative(self: HttpHeader, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_http_header);
-        raw.name = try marshal.cString(allocator, self.name);
-        raw.value = try marshal.cString(allocator, self.value);
+        raw.name = marshal.view(self.name);
+        raw.value = marshal.view(self.value);
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header) status.Error!HttpHeader {
         return .{
-            .name = try allocator.dupe(u8, std.mem.span(raw.name orelse return error.NativeError)),
-            .value = try allocator.dupe(u8, std.mem.span(raw.value orelse return error.NativeError)),
+            .name = try marshal.copyView(allocator, raw.name),
+            .value = try marshal.copyView(allocator, raw.value),
         };
     }
 };
@@ -1343,7 +1348,7 @@ pub const HttpHeaderRule = struct {
         var raw = std.mem.zeroes(c.mln_http_header_rule);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
-        raw.url = try marshal.cString(allocator, self.url);
+        raw.url = marshal.view(self.url);
         raw.headers = blk: {
             const items = try allocator.alloc(c.mln_http_header, self.headers.len);
             for (self.headers, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
@@ -1357,7 +1362,7 @@ pub const HttpHeaderRule = struct {
         return .{
             .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
-            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+            .url = try marshal.copyView(allocator, raw.url),
             .headers = blk: {
                 const copied = try allocator.alloc(HttpHeader, raw.header_count);
                 for (try marshal.nativeSlice(c.mln_http_header, raw.headers, raw.header_count), 0..) |item, index| copied[index] = try HttpHeader.fromNative(allocator, item);
@@ -2125,9 +2130,10 @@ pub const OfflineGeometryRegionDefinition = struct {
     pixel_ratio: f32 = std.mem.zeroes(f32),
     include_ideographs: bool = std.mem.zeroes(bool),
     pub fn toNative(self: OfflineGeometryRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_geometry_region_definition {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_offline_geometry_region_definition);
-        raw.style_url = try marshal.cString(allocator, self.style_url);
+        raw.style_url = marshal.view(self.style_url);
         raw.geometry = marshal.view(self.geometry);
         raw.min_zoom = self.min_zoom;
         raw.max_zoom = self.max_zoom;
@@ -2138,7 +2144,7 @@ pub const OfflineGeometryRegionDefinition = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_offline_geometry_region_definition) status.Error!OfflineGeometryRegionDefinition {
         return .{
-            .style_url = try allocator.dupe(u8, std.mem.span(raw.style_url orelse return error.NativeError)),
+            .style_url = try marshal.copyView(allocator, raw.style_url),
             .geometry = try marshal.copyView(allocator, raw.geometry),
             .min_zoom = raw.min_zoom,
             .max_zoom = raw.max_zoom,
@@ -2297,9 +2303,10 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     pixel_ratio: f32 = std.mem.zeroes(f32),
     include_ideographs: bool = std.mem.zeroes(bool),
     pub fn toNative(self: OfflineTilePyramidRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_tile_pyramid_region_definition {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_offline_tile_pyramid_region_definition);
-        raw.style_url = try marshal.cString(allocator, self.style_url);
+        raw.style_url = marshal.view(self.style_url);
         raw.bounds = self.bounds.toNative();
         raw.min_zoom = self.min_zoom;
         raw.max_zoom = self.max_zoom;
@@ -2310,7 +2317,7 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_offline_tile_pyramid_region_definition) status.Error!OfflineTilePyramidRegionDefinition {
         return .{
-            .style_url = try allocator.dupe(u8, std.mem.span(raw.style_url orelse return error.NativeError)),
+            .style_url = try marshal.copyView(allocator, raw.style_url),
             .bounds = LatLngBounds.fromNative(raw.bounds),
             .min_zoom = raw.min_zoom,
             .max_zoom = raw.max_zoom,
@@ -3519,7 +3526,7 @@ pub const ResourcePriority = enum(u32) {
 pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (?*anyopaque, ResourceRequest, ResourceRequestHandle) status.Error!ResourceProviderDecision = null,
+    callback: ?*const fn (?*anyopaque, ResourceRequestInfo, ResourceRequest) status.Error!ResourceProviderDecision = null,
     /// The requests that reach the provider; empty to claim every request.
     routes: []const ResourceRoute = &.{},
     pub fn toNative(self: ResourceProvider, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_provider {
@@ -3549,12 +3556,12 @@ pub const ResourceProvider = struct {
                 var scope: callback.Scope = .{};
                 scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_2);
                 defer scope.leave();
-                const request = try ResourceRequestHandle.beginDecision(callback_arg_2);
+                const request = try ResourceRequest.beginDecision(callback_arg_2);
                 errdefer _ = request.finishDecision(false);
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
-                const result = host(state.value.context, try ResourceRequest.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), request) catch |err| {
+                const result = host(state.value.context, try ResourceRequestInfo.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), request) catch |err| {
                     callback.reportError("mln_resource_provider_callback", err);
                     return if (request.finishDecision(false)) c.MLN_RESOURCE_PROVIDER_DECISION_HANDLE else c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
                 };
@@ -3594,64 +3601,6 @@ pub const ResourceRange = struct {
         return .{
             .start = raw.start,
             .end = raw.end,
-        };
-    }
-};
-
-pub const ResourceRequest = struct {
-    /// URL entering the network layer, before tile server normalization. Copied
-    /// text, owned by the caller.
-    requested_url: ?[]const u8 = null,
-    /// URL to fetch, after resource-kind normalization against the runtime's
-    /// tile server options and API key. Copied text, owned by the caller.
-    resolved_url: ?[]const u8 = null,
-    kind: ResourceKind = std.mem.zeroes(ResourceKind),
-    loading_method: ResourceLoadingMethod = std.mem.zeroes(ResourceLoadingMethod),
-    priority: ResourcePriority = std.mem.zeroes(ResourcePriority),
-    usage: ResourceUsage = std.mem.zeroes(ResourceUsage),
-    storage_policy: ResourceStoragePolicy = std.mem.zeroes(ResourceStoragePolicy),
-    range: ?ResourceRange = null,
-    prior_modified_unix_ms: ?i64 = null,
-    prior_expires_unix_ms: ?i64 = null,
-    /// Copied text, owned by the caller.
-    prior_etag: ?[]const u8 = null,
-    /// Copied bytes, owned by the caller.
-    prior_data: []const u8 = &.{},
-    pub fn toNative(self: ResourceRequest, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_resource_request);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_resource_request);
-        raw.requested_url = if (self.requested_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.resolved_url = if (self.resolved_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.kind = self.kind.toNative();
-        raw.loading_method = self.loading_method.toNative();
-        raw.priority = self.priority.toNative();
-        raw.usage = self.usage.toNative();
-        raw.storage_policy = self.storage_policy.toNative();
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_RANGE, &raw.range, self.range);
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
-        raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.prior_data = @ptrCast(self.prior_data.ptr);
-        raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request) status.Error!ResourceRequest {
-        return .{
-            .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
-            .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
-            .kind = ResourceKind.fromNative(raw.kind),
-            .loading_method = ResourceLoadingMethod.fromNative(raw.loading_method),
-            .priority = ResourcePriority.fromNative(raw.priority),
-            .usage = ResourceUsage.fromNative(raw.usage),
-            .storage_policy = ResourceStoragePolicy.fromNative(raw.storage_policy),
-            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
-            .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
-            .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
-            .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
-            .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
         };
     }
 };
@@ -3698,7 +3647,7 @@ pub const ResourceRequestCancelHandler = struct {
     }
 };
 
-/// Field mask values for `mln_resource_request`.
+/// Field mask values for `mln_resource_request_info`.
 ///
 /// See `mln_resource_request_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3719,6 +3668,64 @@ pub const ResourceRequestField = struct {
     pub const unionWith = methods.unionWith;
 };
 
+pub const ResourceRequestInfo = struct {
+    /// URL entering the network layer, before tile server normalization. Copied
+    /// text, owned by the caller.
+    requested_url: ?[]const u8 = null,
+    /// URL to fetch, after resource-kind normalization against the runtime's
+    /// tile server options and API key. Copied text, owned by the caller.
+    resolved_url: ?[]const u8 = null,
+    kind: ResourceKind = std.mem.zeroes(ResourceKind),
+    loading_method: ResourceLoadingMethod = std.mem.zeroes(ResourceLoadingMethod),
+    priority: ResourcePriority = std.mem.zeroes(ResourcePriority),
+    usage: ResourceUsage = std.mem.zeroes(ResourceUsage),
+    storage_policy: ResourceStoragePolicy = std.mem.zeroes(ResourceStoragePolicy),
+    range: ?ResourceRange = null,
+    prior_modified_unix_ms: ?i64 = null,
+    prior_expires_unix_ms: ?i64 = null,
+    /// Copied text, owned by the caller.
+    prior_etag: ?[]const u8 = null,
+    /// Copied bytes, owned by the caller.
+    prior_data: []const u8 = &.{},
+    pub fn toNative(self: ResourceRequestInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request_info {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_resource_request_info);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_resource_request_info);
+        raw.requested_url = if (self.requested_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.resolved_url = if (self.resolved_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.kind = self.kind.toNative();
+        raw.loading_method = self.loading_method.toNative();
+        raw.priority = self.priority.toNative();
+        raw.usage = self.usage.toNative();
+        raw.storage_policy = self.storage_policy.toNative();
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_RANGE, &raw.range, self.range);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
+        raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.prior_data = @ptrCast(self.prior_data.ptr);
+        raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request_info) status.Error!ResourceRequestInfo {
+        return .{
+            .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
+            .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
+            .kind = ResourceKind.fromNative(raw.kind),
+            .loading_method = ResourceLoadingMethod.fromNative(raw.loading_method),
+            .priority = ResourcePriority.fromNative(raw.priority),
+            .usage = ResourceUsage.fromNative(raw.usage),
+            .storage_policy = ResourceStoragePolicy.fromNative(raw.storage_policy),
+            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
+            .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
+            .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
+            .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
+            .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
+        };
+    }
+};
+
 /// A resource provider's answer to one request.
 ///
 /// See `mln_resource_response` in the
@@ -3735,6 +3742,7 @@ pub const ResourceResponse = struct {
     etag: ?[]const u8 = null,
     retry_after_unix_ms: ?i64 = null,
     pub fn toNative(self: ResourceResponse, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_response {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_response);
         raw.fields = 0;
@@ -3743,11 +3751,11 @@ pub const ResourceResponse = struct {
         raw.error_reason = self.error_reason.toNative();
         raw.bytes = @ptrCast(self.bytes.ptr);
         raw.byte_count = std.math.cast(@TypeOf(raw.byte_count), self.bytes.len) orelse return error.InvalidArgument;
-        raw.error_message = if (self.error_message) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.error_message = if (self.error_message) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.must_revalidate = self.must_revalidate;
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, self.modified_unix_ms);
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, self.expires_unix_ms);
-        raw.etag = if (self.etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.etag = if (self.etag) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
         return raw;
     }
@@ -3757,11 +3765,11 @@ pub const ResourceResponse = struct {
             .status = ResourceResponseStatus.fromNative(raw.status),
             .error_reason = ResourceErrorReason.fromNative(raw.error_reason),
             .bytes = try marshal.copyView(allocator, .{ .data = raw.bytes, .size = raw.byte_count }),
-            .error_message = if (raw.error_message == null) null else try allocator.dupe(u8, std.mem.span(raw.error_message orelse return error.NativeError)),
+            .error_message = if (raw.error_message.size == 0) null else try marshal.copyView(allocator, raw.error_message),
             .must_revalidate = raw.must_revalidate,
             .modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_MODIFIED != 0) raw.modified_unix_ms else null,
             .expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_EXPIRES != 0) raw.expires_unix_ms else null,
-            .etag = if (raw.etag == null) null else try allocator.dupe(u8, std.mem.span(raw.etag orelse return error.NativeError)),
+            .etag = if (raw.etag.size == 0) null else try marshal.copyView(allocator, raw.etag),
             .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
@@ -3813,15 +3821,16 @@ pub const ResourceRewriteRule = struct {
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
-    /// The replacement URL, or null to keep the URL and stop the search.
+    /// The replacement URL, or empty to keep the URL and stop the search.
     replacement_url: ?[]const u8 = null,
     pub fn toNative(self: ResourceRewriteRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_rewrite_rule {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_rewrite_rule);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
-        raw.url = try marshal.cString(allocator, self.url);
-        raw.replacement_url = if (self.replacement_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.url = marshal.view(self.url);
+        raw.replacement_url = if (self.replacement_url) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         return raw;
     }
 
@@ -3829,8 +3838,8 @@ pub const ResourceRewriteRule = struct {
         return .{
             .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
-            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
-            .replacement_url = if (raw.replacement_url == null) null else try allocator.dupe(u8, std.mem.span(raw.replacement_url orelse return error.NativeError)),
+            .url = try marshal.copyView(allocator, raw.url),
+            .replacement_url = if (raw.replacement_url.size == 0) null else try marshal.copyView(allocator, raw.replacement_url),
         };
     }
 };
@@ -3849,11 +3858,12 @@ pub const ResourceRoute = struct {
     /// The URL stage to compare.
     url_stage: ResourceRouteUrl = std.mem.zeroes(ResourceRouteUrl),
     pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
+        _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_route);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
-        raw.url = try marshal.cString(allocator, self.url);
+        raw.url = marshal.view(self.url);
         raw.url_stage = self.url_stage.toNative();
         return raw;
     }
@@ -3862,7 +3872,7 @@ pub const ResourceRoute = struct {
         return .{
             .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
-            .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+            .url = try marshal.copyView(allocator, raw.url),
             .url_stage = ResourceRouteUrl.fromNative(raw.url_stage),
         };
     }
@@ -4295,9 +4305,9 @@ pub const RuntimeEventType = enum(u32) {
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeOptions = struct {
-    /// Directory root for asset:// URLs. Copied during runtime creation. Null
-    /// or empty selects `/android_asset` on Android and `.` elsewhere. Copied
-    /// text, owned by the caller.
+    /// Directory root for asset:// URLs. Copied during runtime creation. Empty
+    /// selects `/android_asset` on Android and `.` elsewhere. Copied text,
+    /// owned by the caller.
     asset_path: ?[]const u8 = null,
     /// Cache database path. Copied during runtime creation. Copied text, owned
     /// by the caller.
@@ -4310,8 +4320,8 @@ pub const RuntimeOptions = struct {
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
         var raw = c.mln_runtime_options_default();
         raw.size = @sizeOf(c.mln_runtime_options);
-        raw.asset_path = if (self.asset_path) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.cache_path = if (self.cache_path) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
+        raw.asset_path = if (self.asset_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
+        raw.cache_path = if (self.cache_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.event_mask = self.event_mask.toNative();
         raw.event_wake = try self.event_wake.toNative(allocator, roots);
         return raw;
@@ -4319,8 +4329,8 @@ pub const RuntimeOptions = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_options) status.Error!RuntimeOptions {
         return .{
-            .asset_path = if (raw.asset_path == null) null else try allocator.dupe(u8, std.mem.span(raw.asset_path orelse return error.NativeError)),
-            .cache_path = if (raw.cache_path == null) null else try allocator.dupe(u8, std.mem.span(raw.cache_path orelse return error.NativeError)),
+            .asset_path = if (raw.asset_path.size == 0) null else try marshal.copyView(allocator, raw.asset_path),
+            .cache_path = if (raw.cache_path.size == 0) null else try marshal.copyView(allocator, raw.cache_path),
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
             .event_wake = .{},
         };
@@ -6112,10 +6122,10 @@ pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, o
 
 /// Releases prepared GeoJSON source data.
 ///
-/// See `mln_geojson_source_data_destroy` in the
+/// See `mln_geojson_source_data_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geojsonSourceDataDestroy(data: GeojsonSourceData) status.Error!void {
-    return call.direct("mln_geojson_source_data_destroy", .close, data, void, null, .{});
+pub fn geojsonSourceDataRelease(data: GeojsonSourceData) status.Error!void {
+    return call.direct("mln_geojson_source_data_release", .close, data, void, null, .{});
 }
 
 /// Returns default GeoJSON source options.
@@ -6139,7 +6149,7 @@ pub fn gpuSyncDefault() status.Error!GpuSync {
 /// See `mln_http_header_transform_response_set_header` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn httpHeaderTransformResponseSetHeader(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_http_header_transform_response_set_header", .scoped, response, null, diagnostic, .{ name, name.len, value, value.len });
+    return call.invoke("mln_http_header_transform_response_set_header", .scoped, response, null, diagnostic, .{ name, value });
 }
 
 /// Converts spherical Mercator projected meters to a geographic coordinate.
@@ -6678,14 +6688,6 @@ pub fn mapOptionsDefault() status.Error!MapOptions {
     return call.direct("mln_map_options_default", .none, {}, MapOptions, null, .{});
 }
 
-/// Closes a standalone projection.
-///
-/// See `mln_map_projection_close` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionClose(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_map_projection_close", .close, projection, null, diagnostic, .{});
-}
-
 /// Copies the projection camera into out_camera.
 ///
 /// See `mln_map_projection_get_camera` in the
@@ -6749,6 +6751,14 @@ pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const ScreenPoint) {
     return call.invoke("mln_map_projection_pixels_for_lat_lngs", .borrow, projection, allocator, diagnostic, .{ coordinates, coordinates.len, call.outArray(ScreenPoint, call.len(coordinates)) });
+}
+
+/// Releases a standalone projection.
+///
+/// See `mln_map_projection_release` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionRelease(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_map_projection_release", .close, projection, null, diagnostic, .{});
 }
 
 /// Applies a camera update to a standalone projection.
@@ -7035,8 +7045,8 @@ pub fn mapSetStyleTransitionOptions(allocator: std.mem.Allocator, map: Map, opti
 ///
 /// See `mln_map_set_style_url` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapSetStyleUrl(allocator: std.mem.Allocator, map: Map, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_style_url", .lease, map, call.command, allocator, diagnostic, .{call.cString(url)});
+pub fn mapSetStyleUrl(map: Map, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_url", .lease, map, call.command, null, diagnostic, .{url});
 }
 
 /// Submits a copied tile-options command.
@@ -7257,17 +7267,6 @@ pub fn renderSessionCreateProjection(session: RenderSession, diagnostic: ?*diagn
     return call.invoke("mln_render_session_create_projection", .lease, session, null, diagnostic, .{call.adopt(MapProjection, .none)});
 }
 
-/// Retires a detached or abandoned session handle. The call is CPU-only and may
-/// run on any native thread, including from one of the session's own
-/// completions. If an abandonment is still in progress on another thread, this
-/// waits for it to finish before consuming the session owner.
-///
-/// See `mln_render_session_destroy` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionDestroy(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_render_session_destroy", .close, session, null, diagnostic, .{});
-}
-
 /// Starts normal graphics-owner teardown and map detachment.
 ///
 /// See `mln_render_session_detach` in the
@@ -7358,6 +7357,17 @@ pub fn renderSessionReadTexture(allocator: std.mem.Allocator, session: RenderSes
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn renderSessionReduceMemoryUse(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_render_session_reduce_memory_use", .lease, session, call.unit, null, diagnostic, .{});
+}
+
+/// Retires a detached or abandoned session handle. The call is CPU-only and may
+/// run on any native thread, including from one of the session's own
+/// completions. If an abandonment is still in progress on another thread, this
+/// waits for it to finish before consuming the session owner.
+///
+/// See `mln_render_session_release` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub fn renderSessionRelease(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_render_session_release", .close, session, null, diagnostic, .{});
 }
 
 /// Requests a frame without waiting. Every accepted demand produces one
@@ -7497,7 +7507,7 @@ pub fn renderedQueryGeometryPoint(allocator: std.mem.Allocator, point: ScreenPoi
 ///
 /// See `mln_resource_request_complete` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceRequestHandle, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceRequest, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_resource_request_complete", .complete, handle, allocator, diagnostic, .{response});
 }
 
@@ -7505,7 +7515,7 @@ pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceReq
 ///
 /// See `mln_resource_request_is_cancelled` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestIsCancelled(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+pub fn resourceRequestIsCancelled(handle: ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     return call.invoke("mln_resource_request_is_cancelled", .lease, handle, null, diagnostic, .{call.out(bool)});
 }
 
@@ -7513,7 +7523,7 @@ pub fn resourceRequestIsCancelled(handle: ResourceRequestHandle, diagnostic: ?*d
 ///
 /// See `mln_resource_request_pass_through` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestPassThrough(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn resourceRequestPassThrough(handle: ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_resource_request_pass_through", .complete, handle, null, diagnostic, .{});
 }
 
@@ -7521,7 +7531,7 @@ pub fn resourceRequestPassThrough(handle: ResourceRequestHandle, diagnostic: ?*d
 ///
 /// See `mln_resource_request_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestRelease(handle: ResourceRequestHandle) status.Error!void {
+pub fn resourceRequestRelease(handle: ResourceRequest) status.Error!void {
     return call.direct("mln_resource_request_release", .close, handle, void, null, .{});
 }
 
@@ -7530,7 +7540,7 @@ pub fn resourceRequestRelease(handle: ResourceRequestHandle) status.Error!void {
 ///
 /// See `mln_resource_request_set_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequestHandle, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequest, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
 }
 
@@ -7540,7 +7550,7 @@ pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: Re
 ///
 /// See `mln_resource_request_wait_until_retired` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn resourceRequestWaitUntilRetired(handle: ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_resource_request_wait_until_retired", .issued, handle, null, diagnostic, .{});
 }
 
@@ -7550,7 +7560,7 @@ pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle, diagnostic
 /// See `mln_resource_transform_response_set_url` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_resource_transform_response_set_url", .scoped, response, null, diagnostic, .{ url, url.len });
+    return call.invoke("mln_resource_transform_response_set_url", .scoped, response, null, diagnostic, .{url});
 }
 
 /// Starts an ordered runtime barrier.
@@ -7678,7 +7688,7 @@ pub fn runtimeListOfflineRegions(allocator: std.mem.Allocator, runtime: Runtime,
 /// See `mln_runtime_merge_offline_regions` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn runtimeMergeOfflineRegions(allocator: std.mem.Allocator, runtime: Runtime, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
-    return call.submit("mln_runtime_merge_offline_regions", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{call.cString(side_database_path)});
+    return call.submit("mln_runtime_merge_offline_regions", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{side_database_path});
 }
 
 /// Returns runtime options initialized for this C API version.
@@ -8129,9 +8139,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_style_transition_options", .lease, map, allocator, diagnostic, .{options});
     }
 
-    pub fn setStyleUrl(self: MapDiscarding, allocator: std.mem.Allocator, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setStyleUrl(self: MapDiscarding, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_style_url", .lease, map, allocator, diagnostic, .{call.cString(url)});
+        return call.discard("mln_map_set_style_url", .lease, map, null, diagnostic, .{url});
     }
 
     pub fn setTileOptions(self: MapDiscarding, allocator: std.mem.Allocator, options: MapTileOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

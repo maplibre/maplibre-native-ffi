@@ -123,7 +123,7 @@ app_error render_session_finish_attach(
   awaited_completion_deinit(attached);
   if (status != MLN_STATUS_OK) {
     abandon(session);
-    (void)mln_render_session_destroy(session->handle, NULL);
+    (void)mln_render_session_release(session->handle, NULL);
     session->handle = MLN_HANDLE_NULL;
     return log_failure(
       APP_ERROR_ATTACH_FAILED, "render target attach failed", status, NULL
@@ -153,7 +153,7 @@ void render_session_close(render_session* session) {
   if (!detached) {
     abandon(session);
   }
-  (void)mln_render_session_destroy(session->handle, NULL);
+  (void)mln_render_session_release(session->handle, NULL);
   *session = (render_session){.handle = MLN_HANDLE_NULL};
 }
 
@@ -280,9 +280,11 @@ void render_session_release_frame(mln_acquired_frame* frame) {
   mln_gpu_sync sync = mln_gpu_sync_default();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
-    mln_acquired_frame_release(frame, &sync, &diagnostic);
+    mln_acquired_frame_release(*frame, &sync, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("texture release failed", status, &diagnostic);
+  } else {
+    *frame = MLN_HANDLE_NULL;
   }
 }
 

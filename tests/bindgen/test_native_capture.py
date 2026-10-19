@@ -138,7 +138,7 @@ DELIVERY_TEST = r"""
 #include <cstring>
 #include "delivery/capture.hpp"
 static unsigned releases = 0;
-extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept { ++releases; }
+extern "C" void mln_resource_request_release(mln_resource_request) noexcept { ++releases; }
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
 
 template <class T, class Capture>
@@ -162,7 +162,7 @@ int main() {
   assert(releases == 0);
 
   char url[] = "custom://style.json";
-  mln_resource_request request{};
+  mln_resource_request_info request{};
   request.requested_url = url;
   const mln_resource_request_delivery provided{&request, 9};
   const auto arguments = copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
@@ -203,7 +203,7 @@ void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 #include "delivery/delivery_queue.hpp"
 static unsigned disposed = 0;
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
-extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept {}
+extern "C" void mln_resource_request_release(mln_resource_request) noexcept {}
 
 // Copies count values into one allocation, as a queued completion does.
 template <class T>
@@ -304,7 +304,7 @@ FIXTURE_TEST = r"""
 #include "delivery/delivery_queue.hpp"
 #include <cassert>
 extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
-extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept {}
+extern "C" void mln_resource_request_release(mln_resource_request) noexcept {}
 static auto copy(const mln_capture_fixture& input) -> const mln_capture_fixture* {
   const auto& capture = mln::delivery::completion_capture<mln_capture_fixture>;
   mln::delivery::Arena<false> measure{nullptr, 0};

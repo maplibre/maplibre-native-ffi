@@ -70,7 +70,7 @@ typedef struct mln_test_provider_request {
   char prior_etag[64];
   size_t prior_data_size;
   // Set for a held resource; the case completes and releases it.
-  mln_resource_request_handle handle;
+  mln_resource_request handle;
 } mln_test_provider_request;
 
 #define MLN_TEST_PROVIDER_REQUEST_CAPACITY 64

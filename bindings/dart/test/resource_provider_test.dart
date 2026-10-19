@@ -113,7 +113,7 @@ void main() {
 
   test('a provider answers a request after its callback returns', () async {
     const styleUrl = 'custom://deferred-style.json';
-    final handed = Completer<(ResourceRequest, ResourceRequestHandle)>();
+    final handed = Completer<(ResourceRequestInfo, ResourceRequestHandle)>();
     final fixture = await openRuntime(
       provider: routedProvider([
         styleRoute(styleUrl),

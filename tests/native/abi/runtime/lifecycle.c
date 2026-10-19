@@ -190,7 +190,7 @@ static void style_functions_reject_null_inputs(void) {
   );
   MLN_TEST_INVALID(mln_test_map_set_style_url(map, NULL));
   TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(mln_test_last_error(), "url must not be null"), mln_test_last_error()
+    strstr(mln_test_last_error(), "url has null data"), mln_test_last_error()
   );
 
   // A rejected style read never invokes or releases the completion, so the

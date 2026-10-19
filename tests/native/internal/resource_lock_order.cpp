@@ -88,7 +88,7 @@ auto blocking_transform(
 ) -> mln_status {
   static_cast<void>(kind);
   auto& transform = *static_cast<BlockingTransform*>(user_data);
-  if (out_response != nullptr) out_response->url = nullptr;
+  if (out_response != nullptr) out_response->url = {};
   if (
     transform.only_url != nullptr &&
     (url == nullptr || std::strstr(url, transform.only_url) == nullptr)
@@ -156,8 +156,8 @@ struct LookupProvider {
 };
 
 auto lookup_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(handle);
   auto& provider = *static_cast<LookupProvider*>(user_data);
@@ -256,8 +256,8 @@ struct ParkedProvider {
 };
 
 auto parked_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(request);
   static_cast<void>(handle);

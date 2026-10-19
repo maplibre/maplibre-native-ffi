@@ -269,7 +269,7 @@ func installProvider(
     let style = Data(#"""
     {"version":8,"sources":{},"layers":[],"sprite":"custom://routed/sprite"}
     """#.utf8)
-    let seen = LockedBox<[ResourceRequest]>([])
+    let seen = LockedBox<[ResourceRequestInfo]>([])
     try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
       callback: { request, handle in
         seen.update { $0.append(request) }

@@ -16,7 +16,7 @@ typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
 typedef mln_render_frame_batch = Uint64;
 typedef mln_render_session = Uint64;
-typedef mln_resource_request_handle = Uint64;
+typedef mln_resource_request = Uint64;
 typedef mln_runtime = Uint64;
 
 typedef mln_camera_transition_end_callback =
@@ -64,8 +64,8 @@ typedef mln_resource_provider_callback =
 typedef mln_resource_provider_callbackFunction =
     Uint32 Function(
       Pointer<Void> user_data,
-      Pointer<mln_resource_request> request,
-      mln_resource_request_handle handle,
+      Pointer<mln_resource_request_info> request,
+      mln_resource_request handle,
     );
 typedef mln_resource_request_cancel_callback =
     Pointer<NativeFunction<mln_resource_request_cancel_callbackFunction>>;
@@ -431,8 +431,8 @@ final class mln_gpu_sync extends Struct {
 }
 
 final class mln_http_header extends Struct {
-  external Pointer<Char> name;
-  external Pointer<Char> value;
+  external mln_buffer_view name;
+  external mln_buffer_view value;
 }
 
 final class mln_http_header_rule extends Struct {
@@ -440,7 +440,7 @@ final class mln_http_header_rule extends Struct {
   external int kinds;
   @Uint32()
   external int flags;
-  external Pointer<Char> url;
+  external mln_buffer_view url;
   external Pointer<mln_http_header> headers;
   @Size()
   external int header_count;
@@ -651,7 +651,7 @@ final class mln_metal_texture_frame extends Struct {
 }
 
 final class mln_offline_geometry_region_definition extends Struct {
-  external Pointer<Char> style_url;
+  external mln_buffer_view style_url;
   external mln_buffer_view geometry;
   @Double()
   external double min_zoom;
@@ -707,7 +707,7 @@ final class mln_offline_region_status extends Struct {
 }
 
 final class mln_offline_tile_pyramid_region_definition extends Struct {
-  external Pointer<Char> style_url;
+  external mln_buffer_view style_url;
   external mln_lat_lng_bounds bounds;
   @Double()
   external double min_zoom;
@@ -1010,7 +1010,21 @@ final class mln_resource_range extends Struct {
   external int end;
 }
 
-final class mln_resource_request extends Struct {
+final class mln_resource_request_cancel_handler extends Struct {
+  @Uint32()
+  external int size;
+  external mln_resource_request_cancel_callback callback;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
+}
+
+final class mln_resource_request_delivery extends Struct {
+  external Pointer<mln_resource_request_info> request;
+  @Uint64()
+  external int handle;
+}
+
+final class mln_resource_request_info extends Struct {
   @Uint32()
   external int size;
   @Uint32()
@@ -1038,20 +1052,6 @@ final class mln_resource_request extends Struct {
   external int prior_data_size;
 }
 
-final class mln_resource_request_cancel_handler extends Struct {
-  @Uint32()
-  external int size;
-  external mln_resource_request_cancel_callback callback;
-  external Pointer<Void> user_data;
-  external mln_user_data_release release_user_data;
-}
-
-final class mln_resource_request_delivery extends Struct {
-  external Pointer<mln_resource_request> request;
-  @Uint64()
-  external int handle;
-}
-
 final class mln_resource_response extends Struct {
   @Uint32()
   external int size;
@@ -1064,14 +1064,14 @@ final class mln_resource_response extends Struct {
   external Pointer<Uint8> bytes;
   @Size()
   external int byte_count;
-  external Pointer<Char> error_message;
+  external mln_buffer_view error_message;
   @Bool()
   external bool must_revalidate;
   @Int64()
   external int modified_unix_ms;
   @Int64()
   external int expires_unix_ms;
-  external Pointer<Char> etag;
+  external mln_buffer_view etag;
   @Int64()
   external int retry_after_unix_ms;
 }
@@ -1081,8 +1081,8 @@ final class mln_resource_rewrite_rule extends Struct {
   external int kinds;
   @Uint32()
   external int flags;
-  external Pointer<Char> url;
-  external Pointer<Char> replacement_url;
+  external mln_buffer_view url;
+  external mln_buffer_view replacement_url;
 }
 
 final class mln_resource_route extends Struct {
@@ -1090,7 +1090,7 @@ final class mln_resource_route extends Struct {
   external int kinds;
   @Uint32()
   external int flags;
-  external Pointer<Char> url;
+  external mln_buffer_view url;
   @Uint32()
   external int url_stage;
 }
@@ -1109,7 +1109,7 @@ final class mln_resource_transform extends Struct {
 final class mln_resource_transform_response extends Struct {
   @Uint32()
   external int size;
-  external Pointer<Char> url;
+  external mln_buffer_view url;
   external Pointer<Void> context;
 }
 
@@ -1188,8 +1188,8 @@ final class mln_runtime_event_tile_action extends Struct {
 final class mln_runtime_options extends Struct {
   @Uint32()
   external int size;
-  external Pointer<Char> asset_path;
-  external Pointer<Char> cache_path;
+  external mln_buffer_view asset_path;
+  external mln_buffer_view cache_path;
   @Uint64()
   external int event_mask;
   external mln_wake event_wake;
@@ -2196,13 +2196,13 @@ external int mln_acquired_frame_get_webgpu_texture(
 
 @Native<
   Int32 Function(
-    Pointer<mln_acquired_frame>,
+    mln_acquired_frame,
     Pointer<mln_gpu_sync>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_release(
-  Pointer<mln_acquired_frame> frame,
+  int frame,
   Pointer<mln_gpu_sync> consumer_completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -2398,7 +2398,7 @@ external int mln_geojson_source_data_create(
 );
 
 @Native<Void Function(mln_geojson_source_data)>()
-external void mln_geojson_source_data_destroy(int data);
+external void mln_geojson_source_data_release(int data);
 
 @Native<mln_geojson_source_options Function()>()
 external mln_geojson_source_options mln_geojson_source_options_default();
@@ -2409,19 +2409,15 @@ external mln_gpu_sync mln_gpu_sync_default();
 @Native<
   Int32 Function(
     Pointer<mln_http_header_transform_response>,
-    Pointer<Char>,
-    Size,
-    Pointer<Char>,
-    Size,
+    mln_buffer_view,
+    mln_buffer_view,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_http_header_transform_response_set_header(
   Pointer<mln_http_header_transform_response> response,
-  Pointer<Char> name,
-  int name_size,
-  Pointer<Char> value,
-  int value_size,
+  mln_buffer_view name,
+  mln_buffer_view value,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3388,12 +3384,6 @@ external int mln_map_move_style_layer(
 @Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
 
-@Native<Int32 Function(mln_map_projection, Pointer<mln_diagnostic>)>()
-external int mln_map_projection_close(
-  int projection,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<
   Int32 Function(
     mln_map_projection,
@@ -3515,6 +3505,12 @@ external int mln_map_projection_pixels_for_lat_lngs(
   Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   Pointer<mln_screen_point> out_points,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Int32 Function(mln_map_projection, Pointer<mln_diagnostic>)>()
+external int mln_map_projection_release(
+  int projection,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4070,14 +4066,14 @@ external int mln_map_set_style_transition_options(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<Char>,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_url(
   int map,
-  Pointer<Char> url,
+  mln_buffer_view url,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -4277,12 +4273,6 @@ external int mln_render_session_create_projection(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
-external int mln_render_session_destroy(
-  int session,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<
   Int32 Function(
     mln_render_session,
@@ -4434,6 +4424,12 @@ external int mln_render_session_read_texture(
 external int mln_render_session_reduce_memory_use(
   int session,
   Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
+external int mln_render_session_release(
+  int session,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4622,7 +4618,7 @@ external mln_rendered_query_geometry mln_rendered_query_geometry_point(
 
 @Native<
   Int32 Function(
-    mln_resource_request_handle,
+    mln_resource_request,
     Pointer<mln_resource_response>,
     Pointer<mln_diagnostic>,
   )
@@ -4634,11 +4630,7 @@ external int mln_resource_request_complete(
 );
 
 @Native<
-  Int32 Function(
-    mln_resource_request_handle,
-    Pointer<Bool>,
-    Pointer<mln_diagnostic>,
-  )
+  Int32 Function(mln_resource_request, Pointer<Bool>, Pointer<mln_diagnostic>)
 >()
 external int mln_resource_request_is_cancelled(
   int handle,
@@ -4646,18 +4638,18 @@ external int mln_resource_request_is_cancelled(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_resource_request_handle, Pointer<mln_diagnostic>)>()
+@Native<Int32 Function(mln_resource_request, Pointer<mln_diagnostic>)>()
 external int mln_resource_request_pass_through(
   int handle,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Void Function(mln_resource_request_handle)>()
+@Native<Void Function(mln_resource_request)>()
 external void mln_resource_request_release(int handle);
 
 @Native<
   Int32 Function(
-    mln_resource_request_handle,
+    mln_resource_request,
     Pointer<mln_resource_request_cancel_handler>,
     Pointer<Bool>,
     Pointer<mln_diagnostic>,
@@ -4670,7 +4662,7 @@ external int mln_resource_request_set_cancel_callback(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_resource_request_handle, Pointer<mln_diagnostic>)>()
+@Native<Int32 Function(mln_resource_request, Pointer<mln_diagnostic>)>()
 external int mln_resource_request_wait_until_retired(
   int handle,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -4679,15 +4671,13 @@ external int mln_resource_request_wait_until_retired(
 @Native<
   Int32 Function(
     Pointer<mln_resource_transform_response>,
-    Pointer<Char>,
-    Size,
+    mln_buffer_view,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_resource_transform_response_set_url(
   Pointer<mln_resource_transform_response> response,
-  Pointer<Char> url,
-  int url_size,
+  mln_buffer_view url,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4868,14 +4858,14 @@ external int mln_runtime_list_offline_regions(
 @Native<
   Int32 Function(
     mln_runtime,
-    Pointer<Char>,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_merge_offline_regions(
   int runtime,
-  Pointer<Char> side_database_path,
+  mln_buffer_view side_database_path,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

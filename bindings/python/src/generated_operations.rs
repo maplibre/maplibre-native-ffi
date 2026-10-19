@@ -1068,9 +1068,7 @@ fn generated_copy_mln_offline_geometry_region_definition(
     value: &sys::mln_offline_geometry_region_definition,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("style_url", unsafe {
-        generated_c_string(py, value.style_url, false)
-    }?)?;
+    dict.set_item("style_url", generated_text(py, value.style_url)?)?;
     dict.set_item("geometry", unsafe { generated_bytes(py, value.geometry) }?)?;
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
@@ -1171,9 +1169,7 @@ fn generated_copy_mln_offline_tile_pyramid_region_definition(
     value: &sys::mln_offline_tile_pyramid_region_definition,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("style_url", unsafe {
-        generated_c_string(py, value.style_url, false)
-    }?)?;
+    dict.set_item("style_url", generated_text(py, value.style_url)?)?;
     dict.set_item(
         "bounds",
         generated_copy_mln_lat_lng_bounds(py, &value.bounds)?,
@@ -1653,8 +1649,8 @@ fn generated_copy_mln_rendering_stats(
 
 unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     user_data: *mut std::ffi::c_void,
-    request: *const sys::mln_resource_request,
-    handle: sys::mln_resource_request_handle,
+    request: *const sys::mln_resource_request_info,
+    handle: sys::mln_resource_request,
 ) -> sys::mln_resource_provider_decision {
     let _policy = GeneratedCallbackPolicy::enter(
         &[
@@ -1685,7 +1681,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                     }
                     {
                         let referenced = unsafe { *request };
-                        generated_copy_mln_resource_request(py, &referenced)?
+                        generated_copy_mln_resource_request_info(py, &referenced)?
                     }
                 },
                 Py::new(
@@ -1713,9 +1709,9 @@ fn generated_copy_mln_resource_range(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_resource_request(
+fn generated_copy_mln_resource_request_info(
     py: Python<'_>,
-    value: &sys::mln_resource_request,
+    value: &sys::mln_resource_request_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("requested_url", unsafe {
@@ -1938,12 +1934,18 @@ fn generated_copy_mln_runtime_options(
     value: &sys::mln_runtime_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("asset_path", unsafe {
-        generated_c_string(py, value.asset_path, true)
-    }?)?;
-    dict.set_item("cache_path", unsafe {
-        generated_c_string(py, value.cache_path, true)
-    }?)?;
+    dict.set_item(
+        "asset_path",
+        generated_optional(py, value.asset_path.size != 0, || {
+            generated_text(py, value.asset_path)
+        })?,
+    )?;
+    dict.set_item(
+        "cache_path",
+        generated_optional(py, value.cache_path.size != 0, || {
+            generated_text(py, value.cache_path)
+        })?,
+    )?;
     dict.set_item("event_mask", generated_value(py, value.event_mask)?)?;
     Ok(dict.into_any().unbind())
 }
@@ -3203,8 +3205,8 @@ fn generated_input_mln_http_header<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_http_header> {
     let mut raw: sys::mln_http_header = unsafe { std::mem::zeroed() };
-    raw.name = storage.c_string(value.getattr("name")?)?;
-    raw.value = storage.c_string(value.getattr("value")?)?;
+    raw.name = storage.buffer(value.getattr("name")?, true)?;
+    raw.value = storage.buffer(value.getattr("value")?, true)?;
     Ok(raw)
 }
 
@@ -3219,7 +3221,7 @@ fn generated_input_mln_http_header_rule<'py>(
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
-    raw.url = storage.c_string(value.getattr("url")?)?;
+    raw.url = storage.buffer(value.getattr("url")?, true)?;
     raw.headers = {
         let items = generated_items(&value.getattr("headers")?, |item| {
             generated_input_mln_http_header(&item, storage)
@@ -3501,7 +3503,7 @@ fn generated_input_mln_offline_geometry_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_geometry_region_definition> {
     let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
-    raw.style_url = storage.c_string(value.getattr("style_url")?)?;
+    raw.style_url = storage.buffer(value.getattr("style_url")?, true)?;
     raw.geometry = storage.buffer(value.getattr("geometry")?, false)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
     raw.max_zoom = value.getattr("max_zoom")?.extract::<f64>()?;
@@ -3542,7 +3544,7 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_tile_pyramid_region_definition> {
     let mut raw: sys::mln_offline_tile_pyramid_region_definition = unsafe { std::mem::zeroed() };
-    raw.style_url = storage.c_string(value.getattr("style_url")?)?;
+    raw.style_url = storage.buffer(value.getattr("style_url")?, true)?;
     raw.bounds = generated_input_mln_lat_lng_bounds(&value.getattr("bounds")?, storage)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
     raw.max_zoom = value.getattr("max_zoom")?.extract::<f64>()?;
@@ -3866,12 +3868,7 @@ fn generated_input_mln_resource_response<'py>(
         raw.byte_count = generated_length(buffer.size)?;
         buffer.data.cast()
     };
-    let field = value.getattr("error_message")?;
-    raw.error_message = if field.is_none() {
-        std::ptr::null()
-    } else {
-        storage.c_string(field)?
-    };
+    raw.error_message = storage.buffer(value.getattr("error_message")?, true)?;
     raw.must_revalidate = value.getattr("must_revalidate")?.extract::<bool>()?;
     if let Some(field) = generated_present(value, "modified_unix_ms")? {
         raw.modified_unix_ms = field.extract::<i64>()?;
@@ -3881,12 +3878,7 @@ fn generated_input_mln_resource_response<'py>(
         raw.expires_unix_ms = field.extract::<i64>()?;
         raw.fields |= sys::MLN_RESOURCE_RESPONSE_EXPIRES;
     }
-    let field = value.getattr("etag")?;
-    raw.etag = if field.is_none() {
-        std::ptr::null()
-    } else {
-        storage.c_string(field)?
-    };
+    raw.etag = storage.buffer(value.getattr("etag")?, true)?;
     if let Some(field) = generated_present(value, "retry_after_unix_ms")? {
         raw.retry_after_unix_ms = field.extract::<i64>()?;
         raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
@@ -3905,13 +3897,8 @@ fn generated_input_mln_resource_rewrite_rule<'py>(
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
-    raw.url = storage.c_string(value.getattr("url")?)?;
-    let field = value.getattr("replacement_url")?;
-    raw.replacement_url = if field.is_none() {
-        std::ptr::null()
-    } else {
-        storage.c_string(field)?
-    };
+    raw.url = storage.buffer(value.getattr("url")?, true)?;
+    raw.replacement_url = storage.buffer(value.getattr("replacement_url")?, true)?;
     Ok(raw)
 }
 
@@ -3926,7 +3913,7 @@ fn generated_input_mln_resource_route<'py>(
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
-    raw.url = storage.c_string(value.getattr("url")?)?;
+    raw.url = storage.buffer(value.getattr("url")?, true)?;
     raw.url_stage = value
         .getattr("url_stage")?
         .extract::<sys::mln_resource_route_url>()?;
@@ -3969,18 +3956,8 @@ fn generated_input_mln_runtime_options<'py>(
     }
     let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-    let field = value.getattr("asset_path")?;
-    raw.asset_path = if field.is_none() {
-        std::ptr::null()
-    } else {
-        storage.c_string(field)?
-    };
-    let field = value.getattr("cache_path")?;
-    raw.cache_path = if field.is_none() {
-        std::ptr::null()
-    } else {
-        storage.c_string(field)?
-    };
+    raw.asset_path = storage.buffer(value.getattr("asset_path")?, true)?;
+    raw.cache_path = storage.buffer(value.getattr("cache_path")?, true)?;
     raw.event_mask = value
         .getattr("event_mask")?
         .extract::<sys::mln_runtime_event_mask>()?;
@@ -4687,7 +4664,7 @@ unsafe extern "C" fn generated_dispose_mln_event_batch(
 unsafe extern "C" fn generated_dispose_mln_geojson_source_data(
     handle: sys::mln_geojson_source_data,
 ) -> sys::mln_status {
-    unsafe { sys::mln_geojson_source_data_destroy(handle) };
+    unsafe { sys::mln_geojson_source_data_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -4698,7 +4675,7 @@ unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln
 unsafe extern "C" fn generated_dispose_mln_map_projection(
     handle: sys::mln_map_projection,
 ) -> sys::mln_status {
-    unsafe { sys::mln_map_projection_close(handle, std::ptr::null_mut()) }
+    unsafe { sys::mln_map_projection_release(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_render_frame_batch(
@@ -4826,10 +4803,10 @@ impl AcquiredFrameHandle {
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
-        let mut handle = reservation.handle();
+        let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_acquired_frame_release(&mut handle, &consumer_completion_value, diagnostic)
+                sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
             })
         }?;
         reservation.commit();
@@ -4868,12 +4845,12 @@ impl EventBatchHandle {
 impl GeojsonSourceDataHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_geojson_source_data_destroy", self.admission())?;
+        let mut call = GeneratedCall::new(py, "mln_geojson_source_data_release", self.admission())?;
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_geojson_source_data_destroy(handle)) };
+        unsafe { call.run(|| sys::mln_geojson_source_data_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -4894,18 +4871,16 @@ impl HttpHeaderTransformResponseScope {
             self.native as u64,
         )?;
         let storage = &mut call.storage;
-        let name_view = storage.buffer(name.clone(), true)?;
-        let value_view = storage.buffer(value.clone(), true)?;
+        let name_value = storage.buffer(name.clone(), true)?;
+        let value_value = storage.buffer(value.clone(), true)?;
         let handle =
             self.scope.pointer(self.native)? as *mut sys::mln_http_header_transform_response;
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_http_header_transform_response_set_header(
                     handle,
-                    name_view.data.cast(),
-                    name_view.size,
-                    value_view.data.cast(),
-                    value_view.size,
+                    name_value,
+                    value_value,
                     diagnostic,
                 )
             })
@@ -8509,7 +8484,7 @@ impl MapHandle {
     fn set_style_url(&self, py: Python<'_>, url: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_set_style_url", self.admission())?;
         let storage = &mut call.storage;
-        let url_value = storage.c_string(url.clone())?;
+        let url_value = storage.buffer(url.clone(), true)?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -8525,7 +8500,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_set_style_url", self.admission())?;
         let storage = &mut call.storage;
-        let url_value = storage.c_string(url.clone())?;
+        let url_value = storage.buffer(url.clone(), true)?;
         let handle = self.live()?;
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -8645,17 +8620,6 @@ impl MapHandle {
 
 #[pymethods]
 impl MapProjectionHandle {
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_projection_close", self.admission())?;
-        let Some(mut reservation) = self.reserve()? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_map_projection_close(handle, diagnostic)) }?;
-        reservation.commit();
-        Ok(py.None())
-    }
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_projection_get_camera", self.admission())?;
@@ -8866,6 +8830,17 @@ impl MapProjectionHandle {
             generated_copy_mln_screen_point(py, element)
         })
     }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_projection_release", self.admission())?;
+        let Some(mut reservation) = self.reserve()? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_map_projection_release(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
+    }
     #[pyo3(signature = (camera=None))]
     fn set_camera(&self, py: Python<'_>, camera: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_projection_set_camera", self.admission())?;
@@ -9045,17 +9020,6 @@ impl RenderSessionHandle {
             })
         }?;
         unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_destroy", self.admission())?;
-        let Some(mut reservation) = self.reserve()? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_render_session_destroy(handle, diagnostic)) }?;
-        reservation.commit();
-        Ok(py.None())
     }
     #[pyo3(signature = ())]
     fn detach(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9293,6 +9257,17 @@ impl RenderSessionHandle {
                 convert,
             )
         }
+    }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_render_session_release", self.admission())?;
+        let Some(mut reservation) = self.reserve()? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_render_session_release(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
     }
     #[pyo3(signature = (demand=None))]
     fn request_frame(
@@ -9735,16 +9710,11 @@ impl ResourceTransformResponseScope {
             self.native as u64,
         )?;
         let storage = &mut call.storage;
-        let url_view = storage.buffer(url.clone(), true)?;
+        let url_value = storage.buffer(url.clone(), true)?;
         let handle = self.scope.pointer(self.native)? as *mut sys::mln_resource_transform_response;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_resource_transform_response_set_url(
-                    handle,
-                    url_view.data.cast(),
-                    url_view.size,
-                    diagnostic,
-                )
+                sys::mln_resource_transform_response_set_url(handle, url_value, diagnostic)
             })
         }?;
         Ok(py.None())
@@ -10011,7 +9981,7 @@ impl RuntimeHandle {
         let mut call =
             GeneratedCall::new(py, "mln_runtime_merge_offline_regions", self.admission())?;
         let storage = &mut call.storage;
-        let side_database_path_value = storage.c_string(side_database_path.clone())?;
+        let side_database_path_value = storage.buffer(side_database_path.clone(), true)?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -10356,9 +10326,8 @@ struct ResourceRequestHandle {
     // The accepted cancel callback, which native owns until it retires.
     cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
     // Dropped by hand, with the GIL released; see the Drop impl below.
-    state: ManuallyDrop<
-        Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request_handle>>,
-    >,
+    state:
+        ManuallyDrop<Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request>>>,
 }
 impl Drop for ResourceRequestHandle {
     fn drop(&mut self) {
@@ -10407,7 +10376,7 @@ impl ResourceRequestHandle {
     }
 }
 unsafe fn register_resource_request_cancel(
-    handle: sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request,
     callback: maplibre_core::decision::ContextCallback,
     user_data: *mut std::ffi::c_void,
     release: maplibre_core::decision::ContextCallback,
@@ -10431,7 +10400,7 @@ unsafe fn register_resource_request_cancel(
     }
 }
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
-    sys::mln_resource_request_handle,
+    sys::mln_resource_request,
 > = unsafe {
     maplibre_core::decision::DecisionHandleFns::new(
         "ResourceRequestHandle",

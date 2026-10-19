@@ -65,7 +65,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
     owners = {"map": result(harness.runtime.create_map())}
 
     def abandon_map(
-        request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> None:
         handles.append(handle)
         handle.set_cancel_callback(mln.ResourceRequestCancelHandler(cancelled.set))
@@ -106,7 +106,9 @@ def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
     handles: list[mln.ResourceRequestHandle] = []
     provided = threading.Event()
 
-    def hold(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def hold(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         handles.append(handle)
         provided.set()
 

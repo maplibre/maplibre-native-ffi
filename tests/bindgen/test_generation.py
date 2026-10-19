@@ -78,7 +78,6 @@ class GenerationTests(unittest.TestCase):
         for length, direction in (
             ("point_count", "out"),
             ("nul", "out"),
-            ("point_count", "inout"),
         ):
             with (
                 self.subTest(length=length, direction=direction),

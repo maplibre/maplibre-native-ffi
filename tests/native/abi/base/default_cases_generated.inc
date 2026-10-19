@@ -629,10 +629,18 @@ static void mln_runtime_options_default_holds_its_annotated_values(void) {
     "mln_runtime_options.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    value.asset_path == NULL, "mln_runtime_options.asset_path"
+    value.asset_path.data == NULL, "mln_runtime_options.asset_path.data"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.asset_path.size,
+    "mln_runtime_options.asset_path.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    value.cache_path == NULL, "mln_runtime_options.cache_path"
+    value.cache_path.data == NULL, "mln_runtime_options.cache_path.data"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.cache_path.size,
+    "mln_runtime_options.cache_path.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)MLN_RUNTIME_EVENT_MASK_ALL, (uint64_t)value.event_mask,

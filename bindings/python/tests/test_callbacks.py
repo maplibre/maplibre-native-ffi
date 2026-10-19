@@ -162,7 +162,9 @@ def test_a_callback_can_make_only_the_calls_its_policy_allows(
 ) -> None:
     refusals: list[BaseException] = []
 
-    def serve(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def serve(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         try:
             harness.runtime.barrier()
         except mln.InvalidStateError as error:
@@ -185,7 +187,9 @@ def test_an_exception_in_a_callback_is_reported_and_contained(
     reports: list[object] = []
     monkeypatch.setattr(sys, "unraisablehook", reports.append)
 
-    def fail(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def fail(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         raise RuntimeError("provider failed")
 
     harness.routes["custom://raises.json"] = fail
@@ -247,7 +251,9 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
     handles: list[mln.ResourceRequestHandle] = []
     provided = threading.Event()
 
-    def defer(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def defer(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         handles.append(handle)
         provided.set()
 
@@ -298,7 +304,7 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         return mln.Status.OK
 
     def pass_through(
-        request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> mln.ResourceProviderDecision:
         passed_through.append(handle)
         return mln.ResourceProviderDecision.PASS_THROUGH
@@ -351,7 +357,9 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
     handles: list[mln.ResourceRequestHandle] = []
     provided = threading.Event()
 
-    def hold(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def hold(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         handles.append(handle)
         provided.set()
 
@@ -385,7 +393,7 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     )
 
     def provide(
-        request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> mln.ResourceProviderDecision:
         seen.append((request.kind, request.requested_url))
         if request.kind == mln.ResourceKind.STYLE:
@@ -531,7 +539,9 @@ def test_a_provider_passes_a_deferred_request_to_native_loading(
     handles: list[mln.ResourceRequestHandle] = []
     handed = threading.Event()
 
-    def hold(_request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def hold(
+        _request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         handles.append(handle)
         handed.set()
 

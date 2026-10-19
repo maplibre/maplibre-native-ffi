@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public readonly record struct ResourceProvider
 {
     public ResourceProvider(
-        Func<ResourceRequest, ResourceRequestHandle, ResourceProviderDecision>? Callback,
+        Func<ResourceRequestInfo, ResourceRequestHandle, ResourceProviderDecision>? Callback,
         ResourceRoute[] Routes
     )
     {
@@ -24,7 +24,7 @@ public readonly record struct ResourceProvider
     /// Decides each request that the routes leave to the provider.
     /// </summary>
     public Func<
-        ResourceRequest,
+        ResourceRequestInfo,
         ResourceRequestHandle,
         ResourceProviderDecision
     >? Callback { get; init; }

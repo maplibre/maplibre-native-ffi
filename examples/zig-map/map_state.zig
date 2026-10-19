@@ -53,7 +53,7 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| {};
 
-        try loadStyle(allocator, &map, &diagnostic, smoke);
+        try loadStyle(&map, &diagnostic, smoke);
         try setCamera(allocator, &map, &diagnostic);
         return .{
             .allocator = allocator,
@@ -172,7 +172,6 @@ const smoke_style_json =
 ;
 
 fn loadStyle(
-    allocator: std.mem.Allocator,
     map: *maplibre.Map,
     diagnostic: *maplibre.Diagnostic,
     smoke: bool,
@@ -180,7 +179,7 @@ fn loadStyle(
     const submitted = if (smoke)
         maplibre.mapSetStyleJson(map.*, smoke_style_json, diagnostic)
     else
-        maplibre.mapSetStyleUrl(allocator, map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic);
+        maplibre.mapSetStyleUrl(map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic);
     var completion = submitted catch |err| {
         diagnostics.logError("style load failed", err, diagnostic);
         return types.AppError.StyleLoadFailed;

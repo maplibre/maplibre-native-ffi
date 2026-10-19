@@ -33,8 +33,8 @@ mln_status binding_mln_http_header_transform_callback(
   mln_http_header_transform_response* out_response
 );
 uint32_t binding_mln_resource_provider_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 );
 mln_status binding_mln_resource_transform_callback(
   void* user_data, uint32_t kind, const char* url,
@@ -63,7 +63,7 @@ enum { binding_operation_mln_event_batch_release = 20 };
 enum { binding_operation_mln_frame_demand_default = 21 };
 enum { binding_operation_mln_free_camera_options_default = 22 };
 enum { binding_operation_mln_geojson_source_data_create = 23 };
-enum { binding_operation_mln_geojson_source_data_destroy = 24 };
+enum { binding_operation_mln_geojson_source_data_release = 24 };
 enum { binding_operation_mln_geojson_source_options_default = 25 };
 enum { binding_operation_mln_gpu_sync_default = 26 };
 enum { binding_operation_mln_http_header_transform_response_set_header = 27 };
@@ -136,17 +136,17 @@ enum { binding_operation_mln_map_list_style_layers = 89 };
 enum { binding_operation_mln_map_list_style_sources = 90 };
 enum { binding_operation_mln_map_move_style_layer = 91 };
 enum { binding_operation_mln_map_options_default = 92 };
-enum { binding_operation_mln_map_projection_close = 93 };
-enum { binding_operation_mln_map_projection_get_camera = 94 };
-enum { binding_operation_mln_map_projection_lat_lng_for_pixel = 95 };
-enum { binding_operation_mln_map_projection_lat_lng_for_pixel_unwrapped = 96 };
-enum { binding_operation_mln_map_projection_lat_lngs_for_pixels = 97 };
+enum { binding_operation_mln_map_projection_get_camera = 93 };
+enum { binding_operation_mln_map_projection_lat_lng_for_pixel = 94 };
+enum { binding_operation_mln_map_projection_lat_lng_for_pixel_unwrapped = 95 };
+enum { binding_operation_mln_map_projection_lat_lngs_for_pixels = 96 };
 enum {
-  binding_operation_mln_map_projection_lat_lngs_for_pixels_unwrapped = 98
+  binding_operation_mln_map_projection_lat_lngs_for_pixels_unwrapped = 97
 };
-enum { binding_operation_mln_map_projection_meters_per_pixel_at_latitude = 99 };
-enum { binding_operation_mln_map_projection_pixel_for_lat_lng = 100 };
-enum { binding_operation_mln_map_projection_pixels_for_lat_lngs = 101 };
+enum { binding_operation_mln_map_projection_meters_per_pixel_at_latitude = 98 };
+enum { binding_operation_mln_map_projection_pixel_for_lat_lng = 99 };
+enum { binding_operation_mln_map_projection_pixels_for_lat_lngs = 100 };
+enum { binding_operation_mln_map_projection_release = 101 };
 enum { binding_operation_mln_map_projection_set_camera = 102 };
 enum { binding_operation_mln_map_projection_set_visible_coordinates = 103 };
 enum { binding_operation_mln_map_projection_set_visible_geometry = 104 };
@@ -211,18 +211,18 @@ enum { binding_operation_mln_render_session_attach_options_default = 160 };
 enum { binding_operation_mln_render_session_barrier = 161 };
 enum { binding_operation_mln_render_session_clear_data = 162 };
 enum { binding_operation_mln_render_session_create_projection = 163 };
-enum { binding_operation_mln_render_session_destroy = 164 };
-enum { binding_operation_mln_render_session_detach = 165 };
-enum { binding_operation_mln_render_session_dispose = 166 };
-enum { binding_operation_mln_render_session_drain_frame_results = 167 };
-enum { binding_operation_mln_render_session_dump_debug_logs = 168 };
-enum { binding_operation_mln_render_session_get_capabilities = 169 };
-enum { binding_operation_mln_render_session_get_snapshot = 170 };
-enum { binding_operation_mln_render_session_query_feature_extensions = 171 };
-enum { binding_operation_mln_render_session_query_rendered_features = 172 };
-enum { binding_operation_mln_render_session_query_source_features = 173 };
-enum { binding_operation_mln_render_session_read_texture = 174 };
-enum { binding_operation_mln_render_session_reduce_memory_use = 175 };
+enum { binding_operation_mln_render_session_detach = 164 };
+enum { binding_operation_mln_render_session_dispose = 165 };
+enum { binding_operation_mln_render_session_drain_frame_results = 166 };
+enum { binding_operation_mln_render_session_dump_debug_logs = 167 };
+enum { binding_operation_mln_render_session_get_capabilities = 168 };
+enum { binding_operation_mln_render_session_get_snapshot = 169 };
+enum { binding_operation_mln_render_session_query_feature_extensions = 170 };
+enum { binding_operation_mln_render_session_query_rendered_features = 171 };
+enum { binding_operation_mln_render_session_query_source_features = 172 };
+enum { binding_operation_mln_render_session_read_texture = 173 };
+enum { binding_operation_mln_render_session_reduce_memory_use = 174 };
+enum { binding_operation_mln_render_session_release = 175 };
 enum { binding_operation_mln_render_session_request_frame = 176 };
 enum { binding_operation_mln_render_session_resize = 177 };
 enum { binding_operation_mln_render_session_service_driver_work = 178 };

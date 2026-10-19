@@ -56,7 +56,7 @@ static mln_lat_lng coordinate_at(mln_map map, mln_screen_point point) {
   MLN_TEST_OK(
     mln_map_projection_lat_lng_for_pixel(projection, point, &coordinate, NULL)
   );
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   return coordinate;
 }
 
@@ -560,7 +560,7 @@ static void an_offset_moves_the_content_with_the_pointer(void) {
   const mln_screen_point moved = projected_pixel(projection, before.center);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 138.0, moved.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 134.0, moved.y);
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -600,7 +600,7 @@ static void one_delta_turns_and_tilts_about_its_anchor(void) {
   MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 25.0, camera.bearing);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 25.0, camera.pitch);
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -759,7 +759,7 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, camera.zoom);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, camera.bearing);
-  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};

@@ -116,7 +116,7 @@ func newRuntimeFixture(t *testing.T) *fixture {
 
 // denyingProvider fails every request, so no test reaches the network.
 func denyingProvider() ResourceProvider {
-	return ResourceProvider{Callback: func(_ ResourceRequest, request *ResourceRequestHandle) ResourceProviderDecision {
+	return ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
 		message := "the test fixture serves no resources"
 		_ = request.Complete(ResourceResponse{
 			Status:       ResourceResponseStatusError,
@@ -133,7 +133,7 @@ func denyingProvider() ResourceProvider {
 func (f *fixture) serveStyle(t *testing.T, url string) {
 	t.Helper()
 	deny := denyingProvider().Callback
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedUrl == nil || *request.RequestedUrl != url {
 			return deny(request, handle)
 		}
@@ -160,7 +160,7 @@ func (f *fixture) serveLoopback(t *testing.T, bodies map[string]string) string {
 	}))
 	t.Cleanup(server.Close)
 	deny := denyingProvider().Callback
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedUrl != nil && strings.HasPrefix(*request.RequestedUrl, server.URL+"/") {
 			return ResourceProviderDecisionPassThrough
 		}

@@ -56,6 +56,9 @@ struct MapObject {
   // standalone projection copies state that pairs with the C snapshot.
   mln::TransformState snapshot_transform;
   uint64_t next_snapshot_generation = 1;
+  // Worker-owned invalidation; every command still publishes a generation.
+  bool snapshot_config_dirty = true;
+  bool snapshot_camera_dirty = true;
   std::atomic<uint64_t> latest_resize_submission{0};
   // A rejected direct resize cannot supersede the session's extent command.
   std::atomic<uint64_t> latest_session_resize_submission{0};

@@ -36,9 +36,8 @@ void main() {
     },
   );
 
-  test('strings cross as NUL-terminated and explicit-length views', () async {
-    // The C API reads a path to its NUL, so a path with an embedded NUL is
-    // rejected before it crosses.
+  test('host strings use views and native-lent strings decode', () async {
+    // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(
       () => runtimeCreate(const RuntimeOptions(cachePath: 'cache\u0000tail')),
       throwsA(isA<InvalidArgumentException>()),
@@ -46,7 +45,20 @@ void main() {
 
     // A layer ID crosses as a view with an explicit length, so an ID with an
     // embedded NUL names that layer and not the prefix before the NUL.
-    final fixture = await openRuntime();
+    const url = 'custom://native-lent.json';
+    final requested = Completer<String?>();
+    final fixture = await openRuntime(
+      provider: routedProvider([styleRoute(url)], (request, handle) {
+        requested.complete(request.requestedUrl);
+        handle.complete(
+          ResourceResponse(
+            status: ResourceResponseStatus.ok,
+            bytes: jsonBytes(emptyStyleJson),
+          ),
+        );
+        handle.close();
+      }),
+    );
     final map = await fixture.openStyledMap(
       '{"version":8,"sources":{},"layers":['
       '{"id":"a\\u0000b","type":"background"}]}',
@@ -56,6 +68,8 @@ void main() {
     expect((await map.listStyleLayers()).map((layer) => layer.id), [
       'a\u0000b',
     ]);
+    await expectCommitted(map.setStyleUrl(url));
+    expect(await within(requested.future, 'the native-lent URL'), url);
   });
 
   test(

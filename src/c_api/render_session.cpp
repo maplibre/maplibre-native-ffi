@@ -123,7 +123,7 @@ auto mln_acquired_frame_get_producer_sync(
 }
 
 auto mln_acquired_frame_release(
-  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion,
+  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
@@ -211,11 +211,11 @@ auto mln_render_session_abandon(
   });
 }
 
-auto mln_render_session_destroy(
+auto mln_render_session_release(
   mln_render_session session, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_destroy(session);
+    return mln::core::render_session_release(session);
   });
 }
 

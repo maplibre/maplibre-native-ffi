@@ -132,7 +132,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
          .byte_count = sizeof(tile),
          .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
          .expires_unix_ms = 1,
-         .etag = "replacement-tile",
+         .etag = MLN_BUFFER_LITERAL("replacement-tile"),
          .must_revalidate = true,
        },
      .has_later_response = true,
@@ -140,7 +140,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
        .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
        .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
        .expires_unix_ms = 1,
-       .etag = "replacement-tile",
+       .etag = MLN_BUFFER_LITERAL("replacement-tile"),
        .must_revalidate = true,
      }},
   };

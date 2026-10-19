@@ -381,15 +381,15 @@ typedef struct mln_runtime_options {
   uint32_t size;
   /**
    * Directory root for asset:// URLs. Copied during runtime creation.
-   * Null or empty selects `/android_asset` on Android and `.` elsewhere.
+   * Empty selects `/android_asset` on Android and `.` elsewhere.
    *
    * On Android, paths under `/android_asset/` read the APK `assets/`
    * directory after mln_android_init. Other paths read the filesystem.
    * Explicit file:// URLs use their own paths, independently of this root.
    */
-  const char* asset_path MLN_BINDING("nullable=true");
+  mln_buffer_view asset_path MLN_BINDING("optional=empty");
   /** Cache database path. Copied during runtime creation. */
-  const char* cache_path MLN_BINDING("nullable=true");
+  mln_buffer_view cache_path MLN_BINDING("optional=empty");
   /**
    * Runtime-scoped event types this runtime queues, as a bitwise OR of
    * mln_runtime_event_mask values.
@@ -678,7 +678,7 @@ typedef struct mln_resource_route {
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
-  const char* url;
+  mln_buffer_view url;
   /** The URL stage to compare. */
   uint32_t url_stage MLN_BINDING("enum=mln_resource_route_url");
 } mln_resource_route;
@@ -687,7 +687,7 @@ typedef struct mln_resource_route {
  * One rule of a native resource transform.
  *
  * The first rule whose kind and URL match decides the replacement. A matching
- * rule with a null replacement_url keeps the URL and stops the search.
+ * rule with an empty replacement_url keeps the URL and stops the search.
  */
 typedef struct mln_resource_rewrite_rule {
   /** The resource kinds to match. */
@@ -697,15 +697,15 @@ typedef struct mln_resource_rewrite_rule {
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
-  const char* url;
-  /** The replacement URL, or null to keep the URL and stop the search. */
-  const char* replacement_url MLN_BINDING("nullable=true");
+  mln_buffer_view url;
+  /** The replacement URL, or empty to keep the URL and stop the search. */
+  mln_buffer_view replacement_url MLN_BINDING("optional=empty");
 } mln_resource_rewrite_rule;
 
 /** One HTTP header that a header rule supplies. */
 typedef struct mln_http_header {
-  const char* name;
-  const char* value;
+  mln_buffer_view name;
+  mln_buffer_view value;
 } mln_http_header;
 
 /**
@@ -722,7 +722,7 @@ typedef struct mln_http_header_rule {
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
-  const char* url;
+  mln_buffer_view url;
   /**
    * The headers to set. Registration validates each one as
    * mln_http_header_transform_response_set_header() does.
@@ -733,8 +733,8 @@ typedef struct mln_http_header_rule {
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
-  /** Replacement URL, copied on return. Null or empty keeps the original. */
-  const char* url MLN_BINDING("nullable=true");
+  /** Replacement URL, copied on return. Empty keeps the original. */
+  mln_buffer_view url MLN_BINDING("optional=empty");
   /** C API-managed callback context, which callbacks leave unchanged. */
   void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_resource_transform_response MLN_BINDING("kind=callback_response");
@@ -750,13 +750,12 @@ typedef struct mln_resource_transform_response {
  * Returns:
  * - MLN_STATUS_OK when the replacement URL was copied.
  * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
- *   small, url is null with a non-zero size, or url contains embedded NUL.
+ *   small, url.data is null with a nonzero size, or url contains embedded NUL.
  * - MLN_STATUS_INVALID_STATE when called outside a resource transform callback.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_transform_response_set_url(
-  mln_resource_transform_response* response,
-  const char* url MLN_BINDING("length=url_size"), size_t url_size,
+  mln_resource_transform_response* response, mln_buffer_view url,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -842,7 +841,7 @@ typedef struct mln_http_header_transform_response {
  * Returns:
  * - MLN_STATUS_OK when the header was recorded.
  * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
- *   small, a pointer is null with a non-zero size, name is not a valid HTTP
+ *   small, a view has null data with a nonzero size, name is not a valid HTTP
  *   field name, value is not valid UTF-8, value contains a disallowed control
  *   byte, or name identifies a header managed by MapLibre or the platform
  *   transport.
@@ -851,10 +850,8 @@ typedef struct mln_http_header_transform_response {
  * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
  */
 MLN_API mln_status mln_http_header_transform_response_set_header(
-  mln_http_header_transform_response* response,
-  const char* name MLN_BINDING("length=name_size"), size_t name_size,
-  const char* value MLN_BINDING("length=value_size"), size_t value_size,
-  mln_diagnostic* out_diagnostic
+  mln_http_header_transform_response* response, mln_buffer_view name,
+  mln_buffer_view value, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -926,7 +923,7 @@ typedef struct mln_resource_range {
   uint64_t end;
 } mln_resource_range MLN_BINDING("fields=ordered");
 
-/** Field mask values for mln_resource_request. */
+/** Field mask values for mln_resource_request_info. */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
   /** The request asks only for the bytes in range. */
   MLN_RESOURCE_REQUEST_RANGE = 1U << 0U,
@@ -936,7 +933,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
   MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 1U << 2U,
 } mln_resource_request_field;
 
-typedef struct mln_resource_request {
+typedef struct mln_resource_request_info {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_resource_request_field");
   /**
@@ -976,7 +973,7 @@ typedef struct mln_resource_request {
   const uint8_t* prior_data
     MLN_BINDING("length=prior_data_size;encoding=bytes");
   size_t prior_data_size;
-} mln_resource_request;
+} mln_resource_request_info;
 
 /** Field mask values for mln_resource_response. */
 typedef enum MLN_BINDING(
@@ -1004,13 +1001,13 @@ typedef struct mln_resource_response {
   /** Response bytes. May be null only when byte_count is 0. */
   const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
   size_t byte_count;
-  const char* error_message MLN_BINDING("nullable=true");
+  mln_buffer_view error_message MLN_BINDING("optional=empty");
   bool must_revalidate;
   int64_t modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
   int64_t expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
-  const char* etag MLN_BINDING("nullable=true");
+  mln_buffer_view etag MLN_BINDING("optional=empty");
   int64_t retry_after_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
 } mln_resource_response;
@@ -1070,8 +1067,8 @@ MLN_BINDING(
   "mln_resource_request_release"
 )
 typedef uint32_t (*mln_resource_provider_callback)(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 );
 
 /**
@@ -1088,7 +1085,7 @@ typedef uint32_t (*mln_resource_provider_callback)(
  */
 MLN_BINDING(
   "reentry=protocol;"
-  "reentry_owner=mln_resource_request_handle;"
+  "reentry_owner=mln_resource_request;"
   "reentry_calls="
   "mln_resource_request_complete,"
   "mln_resource_request_pass_through,"
@@ -1183,7 +1180,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
  * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
- *   small, options->event_mask holds unknown bits, the wake descriptor is
+ *   small, a path view has null data with a nonzero size or embedded NUL,
+ *   options->event_mask holds unknown bits, the wake descriptor is
  *   invalid, or out_runtime is null or does not point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
@@ -1277,19 +1275,21 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
  * Completion is one-shot. A second completion, completion after cancellation,
  * or completion with null arguments returns a non-OK status and does not invoke
  * MapLibre's resource callback. Malformed response contents are converted to
- * provider error responses and still consume the completion.
+ * provider error responses and still consume the completion. Invalid string
+ * views are rejected before the completion is consumed.
  *
  * Returns:
  * - MLN_STATUS_OK when the response was accepted for asynchronous delivery.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or response
- *   is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, response is
+ *   null, or a response string has null data with a nonzero size or embedded
+ * NUL.
  * - MLN_STATUS_INVALID_STATE when handle has been released, or the request was
  *   cancelled, already completed, passed through, or can no longer accept a
  * response.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_request_complete(
-  mln_resource_request_handle handle, const mln_resource_response* response,
+  mln_resource_request handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1318,7 +1318,7 @@ MLN_API mln_status mln_resource_request_complete(
  * outstanding.
  */
 MLN_API mln_status mln_resource_request_pass_through(
-  mln_resource_request_handle handle, mln_diagnostic* out_diagnostic
+  mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1336,8 +1336,7 @@ MLN_API mln_status mln_resource_request_pass_through(
  * - MLN_STATUS_INVALID_STATE when handle has been released.
  */
 MLN_API mln_status mln_resource_request_is_cancelled(
-  mln_resource_request_handle handle,
-  bool* out_cancelled MLN_BINDING("direction=out"),
+  mln_resource_request handle, bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1372,7 +1371,7 @@ MLN_API mln_status mln_resource_request_is_cancelled(
  */
 MLN_BINDING("accepted_unless=out_cancelled")
 MLN_API mln_status mln_resource_request_set_cancel_callback(
-  mln_resource_request_handle handle,
+  mln_resource_request handle,
   const mln_resource_request_cancel_handler* handler,
   bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -1396,7 +1395,7 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * including from a copy another thread holds.
  */
 MLN_API void mln_resource_request_release(
-  mln_resource_request_handle handle
+  mln_resource_request handle
 ) MLN_NOEXCEPT;
 
 /**
@@ -1414,7 +1413,7 @@ MLN_API void mln_resource_request_release(
  * - MLN_STATUS_INVALID_ARGUMENT when handle is MLN_HANDLE_NULL.
  */
 MLN_API mln_status mln_resource_request_wait_until_retired(
-  mln_resource_request_handle handle MLN_BINDING("handle_access=issued"),
+  mln_resource_request handle MLN_BINDING("handle_access=issued"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

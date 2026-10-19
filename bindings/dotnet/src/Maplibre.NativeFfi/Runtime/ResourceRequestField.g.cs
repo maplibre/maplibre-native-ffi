@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Field mask values for <c>mln_resource_request</c>.
+/// Field mask values for <c>mln_resource_request_info</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_request_field</c> in the <see

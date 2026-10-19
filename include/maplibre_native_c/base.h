@@ -3,9 +3,9 @@
  * Public C API declarations for base ABI types, status values, and handles.
  *
  * Handles are opaque 64-bit ids. Each handle remains distinguishable from
- * every later handle after release. A handle is released once the call that
- * ends it, such as a release, close, destroy, or dispose, accepts it. Passing a
- * released handle reports MLN_STATUS_INVALID_STATE. Passing an invalid handle,
+ * every later handle after release. A release or disposal ends a handle once
+ * the call accepts it. Passing a released handle reports
+ * MLN_STATUS_INVALID_STATE. Passing an invalid handle,
  * which is the null handle, a handle of another type, or a value this library
  * never issued, reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no
  * effect, and its diagnostic names the case.
@@ -124,19 +124,24 @@ typedef uint64_t mln_map MLN_BINDING(
   "kind=handle;release=mln_map_release;parent=mln_runtime;"
   "dispose=mln_map_dispose"
 );
+/** Prepared GeoJSON data that sources retain independently of its handle. */
+typedef uint64_t mln_geojson_source_data MLN_BINDING(
+  "kind=handle;release=mln_geojson_source_data_release;"
+  "dispose=mln_geojson_source_data_release"
+);
 /** A standalone projection of a map's transform state at its creation. */
 typedef uint64_t mln_map_projection MLN_BINDING(
-  "kind=handle;release=mln_map_projection_close;"
-  "dispose=mln_map_projection_close"
+  "kind=handle;release=mln_map_projection_release;"
+  "dispose=mln_map_projection_release"
 );
 /** A resource request that a resource provider handles. */
-typedef uint64_t mln_resource_request_handle MLN_BINDING(
+typedef uint64_t mln_resource_request MLN_BINDING(
   "kind=handle;release=mln_resource_request_release;"
-  "dispose=mln_resource_request_release;prefix=mln_resource_request"
+  "dispose=mln_resource_request_release"
 );
 /** A render session, which renders one map to one render target. */
 typedef uint64_t mln_render_session MLN_BINDING(
-  "kind=handle;release=mln_render_session_destroy;parent=mln_map;"
+  "kind=handle;release=mln_render_session_release;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
 /** An owned batch of runtime events from one drain. */

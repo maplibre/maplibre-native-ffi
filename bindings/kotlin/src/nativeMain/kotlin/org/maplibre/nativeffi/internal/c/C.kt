@@ -82,7 +82,7 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_release(
-      frame.toCPointer(),
+      frame.toULong(),
       consumerCompletion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -193,8 +193,8 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_geojson_source_data_destroy(data: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_geojson_source_data_destroy(data.toULong())
+  actual fun mln_geojson_source_data_release(data: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_geojson_source_data_release(data.toULong())
   }
 
   actual fun mln_geojson_source_options_default(returned: Long) {
@@ -210,17 +210,13 @@ internal actual object C {
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
-    nameSize: Long,
     value: Long,
-    valueSize: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_http_header_transform_response_set_header(
       response.toCPointer(),
-      name.toCPointer(),
-      nameSize.convert(),
-      value.toCPointer(),
-      valueSize.convert(),
+      name.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      value.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       outDiagnostic.toCPointer(),
     )
 
@@ -1077,12 +1073,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_close(
-      projection.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_projection_get_camera(
     projection: Long,
     outCamera: Long,
@@ -1188,6 +1178,12 @@ internal actual object C {
       coordinates.toCPointer(),
       coordinateCount.convert(),
       outPoints.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_release(
+      projection.toULong(),
       outDiagnostic.toCPointer(),
     )
 
@@ -1673,7 +1669,7 @@ internal actual object C {
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_url(
       map.toULong(),
-      url.toCPointer(),
+      url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1870,12 +1866,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_destroy(session: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_destroy(
-      session.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_detach(
       session.toULong(),
@@ -2003,6 +1993,12 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_reduce_memory_use(
       session.toULong(),
       completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_release(session: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_release(
+      session.toULong(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2225,13 +2221,11 @@ internal actual object C {
   actual fun mln_resource_transform_response_set_url(
     response: Long,
     url: Long,
-    urlSize: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_response_set_url(
       response.toCPointer(),
-      url.toCPointer(),
-      urlSize.convert(),
+      url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2403,7 +2397,7 @@ internal actual object C {
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_merge_offline_regions(
       runtime.toULong(),
-      sideDatabasePath.toCPointer(),
+      sideDatabasePath.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

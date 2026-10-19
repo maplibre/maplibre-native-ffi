@@ -62,4 +62,13 @@ auto create_completion_operation(
   CompletionOperation& out
 ) -> mln_status;
 
+auto create_completion_operation(
+  std::shared_ptr<Completion> completion, CompletionOperation::Delivery deliver,
+  CompletionOperation& out
+) -> mln_status;
+auto create_completion_operation(
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless,
+  CompletionOperation& out
+) -> mln_status;
+
 }  // namespace mln::core

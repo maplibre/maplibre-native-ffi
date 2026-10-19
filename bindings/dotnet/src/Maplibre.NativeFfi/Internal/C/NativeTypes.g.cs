@@ -271,15 +271,15 @@ internal unsafe struct mln_gpu_sync
 
 internal unsafe struct mln_http_header
 {
-    public sbyte* name;
-    public sbyte* value;
+    public mln_buffer_view name;
+    public mln_buffer_view value;
 }
 
 internal unsafe struct mln_http_header_rule
 {
     public uint kinds;
     public uint flags;
-    public sbyte* url;
+    public mln_buffer_view url;
     public mln_http_header* headers;
     public nuint header_count;
 }
@@ -448,7 +448,7 @@ internal unsafe struct mln_metal_texture_frame
 
 internal unsafe struct mln_offline_geometry_region_definition
 {
-    public sbyte* style_url;
+    public mln_buffer_view style_url;
     public mln_buffer_view geometry;
     public double min_zoom;
     public double max_zoom;
@@ -496,7 +496,7 @@ internal unsafe struct mln_offline_region_status
 
 internal unsafe struct mln_offline_tile_pyramid_region_definition
 {
-    public sbyte* style_url;
+    public mln_buffer_view style_url;
     public mln_lat_lng_bounds bounds;
     public double min_zoom;
     public double max_zoom;
@@ -730,7 +730,7 @@ internal unsafe struct mln_resource_provider
     public uint size;
     public delegate* unmanaged[Cdecl]<
         void*,
-        mln_resource_request*,
+        mln_resource_request_info*,
         MlnResourceRequest,
         uint> callback;
     public void* user_data;
@@ -746,7 +746,15 @@ internal unsafe struct mln_resource_range
     public ulong end;
 }
 
-internal unsafe struct mln_resource_request
+internal unsafe struct mln_resource_request_cancel_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, void> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
+internal unsafe struct mln_resource_request_info
 {
     public uint size;
     public mln_resource_request_field fields;
@@ -765,14 +773,6 @@ internal unsafe struct mln_resource_request
     public nuint prior_data_size;
 }
 
-internal unsafe struct mln_resource_request_cancel_handler
-{
-    public uint size;
-    public delegate* unmanaged[Cdecl]<void*, void> callback;
-    public void* user_data;
-    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
-}
-
 internal unsafe struct mln_resource_response
 {
     public uint size;
@@ -781,11 +781,11 @@ internal unsafe struct mln_resource_response
     public uint error_reason;
     public byte* bytes;
     public nuint byte_count;
-    public sbyte* error_message;
+    public mln_buffer_view error_message;
     public byte must_revalidate;
     public long modified_unix_ms;
     public long expires_unix_ms;
-    public sbyte* etag;
+    public mln_buffer_view etag;
     public long retry_after_unix_ms;
 }
 
@@ -793,15 +793,15 @@ internal unsafe struct mln_resource_rewrite_rule
 {
     public uint kinds;
     public uint flags;
-    public sbyte* url;
-    public sbyte* replacement_url;
+    public mln_buffer_view url;
+    public mln_buffer_view replacement_url;
 }
 
 internal unsafe struct mln_resource_route
 {
     public uint kinds;
     public uint flags;
-    public sbyte* url;
+    public mln_buffer_view url;
     public uint url_stage;
 }
 
@@ -823,7 +823,7 @@ internal unsafe struct mln_resource_transform
 internal unsafe struct mln_resource_transform_response
 {
     public uint size;
-    public sbyte* url;
+    public mln_buffer_view url;
     public void* context;
 }
 
@@ -902,8 +902,8 @@ internal unsafe struct mln_runtime_event_tile_action
 internal unsafe struct mln_runtime_options
 {
     public uint size;
-    public sbyte* asset_path;
-    public sbyte* cache_path;
+    public mln_buffer_view asset_path;
+    public mln_buffer_view cache_path;
     public ulong event_mask;
     public mln_wake event_wake;
 }

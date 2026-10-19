@@ -97,7 +97,7 @@ def denied_response() -> mln.ResourceResponse:
     )
 
 
-type Route = Callable[[mln.ResourceRequest, mln.ResourceRequestHandle], object]
+type Route = Callable[[mln.ResourceRequestInfo, mln.ResourceRequestHandle], object]
 
 
 class Harness:
@@ -121,7 +121,7 @@ class Harness:
         )
 
     def _provide(
-        self, request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
+        self, request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> mln.ResourceProviderDecision:
         route = self.routes.get(request.requested_url or "")
         if route is not None:

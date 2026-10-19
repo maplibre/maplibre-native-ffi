@@ -55,7 +55,7 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_release(
-        MlnAcquiredFrame* frame,
+        MlnAcquiredFrame frame,
         mln_gpu_sync* consumer_completion,
         mln_diagnostic* out_diagnostic
     );
@@ -129,7 +129,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_geojson_source_data_destroy(MlnGeojsonSourceData data);
+    internal static partial void mln_geojson_source_data_release(MlnGeojsonSourceData data);
 
     [LibraryImport(LibraryName)]
     internal static partial mln_geojson_source_options mln_geojson_source_options_default();
@@ -140,10 +140,8 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
         mln_http_header_transform_response* response,
-        sbyte* name,
-        nuint name_size,
-        sbyte* value,
-        nuint value_size,
+        mln_buffer_view name,
+        mln_buffer_view value,
         mln_diagnostic* out_diagnostic
     );
 
@@ -696,12 +694,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_map_options mln_map_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_close(
-        MlnMapProjection projection,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_get_camera(
         MlnMapProjection projection,
         mln_camera_options* out_camera,
@@ -764,6 +756,12 @@ internal static unsafe partial class NativeMethods
         mln_lat_lng* coordinates,
         nuint coordinate_count,
         mln_screen_point* out_points,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_release(
+        MlnMapProjection projection,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1068,7 +1066,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_style_url(
         MlnMap map,
-        sbyte* url,
+        mln_buffer_view url,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1201,12 +1199,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_destroy(
-        MlnRenderSession session,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_detach(
         MlnRenderSession session,
         mln_completion* completion,
@@ -1288,6 +1280,12 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_reduce_memory_use(
         MlnRenderSession session,
         mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_release(
+        MlnRenderSession session,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1437,8 +1435,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_transform_response_set_url(
         mln_resource_transform_response* response,
-        sbyte* url,
-        nuint url_size,
+        mln_buffer_view url,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1557,7 +1554,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_merge_offline_regions(
         MlnRuntime runtime,
-        sbyte* side_database_path,
+        mln_buffer_view side_database_path,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

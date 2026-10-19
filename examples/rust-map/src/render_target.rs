@@ -246,7 +246,7 @@ impl Session {
         }
     }
 
-    /// Detaches, abandoning instead when that fails, then destroys the
+    /// Detaches, abandoning instead when that fails, then releases the
     /// session.
     pub fn close(mut self) -> Result<(), Box<dyn StdError>> {
         let detached = self
@@ -258,7 +258,7 @@ impl Session {
             self.abandon();
         }
         self.session
-            .destroy()
+            .release()
             .map_err(|error| Box::new(error) as Box<dyn StdError>)
     }
 

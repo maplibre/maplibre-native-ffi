@@ -551,9 +551,9 @@ impl Session {
         self.drive(self.handle.read_texture().unwrap()).unwrap()
     }
 
-    /// Detaches and destroys the session.
+    /// Detaches and releases the session.
     pub fn close(self) {
         self.drive(self.handle.detach().unwrap()).unwrap();
-        self.handle.destroy().unwrap();
+        self.handle.release().unwrap();
     }
 }

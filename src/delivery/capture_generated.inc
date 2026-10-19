@@ -161,11 +161,11 @@ auto capture_element(
   switch (source.definition.type) {
     case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
       result.definition.data.tile_pyramid.style_url =
-        string(arena, source.definition.data.tile_pyramid.style_url);
+        buffer(arena, source.definition.data.tile_pyramid.style_url);
       break;
     case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
       result.definition.data.geometry.style_url =
-        string(arena, source.definition.data.geometry.style_url);
+        buffer(arena, source.definition.data.geometry.style_url);
       result.definition.data.geometry.geometry =
         buffer(arena, source.definition.data.geometry.geometry);
       break;
@@ -464,7 +464,7 @@ inline auto dispose_owner(
       return MLN_STATUS_OK;
     }
     case mln::core::HandleKind::GeoJsonSourceData: {
-      mln_geojson_source_data_destroy(
+      mln_geojson_source_data_release(
         static_cast<mln_geojson_source_data>(handle)
       );
       return MLN_STATUS_OK;
@@ -473,7 +473,7 @@ inline auto dispose_owner(
       return mln_map_dispose(static_cast<mln_map>(handle), nullptr);
     }
     case mln::core::HandleKind::MapProjection: {
-      return mln_map_projection_close(
+      return mln_map_projection_release(
         static_cast<mln_map_projection>(handle), nullptr
       );
     }
@@ -489,9 +489,7 @@ inline auto dispose_owner(
       );
     }
     case mln::core::HandleKind::ResourceRequest: {
-      mln_resource_request_release(
-        static_cast<mln_resource_request_handle>(handle)
-      );
+      mln_resource_request_release(static_cast<mln_resource_request>(handle));
       return MLN_STATUS_OK;
     }
     case mln::core::HandleKind::Runtime: {

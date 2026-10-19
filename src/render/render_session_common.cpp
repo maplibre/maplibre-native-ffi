@@ -1300,11 +1300,16 @@ auto submit_driver_work(
   mln_render_session session, const mln_completion* completion,
   CompletionOperation::Delivery deliver,
   const RenderDriverWorkFactory& make_work,
-  const RenderDriverAdmission& admit = {}
+  const RenderDriverAdmission& admit = {},
+  std::shared_ptr<Completion> checked = {}
 ) -> mln_status {
   auto async = CompletionOperation{};
   const auto registered =
-    create_completion_operation(completion, std::move(deliver), async);
+    checked
+      ? create_completion_operation(
+          std::move(checked), std::move(deliver), async
+        )
+      : create_completion_operation(completion, std::move(deliver), async);
   if (registered != MLN_STATUS_OK) return registered;
   auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
@@ -1434,7 +1439,8 @@ auto enqueue_driver_result_operation(
 
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
-  const mln_render_session* out_session, const mln_completion* completion
+  const mln_render_session* out_session, const mln_completion* completion,
+  std::shared_ptr<Completion>* checked
 ) -> mln_status {
   if (options == nullptr) {
     set_thread_error("render session attach options must not be null");
@@ -1452,6 +1458,7 @@ auto validate_render_session_attach_request(
   const auto completion_status =
     make_completion(completion, checked_completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
+  if (checked) *checked = std::move(checked_completion);
   if (
     options->driver != MLN_RENDER_DRIVER_CORE_WORKER &&
     options->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -1472,8 +1479,10 @@ auto start_attach_render_session(
     set_thread_error("render session must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto request_status =
-    validate_render_session_attach_request(options, out_session, completion);
+  auto checked_completion = std::shared_ptr<Completion>{};
+  const auto request_status = validate_render_session_attach_request(
+    options, out_session, completion, &checked_completion
+  );
   if (request_status != MLN_STATUS_OK) {
     return request_status;
   }
@@ -1507,8 +1516,9 @@ auto start_attach_render_session(
                       : std::make_shared<QueueLock>(options->queue_lock);
 
   auto async = CompletionOperation{};
-  const auto operation_status =
-    create_completion_operation(completion, valueless, async);
+  const auto operation_status = create_completion_operation(
+    std::move(checked_completion), valueless, async
+  );
   if (operation_status != MLN_STATUS_OK) {
     return operation_status;
   }
@@ -1777,9 +1787,9 @@ auto retarget_kind_status(
 
 auto validate_render_session_retarget_submission(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_completion* completion
+  const mln_completion* completion,
+  std::shared_ptr<Completion>& checked_completion
 ) -> mln_status {
-  auto checked_completion = std::shared_ptr<Completion>{};
   const auto completion_status =
     make_completion(completion, checked_completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
@@ -1902,7 +1912,7 @@ namespace {
 // snapshot reports the applied extent until the replacement runs.
 auto submit_retarget(
   mln_render_session session, const mln_logical_extent& extent,
-  RenderDriverCallable work, const mln_completion* completion,
+  RenderDriverCallable work, std::shared_ptr<Completion> completion,
   const ValuelessCompletion& valueless, RenderDriverAdmission admit
 ) -> mln_status {
   auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
@@ -1915,7 +1925,8 @@ auto submit_retarget(
       map = live.map;
     };
   const auto status = submit_driver_work(
-    session, completion, std::move(deliver), make_work, admit
+    session, nullptr, std::move(deliver), make_work, admit,
+    std::move(completion)
   );
   if (status == MLN_STATUS_OK) {
     static_cast<void>(map_post_resize(map, extent.width, extent.height));
@@ -1929,7 +1940,7 @@ auto enqueue_borrowed_texture_retarget(
   mln_render_session session, std::size_t texture_count,
   const mln_logical_extent& extent, uint32_t physical_width,
   uint32_t physical_height, RenderTargetReplacer replace,
-  const mln_completion* completion, ValuelessCompletion valueless
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status {
   return submit_retarget(
     session, extent,
@@ -1985,7 +1996,7 @@ auto enqueue_borrowed_texture_retarget(
 
 auto enqueue_surface_retarget(
   mln_render_session session, const mln_logical_extent& extent,
-  RenderTargetReplacer replace, const mln_completion* completion,
+  RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
   ValuelessCompletion valueless
 ) -> mln_status {
   return submit_retarget(
@@ -2294,7 +2305,7 @@ auto render_session_projection_create(
   );
 }
 
-auto render_session_destroy(mln_render_session session) -> mln_status {
+auto render_session_release(mln_render_session session) -> mln_status {
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
   mln::testing::hit(mln::testing::SyncPoint::RenderDestroyLeased);
@@ -3578,10 +3589,10 @@ auto acquired_frame_get_producer_sync(
 }
 
 auto acquired_frame_release(
-  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion
+  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion
 ) -> mln_status {
-  if (frame == nullptr || *frame == MLN_HANDLE_NULL) {
-    set_thread_error("frame must point to a live acquired frame handle");
+  if (frame == MLN_HANDLE_NULL) {
+    set_thread_error("frame must be a live acquired frame handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto copied =
@@ -3592,7 +3603,7 @@ auto acquired_frame_release(
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto live = handle_table<mln_acquired_frame_object>().lease(*frame);
+  const auto live = handle_table<mln_acquired_frame_object>().lease(frame);
   if (live == nullptr) return recorded_handle_fault_status();
   auto wakes = DeferredWakes{};
   {
@@ -3634,13 +3645,11 @@ auto acquired_frame_release(
         static_cast<void>(queue_frame_demand_work_locked(session, wakes));
     }
   }
-  const auto consumed =
-    handle_table<mln_acquired_frame_object>().remove(*frame);
+  const auto consumed = handle_table<mln_acquired_frame_object>().remove(frame);
   if (!consumed) {
     set_thread_error("acquired frame was already released");
     return MLN_STATUS_INVALID_STATE;
   }
-  *frame = MLN_HANDLE_NULL;
   if (copied.kind == MLN_GPU_SYNC_CPU_COMPLETE) return MLN_STATUS_OK;
   const auto release = [consumed, copied]() {
     auto status = MLN_STATUS_OK;

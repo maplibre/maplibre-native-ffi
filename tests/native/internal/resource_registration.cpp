@@ -62,7 +62,7 @@ void rejected_provider_registration_queues_no_retirement() {
 
 void count_release(void* data) { ++*static_cast<int*>(data); }
 auto provider_callback(
-  void*, const mln_resource_request*, mln_resource_request_handle
+  void*, const mln_resource_request_info*, mln_resource_request
 ) -> uint32_t {
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
@@ -147,8 +147,8 @@ struct RefusedCopy {
 };
 
 auto refuse_request_copy(
-  void* data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   auto& probe = *static_cast<RefusedCopy*>(data);
   const auto faults = mln::native_tests::AllocationFaults{};

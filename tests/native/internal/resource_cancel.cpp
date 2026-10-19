@@ -32,8 +32,8 @@ auto style_response() -> mln_resource_response {
 }
 
 auto release_then_throw_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(user_data);
   static_cast<void>(request);
@@ -66,7 +66,7 @@ struct CompletedRequest {
   std::atomic_int cancel_count = 0;
   std::atomic_int release_count = 0;
   std::atomic_int register_status = MLN_STATUS_NATIVE_ERROR;
-  std::atomic<mln_resource_request_handle> handle = MLN_HANDLE_NULL;
+  std::atomic<mln_resource_request> handle = MLN_HANDLE_NULL;
 };
 
 void count_cancel(void* user_data) {
@@ -81,8 +81,8 @@ void count_cancel_release(void* user_data) {
 
 // Registers a cancel callback, then answers the request inline.
 auto complete_inline_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(request);
   auto& probe = *static_cast<CompletedRequest*>(user_data);
@@ -152,7 +152,7 @@ struct BlockingCancel {
   std::atomic_bool provider_entered = false;
   std::atomic_int register_status = MLN_STATUS_NATIVE_ERROR;
   std::atomic_bool register_reported_cancelled = true;
-  std::atomic<mln_resource_request_handle> handle = MLN_HANDLE_NULL;
+  std::atomic<mln_resource_request> handle = MLN_HANDLE_NULL;
   std::atomic_int status_after_self_release = MLN_STATUS_OK;
   std::atomic_int complete_status_after_self_release = MLN_STATUS_OK;
   std::atomic_bool callback_entered = false;
@@ -186,8 +186,8 @@ void block_in_cancel(void* user_data) {
 }
 
 auto blocking_cancel_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(request);
   auto& probe = *static_cast<BlockingCancel*>(user_data);
@@ -294,7 +294,7 @@ struct BlockingRegistrationRelease {
   mln_test_thread* releaser = nullptr;
   std::atomic_bool provider_entered = false;
   std::atomic_int register_status = MLN_STATUS_NATIVE_ERROR;
-  std::atomic<mln_resource_request_handle> handle = MLN_HANDLE_NULL;
+  std::atomic<mln_resource_request> handle = MLN_HANDLE_NULL;
   std::atomic_bool release_entered = false;
   std::atomic_bool drain_returned = false;
   std::atomic_bool drain_returned_during_release = false;
@@ -321,8 +321,8 @@ void release_request_on_this_thread(void* argument) {
 }
 
 auto blocking_registration_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) -> uint32_t {
   static_cast<void>(request);
   auto& probe = *static_cast<BlockingRegistrationRelease*>(user_data);

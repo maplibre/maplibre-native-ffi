@@ -150,14 +150,12 @@ public extension RuntimeHandle {
         result,
         as: mln_offline_region_info.self
       ).map { try OfflineRegionInfo(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in
-      try mln_runtime_merge_offline_regions(
-        raw,
-        arena.cString(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
+    ) { raw, arena, completion, diagnostic in mln_runtime_merge_offline_regions(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
 
   /// Sets an offline region's native download state.

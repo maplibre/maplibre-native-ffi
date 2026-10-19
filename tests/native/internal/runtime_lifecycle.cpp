@@ -65,6 +65,7 @@ void submission_failure_callbacks_can_submit_again() {
   );
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, reentrant_status);
   TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
+  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
 
   reentrant_status = MLN_STATUS_OK;
   auto operation =
@@ -77,6 +78,7 @@ void submission_failure_callbacks_can_submit_again() {
   );
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, reentrant_status);
   TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
+  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
 
   auto rejected = mln_test_completion_default(0);
   auto pair = mln::core::CompletionOperation{};
@@ -95,6 +97,7 @@ void submission_failure_callbacks_can_submit_again() {
   mln_test_completion_reject(&rejected);
   mln_test_completion_destroy(&rejected);
   TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
+  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
 }
 
 // A released map completes before its worker pool shuts down, and the runtime
@@ -316,7 +319,8 @@ void accepted_completions_keep_runtime_submissions_pending() {
     auto tracked = false;
     {
       const auto lock = std::scoped_lock{live->terminal_mutex};
-      tracked = live->pending_submissions.size() == 1;
+      tracked =
+        live->pending_submissions.size() + live->pending_commands.size() == 1;
     }
     auto barrier = mln_test_completion_default(0);
     const auto barrier_status =
@@ -366,7 +370,8 @@ void operation_submission_waits_for_native_work_to_retire() {
   auto tracked = false;
   {
     const auto lock = std::scoped_lock{live->terminal_mutex};
-    tracked = live->pending_submissions.size() == 1;
+    tracked =
+      live->pending_submissions.size() + live->pending_commands.size() == 1;
   }
   mln_test_gate_release(&work);
   MLN_TEST_OK(mln_test_completion_settle(&completed));
@@ -448,7 +453,8 @@ void abandoned_completion_keeps_its_submission_pending_until_delivery() {
     auto tracked = false;
     {
       const auto lock = std::scoped_lock{live->terminal_mutex};
-      tracked = live->pending_submissions.size() == 1;
+      tracked =
+        live->pending_submissions.size() + live->pending_commands.size() == 1;
     }
     completion.reset();
     const auto status = mln_test_completion_settle(&result);

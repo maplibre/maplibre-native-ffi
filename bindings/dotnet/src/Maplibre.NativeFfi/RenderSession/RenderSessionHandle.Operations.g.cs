@@ -34,7 +34,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             .Unwrap();
         state = new(
             handle,
-            static (live, diagnostic) => NativeMethods.mln_render_session_destroy(live, diagnostic),
+            static (live, diagnostic) => NativeMethods.mln_render_session_release(live, diagnostic),
             nameof(RenderSessionHandle),
             Abandon,
             retainedParent: parent
@@ -166,22 +166,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             NativeMethods.mln_render_session_create_projection(Handle, &outProjection, Diagnostic)
         );
         return MapProjectionHandle.Adopt(outProjection);
-    }
-
-    /// <summary>
-    /// Retires a detached or abandoned session handle. The call is CPU-only and
-    /// may run on any native thread, including from one of the session's own
-    /// completions. If an abandonment is still in progress on another thread,
-    /// this waits for it to finish before consuming the session owner.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_destroy</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_destroy");
-        state.Close();
     }
 
     /// <summary>
@@ -416,6 +400,22 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                 NativeMethods.mln_render_session_reduce_memory_use(Handle, completion, diagnostic),
             cancellationToken
         );
+    }
+
+    /// <summary>
+    /// Retires a detached or abandoned session handle. The call is CPU-only and
+    /// may run on any native thread, including from one of the session's own
+    /// completions. If an abandonment is still in progress on another thread,
+    /// this waits for it to finish before consuming the session owner.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public void Close()
+    {
+        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_release");
+        state.Close();
     }
 
     /// <summary>

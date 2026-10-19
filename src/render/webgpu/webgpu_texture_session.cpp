@@ -1283,8 +1283,9 @@ auto webgpu_borrowed_texture_set_target_start(
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::BorrowedTexture, completion
+    session, RetargetTargetKind::BorrowedTexture, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
@@ -1307,7 +1308,7 @@ auto webgpu_borrowed_texture_set_target_start(
        WebGPUBorrowedTarget{*descriptor}](mln_render_session_object& live) {
       return live.texture.backend->set_webgpu_borrowed_target(target);
     },
-    completion,
+    std::move(checked_completion),
     valueless_completion<
       &mln_render_session_set_webgpu_borrowed_texture_target>()
   );
@@ -1373,8 +1374,9 @@ auto webgpu_surface_set_target_start(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::Surface, completion
+    session, RetargetTargetKind::Surface, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
@@ -1396,7 +1398,7 @@ auto webgpu_surface_set_target_start(
     [copied](mln_render_session_object& live) {
       return live.surface.backend->set_webgpu_target(copied);
     },
-    completion,
+    std::move(checked_completion),
     valueless_completion<&mln_render_session_set_webgpu_surface_target>()
   );
 }

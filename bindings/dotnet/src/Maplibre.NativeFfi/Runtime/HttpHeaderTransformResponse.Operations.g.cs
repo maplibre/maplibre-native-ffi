@@ -19,15 +19,11 @@ public sealed unsafe partial class HttpHeaderTransformResponse
     {
         using var call = Enter(this, "mln_http_header_transform_response_set_header");
         using var scope = new NativeCallScope();
-        var bufferName = scope.Utf8(name);
-        var bufferValue = scope.Utf8(value);
         Check(
             NativeMethods.mln_http_header_transform_response_set_header(
                 Pointer,
-                (sbyte*)bufferName.data,
-                checked((nuint)bufferName.size),
-                (sbyte*)bufferValue.data,
-                checked((nuint)bufferValue.size),
+                scope.Utf8(name),
+                scope.Utf8(value),
                 Diagnostic
             )
         );

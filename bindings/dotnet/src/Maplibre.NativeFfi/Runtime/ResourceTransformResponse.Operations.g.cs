@@ -19,12 +19,10 @@ public sealed unsafe partial class ResourceTransformResponse
     {
         using var call = Enter(this, "mln_resource_transform_response_set_url");
         using var scope = new NativeCallScope();
-        var bufferUrl = scope.Utf8(url);
         Check(
             NativeMethods.mln_resource_transform_response_set_url(
                 Pointer,
-                (sbyte*)bufferUrl.data,
-                checked((nuint)bufferUrl.size),
+                scope.Utf8(url),
                 Diagnostic
             )
         );

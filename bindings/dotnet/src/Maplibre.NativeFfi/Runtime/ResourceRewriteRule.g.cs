@@ -19,7 +19,7 @@ namespace Maplibre.NativeFfi;
 /// The URL or glob pattern to compare.
 /// </param>
 /// <param name="ReplacementUrl">
-/// The replacement URL, or null to keep the URL and stop the search.
+/// The replacement URL, or empty to keep the URL and stop the search.
 /// </param>
 public readonly partial record struct ResourceRewriteRule(
     ResourceKindMask Kinds,

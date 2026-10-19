@@ -561,7 +561,7 @@ typedef struct mln_bound_options {
 /** Tile-pyramid offline region definition. */
 typedef struct mln_offline_tile_pyramid_region_definition {
   /** Style URL. Copied during region creation. */
-  const char* style_url;
+  mln_buffer_view style_url;
   mln_lat_lng_bounds bounds;
   double min_zoom;
   /**
@@ -576,7 +576,7 @@ typedef struct mln_offline_tile_pyramid_region_definition {
 /** Geometry offline region definition. */
 typedef struct mln_offline_geometry_region_definition {
   /** Style URL. Copied during region creation. */
-  const char* style_url;
+  mln_buffer_view style_url;
   /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
   mln_buffer_view geometry MLN_BINDING("encoding=json");
   double min_zoom;
@@ -724,7 +724,8 @@ MLN_API mln_status mln_runtime_list_offline_regions(
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle,
- *   side_database_path is null or names no readable database file, or
+ *   side_database_path has null data with a nonzero size, contains embedded
+ *   NUL, or names no readable database file, or
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
@@ -736,7 +737,7 @@ MLN_API mln_status mln_runtime_list_offline_regions(
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
 MLN_API mln_status mln_runtime_merge_offline_regions(
-  mln_runtime runtime, const char* side_database_path,
+  mln_runtime runtime, mln_buffer_view side_database_path,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1341,15 +1342,16 @@ mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, url is null, or
- *   completion is invalid.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, url has null
+ *   data with a nonzero size or contains embedded NUL, or completion is
+ * invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
  *   closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_url(
-  mln_map map, const char* url, const mln_completion* completion,
+  mln_map map, mln_buffer_view url, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

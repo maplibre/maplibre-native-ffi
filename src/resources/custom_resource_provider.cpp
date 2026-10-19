@@ -24,6 +24,7 @@
 #include "resources/custom_resource_provider.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
@@ -98,7 +99,7 @@ struct ResourceRequestObject {
   // removes the table entry once the callback returns.
   bool remove_after_cancel_callback = false;
   std::thread::id cancel_callback_thread;
-  mln_resource_request_handle handle = MLN_HANDLE_NULL;
+  mln_resource_request handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
   mln::ActorRef<ProviderRequest> loader;
   // The cached bytes MapLibre withheld from the requester until this request
@@ -244,17 +245,14 @@ auto response_from_abi(const mln_resource_response& provider_response)
   if ((provider_response.fields & MLN_RESOURCE_RESPONSE_EXPIRES) != 0U) {
     response.expires = from_unix_ms(provider_response.expires_unix_ms);
   }
-  if (provider_response.etag != nullptr) {
-    response.etag = std::string{provider_response.etag};
+  if (provider_response.etag.size != 0) {
+    response.etag = string_from_view(provider_response.etag);
   }
 
   if (provider_response.status == MLN_RESOURCE_RESPONSE_STATUS_ERROR) {
     auto message = std::string{"resource provider failed"};
-    if (
-      provider_response.error_message != nullptr &&
-      *provider_response.error_message != '\0'
-    ) {
-      message = provider_response.error_message;
+    if (provider_response.error_message.size != 0) {
+      message = string_from_view(provider_response.error_message);
     }
     auto retry_after = std::optional<mln::Timestamp>{};
     if ((provider_response.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER) != 0U) {
@@ -350,7 +348,7 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
 // release on any other thread finds the object and waits, whether or not an
 // earlier release already retired it. A release from inside either callback
 // returns without waiting and leaves the removal to the call running it.
-void retire_request(mln_resource_request_handle handle) noexcept {
+void retire_request(mln_resource_request handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().try_lease(handle);
   if (object == nullptr) {
     return;
@@ -419,7 +417,7 @@ auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
 
 auto make_request_view(
   const mln::Resource& resource, const std::string& resolved_url
-) -> mln_resource_request {
+) -> mln_resource_request_info {
   const auto* prior_data = resource.priorData == nullptr
                              ? nullptr
                              : bytes_from_string(*resource.priorData);
@@ -427,8 +425,8 @@ auto make_request_view(
   if (resource.dataRange) fields |= MLN_RESOURCE_REQUEST_RANGE;
   if (resource.priorModified) fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED;
   if (resource.priorExpires) fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES;
-  auto request = mln_resource_request{
-    .size = sizeof(mln_resource_request),
+  auto request = mln_resource_request_info{
+    .size = sizeof(mln_resource_request_info),
     .fields = fields,
     .requested_url = resource.url.c_str(),
     .resolved_url = resolved_url.c_str(),
@@ -462,7 +460,7 @@ auto make_request_view(
 }
 
 struct CustomProviderInvocation {
-  mln_resource_request_handle handle = MLN_HANDLE_NULL;
+  mln_resource_request handle = MLN_HANDLE_NULL;
   // Held for the whole invocation, so a host that releases inline cannot free
   // the object out from under the code that runs after the callback returns.
   std::shared_ptr<ResourceRequestObject> object;
@@ -573,10 +571,17 @@ auto request_custom_resource(
 }
 
 auto complete_resource_request(
-  mln_resource_request_handle handle, const mln_resource_response* response
+  mln_resource_request handle, const mln_resource_response* response
 ) -> mln_status {
   if (response == nullptr) {
     set_thread_error("response must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    response->size >= sizeof(mln_resource_response) &&
+    (!validate_c_string_view(response->etag, "etag") ||
+     !validate_c_string_view(response->error_message, "error_message"))
+  ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
@@ -619,8 +624,7 @@ auto complete_resource_request(
   return MLN_STATUS_OK;
 }
 
-auto pass_through_resource_request(mln_resource_request_handle handle)
-  -> mln_status {
+auto pass_through_resource_request(mln_resource_request handle) -> mln_status {
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
   if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->mutex};
@@ -641,7 +645,7 @@ auto pass_through_resource_request(mln_resource_request_handle handle)
 }
 
 auto resource_request_cancelled(
-  mln_resource_request_handle handle, bool* out_cancelled
+  mln_resource_request handle, bool* out_cancelled
 ) -> mln_status {
   if (out_cancelled == nullptr) {
     set_thread_error("out_cancelled must not be null");
@@ -660,7 +664,7 @@ auto resource_request_cancelled(
 }
 
 auto set_resource_request_cancel_callback(
-  mln_resource_request_handle handle,
+  mln_resource_request handle,
   const mln_resource_request_cancel_handler* handler, bool* out_cancelled
 ) -> mln_status {
   if (handler == nullptr) {
@@ -701,7 +705,7 @@ auto set_resource_request_cancel_callback(
   return MLN_STATUS_OK;
 }
 
-auto wait_for_resource_request_retired(mln_resource_request_handle handle)
+auto wait_for_resource_request_retired(mln_resource_request handle)
   -> mln_status {
   if (handle == MLN_HANDLE_NULL) {
     set_thread_error("resource request handle must not be null");
@@ -731,7 +735,7 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
   return MLN_STATUS_OK;
 }
 
-void release_resource_request(mln_resource_request_handle handle) noexcept {
+void release_resource_request(mln_resource_request handle) noexcept {
   if (
     const auto object = handle_table<ResourceRequestObject>().try_lease(handle)
   ) {

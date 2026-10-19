@@ -722,8 +722,9 @@ auto opengl_borrowed_texture_set_target_start(
   const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::BorrowedTexture, completion
+    session, RetargetTargetKind::BorrowedTexture, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
@@ -750,7 +751,7 @@ auto opengl_borrowed_texture_set_target_start(
        OpenGLBorrowedTarget{*descriptor}](mln_render_session_object& live) {
       return live.texture.backend->set_opengl_borrowed_target(target);
     },
-    completion,
+    std::move(checked_completion),
     valueless_completion<
       &mln_render_session_set_opengl_borrowed_texture_target>()
   );

@@ -51,7 +51,7 @@ ANNOTATION_VALUES = {
     "shape": frozenset({"array"}),
     "ownership": frozenset({"borrowed", "owned"}),
     "encoding": frozenset({"json", "bytes"}),
-    "direction": frozenset({"out", "inout"}),
+    "direction": frozenset({"out"}),
     "nullable": frozenset({"true"}),
     "optional": frozenset({"empty"}),
     "lifetime": frozenset({"call", "owner", "process"}),
@@ -142,7 +142,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "wait_retired",
         "delivery",
         "synchronous",
-        "prefix",
         "fields",
     }
 )
@@ -379,7 +378,7 @@ class Conventions:
             if signature.result is not None and signature.result.kind == "void":
                 defaults["failure"] = "contain"
         if explicit.get("kind") == "handle":
-            defaults.update(parent="none", prefix=typedef.name)
+            defaults.update(parent="none")
         record = self.records.get(typedef.name)
         if explicit.get("kind") == "callback_registration" and record:
             contexts = [
@@ -753,7 +752,7 @@ def validate(api: Api) -> None:
                 enum.name for enum in api.enums
             }:
                 errors.append(f"{pcontext}: enum names an absent enum")
-            if parameter.metadata.get("direction") in ("out", "inout"):
+            if parameter.metadata.get("direction") == "out":
                 if parameter.type.kind != "pointer":
                     errors.append(f"{pcontext}: output direction requires a pointer")
                 elif parameter.type.pointee and parameter.type.pointee.const:
@@ -768,11 +767,10 @@ def validate(api: Api) -> None:
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
             if (
-                parameter.metadata.get("direction") in {"out", "inout"}
+                parameter.metadata.get("direction") == "out"
                 and parameter.metadata.get("length") not in {None, "1"}
                 and (
-                    parameter.metadata.get("direction") != "out"
-                    or parameter.type.pointee is None
+                    parameter.type.pointee is None
                     or parameter.type.pointee.kind == "pointer"
                     or not any(
                         input_.metadata.get("direction", "in") == "in"
@@ -1002,8 +1000,6 @@ def validate(api: Api) -> None:
                     context,
                 )
             )
-        if "prefix" in typedef.metadata and typedef.metadata.get("kind") != "handle":
-            errors.append(f"{context}: prefix names a handle's operations")
         for parameter in typedef.parameters:
             pcontext = f"{context} callback parameter {parameter.name}"
             errors.extend(
@@ -1674,7 +1670,7 @@ def absence_errors(api: Api, function: Function, context: str) -> list[str]:
     directions = [
         parameter.metadata.get("direction", "in") for parameter in function.parameters
     ]
-    if directions.count("out") != 1 or "inout" in directions:
+    if directions.count("out") != 1:
         errors.append(f"{context}: absent_on requires exactly one output")
     statuses = {
         value.name: value.value

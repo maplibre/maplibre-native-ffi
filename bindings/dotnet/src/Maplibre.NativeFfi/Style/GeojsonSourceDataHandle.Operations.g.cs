@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Prepared GeoJSON data that sources retain independently of its handle.
+/// </summary>
+/// <remarks>
+/// See <c>mln_geojson_source_data</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class GeojsonSourceDataHandle
     : IDisposable,
         INativeOwner<MlnGeojsonSourceData>
@@ -25,7 +32,7 @@ public sealed unsafe partial class GeojsonSourceDataHandle
 
     private static mln_status Abandon(MlnGeojsonSourceData live, mln_diagnostic* diagnostic)
     {
-        NativeMethods.mln_geojson_source_data_destroy(live);
+        NativeMethods.mln_geojson_source_data_release(live);
         return mln_status.MLN_STATUS_OK;
     }
 
@@ -39,7 +46,7 @@ public sealed unsafe partial class GeojsonSourceDataHandle
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_destroy");
+        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_release");
         state.Retire();
     }
 
@@ -73,12 +80,12 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     /// Releases prepared GeoJSON source data.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_geojson_source_data_destroy</c> in the <see
+    /// See <c>mln_geojson_source_data_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_destroy");
+        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_release");
         state.Close();
     }
 }

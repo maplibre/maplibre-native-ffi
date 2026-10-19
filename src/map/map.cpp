@@ -610,6 +610,8 @@ class HeadlessObserver final : public mln::MapObserver {
         callback_sources_(std::move(callback_sources)) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
+    if (const auto map = event_state_->owner.lock())
+      map->snapshot_camera_dirty = true;
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
       return;
     }
@@ -620,6 +622,8 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   void onCameraIsChanging() override {
+    if (const auto map = event_state_->owner.lock())
+      map->snapshot_camera_dirty = true;
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)) {
       return;
     }
@@ -631,6 +635,8 @@ class HeadlessObserver final : public mln::MapObserver {
   // runs their handlers when it publishes. Outside one, they run from a later
   // task, after this change's event is queued, whatever the mask selects.
   void onCameraDidChange(CameraChangeMode mode) override {
+    if (const auto map = event_state_->owner.lock())
+      map->snapshot_camera_dirty = true;
     auto& events = *event_state_;
     const auto did_change = selected(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE);
     const auto ended =
@@ -1096,11 +1102,10 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     schedule_announcement();
   }
 
-  // Runs as its own task on the runtime worker, after the work queued ahead of
-  // it, so a burst of commands that the worker already holds reaches the
-  // attached session as one notice and one frame. The updates stored outside
-  // a transaction since the last announcement share the snapshot and the event
-  // that this publishes and queues.
+  // Runs after a command burst, before the next non-command work item, so
+  // queued commands reach the attached session as one notice and one frame. The
+  // updates stored outside a transaction since the last announcement share the
+  // snapshot and the event that this publishes and queues.
   auto announce() noexcept -> void {
     if (!std::exchange(announcement_scheduled_, false)) return;
     auto generation = uint64_t{0};
@@ -1209,10 +1214,15 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   auto schedule_announcement() noexcept -> void {
     if (std::exchange(announcement_scheduled_, true)) return;
     try {
-      run_loop_.invoke([owner = event_state_->owner]() noexcept {
-        const auto live = owner.lock();
-        if (live != nullptr && live->map != nullptr) live->frontend->announce();
-      });
+      const auto map = event_state_->owner.lock();
+      if (!map) return;
+      map->runtime_state->executor.invoke_notice(
+        [owner = event_state_->owner]() noexcept {
+          const auto live = owner.lock();
+          if (live != nullptr && live->map != nullptr)
+            live->frontend->announce();
+        }
+      );
     } catch (...) {
       announce();
     }
@@ -2634,6 +2644,40 @@ auto lease_map(mln_map map) -> std::shared_ptr<MapObject> {
 }
 
 auto publish_map_snapshot(MapObject& live) -> uint64_t {
+  if (!live.snapshot_config_dirty) {
+    const auto generation = live.next_snapshot_generation++;
+    const auto update_generation = live.frontend->latest_update_generation();
+    const auto fully_loaded = live.map->isFullyLoaded();
+    const auto gesture = live.map->isGestureInProgress();
+    const auto refresh_camera = live.snapshot_camera_dirty;
+    auto camera = mln_camera_options{};
+    auto free_camera = mln_free_camera_options{};
+    auto transform = std::optional<mln::TransformState>{};
+    if (refresh_camera) {
+      camera = from_native_camera(live.map->getCameraOptions());
+      free_camera = from_native_free_camera(live.map->getFreeCameraOptions());
+      transform.emplace(live.map->getTransformState());
+    }
+    {
+      const auto lock = std::scoped_lock{live.snapshot_mutex};
+      live.snapshot.generation = generation;
+      live.snapshot.logical_extent = live.logical_extent;
+      live.snapshot.event_mask =
+        live.event_state->mask.load(std::memory_order_relaxed);
+      live.snapshot.fully_loaded = fully_loaded;
+      live.snapshot.gesture_in_progress = gesture;
+      live.snapshot.latest_render_update_generation = update_generation;
+      if (refresh_camera) {
+        live.snapshot.camera = camera;
+        live.snapshot.free_camera = free_camera;
+        live.snapshot_transform = std::move(*transform);
+      }
+    }
+    live.snapshot_camera_dirty = false;
+    live.event_state->published_generation = generation;
+    return generation;
+  }
+
   const auto options = live.map->getMapOptions();
   auto snapshot = mln_map_snapshot{
     .size = sizeof(mln_map_snapshot),
@@ -2684,6 +2728,8 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     live.snapshot = snapshot;
     live.snapshot_transform = std::move(transform);
   }
+  live.snapshot_config_dirty = false;
+  live.snapshot_camera_dirty = false;
   live.event_state->published_generation = generation;
   return generation;
 }
@@ -2692,28 +2738,8 @@ auto announce_pending_render_update(MapObject& map) noexcept -> void {
   map.frontend->announce();
 }
 
-// Publishes a snapshot that refreshes only the fields that change without a
-// command: the camera, load progress, and the latest render update. Every map
-// command publishes a whole snapshot, so the other fields are still current.
 auto publish_map_render_state(MapObject& live) -> uint64_t {
-  const auto camera = from_native_camera(live.map->getCameraOptions());
-  const auto free_camera =
-    from_native_free_camera(live.map->getFreeCameraOptions());
-  const auto fully_loaded = live.map->isFullyLoaded();
-  const auto update_generation = live.frontend->latest_update_generation();
-  auto transform = live.map->getTransformState();
-  const auto generation = live.next_snapshot_generation++;
-  {
-    const std::scoped_lock lock(live.snapshot_mutex);
-    live.snapshot.generation = generation;
-    live.snapshot.camera = camera;
-    live.snapshot.free_camera = free_camera;
-    live.snapshot.fully_loaded = fully_loaded;
-    live.snapshot.latest_render_update_generation = update_generation;
-    live.snapshot_transform = std::move(transform);
-  }
-  live.event_state->published_generation = generation;
-  return generation;
+  return publish_map_snapshot(live);
 }
 
 // Opens a transaction, which holds the events that the map raises until
@@ -2820,9 +2846,8 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
   return outcome;
 }
 
-auto complete_map_command(
-  const std::shared_ptr<Completion>& completion, MapCommandOutcome outcome
-) -> void {
+auto complete_map_command(Completion* completion, MapCommandOutcome outcome)
+  -> void {
   complete_command(
     completion,
     outcome.status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
@@ -3012,41 +3037,47 @@ auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
   return MLN_STATUS_OK;
 }
 
-template <typename Work>
-auto submit_map_command_impl(
-  mln_map map, Work work, const mln_completion* completion
-) -> mln_status {
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  return submit_runtime_command(
-    context.runtime,
-    [live = std::move(context.map), map_lease = std::move(context.control),
-     completion_state, work = std::move(work)](uint64_t) mutable -> void {
-      complete_map_command(
-        completion_state, run_map_transaction(live, std::move(work))
-      );
-    },
-    completion_state
+}  // namespace
+
+auto execute_map_command(MapCommandTask& task) -> void {
+  complete_map_command(
+    task.completion, run_map_transaction(task.map, [&task](MapObject&) {
+      return task.map_work(task);
+    })
   );
 }
 
-}  // namespace
-
-auto submit_map_command(
-  mln_map map, std::function<mln_status(MapObject&)> work,
-  const mln_completion* completion
+auto prepare_map_command_task(
+  mln_map map, MapCommandTask& task, const mln_completion* descriptor
 ) -> mln_status {
-  return submit_map_command_impl(map, std::move(work), completion);
+  if (descriptor) {
+    const auto status = make_completion(descriptor, task.embedded_completion);
+    if (status != MLN_STATUS_OK) return status;
+    task.completion = &*task.embedded_completion;
+  }
+  task.map = lease_map(map);
+  if (!task.map) return recorded_handle_fault_status();
+  if (!task.map->control.acquire()) {
+    set_thread_error("map is closing");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  task.map_lease = ControlLease{&task.map->control};
+  auto runtime = task.map->runtime_state;
+  if (runtime->disposal_requested.load()) {
+    return report_handle_fault(
+      HandleTraits<RuntimeObject>::kind, task.map->runtime, HandleFault::Stale
+    );
+  }
+  return MLN_STATUS_OK;
+}
+
+auto submit_map_command_task(
+  mln_map map, MapCommandTask& task, const mln_completion* descriptor
+) -> mln_status {
+  const auto status = prepare_map_command_task(map, task, descriptor);
+  if (status != MLN_STATUS_OK) return status;
+  const auto runtime = task.map->runtime_state;
+  return submit_runtime_command_task(runtime, task);
 }
 
 auto start_style_operation(
@@ -3398,79 +3429,88 @@ auto submit_map_resize(
   mln_map map, mln_logical_extent extent, const mln_completion* completion,
   bool from_session
 ) -> mln_status {
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
-  const auto extent_status = validate_logical_extent(
-    extent, "extent dimensions and scale factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  // The renderer takes its pixel ratio at map creation and has no setter, so a
-  // resize that reported a different scale would publish a scale nothing uses.
-  if (extent.scale_factor != context.map->logical_extent.scale_factor) {
-    set_thread_error("scale factor is fixed at map creation");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* const resize_slot = from_session
-                              ? &context.map->latest_session_resize_submission
-                              : &context.map->latest_resize_submission;
-  const auto status = submit_runtime_command(
-    context.runtime,
-    [live = std::move(context.map), submission = std::move(context.control),
-     completion_state, extent, from_session,
-     resize_slot](uint64_t sequence) mutable -> void {
-      if (!from_session) {
-        auto attached = false;
-        {
-          const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
-          attached = live->render_target_session != nullptr;
+  struct ResizeTask final : MapCommandTask {
+    mln_logical_extent extent;
+    bool from_session;
+    ResizeTask(mln_logical_extent extent, bool from_session)
+        : extent(extent), from_session(from_session) {
+      command = true;
+      run = [](ExecutorTask* base) noexcept {
+        auto owner =
+          std::unique_ptr<ResizeTask>{static_cast<ResizeTask*>(base)};
+        run_runtime_command_task(*owner);
+      };
+      work = [](RuntimeCommandTask& base) {
+        auto& self = static_cast<ResizeTask&>(base);
+        auto& live = *self.map;
+        if (!self.from_session) {
+          auto attached = false;
+          {
+            const auto lock =
+              std::scoped_lock{handle_table<MapObject>().mutex()};
+            attached = live.render_target_session != nullptr;
+          }
+          if (attached) {
+            complete_command(
+              self.completion, MLN_COMMAND_DISPOSITION_FAILED,
+              MLN_STATUS_INVALID_STATE, 0,
+              "map still has an attached render session"
+            );
+            return;
+          }
         }
-        if (attached) {
+        const auto latest = self.from_session
+                              ? live.latest_session_resize_submission.load()
+                              : live.latest_resize_submission.load();
+        if (self.sequence != latest) {
           complete_command(
-            completion_state, MLN_COMMAND_DISPOSITION_FAILED,
-            MLN_STATUS_INVALID_STATE, 0,
-            "map still has an attached render session"
+            self.completion, MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK
           );
           return;
         }
-      }
-      if (sequence != resize_slot->load()) {
-        complete_command(
-          completion_state, MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK
+        complete_map_command(
+          self.completion,
+          run_map_transaction(
+            self.map, [extent = self.extent](MapObject& live) -> mln_status {
+              // Map::setSize publishes an update even when the size is
+              // unchanged.
+              if (
+                live.logical_extent.width == extent.width &&
+                live.logical_extent.height == extent.height
+              )
+                return MLN_STATUS_OK;
+              live.logical_extent.width = extent.width;
+              live.logical_extent.height = extent.height;
+              live.snapshot_camera_dirty = true;
+              live.map->setSize(mln::Size{extent.width, extent.height});
+              return MLN_STATUS_OK;
+            }
+          )
         );
-        return;
-      }
-      complete_map_command(
-        completion_state,
-        run_map_transaction(live, [extent](MapObject& map) -> mln_status {
-          // Map::setSize publishes a render update even when the size is
-          // unchanged.
-          if (
-            map.logical_extent.width == extent.width &&
-            map.logical_extent.height == extent.height
-          ) {
-            return MLN_STATUS_OK;
-          }
-          map.logical_extent.width = extent.width;
-          map.logical_extent.height = extent.height;
-          map.map->setSize(mln::Size{extent.width, extent.height});
-          return MLN_STATUS_OK;
-        })
-      );
-    },
-    completion_state, resize_slot
+      };
+      clear_work = [](RuntimeCommandTask& base) noexcept {
+        auto& self = static_cast<ResizeTask&>(base);
+        self.map_lease.reset();
+        self.map.reset();
+      };
+    }
+  };
+  auto task = std::make_unique<ResizeTask>(extent, from_session);
+  const auto prepared = prepare_map_command_task(map, *task, completion);
+  if (prepared != MLN_STATUS_OK) return prepared;
+  const auto extent_status = validate_logical_extent(
+    extent, "extent dimensions and scale factor must be positive"
   );
+  if (extent_status != MLN_STATUS_OK) return extent_status;
+  if (extent.scale_factor != task->map->logical_extent.scale_factor) {
+    set_thread_error("scale factor is fixed at map creation");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto* slot = from_session ? &task->map->latest_session_resize_submission
+                            : &task->map->latest_resize_submission;
+  const auto runtime = task->map->runtime_state;
+  const auto status = submit_runtime_command_task(runtime, *task, slot);
+  if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }
 
@@ -3624,43 +3664,25 @@ PendingMapResult::~PendingMapResult() {
 
 auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status {
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  // The map mode is fixed at creation, so this rejection belongs on the
-  // calling thread rather than in the command body.
-  if (context.map->map_mode != MLN_MAP_MODE_CONTINUOUS) {
+  const auto live = lease_map(map);
+  if (!live) return recorded_handle_fault_status();
+  if (live->map_mode != MLN_MAP_MODE_CONTINUOUS) {
     set_thread_error("map is not in continuous mode");
     return MLN_STATUS_INVALID_STATE;
   }
-  return submit_runtime_command(
-    context.runtime,
-    [live = std::move(context.map), submission = std::move(context.control),
-     completion_state](uint64_t) mutable -> void {
-      complete_map_command(
-        completion_state,
-        run_map_transaction(live, [](MapObject& map) -> mln_status {
-          map.map->triggerRepaint();
-          return MLN_STATUS_OK;
-        })
-      );
+  return submit_map_command(
+    map,
+    [](MapObject& live) -> mln_status {
+      live.map->triggerRepaint();
+      return MLN_STATUS_OK;
     },
-    completion_state
+    completion
   );
 }
 
 auto map_begin_command_group(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return submit_map_command_impl(
+  return submit_map_command(
     map,
     [](MapObject& live) -> mln_status {
       live.frontend->begin_command_group();
@@ -3672,7 +3694,7 @@ auto map_begin_command_group(mln_map map, const mln_completion* completion)
 
 auto map_end_command_group(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return submit_map_command_impl(
+  return submit_map_command(
     map,
     [](MapObject& live) -> mln_status {
       if (!live.frontend->end_command_group()) {
@@ -4100,36 +4122,17 @@ auto map_style_url_start(mln_map map, const mln_completion* completion)
 auto map_set_event_mask(
   mln_map map, uint64_t mask, const mln_completion* completion
 ) -> mln_status {
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
   if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
     set_thread_error("mask must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  return submit_runtime_command(
-    context.runtime,
-    [live = std::move(context.map), mask,
-     submission = std::move(context.control),
-     completion_state](uint64_t) mutable -> void {
-      complete_map_command(
-        completion_state,
-        run_map_transaction(live, [mask](MapObject& map) -> mln_status {
-          map.event_state->mask.store(mask, std::memory_order_relaxed);
-          return MLN_STATUS_OK;
-        })
-      );
+  return submit_map_command(
+    map,
+    [mask](MapObject& live) -> mln_status {
+      live.event_state->mask.store(mask, std::memory_order_relaxed);
+      return MLN_STATUS_OK;
     },
-    completion_state
+    completion
   );
 }
 
@@ -4139,30 +4142,14 @@ template <typename Mutation>
 auto submit_camera_command(
   mln_map map, Mutation mutation, const mln_completion* completion
 ) -> mln_status {
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) return acquire_status;
-  return submit_runtime_command(
-    context.runtime,
-    [live = std::move(context.map), mutation = std::move(mutation),
-     submission = std::move(context.control),
-     completion_state](uint64_t) mutable -> void {
-      complete_map_command(
-        completion_state,
-        run_map_transaction(live, [&mutation](MapObject& map) -> mln_status {
-          mutation(map);
-          return MLN_STATUS_OK;
-        })
-      );
+  return submit_map_command(
+    map,
+    [mutation = std::move(mutation)](MapObject& live) mutable -> mln_status {
+      live.snapshot_camera_dirty = true;
+      mutation(live);
+      return MLN_STATUS_OK;
     },
-    completion_state
+    completion
   );
 }
 
@@ -4479,12 +4466,14 @@ auto map_set_debug_options(MapObject& live, uint32_t options) -> mln_status {
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
+  live.snapshot_config_dirty = true;
   live.map->setDebug(to_native_debug_options(options));
   return MLN_STATUS_OK;
 }
 
 auto map_set_rendering_stats_view_enabled(MapObject& live, bool enabled)
   -> mln_status {
+  live.snapshot_config_dirty = true;
   live.map->enableRenderingStatsView(enabled);
   return MLN_STATUS_OK;
 }
@@ -4502,6 +4491,8 @@ auto map_set_viewport_options(
     return options_status;
   }
 
+  live.snapshot_config_dirty = true;
+  live.snapshot_camera_dirty = true;
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0U) {
     live.map->setNorthOrientation(
       to_native_north_orientation(options->north_orientation)
@@ -4528,6 +4519,7 @@ auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
     return options_status;
   }
 
+  live.snapshot_config_dirty = true;
   if ((options->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U) {
     live.map->setPrefetchZoomDelta(
       static_cast<uint8_t>(options->prefetch_zoom_delta)
@@ -4585,7 +4577,7 @@ auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   return map_projection_create_from_transform(transform, out_projection);
 }
 
-auto map_projection_close(mln_map_projection projection) -> mln_status {
+auto map_projection_release(mln_map_projection projection) -> mln_status {
   auto& table = handle_table<MapProjectionObject>();
   std::shared_ptr<MapProjectionObject> owned;
   {
@@ -5153,6 +5145,8 @@ auto map_set_bounds(MapObject& live, const mln_bound_options* options)
 
   // Native setBounds only applies optionals that are set, so this preserves
   // constraints omitted from options->fields.
+  live.snapshot_config_dirty = true;
+  live.snapshot_camera_dirty = true;
   live.map->setBounds(to_native_bound_options(*options));
   return MLN_STATUS_OK;
 }
@@ -5165,6 +5159,7 @@ auto map_set_free_camera_options(
     return options_status;
   }
 
+  live.snapshot_camera_dirty = true;
   live.map->setFreeCameraOptions(to_native_free_camera(*options));
   return MLN_STATUS_OK;
 }
@@ -5203,9 +5198,11 @@ auto map_set_projection_mode(
   if ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
     copied.withYSkew(mode->y_skew);
   }
-  return submit_map_command_impl(
+  return submit_map_command(
     map,
     [copied = std::move(copied)](MapObject& live) mutable -> mln_status {
+      live.snapshot_config_dirty = true;
+      live.snapshot_camera_dirty = true;
       live.map->setProjectionMode(std::move(copied));
       return MLN_STATUS_OK;
     },

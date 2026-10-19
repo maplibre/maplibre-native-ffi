@@ -6,10 +6,9 @@ import (
 	"testing"
 )
 
-// A string the C API reads NUL-terminated rejects an embedded NUL before the
-// call, and one it reads as an explicit-length view carries the NUL to native,
-// which decides what it means.
-func TestStringsCrossInTheirDeclaredShape(t *testing.T) {
+// Host strings cross as views. Native validates paths and URLs, and native-lent
+// strings decode from terminated storage.
+func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 	asset := "asset\x00root"
 	options := DefaultRuntimeOptions()
 	options.AssetPath = &asset
@@ -25,6 +24,7 @@ func TestStringsCrossInTheirDeclaredShape(t *testing.T) {
 		t.Fatalf("SetStyleJson with a NUL = %+v, want native's parse failure", completion)
 	}
 	const url = "custom://named-style.json"
+	f.serveStyle(t, url)
 	if _, err := f.m.SetStyleUrl(url); err != nil {
 		t.Fatal(err)
 	}

@@ -4,8 +4,11 @@
 // the matchers directly.
 
 #include <array>
+#include <atomic>
+#include <barrier>
 #include <cstdint>
 #include <string_view>
+#include <thread>
 
 #include "resources/url_rules.hpp"
 
@@ -90,7 +93,7 @@ void routes_compare_the_url_stage_they_select() {
   const auto resolved = table_of({
     .kinds = MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE,
     .flags = MLN_URL_MATCH_EXACT,
-    .url = "https://maps.localhost/style.json",
+    .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
     .url_stage = MLN_RESOURCE_ROUTE_URL_RESOLVED,
   });
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url));
@@ -104,7 +107,7 @@ void routes_compare_the_url_stage_they_select() {
   const auto requested = table_of({
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = MLN_URL_MATCH_EXACT,
-    .url = "maplibre://maps/style",
+    .url = MLN_BUFFER_LITERAL("maplibre://maps/style"),
     .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
   });
   TEST_ASSERT_TRUE(requested.matches(MLN_RESOURCE_KIND_TILE, alias, style_url));
@@ -115,7 +118,7 @@ void routes_compare_the_url_stage_they_select() {
   const auto requested_glob = table_of({
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = MLN_URL_MATCH_GLOB,
-    .url = "maplibre://**",
+    .url = MLN_BUFFER_LITERAL("maplibre://**"),
     .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
   });
   TEST_ASSERT_TRUE(
@@ -139,10 +142,34 @@ void pathological_globs_have_linear_work_in_candidate_length() {
   }
 }
 
+void concurrent_matches_keep_independent_scratch() {
+  const auto compiled =
+    mln::core::CompiledGlob{"https://*.localhost/**/tile?.pbf"};
+  auto start = std::barrier{8};
+  auto valid = std::atomic_bool{true};
+  auto threads = std::array<std::jthread, 8>{};
+  for (auto& thread : threads) {
+    thread = std::jthread{[&]() {
+      start.arrive_and_wait();
+      for (auto attempt = 0; attempt < 1000; ++attempt) {
+        if (
+          !compiled.matches("https://maps.localhost/a/b/tile1.pbf") ||
+          compiled.matches("https://maps.localhost/a/b/tile12.pbf")
+        ) {
+          valid.store(false, std::memory_order_relaxed);
+        }
+      }
+    }};
+  }
+  for (auto& thread : threads) thread.join();
+  TEST_ASSERT_TRUE(valid.load(std::memory_order_relaxed));
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(globs_match_the_documented_pattern_language);
+  RUN_TEST(concurrent_matches_keep_independent_scratch);
   RUN_TEST(pathological_globs_have_linear_work_in_candidate_length);
   RUN_TEST(routes_compare_the_url_stage_they_select);
 }

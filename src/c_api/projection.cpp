@@ -15,11 +15,11 @@ auto mln_map_create_projection(
   });
 }
 
-auto mln_map_projection_close(
+auto mln_map_projection_release(
   mln_map_projection projection, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_projection_close(projection);
+    return mln::core::map_projection_release(projection);
   });
 }
 

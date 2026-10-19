@@ -7,7 +7,7 @@ from dataclasses import replace
 import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import api
-from support import EMPTY_STYLE, Harness, result
+from support import EMPTY_STYLE, Harness, ok_response, result
 
 
 def _jump(map_handle: mln.MapHandle, camera: mln.CameraOptions) -> None:
@@ -19,15 +19,28 @@ def _jump(map_handle: mln.MapHandle, camera: mln.CameraOptions) -> None:
     )
 
 
-def test_strings_cross_as_c_strings_and_as_sized_views(
+def test_host_strings_use_views_and_native_lent_strings_decode(
+    harness: Harness,
     map_handle: mln.MapHandle,
 ) -> None:
+    seen: list[str | None] = []
+
+    def serve(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
+        seen.append(request.resolved_url)
+        handle.complete(ok_response())
+
+    harness.routes["custom://native-lent.json"] = serve
+    map_handle.set_style_url("custom://native-lent.json")
+    harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+    assert seen == ["custom://native-lent.json"]
     result(map_handle.set_style_json(EMPTY_STYLE))
     layer_id = "café-层"
     layer = json.dumps({"id": layer_id, "type": "background"}, ensure_ascii=False)
 
     # The layer JSON crosses as sized UTF-8 bytes, and the ID comes back
-    # through a lookup that takes it as a NUL-terminated string.
+    # through a lookup that also takes an explicit-length view.
     result(map_handle.add_style_layer_json(layer.encode()))
     assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
     stored = result(map_handle.get_style_layer_json(layer_id))
@@ -36,7 +49,7 @@ def test_strings_cross_as_c_strings_and_as_sized_views(
 
     with pytest.raises(mln.InvalidArgumentError) as raised:
         map_handle.set_style_url("custom://bad\0url")
-    assert raised.value.native_status_code is None
+    assert raised.value.native_status_code is not None
     assert "embedded NUL" in raised.value.diagnostic
     with pytest.raises(TypeError, match="instance of 'bytes'"):
         map_handle.add_style_layer_json(typing.cast(typing.Any, layer))

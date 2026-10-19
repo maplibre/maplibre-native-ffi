@@ -778,8 +778,8 @@ internal static unsafe class GeneratedValues
         Required(value.Name, "HttpHeader.Name must not be null.");
         Required(value.Value, "HttpHeader.Value must not be null.");
         var native = new mln_http_header();
-        native.name = scope.CString(value.Name);
-        native.value = scope.CString(value.Value);
+        native.name = scope.Utf8(value.Name);
+        native.value = scope.Utf8(value.Value);
         return native;
     }
 
@@ -792,7 +792,7 @@ internal static unsafe class GeneratedValues
         var native = new mln_http_header_rule();
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
-        native.url = scope.CString(value.Url);
+        native.url = scope.Utf8(value.Url);
         native.headers = scope.Array<mln_http_header, HttpHeader>(
             value.HeadersStorage.Items,
             item => NativeHttpHeader(item, scope)
@@ -1262,7 +1262,7 @@ internal static unsafe class GeneratedValues
     ) =>
         new()
         {
-            StyleUrl = NativeCallScope.CopyCString(value.style_url),
+            StyleUrl = RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
             GeometryStorage = new(ValueStructs.CopyBufferView(value.geometry)),
             MinZoom = value.min_zoom,
             MaxZoom = value.max_zoom,
@@ -1277,7 +1277,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.StyleUrl, "OfflineGeometryRegionDefinition.StyleUrl must not be null.");
         var native = new mln_offline_geometry_region_definition();
-        native.style_url = scope.CString(value.StyleUrl);
+        native.style_url = scope.Utf8(value.StyleUrl);
         native.geometry = scope.Buffer(value.GeometryStorage.Items);
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
@@ -1392,7 +1392,7 @@ internal static unsafe class GeneratedValues
         mln_offline_tile_pyramid_region_definition value
     ) =>
         new(
-            NativeCallScope.CopyCString(value.style_url),
+            RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
             CopyLatLngBounds(value.bounds),
             value.min_zoom,
             value.max_zoom,
@@ -1407,7 +1407,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.StyleUrl, "OfflineTilePyramidRegionDefinition.StyleUrl must not be null.");
         var native = new mln_offline_tile_pyramid_region_definition();
-        native.style_url = scope.CString(value.StyleUrl);
+        native.style_url = scope.Utf8(value.StyleUrl);
         native.bounds = NativeLatLngBounds(value.Bounds);
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
@@ -2037,7 +2037,7 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint InvokeResourceProviderCallback(
         void* user_data,
-        mln_resource_request* request,
+        mln_resource_request_info* request,
         MlnResourceRequest handle
     )
     {
@@ -2051,7 +2051,7 @@ internal static unsafe class GeneratedValues
             );
             var decision =
                 ((ResourceProvider)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                    CopyResourceRequest(NativeCallScope.Read(request)),
+                    CopyResourceRequestInfo(NativeCallScope.Read(request)),
                     owned
                 )
                 ?? (ResourceProviderDecision)
@@ -2113,79 +2113,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static ResourceRequest CopyResourceRequest(mln_resource_request value) =>
-        new()
-        {
-            RequestedUrl =
-                value.requested_url == null
-                    ? null
-                    : NativeCallScope.CopyCString(value.requested_url),
-            ResolvedUrl =
-                value.resolved_url == null ? null : NativeCallScope.CopyCString(value.resolved_url),
-            Kind = (ResourceKind)value.kind,
-            LoadingMethod = (ResourceLoadingMethod)value.loading_method,
-            Priority = (ResourcePriority)value.priority,
-            Usage = (ResourceUsage)value.usage,
-            StoragePolicy = (ResourceStoragePolicy)value.storage_policy,
-            Range = value.fields.HasFlag(MLN_RESOURCE_REQUEST_RANGE)
-                ? CopyResourceRange(value.range)
-                : null,
-            PriorModifiedUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
-                ? value.prior_modified_unix_ms
-                : null,
-            PriorExpiresUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
-                ? value.prior_expires_unix_ms
-                : null,
-            PriorEtag =
-                value.prior_etag == null ? null : NativeCallScope.CopyCString(value.prior_etag),
-            PriorDataStorage = new(
-                NativeCallScope.CopyArray<byte>(
-                    (byte*)value.prior_data,
-                    (nuint)(value.prior_data_size)
-                )
-            ),
-        };
-
-    internal static mln_resource_request NativeResourceRequest(
-        ResourceRequest value,
-        NativeCallScope scope
-    )
-    {
-        var native = new mln_resource_request();
-        native.fields = 0;
-        native.size = (uint)sizeof(mln_resource_request);
-        native.requested_url = value.RequestedUrl is null
-            ? null
-            : scope.CString(value.RequestedUrl);
-        native.resolved_url = value.ResolvedUrl is null ? null : scope.CString(value.ResolvedUrl);
-        native.kind = (uint)value.Kind;
-        native.loading_method = (uint)value.LoadingMethod;
-        native.priority = (uint)value.Priority;
-        native.usage = (uint)value.Usage;
-        native.storage_policy = (uint)value.StoragePolicy;
-        native.fields |= Put(
-            value.Range,
-            ref native.range,
-            MLN_RESOURCE_REQUEST_RANGE,
-            NativeResourceRange
-        );
-        native.fields |= Put(
-            value.PriorModifiedUnixMs,
-            ref native.prior_modified_unix_ms,
-            MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
-        );
-        native.fields |= Put(
-            value.PriorExpiresUnixMs,
-            ref native.prior_expires_unix_ms,
-            MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
-        );
-        native.prior_etag = value.PriorEtag is null ? null : scope.CString(value.PriorEtag);
-        var bufferPriorData = scope.Buffer(value.PriorDataStorage.Items);
-        native.prior_data = (byte*)bufferPriorData.data;
-        native.prior_data_size = checked((nuint)bufferPriorData.size);
-        return native;
-    }
-
     private static readonly string[] AllowedResourceRequestCancelHandlerCallback =
     [
         "mln_resource_request_complete",
@@ -2233,6 +2160,79 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static ResourceRequestInfo CopyResourceRequestInfo(mln_resource_request_info value) =>
+        new()
+        {
+            RequestedUrl =
+                value.requested_url == null
+                    ? null
+                    : NativeCallScope.CopyCString(value.requested_url),
+            ResolvedUrl =
+                value.resolved_url == null ? null : NativeCallScope.CopyCString(value.resolved_url),
+            Kind = (ResourceKind)value.kind,
+            LoadingMethod = (ResourceLoadingMethod)value.loading_method,
+            Priority = (ResourcePriority)value.priority,
+            Usage = (ResourceUsage)value.usage,
+            StoragePolicy = (ResourceStoragePolicy)value.storage_policy,
+            Range = value.fields.HasFlag(MLN_RESOURCE_REQUEST_RANGE)
+                ? CopyResourceRange(value.range)
+                : null,
+            PriorModifiedUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
+                ? value.prior_modified_unix_ms
+                : null,
+            PriorExpiresUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
+                ? value.prior_expires_unix_ms
+                : null,
+            PriorEtag =
+                value.prior_etag == null ? null : NativeCallScope.CopyCString(value.prior_etag),
+            PriorDataStorage = new(
+                NativeCallScope.CopyArray<byte>(
+                    (byte*)value.prior_data,
+                    (nuint)(value.prior_data_size)
+                )
+            ),
+        };
+
+    internal static mln_resource_request_info NativeResourceRequestInfo(
+        ResourceRequestInfo value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_resource_request_info();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_resource_request_info);
+        native.requested_url = value.RequestedUrl is null
+            ? null
+            : scope.CString(value.RequestedUrl);
+        native.resolved_url = value.ResolvedUrl is null ? null : scope.CString(value.ResolvedUrl);
+        native.kind = (uint)value.Kind;
+        native.loading_method = (uint)value.LoadingMethod;
+        native.priority = (uint)value.Priority;
+        native.usage = (uint)value.Usage;
+        native.storage_policy = (uint)value.StoragePolicy;
+        native.fields |= Put(
+            value.Range,
+            ref native.range,
+            MLN_RESOURCE_REQUEST_RANGE,
+            NativeResourceRange
+        );
+        native.fields |= Put(
+            value.PriorModifiedUnixMs,
+            ref native.prior_modified_unix_ms,
+            MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
+        );
+        native.fields |= Put(
+            value.PriorExpiresUnixMs,
+            ref native.prior_expires_unix_ms,
+            MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
+        );
+        native.prior_etag = value.PriorEtag is null ? null : scope.CString(value.PriorEtag);
+        var bufferPriorData = scope.Buffer(value.PriorDataStorage.Items);
+        native.prior_data = (byte*)bufferPriorData.data;
+        native.prior_data_size = checked((nuint)bufferPriorData.size);
+        return native;
+    }
+
     internal static mln_resource_response NativeResourceResponse(
         ResourceResponse value,
         NativeCallScope scope
@@ -2246,9 +2246,7 @@ internal static unsafe class GeneratedValues
         var bufferBytes = scope.Buffer(value.BytesStorage.Items);
         native.bytes = (byte*)bufferBytes.data;
         native.byte_count = checked((nuint)bufferBytes.size);
-        native.error_message = value.ErrorMessage is null
-            ? null
-            : scope.CString(value.ErrorMessage);
+        native.error_message = scope.Utf8(value.ErrorMessage ?? "");
         native.must_revalidate = (byte)(value.MustRevalidate ? 1 : 0);
         native.fields |= Put(
             value.ModifiedUnixMs,
@@ -2260,7 +2258,7 @@ internal static unsafe class GeneratedValues
             ref native.expires_unix_ms,
             MLN_RESOURCE_RESPONSE_EXPIRES
         );
-        native.etag = value.Etag is null ? null : scope.CString(value.Etag);
+        native.etag = scope.Utf8(value.Etag ?? "");
         native.fields |= Put(
             value.RetryAfterUnixMs,
             ref native.retry_after_unix_ms,
@@ -2278,10 +2276,8 @@ internal static unsafe class GeneratedValues
         var native = new mln_resource_rewrite_rule();
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
-        native.url = scope.CString(value.Url);
-        native.replacement_url = value.ReplacementUrl is null
-            ? null
-            : scope.CString(value.ReplacementUrl);
+        native.url = scope.Utf8(value.Url);
+        native.replacement_url = scope.Utf8(value.ReplacementUrl ?? "");
         return native;
     }
 
@@ -2294,7 +2290,7 @@ internal static unsafe class GeneratedValues
         var native = new mln_resource_route();
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
-        native.url = scope.CString(value.Url);
+        native.url = scope.Utf8(value.Url);
         native.url_stage = (uint)value.UrlStage;
         return native;
     }
@@ -2522,8 +2518,12 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeOptions CopyRuntimeOptions(mln_runtime_options value) =>
         new(
-            value.asset_path == null ? null : NativeCallScope.CopyCString(value.asset_path),
-            value.cache_path == null ? null : NativeCallScope.CopyCString(value.cache_path),
+            value.asset_path.size == 0
+                ? null
+                : RuntimeStructs.CopyUtf8((sbyte*)value.asset_path.data, value.asset_path.size),
+            value.cache_path.size == 0
+                ? null
+                : RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size),
             (RuntimeEventMask)value.event_mask,
             default
         );
@@ -2535,8 +2535,8 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_runtime_options_default();
         native.size = (uint)sizeof(mln_runtime_options);
-        native.asset_path = value.AssetPath is null ? null : scope.CString(value.AssetPath);
-        native.cache_path = value.CachePath is null ? null : scope.CString(value.CachePath);
+        native.asset_path = scope.Utf8(value.AssetPath ?? "");
+        native.cache_path = scope.Utf8(value.CachePath ?? "");
         native.event_mask = (ulong)value.EventMask;
         native.event_wake = NativeWake(value.EventWake, scope);
         return native;

@@ -136,7 +136,7 @@ pub fn main(init_args: std.process.Init) !void {
     var style = if (isSmokeRun(init_args))
         try maplibre.mapSetStyleJson(map, smoke_style_json, &diagnostic)
     else
-        try maplibre.mapSetStyleUrl(allocator, map, style_url, &diagnostic);
+        try maplibre.mapSetStyleUrl(map, style_url, &diagnostic);
     style.deinit();
 
     var context = try OwnedTextureContext.init();

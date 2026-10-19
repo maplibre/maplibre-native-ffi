@@ -104,7 +104,7 @@ typedef struct mln_queue_lock {
  * invokes no completion. Hosts may service caller-driver work before
  * attachment completes. A failed completion still requires
  * mln_render_session_detach() or mln_render_session_abandon() before
- * mln_render_session_destroy().
+ * mln_render_session_release().
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;

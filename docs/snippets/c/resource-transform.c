@@ -31,7 +31,8 @@ static mln_status add_api_key(
 
   // The helper copies the URL before rewritten leaves scope.
   return mln_resource_transform_response_set_url(
-    out_response, rewritten, strlen(rewritten), NULL
+    out_response,
+    (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)}, NULL
   );
   // #endregion rewrite
 }
@@ -57,8 +58,15 @@ mln_status install_rewrite_rules(
   // #region rules
   const mln_resource_rewrite_rule rule = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = "https://tiles.example.com/style.json",
-    .replacement_url = "https://mirror.example.com/style.json",
+    .url =
+      (mln_buffer_view){
+        .data = "https://tiles.example.com/style.json",
+        .size = sizeof("https://tiles.example.com/style.json") - 1
+      },
+    .replacement_url = (mln_buffer_view){
+      .data = "https://mirror.example.com/style.json",
+      .size = sizeof("https://mirror.example.com/style.json") - 1
+    },
   };
   const mln_resource_transform transform = {
     .size = sizeof(transform),

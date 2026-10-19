@@ -157,7 +157,7 @@ internal object Upcalls {
       val decisionOwner = ResourceRequestHandle(handle)
       decisionOwner.binding
         .decide(decisionOwner, "mln_resource_provider_callback") {
-          value.callback(readResourceRequest(request), decisionOwner).rawValue
+          value.callback(readResourceRequestInfo(request), decisionOwner).rawValue
         }
         .toInt()
     }

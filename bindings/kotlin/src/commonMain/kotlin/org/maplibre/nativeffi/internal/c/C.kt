@@ -62,7 +62,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_geojson_source_data_destroy(data: Long): Unit
+  fun mln_geojson_source_data_release(data: Long): Unit
 
   fun mln_geojson_source_options_default(returned: Long): Unit
 
@@ -71,9 +71,7 @@ internal expect object C {
   fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
-    nameSize: Long,
     value: Long,
-    valueSize: Long,
     outDiagnostic: Long,
   ): Int
 
@@ -483,8 +481,6 @@ internal expect object C {
 
   fun mln_map_options_default(returned: Long): Unit
 
-  fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int
-
   fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_lat_lng_for_pixel(
@@ -538,6 +534,8 @@ internal expect object C {
     outPoints: Long,
     outDiagnostic: Long,
   ): Int
+
+  fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_set_camera(projection: Long, camera: Long, outDiagnostic: Long): Int
 
@@ -819,8 +817,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_render_session_destroy(session: Long, outDiagnostic: Long): Int
-
   fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int
@@ -875,6 +871,8 @@ internal expect object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int
+
+  fun mln_render_session_release(session: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_request_frame(session: Long, demand: Long, outDiagnostic: Long): Int
 
@@ -973,12 +971,7 @@ internal expect object C {
 
   fun mln_resource_request_wait_until_retired(handle: Long, outDiagnostic: Long): Int
 
-  fun mln_resource_transform_response_set_url(
-    response: Long,
-    url: Long,
-    urlSize: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_resource_transform_response_set_url(response: Long, url: Long, outDiagnostic: Long): Int
 
   fun mln_runtime_barrier(runtime: Long, completion: Long, outDiagnostic: Long): Int
 

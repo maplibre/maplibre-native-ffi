@@ -46,20 +46,20 @@ MLN_API mln_status mln_map_create_projection(
 ) MLN_NOEXCEPT;
 
 /**
- * Closes a standalone projection.
+ * Releases a standalone projection.
  *
- * The close retires the handle, waits for projection calls already running on
+ * The release retires the handle, waits for projection calls already running on
  * other threads, and destroys the projection before it returns. A later call
  * with the retired handle returns MLN_STATUS_INVALID_STATE. This function
  * may be called from any thread.
  *
  * Returns:
- * - MLN_STATUS_OK when the projection was closed by this call.
+ * - MLN_STATUS_OK when the projection was released by this call.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_projection_close(
+MLN_API mln_status mln_map_projection_release(
   mln_map_projection projection, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

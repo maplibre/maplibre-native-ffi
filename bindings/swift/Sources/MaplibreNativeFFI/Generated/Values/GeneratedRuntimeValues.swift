@@ -95,14 +95,17 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
     raw: mln_http_header,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    name = try NativeString.copyCString(raw.name)
-    value = try NativeString.copyCString(raw.value)
+    name = try NativeString.copyUTF8(data: raw.name.data, size: raw.name.size)
+    value = try NativeString.copyUTF8(
+      data: raw.value.data,
+      size: raw.value.size
+    )
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header {
     var raw = mln_http_header()
-    raw.name = try arena.cString(name)
-    raw.value = try arena.cString(value)
+    raw.name = arena.view(name)
+    raw.value = arena.view(value)
     return raw
   }
 }
@@ -143,7 +146,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   ) throws {
     kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
-    url = try NativeString.copyCString(raw.url)
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
     headers = try NativeInputArena.copyArray(
       raw.headers,
       count: Int(raw.header_count)
@@ -154,7 +157,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
     var raw = mln_http_header_rule()
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
-    raw.url = try arena.cString(url)
+    raw.url = arena.view(url)
     raw.headers = try arena
       .array(headers.map { try $0.nativeValue(arena: arena) })
     raw.header_count = try NativeInputArena.count(headers.count)
@@ -518,13 +521,13 @@ public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
   /// Decides each request that the routes leave to the provider.
-  public var callback: (@Sendable (ResourceRequest,
+  public var callback: (@Sendable (ResourceRequestInfo,
                                    ResourceRequestHandle) throws
       -> ResourceProviderDecision)?
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: (@Sendable (ResourceRequest, ResourceRequestHandle) throws
+    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle) throws
       -> ResourceProviderDecision)? = nil,
     routes: [ResourceRoute] = []
   ) {
@@ -560,8 +563,8 @@ private let allowedResourceProviderCallback: Set<String> = [
 ]
 private func invokeResourceProviderCallback(
   user_data: UnsafeMutableRawPointer?,
-  request: UnsafePointer<mln_resource_request>?,
-  handle: mln_resource_request_handle
+  request: UnsafePointer<mln_resource_request_info>?,
+  handle: mln_resource_request
 ) -> UInt32 {
   guard let user_data
   else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
@@ -578,7 +581,7 @@ private func invokeResourceProviderCallback(
   defer { admission.end() }
   do { let accepted = try box.value.callback?(
     NativeInputArena.copyArray(request, count: 1)
-      .map { try ResourceRequest(raw: $0) }[0],
+      .map { try ResourceRequestInfo(raw: $0) }[0],
     decisionOwner
   ).rawValue == MLN_RESOURCE_PROVIDER_DECISION_HANDLE
     .rawValue; return decisionOwner.handle
@@ -636,115 +639,6 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
     var raw = mln_resource_range()
     raw.start = start
     raw.end = end
-    return raw
-  }
-}
-
-public struct ResourceRequest: Equatable, Hashable, Sendable {
-  /// URL entering the network layer, before tile server normalization. Copied
-  /// text, owned by the caller.
-  public var requestedUrl: String?
-  /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key. Copied text, owned by the caller.
-  public var resolvedUrl: String?
-  public var kind: ResourceKind
-  public var loadingMethod: ResourceLoadingMethod
-  public var priority: ResourcePriority
-  public var usage: ResourceUsage
-  public var storagePolicy: ResourceStoragePolicy
-  public var range: ResourceRange?
-  public var priorModifiedUnixMs: Int64?
-  public var priorExpiresUnixMs: Int64?
-  /// Copied text, owned by the caller.
-  public var priorEtag: String?
-  /// Copied bytes, owned by the caller.
-  public var priorData: Data
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(
-    requestedUrl: String? = nil,
-    resolvedUrl: String? = nil,
-    kind: ResourceKind = .init(rawValue: 0),
-    loadingMethod: ResourceLoadingMethod = .init(rawValue: 0),
-    priority: ResourcePriority = .init(rawValue: 0),
-    usage: ResourceUsage = .init(rawValue: 0),
-    storagePolicy: ResourceStoragePolicy = .init(rawValue: 0),
-    range: ResourceRange? = nil,
-    priorModifiedUnixMs: Int64? = nil,
-    priorExpiresUnixMs: Int64? = nil,
-    priorEtag: String? = nil,
-    priorData: Data = Data()
-  ) {
-    self.requestedUrl = requestedUrl
-    self.resolvedUrl = resolvedUrl
-    self.kind = kind
-    self.loadingMethod = loadingMethod
-    self.priority = priority
-    self.usage = usage
-    self.storagePolicy = storagePolicy
-    self.range = range
-    self.priorModifiedUnixMs = priorModifiedUnixMs
-    self.priorExpiresUnixMs = priorExpiresUnixMs
-    self.priorEtag = priorEtag
-    self.priorData = priorData
-  }
-
-  init(
-    raw: mln_resource_request,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    requestedUrl = raw.requested_url == nil ? nil : try NativeString
-      .copyCString(raw.requested_url)
-    resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
-      .copyCString(raw.resolved_url)
-    kind = ResourceKind(rawValue: raw.kind)
-    loadingMethod = ResourceLoadingMethod(rawValue: raw.loading_method)
-    priority = ResourcePriority(rawValue: raw.priority)
-    usage = ResourceUsage(rawValue: raw.usage)
-    storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
-    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
-      .rawValue != 0 ? ResourceRange(raw: raw.range) : nil
-    priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
-      .rawValue != 0 ? raw.prior_modified_unix_ms : nil
-    priorExpiresUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
-      .rawValue != 0 ? raw.prior_expires_unix_ms : nil
-    priorEtag = raw.prior_etag == nil ? nil : try NativeString
-      .copyCString(raw.prior_etag)
-    priorData = try NativeString.copyData(
-      data: raw.prior_data,
-      size: Int(raw.prior_data_size)
-    )
-  }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_resource_request {
-    var raw = mln_resource_request()
-    raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_resource_request>.size)
-    raw.requested_url = try requestedUrl.map { try arena.cString($0) }
-    raw.resolved_url = try resolvedUrl.map { try arena.cString($0) }
-    raw.kind = kind.rawValue
-    raw.loading_method = loadingMethod.rawValue
-    raw.priority = priority.rawValue
-    raw.usage = usage.rawValue
-    raw.storage_policy = storagePolicy.rawValue
-    if let item = range {
-      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range = item
-        .nativeValue()
-    }
-    if let item = priorModifiedUnixMs {
-      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
-        .prior_modified_unix_ms = item
-    }
-    if let item = priorExpiresUnixMs {
-      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES.rawValue; raw
-        .prior_expires_unix_ms = item
-    }
-    raw.prior_etag = try priorEtag.map { try arena.cString($0) }
-    raw.prior_data = arena.view(priorData).data?
-      .assumingMemoryBound(to: UInt8.self)
-    raw.prior_data_size = try NativeInputArena.count(priorData.count)
     return raw
   }
 }
@@ -812,7 +706,7 @@ private func invokeResourceRequestCancelHandlerCallback(
   }
 }
 
-/// Field mask values for `mln_resource_request`.
+/// Field mask values for `mln_resource_request_info`.
 ///
 /// See `mln_resource_request_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -830,6 +724,117 @@ public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
   public static let priorModified: ResourceRequestField = .init(rawValue: 2)
   /// The cached copy being revalidated carries an expiration time.
   public static let priorExpires: ResourceRequestField = .init(rawValue: 4)
+}
+
+public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
+  /// URL entering the network layer, before tile server normalization. Copied
+  /// text, owned by the caller.
+  public var requestedUrl: String?
+  /// URL to fetch, after resource-kind normalization against the runtime's tile
+  /// server options and API key. Copied text, owned by the caller.
+  public var resolvedUrl: String?
+  public var kind: ResourceKind
+  public var loadingMethod: ResourceLoadingMethod
+  public var priority: ResourcePriority
+  public var usage: ResourceUsage
+  public var storagePolicy: ResourceStoragePolicy
+  public var range: ResourceRange?
+  public var priorModifiedUnixMs: Int64?
+  public var priorExpiresUnixMs: Int64?
+  /// Copied text, owned by the caller.
+  public var priorEtag: String?
+  /// Copied bytes, owned by the caller.
+  public var priorData: Data
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(
+    requestedUrl: String? = nil,
+    resolvedUrl: String? = nil,
+    kind: ResourceKind = .init(rawValue: 0),
+    loadingMethod: ResourceLoadingMethod = .init(rawValue: 0),
+    priority: ResourcePriority = .init(rawValue: 0),
+    usage: ResourceUsage = .init(rawValue: 0),
+    storagePolicy: ResourceStoragePolicy = .init(rawValue: 0),
+    range: ResourceRange? = nil,
+    priorModifiedUnixMs: Int64? = nil,
+    priorExpiresUnixMs: Int64? = nil,
+    priorEtag: String? = nil,
+    priorData: Data = Data()
+  ) {
+    self.requestedUrl = requestedUrl
+    self.resolvedUrl = resolvedUrl
+    self.kind = kind
+    self.loadingMethod = loadingMethod
+    self.priority = priority
+    self.usage = usage
+    self.storagePolicy = storagePolicy
+    self.range = range
+    self.priorModifiedUnixMs = priorModifiedUnixMs
+    self.priorExpiresUnixMs = priorExpiresUnixMs
+    self.priorEtag = priorEtag
+    self.priorData = priorData
+  }
+
+  init(
+    raw: mln_resource_request_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    requestedUrl = raw.requested_url == nil ? nil : try NativeString
+      .copyCString(raw.requested_url)
+    resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
+      .copyCString(raw.resolved_url)
+    kind = ResourceKind(rawValue: raw.kind)
+    loadingMethod = ResourceLoadingMethod(rawValue: raw.loading_method)
+    priority = ResourcePriority(rawValue: raw.priority)
+    usage = ResourceUsage(rawValue: raw.usage)
+    storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
+    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
+      .rawValue != 0 ? ResourceRange(raw: raw.range) : nil
+    priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
+      .rawValue != 0 ? raw.prior_modified_unix_ms : nil
+    priorExpiresUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
+      .rawValue != 0 ? raw.prior_expires_unix_ms : nil
+    priorEtag = raw.prior_etag == nil ? nil : try NativeString
+      .copyCString(raw.prior_etag)
+    priorData = try NativeString.copyData(
+      data: raw.prior_data,
+      size: Int(raw.prior_data_size)
+    )
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_request_info
+  {
+    var raw = mln_resource_request_info()
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_resource_request_info>.size)
+    raw.requested_url = try requestedUrl.map { try arena.cString($0) }
+    raw.resolved_url = try resolvedUrl.map { try arena.cString($0) }
+    raw.kind = kind.rawValue
+    raw.loading_method = loadingMethod.rawValue
+    raw.priority = priority.rawValue
+    raw.usage = usage.rawValue
+    raw.storage_policy = storagePolicy.rawValue
+    if let item = range {
+      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range = item
+        .nativeValue()
+    }
+    if let item = priorModifiedUnixMs {
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
+        .prior_modified_unix_ms = item
+    }
+    if let item = priorExpiresUnixMs {
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES.rawValue; raw
+        .prior_expires_unix_ms = item
+    }
+    raw.prior_etag = try priorEtag.map { try arena.cString($0) }
+    raw.prior_data = arena.view(priorData).data?
+      .assumingMemoryBound(to: UInt8.self)
+    raw.prior_data_size = try NativeInputArena.count(priorData.count)
+    return raw
+  }
 }
 
 /// A resource provider's answer to one request.
@@ -883,14 +888,20 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
       data: raw.bytes,
       size: Int(raw.byte_count)
     )
-    errorMessage = raw.error_message == nil ? nil : try NativeString
-      .copyCString(raw.error_message)
+    errorMessage = raw.error_message.size == 0 ? nil : try NativeString
+      .copyUTF8(
+        data: raw.error_message.data,
+        size: raw.error_message.size
+      )
     mustRevalidate = raw.must_revalidate
     modifiedUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_MODIFIED
       .rawValue != 0 ? raw.modified_unix_ms : nil
     expiresUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_EXPIRES
       .rawValue != 0 ? raw.expires_unix_ms : nil
-    etag = raw.etag == nil ? nil : try NativeString.copyCString(raw.etag)
+    etag = raw.etag.size == 0 ? nil : try NativeString.copyUTF8(
+      data: raw.etag.data,
+      size: raw.etag.size
+    )
     retryAfterUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER
       .rawValue != 0 ? raw.retry_after_unix_ms : nil
   }
@@ -903,7 +914,7 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     raw.error_reason = errorReason.rawValue
     raw.bytes = arena.view(bytes).data?.assumingMemoryBound(to: UInt8.self)
     raw.byte_count = try NativeInputArena.count(bytes.count)
-    raw.error_message = try errorMessage.map { try arena.cString($0) }
+    raw.error_message = errorMessage.map { arena.view($0) } ?? mln_buffer_view()
     raw.must_revalidate = mustRevalidate
     if let item = modifiedUnixMs {
       raw.fields |= MLN_RESOURCE_RESPONSE_MODIFIED.rawValue; raw
@@ -913,7 +924,7 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
       raw.fields |= MLN_RESOURCE_RESPONSE_EXPIRES.rawValue; raw
         .expires_unix_ms = item
     }
-    raw.etag = try etag.map { try arena.cString($0) }
+    raw.etag = etag.map { arena.view($0) } ?? mln_buffer_view()
     if let item = retryAfterUnixMs {
       raw.fields |= MLN_RESOURCE_RESPONSE_RETRY_AFTER.rawValue; raw
         .retry_after_unix_ms = item
@@ -971,7 +982,7 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
   public var url: String
-  /// The replacement URL, or null to keep the URL and stop the search.
+  /// The replacement URL, or empty to keep the URL and stop the search.
   public var replacementUrl: String?
   public static var `default`: Self {
     Self()
@@ -995,9 +1006,12 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
   ) throws {
     kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
-    url = try NativeString.copyCString(raw.url)
-    replacementUrl = raw.replacement_url == nil ? nil : try NativeString
-      .copyCString(raw.replacement_url)
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
+    replacementUrl = raw.replacement_url.size == 0 ? nil : try NativeString
+      .copyUTF8(
+        data: raw.replacement_url.data,
+        size: raw.replacement_url.size
+      )
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -1006,8 +1020,9 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
     var raw = mln_resource_rewrite_rule()
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
-    raw.url = try arena.cString(url)
-    raw.replacement_url = try replacementUrl.map { try arena.cString($0) }
+    raw.url = arena.view(url)
+    raw.replacement_url = replacementUrl
+      .map { arena.view($0) } ?? mln_buffer_view()
     return raw
   }
 }
@@ -1047,7 +1062,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   ) throws {
     kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
-    url = try NativeString.copyCString(raw.url)
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
     urlStage = ResourceRouteUrl(rawValue: raw.url_stage)
   }
 
@@ -1055,7 +1070,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     var raw = mln_resource_route()
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
-    raw.url = try arena.cString(url)
+    raw.url = arena.view(url)
     raw.url_stage = urlStage.rawValue
     return raw
   }
@@ -1657,9 +1672,9 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Sendable {
-  /// Directory root for asset:// URLs. Copied during runtime creation. Null or
-  /// empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
-  /// owned by the caller.
+  /// Directory root for asset:// URLs. Copied during runtime creation. Empty
+  /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
+  /// by the caller.
   public var assetPath: String?
   /// Cache database path. Copied during runtime creation. Copied text, owned by
   /// the caller.
@@ -1689,10 +1704,14 @@ public struct RuntimeOptions: Sendable {
     raw: mln_runtime_options,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    assetPath = raw.asset_path == nil ? nil : try NativeString
-      .copyCString(raw.asset_path)
-    cachePath = raw.cache_path == nil ? nil : try NativeString
-      .copyCString(raw.cache_path)
+    assetPath = raw.asset_path.size == 0 ? nil : try NativeString.copyUTF8(
+      data: raw.asset_path.data,
+      size: raw.asset_path.size
+    )
+    cachePath = raw.cache_path.size == 0 ? nil : try NativeString.copyUTF8(
+      data: raw.cache_path.data,
+      size: raw.cache_path.size
+    )
     eventMask = RuntimeEventMask(rawValue: raw.event_mask)
     eventWake = Wake()
   }
@@ -1700,8 +1719,8 @@ public struct RuntimeOptions: Sendable {
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
     var raw = mln_runtime_options_default()
     raw.size = UInt32(MemoryLayout<mln_runtime_options>.size)
-    raw.asset_path = try assetPath.map { try arena.cString($0) }
-    raw.cache_path = try cachePath.map { try arena.cString($0) }
+    raw.asset_path = assetPath.map { arena.view($0) } ?? mln_buffer_view()
+    raw.cache_path = cachePath.map { arena.view($0) } ?? mln_buffer_view()
     raw.event_mask = eventMask.rawValue
     raw.event_wake = try eventWake.nativeValue(arena: arena)
     return raw

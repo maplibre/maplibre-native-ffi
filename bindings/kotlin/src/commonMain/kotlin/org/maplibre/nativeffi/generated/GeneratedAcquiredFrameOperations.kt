@@ -131,7 +131,6 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    */
   public fun release(consumerCompletion: GpuSync = GeneratedApi.gpuSyncDefault()): Unit =
     nativeClose(this, binding, "mln_acquired_frame_release") {
-      val holder = allocate(8, 8).also { writeI64(it, handle) }
-      check(C.mln_acquired_frame_release(holder, writeGpuSync(consumerCompletion), diagnostic))
+      check(C.mln_acquired_frame_release(handle, writeGpuSync(consumerCompletion), diagnostic))
     }
 }

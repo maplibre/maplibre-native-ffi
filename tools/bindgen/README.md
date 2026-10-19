@@ -59,6 +59,13 @@ names its result and its input, as in `mln_map_projection_pixel_for_lat_lng`,
 and a function that reports a fixed fact of the library is a noun, as in
 `mln_c_version`.
 
+Use `_release` for a handle's teardown. A successful release consumes the
+handle; a failed release retains it, and an asynchronous release takes a
+completion. A handle whose release is asynchronous, can fail on state, or takes
+arguments also has `_dispose`: it consumes a live handle without blocking on
+host work, and finalizers call it. `detach` and `abandon` end an attachment and
+keep those verbs.
+
 ## Follow the ABI rules
 
 Each declaration follows these rules, which every binding relies on:
@@ -111,6 +118,9 @@ Each declaration follows these rules, which every binding relies on:
   A binding starts each record from that function, or from zero with size set
   when the struct has none. The schema rejects a default function for a record
   that native never reads, directly or embedded in an input.
+- Host-lent input strings use `mln_buffer_view`. Native-lent strings use
+  NUL-terminated `const char*`. Native rejects embedded NUL in views that reach
+  C-string consumers, including paths, URLs, HTTP headers, and etags.
 - An optional scalar or aggregate member of a struct names its bit in the
   struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
   enum: `MLN_BINDING("mask=fields;bit=<constant>")`. The mask names a sibling
@@ -164,7 +174,7 @@ the rest: `lifetime=completion` for an array completion result, and
 | Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`                      |
 | `kind=reserved` member              | `default=0`                                                                                           |
 | Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                                |
-| Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                             |
+| Handle typedef                      | `parent=none`; its operations begin with its own name                                                 |
 | Callback registration               | `user_data` names its one `kind=context` member                                                       |
 | Record typedef                      | `default` names the one function that takes no arguments and returns the record                       |
 
@@ -180,11 +190,8 @@ batch belongs to the delivery protocol, which each binding runtime drives
 itself, so the generator treats it, and every type that only it reaches, as a
 runtime export with no public member. No other rule reads a declaration's name.
 
-Nine keys state what a C shape cannot:
+Eight keys state what a C shape cannot:
 
-- `prefix=` on a handle names the prefix of its operations when that differs
-  from the handle's type name, as `mln_resource_request` does for
-  `mln_resource_request_handle`.
 - `fields=ordered` on a record of plain values says that its field order is part
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or

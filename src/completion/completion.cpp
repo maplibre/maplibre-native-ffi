@@ -219,9 +219,8 @@ auto Completion::revoke() noexcept -> void {
   }
 }
 
-auto Completion::set_retirement_callback(
-  std::function<void()> callback
-) noexcept -> void {
+auto Completion::set_retirement_callback(CompletionRetirement callback) noexcept
+  -> void {
   assert(state_.load() == State::Created);
   retirement_callback_ = std::move(callback);
 }
@@ -230,13 +229,8 @@ auto Completion::retire_work() noexcept -> void { retire_part(); }
 
 auto Completion::retire_part() noexcept -> void {
   if (retirement_parts_.fetch_sub(1) != 1) return;
-  auto callback = std::move(retirement_callback_);
-  if (!callback) return;
-  try {
-    callback();
-  } catch (...) {
-    // Retirement observation cannot reopen completed native work.
-  }
+  auto callback = std::exchange(retirement_callback_, {});
+  if (callback.run) callback.run(callback.owner, callback.sequence);
 }
 
 auto Completion::deliver_undelivered() noexcept -> void {
@@ -268,8 +262,9 @@ auto Completion::release() noexcept -> void {
   retire_part();
 }
 
-auto make_completion(
-  const mln_completion* completion, std::shared_ptr<Completion>& out
+auto make_completion_sink(
+  const mln_completion* completion, CompletionSink& sink,
+  delivery::ItemPtr& fallback
 ) -> mln_status {
   auto queue = std::shared_ptr<delivery::DeliveryQueueState>{};
   if (completion == nullptr) {
@@ -298,8 +293,6 @@ auto make_completion(
     }
   }
   const auto* descriptor = completion;
-  auto sink = CompletionSink{};
-  auto fallback = delivery::ItemPtr{};
   try {
     if (descriptor->queue != MLN_HANDLE_NULL) {
       sink.queue_ = std::move(queue);
@@ -312,12 +305,38 @@ auto make_completion(
     } else {
       sink.descriptor_ = *descriptor;
     }
-    out = std::make_shared<Completion>(std::move(sink), std::move(fallback));
   } catch (...) {
-    out = nullptr;
     set_thread_error("asynchronous completion state could not be allocated");
     return MLN_STATUS_NATIVE_ERROR;
   }
+  return MLN_STATUS_OK;
+}
+
+auto make_completion(
+  const mln_completion* descriptor, std::shared_ptr<Completion>& out
+) -> mln_status {
+  auto sink = CompletionSink{};
+  auto fallback = delivery::ItemPtr{};
+  const auto status = make_completion_sink(descriptor, sink, fallback);
+  if (status != MLN_STATUS_OK) return status;
+  try {
+    out = std::make_shared<Completion>(std::move(sink), std::move(fallback));
+  } catch (...) {
+    out.reset();
+    set_thread_error("asynchronous completion state could not be allocated");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto make_completion(
+  const mln_completion* descriptor, std::optional<Completion>& out
+) -> mln_status {
+  auto sink = CompletionSink{};
+  auto fallback = delivery::ItemPtr{};
+  const auto status = make_completion_sink(descriptor, sink, fallback);
+  if (status != MLN_STATUS_OK) return status;
+  out.emplace(std::move(sink), std::move(fallback));
   return MLN_STATUS_OK;
 }
 
@@ -343,6 +362,15 @@ auto complete_failure(
 auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
   mln_status status, std::uint64_t generation, std::string diagnostic
+) noexcept -> void {
+  complete_command(
+    completion.get(), disposition, status, generation, std::move(diagnostic)
+  );
+}
+
+auto complete_command(
+  Completion* completion, std::uint32_t disposition, mln_status status,
+  std::uint64_t generation, std::string diagnostic
 ) noexcept -> void {
   if (status != MLN_STATUS_OK) {
     disposition = status == MLN_STATUS_CANCELLED

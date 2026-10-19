@@ -66,13 +66,13 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
     MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
   );
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_render_session_destroy(session, NULL)
+    MLN_STATUS_INVALID_STATE, mln_render_session_release(session, NULL)
   );
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
   MLN_TEST_OK(mln_render_session_abandon(session, &abandoned, NULL));
-  MLN_TEST_OK(mln_render_session_destroy(session, NULL));
+  MLN_TEST_OK(mln_render_session_release(session, NULL));
 
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
@@ -908,7 +908,7 @@ static void abandon_destroys_an_owned_texture_ring(void) {
   );
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
   TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&live_objects[COUNTED_IMAGE]));
-  MLN_TEST_OK(mln_acquired_frame_release(&frame, NULL, NULL));
+  MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
 
   abandon_destroying_everything(fixture.session);
 
@@ -980,7 +980,7 @@ static void a_ring_shares_its_render_pass_across_slots(bool borrowed) {
   for (uint64_t token = 1; token <= 2; token += 1) {
     mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, token);
     TEST_ASSERT_EQUAL_UINT32(0, acquired_slot(frame));
-    MLN_TEST_OK(mln_acquired_frame_release(&frame, NULL, NULL));
+    MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
   }
   const int pipelines = atomic_load(&created_objects[COUNTED_PIPELINE]);
   TEST_ASSERT_GREATER_THAN_INT(0, pipelines);
@@ -990,8 +990,8 @@ static void a_ring_shares_its_render_pass_across_slots(bool borrowed) {
   TEST_ASSERT_EQUAL_UINT32(0, acquired_slot(held));
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 4);
   TEST_ASSERT_EQUAL_UINT32(1, acquired_slot(frame));
-  MLN_TEST_OK(mln_acquired_frame_release(&frame, NULL, NULL));
-  MLN_TEST_OK(mln_acquired_frame_release(&held, NULL, NULL));
+  MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
+  MLN_TEST_OK(mln_acquired_frame_release(held, NULL, NULL));
 
   TEST_ASSERT_EQUAL_INT(
     pipelines, atomic_load(&created_objects[COUNTED_PIPELINE])

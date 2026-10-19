@@ -445,12 +445,12 @@ mod tests {
     const ACCEPT: u32 = 1;
     const PASS_THROUGH: u32 = 0;
 
-    fn fake_for(handle: sys::mln_resource_request_handle) -> Arc<FakeRequest> {
+    fn fake_for(handle: sys::mln_resource_request) -> Arc<FakeRequest> {
         Arc::clone(&fakes().lock().unwrap()[&handle.0])
     }
 
     unsafe extern "C" fn fake_complete(
-        handle: sys::mln_resource_request_handle,
+        handle: sys::mln_resource_request,
         _response: *const sys::mln_resource_response,
         _diagnostic: *mut sys::mln_diagnostic,
     ) -> sys::mln_status {
@@ -460,7 +460,7 @@ mod tests {
     }
 
     /// Completes the request with an empty response, as a generated owner does.
-    fn complete(state: &DecisionHandleState<sys::mln_resource_request_handle>) -> Result<()> {
+    fn complete(state: &DecisionHandleState<sys::mln_resource_request>) -> Result<()> {
         state.complete_with(|handle| {
             // SAFETY: the fake reads nothing through the response.
             crate::check(|diagnostic| unsafe {
@@ -470,7 +470,7 @@ mod tests {
     }
 
     unsafe fn fake_cancel_registration(
-        _handle: sys::mln_resource_request_handle,
+        _handle: sys::mln_resource_request,
         _callback: ContextCallback,
         _user_data: *mut c_void,
         _release: ContextCallback,
@@ -480,7 +480,7 @@ mod tests {
         sys::MLN_STATUS_UNSUPPORTED
     }
 
-    unsafe extern "C" fn fake_release(handle: sys::mln_resource_request_handle) {
+    unsafe extern "C" fn fake_release(handle: sys::mln_resource_request) {
         let fake = fake_for(handle);
         if let Some(sender) = fake.release_thread.lock().unwrap().take() {
             sender.send(std::thread::current().id()).unwrap();
@@ -496,7 +496,7 @@ mod tests {
     /// A request state machine over a fake native request of its own.
     struct Fixture {
         fake: Arc<FakeRequest>,
-        state: Arc<DecisionHandleState<sys::mln_resource_request_handle>>,
+        state: Arc<DecisionHandleState<sys::mln_resource_request>>,
     }
 
     impl Fixture {
@@ -517,7 +517,7 @@ mod tests {
             // contract, and this id reaches only them, never the C API.
             let state = unsafe {
                 DecisionHandleState::new(
-                    sys::mln_resource_request_handle(id),
+                    sys::mln_resource_request(id),
                     DecisionHandleFns::new(
                         "ResourceRequestHandle",
                         ACCEPT,
@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn a_request_keeps_all_64_bits_of_its_native_handle() {
         let fixture = Fixture::new();
-        let native = DecisionHandleState::<sys::mln_resource_request_handle>::native_handle(
+        let native = DecisionHandleState::<sys::mln_resource_request>::native_handle(
             &fixture.state.lock_inner().unwrap(),
         );
         // The fixture's id sets the high bits, and only the whole id finds

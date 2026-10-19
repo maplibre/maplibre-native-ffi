@@ -123,15 +123,15 @@ internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
   allocate(16, 8).also { putScreenPoint(it, value) }
 
 internal fun NativeCall.putRuntimeOptions(target: Long, value: RuntimeOptions) {
-  writeU32(target, w(40, 56).toUInt())
-  writeAddress(target + w(4, 8), value.assetPath?.let { cString(it) } ?: 0L)
-  writeAddress(target + w(8, 16), value.cachePath?.let { cString(it) } ?: 0L)
-  writeU64(target + w(16, 24), value.eventMask.rawValue)
-  putWake(target + w(24, 32), value.eventWake)
+  writeU32(target, w(48, 72).toUInt())
+  putView(target + w(4, 8), value.assetPath)
+  putView(target + w(12, 24), value.cachePath)
+  writeU64(target + w(24, 40), value.eventMask.rawValue)
+  putWake(target + w(32, 48), value.eventWake)
 }
 
 internal fun NativeCall.writeRuntimeOptions(value: RuntimeOptions): Long =
-  allocate(w(40, 56), 8).also { putRuntimeOptions(it, value) }
+  allocate(w(48, 72), 8).also { putRuntimeOptions(it, value) }
 
 internal fun NativeCall.putCustomGeometrySourceOptions(
   target: Long,
@@ -892,32 +892,32 @@ internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
   allocate(32, 8).also { putFrameDemand(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
-  writeU32(target, w(64, 80).toUInt())
+  writeU32(target, w(72, 96).toUInt())
   var fields = 0u
   writeU32(target + 8, value.status.rawValue)
   writeU32(target + 12, value.errorReason.rawValue)
   writeAddress(target + 16, bytes(value.bytes))
   writeSize(target + w(20, 24), value.bytes.size.toULong())
-  writeAddress(target + w(24, 32), value.errorMessage?.let { cString(it) } ?: 0L)
-  writeBool(target + w(28, 40), value.mustRevalidate)
+  putView(target + w(24, 32), value.errorMessage)
+  writeBool(target + w(32, 48), value.mustRevalidate)
   value.modifiedUnixMs?.let {
     fields = fields or 1u
-    writeI64(target + w(32, 48), it)
+    writeI64(target + w(40, 56), it)
   }
   value.expiresUnixMs?.let {
     fields = fields or 2u
-    writeI64(target + w(40, 56), it)
+    writeI64(target + w(48, 64), it)
   }
-  writeAddress(target + w(48, 64), value.etag?.let { cString(it) } ?: 0L)
+  putView(target + w(56, 72), value.etag)
   value.retryAfterUnixMs?.let {
     fields = fields or 4u
-    writeI64(target + w(56, 72), it)
+    writeI64(target + w(64, 88), it)
   }
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
-  allocate(w(64, 80), 8).also { putResourceResponse(it, value) }
+  allocate(w(72, 96), 8).also { putResourceResponse(it, value) }
 
 internal fun NativeCall.putResourceRequestCancelHandler(
   target: Long,
@@ -945,7 +945,7 @@ internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
   allocate(40, 8).also { putMapOptions(it, value) }
 
 internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
-  writeU32(target, 72.toUInt())
+  writeU32(target, w(72, 80).toUInt())
   when (val variant = value.data) {
     is OfflineRegionDefinitionData.TilePyramid -> {
       writeU32(target + 4, 1u)
@@ -961,13 +961,13 @@ internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: Offline
 }
 
 internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long =
-  allocate(72, 8).also { putOfflineRegionDefinition(it, value) }
+  allocate(w(72, 80), 8).also { putOfflineRegionDefinition(it, value) }
 
 internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
   writeU32(target, w(24, 48).toUInt())
   writeAddress(
     target + w(16, 32),
-    array(value.rules, w(20, 32), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
+    array(value.rules, w(24, 40), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
   )
   writeSize(target + w(20, 40), value.rules.size.toULong())
   if (value.callback == null) return
@@ -983,7 +983,7 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   writeU32(target, w(32, 56).toUInt())
   writeAddress(
     target + w(24, 40),
-    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+    array(value.routes, w(20, 32), w(4, 8)) { at, item -> putResourceRoute(at, item) },
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -998,7 +998,7 @@ internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransf
   writeU32(target, w(24, 48).toUInt())
   writeAddress(
     target + w(16, 32),
-    array(value.rules, w(16, 24), w(4, 8)) { at, item -> putResourceRewriteRule(at, item) },
+    array(value.rules, w(24, 40), w(4, 8)) { at, item -> putResourceRewriteRule(at, item) },
   )
   writeSize(target + w(20, 40), value.rules.size.toULong())
   if (value.callback == null) return
@@ -1378,9 +1378,9 @@ internal fun readRenderedQueryGeometry(source: Long): RenderedQueryGeometry =
 
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
   RuntimeOptions(
-    assetPath = readCStringOrNull(readAddress(source + w(4, 8))),
-    cachePath = readCStringOrNull(readAddress(source + w(8, 16))),
-    eventMask = RuntimeEventMask(readU64(source + w(16, 24))),
+    assetPath = readViewString(source + w(4, 8)).takeIf { it.isNotEmpty() },
+    cachePath = readViewString(source + w(12, 24)).takeIf { it.isNotEmpty() },
+    eventMask = RuntimeEventMask(readU64(source + w(24, 40))),
     eventWake = Wake(),
   )
 
@@ -1670,7 +1670,7 @@ internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
   OfflineRegionInfo(
     id = readI64(source),
     definition = readOfflineRegionDefinition(source + 8),
-    metadata = readBytes(readAddress(source + 80), readSize(source + w(84, 88))),
+    metadata = readBytes(readAddress(source + w(80, 88)), readSize(source + w(84, 96))),
   )
 
 internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
@@ -1866,74 +1866,74 @@ internal fun NativeArena.putOfflineTilePyramidRegionDefinition(
   target: Long,
   value: OfflineTilePyramidRegionDefinition,
 ) {
-  writeAddress(target, cString(value.styleUrl))
-  putLatLngBounds(target + 8, value.bounds)
-  writeF64(target + 40, value.minZoom)
-  writeF64(target + 48, value.maxZoom)
-  writeF32(target + 56, value.pixelRatio)
-  writeBool(target + 60, value.includeIdeographs)
+  putView(target, value.styleUrl)
+  putLatLngBounds(target + w(8, 16), value.bounds)
+  writeF64(target + w(40, 48), value.minZoom)
+  writeF64(target + w(48, 56), value.maxZoom)
+  writeF32(target + w(56, 64), value.pixelRatio)
+  writeBool(target + w(60, 68), value.includeIdeographs)
 }
 
 internal fun NativeArena.writeOfflineTilePyramidRegionDefinition(
   value: OfflineTilePyramidRegionDefinition,
-): Long = allocate(64, 8).also { putOfflineTilePyramidRegionDefinition(it, value) }
+): Long = allocate(w(64, 72), 8).also { putOfflineTilePyramidRegionDefinition(it, value) }
 
 internal fun NativeArena.putOfflineGeometryRegionDefinition(
   target: Long,
   value: OfflineGeometryRegionDefinition,
 ) {
-  writeAddress(target, cString(value.styleUrl))
-  putView(target + w(4, 8), value.geometry)
-  writeF64(target + w(16, 24), value.minZoom)
-  writeF64(target + w(24, 32), value.maxZoom)
-  writeF32(target + w(32, 40), value.pixelRatio)
-  writeBool(target + w(36, 44), value.includeIdeographs)
+  putView(target, value.styleUrl)
+  putView(target + w(8, 16), value.geometry)
+  writeF64(target + w(16, 32), value.minZoom)
+  writeF64(target + w(24, 40), value.maxZoom)
+  writeF32(target + w(32, 48), value.pixelRatio)
+  writeBool(target + w(36, 52), value.includeIdeographs)
 }
 
 internal fun NativeArena.writeOfflineGeometryRegionDefinition(
   value: OfflineGeometryRegionDefinition,
-): Long = allocate(w(40, 48), 8).also { putOfflineGeometryRegionDefinition(it, value) }
+): Long = allocate(w(40, 56), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
 internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
-  writeAddress(target + 8, cString(value.url))
+  putView(target + 8, value.url)
   writeAddress(
-    target + w(12, 16),
-    array(value.headers, w(8, 16), w(4, 8)) { at, item -> putHttpHeader(at, item) },
+    target + w(16, 24),
+    array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) },
   )
-  writeSize(target + w(16, 24), value.headers.size.toULong())
+  writeSize(target + w(20, 32), value.headers.size.toULong())
 }
 
 internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
-  allocate(w(20, 32), w(4, 8)).also { putHttpHeaderRule(it, value) }
+  allocate(w(24, 40), w(4, 8)).also { putHttpHeaderRule(it, value) }
 
 internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
-  writeAddress(target + 8, cString(value.url))
-  writeU32(target + w(12, 16), value.urlStage.rawValue)
+  putView(target + 8, value.url)
+  writeU32(target + w(16, 24), value.urlStage.rawValue)
 }
 
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
+  allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
-  writeAddress(target + 8, cString(value.url))
-  writeAddress(target + w(12, 16), value.replacementUrl?.let { cString(it) } ?: 0L)
+  putView(target + 8, value.url)
+  putView(target + w(16, 24), value.replacementUrl)
 }
 
 internal fun NativeArena.writeResourceRewriteRule(value: ResourceRewriteRule): Long =
-  allocate(w(16, 24), w(4, 8)).also { putResourceRewriteRule(it, value) }
+  allocate(w(24, 40), w(4, 8)).also { putResourceRewriteRule(it, value) }
 
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
-internal fun readResourceRequest(source: Long): ResourceRequest {
+internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
-  return ResourceRequest(
+  return ResourceRequestInfo(
     requestedUrl = readCStringOrNull(readAddress(source + 8)),
     resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
     kind = ResourceKind(readU32(source + w(16, 24))),
@@ -2122,7 +2122,8 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
             )
           2u ->
             OfflineRegionDefinitionData.Geometry(readOfflineGeometryRegionDefinition(source + 8))
-          else -> OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, 64))
+          else ->
+            OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
         }
       },
   )
@@ -2177,12 +2178,12 @@ internal fun NativeArena.writeWebglContextDescriptor(value: WebglContextDescript
   allocate(w(16, 24), w(4, 8)).also { putWebglContextDescriptor(it, value) }
 
 internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
-  writeAddress(target, cString(value.name))
-  writeAddress(target + w(4, 8), cString(value.value))
+  putView(target, value.name)
+  putView(target + w(8, 16), value.value)
 }
 
 internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
-  allocate(w(8, 16), w(4, 8)).also { putHttpHeader(it, value) }
+  allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
 internal fun readResourceRange(source: Long): ResourceRange =
   ResourceRange(start = readU64(source), end = readU64(source + 8))
@@ -2250,22 +2251,22 @@ internal fun readOfflineTilePyramidRegionDefinition(
   source: Long,
 ): OfflineTilePyramidRegionDefinition =
   OfflineTilePyramidRegionDefinition(
-    styleUrl = readCString(readAddress(source)),
-    bounds = readLatLngBounds(source + 8),
-    minZoom = readF64(source + 40),
-    maxZoom = readF64(source + 48),
-    pixelRatio = readF32(source + 56),
-    includeIdeographs = readBool(source + 60),
+    styleUrl = readViewString(source),
+    bounds = readLatLngBounds(source + w(8, 16)),
+    minZoom = readF64(source + w(40, 48)),
+    maxZoom = readF64(source + w(48, 56)),
+    pixelRatio = readF32(source + w(56, 64)),
+    includeIdeographs = readBool(source + w(60, 68)),
   )
 
 internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition =
   OfflineGeometryRegionDefinition(
-    styleUrl = readCString(readAddress(source)),
-    geometry = readView(source + w(4, 8)),
-    minZoom = readF64(source + w(16, 24)),
-    maxZoom = readF64(source + w(24, 32)),
-    pixelRatio = readF32(source + w(32, 40)),
-    includeIdeographs = readBool(source + w(36, 44)),
+    styleUrl = readViewString(source),
+    geometry = readView(source + w(8, 16)),
+    minZoom = readF64(source + w(16, 32)),
+    maxZoom = readF64(source + w(24, 40)),
+    pixelRatio = readF32(source + w(32, 48)),
+    includeIdeographs = readBool(source + w(36, 52)),
   )
 
 internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =

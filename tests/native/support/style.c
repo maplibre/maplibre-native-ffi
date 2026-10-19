@@ -254,8 +254,8 @@ typedef struct served_routes {
 } served_routes;
 
 static uint32_t serve_route(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   const served_routes* served = user_data;
   mln_test_style_route* route =
@@ -264,7 +264,8 @@ static uint32_t serve_route(
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-    .error_message = "the style suite serves no such resource",
+    .error_message =
+      MLN_BUFFER_LITERAL("the style suite serves no such resource"),
   };
   if (route != NULL) {
     response = (mln_resource_response){

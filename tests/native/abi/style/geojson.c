@@ -298,26 +298,26 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
   MLN_TEST_INVALID(mln_geojson_source_data_create(
     MLN_BUFFER_LITERAL(EMPTY_COLLECTION), NULL, &reused, NULL
   ));
-  mln_geojson_source_data_destroy(populated);
+  mln_geojson_source_data_release(populated);
 
   // Every field in range prepares. The clustering constraints belong to
   // clustering alone, so the same data tiles fine without it, and an empty
   // collection carries nothing to cluster, so a later update supplies them.
   mln_geojson_source_options options = mln_geojson_source_options_default();
   every_option(&options);
-  mln_geojson_source_data_destroy(prepare(POINT_COLLECTION("a"), &options));
-  mln_geojson_source_data_destroy(prepare(point_and_collection, NULL));
-  mln_geojson_source_data_destroy(prepare(bare_point, NULL));
+  mln_geojson_source_data_release(prepare(POINT_COLLECTION("a"), &options));
+  mln_geojson_source_data_release(prepare(point_and_collection, NULL));
+  mln_geojson_source_data_release(prepare(bare_point, NULL));
   options = mln_geojson_source_options_default();
   clustered(&options);
-  mln_geojson_source_data_destroy(prepare(EMPTY_COLLECTION, &options));
+  mln_geojson_source_data_release(prepare(EMPTY_COLLECTION, &options));
 }
 
 static void geojson_max_zoom_respects_the_tiling_limit(void) {
   mln_geojson_source_options options = mln_geojson_source_options_default();
   options.fields = MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
   options.max_zoom = 24.0;
-  mln_geojson_source_data_destroy(
+  mln_geojson_source_data_release(
     prepare(POINT_COLLECTION("boundary"), &options)
   );
 
@@ -337,7 +337,7 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
   mln_geojson_source_options options = mln_geojson_source_options_default();
   options.fields = MLN_GEOJSON_SOURCE_OPTION_BUFFER;
   options.buffer = 512;
-  mln_geojson_source_data_destroy(
+  mln_geojson_source_data_release(
     prepare(POINT_COLLECTION("buffer"), &options)
   );
 
@@ -355,7 +355,7 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
                    MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
   options.cluster = true;
   options.cluster_radius = 4095;
-  mln_geojson_source_data_destroy(
+  mln_geojson_source_data_release(
     prepare(POINT_COLLECTION("radius"), &options)
   );
 
@@ -387,7 +387,7 @@ static void geojson_sources_take_and_validate_their_options(void) {
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
   ));
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
     map, MLN_BUFFER_LITERAL("points"), url, &options, &completion.descriptor,
     NULL
@@ -433,15 +433,15 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
     ));
     // The last install is still pending when the handle goes away.
     if (index == 2) {
-      mln_geojson_source_data_destroy(data);
+      mln_geojson_source_data_release(data);
     }
     MLN_TEST_OK(mln_test_completion_settle(&completion));
     draw_source(map, sources[index]);
   }
 
   // A second destroy is a no-op, and the dead handle installs nowhere.
-  mln_geojson_source_data_destroy(data);
-  mln_geojson_source_data_destroy(MLN_HANDLE_NULL);
+  mln_geojson_source_data_release(data);
+  mln_geojson_source_data_release(MLN_HANDLE_NULL);
   mln_completion rejected = mln_test_discard_completion();
   MLN_TEST_INVALID_STATE(mln_map_set_geojson_source_data(
     map, MLN_BUFFER_LITERAL("first"), data, &rejected, NULL
@@ -519,7 +519,7 @@ static void prepared_data_must_match_the_source_options(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_add_geojson_source_data(map, id, data, &completion.descriptor, NULL)
   );
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
 
   // Data prepared without clustering tiles inconsistently with the source.
   data = prepare(points, NULL);
@@ -527,7 +527,7 @@ static void prepared_data_must_match_the_source_options(void) {
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
     mln_map_set_geojson_source_data(map, id, data, &completion.descriptor, NULL)
   );
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
 
   static const cluster_match_case cases[] = {
     {"the same JSON", NULL, MLN_STATUS_OK},
@@ -569,7 +569,7 @@ static void prepared_data_must_match_the_source_options(void) {
       cases[index].expected, mln_test_completion_settle(&completion),
       cases[index].label
     );
-    mln_geojson_source_data_destroy(data);
+    mln_geojson_source_data_release(data);
   }
 
   // Every other option is compared too, so data that differs from the source
@@ -593,7 +593,7 @@ static void prepared_data_must_match_the_source_options(void) {
         map, id, data, &completion.descriptor, NULL
       )
     );
-    mln_geojson_source_data_destroy(data);
+    mln_geojson_source_data_release(data);
   }
 
   mln_test_destroy_map(map);
@@ -623,7 +623,7 @@ static void render_points(
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
   ));
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
   draw_source(map, "points");
 
   mln_test_render_fixture fixture = {0};

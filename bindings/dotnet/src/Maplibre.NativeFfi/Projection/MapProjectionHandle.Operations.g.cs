@@ -20,7 +20,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     {
         state = new(
             handle,
-            static (live, diagnostic) => NativeMethods.mln_map_projection_close(live, diagnostic),
+            static (live, diagnostic) => NativeMethods.mln_map_projection_release(live, diagnostic),
             nameof(MapProjectionHandle),
             Abandon
         );
@@ -34,7 +34,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         );
 
     private static mln_status Abandon(MlnMapProjection live, mln_diagnostic* diagnostic) =>
-        NativeMethods.mln_map_projection_close(live, diagnostic);
+        NativeMethods.mln_map_projection_release(live, diagnostic);
 
     NativeHandleState<MlnMapProjection> INativeOwner<MlnMapProjection>.State => state;
     internal MlnMapProjection Handle => state.Handle;
@@ -46,21 +46,8 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_close");
+        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_release");
         state.Retire();
-    }
-
-    /// <summary>
-    /// Closes a standalone projection.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_close</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_close");
-        state.Close();
     }
 
     /// <summary>
@@ -252,6 +239,19 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
             (nuint)(coordinates.Length),
             static item => CopyScreenPoint(item)
         );
+    }
+
+    /// <summary>
+    /// Releases a standalone projection.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public void Close()
+    {
+        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_release");
+        state.Close();
     }
 
     /// <summary>

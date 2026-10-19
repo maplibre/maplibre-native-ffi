@@ -2,7 +2,7 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
-public sealed record ResourceRequest
+public sealed record ResourceRequestInfo
 {
     /// <summary>
     /// URL entering the network layer, before tile server normalization. Copied

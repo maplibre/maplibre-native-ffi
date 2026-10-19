@@ -1746,15 +1746,14 @@ impl HttpHeaderTransformResponse<'_> {
             "mln_http_header_transform_response_set_header",
             self.raw.as_ptr() as usize as u64,
         )?;
-        let name_size = convert::count(name.len())?;
-        let value_size = convert::count(value.len())?;
+        let arena = &mut InputArena::default();
+        let native_name = to_native(&name, arena)?;
+        let native_value = to_native(&value, arena)?;
         maplibre_core::check(|out_diagnostic| unsafe {
             sys::mln_http_header_transform_response_set_header(
                 self.raw.as_ptr(),
-                name.as_ptr().cast(),
-                name_size,
-                value.as_ptr().cast(),
-                value_size,
+                native_name,
+                native_value,
                 out_diagnostic,
             )
         })
@@ -4362,7 +4361,7 @@ pub struct ResourceProvider {
     /// Decides each request that the routes leave to the provider.
     pub callback: Option<
         std::sync::Arc<
-            dyn Fn(ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision
+            dyn Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
                 + Send
                 + Sync
                 + 'static,
@@ -4379,7 +4378,7 @@ impl std::fmt::Debug for ResourceProvider {
 impl ResourceProvider {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision
+        F: Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
             + Send
             + Sync
             + 'static,
@@ -4389,7 +4388,7 @@ impl ResourceProvider {
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision
+        F: Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
             + Send
             + Sync
             + 'static,
@@ -4398,8 +4397,8 @@ impl ResourceProvider {
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
-        request: *const sys::mln_resource_request,
-        handle: sys::mln_resource_request_handle,
+        request: *const sys::mln_resource_request_info,
+        handle: sys::mln_resource_request,
     ) -> u32 {
         let _policy = callback::enter(Some((
             &[
@@ -4424,7 +4423,7 @@ impl ResourceProvider {
             Ok(Some(
                 callback::require(&state.callback)?(
                     unsafe { convert::copy_reference(request) }?,
-                    ResourceRequestHandle {
+                    ResourceRequest {
                         state: std::sync::Arc::clone(&request_state),
                         not_sync: std::marker::PhantomData,
                     },
@@ -4491,107 +4490,16 @@ impl FromNative<sys::mln_resource_range> for ResourceRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct ResourceRequest {
-    /// URL entering the network layer, before tile server normalization. Copied
-    /// text, owned by the caller.
-    pub requested_url: Option<String>,
-    /// URL to fetch, after resource-kind normalization against the runtime's
-    /// tile server options and API key. Copied text, owned by the caller.
-    pub resolved_url: Option<String>,
-    pub kind: ResourceKind,
-    pub loading_method: ResourceLoadingMethod,
-    pub priority: ResourcePriority,
-    pub usage: ResourceUsage,
-    pub storage_policy: ResourceStoragePolicy,
-    pub range: Option<ResourceRange>,
-    pub prior_modified_unix_ms: Option<i64>,
-    pub prior_expires_unix_ms: Option<i64>,
-    /// Copied text, owned by the caller.
-    pub prior_etag: Option<String>,
-    /// Copied bytes, owned by the caller.
-    pub prior_data: Vec<u8>,
-}
-impl FromNative<sys::mln_resource_request> for ResourceRequest {
-    unsafe fn from_native(raw: sys::mln_resource_request) -> Result<Self> {
-        Ok(Self {
-            requested_url: unsafe { from_native(raw.requested_url) }?,
-            resolved_url: unsafe { from_native(raw.resolved_url) }?,
-            kind: unsafe { from_native(raw.kind) }?,
-            loading_method: unsafe { from_native(raw.loading_method) }?,
-            priority: unsafe { from_native(raw.priority) }?,
-            usage: unsafe { from_native(raw.usage) }?,
-            storage_policy: unsafe { from_native(raw.storage_policy) }?,
-            range: unsafe {
-                convert::present(raw.fields, sys::MLN_RESOURCE_REQUEST_RANGE, raw.range)
-            }?,
-            prior_modified_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0)
-                .then_some(raw.prior_modified_unix_ms),
-            prior_expires_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0)
-                .then_some(raw.prior_expires_unix_ms),
-            prior_etag: unsafe { from_native(raw.prior_etag) }?,
-            prior_data: unsafe { convert::counted(raw.prior_data, raw.prior_data_size) }?,
-        })
-    }
-}
-
-/// Cancel callback state for one handled resource request.
-///
-/// See `mln_resource_request_cancel_handler` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Default)]
-pub struct ResourceRequestCancelHandler {
-    pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
-}
-impl std::fmt::Debug for ResourceRequestCancelHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResourceRequestCancelHandler")
-            .finish_non_exhaustive()
-    }
-}
-impl ResourceRequestCancelHandler {
-    pub fn with_callback<F>(mut self, callback: F) -> Self
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        self.callback = Some(Box::new(callback));
-        self
-    }
-    pub fn new<F>(callback: F) -> Self
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        Self::default().with_callback(callback)
-    }
-}
-
-native_flags! {
-/// Field mask values for `mln_resource_request`.
-///
-/// See `mln_resource_request_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct ResourceRequestField: u32 {
-    /// The request asks only for the bytes in range.
-    const RANGE = 1;
-    /// The cached copy being revalidated carries a modification time.
-    const PRIOR_MODIFIED = 2;
-    /// The cached copy being revalidated carries an expiration time.
-    const PRIOR_EXPIRES = 4;
-}
-}
-
 /// A resource request that a resource provider handles.
 ///
-/// See `mln_resource_request_handle` in the
+/// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 #[derive(Debug)]
-pub struct ResourceRequestHandle {
-    state: std::sync::Arc<
-        maplibre_core::decision::DecisionHandleState<sys::mln_resource_request_handle>,
-    >,
+pub struct ResourceRequest {
+    state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request>>,
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }
-impl ResourceRequestHandle {
+impl ResourceRequest {
     /// Hands an outstanding provider request to the built-in network loader.
     ///
     /// See `mln_resource_request_pass_through` in the
@@ -4665,6 +4573,95 @@ impl ResourceRequestHandle {
         )?;
         self.state.close();
         Ok(())
+    }
+}
+
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Default)]
+pub struct ResourceRequestCancelHandler {
+    pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
+}
+impl std::fmt::Debug for ResourceRequestCancelHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceRequestCancelHandler")
+            .finish_non_exhaustive()
+    }
+}
+impl ResourceRequestCancelHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.callback = Some(Box::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+}
+
+native_flags! {
+/// Field mask values for `mln_resource_request_info`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceRequestField: u32 {
+    /// The request asks only for the bytes in range.
+    const RANGE = 1;
+    /// The cached copy being revalidated carries a modification time.
+    const PRIOR_MODIFIED = 2;
+    /// The cached copy being revalidated carries an expiration time.
+    const PRIOR_EXPIRES = 4;
+}
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ResourceRequestInfo {
+    /// URL entering the network layer, before tile server normalization. Copied
+    /// text, owned by the caller.
+    pub requested_url: Option<String>,
+    /// URL to fetch, after resource-kind normalization against the runtime's
+    /// tile server options and API key. Copied text, owned by the caller.
+    pub resolved_url: Option<String>,
+    pub kind: ResourceKind,
+    pub loading_method: ResourceLoadingMethod,
+    pub priority: ResourcePriority,
+    pub usage: ResourceUsage,
+    pub storage_policy: ResourceStoragePolicy,
+    pub range: Option<ResourceRange>,
+    pub prior_modified_unix_ms: Option<i64>,
+    pub prior_expires_unix_ms: Option<i64>,
+    /// Copied text, owned by the caller.
+    pub prior_etag: Option<String>,
+    /// Copied bytes, owned by the caller.
+    pub prior_data: Vec<u8>,
+}
+impl FromNative<sys::mln_resource_request_info> for ResourceRequestInfo {
+    unsafe fn from_native(raw: sys::mln_resource_request_info) -> Result<Self> {
+        Ok(Self {
+            requested_url: unsafe { from_native(raw.requested_url) }?,
+            resolved_url: unsafe { from_native(raw.resolved_url) }?,
+            kind: unsafe { from_native(raw.kind) }?,
+            loading_method: unsafe { from_native(raw.loading_method) }?,
+            priority: unsafe { from_native(raw.priority) }?,
+            usage: unsafe { from_native(raw.usage) }?,
+            storage_policy: unsafe { from_native(raw.storage_policy) }?,
+            range: unsafe {
+                convert::present(raw.fields, sys::MLN_RESOURCE_REQUEST_RANGE, raw.range)
+            }?,
+            prior_modified_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0)
+                .then_some(raw.prior_modified_unix_ms),
+            prior_expires_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0)
+                .then_some(raw.prior_expires_unix_ms),
+            prior_etag: unsafe { from_native(raw.prior_etag) }?,
+            prior_data: unsafe { convert::counted(raw.prior_data, raw.prior_data_size) }?,
+        })
     }
 }
 
@@ -4753,7 +4750,7 @@ pub struct ResourceRewriteRule {
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
     pub url: String,
-    /// The replacement URL, or null to keep the URL and stop the search.
+    /// The replacement URL, or empty to keep the URL and stop the search.
     pub replacement_url: Option<String>,
 }
 impl Default for ResourceRewriteRule {
@@ -4944,12 +4941,12 @@ impl ResourceTransformResponse<'_> {
             "mln_resource_transform_response_set_url",
             self.raw.as_ptr() as usize as u64,
         )?;
-        let url_size = convert::count(url.len())?;
+        let arena = &mut InputArena::default();
+        let native_url = to_native(&url, arena)?;
         maplibre_core::check(|out_diagnostic| unsafe {
             sys::mln_resource_transform_response_set_url(
                 self.raw.as_ptr(),
-                url.as_ptr().cast(),
-                url_size,
+                native_url,
                 out_diagnostic,
             )
         })
@@ -5320,9 +5317,9 @@ pub enum RuntimeEventType: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
-    /// Directory root for asset:// URLs. Copied during runtime creation. Null
-    /// or empty selects `/android_asset` on Android and `.` elsewhere. Copied
-    /// text, owned by the caller.
+    /// Directory root for asset:// URLs. Copied during runtime creation. Empty
+    /// selects `/android_asset` on Android and `.` elsewhere. Copied text,
+    /// owned by the caller.
     pub asset_path: Option<String>,
     /// Cache database path. Copied during runtime creation. Copied text, owned
     /// by the caller.
@@ -5352,8 +5349,8 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
 impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
     unsafe fn from_native(raw: sys::mln_runtime_options) -> Result<Self> {
         Ok(Self {
-            asset_path: unsafe { from_native(raw.asset_path) }?,
-            cache_path: unsafe { from_native(raw.cache_path) }?,
+            asset_path: unsafe { convert::nonempty(raw.asset_path) }?,
+            cache_path: unsafe { convert::nonempty(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
             event_wake: Default::default(),
         })
@@ -7226,7 +7223,7 @@ impl FromNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
 }
 
 unsafe fn register_resource_request_cancel(
-    handle: sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request,
     callback: maplibre_core::decision::ContextCallback,
     user_data: *mut std::ffi::c_void,
     release: maplibre_core::decision::ContextCallback,
@@ -7250,10 +7247,10 @@ unsafe fn register_resource_request_cancel(
     }
 }
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
-    sys::mln_resource_request_handle,
+    sys::mln_resource_request,
 > = unsafe {
     maplibre_core::decision::DecisionHandleFns::new(
-        "ResourceRequestHandle",
+        "ResourceRequest",
         sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,

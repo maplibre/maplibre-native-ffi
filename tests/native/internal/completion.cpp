@@ -265,7 +265,12 @@ void queue_resolution_falls_back_without_allocation() {
   auto tag = 0;
   auto retired = false;
   auto completion = created(queued_descriptor(queue, &tag));
-  completion->set_retirement_callback([&retired] { retired = true; });
+  completion->set_retirement_callback({
+    .owner = std::shared_ptr<void>{std::shared_ptr<void>{}, &retired},
+    .run = [](const std::shared_ptr<void>& owner, uint64_t) noexcept {
+      *static_cast<bool*>(owner.get()) = true;
+    },
+  });
   completion->accept();
   completion->retire_work();
   auto text = std::string(1024, 'x');
@@ -336,7 +341,12 @@ void abandoned_queue_completion_pushes_cancelled() {
   auto retired = false;
   {
     auto completion = created(queued_descriptor(queue, nullptr));
-    completion->set_retirement_callback([&retired] { retired = true; });
+    completion->set_retirement_callback({
+      .owner = std::shared_ptr<void>{std::shared_ptr<void>{}, &retired},
+      .run = [](const std::shared_ptr<void>& owner, uint64_t) noexcept {
+        *static_cast<bool*>(owner.get()) = true;
+      },
+    });
     completion->accept();
     completion->retire_work();
   }

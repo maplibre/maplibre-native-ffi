@@ -129,7 +129,7 @@ static void add_the_late_source(
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("late"), data, &completion.descriptor, NULL
   ));
-  mln_geojson_source_data_destroy(data);
+  mln_geojson_source_data_release(data);
 }
 
 static void remove_the_swatch(
@@ -531,7 +531,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
     }
   }
 
-  mln_geojson_source_data_destroy(state.data);
+  mln_geojson_source_data_release(state.data);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

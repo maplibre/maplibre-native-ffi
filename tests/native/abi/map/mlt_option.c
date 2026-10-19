@@ -28,8 +28,8 @@ typedef struct mlt_tile {
 } mlt_tile;
 
 static uint32_t serve_recorded_tile(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   const mlt_tile* tile = user_data;
   (void)request;

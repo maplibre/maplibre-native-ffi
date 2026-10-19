@@ -207,8 +207,8 @@ mln_acquired_frame mln_test_render_and_acquire(
 
 void mln_test_render_release_frame(mln_acquired_frame* frame) {
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, *frame);
+  MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
+  *frame = MLN_HANDLE_NULL;
 }
 
 mln_status mln_test_render_read_back(

@@ -63,8 +63,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_geojson_source_data_destroy =
-    Ffm.downcall("mln_geojson_source_data_destroy", null, JAVA_LONG)
+  private val mln_geojson_source_data_release =
+    Ffm.downcall("mln_geojson_source_data_release", null, JAVA_LONG)
   private val mln_geojson_source_options_default =
     Ffm.downcall("mln_geojson_source_options_default", mln_geojson_source_options)
   private val mln_gpu_sync_default = Ffm.downcall("mln_gpu_sync_default", mln_gpu_sync)
@@ -73,10 +73,8 @@ internal actual object C {
       "mln_http_header_transform_response_set_header",
       JAVA_INT,
       JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
+      mln_buffer_view,
+      mln_buffer_view,
       JAVA_LONG,
     )
   private val mln_lat_lng_for_projected_meters =
@@ -581,8 +579,6 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_map_options_default = Ffm.downcall("mln_map_options_default", mln_map_options)
-  private val mln_map_projection_close =
-    Ffm.downcall("mln_map_projection_close", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
     Ffm.downcall("mln_map_projection_get_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_lat_lng_for_pixel =
@@ -651,6 +647,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_projection_release =
+    Ffm.downcall("mln_map_projection_release", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_set_camera =
     Ffm.downcall("mln_map_projection_set_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_set_visible_coordinates =
@@ -933,7 +931,14 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_map_set_style_url =
-    Ffm.downcall("mln_map_set_style_url", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall(
+      "mln_map_set_style_url",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_set_tile_options =
     Ffm.downcall("mln_map_set_tile_options", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_viewport_options =
@@ -999,8 +1004,6 @@ internal actual object C {
     Ffm.downcall("mln_render_session_clear_data", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_create_projection =
     Ffm.downcall("mln_render_session_create_projection", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_destroy =
-    Ffm.downcall("mln_render_session_destroy", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_detach =
     Ffm.downcall("mln_render_session_detach", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_dispose =
@@ -1056,6 +1059,8 @@ internal actual object C {
     Ffm.downcall("mln_render_session_read_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_reduce_memory_use =
     Ffm.downcall("mln_render_session_reduce_memory_use", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_release =
+    Ffm.downcall("mln_render_session_release", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_request_frame =
     Ffm.downcall("mln_render_session_request_frame", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_resize =
@@ -1185,8 +1190,7 @@ internal actual object C {
       "mln_resource_transform_response_set_url",
       JAVA_INT,
       JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
     )
   private val mln_runtime_barrier =
@@ -1267,7 +1271,7 @@ internal actual object C {
       "mln_runtime_merge_offline_regions",
       JAVA_INT,
       JAVA_LONG,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1503,8 +1507,8 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_geojson_source_data_destroy(data: Long) {
-    mln_geojson_source_data_destroy.invoke(data)
+  actual fun mln_geojson_source_data_release(data: Long) {
+    mln_geojson_source_data_release.invoke(data)
   }
 
   actual fun mln_geojson_source_options_default(returned: Long) {
@@ -1519,17 +1523,13 @@ internal actual object C {
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
-    nameSize: Long,
     value: Long,
-    valueSize: Long,
     outDiagnostic: Long,
   ): Int =
     mln_http_header_transform_response_set_header.invokeExact(
       response,
-      name,
-      nameSize,
-      value,
-      valueSize,
+      Ffm.value(name, mln_buffer_view),
+      Ffm.value(value, mln_buffer_view),
       outDiagnostic,
     ) as Int
 
@@ -2297,9 +2297,6 @@ internal actual object C {
     mln_map_options_default.invokeExact(Ffm.into(returned, mln_map_options)) as MemorySegment
   }
 
-  actual fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int =
-    mln_map_projection_close.invokeExact(projection, outDiagnostic) as Int
-
   actual fun mln_map_projection_get_camera(
     projection: Long,
     outCamera: Long,
@@ -2402,6 +2399,9 @@ internal actual object C {
       outPoints,
       outDiagnostic,
     ) as Int
+
+  actual fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int =
+    mln_map_projection_release.invokeExact(projection, outDiagnostic) as Int
 
   actual fun mln_map_projection_set_camera(
     projection: Long,
@@ -2821,7 +2821,13 @@ internal actual object C {
     url: Long,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_map_set_style_url.invokeExact(map, url, completion, outDiagnostic) as Int
+  ): Int =
+    mln_map_set_style_url.invokeExact(
+      map,
+      Ffm.value(url, mln_buffer_view),
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_set_tile_options(
     map: Long,
@@ -2962,9 +2968,6 @@ internal actual object C {
   ): Int =
     mln_render_session_create_projection.invokeExact(session, outProjection, outDiagnostic) as Int
 
-  actual fun mln_render_session_destroy(session: Long, outDiagnostic: Long): Int =
-    mln_render_session_destroy.invokeExact(session, outDiagnostic) as Int
-
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_render_session_detach.invokeExact(session, completion, outDiagnostic) as Int
 
@@ -3060,6 +3063,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_reduce_memory_use.invokeExact(session, completion, outDiagnostic) as Int
+
+  actual fun mln_render_session_release(session: Long, outDiagnostic: Long): Int =
+    mln_render_session_release.invokeExact(session, outDiagnostic) as Int
 
   actual fun mln_render_session_request_frame(
     session: Long,
@@ -3260,11 +3266,13 @@ internal actual object C {
   actual fun mln_resource_transform_response_set_url(
     response: Long,
     url: Long,
-    urlSize: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_resource_transform_response_set_url.invokeExact(response, url, urlSize, outDiagnostic)
-      as Int
+    mln_resource_transform_response_set_url.invokeExact(
+      response,
+      Ffm.value(url, mln_buffer_view),
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_runtime_barrier(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     mln_runtime_barrier.invokeExact(runtime, completion, outDiagnostic) as Int
@@ -3375,7 +3383,7 @@ internal actual object C {
   ): Int =
     mln_runtime_merge_offline_regions.invokeExact(
       runtime,
-      sideDatabasePath,
+      Ffm.value(sideDatabasePath, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int
@@ -3919,8 +3927,8 @@ internal val mln_runtime_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    ADDRESS.withName("asset_path"),
-    ADDRESS.withName("cache_path"),
+    mln_buffer_view.withName("asset_path"),
+    mln_buffer_view.withName("cache_path"),
     JAVA_LONG.withName("event_mask"),
     mln_wake.withName("event_wake"),
   )

@@ -7,7 +7,7 @@
 "ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
 "ERR-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::creation_checks_the_c_abi_version_before_it_reaches_native"
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
-"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::closing_a_handle_twice_does_nothing"
+"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_does_nothing"
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
 "LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_read_on_another_thread_holds_off_close_until_it_ends"
 "LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
@@ -31,7 +31,7 @@
 "CB-10" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_receives_only_the_requests_its_routes_match"
 "CB-11" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_transform_rewrites_through_its_rules_with_no_callback"
 "CB-12" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_passes_a_deferred_request_to_native_loading"
-"VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected"
+"VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::host_strings_use_views_and_native_lent_strings_decode"
 "VAL-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::presence_fields_keep_a_present_zero_apart_from_an_absent_value"
 "VAL-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"
 # Generated fields carry the C widths exactly, so the only narrowing is a

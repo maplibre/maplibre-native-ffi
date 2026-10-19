@@ -76,7 +76,7 @@ public extension AcquiredFrameHandle {
       try handle.closeOnce { live in
         var raw = live.raw
         try checkStatus { diagnostic in mln_acquired_frame_release(
-          &raw,
+          raw,
           arena.store(consumerCompletion.nativeValue()),
           diagnostic
         ) }

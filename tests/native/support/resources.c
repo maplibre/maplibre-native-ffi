@@ -154,7 +154,8 @@ mln_resource_response mln_test_error_response(
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = reason,
-    .error_message = message,
+    .error_message =
+      (mln_buffer_view){.data = message, .size = strlen(message)},
   };
 }
 
@@ -163,8 +164,8 @@ static void copy_text(const char* text, char* out, size_t capacity) {
 }
 
 static uint32_t scripted_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   mln_test_provider* provider = user_data;
   const mln_test_provided_resource* match = NULL;

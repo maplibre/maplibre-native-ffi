@@ -30,9 +30,16 @@ public sealed class GeneratedValueTests
     private static byte[] EmptyGeoJsonSource =>
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
 
-    [Fact]
-    public async Task StringsCrossAsTerminatedAndAsExplicitLengthViews()
+    private static unsafe void AssertNativeLentStringDecodes()
     {
+        using var scope = new NativeCallScope();
+        Assert.Equal("native-lent é", NativeCallScope.CopyCString(scope.CString("native-lent é")));
+    }
+
+    [Fact]
+    public async Task HostStringsUseViewsAndNativeLentStringsDecode()
+    {
+        AssertNativeLentStringDecodes();
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
         // A source ID crosses as an explicit-length view, so an embedded NUL is part of the ID.
@@ -45,12 +52,13 @@ public sealed class GeneratedValueTests
         Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after", TestWaits.Token));
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before", TestWaits.Token));
 
-        // A style URL crosses NUL-terminated, where an embedded NUL would cut it short.
+        // Native rejects a NUL in a URL view before a C-string consumer reads it.
         var error = Assert.Throws<InvalidArgumentException>(() =>
         {
             _ = fixture.Map.SetStyleUrlAsync("style\0.json", TestWaits.Token);
         });
         Assert.Contains("embedded NUL", error.Diagnostic, StringComparison.Ordinal);
+        Assert.NotNull(error.RawStatus);
     }
 
     [Fact]

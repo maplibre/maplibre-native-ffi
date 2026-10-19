@@ -9,17 +9,15 @@ public extension HttpHeaderTransformResponse {
   ///
   /// See `mln_http_header_transform_response_set_header` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setHeader(name bindingArg0: String, value bindingArg2: String) throws {
+  func setHeader(name bindingArg0: String, value bindingArg1: String) throws {
     try nativeInvoke(
       owner: self,
       "mln_http_header_transform_response_set_header"
     ) { _, arena, diagnostic in
       try mln_http_header_transform_response_set_header(
         nativePointer,
-        arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-        NativeInputArena.count(bindingArg0.count),
-        arena.view(bindingArg2).data?.assumingMemoryBound(to: CChar.self),
-        NativeInputArena.count(bindingArg2.count),
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
         diagnostic
       )
     }
@@ -94,8 +92,7 @@ public extension ResourceTransformResponse {
     { _, arena, diagnostic in
       try mln_resource_transform_response_set_url(
         nativePointer,
-        arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-        NativeInputArena.count(bindingArg0.count),
+        arena.view(bindingArg0),
         diagnostic
       )
     }

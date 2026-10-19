@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
-public abstract class GeneratedResourceRequestHandleOperations internal constructor() {
+public abstract class GeneratedResourceRequestOperations internal constructor() {
   internal abstract val binding: DecisionOwnerState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 

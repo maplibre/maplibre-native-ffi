@@ -74,12 +74,12 @@ typedef struct mln_log_delivery {
 /** Copied mln_resource_provider_callback arguments. */
 typedef struct mln_resource_request_delivery {
   /** The copied request, owned by the batch. */
-  const mln_resource_request* request MLN_BINDING("lifetime=owner");
+  const mln_resource_request_info* request MLN_BINDING("lifetime=owner");
   /**
    * Owned by the batch until mln_delivery_batch_take(); releasing the batch
    * without taking it releases the handle, which fails the request.
    */
-  mln_resource_request_handle handle;
+  mln_resource_request handle;
 } mln_resource_request_delivery;
 
 /** Payload of one delivery, selected by mln_delivery.type. */

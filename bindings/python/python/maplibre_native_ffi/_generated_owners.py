@@ -81,6 +81,12 @@ class EventBatchHandle(_EventBatchHandleOperations, NativeHandleMixin):
 
 
 class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMixin):
+    """Prepared GeoJSON data that sources retain independently of its handle.
+
+    See `mln_geojson_source_data` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "GeojsonSourceDataHandle"
     _parent: NativeHandleMixin | None
 
@@ -182,7 +188,7 @@ class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
 class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin):
     """A resource request that a resource provider handles.
 
-    See `mln_resource_request_handle` in the
+    See `mln_resource_request` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 

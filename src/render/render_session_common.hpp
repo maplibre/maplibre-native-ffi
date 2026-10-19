@@ -850,7 +850,8 @@ auto enqueue_driver_result_operation(
 ) -> mln_status;
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
-  const mln_render_session* out_session, const mln_completion* completion
+  const mln_render_session* out_session, const mln_completion* completion,
+  std::shared_ptr<Completion>* checked = nullptr
 ) -> mln_status;
 
 auto start_attach_render_session(
@@ -995,7 +996,7 @@ enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
 // objects from the descriptor.
 auto validate_render_session_retarget_submission(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_completion* completion
+  const mln_completion* completion, std::shared_ptr<Completion>& checked
 ) -> mln_status;
 
 // Rechecks on the driver thread that the session can take the replacement.
@@ -1032,7 +1033,7 @@ auto enqueue_borrowed_texture_retarget(
   mln_render_session session, std::size_t texture_count,
   const mln_logical_extent& extent, uint32_t physical_width,
   uint32_t physical_height, RenderTargetReplacer replace,
-  const mln_completion* completion, ValuelessCompletion valueless
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status;
 
 // Queues the replacement of a surface for render_session_set_target(). A
@@ -1042,14 +1043,14 @@ auto enqueue_borrowed_texture_retarget(
 // map, and `replace` owns a copy of the descriptor.
 auto enqueue_surface_retarget(
   mln_render_session session, const mln_logical_extent& extent,
-  RenderTargetReplacer replace, const mln_completion* completion,
+  RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
   ValuelessCompletion valueless
 ) -> mln_status;
 auto render_session_projection_create(
   mln_render_session session, mln_map_projection* out_projection
 ) -> mln_status;
 
-auto render_session_destroy(mln_render_session session) -> mln_status;
+auto render_session_release(mln_render_session session) -> mln_status;
 auto render_session_dispose(mln_render_session session) -> mln_status;
 // Disposes a session as render_session_dispose does, except that retirement
 // quarantines its graphics resources instead of detaching it, so it makes no
@@ -1151,7 +1152,7 @@ auto acquired_frame_get_producer_sync(
   mln_acquired_frame frame, mln_gpu_sync* out_sync
 ) -> mln_status;
 auto acquired_frame_release(
-  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion
+  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion
 ) -> mln_status;
 auto render_session_resize_start(
   mln_render_session session, mln_logical_extent extent,

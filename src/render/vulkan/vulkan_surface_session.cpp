@@ -628,8 +628,9 @@ auto vulkan_surface_set_target_start(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::Surface, completion
+    session, RetargetTargetKind::Surface, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
@@ -651,7 +652,7 @@ auto vulkan_surface_set_target_start(
     [copied](mln_render_session_object& live) {
       return live.surface.backend->set_vulkan_target(copied);
     },
-    completion,
+    std::move(checked_completion),
     valueless_completion<&mln_render_session_set_vulkan_surface_target>()
   );
 }

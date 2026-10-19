@@ -401,8 +401,9 @@ auto metal_surface_set_target_start(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::Surface, completion
+    session, RetargetTargetKind::Surface, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
@@ -431,7 +432,7 @@ auto metal_surface_set_target_start(
       retained.context.device = device.get();
       return live.surface.backend->set_metal_target(retained);
     },
-    completion,
+    std::move(checked_completion),
     valueless_completion<&mln_render_session_set_metal_surface_target>()
   );
 }

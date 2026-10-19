@@ -21,7 +21,7 @@ mln_status add_vehicle_source(mln_map map, const mln_completion* completion) {
   status = mln_map_add_geojson_source_data(
     map, view("vehicles"), empty, completion, NULL
   );
-  mln_geojson_source_data_destroy(empty);
+  mln_geojson_source_data_release(empty);
   return status;
   // #endregion add
 }
@@ -71,7 +71,7 @@ mln_status publish_vehicles(
   status = mln_map_set_geojson_source_data(
     map, view("vehicles"), prepared, completion, NULL
   );
-  mln_geojson_source_data_destroy(prepared);
+  mln_geojson_source_data_release(prepared);
   return status;
   // #endregion publish
 }

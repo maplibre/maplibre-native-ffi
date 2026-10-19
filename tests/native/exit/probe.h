@@ -180,8 +180,8 @@ static inline void probe_write_points(void) {
 // Serves the style and its GeoJSON data, and fails every other request, from
 // inside the callback on the file source thread that asks.
 static inline uint32_t probe_provide(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
 ) {
   (void)user_data;
   const char* url =
@@ -255,7 +255,11 @@ static inline mln_map probe_create_map(mln_runtime runtime) {
   const mln_map map = latch.handle;
   probe_require(
     mln_map_set_style_url(
-      map, "custom://style.json", &probe_discarding_completion, NULL
+      map,
+      (mln_buffer_view){
+        .data = "custom://style.json", .size = sizeof("custom://style.json") - 1
+      },
+      &probe_discarding_completion, NULL
     ),
     "setting the style"
   );

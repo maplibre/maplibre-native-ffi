@@ -30,12 +30,12 @@ fn creation_checks_the_c_abi_version_before_it_reaches_native() {
 }
 
 #[test]
-fn closing_a_handle_twice_does_nothing() {
+fn releasing_a_handle_twice_does_nothing() {
     let fixture = Fixture::new();
     let projection = fixture.map().create_projection().unwrap();
-    projection.close().unwrap();
-    // The second close finds the handle closed and never reaches native.
-    projection.close().unwrap();
+    projection.release().unwrap();
+    // The second release finds the handle closed and never reaches native.
+    projection.release().unwrap();
     assert!(projection.is_closed());
     let error = projection.get_camera().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);

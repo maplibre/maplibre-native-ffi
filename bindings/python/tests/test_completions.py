@@ -103,7 +103,9 @@ def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
     running = threading.Event()
     release = threading.Event()
 
-    def hold(request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+    def hold(
+        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+    ) -> None:
         handles.append(handle)
         provided.set()
 

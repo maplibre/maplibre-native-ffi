@@ -12,11 +12,11 @@ public abstract class GeneratedGeojsonSourceDataOperations internal constructor(
   /**
    * Releases prepared GeoJSON source data.
    *
-   * See `mln_geojson_source_data_destroy` in the
+   * See `mln_geojson_source_data_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun destroy(): Unit =
-    nativeClose(this, binding, "mln_geojson_source_data_destroy") {
-      C.mln_geojson_source_data_destroy(handle)
+  public fun release(): Unit =
+    nativeClose(this, binding, "mln_geojson_source_data_release") {
+      C.mln_geojson_source_data_release(handle)
     }
 }

@@ -17,8 +17,8 @@ internal object GeneratedOwnerDisposal {
   }
 
   fun geojsonSourceData(handle: Long) {
-    CallbackAdmission.check(handle, "mln_geojson_source_data_destroy")
-    C.mln_geojson_source_data_destroy(handle)
+    CallbackAdmission.check(handle, "mln_geojson_source_data_release")
+    C.mln_geojson_source_data_release(handle)
   }
 
   fun map(handle: Long) {
@@ -27,8 +27,8 @@ internal object GeneratedOwnerDisposal {
   }
 
   fun mapProjection(handle: Long) {
-    CallbackAdmission.check(handle, "mln_map_projection_close")
-    NativeDiagnostics.check { diagnostic -> C.mln_map_projection_close(handle, diagnostic) }
+    CallbackAdmission.check(handle, "mln_map_projection_release")
+    NativeDiagnostics.check { diagnostic -> C.mln_map_projection_release(handle, diagnostic) }
   }
 
   fun renderFrameBatch(handle: Long) {
@@ -41,7 +41,7 @@ internal object GeneratedOwnerDisposal {
     NativeDiagnostics.check { diagnostic -> C.mln_render_session_dispose(handle, diagnostic) }
   }
 
-  fun resourceRequestHandle(handle: Long) {
+  fun resourceRequest(handle: Long) {
     CallbackAdmission.check(handle, "mln_resource_request_release")
     C.mln_resource_request_release(handle)
   }

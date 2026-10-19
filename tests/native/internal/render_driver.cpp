@@ -580,7 +580,7 @@ void a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full() {
   mln::testing::advance_render_clock(std::chrono::hours{2});
 
   const auto cpu_complete = mln_gpu_sync_default();
-  MLN_TEST_OK(mln_acquired_frame_release(&first, &cpu_complete, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(first, &cpu_complete, nullptr));
   const auto batch = wait_for_results(fixture, 1);
   const auto result = batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT64(113, result.token);
@@ -588,7 +588,7 @@ void a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full() {
     MLN_RENDER_RESULT_DEADLINE_MISSED, result.disposition
   );
   mln_render_frame_batch_release(batch);
-  MLN_TEST_OK(mln_acquired_frame_release(&second, &cpu_complete, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(second, &cpu_complete, nullptr));
   destroy_fixture(fixture);
 }
 
@@ -954,7 +954,7 @@ void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
   auto frame = mln_test_render_and_acquire(&fixture.render, 141);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
-  MLN_TEST_OK(mln_acquired_frame_release(&frame, nullptr, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(frame, nullptr, nullptr));
 
   auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
   auto* releasing =
@@ -1004,7 +1004,8 @@ void release_with_a_gpu_wait(
   sync.kind = MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
   sync.value = 1;
   racing.release_status =
-    mln_acquired_frame_release(&racing.frame, &sync, nullptr);
+    mln_acquired_frame_release(racing.frame, &sync, nullptr);
+  if (racing.release_status == MLN_STATUS_OK) racing.frame = MLN_HANDLE_NULL;
 }
 
 // A frame release can reach a session after abandon took its backend and
@@ -1209,7 +1210,7 @@ auto submit_camera_zoom(mln_map map, double zoom, mln_test_completion& done)
   return mln_map_update_camera(map, &update, &done.descriptor, nullptr);
 }
 
-void a_stored_update_notice_waits_behind_queued_worker_work() {
+void a_stored_update_notice_precedes_queued_worker_work() {
   auto fixture = Fixture{};
   create_fixture(fixture);
   render_until_idle(fixture);
@@ -1243,17 +1244,14 @@ void a_stored_update_notice_waits_behind_queued_worker_work() {
     mln_render_session_get_snapshot(fixture.render.session, &during, nullptr)
   );
   const auto stored = latest_update_generation(fixture.map);
+  const auto batch = wait_for_results(fixture, 1);
   mln_test_gate_release(later_gate.get());
   mln_test_completion_destroy(&move);
-  const auto batch = wait_for_results(fixture, 1);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   destroy_fixture(fixture);
   TEST_ASSERT_GREATER_THAN_UINT64(before.map_update_generation, stored);
-  TEST_ASSERT_EQUAL_UINT64(
-    before.map_update_generation, during.map_update_generation
-  );
-  TEST_ASSERT_EQUAL_UINT32(1, during.pending_demand_count);
+  TEST_ASSERT_EQUAL_UINT64(stored, during.map_update_generation);
   TEST_ASSERT_EQUAL_UINT64(stored, result.map_update_generation);
 }
 
@@ -1433,7 +1431,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_unavailable_drawable_releases_its_slot_for_a_retry);
   RUN_TEST(an_idle_demand_reports_a_failed_backend_activation);
   RUN_TEST(a_cpu_complete_release_reuses_its_slot_before_the_driver_resumes);
-  RUN_TEST(a_stored_update_notice_waits_behind_queued_worker_work);
+  RUN_TEST(a_stored_update_notice_precedes_queued_worker_work);
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);

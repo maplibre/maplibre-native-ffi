@@ -91,7 +91,7 @@ internal actual object UpcallStubs {
   actual val resourceProviderCallback: Long =
     staticCFunction {
       userData: COpaquePointer?,
-      request: CPointer<mln_resource_request>?,
+      request: CPointer<mln_resource_request_info>?,
       handle: ULong ->
       Upcalls.resourceProviderCallback(userData.toLong(), request.toLong(), handle.toLong())
         .toUInt()

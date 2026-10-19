@@ -98,7 +98,7 @@ const failing_style_url = "custom://failing-provider.json";
 
 var provider_failures = support.Counter{};
 
-fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
         try maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null);
         try maplibre.resourceRequestRelease(handle);
@@ -133,11 +133,11 @@ test "an error returned by a resource provider is contained and reported" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = completeThenFail });
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, failing_style_url, null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, failing_style_url, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "custom://unanswered.json", null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "custom://unanswered.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
     try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://unanswered.json") != null);
@@ -153,9 +153,9 @@ test "an error returned by a resource provider is contained and reported" {
 const DeferringProvider = struct {
     url: []const u8,
     taken: support.Counter = .{},
-    handles: [4]maplibre.ResourceRequestHandle = undefined,
+    handles: [4]maplibre.ResourceRequest = undefined,
 
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         const self: *DeferringProvider = @ptrCast(@alignCast(context.?));
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
             try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
@@ -172,15 +172,15 @@ const DeferringProvider = struct {
         try fixture.setProvider(.{ .callback = provide, .context = self });
     }
 
-    fn take(self: *DeferringProvider, fixture: *support.Fixture) !maplibre.ResourceRequestHandle {
+    fn take(self: *DeferringProvider, fixture: *support.Fixture) !maplibre.ResourceRequest {
         const index = self.taken.get();
-        try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, self.url, null));
+        try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, self.url, null));
         try self.taken.waitFor(index + 1);
         return self.handles[index];
     }
 };
 
-fn completeOnThread(handle: maplibre.ResourceRequestHandle, result: *?anyerror) void {
+fn completeOnThread(handle: maplibre.ResourceRequest, result: *?anyerror) void {
     maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = support.style_json }, null) catch |err| {
         result.* = err;
         return;
@@ -201,8 +201,8 @@ test "a decision handle answers its request later from another thread" {
     try testing.expect(!try maplibre.resourceRequestIsCancelled(handle, null));
 
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidString, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .etag = "bad\x00tag" }, &diagnostic));
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try testing.expectError(error.InvalidArgument, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .etag = "bad\x00tag" }, &diagnostic));
+    try testing.expect(diagnostic.raw_status != null);
 
     var thread_result: ?anyerror = error.NotRun;
     const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
@@ -264,7 +264,7 @@ test "a registration that reports cancellation is never rooted" {
     // Cancellation lands on a MapLibre thread with nothing registered to
     // report it, so the wait checks the request again after each wake.
     try fixture.events.waitUntil(handle, struct {
-        fn ready(request: maplibre.ResourceRequestHandle) anyerror!bool {
+        fn ready(request: maplibre.ResourceRequest) anyerror!bool {
             return maplibre.resourceRequestIsCancelled(request, null);
         }
     }.ready);
@@ -283,7 +283,7 @@ test "a registration that reports cancellation is never rooted" {
     try testing.expectEqual(@as(usize, 0), probe.releases.get());
 }
 
-fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequest, _: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     return .pass_through;
 }
 
@@ -318,7 +318,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     var probe = TransformProbe{};
     try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .callback = TransformProbe.transform, .context = &probe }, null));
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "unsupported://original.json", null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "unsupported://original.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
@@ -345,7 +345,7 @@ const RoutedProvider = struct {
     sources: support.Counter = .{},
     others: support.Counter = .{},
 
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
+    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         const self: *RoutedProvider = @ptrCast(@alignCast(context.?));
         const url = request.requested_url orelse "";
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
@@ -395,13 +395,13 @@ test "a provider receives only the requests its routes match" {
     _ = scratch.reset(.free_all);
     try support.resolve(registered);
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "custom://outside.json", null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "custom://outside.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
     try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://outside.json") != null);
     try testing.expectEqual(@as(usize, 0), provider.calls());
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, routed_style_url, null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, routed_style_url, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
     try provider.sources.waitFor(1);
@@ -508,7 +508,7 @@ test "a transform's rules rewrite a request with no callback registered" {
     _ = scratch.reset(.free_all);
     try support.resolve(registered);
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, original, null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, original, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
     try testing.expectEqual(@as(usize, 1), server.served.load(.acquire));

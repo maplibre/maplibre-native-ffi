@@ -57,7 +57,7 @@ void render_forced_frame(const mln_test_render_fixture& fixture) {
     mln_render_session_acquire_frame(fixture.session, &frame, nullptr)
   );
   const auto cpu_complete = mln_gpu_sync_default();
-  MLN_TEST_OK(mln_acquired_frame_release(&frame, &cpu_complete, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(frame, &cpu_complete, nullptr));
 }
 
 // A still image completes only with a frame that rendered the map as its

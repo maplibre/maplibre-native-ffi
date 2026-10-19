@@ -79,10 +79,14 @@ struct NativeGeojsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool
   {
-    mln_geojson_source_data_destroy(raw); return true
+    mln_geojson_source_data_release(raw); return true
   }
 }
 
+/// Prepared GeoJSON data that sources retain independently of its handle.
+///
+/// See `mln_geojson_source_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class GeojsonSourceDataHandle: @unchecked Sendable,
   NativeReceiver
 {
@@ -146,7 +150,7 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver {
 
 struct NativeMapProjectionHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_map_projection_close(
+    mln_map_projection_release(
       raw,
       nil
     ) == MLN_STATUS_OK
@@ -262,12 +266,12 @@ struct NativeResourceRequestHandle: NativeHandle {
 
 /// A resource request that a resource provider handles.
 ///
-/// See `mln_resource_request_handle` in the
+/// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeResourceRequestHandle>
   init(
-    adopting raw: mln_resource_request_handle,
+    adopting raw: mln_resource_request,
     pendingDecision: Bool = false
   ) throws {
     handle = try NativeHandleBox(

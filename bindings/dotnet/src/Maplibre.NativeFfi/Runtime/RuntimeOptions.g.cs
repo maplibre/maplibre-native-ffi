@@ -10,9 +10,9 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="AssetPath">
-/// Directory root for asset:// URLs. Copied during runtime creation. Null or
-/// empty selects <c>/android_asset</c> on Android and <c>.</c> elsewhere.
-/// Copied text, owned by the caller.
+/// Directory root for asset:// URLs. Copied during runtime creation. Empty
+/// selects <c>/android_asset</c> on Android and <c>.</c> elsewhere. Copied
+/// text, owned by the caller.
 /// </param>
 /// <param name="CachePath">
 /// Cache database path. Copied during runtime creation. Copied text, owned by

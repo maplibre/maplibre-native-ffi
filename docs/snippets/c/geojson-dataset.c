@@ -67,7 +67,7 @@ mln_status show_one_point(
   status = mln_map_add_geojson_source_data(
     map, view("pins"), prepared, completion, NULL
   );
-  mln_geojson_source_data_destroy(prepared);
+  mln_geojson_source_data_release(prepared);
   return status;
   // #endregion inline-data
 }

@@ -41,7 +41,7 @@
 "CB-12" = "A provider can pass a deferred decision handle to native loading and then release its owner"
 
 # Generated value shapes
-"VAL-01" = "Strings cross as NUL-terminated and as explicit-length views, and an embedded NUL is rejected where the C API needs termination"
+"VAL-01" = "Host strings cross as explicit-length views; native-lent terminated strings decode, and native rejects embedded NUL where a string reaches a C-string consumer"
 "VAL-02" = "Presence fields and masks round-trip optional values"
 "VAL-03" = "A strided batch and a union with an unknown arm decode without losing data"
 "VAL-04" = "Integer narrowing is checked, open enums keep unknown values, and 64-bit carriers round-trip"

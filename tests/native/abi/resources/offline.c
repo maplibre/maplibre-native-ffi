@@ -27,7 +27,10 @@ static mln_offline_region_definition tile_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .style_url = offline_style_url,
+      .style_url =
+        (mln_buffer_view){
+          .data = offline_style_url, .size = strlen(offline_style_url)
+        },
       .bounds =
         {
           .southwest = {.latitude = 1.0, .longitude = 2.0},
@@ -46,7 +49,10 @@ static mln_offline_region_definition geometry_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
     .data.geometry = {
-      .style_url = offline_style_url,
+      .style_url =
+        (mln_buffer_view){
+          .data = offline_style_url, .size = strlen(offline_style_url)
+        },
       .geometry = MLN_BUFFER_LITERAL(line_geometry),
       .min_zoom = 5.0,
       .max_zoom = 6.0,
@@ -84,7 +90,7 @@ static void with_zero_size(void* descriptor) {
 
 static void pyramid_without_style(void* descriptor) {
   ((mln_offline_region_definition*)descriptor)->data.tile_pyramid.style_url =
-    NULL;
+    (mln_buffer_view){.data = NULL, .size = 1};
 }
 
 static void pyramid_with_inverted_bounds(void* descriptor) {
@@ -101,7 +107,8 @@ static void pyramid_with_inverted_zoom_range(void* descriptor) {
 static void as_geometry_without_style(void* descriptor) {
   mln_offline_region_definition* definition = descriptor;
   *definition = geometry_definition();
-  definition->data.geometry.style_url = NULL;
+  definition->data.geometry.style_url =
+    (mln_buffer_view){.data = NULL, .size = 1};
 }
 
 static void as_geometry_without_bytes(void* descriptor) {
@@ -190,7 +197,7 @@ static void copy_regions(void* user_data, const mln_completion_result* result) {
     region_copy* copy = &probe->regions[index];
     copy->id = info->id;
     copy->type = info->definition.type;
-    const char* style_url = NULL;
+    mln_buffer_view style_url = {0};
     if (info->definition.type == MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID) {
       const mln_offline_tile_pyramid_region_definition* pyramid =
         &info->definition.data.tile_pyramid;
@@ -217,8 +224,8 @@ static void copy_regions(void* user_data, const mln_completion_result* result) {
       }
     }
     (void)snprintf(
-      copy->style_url, sizeof(copy->style_url), "%s",
-      style_url == NULL ? "" : style_url
+      copy->style_url, sizeof(copy->style_url), "%.*s", (int)style_url.size,
+      style_url.size == 0 ? "" : (const char*)style_url.data
     );
     if (info->metadata_size <= sizeof(copy->metadata)) {
       if (info->metadata_size != 0) {
@@ -299,7 +306,8 @@ static region_probe* merge_database(mln_runtime runtime, const char* path) {
   region_probe* probe = new_region_probe(&completion);
   return finish_region_probe(
     mln_runtime_merge_offline_regions(
-      runtime, path, &completion, MLN_TEST_DIAGNOSTIC
+      runtime, (mln_buffer_view){.data = path, .size = strlen(path)},
+      &completion, MLN_TEST_DIAGNOSTIC
     ),
     probe
   );
@@ -574,16 +582,21 @@ static void offline_database_merge_rejects_what_names_no_database_file(void) {
   };
   mln_runtime runtime = mln_test_create_runtime();
   mln_completion completion = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_runtime_merge_offline_regions(runtime, NULL, &completion, NULL)
-  );
+  MLN_TEST_INVALID(mln_runtime_merge_offline_regions(
+    runtime, (mln_buffer_view){.data = NULL, .size = 1}, &completion, NULL
+  ));
   for (size_t index = 0;
        index < sizeof(unreadable_paths) / sizeof(unreadable_paths[0]);
        index += 1) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT,
       mln_runtime_merge_offline_regions(
-        runtime, unreadable_paths[index], &completion, MLN_TEST_DIAGNOSTIC
+        runtime,
+        (mln_buffer_view){
+          .data = unreadable_paths[index],
+          .size = strlen(unreadable_paths[index])
+        },
+        &completion, MLN_TEST_DIAGNOSTIC
       ),
       unreadable_paths[index]
     );
@@ -615,7 +628,9 @@ static void offline_database_merge_reports_a_corrupt_side_database(void) {
   // The file opens read-only, so acceptance succeeds and the schema failure
   // reaches the completion instead.
   MLN_TEST_OK(mln_runtime_merge_offline_regions(
-    runtime, fixture_path, &merge.descriptor, NULL
+    runtime,
+    (mln_buffer_view){.data = fixture_path, .size = strlen(fixture_path)},
+    &merge.descriptor, NULL
   ));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&merge, -1));
   TEST_ASSERT_NOT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&merge));
@@ -675,7 +690,7 @@ static mln_offline_region_id write_side_database(
   const char* path, const uint8_t* metadata, size_t metadata_size
 ) {
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path = path;
+  options.cache_path = (mln_buffer_view){.data = path, .size = strlen(path)};
   mln_runtime side = mln_test_create_runtime_with_options(options);
   const mln_offline_region_definition definition = tile_definition();
   region_probe* created =
@@ -910,7 +925,7 @@ static void a_failed_download_request_reports_its_reason(void) {
      .response = {
        .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
        .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-       .error_message = "the tile host is unreachable",
+       .error_message = MLN_BUFFER_LITERAL("the tile host is unreachable"),
      }},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 2);
@@ -1037,7 +1052,8 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = mln_test_pulse_wake();
-  options.cache_path = cache_path;
+  options.cache_path =
+    (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   // A resource configuration completion runs on the runtime worker, so the
   // offline operation and the release queue behind it.
@@ -1071,7 +1087,8 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   mln_test_completion_destroy(&release);
 
   mln_runtime_options reopen = mln_runtime_options_default();
-  reopen.cache_path = cache_path;
+  reopen.cache_path =
+    (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
   mln_runtime reopened = mln_test_create_runtime_with_options(reopen);
   region_probe* listed = list_regions(reopened);
   MLN_TEST_OK(listed->status);

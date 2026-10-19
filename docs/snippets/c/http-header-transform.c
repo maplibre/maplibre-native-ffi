@@ -23,8 +23,9 @@ static mln_status add_authorization(
   // #region set
   // The helper copies the name and the value before it returns.
   return mln_http_header_transform_response_set_header(
-    out_response, header_name, sizeof(header_name) - 1, token, strlen(token),
-    NULL
+    out_response,
+    (mln_buffer_view){.data = header_name, .size = sizeof(header_name) - 1},
+    (mln_buffer_view){.data = token, .size = strlen(token)}, NULL
   );
   // #endregion set
 }

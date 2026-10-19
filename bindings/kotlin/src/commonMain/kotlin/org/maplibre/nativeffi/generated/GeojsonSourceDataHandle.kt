@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * Prepared GeoJSON data that sources retain independently of its handle.
+ *
+ * See `mln_geojson_source_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class GeojsonSourceDataHandle
 internal constructor(
   handle: Long,
@@ -22,6 +28,6 @@ internal constructor(
     get() = binding.issued().toULong()
 
   public override fun close() {
-    destroy()
+    release()
   }
 }

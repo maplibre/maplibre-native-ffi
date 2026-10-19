@@ -124,7 +124,7 @@ static void map_released(void* user_data, const mln_completion_result* result) {
 static void detached(void* user_data, const mln_completion_result* result) {
   teardown_state* state = user_data;
   if (result->status != MLN_STATUS_OK) return;
-  mln_render_session_destroy(state->session, NULL);
+  mln_render_session_release(state->session, NULL);
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = map_released,

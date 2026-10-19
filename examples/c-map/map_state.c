@@ -7,7 +7,8 @@
 
 static app_error create_runtime(map_state* state) {
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path = ":memory:";
+  options.cache_path =
+    (mln_buffer_view){.data = ":memory:", .size = sizeof(":memory:") - 1};
   options.event_wake = app_event_wake(APP_EVENT_RUNTIME_EVENTS);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
@@ -68,8 +69,12 @@ static mln_status load_style(
     );
   }
   return mln_map_set_style_url(
-    state->map, "https://tiles.openfreemap.org/styles/bright", &completion,
-    diagnostic
+    state->map,
+    (mln_buffer_view){
+      .data = "https://tiles.openfreemap.org/styles/bright",
+      .size = sizeof("https://tiles.openfreemap.org/styles/bright") - 1
+    },
+    &completion, diagnostic
   );
 }
 
