@@ -771,13 +771,13 @@ class ResourceKind(UnknownIntEnum):
 
 class ResourceKindMask(IntFlag):
     """The resource kinds that a route or rule matches, one bit per
-    `mln_resource_kind` value.
+    `mln_resource_kind` value. Registration requires at least one known bit.
+    `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
 
     See `mln_resource_kind_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    ANY = 0
     UNKNOWN = 1
     STYLE = 2
     SOURCE = 4
@@ -786,6 +786,7 @@ class ResourceKindMask(IntFlag):
     SPRITE_IMAGE = 32
     SPRITE_JSON = 64
     IMAGE = 128
+    ALL = 255
 
 
 class ResourceLoadingMethod(UnknownIntEnum):
@@ -839,6 +840,17 @@ class ResourceResponseStatus(UnknownIntEnum):
     ERROR = 1
     NO_CONTENT = 2
     NOT_MODIFIED = 3
+
+
+class ResourceRouteUrl(UnknownIntEnum):
+    """The URL stage that a provider route compares.
+
+    See `mln_resource_route_url` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    RESOLVED = 0
+    REQUESTED = 1
 
 
 class ResourceStoragePolicy(UnknownIntEnum):
@@ -1160,9 +1172,8 @@ class UrlMatchFlags(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    FLAGS_NONE = 0
+    EXACT = 0
     GLOB = 1
-    REQUESTED_URL = 2
 
 
 class ViewportMode(UnknownIntEnum):
@@ -1736,11 +1747,6 @@ class FrameDemand:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     """
 
-    flags: FrameDemandFlag
-    """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
-    `MLN_FRAME_DEMAND_IF_NEEDED`.
-    """
-
     token: int
     """Host identity returned with the terminal frame result."""
 
@@ -1752,6 +1758,11 @@ class FrameDemand:
     no limit. A demand that waits, for a free texture slot or for a map
     update, is checked against its timeout when it runs again; a wait has no
     timer of its own.
+    """
+
+    flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
+    """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
+    `MLN_FRAME_DEMAND_IF_NEEDED`.
     """
 
     @classmethod
@@ -1921,13 +1932,8 @@ class HttpHeaderRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kinds: ResourceKindMask
-    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    unknown bit.
-    """
-
     flags: UrlMatchFlags
-    """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
+    """A bitwise OR of `mln_url_match_flags` values."""
 
     url: str
     """The URL or glob pattern to compare."""
@@ -1936,6 +1942,9 @@ class HttpHeaderRule:
     """The headers to set. Registration validates each one as
     `mln_http_header_transform_response_set_header()` does.
     """
+
+    kinds: ResourceKindMask = ResourceKindMask.ALL
+    """The resource kinds to match."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2076,13 +2085,13 @@ class LogicalExtent:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    width: int
+    width: int = 256
     """Width in UI pixels. Defaults to 256."""
 
-    height: int
+    height: int = 256
     """Height in UI pixels. Defaults to 256."""
 
-    scale_factor: float
+    scale_factor: float = 1.0
     """Device pixels per UI pixel. Defaults to 1.0."""
 
     @classmethod
@@ -2114,7 +2123,7 @@ class MapOptions:
     encodings. Defaults to false.
     """
 
-    event_mask: RuntimeEventMask
+    event_mask: RuntimeEventMask = RuntimeEventMask.ALL
     """Map-originated event types this map queues, as a bitwise OR of
     `mln_runtime_event_mask` values.
     """
@@ -2305,19 +2314,19 @@ class MetalBorrowedTextureDescriptor:
     warning.
     """
 
-    physical_width: int
+    textures: tuple[MetalBorrowedTexture, ...]
+    """The ring's textures, one per slot, in slot order. Required. Copied value,
+    owned by the caller.
+    """
+
+    physical_width: int = 256
     """Physical texture width in device pixels. Must be positive. Defaults to
     256.
     """
 
-    physical_height: int
+    physical_height: int = 256
     """Physical texture height in device pixels. Must be positive. Defaults to
     256.
-    """
-
-    textures: tuple[MetalBorrowedTexture, ...]
-    """The ring's textures, one per slot, in slot order. Required. Copied value,
-    owned by the caller.
     """
 
     @classmethod
@@ -2677,16 +2686,6 @@ class OpenglBorrowedTextureDescriptor:
     warning.
     """
 
-    physical_width: int
-    """Physical texture width in device pixels. Must be positive. Defaults to
-    256.
-    """
-
-    physical_height: int
-    """Physical texture height in device pixels. Must be positive. Defaults to
-    256.
-    """
-
     context: OpenglContextDescriptor
     """Borrowed OpenGL context provider data. The textures must belong to this
     context or a context in the same share group.
@@ -2699,6 +2698,16 @@ class OpenglBorrowedTextureDescriptor:
 
     target: int
     """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
+
+    physical_width: int = 256
+    """Physical texture width in device pixels. Must be positive. Defaults to
+    256.
+    """
+
+    physical_height: int = 256
+    """Physical texture height in device pixels. Must be positive. Defaults to
+    256.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3151,12 +3160,12 @@ class RenderSessionAttachOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    driver: RenderDriverKind
+    driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD
     """One `mln_render_driver_kind` value. Defaults to
     `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
     """
 
-    requested_texture_ring_depth: int
+    requested_texture_ring_depth: int = 1
     """Requested slot count of a session-owned texture ring, from one to three.
     Private targets grant one slot regardless of this value. A borrowed
     texture ring's depth is its texture count, so borrowed and other targets
@@ -3551,19 +3560,17 @@ class ResourceRewriteRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kinds: ResourceKindMask
-    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    unknown bit.
-    """
-
     flags: UrlMatchFlags
-    """A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL."""
+    """A bitwise OR of `mln_url_match_flags` values."""
 
     url: str
     """The URL or glob pattern to compare."""
 
+    kinds: ResourceKindMask = ResourceKindMask.ALL
+    """The resource kinds to match."""
+
     replacement_url: str | None = None
-    """The replacement URL, or null to leave a matching URL unchanged."""
+    """The replacement URL, or null to keep the URL and stop the search."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3583,16 +3590,17 @@ class ResourceRoute:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kinds: ResourceKindMask
-    """A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    unknown bit.
-    """
-
     flags: UrlMatchFlags
     """A bitwise OR of `mln_url_match_flags` values."""
 
     url: str
     """The URL or glob pattern to compare."""
+
+    url_stage: ResourceRouteUrl
+    """The URL stage to compare."""
+
+    kinds: ResourceKindMask = ResourceKindMask.ALL
+    """The resource kinds to match."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3600,6 +3608,7 @@ class ResourceRoute:
             kinds=ResourceKindMask(raw["kinds"]),
             flags=UrlMatchFlags(raw["flags"]),
             url=raw["url"],
+            url_stage=ResourceRouteUrl(raw["url_stage"]),
         )
 
 
@@ -3825,11 +3834,6 @@ class RuntimeOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    event_mask: RuntimeEventMask
-    """Runtime-scoped event types this runtime queues, as a bitwise OR of
-    `mln_runtime_event_mask` values.
-    """
-
     asset_path: str | None = None
     """Directory root for asset:// URLs. Copied during runtime creation. Null or
     empty selects `/android_asset` on Android and `.` elsewhere. Copied text,
@@ -3839,6 +3843,11 @@ class RuntimeOptions:
     cache_path: str | None = None
     """Cache database path. Copied during runtime creation. Copied text, owned
     by the caller.
+    """
+
+    event_mask: RuntimeEventMask = RuntimeEventMask.ALL
+    """Runtime-scoped event types this runtime queues, as a bitwise OR of
+    `mln_runtime_event_mask` values.
     """
 
     event_wake: Wake = field(default_factory=lambda: Wake())
@@ -4440,14 +4449,6 @@ class VulkanBorrowedTextureDescriptor:
     warning.
     """
 
-    physical_width: int
-    """Physical image width in device pixels. Must be positive. Defaults to 256."""
-
-    physical_height: int
-    """Physical image height in device pixels. Must be positive. Defaults to
-    256.
-    """
-
     context: VulkanContextDescriptor
     """Borrowed Vulkan context. All handles are required."""
 
@@ -4464,7 +4465,15 @@ class VulkanBorrowedTextureDescriptor:
     initial_layout: int
     """Backend-native VkImageLayout value expected at render-pass begin."""
 
-    final_layout: int
+    physical_width: int = 256
+    """Physical image width in device pixels. Must be positive. Defaults to 256."""
+
+    physical_height: int = 256
+    """Physical image height in device pixels. Must be positive. Defaults to
+    256.
+    """
+
+    final_layout: int = 5
     """Backend-native VkImageLayout value left after rendering succeeds.
     Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
     """
@@ -4749,12 +4758,6 @@ class WebgpuBorrowedTextureDescriptor:
     warning.
     """
 
-    physical_width: int
-    """Physical texture width in device pixels. Defaults to 256."""
-
-    physical_height: int
-    """Physical texture height in device pixels. Defaults to 256."""
-
     context: WebgpuContextDescriptor
     """Borrowed WebGPU context. device is required. Rendering is submitted
     through context.queue or that device's default queue.
@@ -4769,6 +4772,12 @@ class WebgpuBorrowedTextureDescriptor:
     """Backend-native WGPUTextureFormat value of every texture. Undefined is
     invalid.
     """
+
+    physical_width: int = 256
+    """Physical texture width in device pixels. Defaults to 256."""
+
+    physical_height: int = 256
+    """Physical texture height in device pixels. Defaults to 256."""
 
     @classmethod
     def _from_native(cls, raw):

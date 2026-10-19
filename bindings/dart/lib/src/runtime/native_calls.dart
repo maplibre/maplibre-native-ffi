@@ -76,7 +76,7 @@ Future<T> _queryOwned<T>(_NativeStart start, T Function(int handle) adopt) =>
     startNativeCompletion(
       start: _withArena(start),
       decode: (result) => adopt(result.value.cast<Uint64>().value),
-      claimBeforeDecode: true,
+      ownsHandle: true,
     );
 
 /// Starts an attachment, which writes its owner's handle at admission and

@@ -1,0 +1,210 @@
+// Rejected registrations retain host ownership even when acceptance throws.
+#include <mln/storage/response.hpp>
+#include <mln/util/run_loop.hpp>
+
+#include "internal/support/allocation_faults.hpp"
+#include "internal/support/resources.hpp"
+#include "resources/custom_resource_provider.hpp"
+#include "runtime/runtime.hpp"
+#include "support/test_support.h"
+
+namespace {
+void rejected_provider_registration_queues_no_retirement() {
+  auto unexpected_retirements = std::size_t{};
+  for (auto budget = std::size_t{}; budget < 24; ++budget) {
+    auto runtime = mln_runtime{MLN_HANDLE_NULL};
+    auto options = mln_runtime_options_default();
+    MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
+    auto queue = mln_delivery_queue{MLN_HANDLE_NULL};
+    const auto queue_options = mln_delivery_queue_options{
+      .size = sizeof(mln_delivery_queue_options),
+    };
+    MLN_TEST_OK(mln_delivery_queue_create(&queue_options, &queue, nullptr));
+    const auto provider = mln_resource_provider{
+      .size = sizeof(mln_resource_provider),
+      .queue = queue,
+      .routes = nullptr,
+      .route_count = 0,
+    };
+    auto completion = mln_test_completion_default(0);
+    auto status = MLN_STATUS_OK;
+    {
+      const auto faults = mln::native_tests::AllocationFaults{budget};
+      status = mln_runtime_set_resource_provider(
+        runtime, &provider, &completion.descriptor, nullptr
+      );
+    }
+    if (status == MLN_STATUS_OK) {
+      MLN_TEST_OK(mln_test_completion_settle(&completion));
+    } else {
+      mln_test_completion_reject(&completion);
+      mln_test_completion_destroy(&completion);
+      auto batch = MLN_HANDLE_NULL;
+      const auto drained = mln_delivery_queue_drain(queue, &batch, nullptr);
+      if (drained == MLN_STATUS_OK) {
+        auto view = mln_delivery_batch_view{
+          .size = sizeof(mln_delivery_batch_view),
+        };
+        MLN_TEST_OK(mln_delivery_batch_get(batch, &view, nullptr));
+        unexpected_retirements += view.delivery_count;
+        mln_delivery_batch_release(batch);
+      }
+    }
+    auto released = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_runtime_release(runtime, &released.descriptor, nullptr));
+    MLN_TEST_OK(mln_test_completion_settle(&released));
+    mln_delivery_queue_release(queue);
+  }
+  TEST_ASSERT_EQUAL_size_t_MESSAGE(
+    0, unexpected_retirements, "a rejected provider queued its retirement"
+  );
+}
+
+void count_release(void* data) { ++*static_cast<int*>(data); }
+auto provider_callback(
+  void*, const mln_resource_request*, mln_resource_request_handle
+) -> uint32_t {
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+auto rewrite_callback(
+  void*, uint32_t, const char*, mln_resource_transform_response*
+) -> mln_status {
+  return MLN_STATUS_OK;
+}
+auto header_callback(
+  void*, uint32_t, const char*, mln_http_header_transform_response*
+) -> mln_status {
+  return MLN_STATUS_OK;
+}
+
+void rejected_callback_registrations_never_release_caller_data() {
+  for (auto mode = 0; mode < 3; ++mode) {
+    for (auto budget = std::size_t{0}; budget < 24; ++budget) {
+      auto runtime = mln_runtime{MLN_HANDLE_NULL};
+      auto options = mln_runtime_options_default();
+      MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
+      auto releases = 0;
+      const auto provider = mln_resource_provider{
+        .size = sizeof(mln_resource_provider),
+        .callback = provider_callback,
+        .user_data = &releases,
+        .release_user_data = count_release,
+        .queue = MLN_HANDLE_NULL,
+        .routes = nullptr,
+        .route_count = 0
+      };
+      const auto rewrite = mln_resource_transform{
+        .size = sizeof(mln_resource_transform),
+        .callback = rewrite_callback,
+        .user_data = &releases,
+        .release_user_data = count_release,
+        .rules = nullptr,
+        .rule_count = 0
+      };
+      const auto header = mln_http_header_transform{
+        .size = sizeof(mln_http_header_transform),
+        .callback = header_callback,
+        .user_data = &releases,
+        .release_user_data = count_release,
+        .rules = nullptr,
+        .rule_count = 0
+      };
+      auto completion = mln_test_completion_default(0);
+      auto status = MLN_STATUS_OK;
+      {
+        const auto faults = mln::native_tests::AllocationFaults{budget};
+        if (mode == 0)
+          status = mln_runtime_set_resource_provider(
+            runtime, &provider, &completion.descriptor, nullptr
+          );
+        else if (mode == 1)
+          status = mln_runtime_set_resource_transform(
+            runtime, &rewrite, &completion.descriptor, nullptr
+          );
+        else
+          status = mln_runtime_set_http_header_transform(
+            runtime, &header, &completion.descriptor, nullptr
+          );
+      }
+      if (status == MLN_STATUS_OK)
+        MLN_TEST_OK(mln_test_completion_settle(&completion));
+      else {
+        mln_test_completion_reject(&completion);
+        mln_test_completion_destroy(&completion);
+      }
+      auto released = mln_test_completion_default(0);
+      MLN_TEST_OK(mln_runtime_release(runtime, &released.descriptor, nullptr));
+      MLN_TEST_OK(mln_test_completion_settle(&released));
+      TEST_ASSERT_EQUAL_INT(status == MLN_STATUS_OK ? 1 : 0, releases);
+    }
+  }
+}
+
+struct RefusedCopy {
+  mln_resource_provider_callback callback;
+  void* user_data;
+  bool handled = false;
+};
+
+auto refuse_request_copy(
+  void* data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) -> uint32_t {
+  auto& probe = *static_cast<RefusedCopy*>(data);
+  const auto faults = mln::native_tests::AllocationFaults{};
+  const auto decision = probe.callback(probe.user_data, request, handle);
+  probe.handled = decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  return decision;
+}
+
+void a_failed_queue_copy_fails_closed_without_allocating() {
+  auto loop = mln::util::RunLoop{};
+  auto runtime = mln_test_create_runtime();
+  auto queue = mln_delivery_queue{MLN_HANDLE_NULL};
+  const auto options =
+    mln_delivery_queue_options{.size = sizeof(mln_delivery_queue_options)};
+  MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, nullptr));
+  const auto descriptor = mln_resource_provider{
+    .size = sizeof(mln_resource_provider),
+    .queue = queue,
+    .routes = nullptr,
+    .route_count = 0,
+  };
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, descriptor));
+  const auto live = mln::core::lease_runtime(runtime);
+  auto provider = mln::core::acquire_resource_provider_for_platform_context(
+    live->platform_context
+  );
+  auto probe = RefusedCopy{provider->callback(), provider->user_data()};
+  auto failed = false;
+  auto passed_through = false;
+  auto request = mln::core::request_custom_resource(
+    mln::Resource::style("custom://refused.json"), "custom://refused.json",
+    refuse_request_copy, &probe,
+    [&](const mln::Response& response) {
+      failed = response.error != nullptr;
+      loop.stop();
+    },
+    [&](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
+      passed_through = true;
+      return nullptr;
+    }
+  );
+  loop.run();
+  request.reset();
+  provider.reset();
+  MLN_TEST_OK(mln::native_tests::clear_resource_provider(runtime));
+  mln_test_destroy_runtime(runtime);
+  mln_delivery_queue_release(queue);
+  TEST_ASSERT_TRUE(probe.handled);
+  TEST_ASSERT_TRUE(failed);
+  TEST_ASSERT_FALSE(passed_through);
+}
+
+}  // namespace
+
+MLN_TEST_GROUP {
+  RUN_TEST(rejected_provider_registration_queues_no_retirement);
+  RUN_TEST(a_failed_queue_copy_fails_closed_without_allocating);
+  RUN_TEST(rejected_callback_registrations_never_release_caller_data);
+}

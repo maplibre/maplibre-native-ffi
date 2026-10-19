@@ -983,7 +983,7 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   writeU32(target, w(32, 56).toUInt())
   writeAddress(
     target + w(24, 40),
-    array(value.routes, w(12, 16), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -1912,10 +1912,11 @@ internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
   writeAddress(target + 8, cString(value.url))
+  writeU32(target + w(12, 16), value.urlStage.rawValue)
 }
 
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(12, 16), w(4, 8)).also { putResourceRoute(it, value) }
+  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
   writeU32(target, value.kinds.rawValue)

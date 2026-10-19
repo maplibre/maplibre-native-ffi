@@ -240,7 +240,7 @@ def operation(plan, values, *, discard=False):
         access = "Consuming"
     elif plan.consumes:
         access = "Closing"
-    elif decision and plan.name == decision.complete:
+    elif decision and plan.name in (decision.complete, decision.resume):
         access = "Completing"
     elif plan.receiver_access == "issued":
         access = "Issued"

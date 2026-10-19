@@ -30,7 +30,7 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
     this.decode,
     this.submissionStack,
     this.acceptErrorStatus,
-    this.claimBeforeDecode,
+    this.ownsHandle,
   );
 
   @override
@@ -39,7 +39,7 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
   final NativeCompletionDecoder<T> decode;
   final StackTrace submissionStack;
   final bool acceptErrorStatus;
-  final bool claimBeforeDecode;
+  final bool ownsHandle;
 
   @override
   void finish(int batch, int index, raw.mln_completion_result result) {
@@ -50,11 +50,8 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
           return diagnostic.isEmpty ? 'native operation failed' : diagnostic;
         });
       }
-      if (claimBeforeDecode) _take(batch, index);
+      if (ownsHandle) _take(batch, index);
       final value = decode(result);
-      // An owned value that the decoder did not claim stays with the batch,
-      // whose release disposes it.
-      if (!claimBeforeDecode) _take(batch, index);
       completer.complete(value);
     } catch (error) {
       completer.completeError(error, submissionStack);
@@ -195,17 +192,6 @@ final class DeliveryQueue implements Finalizable {
 
   void _retire(int token) => _registrations.remove(token)?.target?._finish();
 
-  /// The most recent registration still pending that handles [type], or
-  /// null when none is.
-  DeliveryRegistration? latestRegistrationForTesting(int type) {
-    final pending = _registrations.values
-        .map((reference) => reference.target)
-        .whereType<DeliveryRegistration>()
-        .where((registration) => registration.handlers.containsKey(type))
-        .toList();
-    return pending.isEmpty ? null : pending.last;
-  }
-
   int _addCompletion(_PendingCompletionBase pending) {
     final token = _nextToken++;
     _pendingCompletions[token] = pending;
@@ -232,8 +218,8 @@ final class DeliveryQueue implements Finalizable {
             output,
             nativeDiagnostic,
           );
-          // A failed drain leaves the deliveries queued and wakes this port
-          // again, so the next wake message retries.
+          // A failed drain retains deliveries and arms one deferred wake.
+          // A failed retry leaves service to the host's schedule.
           if (status != nativeStatusOk) return 0;
           return output.value;
         });
@@ -296,7 +282,7 @@ Future<T> startNativeCompletion<T>({
   required NativeCompletionStart start,
   required NativeCompletionDecoder<T> decode,
   bool acceptErrorStatus = false,
-  bool claimBeforeDecode = false,
+  bool ownsHandle = false,
   void Function()? onRejected,
 }) {
   final queue = isolateDeliveryQueue;
@@ -307,7 +293,7 @@ Future<T> startNativeCompletion<T>({
       decode,
       StackTrace.current,
       acceptErrorStatus,
-      claimBeforeDecode,
+      ownsHandle,
     ),
   );
   try {

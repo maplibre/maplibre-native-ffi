@@ -50,3 +50,23 @@ mln_status install_transform(
   );
 }
 // #endregion install
+
+mln_status install_rewrite_rules(
+  mln_runtime runtime, const mln_completion* completion
+) {
+  // #region rules
+  const mln_resource_rewrite_rule rule = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = "https://tiles.example.com/style.json",
+    .replacement_url = "https://mirror.example.com/style.json",
+  };
+  const mln_resource_transform transform = {
+    .size = sizeof(transform),
+    .rules = &rule,
+    .rule_count = 1,
+  };
+  // #endregion rules
+  return mln_runtime_set_resource_transform(
+    runtime, &transform, completion, NULL
+  );
+}

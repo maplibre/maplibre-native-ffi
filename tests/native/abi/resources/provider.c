@@ -3,6 +3,9 @@
 // provider's answer reaches the map, including through the ambient cache.
 
 #include "support/map.h"
+#if !defined(__EMSCRIPTEN__)
+#include "support/http_server.h"
+#endif
 #include "support/resources.h"
 #include "support/test_support.h"
 
@@ -118,6 +121,7 @@ static void resource_provider_registration_releases_owned_state(void) {
 
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
   mln_resource_request_release(MLN_HANDLE_NULL);
+  MLN_TEST_INVALID(mln_resource_request_pass_through(MLN_HANDLE_NULL, NULL));
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
   bool cancelled = false;
@@ -1040,7 +1044,78 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   mln_test_provider_destroy(provider);
 }
 
+#if !defined(__EMSCRIPTEN__)
+static uint32_t hand_back_inline(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  atomic_int* status = user_data;
+  atomic_store(status, mln_resource_request_pass_through(handle, NULL));
+  mln_resource_request_release(handle);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static void a_callback_request_can_pass_through_inline_or_later(void) {
+  const mln_test_http_route routes[] = {
+    {
+      .path = "/inline.json",
+      .body = (const uint8_t*)inline_style_json,
+      .body_size = sizeof(inline_style_json) - 1,
+    },
+    {
+      .path = "/deferred.json",
+      .body = (const uint8_t*)inline_style_json,
+      .body_size = sizeof(inline_style_json) - 1,
+    },
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 2);
+  mln_runtime runtime = mln_test_create_runtime();
+  for (int mode = 0; mode < 2; ++mode) {
+    char url[256];
+    mln_test_http_server_url(server, routes[mode].path, url, sizeof(url));
+    static dropped_request_probe probe;
+    atomic_store(&probe.handle, MLN_HANDLE_NULL);
+    atomic_store(&probe.release_inline, false);
+    static atomic_int status;
+    atomic_store(&status, MLN_STATUS_NATIVE_ERROR);
+    const mln_resource_provider provider = {
+      .size = sizeof(mln_resource_provider),
+      .callback =
+        mode == 0 ? hand_back_inline : claim_and_drop_resource_provider,
+      .user_data = mode == 0 ? (void*)&status : (void*)&probe,
+    };
+    MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+    mln_map map = mln_test_create_map(runtime);
+    MLN_TEST_OK(mln_test_map_set_style_url(map, url));
+    if (mode == 1) {
+      TEST_ASSERT_TRUE(mln_test_await(
+        dropped_request_claimed, &probe, mln_test_deadline_default(),
+        "the provider to claim the request"
+      ));
+      const mln_resource_request_handle handle = atomic_load(&probe.handle);
+      MLN_TEST_OK(mln_resource_request_pass_through(handle, NULL));
+      mln_resource_request_release(handle);
+    }
+    TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+    if (mode == 0) MLN_TEST_STATUS(MLN_STATUS_OK, atomic_load(&status));
+    mln_test_destroy_map(map);
+  }
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/inline.json")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/deferred.json")
+  );
+  mln_test_http_server_stop(server);
+}
+#endif
+
 MLN_TEST_GROUP {
+#if !defined(__EMSCRIPTEN__)
+  RUN_TEST(a_callback_request_can_pass_through_inline_or_later);
+#endif
   RUN_TEST(resource_provider_registration_validates_its_descriptor);
   RUN_TEST(resource_provider_registration_releases_owned_state);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);

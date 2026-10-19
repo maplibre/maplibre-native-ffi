@@ -270,10 +270,16 @@ int main() {
   mln_map handles[] = {42, 43};
   const auto* maps = copy(handles, 2);
   assert(maps[0] == 42 && maps[1] == 43);
-  mln::delivery::completion_capture<mln_map>.discard(maps, 2);
+  auto owned = mln::delivery::DeliveryItem{};
+  owned.view.payload.completion = mln_completion_result{
+    .size = sizeof(mln_completion_result), .status = MLN_STATUS_OK,
+    .disposition = 0, .value_size = sizeof(mln_map), .generation = 0,
+    .diagnostic = {}, .value = maps, .value_count = 2
+  };
+  mln::delivery::completion_capture<mln_map>.discard(owned);
   assert(disposed == 2);
-  assert(mln::delivery::completion_capture<mln_map>.discard_item != nullptr);
-  assert(mln::delivery::completion_capture<mln_style_source_info>.discard_item == nullptr);
+  assert(mln::delivery::completion_capture<mln_map>.discard != nullptr);
+  assert(mln::delivery::completion_capture<mln_style_source_info>.discard == nullptr);
 }
 """
 

@@ -275,13 +275,34 @@ def declaration(values, value):
         derives += ["Copy", "PartialEq"]
     elif comparable(value):
         derives.append("PartialEq")
-    if not value.default:
+    initials = [
+        field for field in value.fields if field.public and field.initial is not None
+    ]
+    if not value.default and not initials:
         derives.append("Default")
     default = (
         f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
         if value.default
         else ""
     )
+    if initials and not value.default:
+        defaults = []
+        for field in value.fields:
+            if not field.public:
+                continue
+            field_initial = field.initial
+            expression = "Default::default()"
+            if field_initial is not None:
+                expression = (
+                    f"{values.public(field.value)}::{field_initial.member.upper()}"
+                    if field.value.kind == "enum"
+                    else field_initial.literal
+                )
+            defaults.append(f"{identifier(field.name)}: {expression}")
+        defaults.extend(
+            f"{identifier(flag.member)}: false" for flag in value.mask_flags
+        )
+        default = f"impl Default for {name} {{ fn default() -> Self {{ Self {{ {', '.join(defaults)} }} }} }}\n"
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     impl = f"impl {name} {{ {' '.join(constructors)} }}\n" if constructors else ""
     directions = values.directions.get(value.native, {"in", "out"})

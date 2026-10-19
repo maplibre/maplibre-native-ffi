@@ -11,31 +11,7 @@ namespace mln::core {
 namespace {
 
 constexpr auto known_url_match_flags =
-  static_cast<std::uint32_t>(MLN_URL_MATCH_GLOB) |
-  static_cast<std::uint32_t>(MLN_URL_MATCH_REQUESTED_URL);
-
-constexpr auto known_resource_kinds =
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_UNKNOWN) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_STYLE) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SOURCE) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_TILE) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_GLYPHS) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_SPRITE_JSON) |
-  static_cast<std::uint32_t>(MLN_RESOURCE_KIND_MASK_IMAGE);
-
-auto literal_span(
-  std::string_view pattern, std::size_t index, char candidate
-) noexcept -> std::size_t {
-  const auto element = pattern[index];
-  if (element == '?') {
-    return candidate == '/' ? 0 : 1;
-  }
-  if (element == '\\' && index + 1 < pattern.size()) {
-    return pattern[index + 1] == candidate ? 2 : 0;
-  }
-  return element == candidate ? 1 : 0;
-}
+  static_cast<std::uint32_t>(MLN_URL_MATCH_GLOB);
 
 auto reject(const char* what, std::size_t index, const char* reason)
   -> mln_status {
@@ -45,114 +21,94 @@ auto reject(const char* what, std::size_t index, const char* reason)
   return MLN_STATUS_INVALID_ARGUMENT;
 }
 
-// Checks the members that routes and rules share. allowed names the flags
-// that this kind of entry accepts.
+// Checks the members that routes and rules share.
 auto check_pattern(
   const char* what, std::size_t index, std::uint32_t kinds, std::uint32_t flags,
-  std::uint32_t allowed, const char* url
+  const char* url
 ) -> mln_status {
   if (url == nullptr) return reject(what, index, "has a null url");
-  if ((kinds & ~known_resource_kinds) != 0) {
-    return reject(what, index, "has unknown kind bits");
+  if (kinds == 0 || (kinds & ~MLN_RESOURCE_KIND_MASK_ALL) != 0) {
+    return reject(what, index, "requires at least one known kind bit");
   }
   if ((flags & ~known_url_match_flags) != 0) {
     return reject(what, index, "has unknown flag bits");
-  }
-  if ((flags & ~allowed) != 0) {
-    return reject(what, index, "sets MLN_URL_MATCH_REQUESTED_URL");
   }
   return MLN_STATUS_OK;
 }
 
 }  // namespace
 
-auto glob_matches(std::string_view pattern, std::string_view candidate) noexcept
-  -> bool {
-  auto pattern_index = std::size_t{0};
-  auto candidate_index = std::size_t{0};
-
-  struct WildcardCheckpoint {
-    std::size_t pattern_index = std::string_view::npos;
-    std::size_t candidate_index = 0;
-  };
-  auto segment_wildcard = WildcardCheckpoint{};
-  auto spanning_wildcard = WildcardCheckpoint{};
-
-  const auto backtrack = [&]() -> bool {
-    if (segment_wildcard.pattern_index != std::string_view::npos) {
-      if (
-        segment_wildcard.candidate_index < candidate.size() &&
-        candidate[segment_wildcard.candidate_index] != '/'
-      ) {
-        ++segment_wildcard.candidate_index;
-        pattern_index = segment_wildcard.pattern_index;
-        candidate_index = segment_wildcard.candidate_index;
-        return true;
-      }
-      segment_wildcard = {};
-    }
-    if (
-      spanning_wildcard.pattern_index == std::string_view::npos ||
-      spanning_wildcard.candidate_index == candidate.size()
-    ) {
-      return false;
-    }
-    ++spanning_wildcard.candidate_index;
-    segment_wildcard = {};
-    pattern_index = spanning_wildcard.pattern_index;
-    candidate_index = spanning_wildcard.candidate_index;
-    return true;
-  };
-
-  while (true) {
-    if (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
-      const auto run_start = pattern_index;
-      while (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
-        ++pattern_index;
-      }
-      const auto checkpoint =
-        WildcardCheckpoint{pattern_index, candidate_index};
-      if (pattern_index - run_start > 1) {
-        spanning_wildcard = checkpoint;
-        segment_wildcard = {};
-      } else {
-        segment_wildcard = checkpoint;
-      }
-      continue;
-    }
-    if (candidate_index < candidate.size()) {
-      const auto span =
-        pattern_index < pattern.size()
-          ? literal_span(pattern, pattern_index, candidate[candidate_index])
-          : 0;
-      if (span != 0) {
-        pattern_index += span;
-        ++candidate_index;
-        continue;
-      }
-    } else if (pattern_index == pattern.size()) {
-      return true;
-    }
-    if (!backtrack()) {
-      return false;
+CompiledGlob::CompiledGlob(std::string_view pattern) {
+  tokens_.reserve(pattern.size());
+  for (auto index = std::size_t{0}; index < pattern.size(); ++index) {
+    const auto value = pattern[index];
+    if (value == '*') {
+      const auto start = index;
+      while (index + 1 < pattern.size() && pattern[index + 1] == '*') ++index;
+      tokens_.push_back({index == start ? Kind::Segment : Kind::Spanning});
+    } else if (value == '?') {
+      tokens_.push_back({Kind::Any});
+    } else {
+      if (value == '\\' && index + 1 < pattern.size()) ++index;
+      tokens_.push_back({Kind::Literal, pattern[index]});
     }
   }
+  states_.resize(tokens_.size() + 1);
 }
 
-auto url_matches(
-  std::uint32_t flags, std::string_view url, std::string_view candidate
-) noexcept -> bool {
-  if ((flags & static_cast<std::uint32_t>(MLN_URL_MATCH_GLOB)) != 0) {
-    return glob_matches(url, candidate);
+auto CompiledGlob::matches(
+  std::string_view candidate, std::size_t* steps
+) const noexcept -> bool {
+  const auto lock = std::scoped_lock{mutex_};
+  if (steps != nullptr) *steps = 0;
+  states_[0] = 1;
+  for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
+    const auto kind = tokens_[index].kind;
+    states_[index + 1] =
+      (kind == Kind::Segment || kind == Kind::Spanning) && states_[index] != 0;
   }
-  return url == candidate;
+  for (const auto byte : candidate) {
+    auto previous = states_[0];
+    states_[0] = 0;
+    for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
+      if (steps != nullptr) ++*steps;
+      const auto old = states_[index + 1];
+      const auto token = tokens_[index];
+      switch (token.kind) {
+        case Kind::Segment:
+        case Kind::Spanning:
+          states_[index + 1] =
+            states_[index] != 0 ||
+            (old != 0 && (token.kind == Kind::Spanning || byte != '/'));
+          break;
+        case Kind::Any:
+          states_[index + 1] = previous != 0 && byte != '/';
+          break;
+        case Kind::Literal:
+          states_[index + 1] = previous != 0 && byte == token.literal;
+          break;
+      }
+      previous = old;
+    }
+  }
+  return states_.back() != 0;
 }
+
+UrlPattern::UrlPattern(
+  std::uint32_t kinds_, std::uint32_t flags, std::string_view url_
+)
+    : kinds(kinds_),
+      url(url_),
+      glob(
+        (flags & MLN_URL_MATCH_GLOB) != 0 ? std::make_shared<CompiledGlob>(url_)
+                                          : nullptr
+      ) {}
 
 auto UrlPattern::matches(
   std::uint32_t request_kind, std::string_view candidate
 ) const noexcept -> bool {
   return matches_kind(kinds, request_kind) &&
-         url_matches(flags, url, candidate);
+         (glob != nullptr ? glob->matches(candidate) : url == candidate);
 }
 
 auto RouteTable::matches(
@@ -161,10 +117,8 @@ auto RouteTable::matches(
 ) const noexcept -> bool {
   if (routes.empty()) return true;
   for (const auto& route : routes) {
-    const auto requested =
-      (route.flags & static_cast<std::uint32_t>(MLN_URL_MATCH_REQUESTED_URL)) !=
-      0;
-    if (route.matches(kind, requested ? requested_url : resolved_url)) {
+    const auto requested = route.url_stage == MLN_RESOURCE_ROUTE_URL_REQUESTED;
+    if (route.pattern.matches(kind, requested ? requested_url : resolved_url)) {
       return true;
     }
   }
@@ -182,11 +136,18 @@ auto copy_routes(
   out.routes.reserve(count);
   for (std::size_t index = 0; index < count; ++index) {
     const auto& route = routes[index];
-    const auto status = check_pattern(
-      "route", index, route.kinds, route.flags, known_url_match_flags, route.url
-    );
+    const auto status =
+      check_pattern("route", index, route.kinds, route.flags, route.url);
     if (status != MLN_STATUS_OK) return status;
-    out.routes.push_back({route.kinds, route.flags, route.url});
+    if (
+      route.url_stage != MLN_RESOURCE_ROUTE_URL_RESOLVED &&
+      route.url_stage != MLN_RESOURCE_ROUTE_URL_REQUESTED
+    ) {
+      return reject("route", index, "has an unknown url_stage");
+    }
+    out.routes.push_back(
+      {{route.kinds, route.flags, route.url}, route.url_stage}
+    );
   }
   return MLN_STATUS_OK;
 }
@@ -203,10 +164,8 @@ auto copy_rewrite_rules(
   out.rules.reserve(count);
   for (std::size_t index = 0; index < count; ++index) {
     const auto& rule = rules[index];
-    const auto status = check_pattern(
-      "rewrite rule", index, rule.kinds, rule.flags, MLN_URL_MATCH_GLOB,
-      rule.url
-    );
+    const auto status =
+      check_pattern("rewrite rule", index, rule.kinds, rule.flags, rule.url);
     if (status != MLN_STATUS_OK) return status;
     out.rules.push_back(
       RewriteRuleTable::Rule{
@@ -231,9 +190,8 @@ auto copy_header_rules(
   out.rules.reserve(count);
   for (std::size_t index = 0; index < count; ++index) {
     const auto& rule = rules[index];
-    const auto status = check_pattern(
-      "header rule", index, rule.kinds, rule.flags, MLN_URL_MATCH_GLOB, rule.url
-    );
+    const auto status =
+      check_pattern("header rule", index, rule.kinds, rule.flags, rule.url);
     if (status != MLN_STATUS_OK) return status;
     if (rule.headers == nullptr && rule.header_count != 0) {
       return reject(
@@ -279,8 +237,9 @@ auto rewrite_rules_callback(
     return MLN_STATUS_OK;
   }
   const auto& table = *static_cast<const RewriteRuleTable*>(user_data);
+  const auto candidate = std::string_view{url};
   for (const auto& rule : table.rules) {
-    if (!rule.pattern.matches(kind, url)) continue;
+    if (!rule.pattern.matches(kind, candidate)) continue;
     if (!rule.replacement_url.has_value()) return MLN_STATUS_OK;
     return mln_resource_transform_response_set_url(
       out_response, rule.replacement_url->data(), rule.replacement_url->size(),
@@ -298,8 +257,9 @@ auto header_rules_callback(
     return MLN_STATUS_OK;
   }
   const auto& table = *static_cast<const HeaderRuleTable*>(user_data);
+  const auto candidate = std::string_view{url};
   for (const auto& rule : table.rules) {
-    if (!rule.pattern.matches(kind, url)) continue;
+    if (!rule.pattern.matches(kind, candidate)) continue;
     for (const auto& [name, value] : rule.headers) {
       const auto status = mln_http_header_transform_response_set_header(
         out_response, name.data(), name.size(), value.data(), value.size(),

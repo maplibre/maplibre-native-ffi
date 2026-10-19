@@ -142,7 +142,7 @@ def operation(plan, values, *, discard=False):
         (
             cb.decision
             for cb in values.bound.callbacks.values()
-            if cb.decision and cb.decision.complete == plan.name
+            if cb.decision and plan.name in (cb.decision.complete, cb.decision.resume)
         ),
         None,
     )

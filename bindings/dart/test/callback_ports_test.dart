@@ -3,8 +3,7 @@
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show singleCallbackPortProbeForTesting;
+import 'support/runtime_probes.dart';
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';

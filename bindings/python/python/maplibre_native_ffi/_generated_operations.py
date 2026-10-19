@@ -1811,6 +1811,14 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         """
         return self._native.is_cancelled()
 
+    def pass_through(self) -> None:
+        """Hands an outstanding provider request to the built-in network loader.
+
+        See `mln_resource_request_pass_through` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.pass_through()
+
     def close(self) -> None:
         return self._native.close()
 

@@ -399,11 +399,14 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     routes = [
         # Another kind: claims no style or sprite, whatever its URL.
         mln.ResourceRoute(
-            kinds=mln.ResourceKindMask.TILE, flags=mln.UrlMatchFlags.GLOB, url="**"
+            url_stage=mln.ResourceRouteUrl.RESOLVED,
+            kinds=mln.ResourceKindMask.TILE,
+            flags=mln.UrlMatchFlags.GLOB,
+            url="**",
         ),
         # A URL pattern alone claims every kind under it.
         mln.ResourceRoute(
-            kinds=mln.ResourceKindMask.ANY,
+            url_stage=mln.ResourceRouteUrl.RESOLVED,
             flags=mln.UrlMatchFlags.GLOB,
             url="custom://routed/**",
         ),
@@ -414,7 +417,10 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     # Native holds its own copy, so a route that would claim everything,
     # added after the call, claims nothing.
     routes[0] = mln.ResourceRoute(
-        kinds=mln.ResourceKindMask.ANY, flags=mln.UrlMatchFlags.GLOB, url="**"
+        url_stage=mln.ResourceRouteUrl.RESOLVED,
+        kinds=mln.ResourceKindMask.ALL,
+        flags=mln.UrlMatchFlags.GLOB,
+        url="**",
     )
     routes.clear()
     result(registered)
@@ -479,13 +485,13 @@ def test_transform_rules_rewrite_a_request_without_a_callback(
             # Another kind: no match.
             mln.ResourceRewriteRule(
                 kinds=mln.ResourceKindMask.TILE,
-                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                flags=mln.UrlMatchFlags.EXACT,
                 url=original,
                 replacement_url=f"{base}/tile.json",
             ),
             mln.ResourceRewriteRule(
                 kinds=mln.ResourceKindMask.STYLE,
-                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                flags=mln.UrlMatchFlags.EXACT,
                 url=original,
                 replacement_url=rewritten,
             ),
@@ -493,8 +499,8 @@ def test_transform_rules_rewrite_a_request_without_a_callback(
         header_rules = [
             # Header rules match the URL that the resource rules produced.
             mln.HttpHeaderRule(
-                kinds=mln.ResourceKindMask.ANY,
-                flags=mln.UrlMatchFlags.FLAGS_NONE,
+                kinds=mln.ResourceKindMask.ALL,
+                flags=mln.UrlMatchFlags.EXACT,
                 url=rewritten,
                 headers=(mln.HttpHeader(name="X-Rule", value="applied"),),
             ),
@@ -517,3 +523,28 @@ def test_transform_rules_rewrite_a_request_without_a_callback(
         harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
 
     assert requests == [("/rewritten.json", "applied")]
+
+
+def test_a_provider_passes_a_deferred_request_to_native_loading(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    handles: list[mln.ResourceRequestHandle] = []
+    handed = threading.Event()
+
+    def hold(_request: mln.ResourceRequest, handle: mln.ResourceRequestHandle) -> None:
+        handles.append(handle)
+        handed.set()
+
+    requests: list[tuple[str, str | None]] = []
+    with _loopback_server(requests) as base:
+        url = base + "/style.json"
+        harness.routes[url] = hold
+        result(map_handle.set_style_url(url))
+        assert handed.wait(TIMEOUT)
+        handle = handles.pop()
+        handle.pass_through()
+        with pytest.raises(mln.InvalidStateError):
+            handle.pass_through()
+        handle.close()
+        harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
+        assert [path for path, _ in requests] == ["/style.json"]

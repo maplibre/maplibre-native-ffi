@@ -499,6 +499,20 @@ class Values:
                 chunks.append(
                     f"func Default{typename}() {typename} {{ return copy{typename}(C.{value.default}()) }}"
                 )
+            elif any(v is not None and f.initial is not None for _, v, f in members):
+                defaults = []
+                for member, v, f in members:
+                    if v is not None and f.initial is not None:
+                        initial = f.initial
+                        expression = (
+                            self.type(v) + name(initial.member)
+                            if v.kind == "enum"
+                            else initial.literal
+                        )
+                        defaults.append(f"{member}: {expression}")
+                chunks.append(
+                    f"func Default{typename}() {typename} {{ return {typename}{{{', '.join(defaults)}}} }}"
+                )
         for native, value in self.views.items():
             typename = public(native) + "View"
             chunks.append(

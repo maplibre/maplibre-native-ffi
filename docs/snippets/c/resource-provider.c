@@ -81,13 +81,28 @@ void watch_for_cancellation(
 mln_status install_provider(
   mln_runtime runtime, asset_store* store, const mln_completion* completion
 ) {
+  const mln_resource_route route = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = "app://**",
+  };
   const mln_resource_provider provider = {
     .size = sizeof(provider),
     .callback = serve_bundled_asset,
     .user_data = store,
+    .routes = &route,
+    .route_count = 1,
   };
   return mln_runtime_set_resource_provider(
     runtime, &provider, completion, NULL
   );
 }
 // #endregion install
+
+// #region pass-through
+mln_status resume_native_loading(mln_resource_request_handle handle) {
+  const mln_status status = mln_resource_request_pass_through(handle, NULL);
+  if (status == MLN_STATUS_OK) mln_resource_request_release(handle);
+  return status;
+}
+// #endregion pass-through

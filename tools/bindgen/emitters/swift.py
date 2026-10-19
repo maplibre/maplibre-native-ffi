@@ -211,7 +211,8 @@ def operation(
     doc_comment = doc(value_types.bound, function.name)
     modifier = "" if receiver else "static "
     claim = any(
-        callback.decision and callback.decision.complete == function.name
+        callback.decision
+        and function.name in (callback.decision.complete, callback.decision.resume)
         for callback in value_types.bound.callbacks.values()
     )
     access = (

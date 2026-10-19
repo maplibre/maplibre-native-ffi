@@ -325,7 +325,9 @@ def declaration(values, value):
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
-        default = zero(f.value, field_type)
+        default = (
+            values.initial(f) if f.initial is not None else zero(f.value, field_type)
+        )
         fields.append(
             f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
         )

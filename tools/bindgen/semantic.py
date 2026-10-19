@@ -87,6 +87,7 @@ class DecisionPlan:
     cancelled: str
     cancel_registration: str
     wait_retired: str
+    resume: str | None = None
 
 
 @dataclass(frozen=True)
@@ -191,7 +192,7 @@ CONTROL_ROLES = frozenset(
 
 @dataclass(frozen=True)
 class FieldInitial:
-    """The nonzero value that a field holds in its record's native default.
+    """The nonzero initial value that a binding constructor gives a field.
 
     `literal` is the annotation as written; `value` is the number it denotes.
     For an enum field, `enumerator` names the constant and `member` is that
@@ -1623,6 +1624,7 @@ class Binder:
             metadata["cancelled"],
             metadata["cancel_registration"],
             metadata["wait_retired"],
+            metadata.get("resume"),
         )
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:

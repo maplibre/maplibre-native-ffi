@@ -624,7 +624,8 @@ def emit_operation(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
     decision_completion = any(
-        decision.complete == function.name for decision in bound.decisions.values()
+        function.name in (decision.complete, decision.resume)
+        for decision in bound.decisions.values()
     )
     reads = bool(
         handle_plan

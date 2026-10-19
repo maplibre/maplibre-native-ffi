@@ -47,6 +47,20 @@ import org.maplibre.nativeffi.withMap
 @OptIn(ExperimentalAtomicApi::class)
 class ResourceCallbackTest {
   @Test
+  fun aProviderPassesADeferredRequestToNativeLoading(): Unit = runSuspendTest {
+    val claimed = CompletableDeferred<ResourceRequestHandle>()
+    withMap(provider = claimingProvider(STYLE_URL, claimed)) {
+      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      val request = claimed.awaitWithin("the provider request")
+      request.passThrough()
+      assertFailsWith<InvalidStateException> { request.passThrough() }
+      request.close()
+      val failure = awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
+      assertTrue(failure.message.orEmpty().contains("declined"))
+    }
+  }
+
+  @Test
   fun aCancelCallbackIsRootedUntilNativeReleasesIt(): Unit = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {

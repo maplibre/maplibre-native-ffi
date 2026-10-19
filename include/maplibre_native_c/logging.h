@@ -84,6 +84,7 @@ typedef struct mln_log_handler {
    * Required in callback mode; null in queue mode.
    */
   mln_log_callback callback;
+  /** Opaque host token in queue mode; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data after the final callback returns, when the
@@ -99,7 +100,9 @@ typedef struct mln_log_handler {
    * record the queue refuses, because the queue was released or the copy
    * could not be allocated, goes to the platform logger instead. Replacing or
    * clearing the handler queues one MLN_DELIVERY_TYPE_RETIRED delivery carrying
-   * user_data after the handler's final record.
+   * user_data after the handler's final record. The queue wakes inline under
+   * the log mutex. Its wake and wake release callback follow the log callback
+   * reentry rules: they must not call this C API or MapLibre Native APIs.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
@@ -120,8 +123,8 @@ typedef struct mln_log_handler {
  * must be thread-safe, return promptly, and must not call this C API or
  * MapLibre Native APIs.
  *
- * In queue mode the handler's records reach the queue instead, and no host
- * code runs on a logging thread.
+ * In queue mode the handler's records reach the queue and its wake runs inline
+ * on the logging thread. The wake follows the same reentry restrictions.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

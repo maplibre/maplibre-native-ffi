@@ -608,13 +608,10 @@ typedef struct mln_event_batch_view {
 /**
  * The resource kinds that a route or rule matches, one bit per
  * mln_resource_kind value.
- *
- * MLN_RESOURCE_KIND_MASK_ANY holds no bit and matches every kind, so a route
- * or rule that leaves kinds at zero applies to every request.
+ * Registration requires at least one known bit. MLN_RESOURCE_KIND_MASK_ALL
+ * selects every resource kind.
  */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
-  /** Matches every resource kind. */
-  MLN_RESOURCE_KIND_MASK_ANY = 0U,
   MLN_RESOURCE_KIND_MASK_UNKNOWN = 1U << MLN_RESOURCE_KIND_UNKNOWN,
   MLN_RESOURCE_KIND_MASK_STYLE = 1U << MLN_RESOURCE_KIND_STYLE,
   MLN_RESOURCE_KIND_MASK_SOURCE = 1U << MLN_RESOURCE_KIND_SOURCE,
@@ -623,6 +620,11 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
   MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 1U << MLN_RESOURCE_KIND_SPRITE_IMAGE,
   MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 1U << MLN_RESOURCE_KIND_SPRITE_JSON,
   MLN_RESOURCE_KIND_MASK_IMAGE = 1U << MLN_RESOURCE_KIND_IMAGE,
+  MLN_RESOURCE_KIND_MASK_ALL = MLN_RESOURCE_KIND_MASK_UNKNOWN |
+    MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE |
+    MLN_RESOURCE_KIND_MASK_TILE | MLN_RESOURCE_KIND_MASK_GLYPHS |
+    MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE | MLN_RESOURCE_KIND_MASK_SPRITE_JSON |
+    MLN_RESOURCE_KIND_MASK_IMAGE,
 } mln_resource_kind_mask;
 
 // This block uses line comments because its examples contain URL patterns that
@@ -649,51 +651,54 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
 /// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern
 /// spans path segments, as in `https://tiles.example.com/**` for one host.
 typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
-  MLN_URL_MATCH_FLAGS_NONE = 0U,
+  MLN_URL_MATCH_EXACT = 0U,
   /** Reads url as a glob pattern. */
   MLN_URL_MATCH_GLOB = 1U << 0U,
-  /** Routes only: compare requested_url instead of resolved_url. */
-  MLN_URL_MATCH_REQUESTED_URL = 1U << 1U,
 } mln_url_match_flags;
+
+/** The URL stage that a provider route compares. */
+typedef enum mln_resource_route_url : uint32_t {
+  MLN_RESOURCE_ROUTE_URL_RESOLVED = 0U,
+  MLN_RESOURCE_ROUTE_URL_REQUESTED = 1U,
+} mln_resource_route_url;
 
 /**
  * One request pattern that a resource provider claims.
  *
- * A route matches a request whose kind has its bit in kinds, or any request
- * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose URL matches url as flags
- * select. With no flags the route compares mln_resource_request.resolved_url
- * exactly.
+ * Routes compare the normalized resolved URL by default, rewrite rules compare
+ * the normalized URL before rewriting, and header rules compare the transformed
+ * URL immediately before an HTTP attempt. A route can select the original
+ * requested URL through url_stage.
  */
 typedef struct mln_resource_route {
-  /**
-   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-   * unknown bit.
-   */
-  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
+  /** The resource kinds to match. */
+  uint32_t kinds MLN_BINDING(
+    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
+  );
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
   const char* url;
+  /** The URL stage to compare. */
+  uint32_t url_stage MLN_BINDING("enum=mln_resource_route_url");
 } mln_resource_route;
 
 /**
  * One rule of a native resource transform.
  *
- * A rule matches a request whose kind has its bit in kinds, or any request
- * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose URL matches url as flags
- * select. The first matching rule rewrites the URL.
+ * The first rule whose kind and URL match decides the replacement. A matching
+ * rule with a null replacement_url keeps the URL and stops the search.
  */
 typedef struct mln_resource_rewrite_rule {
-  /**
-   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-   * unknown bit.
-   */
-  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
-  /** A bitwise OR of mln_url_match_flags values other than REQUESTED_URL. */
+  /** The resource kinds to match. */
+  uint32_t kinds MLN_BINDING(
+    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
+  );
+  /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
   const char* url;
-  /** The replacement URL, or null to leave a matching URL unchanged. */
+  /** The replacement URL, or null to keep the URL and stop the search. */
   const char* replacement_url MLN_BINDING("nullable=true");
 } mln_resource_rewrite_rule;
 
@@ -706,17 +711,15 @@ typedef struct mln_http_header {
 /**
  * One rule of a native HTTP header transform.
  *
- * A rule matches a request whose kind has its bit in kinds, or any request
- * when kinds is MLN_RESOURCE_KIND_MASK_ANY, and whose transformed URL matches
- * url as flags select. The first matching rule supplies all its headers.
+ * The first rule whose kind and URL match supplies all its headers, including
+ * an empty header list that stops the search.
  */
 typedef struct mln_http_header_rule {
-  /**
-   * A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-   * unknown bit.
-   */
-  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
-  /** A bitwise OR of mln_url_match_flags values other than REQUESTED_URL. */
+  /** The resource kinds to match. */
+  uint32_t kinds MLN_BINDING(
+    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
+  );
+  /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
   const char* url;
@@ -792,9 +795,10 @@ typedef mln_status (*mln_resource_transform_callback)(
  *
  * The struct itself is borrowed for the registering call, which copies every
  * rule and string before it returns. With a null callback, rules rewrite each
- * request in native code: the first matching rule replaces the URL, and an
- * empty table rewrites nothing. A rules transform carries no user_data or
- * release_user_data.
+ * request in native code: the first matching rule decides the replacement.
+ * A transform requires a callback or at least one rule; clear it through
+ * mln_runtime_clear_resource_transform(). A rules transform carries no
+ * user_data or release_user_data.
  */
 typedef struct mln_resource_transform {
   uint32_t size;
@@ -885,8 +889,10 @@ typedef mln_status (*mln_http_header_transform_callback)(
  *
  * The struct itself is borrowed for the registering call, which copies every
  * rule, header, and string before it returns. With a null callback, the first
- * rule that matches a request supplies all its headers, and an empty table
- * adds none. A rules transform carries no user_data or release_user_data.
+ * rule that matches a request supplies all its headers. A transform requires a
+ * callback or at least one rule; clear it through
+ * mln_runtime_clear_http_header_transform(). A rules transform carries no
+ * user_data or release_user_data.
  */
 typedef struct mln_http_header_transform {
   uint32_t size;
@@ -1050,6 +1056,7 @@ MLN_BINDING(
   "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
   "decision_pass=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
   "complete=mln_resource_request_complete;"
+  "resume=mln_resource_request_pass_through;"
   "cancelled=mln_resource_request_is_cancelled;"
   "cancel_registration=mln_resource_request_set_cancel_callback;"
   "wait_retired=mln_resource_request_wait_until_retired;"
@@ -1057,6 +1064,7 @@ MLN_BINDING(
   "reentry_owner=handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
+  "mln_resource_request_pass_through,"
   "mln_resource_request_is_cancelled,"
   "mln_resource_request_set_cancel_callback,"
   "mln_resource_request_release"
@@ -1083,6 +1091,7 @@ MLN_BINDING(
   "reentry_owner=mln_resource_request_handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
+  "mln_resource_request_pass_through,"
   "mln_resource_request_is_cancelled,"
   "mln_resource_request_set_cancel_callback,"
   "mln_resource_request_release"
@@ -1145,7 +1154,8 @@ typedef struct mln_resource_provider {
    * MLN_RESOURCE_PROVIDER_DECISION_HANDLE and queues a copy of the request
    * with its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
    * user_data. A request the queue refuses, because the queue was released or
-   * the copy could not be allocated, passes through to native loading. After
+   * the copy could not be allocated, fails without native loading. Process exit
+   * permits pass-through. After
    * replacement, clear, or runtime teardown retires the registration, the
    * queue receives one MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data,
    * after the registration's last request delivery.
@@ -1211,7 +1221,10 @@ MLN_API mln_status mln_runtime_create(
  * and completes as an HTTP error when the provider passes it through.
  *
  * In queue mode, no host code runs on the requesting thread: each request
- * reaches the provider's queue, and the host completes it after draining.
+ * reaches the provider's queue, and the host completes it or passes it through
+ * after draining. A refused delivery, including a released queue or failed
+ * request copy, fails the request. Only process exit permits automatic
+ * pass-through after a refused delivery.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1220,6 +1233,7 @@ MLN_API mln_status mln_runtime_create(
  *   are set, release_user_data is set in queue mode, queue is an invalid
  *   handle, a route is invalid, or completion is invalid. A route is invalid
  *   when routes is null with a nonzero route_count, or the route's url is null
+ *   or its kinds are zero or hold unknown bits, its url_stage is invalid,
  *   or its flags hold an unknown bit; the diagnostic names the route's index.
  * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
  *   runtime is closing.
@@ -1270,12 +1284,41 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
  * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or response
  *   is null.
  * - MLN_STATUS_INVALID_STATE when handle has been released, or the request was
- *   cancelled, already completed, or can no longer accept a response.
+ *   cancelled, already completed, passed through, or can no longer accept a
+ * response.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_request_complete(
   mln_resource_request_handle handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Hands an outstanding provider request to the built-in network loader.
+ *
+ * Call from any thread, inline in a callback that returns HANDLE or after that
+ * callback returns, or after taking a queued request. Native loading starts on
+ * the requesting MapLibre thread and applies the current native transforms.
+ * The request bypasses the provider when it resumes.
+ *
+ * Passing through is one-shot and shares the terminal decision with completion.
+ * Completion, cancellation, release, and pass-through are serialized: only an
+ * outstanding request can pass through. Cancellation that wins first returns
+ * MLN_STATUS_INVALID_STATE; cancellation after acceptance cancels native
+ * loading as usual. The provider's cancel callback no longer runs after
+ * acceptance. The host still releases its handle, which retires any cancel
+ * registration; releasing it after pass-through does not cancel native loading.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when native loading was scheduled.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is invalid.
+ * - MLN_STATUS_INVALID_STATE when the request is cancelled, released,
+ * completed, or already passed through.
+ * - MLN_STATUS_NATIVE_ERROR when scheduling fails; the request stays
+ * outstanding.
+ */
+MLN_API mln_status mln_resource_request_pass_through(
+  mln_resource_request_handle handle, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1396,11 +1439,13 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, a callback comes with rules, a rules
+ *   null, transform->size is too small, neither a callback nor rules are set,
+ *   a callback comes with rules, a rules
  *   transform carries user_data or release_user_data, a rule is invalid, or
  *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, or the rule's url is null or its flags hold an unknown bit or
- *   MLN_URL_MATCH_REQUESTED_URL; the diagnostic names the rule's index.
+ *   rule_count, or the rule's url is null, its kinds are zero or hold unknown
+ *   bits, or its flags hold an unknown bit; the diagnostic names the rule's
+ * index.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -1454,11 +1499,12 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, a callback comes with rules, a rules
+ *   null, transform->size is too small, neither a callback nor rules are set,
+ *   a callback comes with rules, a rules
  *   transform carries user_data or release_user_data, a rule is invalid, or
  *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, its url is null, its flags hold an unknown bit or
- *   MLN_URL_MATCH_REQUESTED_URL, its headers are null with a nonzero
+ *   rule_count, its url is null, its kinds are zero or hold unknown bits, its
+ *   flags hold an unknown bit, its headers are null with a nonzero
  *   header_count, or a header breaks a rule of
  *   mln_http_header_transform_response_set_header(). The diagnostic names the
  *   rule's index and never includes a header value.

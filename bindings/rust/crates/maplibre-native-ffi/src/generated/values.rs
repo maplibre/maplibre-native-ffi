@@ -1598,18 +1598,27 @@ impl ToNative<sys::mln_http_header> for HttpHeader {
 ///
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HttpHeaderRule {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
+    /// The resource kinds to match.
     pub kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    /// A bitwise OR of `mln_url_match_flags` values.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
     pub url: String,
     /// The headers to set. Registration validates each one as
     /// `mln_http_header_transform_response_set_header()` does.
     pub headers: Vec<HttpHeader>,
+}
+impl Default for HttpHeaderRule {
+    fn default() -> Self {
+        Self {
+            kinds: ResourceKindMask::ALL,
+            flags: Default::default(),
+            url: Default::default(),
+            headers: Default::default(),
+        }
+    }
 }
 impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_http_header_rule> {
@@ -2021,7 +2030,7 @@ pub struct LogSeverityMask: u32 {
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LogicalExtent {
     /// Width in UI pixels. Defaults to 256.
     pub width: u32,
@@ -2029,6 +2038,15 @@ pub struct LogicalExtent {
     pub height: u32,
     /// Device pixels per UI pixel. Defaults to 1.0.
     pub scale_factor: f64,
+}
+impl Default for LogicalExtent {
+    fn default() -> Self {
+        Self {
+            width: 256,
+            height: 256,
+            scale_factor: 1.0,
+        }
+    }
 }
 impl LogicalExtent {
     pub const fn new(width: u32, height: u32, scale_factor: f64) -> Self {
@@ -4302,13 +4320,12 @@ pub enum ResourceKind: u32 {
 
 native_flags! {
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value.
+/// `mln_resource_kind` value. Registration requires at least one known bit.
+/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
 ///
 /// See `mln_resource_kind_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct ResourceKindMask: u32 {
-    /// Matches every resource kind.
-    const ANY = 0;
     const UNKNOWN = 1;
     const STYLE = 2;
     const SOURCE = 4;
@@ -4317,6 +4334,7 @@ pub struct ResourceKindMask: u32 {
     const SPRITE_IMAGE = 32;
     const SPRITE_JSON = 64;
     const IMAGE = 128;
+    const ALL = 255;
 }
 }
 
@@ -4386,6 +4404,7 @@ impl ResourceProvider {
         let _policy = callback::enter(Some((
             &[
                 "mln_resource_request_complete",
+                "mln_resource_request_pass_through",
                 "mln_resource_request_is_cancelled",
                 "mln_resource_request_set_cancel_callback",
                 "mln_resource_request_release",
@@ -4573,6 +4592,20 @@ pub struct ResourceRequestHandle {
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }
 impl ResourceRequestHandle {
+    /// Hands an outstanding provider request to the built-in network loader.
+    ///
+    /// See `mln_resource_request_pass_through` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn pass_through(&self) -> Result<()> {
+        let native = self.state.native_for_call()?;
+        maplibre_core::callback::check("mln_resource_request_pass_through", native.0)?;
+        self.state.complete_with(|handle| {
+            maplibre_core::check(|out_diagnostic| unsafe {
+                sys::mln_resource_request_pass_through(handle, out_diagnostic)
+            })
+        })
+    }
+
     /// Completes a C API resource provider request.
     ///
     /// See `mln_resource_request_complete` in the
@@ -4712,17 +4745,26 @@ pub enum ResourceResponseStatus: u32 {
 ///
 /// See `mln_resource_rewrite_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResourceRewriteRule {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
+    /// The resource kinds to match.
     pub kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    /// A bitwise OR of `mln_url_match_flags` values.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
     pub url: String,
-    /// The replacement URL, or null to leave a matching URL unchanged.
+    /// The replacement URL, or null to keep the URL and stop the search.
     pub replacement_url: Option<String>,
+}
+impl Default for ResourceRewriteRule {
+    fn default() -> Self {
+        Self {
+            kinds: ResourceKindMask::ALL,
+            flags: Default::default(),
+            url: Default::default(),
+            replacement_url: Default::default(),
+        }
+    }
 }
 impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_rewrite_rule> {
@@ -4739,15 +4781,26 @@ impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
 ///
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResourceRoute {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
+    /// The resource kinds to match.
     pub kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values.
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
     pub url: String,
+    /// The URL stage to compare.
+    pub url_stage: ResourceRouteUrl,
+}
+impl Default for ResourceRoute {
+    fn default() -> Self {
+        Self {
+            kinds: ResourceKindMask::ALL,
+            flags: Default::default(),
+            url: Default::default(),
+            url_stage: Default::default(),
+        }
+    }
 }
 impl ToNative<sys::mln_resource_route> for ResourceRoute {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_route> {
@@ -4755,8 +4808,20 @@ impl ToNative<sys::mln_resource_route> for ResourceRoute {
         raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
+        raw.url_stage = to_native(&self.url_stage, arena)?;
         Ok(raw)
     }
+}
+
+native_enum! {
+/// The URL stage that a provider route compares.
+///
+/// See `mln_resource_route_url` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub enum ResourceRouteUrl: u32 {
+    Resolved = 0,
+    Requested = 1,
+} Unknown
 }
 
 native_enum! {
@@ -6283,11 +6348,9 @@ native_flags! {
 /// See `mln_url_match_flags` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct UrlMatchFlags: u32 {
-    const FLAGS_NONE = 0;
+    const EXACT = 0;
     /// Reads url as a glob pattern.
     const GLOB = 1;
-    /// Routes only: compare requested_url instead of resolved_url.
-    const REQUESTED_URL = 2;
 }
 }
 
@@ -7197,6 +7260,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
+            "mln_resource_request_pass_through",
             "mln_resource_request_is_cancelled",
             "mln_resource_request_set_cancel_callback",
             "mln_resource_request_release",

@@ -801,14 +801,14 @@ const (
 
 // ResourceKindMask corresponds to mln_resource_kind_mask. The resource kinds
 // that a route or rule matches, one bit per mln_resource_kind value.
+// Registration requires at least one known bit. MLN_RESOURCE_KIND_MASK_ALL
+// selects every resource kind.
 //
 // See mln_resource_kind_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceKindMask uint32
 
 const (
-	// Matches every resource kind.
-	ResourceKindMaskAny         ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_ANY)
 	ResourceKindMaskUnknown     ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_UNKNOWN)
 	ResourceKindMaskStyle       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_STYLE)
 	ResourceKindMaskSource      ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SOURCE)
@@ -817,6 +817,7 @@ const (
 	ResourceKindMaskSpriteImage ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE)
 	ResourceKindMaskSpriteJson  ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_JSON)
 	ResourceKindMaskImage       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_IMAGE)
+	ResourceKindMaskAll         ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_ALL)
 )
 
 func (value ResourceKindMask) Has(flags ResourceKindMask) bool { return value&flags == flags }
@@ -891,6 +892,18 @@ const (
 	ResourceResponseStatusError       ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_ERROR)
 	ResourceResponseStatusNoContent   ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT)
 	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
+)
+
+// ResourceRouteUrl corresponds to mln_resource_route_url. The URL stage that a
+// provider route compares.
+//
+// See mln_resource_route_url in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRouteUrl uint32
+
+const (
+	ResourceRouteUrlResolved  ResourceRouteUrl = ResourceRouteUrl(C.MLN_RESOURCE_ROUTE_URL_RESOLVED)
+	ResourceRouteUrlRequested ResourceRouteUrl = ResourceRouteUrl(C.MLN_RESOURCE_ROUTE_URL_REQUESTED)
 )
 
 type ResourceStoragePolicy uint32
@@ -1280,11 +1293,9 @@ const (
 type UrlMatchFlags uint32
 
 const (
-	UrlMatchFlagsFlagsNone UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_FLAGS_NONE)
+	UrlMatchFlagsExact UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_EXACT)
 	// Reads url as a glob pattern.
 	UrlMatchFlagsGlob UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_GLOB)
-	// Routes only: compare requested_url instead of resolved_url.
-	UrlMatchFlagsRequestedUrl UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_REQUESTED_URL)
 )
 
 func (value UrlMatchFlags) Has(flags UrlMatchFlags) bool { return value&flags == flags }
@@ -2229,10 +2240,9 @@ func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
 // See mln_http_header_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeaderRule struct {
-	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-	// unknown bit.
+	// The resource kinds to match.
 	Kinds ResourceKindMask
-	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
+	// A bitwise OR of mln_url_match_flags values.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
 	Url string
@@ -2256,6 +2266,8 @@ func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_
 	}
 	return raw
 }
+
+func DefaultHttpHeaderRule() HttpHeaderRule { return HttpHeaderRule{Kinds: ResourceKindMaskAll} }
 
 // HttpHeaderTransform corresponds to mln_http_header_transform. HTTP header
 // transform state: a callback, or native header rules.
@@ -2457,6 +2469,10 @@ func nativeLogicalExtent(input LogicalExtent, arena *bindingArena) C.mln_logical
 	raw.height = C.uint32_t(input.Height)
 	raw.scale_factor = C.double(input.ScaleFactor)
 	return raw
+}
+
+func DefaultLogicalExtent() LogicalExtent {
+	return LogicalExtent{Width: 256, Height: 256, ScaleFactor: 1.0}
 }
 
 // MapOptions corresponds to mln_map_options. Options used when creating a map.
@@ -3966,14 +3982,13 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 // See mln_resource_rewrite_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRewriteRule struct {
-	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-	// unknown bit.
+	// The resource kinds to match.
 	Kinds ResourceKindMask
-	// A bitwise OR of mln_url_match_flags values other than REQUESTED_URL.
+	// A bitwise OR of mln_url_match_flags values.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
 	Url string
-	// The replacement URL, or null to leave a matching URL unchanged.
+	// The replacement URL, or null to keep the URL and stop the search.
 	ReplacementUrl *string
 }
 
@@ -3988,19 +4003,24 @@ func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C
 	return raw
 }
 
+func DefaultResourceRewriteRule() ResourceRewriteRule {
+	return ResourceRewriteRule{Kinds: ResourceKindMaskAll}
+}
+
 // ResourceRoute corresponds to mln_resource_route. One request pattern that a
 // resource provider claims.
 //
 // See mln_resource_route in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRoute struct {
-	// A bitwise OR of mln_resource_kind_mask values. Registration rejects an
-	// unknown bit.
+	// The resource kinds to match.
 	Kinds ResourceKindMask
 	// A bitwise OR of mln_url_match_flags values.
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
 	Url string
+	// The URL stage to compare.
+	UrlStage ResourceRouteUrl
 }
 
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
@@ -4008,8 +4028,11 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
 	raw.url = arena.cstring(input.Url)
+	raw.url_stage = C.uint32_t(input.UrlStage)
 	return raw
 }
+
+func DefaultResourceRoute() ResourceRoute { return ResourceRoute{Kinds: ResourceKindMaskAll} }
 
 // ResourceTransform corresponds to mln_resource_transform. Resource transform
 // state: a callback, or native rewrite rules.
@@ -8118,6 +8141,17 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 		return int32(C.mln_resource_request_is_cancelled(C.mln_resource_request_handle(raw), &outCancelled, diagnostic))
 	}, func(arena *bindingArena) bool {
 		return bool(outCancelled)
+	})
+}
+
+// PassThrough hands an outstanding provider request to the built-in network
+// loader.
+//
+// See mln_resource_request_pass_through in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *ResourceRequestHandle) PassThrough() error {
+	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_pass_through), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_pass_through(C.mln_resource_request_handle(raw), diagnostic))
 	})
 }
 

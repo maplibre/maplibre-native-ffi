@@ -2927,6 +2927,7 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
   result.ref.url = nativeUtf8CString(value.url, arena).pointer.cast<Char>();
+  result.ref.url_stage = value.urlStage.rawValue;
   return result;
 }
 
@@ -7242,6 +7243,14 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
     );
     return outCancelled.value;
   });
+
+  /// Hands an outstanding provider request to the built-in network loader.
+  ///
+  /// See `mln_resource_request_pass_through` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  void passThrough() => _check(
+    raw.mln_resource_request_pass_through(_handle.raw, nativeDiagnostic),
+  );
 
   /// Releases the provider's reference to a resource request handle.
   ///

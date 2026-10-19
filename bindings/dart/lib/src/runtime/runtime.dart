@@ -26,32 +26,11 @@ part 'native_calls.dart';
 /// through the isolate's delivery queue instead, which needs no port roots.
 final _globalCallbackPorts = _NativeCallbackPorts();
 
-final class CallbackPortLifecycleProbe {
-  CallbackPortLifecycleProbe._(this._port);
-  final _NativeCallbackPort _port;
-  bool get closed => _port.closed;
-
-  /// Completes when native code releases the port, or the binding refuses it.
-  Future<void> get released => _port._released.future;
-}
-
 /// An owner that roots the ports of its callback registrations.
 abstract interface class _CallbackPortOwner {
+  // ignore: unused_element
   _NativeCallbackPorts get _callbackPorts;
 }
-
-/// Returns an owner's single pending port, or null after its release.
-CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
-  final pending = owner is _CallbackPortOwner
-      ? owner._callbackPorts.pending
-      : throw ArgumentError.value(owner, 'owner', 'has no callback ports');
-  return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
-}
-
-/// Returns the most recent log callback registration that native code has
-/// not yet retired, or null when none is pending.
-DeliveryRegistration? logRegistrationProbeForTesting() => isolateDeliveryQueue
-    .latestRegistrationForTesting(raw.MLN_DELIVERY_TYPE_LOG_RECORD);
 
 final class _NativeCallbackPorts {
   final pending = <_NativeCallbackPort>{};
@@ -153,16 +132,6 @@ void Function(dynamic) _callbackPortHandler(
   state._deliver(message);
 };
 
-/// Decodes a synthetic native batch through the production generated converter.
-List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
-  raw.mln_event_batch_view batch,
-) => _readEventBatchView(batch).events;
-
-/// Decodes a synthetic array completion of coordinates through the production
-/// element reader.
-List<LatLng> decodeLatLngListForTesting(raw.mln_completion_result result) =>
-    _resultLatLng.readList(result);
-
 /// Starts a command and decodes its receipt, including failed dispositions.
 Future<CommandCompletion> _startCommand(
   NativeCompletionStart start, {
@@ -192,14 +161,6 @@ final class CommandCompletion {
   final MaplibreStatus status;
   final String diagnostic;
 }
-
-/// Runs the owned-output adoption that generated operations use, for tests of
-/// its failure paths.
-T adoptOwnedForTesting<T>(
-  int handle,
-  T Function() adopt,
-  void Function(int) dispose,
-) => _adoptOwned(handle, adopt, dispose);
 
 T _adoptOwned<T>(int handle, T Function() adopt, void Function(int) dispose) {
   try {

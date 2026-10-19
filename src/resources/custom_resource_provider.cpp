@@ -12,6 +12,8 @@
 #include <utility>
 
 #include <mln/actor/actor_ref.hpp>
+#include <mln/actor/mailbox.hpp>
+#include <mln/actor/scheduler.hpp>
 #include <mln/storage/file_source.hpp>
 #include <mln/storage/file_source_request.hpp>
 #include <mln/storage/resource.hpp>
@@ -29,9 +31,48 @@
 
 namespace mln::core {
 
+// Owns both phases on the requesting scheduler. Closing its mailbox prevents a
+// cancelled request from starting native loading after destruction.
+class ProviderRequest final : public mln::AsyncRequest {
+ public:
+  using StartNative = std::function<
+    std::unique_ptr<mln::AsyncRequest>(mln::FileSource::Callback)>;
+  ProviderRequest(mln::FileSource::Callback callback, StartNative start)
+      : response(std::move(callback)),
+        start_(std::move(start)),
+        mailbox_(
+          std::make_shared<mln::Mailbox>(*mln::Scheduler::GetCurrent())
+        ) {}
+  ~ProviderRequest() override { mailbox_->close(); }
+  auto actor() -> mln::ActorRef<ProviderRequest> { return {*this, mailbox_}; }
+  void pass_through() {
+    const auto target = response.actor();
+    try {
+      native_ = start_([target](const mln::Response& result) {
+        target.invoke(&mln::FileSourceRequest::setResponse, result);
+      });
+    } catch (...) {
+      auto result = mln::Response{};
+      result.error = std::make_unique<mln::Response::Error>(
+        mln::Response::Error::Reason::Other, "native resource loading failed"
+      );
+      target.invoke(&mln::FileSourceRequest::setResponse, result);
+    }
+  }
+  mln::FileSourceRequest response;
+
+ private:
+  StartNative start_;
+  std::shared_ptr<mln::Mailbox> mailbox_;
+  std::unique_ptr<mln::AsyncRequest> native_;
+};
+
 struct ResourceRequestObject {
-  explicit ResourceRequestObject(mln::ActorRef<mln::FileSourceRequest> actor_)
-      : actor(std::move(actor_)) {}
+  ResourceRequestObject(
+    mln::ActorRef<mln::FileSourceRequest> actor_,
+    mln::ActorRef<ProviderRequest> loader_
+  )
+      : actor(std::move(actor_)), loader(std::move(loader_)) {}
 
   mutable std::mutex mutex;
   std::condition_variable state_changed;
@@ -59,6 +100,7 @@ struct ResourceRequestObject {
   std::thread::id cancel_callback_thread;
   mln_resource_request_handle handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
+  mln::ActorRef<ProviderRequest> loader;
   // The cached bytes MapLibre withheld from the requester until this request
   // revalidates them. Set before the provider sees the handle, then only read.
   std::shared_ptr<const std::string> prior_data;
@@ -493,11 +535,15 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
 auto request_custom_resource(
   const mln::Resource& resource, std::string resolved_url,
   mln_resource_provider_callback provider_callback, void* user_data,
-  mln::FileSource::Callback file_source_callback
+  mln::FileSource::Callback file_source_callback,
+  ProviderRequest::StartNative start_native
 ) -> std::unique_ptr<mln::AsyncRequest> {
-  auto request =
-    std::make_unique<mln::FileSourceRequest>(std::move(file_source_callback));
-  auto object = std::make_shared<ResourceRequestObject>(request->actor());
+  auto request = std::make_unique<ProviderRequest>(
+    std::move(file_source_callback), std::move(start_native)
+  );
+  auto object = std::make_shared<ResourceRequestObject>(
+    request->response.actor(), request->actor()
+  );
   object->prior_data = resource.priorData;
   object->prior_modified = resource.priorModified;
   object->prior_etag = resource.priorEtag;
@@ -505,7 +551,7 @@ auto request_custom_resource(
   object->handle = handle;
   // mbgl runs this on every request destruction, including after a response
   // was delivered, so a completed request does not report cancellation.
-  request->onCancel([object]() noexcept -> void {
+  request->response.onCancel([object]() noexcept -> void {
     {
       const std::scoped_lock lock(object->mutex);
       object->cancelled = true;
@@ -570,6 +616,27 @@ auto complete_resource_request(
       return MLN_STATUS_INVALID_STATE;
     }
   }
+  return MLN_STATUS_OK;
+}
+
+auto pass_through_resource_request(mln_resource_request_handle handle)
+  -> mln_status {
+  const auto live = handle_table<ResourceRequestObject>().lease(handle);
+  if (live == nullptr) return recorded_handle_fault_status();
+  const auto lock = std::scoped_lock{live->mutex};
+  if (live->retired) {
+    return report_handle_fault(
+      HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
+    );
+  }
+  if (live->completed || live->cancelled) {
+    set_thread_error(
+      "resource request is completed, passed through, or cancelled"
+    );
+    return MLN_STATUS_INVALID_STATE;
+  }
+  live->loader.invoke(&ProviderRequest::pass_through);
+  live->completed = true;
   return MLN_STATUS_OK;
 }
 

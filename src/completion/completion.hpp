@@ -53,17 +53,12 @@ class CompletionSink final {
   // Queue mode.
   std::shared_ptr<delivery::DeliveryQueueState> queue_;
   void* user_data_ = nullptr;
-  // Preallocated at acceptance, so a result that cannot be copied still
-  // reaches the queue. Delivery consumes it at most once.
-  mutable delivery::ItemPtr fallback_;
-  // Set by the first deliver(), so a delivery that throws afterwards does not
-  // report a second result.
-  mutable bool delivered_ = false;
+  Completion* owner_ = nullptr;
 };
 
 class Completion final {
  public:
-  explicit Completion(CompletionSink sink) noexcept;
+  explicit Completion(CompletionSink sink, delivery::ItemPtr fallback) noexcept;
   Completion(const Completion&) = delete;
   Completion(Completion&&) = delete;
   auto operator=(const Completion&) -> Completion& = delete;
@@ -94,7 +89,7 @@ class Completion final {
     } catch (...) {
       // Completion delivery cannot reopen terminal native work, but a delivery
       // that threw before reaching the sink still owes the host its result.
-      deliver_undelivered();
+      if (!delivered_) deliver_undelivered();
     }
     release();
   }
@@ -102,19 +97,14 @@ class Completion final {
   auto release() noexcept -> void;
   auto retire_part() noexcept -> void;
 
+  friend class CompletionSink;
   CompletionSink sink_;
+  delivery::ItemPtr fallback_;
+  bool delivered_ = false;
   std::atomic<State> state_ = State::Created;
   std::atomic_uint retirement_parts_ = 2;
   std::function<void()> retirement_callback_;
 };
-
-// Checks a completion descriptor's shape: exactly one of a callback and a
-// delivery queue, and in queue mode, a live queue and no release_user_data.
-auto validate_completion(const mln_completion* completion) -> mln_status;
-// As validate_completion(), except that a command accepts a null completion,
-// which discards its outcome.
-auto validate_command_completion(const mln_completion* completion)
-  -> mln_status;
 
 // Validates a completion descriptor and constructs the Completion that
 // delivers to its callback or queue.

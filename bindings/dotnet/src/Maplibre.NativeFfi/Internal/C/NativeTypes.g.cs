@@ -802,6 +802,7 @@ internal unsafe struct mln_resource_route
     public uint kinds;
     public uint flags;
     public sbyte* url;
+    public uint url_stage;
 }
 
 internal unsafe struct mln_resource_transform
@@ -1595,7 +1596,6 @@ internal enum mln_resource_kind : uint
 
 internal enum mln_resource_kind_mask : uint
 {
-    MLN_RESOURCE_KIND_MASK_ANY = 0,
     MLN_RESOURCE_KIND_MASK_UNKNOWN = 1,
     MLN_RESOURCE_KIND_MASK_STYLE = 2,
     MLN_RESOURCE_KIND_MASK_SOURCE = 4,
@@ -1604,6 +1604,7 @@ internal enum mln_resource_kind_mask : uint
     MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 32,
     MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 64,
     MLN_RESOURCE_KIND_MASK_IMAGE = 128,
+    MLN_RESOURCE_KIND_MASK_ALL = 255,
 }
 
 internal enum mln_resource_loading_method : uint
@@ -1645,6 +1646,12 @@ internal enum mln_resource_response_status : uint
     MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1,
     MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2,
     MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3,
+}
+
+internal enum mln_resource_route_url : uint
+{
+    MLN_RESOURCE_ROUTE_URL_RESOLVED = 0,
+    MLN_RESOURCE_ROUTE_URL_REQUESTED = 1,
 }
 
 internal enum mln_resource_storage_policy : uint
@@ -1867,9 +1874,8 @@ internal enum mln_tile_operation : uint
 
 internal enum mln_url_match_flags : uint
 {
-    MLN_URL_MATCH_FLAGS_NONE = 0,
+    MLN_URL_MATCH_EXACT = 0,
     MLN_URL_MATCH_GLOB = 1,
-    MLN_URL_MATCH_REQUESTED_URL = 2,
 }
 
 internal enum mln_viewport_mode : uint

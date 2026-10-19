@@ -960,6 +960,8 @@ internal expect object C {
 
   fun mln_resource_request_is_cancelled(handle: Long, outCancelled: Long, outDiagnostic: Long): Int
 
+  fun mln_resource_request_pass_through(handle: Long, outDiagnostic: Long): Int
+
   fun mln_resource_request_release(handle: Long): Unit
 
   fun mln_resource_request_set_cancel_callback(

@@ -375,3 +375,24 @@ func installProvider(
     #expect(releases.value == 1)
   }
 }
+
+@Test func aProviderPassesADeferredRequestToNativeLoading() async throws {
+  try await withMapFixture { fixture in
+    let taken = LockedBox<ResourceRequestHandle?>(nil)
+    try await installProvider(on: fixture.runtime,
+                              for: "custom://native.json")
+    { handle in
+      taken.update { $0 = handle }
+      return .handle
+    }
+    try await fixture.map.setStyleUrl(url: "custom://native.json")
+    await awaitCondition("the provider request") { taken.value != nil }
+    let handle = try #require(taken.value)
+    try handle.passThrough()
+    #expect(throws: MaplibreError.self) { try handle.passThrough() }
+    try handle.close()
+    #expect(try await fixture.awaitEvent("the native failure") {
+      $0.type == .mapLoadingFailed && $0.message.contains("declined")
+    } != nil)
+  }
+}

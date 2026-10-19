@@ -23,7 +23,7 @@ generation starts at "Compile binding contracts from the C headers".
    operation, value, callback, registration, and handle plans.
 4. The emitters in `tools/bindgen/emitters/` generate public APIs, values, and
    conversions for each language. `tools/bindgen/native_capture.py` generates
-   native copies for deferred delivery from the same value plans.
+   native copies for delivery queues from the same value plans.
 5. Handwritten runtimes provide library loading, callback roots and scheduling,
    close-once handle state, and platform graphics mechanisms. Native code owns
    call leases and retirement.

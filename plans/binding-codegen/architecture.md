@@ -15,7 +15,7 @@ priorities.
   result ownership, and operation effects. Language emitters generate static
   code from the resolved plans and never infer ownership from a function name.
 - Direct callbacks and borrowed completion values are the fast path. A host
-  runtime that requires deferred delivery captures data before native returns,
+  runtime that requires delivery on its own thread uses a native delivery queue,
   with capture code generated from the same value model.
 - Callback roots, host scheduling, library loading, and handle close-once state
   are runtime mechanisms. Per-operation signatures, values, and conversions are

@@ -217,7 +217,7 @@ class AbiNetworkFileSource final : public mln::FileSource {
       : resource_options_(resource_options.clone()),
         client_options_(client_options.clone()),
         native_(
-          std::make_unique<mln::OnlineFileSource>(
+          std::make_shared<mln::OnlineFileSource>(
             resource_options, client_options
           )
         ) {
@@ -246,7 +246,13 @@ class AbiNetworkFileSource final : public mln::FileSource {
         ) {
           auto request = request_custom_resource(
             resource, std::move(resolved_url), provider->callback(),
-            provider->user_data(), callback
+            provider->user_data(), callback,
+            [native = native_, resource](Callback next) {
+              return request_native(
+                native, native->getResourceOptions(), resource, true,
+                std::move(next)
+              );
+            }
           );
           if (request != nullptr) {
             return request;
@@ -254,19 +260,9 @@ class AbiNetworkFileSource final : public mln::FileSource {
         }
       }
     }
-    if (!native_->canRequest(resource)) {
-      return nullptr;
-    }
-    const auto unsupported = unsupported_network_scheme(options, resource.url);
-    if (unsupported.has_value()) {
-      return respond_immediately(
-        unsupported_scheme_response(
-          *unsupported, resource.url, provider_declined
-        ),
-        std::move(callback)
-      );
-    }
-    return native_->request(resource, std::move(callback));
+    return request_native(
+      native_, options, resource, provider_declined, std::move(callback)
+    );
   }
 
   [[nodiscard]] auto canRequest(const mln::Resource& resource) const
@@ -321,6 +317,31 @@ class AbiNetworkFileSource final : public mln::FileSource {
   }
 
  private:
+  static auto request_native(
+    const std::shared_ptr<mln::FileSource>& native,
+    const mln::ResourceOptions& options, const mln::Resource& resource,
+    bool provider_declined, Callback callback
+  ) -> std::unique_ptr<mln::AsyncRequest> {
+    if (!native->canRequest(resource)) {
+      auto result = mln::Response{};
+      result.error = std::make_unique<mln::Response::Error>(
+        mln::Response::Error::Reason::Other,
+        "native loader cannot request this resource"
+      );
+      return respond_immediately(result, std::move(callback));
+    }
+    const auto unsupported = unsupported_network_scheme(options, resource.url);
+    if (unsupported.has_value()) {
+      return respond_immediately(
+        unsupported_scheme_response(
+          *unsupported, resource.url, provider_declined
+        ),
+        std::move(callback)
+      );
+    }
+    return native->request(resource, std::move(callback));
+  }
+
   // Snapshots the options so reads never race a replacement. The mutex guards
   // only this member and is released before any other lock is taken.
   [[nodiscard]] auto resource_options_snapshot() const -> mln::ResourceOptions {
@@ -365,7 +386,7 @@ class AbiNetworkFileSource final : public mln::FileSource {
   mutable std::mutex resource_options_mutex_;
   mln::ResourceOptions resource_options_;
   mln::ClientOptions client_options_;
-  std::unique_ptr<mln::FileSource> native_;
+  std::shared_ptr<mln::FileSource> native_;
 };
 
 }  // namespace

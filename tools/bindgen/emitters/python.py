@@ -332,7 +332,7 @@ def operation(
         and plan.name == receiver.value.handle.abandon
     )
     if decision:
-        if not plan.consumes and plan.name != decision.complete:
+        if not plan.consumes and plan.name not in (decision.complete, decision.resume):
             setup.append(
                 "        let handle = self.state.issued_handle();"
                 if plan.receiver_access == "issued"
@@ -585,7 +585,7 @@ def operation(
             if status
             else f"        let result = unsafe {{ call.run(|| {call}) }};"
         ]
-        if decision and plan.name == decision.complete:
+        if decision and plan.name in (decision.complete, decision.resume):
             body[-1] = (
                 f"        let result = unsafe {{ call.run(|| self.state.complete_with(|handle| maplibre_core::check(|diagnostic| {call}))) }}.map_err(map_error);"
             )

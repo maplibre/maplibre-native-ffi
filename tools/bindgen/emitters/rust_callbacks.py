@@ -556,6 +556,15 @@ def decision_declaration(values, value):
     def documented(operation):
         return doc(values.bound, operation, "    ").rstrip("\n")
 
+    resume = ""
+    if decision.resume:
+        resume = f"""{documented(decision.resume)}
+    pub fn {method(decision.resume)}(&self) -> Result<()> {{
+        let native = self.state.native_for_call()?;
+        maplibre_core::callback::check("{decision.resume}", native.0)?;
+        self.state.complete_with(|handle| {checked(decision.resume, "handle")})
+    }}
+"""
     _, cancel, cancel_record, _ = cancel_notification(values.bound, decision)
     return f'''{doc(values.bound, value.native)}#[derive(Debug)]
 pub struct {name} {{
@@ -563,6 +572,7 @@ pub struct {name} {{
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }}
 impl {name} {{
+{resume}
 {documented(decision.complete)}
     pub fn {method(decision.complete)}(&self, response: &{values.public(response_value)}) -> Result<()> {{
         let native = self.state.native_for_call()?;

@@ -1205,6 +1205,25 @@ auto submit_resource_configuration_command(
 
 namespace {
 
+// Roll back ownership on every rejected exit, including allocation exceptions
+// while constructing or submitting the command. The caller keeps local storage
+// until acceptance; the context owns it after commit.
+class RegistrationTransfer {
+ public:
+  explicit RegistrationTransfer(RuntimeCallbackContext& context) noexcept
+      : context_(context) {
+    context_.transfer_to_runtime();
+  }
+  ~RegistrationTransfer() {
+    if (!accepted_) context_.return_to_caller();
+  }
+  void accept() noexcept { accepted_ = true; }
+
+ private:
+  RuntimeCallbackContext& context_;
+  bool accepted_ = false;
+};
+
 auto delete_rewrite_rules(void* table) noexcept -> void {
   delete static_cast<RewriteRuleTable*>(table);
 }
@@ -1221,12 +1240,6 @@ auto set_resource_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
   if (transform == nullptr) {
     set_thread_error("resource transform must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1237,6 +1250,12 @@ auto set_resource_transform(
   }
   auto rules = std::unique_ptr<RewriteRuleTable>{};
   if (transform->callback == nullptr) {
+    if (transform->rule_count == 0) {
+      set_thread_error(
+        "a transform requires a callback or rules; use the clear function"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     if (
       transform->user_data != nullptr || transform->release_user_data != nullptr
     ) {
@@ -1270,8 +1289,7 @@ auto set_resource_transform(
       .context = context,
     }
   );
-  auto* const table = rules.release();
-  context->transfer_to_runtime();
+  auto transfer = RegistrationTransfer{*context};
   const auto state = live->resource_transform_state;
   const auto status =
     submit_resource_configuration_command<&mln_runtime_set_resource_transform>(
@@ -1281,9 +1299,9 @@ auto set_resource_transform(
         );
       }
     );
-  if (status != MLN_STATUS_OK) {
-    context->return_to_caller();
-    delete table;
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(rules.release());
+    transfer.accept();
   }
   return status;
 }
@@ -1331,12 +1349,6 @@ auto clear_resource_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
 
   const auto state = live->resource_transform_state;
   return submit_resource_configuration_command<
@@ -1353,12 +1365,6 @@ auto set_http_header_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
   if (transform == nullptr) {
     set_thread_error("HTTP header transform must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1369,6 +1375,12 @@ auto set_http_header_transform(
   }
   auto rules = std::unique_ptr<HeaderRuleTable>{};
   if (transform->callback == nullptr) {
+    if (transform->rule_count == 0) {
+      set_thread_error(
+        "a transform requires a callback or rules; use the clear function"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     if (
       transform->user_data != nullptr || transform->release_user_data != nullptr
     ) {
@@ -1417,8 +1429,7 @@ auto set_http_header_transform(
       .context = context,
     }
   );
-  auto* const table = rules.release();
-  context->transfer_to_runtime();
+  auto transfer = RegistrationTransfer{*context};
   const auto state = live->http_header_transform_state;
   const auto status = submit_resource_configuration_command<
     &mln_runtime_set_http_header_transform>(
@@ -1428,9 +1439,9 @@ auto set_http_header_transform(
       );
     }
   );
-  if (status != MLN_STATUS_OK) {
-    context->return_to_caller();
-    delete table;
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(rules.release());
+    transfer.accept();
   }
   return status;
 }
@@ -1648,12 +1659,6 @@ auto clear_http_header_transform(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
 
   const auto state = live->http_header_transform_state;
   return submit_resource_configuration_command<
@@ -1766,8 +1771,6 @@ auto submit_offline_operation(
   const std::shared_ptr<RuntimeObject>& runtime, OfflinePresent present,
   const mln_completion* descriptor, Schedule schedule
 ) -> mln_status {
-  const auto validation = validate_completion(descriptor);
-  if (validation != MLN_STATUS_OK) return validation;
   auto completion = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(descriptor, completion);
@@ -2493,12 +2496,13 @@ auto queued_provider_callback(
     if (provider.queue->push(item)) {
       return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
     }
-    // The refused item still owns nothing: the handle stays with this call,
-    // which passes the request through.
+    // Release below owns the refused handle; the item must not release it.
     item->discard = nullptr;
   } catch (...) {
   }
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  if (process_exiting()) return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  mln_resource_request_release(handle);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 auto release_queued_provider(void* user_data) noexcept -> void {
@@ -2519,12 +2523,6 @@ auto set_resource_provider(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
   if (provider == nullptr) {
     set_thread_error("provider must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2576,10 +2574,7 @@ auto set_resource_provider(
     .context = context,
     .routes = routes->routes.empty() ? nullptr : std::move(routes),
   };
-  // The context owns the queued registration from here; a rejected command
-  // returns it below.
-  auto* const queued_state = queued_provider.release();
-  context->transfer_to_runtime();
+  auto transfer = RegistrationTransfer{*context};
   const auto state = live->resource_provider_state;
   const auto status =
     submit_resource_configuration_command<&mln_runtime_set_resource_provider>(
@@ -2587,10 +2582,9 @@ auto set_resource_provider(
         replace_registration(*state, &ResourceProviderState::provider, copied);
       }
     );
-  if (status != MLN_STATUS_OK) {
-    context->return_to_caller();
-    // A rejected registration queues no retirement.
-    delete queued_state;
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(queued_provider.release());
+    transfer.accept();
   }
   return status;
 }
@@ -2600,12 +2594,6 @@ auto clear_resource_provider(
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (
-    const auto completion_status = validate_completion(completion);
-    completion_status != MLN_STATUS_OK
-  ) {
-    return completion_status;
-  }
 
   const auto state = live->resource_provider_state;
   return submit_resource_configuration_command<
@@ -2655,8 +2643,6 @@ auto release_runtime_reachable_state(RuntimeObject* runtime) -> void {
 auto runtime_barrier_start(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
   auto completion_state = std::shared_ptr<Completion>{};
@@ -2790,10 +2776,6 @@ auto dispose_runtime(mln_runtime runtime) -> mln_status {
 
 auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) {
-    return completion_status;
-  }
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
   auto release_completion = std::shared_ptr<Completion>{};

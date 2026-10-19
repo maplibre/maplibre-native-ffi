@@ -443,57 +443,61 @@ constexpr auto mln_resource_request_delivery_owns_handles() noexcept -> bool {
   return true;
 }
 inline auto dispose_owner(
-  const char* native_type, std::uint64_t handle
+  mln::core::HandleKind kind, std::uint64_t handle
 ) noexcept -> mln_status {
-  if (native_type == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-  if (std::strcmp(native_type, "mln_acquired_frame") == 0) {
-    return mln_acquired_frame_dispose(
-      static_cast<mln_acquired_frame>(handle), nullptr
-    );
+  switch (kind) {
+    case mln::core::HandleKind::AcquiredFrame: {
+      return mln_acquired_frame_dispose(
+        static_cast<mln_acquired_frame>(handle), nullptr
+      );
+    }
+    case mln::core::HandleKind::DeliveryBatch: {
+      mln_delivery_batch_release(static_cast<mln_delivery_batch>(handle));
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::DeliveryQueue: {
+      mln_delivery_queue_release(static_cast<mln_delivery_queue>(handle));
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::EventBatch: {
+      mln_event_batch_release(static_cast<mln_event_batch>(handle));
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::GeoJsonSourceData: {
+      mln_geojson_source_data_destroy(
+        static_cast<mln_geojson_source_data>(handle)
+      );
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::Map: {
+      return mln_map_dispose(static_cast<mln_map>(handle), nullptr);
+    }
+    case mln::core::HandleKind::MapProjection: {
+      return mln_map_projection_close(
+        static_cast<mln_map_projection>(handle), nullptr
+      );
+    }
+    case mln::core::HandleKind::RenderFrameBatch: {
+      mln_render_frame_batch_release(
+        static_cast<mln_render_frame_batch>(handle)
+      );
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::RenderSession: {
+      return mln_render_session_dispose(
+        static_cast<mln_render_session>(handle), nullptr
+      );
+    }
+    case mln::core::HandleKind::ResourceRequest: {
+      mln_resource_request_release(
+        static_cast<mln_resource_request_handle>(handle)
+      );
+      return MLN_STATUS_OK;
+    }
+    case mln::core::HandleKind::Runtime: {
+      return mln_runtime_dispose(static_cast<mln_runtime>(handle), nullptr);
+    }
+    default:
+      return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (std::strcmp(native_type, "mln_delivery_batch") == 0) {
-    mln_delivery_batch_release(static_cast<mln_delivery_batch>(handle));
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_delivery_queue") == 0) {
-    mln_delivery_queue_release(static_cast<mln_delivery_queue>(handle));
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_event_batch") == 0) {
-    mln_event_batch_release(static_cast<mln_event_batch>(handle));
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_geojson_source_data") == 0) {
-    mln_geojson_source_data_destroy(
-      static_cast<mln_geojson_source_data>(handle)
-    );
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_map") == 0) {
-    return mln_map_dispose(static_cast<mln_map>(handle), nullptr);
-  }
-  if (std::strcmp(native_type, "mln_map_projection") == 0) {
-    return mln_map_projection_close(
-      static_cast<mln_map_projection>(handle), nullptr
-    );
-  }
-  if (std::strcmp(native_type, "mln_render_frame_batch") == 0) {
-    mln_render_frame_batch_release(static_cast<mln_render_frame_batch>(handle));
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_render_session") == 0) {
-    return mln_render_session_dispose(
-      static_cast<mln_render_session>(handle), nullptr
-    );
-  }
-  if (std::strcmp(native_type, "mln_resource_request_handle") == 0) {
-    mln_resource_request_release(
-      static_cast<mln_resource_request_handle>(handle)
-    );
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_runtime") == 0) {
-    return mln_runtime_dispose(static_cast<mln_runtime>(handle), nullptr);
-  }
-  return MLN_STATUS_INVALID_ARGUMENT;
 }

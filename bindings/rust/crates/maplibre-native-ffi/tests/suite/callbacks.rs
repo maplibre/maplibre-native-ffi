@@ -292,6 +292,7 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
                 kinds: ResourceKindMask::TILE,
                 flags: UrlMatchFlags::GLOB,
                 url: "**".to_owned(),
+                ..Default::default()
             },
             // Only a URL pattern: every kind under it reaches the provider.
             ResourceRoute {
@@ -449,4 +450,29 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
         .expect("the binding kept a callback that native never took");
     handle.close().unwrap();
     wait_for(runtime.release());
+}
+
+#[test]
+fn a_provider_passes_a_deferred_request_to_native_loading() {
+    let fixture = Fixture::new();
+    let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
+    let (sender, requests) = mpsc::channel();
+    let sender = Mutex::new(sender);
+    wait_for(
+        fixture
+            .runtime()
+            .set_resource_provider(ResourceProvider::new(move |_, handle| {
+                sender.lock().unwrap().send(handle).unwrap();
+                ResourceProviderDecision::Handle
+            })),
+    );
+    fixture
+        .map()
+        .set_style_url(&server.url("/style.json"))
+        .unwrap();
+    let handle = requests.recv_timeout(timeout()).unwrap();
+    handle.pass_through().unwrap();
+    assert!(handle.pass_through().is_err());
+    handle.close().unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
 }

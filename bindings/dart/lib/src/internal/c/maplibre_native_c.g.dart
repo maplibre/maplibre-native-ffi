@@ -1091,6 +1091,8 @@ final class mln_resource_route extends Struct {
   @Uint32()
   external int flags;
   external Pointer<Char> url;
+  @Uint32()
+  external int url_stage;
 }
 
 final class mln_resource_transform extends Struct {
@@ -1577,18 +1579,13 @@ const MLN_ANIMATION_OPTION_EASING = 8;
 const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
 
 // mln_binding_dart_port_callback
-const MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1068062508;
-const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
-    3644896267;
-const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
-    433183623;
-const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
-    658252347;
-const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
-    1073125309;
-const MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK =
-    2876456937;
-const MLN_BINDING_DART_PORT_WAKE_CALLBACK = 2393247646;
+const MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1;
+const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE = 2;
+const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE = 3;
+const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE = 4;
+const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE = 5;
+const MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK = 6;
+const MLN_BINDING_DART_PORT_WAKE_CALLBACK = 7;
 
 // mln_bound_option_field
 const MLN_BOUND_OPTION_BOUNDS = 1;
@@ -1882,7 +1879,6 @@ const MLN_RESOURCE_KIND_SPRITE_JSON = 6;
 const MLN_RESOURCE_KIND_IMAGE = 7;
 
 // mln_resource_kind_mask
-const MLN_RESOURCE_KIND_MASK_ANY = 0;
 const MLN_RESOURCE_KIND_MASK_UNKNOWN = 1;
 const MLN_RESOURCE_KIND_MASK_STYLE = 2;
 const MLN_RESOURCE_KIND_MASK_SOURCE = 4;
@@ -1891,6 +1887,7 @@ const MLN_RESOURCE_KIND_MASK_GLYPHS = 16;
 const MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 32;
 const MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 64;
 const MLN_RESOURCE_KIND_MASK_IMAGE = 128;
+const MLN_RESOURCE_KIND_MASK_ALL = 255;
 
 // mln_resource_loading_method
 const MLN_RESOURCE_LOADING_METHOD_ALL = 0;
@@ -1920,6 +1917,10 @@ const MLN_RESOURCE_RESPONSE_STATUS_OK = 0;
 const MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1;
 const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2;
 const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
+
+// mln_resource_route_url
+const MLN_RESOURCE_ROUTE_URL_RESOLVED = 0;
+const MLN_RESOURCE_ROUTE_URL_REQUESTED = 1;
 
 // mln_resource_storage_policy
 const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
@@ -2098,9 +2099,8 @@ const MLN_TILE_OPERATION_CANCELLED = 7;
 const MLN_TILE_OPERATION_NULL = 8;
 
 // mln_url_match_flags
-const MLN_URL_MATCH_FLAGS_NONE = 0;
+const MLN_URL_MATCH_EXACT = 0;
 const MLN_URL_MATCH_GLOB = 1;
-const MLN_URL_MATCH_REQUESTED_URL = 2;
 
 // mln_viewport_mode
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
@@ -4643,6 +4643,12 @@ external int mln_resource_request_complete(
 external int mln_resource_request_is_cancelled(
   int handle,
   Pointer<Bool> out_cancelled,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Int32 Function(mln_resource_request_handle, Pointer<mln_diagnostic>)>()
+external int mln_resource_request_pass_through(
+  int handle,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

@@ -17,8 +17,10 @@
 namespace mln::core {
 namespace {
 
-// The diagnostic of a queued completion whose result could not be copied. It
-// has static storage, so the fallback delivery needs no allocation.
+// Small results and diagnostics share the storage reserved for fallback.
+constexpr auto reserved_result_bytes = std::size_t{256};
+
+// Static storage keeps fallback delivery independent of allocation.
 constexpr char uncopyable_result[] =
   "the completion result could not be copied into its delivery queue";
 
@@ -60,8 +62,8 @@ auto CompletionSink::deliver(
     .value = value,
     .value_count = value_count,
   };
-  if (delivered_) return;
-  delivered_ = true;
+  assert(!owner_->delivered_);
+  owner_->delivered_ = true;
   if (process_exiting()) return;
   if (queue_ != nullptr) {
     deliver_queued(result, capture);
@@ -81,17 +83,27 @@ auto CompletionSink::deliver_queued(
 ) const noexcept -> void {
   auto item = delivery::ItemPtr{};
   try {
-    item = delivery::make_item(
-      MLN_DELIVERY_TYPE_COMPLETION, user_data_,
-      [&](auto& arena, mln_delivery_payload& payload) {
-        payload.completion = copy_result(arena, result, capture);
-      }
-    );
+    auto measure =
+      delivery::Arena<false>{nullptr, sizeof(delivery::DeliveryItem)};
+    static_cast<void>(copy_result(measure, result, capture));
+    const auto reserved_size =
+      sizeof(delivery::DeliveryItem) + reserved_result_bytes;
+    item =
+      measure.offset <= reserved_size
+        ? std::move(owner_->fallback_)
+        : delivery::ItemPtr{delivery::detail::allocate_item(measure.offset)};
+    item->view.type = MLN_DELIVERY_TYPE_COMPLETION;
+    item->view.user_data = user_data_;
+    auto arena = delivery::Arena<true>{
+      reinterpret_cast<std::byte*>(item.get()), sizeof(delivery::DeliveryItem),
+      measure.offset
+    };
+    item->view.payload.completion = copy_result(arena, result, capture);
     if (
       capture != nullptr && result.status == MLN_STATUS_OK &&
       result.value != nullptr
     ) {
-      item->discard = capture->discard_item;
+      item->discard = capture->discard;
     }
   } catch (...) {
     // The fallback reports the failure, and nothing keeps the source's owned
@@ -100,9 +112,13 @@ auto CompletionSink::deliver_queued(
       capture != nullptr && result.status == MLN_STATUS_OK &&
       result.value != nullptr
     ) {
-      capture->discard(result.value, result.value_count);
+      if (capture->discard != nullptr) {
+        auto source = delivery::DeliveryItem{};
+        source.view.payload.completion = result;
+        capture->discard(source);
+      }
     }
-    item = std::move(fallback_);
+    if (item == nullptr) item = std::move(owner_->fallback_);
     if (item == nullptr) return;
     item->view.payload.completion = mln_completion_result{
       .size = sizeof(mln_completion_result),
@@ -171,7 +187,10 @@ auto ValuelessCompletion::complete(
   });
 }
 
-Completion::Completion(CompletionSink sink) noexcept : sink_(std::move(sink)) {}
+Completion::Completion(CompletionSink sink, delivery::ItemPtr fallback) noexcept
+    : sink_(std::move(sink)), fallback_(std::move(fallback)) {
+  sink_.owner_ = this;
+}
 
 Completion::~Completion() {
   if (state_.load() == State::Accepted) {
@@ -233,6 +252,7 @@ auto Completion::release() noexcept -> void {
     // retirement, so an observer of retirement sees the delivery finished.
     auto sink = std::move(sink_);
     sink_ = CompletionSink{};
+    fallback_.reset();
     // A queue completion owns nothing of the host's to release.
     const auto release_user_data =
       sink.queue_ == nullptr ? sink.descriptor_.release_user_data : nullptr;
@@ -248,7 +268,10 @@ auto Completion::release() noexcept -> void {
   retire_part();
 }
 
-auto validate_completion(const mln_completion* completion) -> mln_status {
+auto make_completion(
+  const mln_completion* completion, std::shared_ptr<Completion>& out
+) -> mln_status {
+  auto queue = std::shared_ptr<delivery::DeliveryQueueState>{};
   if (completion == nullptr) {
     set_thread_error("completion must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -269,39 +292,27 @@ auto validate_completion(const mln_completion* completion) -> mln_status {
       set_thread_error("a queue completion must not carry release_user_data");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (delivery::resolve_delivery_queue(completion->queue) == nullptr) {
+    queue = delivery::resolve_delivery_queue(completion->queue);
+    if (queue == nullptr) {
       return recorded_handle_fault_status();
     }
   }
-  return MLN_STATUS_OK;
-}
-
-auto validate_command_completion(const mln_completion* completion)
-  -> mln_status {
-  return completion == nullptr ? MLN_STATUS_OK
-                               : validate_completion(completion);
-}
-
-auto make_completion(
-  const mln_completion* descriptor, std::shared_ptr<Completion>& out
-) -> mln_status {
-  const auto status = validate_completion(descriptor);
-  if (status != MLN_STATUS_OK) return status;
+  const auto* descriptor = completion;
   auto sink = CompletionSink{};
+  auto fallback = delivery::ItemPtr{};
   try {
     if (descriptor->queue != MLN_HANDLE_NULL) {
-      sink.queue_ = delivery::resolve_delivery_queue(descriptor->queue);
-      // The queue was live a moment ago; a release in between reports as a
-      // released queue.
-      if (sink.queue_ == nullptr) return recorded_handle_fault_status();
+      sink.queue_ = std::move(queue);
       sink.user_data_ = descriptor->user_data;
-      sink.fallback_ = delivery::make_light_item(
-        MLN_DELIVERY_TYPE_COMPLETION, descriptor->user_data
-      );
+      fallback = delivery::ItemPtr{delivery::detail::allocate_item(
+        sizeof(delivery::DeliveryItem) + reserved_result_bytes
+      )};
+      fallback->view.type = MLN_DELIVERY_TYPE_COMPLETION;
+      fallback->view.user_data = descriptor->user_data;
     } else {
       sink.descriptor_ = *descriptor;
     }
-    out = std::make_shared<Completion>(std::move(sink));
+    out = std::make_shared<Completion>(std::move(sink), std::move(fallback));
   } catch (...) {
     out = nullptr;
     set_thread_error("asynchronous completion state could not be allocated");

@@ -1302,8 +1302,10 @@ auto submit_driver_work(
   const RenderDriverWorkFactory& make_work,
   const RenderDriverAdmission& admit = {}
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto async = CompletionOperation{};
+  const auto registered =
+    create_completion_operation(completion, std::move(deliver), async);
+  if (registered != MLN_STATUS_OK) return registered;
   auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
   {
@@ -1313,10 +1315,6 @@ auto submit_driver_work(
       return MLN_STATUS_INVALID_STATE;
     }
   }
-  auto async = CompletionOperation{};
-  const auto registered =
-    create_completion_operation(completion, std::move(deliver), async);
-  if (registered != MLN_STATUS_OK) return registered;
   {
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -1450,7 +1448,9 @@ auto validate_render_session_attach_request(
     set_thread_error("out_session must point to a null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto completion_status = validate_completion(completion);
+  auto checked_completion = std::shared_ptr<Completion>{};
+  const auto completion_status =
+    make_completion(completion, checked_completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   if (
     options->driver != MLN_RENDER_DRIVER_CORE_WORKER &&
@@ -1779,7 +1779,9 @@ auto validate_render_session_retarget_submission(
   mln_render_session session, RetargetTargetKind kind,
   const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  auto checked_completion = std::shared_ptr<Completion>{};
+  const auto completion_status =
+    make_completion(completion, checked_completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();

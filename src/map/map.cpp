@@ -3016,19 +3016,17 @@ template <typename Work>
 auto submit_map_command_impl(
   mln_map map, Work work, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_command_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_command_completion(completion, completion_state);
     made != MLN_STATUS_OK
   ) {
     return made;
+  }
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
   }
   return submit_runtime_command(
     context.runtime,
@@ -3055,8 +3053,6 @@ auto start_style_operation(
   mln_map map, StyleDelivery delivery, StyleWork work,
   const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(completion, completion_state);
@@ -3126,8 +3122,6 @@ template <auto Function>
 auto start_geometry_operation(
   mln_map map, GeometryWork<Function> work, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(completion, completion_state);
@@ -3315,10 +3309,6 @@ auto create_map_start(
   }
   auto reserve_guard = RuntimeMapRetainGuard{runtime};
   const auto effective = options == nullptr ? map_options_default() : *options;
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) {
-    return completion_status;
-  }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(completion, completion_state);
@@ -3408,9 +3398,12 @@ auto submit_map_resize(
   mln_map map, mln_logical_extent extent, const mln_completion* completion,
   bool from_session
 ) -> mln_status {
-  const auto completion_status = validate_command_completion(completion);
-  if (completion_status != MLN_STATUS_OK) {
-    return completion_status;
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
+  ) {
+    return made;
   }
   const auto extent_status = validate_logical_extent(
     extent, "extent dimensions and scale factor must be positive"
@@ -3432,13 +3425,6 @@ auto submit_map_resize(
   auto* const resize_slot = from_session
                               ? &context.map->latest_session_resize_submission
                               : &context.map->latest_resize_submission;
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
   const auto status = submit_runtime_command(
     context.runtime,
     [live = std::move(context.map), submission = std::move(context.control),
@@ -3580,10 +3566,6 @@ auto dispose_map(mln_map map) -> mln_status {
 }
 
 auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto owned = handle_table<MapObject>().lease(map);
-  if (owned == nullptr) return recorded_handle_fault_status();
   auto release_completion = std::shared_ptr<Completion>{};
   if (
     const auto made = make_completion(completion, release_completion);
@@ -3591,6 +3573,8 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   ) {
     return made;
   }
+  auto owned = handle_table<MapObject>().lease(map);
+  if (owned == nullptr) return recorded_handle_fault_status();
   auto sequence = uint64_t{0};
   auto close_status = MLN_STATUS_OK;
   {
@@ -3640,8 +3624,13 @@ PendingMapResult::~PendingMapResult() {
 
 auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status {
-  const auto completion_status = validate_command_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
+  ) {
+    return made;
+  }
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) {
@@ -3652,13 +3641,6 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
   if (context.map->map_mode != MLN_MAP_MODE_CONTINUOUS) {
     set_thread_error("map is not in continuous mode");
     return MLN_STATUS_INVALID_STATE;
-  }
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -3708,8 +3690,13 @@ auto map_end_command_group(mln_map map, const mln_completion* completion)
 auto map_request_still_image_start(
   mln_map map, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
+  ) {
+    return made;
+  }
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) {
@@ -3728,13 +3715,6 @@ auto map_request_still_image_start(
       submission->reset();
     }
   };
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
       valueless_completion<&mln_map_request_still_image>().complete(
@@ -3976,8 +3956,13 @@ auto start_map_string_operation(
   mln_map map, const mln_completion* completion,
   std::function<std::string(MapObject&)> read
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
+  ) {
+    return made;
+  }
   auto live = lease_map(map);
   if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.acquire()) {
@@ -3986,13 +3971,6 @@ auto start_map_string_operation(
   }
   auto guard = ControlLease{&live->control};
   auto submission = std::make_shared<ControlLease>(std::move(guard));
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
   auto state =
     std::make_shared<OperationObject>([completion_state](
                                         mln_status status,
@@ -4122,12 +4100,14 @@ auto map_style_url_start(mln_map map, const mln_completion* completion)
 auto map_set_event_mask(
   mln_map map, uint64_t mask, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_command_completion(completion);
+  auto completion_state = std::shared_ptr<Completion>{};
   if (
-    completion_status != MLN_STATUS_OK ||
-    (mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    if (completion_status != MLN_STATUS_OK) return completion_status;
+    return made;
+  }
+  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
     set_thread_error("mask must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4135,13 +4115,6 @@ auto map_set_event_mask(
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) {
     return acquire_status;
-  }
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_command_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -4166,11 +4139,6 @@ template <typename Mutation>
 auto submit_camera_command(
   mln_map map, Mutation mutation, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_command_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) return acquire_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
     const auto made = make_command_completion(completion, completion_state);
@@ -4178,6 +4146,9 @@ auto submit_camera_command(
   ) {
     return made;
   }
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) return acquire_status;
   return submit_runtime_command(
     context.runtime,
     [live = std::move(context.map), mutation = std::move(mutation),
@@ -4445,8 +4416,13 @@ auto map_cancel_camera_transition(
 
 auto map_camera_query_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::shared_ptr<Completion>{};
+  if (
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
+  ) {
+    return made;
+  }
   auto live = lease_map(map);
   if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.acquire()) {
@@ -4455,13 +4431,6 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   }
   auto guard = ControlLease{&live->control};
   auto submission = std::make_shared<ControlLease>(std::move(guard));
-  auto completion_state = std::shared_ptr<Completion>{};
-  if (
-    const auto made = make_completion(completion, completion_state);
-    made != MLN_STATUS_OK
-  ) {
-    return made;
-  }
   auto state =
     std::make_shared<OperationObject>([completion_state](
                                         mln_status status,

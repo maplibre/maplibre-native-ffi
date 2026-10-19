@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
 namespace mln::delivery {

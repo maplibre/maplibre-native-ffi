@@ -1659,6 +1659,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     let _policy = GeneratedCallbackPolicy::enter(
         &[
             "mln_resource_request_complete",
+            "mln_resource_request_pass_through",
             "mln_resource_request_is_cancelled",
             "mln_resource_request_set_cancel_callback",
             "mln_resource_request_release",
@@ -3926,6 +3927,9 @@ fn generated_input_mln_resource_route<'py>(
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
     raw.url = storage.c_string(value.getattr("url")?)?;
+    raw.url_stage = value
+        .getattr("url_stage")?
+        .extract::<sys::mln_resource_route_url>()?;
     Ok(raw)
 }
 
@@ -9643,6 +9647,25 @@ impl ResourceRequestHandle {
         }?;
         generated_value(py, out_cancelled)
     }
+    #[pyo3(signature = ())]
+    fn pass_through(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(
+            py,
+            "mln_resource_request_pass_through",
+            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
+        )?;
+        unsafe {
+            call.run(|| {
+                self.state.complete_with(|handle| {
+                    maplibre_core::check(|diagnostic| {
+                        sys::mln_resource_request_pass_through(handle, diagnostic)
+                    })
+                })
+            })
+        }
+        .map_err(map_error)?;
+        Ok(py.None())
+    }
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
             py,
@@ -10418,6 +10441,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
+            "mln_resource_request_pass_through",
             "mln_resource_request_is_cancelled",
             "mln_resource_request_set_cancel_callback",
             "mln_resource_request_release",

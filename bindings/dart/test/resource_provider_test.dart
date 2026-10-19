@@ -4,13 +4,32 @@
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show CallbackPortLifecycleProbe, singleCallbackPortProbeForTesting;
+import 'support/runtime_probes.dart';
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
 void main() {
+  test('a provider passes a deferred request to native loading', () async {
+    const url = 'custom://native.json';
+    final handed = Completer<ResourceRequestHandle>();
+    final fixture = await openRuntime(
+      provider: routedProvider([
+        styleRoute(url),
+      ], (_, handle) => handed.complete(handle)),
+    );
+    final map = await fixture.openMap();
+    await expectCommitted(map.setStyleUrl(url));
+    final handle = await within(handed.future, 'the provider request');
+    handle.passThrough();
+    expect(handle.passThrough, throwsA(isA<InvalidStateException>()));
+    handle.close();
+    final failure = await fixture.awaitEventType(
+      RuntimeEventType.mapLoadingFailed,
+    );
+    expect(failure.message, contains('declined'));
+  });
+
   test('a routed provider answers the requests its routes match', () async {
     const styleUrl = 'custom://routed-style.json';
     const sourceUrl = 'custom://routed-source.json';
@@ -19,7 +38,7 @@ void main() {
     final fixture = await openRuntime(
       provider: routedProvider(
         [
-          // A route that names no kinds claims the style and its source alike.
+          // A route with the default kinds claims the style and its source alike.
           ResourceRoute(
             flags: UrlMatchFlags.glob,
             url: 'custom://routed-*.json',

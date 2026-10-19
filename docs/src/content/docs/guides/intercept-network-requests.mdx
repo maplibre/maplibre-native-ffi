@@ -15,7 +15,9 @@ import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 
 Choose a resource transform to rewrite URLs, an HTTP header transform to add
 headers, or a resource provider to supply response bytes from host storage.
-Register each callback on the runtime.
+Register each configuration on the runtime. Use native rules for fixed URL
+rewrites or headers, and callbacks when the result depends on host computation.
+Native rules also support hosts that cannot run callbacks on MapLibre threads.
 
 Callbacks can run concurrently on native threads. Protect shared state and
 return quickly. Keep registered callback state reachable until native code
@@ -23,7 +25,16 @@ releases it. Release host locks that callbacks acquire before closing the runtim
 
 ## Rewrite a URL
 
-Use a transform to sign a URL or select another host. Check the destination
+Use a transform to sign a URL or select another host. For a fixed rewrite,
+register a table of rules; registration copies the table and its strings.
+
+<Code code={region(transformSnippet, "rules")} lang="c" title="resource-transform.c" />
+
+Rules select resource kinds and compare complete URLs, exactly or with globs.
+The first match decides the result; a rule without a replacement preserves the
+URL and stops the search. Clear the transform to remove the table.
+
+For a computed rewrite, register a callback. Check the destination
 before adding credentials: styles can request tiles, sprites, and glyphs from
 origins that the host does not control.
 
@@ -41,6 +52,8 @@ Register the transform before loading resources that need it.
 
 Use a header transform for credentials that belong in headers. It runs after URL
 transformation, so check the transformed origin before returning credentials.
+A table of header rules supplies fixed headers without a callback; the first
+matching rule supplies its complete header list.
 
 <Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
 
@@ -55,7 +68,13 @@ Register the transform, and clear or replace it when credentials change.
 ### Platform support
 
 Header transforms are unavailable on OpenHarmony and in the browser. Use a
-provider there. The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
+provider there. <Code code={region(providerSnippet, "pass-through")} lang="c" title="resource-provider.c" />
+
+A queue provider can also pass through a request after draining and taking its
+handle. Routes reduce queue traffic; the host still decides whether to serve
+each routed request. A released queue or failed request copy fails the request.
+
+The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
 covers redirect handling and the request paths that bypass transforms.
 
 ## Supply response bytes
@@ -70,15 +89,26 @@ callback.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
-Register the provider before loading its resources.
+Register routes to restrict which requests reach the provider. Routes compare
+normalized URLs by default and can select the original requested URL. Select
+all resource kinds explicitly in C; binding constructors provide that default.
+Go uses its `DefaultResourceRoute()` factory. Register the provider before
+loading its resources.
 
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
 For asynchronous I/O, retain the request handle, complete it when the bytes
-arrive, and release it after completion or cancellation. A cancelled request no
+arrive, and release it after completion or cancellation. If host lookup declines
+the request later, pass its handle to native loading and then release it. A cancelled request no
 longer needs a response; use a cancel callback to stop an in-flight fetch.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
+
+<Code code={region(providerSnippet, "pass-through")} lang="c" title="resource-provider.c" />
+
+A queue provider can also pass through a request after draining and taking its
+handle. Routes reduce queue traffic; the host still decides whether to serve
+each routed request. A released queue or failed request copy fails the request.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) defines
 request ownership, cancellation, callback reentry, and registration retirement.

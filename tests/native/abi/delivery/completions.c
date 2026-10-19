@@ -303,6 +303,24 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void runtime_release_can_finish_before_queued_results_are_drained(void) {
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
+  const mln_completion queued = mln_test_queue_completion(queue.handle, NULL);
+  MLN_TEST_OK(mln_runtime_barrier(runtime, &queued, NULL));
+  MLN_TEST_AWAIT_OK(mln_runtime_release(runtime, &completion.descriptor, NULL));
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_delivery_queue_drain(queue.handle, &batch, NULL));
+  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
+  const size_t count = view.delivery_count;
+  mln_delivery_batch_release(batch);
+  mln_test_delivery_queue_release(&queue);
+  TEST_ASSERT_EQUAL_size_t(1, count);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(command_and_barrier_completions_reach_the_queue);
   RUN_TEST(a_rejected_submission_queues_nothing);
@@ -311,5 +329,6 @@ MLN_TEST_GROUP {
   RUN_TEST(an_untaken_map_is_disposed_with_its_batch);
   RUN_TEST(list_results_outlive_the_runtime);
   RUN_TEST(runtime_release_completes_through_the_queue);
+  RUN_TEST(runtime_release_can_finish_before_queued_results_are_drained);
   RUN_TEST(a_completion_for_a_released_queue_is_discarded);
 }

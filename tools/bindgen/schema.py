@@ -136,6 +136,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "decision_accept",
         "decision_pass",
         "complete",
+        "resume",
         "cancelled",
         "cancel_registration",
         "wait_retired",
@@ -1186,7 +1187,7 @@ def validate(api: Api) -> None:
             "cancel_registration",
             "wait_retired",
         }
-        if decision_keys & typedef.metadata.keys():
+        if (decision_keys | {"resume"}) & typedef.metadata.keys():
             if not decision_keys <= typedef.metadata.keys():
                 errors.append(
                     f"{context}: decision requires handle, both outcomes, completion, cancellation, registration, and retirement wait"
@@ -1222,7 +1223,9 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: decision outcomes require distinct values of one enum"
                 )
-            for key in ("complete", "cancelled", "cancel_registration"):
+            for key in ("complete", "cancelled", "cancel_registration", "resume"):
+                if key not in typedef.metadata:
+                    continue
                 operation = api.functions_by_name.get(typedef.metadata[key])
                 if (
                     operation is None
@@ -1474,15 +1477,14 @@ def defaulted_records(api: Api) -> set[str]:
 
 
 def field_default_errors(api: Api) -> list[str]:
-    """Check each field's `default=`: its value in its record's native default.
+    """Check each field's `default=`: its initial value in binding constructors.
 
     A control role keeps its conventional value. Any other field may state a
     nonzero literal of its own type, or an enumerator of its enum, when it is
-    a plain value that a default function's result holds. A generated C test
-    checks the value against the default function.
+    a plain value. When a native default function exists, a generated C test
+    checks the value against that function.
     """
     conventions = Conventions(api)
-    defaulted = defaulted_records(api)
     enums = {enum.name: enum for enum in api.enums}
     errors = []
     for record in api.records:
@@ -1504,12 +1506,6 @@ def field_default_errors(api: Api) -> list[str]:
                 or conventions.is_record(resolved)
             ):
                 errors.append(f"{context}: default requires a plain value member")
-                continue
-            if record.name not in defaulted:
-                errors.append(
-                    f"{context}: default requires a record that a default "
-                    "function returns"
-                )
                 continue
             enum = enums.get(
                 field.metadata.get("enum", field.type.declaration or "")
@@ -1557,6 +1553,7 @@ FUNCTION_REFERENCES = {
         "view_end",
         "default",
         "complete",
+        "resume",
         "cancelled",
         "cancel_registration",
         "wait_retired",

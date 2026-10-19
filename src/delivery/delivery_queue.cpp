@@ -14,6 +14,11 @@
 namespace mln::delivery {
 namespace {
 
+auto retry_lane() -> core::RetirementLane& {
+  static auto* lane = new core::RetirementLane{};
+  return *lane;
+}
+
 struct DeliveryQueueObject {
   std::shared_ptr<DeliveryQueueState> state;
 };
@@ -80,10 +85,12 @@ auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr {
   return item;
 }
 
-DeliveryQueueState::DeliveryQueueState(
-  std::shared_ptr<core::Wake> wake
-) noexcept
-    : wake_(std::move(wake)) {}
+DeliveryQueueState::DeliveryQueueState(std::shared_ptr<core::Wake> wake)
+    : wake_(std::move(wake)) {
+  static_cast<void>(retry_lane());
+  retry_task_.run = &DeliveryQueueState::run_retry;
+  retry_task_.context = this;
+}
 
 DeliveryQueueState::~DeliveryQueueState() { close(); }
 
@@ -120,29 +127,38 @@ auto DeliveryQueueState::push_without_wake(
 auto DeliveryQueueState::drain(
   std::vector<ItemPtr>& out, std::vector<mln_delivery>& views
 ) -> void {
-  while (true) {
-    auto needed = std::size_t{};
-    {
-      const auto lock = std::scoped_lock{mutex_};
-      needed = out.size() + count_;
-      if (needed <= out.capacity() && needed <= views.capacity()) {
-        for (auto* item = head_; item != nullptr;) {
-          auto* next = item->next;
-          item->next = nullptr;
-          views.push_back(item->view);
-          out.emplace_back(item);
-          item = next;
-        }
-        head_ = nullptr;
-        tail_ = nullptr;
-        count_ = 0;
-        return;
-      }
-    }
-    // Reserving outside the lock keeps pushes from waiting on an allocation.
-    out.reserve(needed);
-    views.reserve(needed);
+  auto limit = std::size_t{};
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    limit = count_;
   }
+  out.reserve(out.size() + limit);
+  views.reserve(views.size() + limit);
+  auto* prefix = static_cast<DeliveryItem*>(nullptr);
+  auto remainder = false;
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    prefix = limit == 0 ? nullptr : head_;
+    auto* last = static_cast<DeliveryItem*>(nullptr);
+    for (auto index = std::size_t{}; index < limit && head_ != nullptr;
+         ++index) {
+      last = head_;
+      head_ = head_->next;
+      --count_;
+    }
+    if (last != nullptr) last->next = nullptr;
+    if (head_ == nullptr) tail_ = nullptr;
+    remainder = head_ != nullptr;
+    retry_armed_ = false;
+  }
+  while (prefix != nullptr) {
+    auto* next = prefix->next;
+    prefix->next = nullptr;
+    views.push_back(prefix->view);
+    out.emplace_back(prefix);
+    prefix = next;
+  }
+  if (remainder) retry_later();
 }
 
 auto DeliveryQueueState::empty() noexcept -> bool {
@@ -158,8 +174,42 @@ auto DeliveryQueueState::rewake() noexcept -> void {
     // Copying the wake under the lock keeps it alive across the call, even
     // when the receiver releases the queue from inside the wake.
     wake = wake_;
+    ++waking_;
   }
   if (wake != nullptr) wake->notify();
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    --waking_;
+    if (waking_ == 0) condition_.notify_all();
+  }
+}
+
+auto DeliveryQueueState::retry_later() noexcept -> void {
+  const auto lock = std::scoped_lock{mutex_};
+  if (closed_ || head_ == nullptr || retry_armed_ || pending_retry_ != nullptr)
+    return;
+  retry_armed_ = true;
+  pending_retry_ = shared_from_this();
+  retry_lane().submit(retry_task_);
+}
+
+auto DeliveryQueueState::run_retry(core::RetirementTask* task) noexcept
+  -> void {
+  auto* state = static_cast<DeliveryQueueState*>(task->context);
+  auto self = std::shared_ptr<DeliveryQueueState>{};
+  {
+    auto lock = std::unique_lock{state->mutex_};
+    state->condition_.wait(lock, [state] { return state->waking_ == 0; });
+    self = state->pending_retry_;
+  }
+  self->rewake();
+  auto remainder = false;
+  {
+    const auto lock = std::scoped_lock{self->mutex_};
+    self->pending_retry_.reset();
+    remainder = !self->retry_armed_ && self->head_ != nullptr;
+  }
+  if (remainder) self->retry_later();
 }
 
 auto DeliveryQueueState::close() noexcept -> void {
@@ -262,7 +312,7 @@ auto drain_delivery_queue(mln_delivery_queue queue, mln_delivery_batch* out)
       static_cast<void>(handle_table<DeliveryBatchObject>().remove(handle));
     }
     // The deliveries stay queued; the wake asks the receiver to drain again.
-    state->rewake();
+    state->retry_later();
     throw;
   }
   if (batch->items.empty()) {

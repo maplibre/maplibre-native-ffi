@@ -1,6 +1,6 @@
 // Queue-mode resource providers: copied requests that the host completes after
 // draining, untaken and cancelled requests, retirement, and requests that a
-// released queue passes through.
+// released queue fails.
 
 #include <string.h>
 
@@ -73,6 +73,7 @@ static void the_host_completes_a_drained_request(void) {
 
   const mln_resource_response response = style_response();
   MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
+  MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
   mln_resource_request_release(handle);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
 
@@ -213,6 +214,7 @@ static void a_request_cancelled_before_the_drain_reports_it(void) {
     mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
   );
   TEST_ASSERT_TRUE(cancelled);
+  MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
   mln_resource_request_release(handle);
 
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
@@ -260,9 +262,8 @@ static void retirement_follows_the_last_request(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// A queue the host released refuses each request, which passes through to
-// native loading.
-static void a_released_queue_passes_requests_through(void) {
+// A refused queue delivery fails the request before native loading.
+static void a_released_queue_fails_requests(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_provider provider = queue_provider(queue.handle, NULL);
@@ -276,7 +277,7 @@ static void a_released_queue_passes_requests_through(void) {
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
   );
-  TEST_ASSERT_NOT_NULL(strstr(message, "declined this request"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
 
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
@@ -351,14 +352,22 @@ static void invalid_routes_are_rejected(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_route routes[] = {
-    {.url = "custom://first"},
-    {.flags = 1U << 31U, .url = "**"},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = "custom://first"},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL, .flags = 1U << 31U, .url = "**"},
   };
   MLN_TEST_INVALID(submit_routes(runtime, routes, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
   const mln_resource_route unknown_kind = {.kinds = 1U << 31U, .url = "**"};
   MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
-  const mln_resource_route null_url = {.url = NULL};
+  const mln_resource_route zero_kinds = {.url = "**"};
+  MLN_TEST_INVALID(submit_routes(runtime, &zero_kinds, 1, NULL));
+  const mln_resource_route invalid_stage = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = "**", .url_stage = UINT32_MAX
+  };
+  MLN_TEST_INVALID(submit_routes(runtime, &invalid_stage, 1, NULL));
+  const mln_resource_route null_url = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .url = NULL
+  };
   MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_routes(runtime, NULL, 1, NULL));
   MLN_TEST_OK(submit_routes(runtime, routes, 1, NULL));
@@ -456,6 +465,7 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_route route = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = "custom://routed/**",
   };
@@ -490,6 +500,71 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_http_server_stop(server);
 }
 
+// The host can decline after taking a queued request. Native transforms still
+// apply, and the request never visits the provider a second time.
+static void a_drained_request_can_pass_through_once(void) {
+  const mln_test_http_route route = {
+    .path = "/rewritten.json",
+    .body = inline_style_json,
+    .body_size = sizeof(inline_style_json) - 1,
+  };
+  mln_test_http_server* server = mln_test_http_server_start(&route, 1);
+  char original[256];
+  char rewritten[256];
+  mln_test_http_server_url(
+    server, "/original.json", original, sizeof(original)
+  );
+  mln_test_http_server_url(
+    server, "/rewritten.json", rewritten, sizeof(rewritten)
+  );
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_resource_provider provider = queue_provider(queue.handle, NULL);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+  const mln_resource_rewrite_rule rule = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = original,
+    .replacement_url = rewritten,
+  };
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &rule,
+    .rule_count = 1,
+  };
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, original));
+  const mln_resource_request_delivery* request = NULL;
+  const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
+  const mln_resource_request_handle handle = request->handle;
+  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
+  mln_delivery_batch_release(batch);
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/rewritten.json")
+  );
+  MLN_TEST_OK(mln_resource_request_pass_through(handle, NULL));
+  MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
+  const mln_resource_response response = style_response();
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_complete(handle, &response, NULL)
+  );
+  mln_resource_request_release(handle);
+  MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/rewritten.json")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/original.json")
+  );
+  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_http_server_stop(server);
+}
+
 #endif
 
 MLN_TEST_GROUP {
@@ -498,12 +573,13 @@ MLN_TEST_GROUP {
   RUN_TEST(a_request_completed_before_handle_returns_loads);
   RUN_TEST(a_request_cancelled_before_the_drain_reports_it);
   RUN_TEST(retirement_follows_the_last_request);
-  RUN_TEST(a_released_queue_passes_requests_through);
+  RUN_TEST(a_released_queue_fails_requests);
   RUN_TEST(releasing_a_queue_fails_its_pending_requests);
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
   RUN_TEST(invalid_routes_are_rejected);
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(routes_filter_a_callback_provider);
   RUN_TEST(routes_filter_a_queue_provider);
+  RUN_TEST(a_drained_request_can_pass_through_once);
 #endif
 }

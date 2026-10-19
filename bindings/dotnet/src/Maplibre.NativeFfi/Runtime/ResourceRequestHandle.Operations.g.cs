@@ -91,6 +91,21 @@ public sealed unsafe partial class ResourceRequestHandle
     }
 
     /// <summary>
+    /// Hands an outstanding provider request to the built-in network loader.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_pass_through</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
+    public void PassThrough()
+    {
+        using var call = Enter(this, "mln_resource_request_pass_through");
+        using var claim = state.BeginClaim();
+        Check(NativeMethods.mln_resource_request_pass_through(Handle, Diagnostic));
+        claim.Accept();
+    }
+
+    /// <summary>
     /// Releases the provider's reference to a resource request handle.
     /// </summary>
     /// <remarks>

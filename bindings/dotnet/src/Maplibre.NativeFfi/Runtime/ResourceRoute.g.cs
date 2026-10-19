@@ -10,8 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Kinds">
-/// A bitwise OR of <c>mln_resource_kind_mask</c> values. Registration rejects
-/// an unknown bit.
+/// The resource kinds to match.
 /// </param>
 /// <param name="Flags">
 /// A bitwise OR of <c>mln_url_match_flags</c> values.
@@ -19,8 +18,16 @@ namespace Maplibre.NativeFfi;
 /// <param name="Url">
 /// The URL or glob pattern to compare.
 /// </param>
+/// <param name="UrlStage">
+/// The URL stage to compare.
+/// </param>
 public readonly partial record struct ResourceRoute(
     ResourceKindMask Kinds,
     UrlMatchFlags Flags,
-    string Url
-);
+    string Url,
+    ResourceRouteUrl UrlStage
+)
+{
+    public ResourceRoute()
+        : this(ResourceKindMask.All, default, default!, default) { }
+}

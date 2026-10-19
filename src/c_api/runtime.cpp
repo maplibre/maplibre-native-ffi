@@ -59,6 +59,14 @@ auto mln_resource_request_complete(
   });
 }
 
+auto mln_resource_request_pass_through(
+  mln_resource_request_handle handle, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::pass_through_resource_request(handle);
+  });
+}
+
 auto mln_resource_request_is_cancelled(
   mln_resource_request_handle handle, bool* out_cancelled,
   mln_diagnostic* out_diagnostic

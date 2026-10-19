@@ -130,31 +130,33 @@ does this. The copies use static capture functions that `native_capture.py`
 generates for each reachable completion value and delivery record. A measuring
 pass computes checked, aligned storage, and then one allocation holds the record
 and all copied payload bytes. A writing pass copies each borrowed byte once and
-rewrites pointers into that allocation. The generated dispatcher selects a
-compiled copier by a type identifier, which is a deterministic hash of the
-native type and its ownership. Nested arrays and union variants follow the same
-recursive rules as the other bindings, and the bindings with direct callbacks
-keep their immediate capture path.
+rewrites pointers into that allocation. Typed completion delivery selects its
+generated capture through the submitting operation's declared result type.
+Nested arrays and union variants follow the same recursive rules as the other
+bindings, and the bindings with direct callbacks keep their immediate capture
+path.
 
-Owned handle results stay owned by the native record until the Dart decoder
-constructs a host owner and adopts the record. Discarded records and failed
-captures invoke the declared disposal operation, and owned root arrays dispose
+Owned handle results stay owned by the delivery batch until Dart takes the
+delivery before constructing a host owner. Releasing an untaken batch or failing
+a capture invokes the declared disposal operation; owned root arrays dispose
 every element. The compiler rejects nested owned handle fields before any array
 or pointer conversion.
 
-Dart completion messages transfer copied results through the VM's native-pointer
-message finalizer, and undelivered messages dispose unclaimed result owners.
-Logging and provider queues use static native wake callbacks. Request
-cancellation keeps its native port context in the request through callback
-quiescence. These paths remain callable after isolate shutdown without
-executable Dart callback addresses.
+Dart drains completions, log records, and resource requests from one delivery
+queue per isolate. A native queue finalizer disposes undrained deliveries when
+the isolate exits. Static native wake callbacks post integer messages to the
+isolate. A queue used for logging wakes inline under the native log mutex, so
+its wake follows the log callback restrictions. Request cancellation keeps its
+native port context in the request through callback quiescence. These paths
+remain callable after isolate shutdown without executable Dart callback
+addresses.
 
 Dart notification stubs are generated from registration descriptors with void
 callbacks and recursively copyable scalar records. Each descriptor field has a
-stable message identifier. Native code copies the arguments into a Dart port
-message, and a shared release callback closes the native context after callback
-quiescence. Host callbacks run in the registration zone, and owner close waits
-for the release messages.
+sequential message identifier within the generated API. Native code copies the
+arguments into a Dart port message, and a shared release callback closes the
+native context after callback quiescence. Host callbacks run in the registration
+zone, and owner close waits for the release messages.
 
 ## Ownership protocols
 

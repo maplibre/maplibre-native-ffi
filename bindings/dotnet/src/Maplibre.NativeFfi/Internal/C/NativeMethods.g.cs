@@ -1412,6 +1412,12 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_resource_request_pass_through(
+        MlnResourceRequest handle,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial void mln_resource_request_release(MlnResourceRequest handle);
 
     [LibraryImport(LibraryName)]

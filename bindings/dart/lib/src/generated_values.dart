@@ -745,15 +745,13 @@ final class ResourceKind extends _Enum {
 }
 
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value.
+/// `mln_resource_kind` value. Registration requires at least one known bit.
+/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
 ///
 /// See `mln_resource_kind_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceKindMask extends _Flags<ResourceKindMask> {
   const ResourceKindMask.fromRawValue(super.rawValue);
-
-  /// Matches every resource kind.
-  static const any = ResourceKindMask.fromRawValue(0);
   static const unknown = ResourceKindMask.fromRawValue(1);
   static const style = ResourceKindMask.fromRawValue(2);
   static const source = ResourceKindMask.fromRawValue(4);
@@ -762,6 +760,7 @@ final class ResourceKindMask extends _Flags<ResourceKindMask> {
   static const spriteImage = ResourceKindMask.fromRawValue(32);
   static const spriteJson = ResourceKindMask.fromRawValue(64);
   static const image = ResourceKindMask.fromRawValue(128);
+  static const all = ResourceKindMask.fromRawValue(255);
   @override
   ResourceKindMask _of(int rawValue) => ResourceKindMask.fromRawValue(rawValue);
 }
@@ -835,6 +834,16 @@ final class ResourceResponseStatus extends _Enum {
   static const error = ResourceResponseStatus.fromRawValue(1);
   static const noContent = ResourceResponseStatus.fromRawValue(2);
   static const notModified = ResourceResponseStatus.fromRawValue(3);
+}
+
+/// The URL stage that a provider route compares.
+///
+/// See `mln_resource_route_url` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRouteUrl extends _Enum {
+  const ResourceRouteUrl.fromRawValue(super.rawValue);
+  static const resolved = ResourceRouteUrl.fromRawValue(0);
+  static const requested = ResourceRouteUrl.fromRawValue(1);
 }
 
 final class ResourceStoragePolicy extends _Enum {
@@ -1217,13 +1226,10 @@ final class TileOperation extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class UrlMatchFlags extends _Flags<UrlMatchFlags> {
   const UrlMatchFlags.fromRawValue(super.rawValue);
-  static const flagsNone = UrlMatchFlags.fromRawValue(0);
+  static const exact = UrlMatchFlags.fromRawValue(0);
 
   /// Reads url as a glob pattern.
   static const glob = UrlMatchFlags.fromRawValue(1);
-
-  /// Routes only: compare requested_url instead of resolved_url.
-  static const requestedUrl = UrlMatchFlags.fromRawValue(2);
   @override
   UrlMatchFlags _of(int rawValue) => UrlMatchFlags.fromRawValue(rawValue);
 }
@@ -4494,17 +4500,16 @@ final class HttpHeader extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class HttpHeaderRule extends _Value {
   HttpHeaderRule({
-    this.kinds = const ResourceKindMask.fromRawValue(0),
+    this.kinds = ResourceKindMask.all,
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
     required List<HttpHeader> headers,
   }) : headers = List.unmodifiable(headers);
 
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   final ResourceKindMask kinds;
 
-  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  /// A bitwise OR of `mln_url_match_flags` values.
   final UrlMatchFlags flags;
 
   /// The URL or glob pattern to compare.
@@ -4617,13 +4622,13 @@ typedef ResourceProviderCallback =
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRoute extends _Value {
   const ResourceRoute({
-    this.kinds = const ResourceKindMask.fromRawValue(0),
+    this.kinds = ResourceKindMask.all,
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
+    this.urlStage = const ResourceRouteUrl.fromRawValue(0),
   });
 
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   final ResourceKindMask kinds;
 
   /// A bitwise OR of `mln_url_match_flags` values.
@@ -4632,8 +4637,11 @@ final class ResourceRoute extends _Value {
   /// The URL or glob pattern to compare.
   final String url;
 
+  /// The URL stage to compare.
+  final ResourceRouteUrl urlStage;
+
   @override
-  List<Object?> get _members => [kinds, flags, url];
+  List<Object?> get _members => [kinds, flags, url, urlStage];
 }
 
 /// Resource provider state.
@@ -4659,23 +4667,22 @@ final class ResourceProvider {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRewriteRule extends _Value {
   const ResourceRewriteRule({
-    this.kinds = const ResourceKindMask.fromRawValue(0),
+    this.kinds = ResourceKindMask.all,
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
     this.replacementUrl,
   });
 
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   final ResourceKindMask kinds;
 
-  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  /// A bitwise OR of `mln_url_match_flags` values.
   final UrlMatchFlags flags;
 
   /// The URL or glob pattern to compare.
   final String url;
 
-  /// The replacement URL, or null to leave a matching URL unchanged.
+  /// The replacement URL, or null to keep the URL and stop the search.
   final String? replacementUrl;
 
   @override

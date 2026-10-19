@@ -421,10 +421,13 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	}
 	requests := make(chan routed, 8)
 	deny := denyingProvider().Callback
+	allKindsRoute := DefaultResourceRoute()
+	allKindsRoute.Flags = UrlMatchFlagsGlob
+	allKindsRoute.Url = "custom://any/**"
 	routes := []ResourceRoute{
 		{Kinds: ResourceKindMaskTile, Flags: UrlMatchFlagsGlob, Url: "**"},
 		{Kinds: ResourceKindMaskStyle, Url: "custom://routed/style.json"},
-		{Flags: UrlMatchFlagsGlob, Url: "custom://any/**"},
+		allKindsRoute,
 	}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		offer(requests, routed{*request.RequestedUrl, request.Kind})
@@ -602,4 +605,28 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestProviderPassesADeferredRequestToNativeLoading(t *testing.T) {
+	f := newFixture(t)
+	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
+	requests := make(chan *ResourceRequestHandle, 1)
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		offer(requests, handle)
+		return ResourceProviderDecisionHandle
+	}})))
+	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
+		t.Fatal(err)
+	}
+	handle := receive(t, requests, "the provider request")
+	if err := handle.PassThrough(); err != nil {
+		t.Fatal(err)
+	}
+	if err := handle.PassThrough(); err == nil {
+		t.Fatal("a second terminal decision succeeded")
+	}
+	if err := handle.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the native style load", isStyleLoaded)
 }

@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,33 +14,41 @@
 
 namespace mln::core {
 
-// Matches candidate against pattern in the glob language that
-// mln_url_match_flags describes. Matching is iterative and allocates nothing,
-// so it bounds stack use on MapLibre threads; the worst case costs the product
-// of the two lengths.
-[[nodiscard]] auto glob_matches(
-  std::string_view pattern, std::string_view candidate
-) noexcept -> bool;
+// A glob compiled into a linear NFA. Each candidate byte visits each token
+// once, so work is O(pattern length * candidate length). Scratch storage is
+// allocated at registration and serialized for concurrent resource threads.
+class CompiledGlob {
+ public:
+  explicit CompiledGlob(std::string_view pattern);
+  [[nodiscard]] auto matches(
+    std::string_view candidate, std::size_t* steps = nullptr
+  ) const noexcept -> bool;
 
-// Compares candidate against url as flags select: exactly, or as a glob.
-[[nodiscard]] auto url_matches(
-  std::uint32_t flags, std::string_view url, std::string_view candidate
-) noexcept -> bool;
+ private:
+  enum class Kind : std::uint8_t { Literal, Any, Segment, Spanning };
+  struct Token {
+    Kind kind;
+    char literal = 0;
+  };
+  std::vector<Token> tokens_;
+  mutable std::mutex mutex_;
+  mutable std::vector<std::uint8_t> states_;
+};
 
 // Whether a rule or route with the kinds mask applies to a request of
 // request_kind.
 [[nodiscard]] constexpr auto matches_kind(
   std::uint32_t kinds, std::uint32_t request_kind
 ) noexcept -> bool {
-  return kinds == MLN_RESOURCE_KIND_MASK_ANY ||
-         (request_kind < 32U && ((kinds >> request_kind) & 1U) != 0);
+  return request_kind < 32U && ((kinds >> request_kind) & 1U) != 0;
 }
 
 // One copied route, rule, or header rule pattern.
 struct UrlPattern {
-  std::uint32_t kinds = MLN_RESOURCE_KIND_MASK_ANY;
-  std::uint32_t flags = 0;
+  UrlPattern(std::uint32_t kinds, std::uint32_t flags, std::string_view url);
+  std::uint32_t kinds;
   std::string url;
+  std::shared_ptr<CompiledGlob> glob;
 
   [[nodiscard]] auto matches(
     std::uint32_t request_kind, std::string_view url
@@ -47,7 +57,11 @@ struct UrlPattern {
 
 // The routes of a resource provider, which owns their strings.
 struct RouteTable {
-  std::vector<UrlPattern> routes;
+  struct Route {
+    UrlPattern pattern;
+    std::uint32_t url_stage;
+  };
+  std::vector<Route> routes;
 
   // Whether a request reaches the provider. A table without routes claims
   // every request.

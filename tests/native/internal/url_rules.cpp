@@ -65,14 +65,16 @@ void globs_match_the_documented_pattern_language() {
   for (const auto& row : glob_cases) {
     const auto pattern = std::string{row.pattern};
     TEST_ASSERT_EQUAL_MESSAGE(
-      row.matches,
-      mln::core::url_matches(MLN_URL_MATCH_GLOB, row.pattern, row.url),
+      row.matches, mln::core::CompiledGlob{row.pattern}.matches(row.url),
       pattern.c_str()
     );
   }
   // Without the glob flag, metacharacters compare literally.
-  TEST_ASSERT_FALSE(mln::core::url_matches(0, "**", style_url));
-  TEST_ASSERT_TRUE(mln::core::url_matches(0, "**", "**"));
+  const auto exact = mln::core::UrlPattern{
+    MLN_RESOURCE_KIND_MASK_ALL, MLN_URL_MATCH_EXACT, "**"
+  };
+  TEST_ASSERT_FALSE(exact.matches(MLN_RESOURCE_KIND_STYLE, style_url));
+  TEST_ASSERT_TRUE(exact.matches(MLN_RESOURCE_KIND_STYLE, "**"));
 }
 
 auto table_of(mln_resource_route route) -> mln::core::RouteTable {
@@ -82,14 +84,14 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
 }
 
 // A route compares the resolved URL unless it asks for the requested one. A
-// route with kind bits matches only those kinds, and one without any matches
-// every kind.
-void routes_compare_the_url_their_flags_select() {
+// route matches only the kinds that its mask names.
+void routes_compare_the_url_stage_they_select() {
   constexpr auto alias = std::string_view{"maplibre://maps/style"};
   const auto resolved = table_of({
     .kinds = MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE,
-    .flags = MLN_URL_MATCH_FLAGS_NONE,
+    .flags = MLN_URL_MATCH_EXACT,
     .url = "https://maps.localhost/style.json",
+    .url_stage = MLN_RESOURCE_ROUTE_URL_RESOLVED,
   });
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url));
   TEST_ASSERT_TRUE(
@@ -100,8 +102,10 @@ void routes_compare_the_url_their_flags_select() {
   TEST_ASSERT_FALSE(resolved.matches(UINT32_MAX, alias, style_url));
 
   const auto requested = table_of({
-    .flags = MLN_URL_MATCH_REQUESTED_URL,
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_EXACT,
     .url = "maplibre://maps/style",
+    .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
   });
   TEST_ASSERT_TRUE(requested.matches(MLN_RESOURCE_KIND_TILE, alias, style_url));
   TEST_ASSERT_FALSE(
@@ -109,8 +113,10 @@ void routes_compare_the_url_their_flags_select() {
   );
 
   const auto requested_glob = table_of({
-    .flags = MLN_URL_MATCH_REQUESTED_URL | MLN_URL_MATCH_GLOB,
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
     .url = "maplibre://**",
+    .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
   });
   TEST_ASSERT_TRUE(
     requested_glob.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url)
@@ -122,9 +128,21 @@ void routes_compare_the_url_their_flags_select() {
   );
 }
 
+void pathological_globs_have_linear_work_in_candidate_length() {
+  constexpr auto pattern = std::string_view{"https://x/**a*aaaaaaaaaaaaaaaab"};
+  const auto compiled = mln::core::CompiledGlob{pattern};
+  for (const auto length : {512U, 1024U, 2048U, 4096U, 8192U}) {
+    const auto url = std::string{"https://x/"} + std::string(length, 'a');
+    auto steps = std::size_t{0};
+    TEST_ASSERT_FALSE(compiled.matches(url, &steps));
+    TEST_ASSERT_TRUE(steps <= pattern.size() * url.size());
+  }
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(globs_match_the_documented_pattern_language);
-  RUN_TEST(routes_compare_the_url_their_flags_select);
+  RUN_TEST(pathological_globs_have_linear_work_in_candidate_length);
+  RUN_TEST(routes_compare_the_url_stage_they_select);
 }

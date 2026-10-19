@@ -100,11 +100,12 @@ extern void mlnGo_mln_resource_request_cancel_handler_callback(void* user_data);
 void binding_mln_resource_request_cancel_handler_callback(void* user_data) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
+    binding_operation_mln_resource_request_pass_through,
     binding_operation_mln_resource_request_is_cancelled,
     binding_operation_mln_resource_request_set_cancel_callback,
     binding_operation_mln_resource_request_release
   };
-  binding_policy policy = {NULL, operations, 4, mlnGoCallbackOwner(user_data)};
+  binding_policy policy = {NULL, operations, 5, mlnGoCallbackOwner(user_data)};
   binding_policy_enter(&policy);
   mlnGo_mln_resource_request_cancel_handler_callback((void*)user_data);
   binding_policy_leave(&policy);
@@ -141,11 +142,12 @@ uint32_t binding_mln_resource_provider_callback(
 ) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
+    binding_operation_mln_resource_request_pass_through,
     binding_operation_mln_resource_request_is_cancelled,
     binding_operation_mln_resource_request_set_cancel_callback,
     binding_operation_mln_resource_request_release
   };
-  binding_policy policy = {NULL, operations, 4, (uint64_t)(uintptr_t)handle};
+  binding_policy policy = {NULL, operations, 5, (uint64_t)(uintptr_t)handle};
   binding_policy_enter(&policy);
   uint32_t result = mlnGo_mln_resource_provider_callback(
     (void*)user_data, (mln_resource_request*)request, handle

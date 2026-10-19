@@ -91,8 +91,8 @@ def delivery_records(bound: BoundApi):
 def _dispose_owner(bound: BoundApi) -> list[str]:
     source = bound.source
     output = [
-        "inline auto dispose_owner(const char* native_type, std::uint64_t handle) noexcept -> mln_status {",
-        "  if (native_type == nullptr) return MLN_STATUS_INVALID_ARGUMENT;",
+        "inline auto dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {",
+        "  switch (kind) {",
     ]
     for handle in sorted(bound.handles.values(), key=lambda item: item.native):
         if not handle.dispose:
@@ -104,10 +104,15 @@ def _dispose_owner(bound: BoundApi) -> list[str]:
             if operation.return_type.kind == "void"
             else f"return {call};"
         )
-        output.append(
-            f'  if (std::strcmp(native_type, "{handle.native}") == 0) {{ {body} }}'
+        kind = "".join(
+            word.title()
+            for word in handle.native.removeprefix("mln_")
+            .removesuffix("_handle")
+            .split("_")
         )
-    output.extend(["  return MLN_STATUS_INVALID_ARGUMENT;", "}", ""])
+        kind = {"GeojsonSourceData": "GeoJsonSourceData"}.get(kind, kind)
+        output.append(f"    case mln::core::HandleKind::{kind}: {{ {body} }}")
+    output.extend(["    default: return MLN_STATUS_INVALID_ARGUMENT;", "  }", "}", ""])
     return output
 
 

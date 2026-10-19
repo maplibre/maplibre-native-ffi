@@ -1330,10 +1330,9 @@ pub const HttpHeader = struct {
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderRule = struct {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
-    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
-    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    /// The resource kinds to match.
+    kinds: ResourceKindMask = ResourceKindMask.all,
+    /// A bitwise OR of `mln_url_match_flags` values.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
@@ -3471,7 +3470,8 @@ pub const ResourceKind = enum(u32) {
 };
 
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value.
+/// `mln_resource_kind` value. Registration requires at least one known bit.
+/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
 ///
 /// See `mln_resource_kind_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3492,7 +3492,7 @@ pub const ResourceKindMask = struct {
     pub const contains = methods.contains;
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
-    pub const any = fromNative(0);
+    pub const all = fromNative(255);
 };
 
 pub const ResourceLoadingMethod = enum(u32) {
@@ -3547,7 +3547,7 @@ pub const ResourceProvider = struct {
                     return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_2);
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_2);
                 defer scope.leave();
                 const request = try ResourceRequestHandle.beginDecision(callback_arg_2);
                 errdefer _ = request.finishDecision(false);
@@ -3684,7 +3684,7 @@ pub const ResourceRequestCancelHandler = struct {
                     return;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.owner);
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.owner);
                 defer scope.leave();
                 host(state.value.context) catch |err| {
                     callback.reportError("mln_resource_request_cancel_callback", err);
@@ -3807,14 +3807,13 @@ pub const ResourceResponseStatus = enum(u32) {
 /// See `mln_resource_rewrite_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRewriteRule = struct {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
-    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
-    /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+    /// The resource kinds to match.
+    kinds: ResourceKindMask = ResourceKindMask.all,
+    /// A bitwise OR of `mln_url_match_flags` values.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
-    /// The replacement URL, or null to leave a matching URL unchanged.
+    /// The replacement URL, or null to keep the URL and stop the search.
     replacement_url: ?[]const u8 = null,
     pub fn toNative(self: ResourceRewriteRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_rewrite_rule {
         _ = roots;
@@ -3841,19 +3840,21 @@ pub const ResourceRewriteRule = struct {
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRoute = struct {
-    /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-    /// unknown bit.
-    kinds: ResourceKindMask = std.mem.zeroes(ResourceKindMask),
+    /// The resource kinds to match.
+    kinds: ResourceKindMask = ResourceKindMask.all,
     /// A bitwise OR of `mln_url_match_flags` values.
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
+    /// The URL stage to compare.
+    url_stage: ResourceRouteUrl = std.mem.zeroes(ResourceRouteUrl),
     pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_route);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = try marshal.cString(allocator, self.url);
+        raw.url_stage = self.url_stage.toNative();
         return raw;
     }
 
@@ -3862,8 +3863,21 @@ pub const ResourceRoute = struct {
             .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
             .url = try allocator.dupe(u8, std.mem.span(raw.url orelse return error.NativeError)),
+            .url_stage = ResourceRouteUrl.fromNative(raw.url_stage),
         };
     }
+};
+
+/// The URL stage that a provider route compares.
+///
+/// See `mln_resource_route_url` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRouteUrl = enum(u32) {
+    requested = 1,
+    resolved = 0,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 pub const ResourceStoragePolicy = enum(u32) {
@@ -5215,17 +5229,15 @@ pub const UnitBezier = struct {
 pub const UrlMatchFlags = struct {
     /// Reads url as a glob pattern.
     glob: bool = false,
-    /// Routes only: compare requested_url instead of resolved_url.
-    requested_url: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
+    pub const native_bits = [_]u32{1};
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
     pub const contains = methods.contains;
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
-    pub const flags_none = fromNative(0);
+    pub const exact = fromNative(0);
 };
 
 /// Three-component vector used by free camera options.
@@ -7495,6 +7507,14 @@ pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceReq
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resourceRequestIsCancelled(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     return call.invoke("mln_resource_request_is_cancelled", .lease, handle, null, diagnostic, .{call.out(bool)});
+}
+
+/// Hands an outstanding provider request to the built-in network loader.
+///
+/// See `mln_resource_request_pass_through` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn resourceRequestPassThrough(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_resource_request_pass_through", .complete, handle, null, diagnostic, .{});
 }
 
 /// Releases the provider's reference to a resource request handle.

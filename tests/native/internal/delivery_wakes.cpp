@@ -1,5 +1,4 @@
-// When a delivery queue's wake runs: never under MapLibre's global log mutex,
-// and again after a drain that failed, so queued deliveries are not stranded.
+// Inline log wakes and deferred recovery after a failed delivery drain.
 
 #include <atomic>
 #include <cstddef>
@@ -8,6 +7,7 @@
 #include <mln/util/event.hpp>
 #include <mln/util/logging.hpp>
 
+#include "delivery/delivery_queue.hpp"
 #include "maplibre_native_c.h"
 #include "support/allocation_faults.hpp"
 #include "support/test_support.h"
@@ -54,8 +54,7 @@ auto queue_handler(mln_delivery_queue queue) -> mln_log_handler {
   };
 }
 
-// A wake that logs once. Under the log mutex, its record would lock that
-// mutex again on the same thread.
+// A wake that records inline service without reentering the logging API.
 struct LoggingWake {
   mln_delivery_queue queue = MLN_HANDLE_NULL;
   std::atomic_bool started = false;
@@ -66,7 +65,7 @@ struct LoggingWake {
 void log_from_wake(void* user_data) noexcept {
   auto& wake = *static_cast<LoggingWake*>(user_data);
   if (wake.started.exchange(true)) return;
-  mln::Log::Warning(mln::Event::General, "a record from the queue's wake");
+  // Log-handler wakes may only schedule service; record the inline call.
   wake.logged.store(true);
   mln_test_pulse();
 }
@@ -76,7 +75,7 @@ void release_logging_wake(void* user_data) noexcept {
   mln_test_pulse();
 }
 
-void a_log_queue_wake_may_log_itself() {
+void a_log_queue_wakes_inline() {
   if (TEST_PROTECT()) {
     log_synchronously();
     auto wake = LoggingWake{};
@@ -93,23 +92,18 @@ void a_log_queue_wake_may_log_itself() {
     MLN_TEST_OK(mln_log_set_callback(&handler, nullptr));
 
     mln::Log::Warning(mln::Event::General, "a record from the test");
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_wait_for_flag(&wake.logged), "the queue's wake never logged"
-    );
+    TEST_ASSERT_TRUE(wake.logged.load());
     MLN_TEST_OK(mln_log_clear_callback(nullptr));
 
-    // Both records, then the handler's retirement.
+    // The record, then the handler's retirement.
     auto batch = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_delivery_queue_drain(wake.queue, &batch, nullptr));
     const auto view = delivery_view(batch);
-    TEST_ASSERT_EQUAL_size_t(3, view.delivery_count);
+    TEST_ASSERT_EQUAL_size_t(2, view.delivery_count);
     TEST_ASSERT_EQUAL_UINT32(
       MLN_DELIVERY_TYPE_LOG_RECORD, delivery_type(view, 0)
     );
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_DELIVERY_TYPE_LOG_RECORD, delivery_type(view, 1)
-    );
-    TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, delivery_type(view, 2));
+    TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, delivery_type(view, 1));
     mln_delivery_batch_release(batch);
 
     mln_delivery_queue_release(wake.queue);
@@ -167,7 +161,7 @@ void a_failed_drain_wakes_the_queue_again() {
       failed = mln_delivery_queue_drain(wake.queue, &batch, nullptr);
     }
     MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, failed);
-    TEST_ASSERT_EQUAL_INT(2, wake.wakes.load());
+    TEST_ASSERT_TRUE(mln_test_wait_for_count(&wake.wakes, 2));
 
     auto batch = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_delivery_queue_drain(wake.queue, &batch, nullptr));
@@ -185,9 +179,106 @@ void a_failed_drain_wakes_the_queue_again() {
   restore_log_defaults();
 }
 
+void failed_batch_reservations_retain_the_queued_prefix() {
+  for (auto budget = std::size_t{}; budget < 5; ++budget) {
+    const auto options = mln_delivery_queue_options{
+      .size = sizeof(mln_delivery_queue_options),
+    };
+    auto handle = mln_delivery_queue{MLN_HANDLE_NULL};
+    MLN_TEST_OK(mln_delivery_queue_create(&options, &handle, nullptr));
+    auto queue = mln::delivery::resolve_delivery_queue(handle);
+    auto item =
+      mln::delivery::make_light_item(MLN_DELIVERY_TYPE_RETIRED, nullptr);
+    const auto pushed = queue->push(item);
+    auto batch = MLN_HANDLE_NULL;
+    auto status = MLN_STATUS_OK;
+    {
+      const auto faults = mln::native_tests::AllocationFaults{budget};
+      status = mln_delivery_queue_drain(handle, &batch, nullptr);
+    }
+    if (status == MLN_STATUS_NATIVE_ERROR) {
+      status = mln_delivery_queue_drain(handle, &batch, nullptr);
+    }
+    auto view =
+      mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+    const auto viewed = mln_delivery_batch_get(batch, &view, nullptr);
+    const auto count = view.delivery_count;
+    mln_delivery_batch_release(batch);
+    mln_delivery_queue_release(handle);
+    TEST_ASSERT_TRUE(pushed);
+    MLN_TEST_OK(status);
+    MLN_TEST_OK(viewed);
+    TEST_ASSERT_EQUAL_size_t(1, count);
+  }
+}
+
+struct InlineDrain {
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  std::atomic_int depth = 0;
+  std::atomic_int maximum_depth = 0;
+  std::atomic_int calls = 0;
+  std::atomic_int status = MLN_STATUS_OK;
+  std::atomic_bool released = false;
+};
+
+void drain_without_memory(void* context) noexcept {
+  auto& probe = *static_cast<InlineDrain*>(context);
+  const auto depth = probe.depth.fetch_add(1) + 1;
+  if (depth > probe.maximum_depth.load()) probe.maximum_depth = depth;
+  if (depth == 1) {
+    const auto faults = mln::native_tests::AllocationFaults{};
+    auto batch = MLN_HANDLE_NULL;
+    probe.status = mln_delivery_queue_drain(probe.queue, &batch, nullptr);
+  }
+  --probe.depth;
+  ++probe.calls;
+  mln_test_pulse();
+}
+
+void failed_inline_drains_get_one_deferred_retry_without_reentry() {
+  auto probe = InlineDrain{};
+  const auto options = mln_delivery_queue_options{
+    .size = sizeof(mln_delivery_queue_options),
+    .wake = {
+      .callback = drain_without_memory,
+      .user_data = &probe,
+      .release_user_data = [](void* context) noexcept {
+        static_cast<InlineDrain*>(context)->released = true;
+        mln_test_pulse();
+      },
+    },
+  };
+  MLN_TEST_OK(mln_delivery_queue_create(&options, &probe.queue, nullptr));
+  auto queue = mln::delivery::resolve_delivery_queue(probe.queue);
+  auto item =
+    mln::delivery::make_light_item(MLN_DELIVERY_TYPE_RETIRED, nullptr);
+  const auto pushed = queue->push(item);
+  const auto retried = mln_test_wait_for_count(&probe.calls, 2);
+  // Both wakes fail; a host-scheduled drain recovers the retained item.
+  auto batch = MLN_HANDLE_NULL;
+  const auto recovered = mln_delivery_queue_drain(probe.queue, &batch, nullptr);
+  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+  const auto viewed = mln_delivery_batch_get(batch, &view, nullptr);
+  const auto count = view.delivery_count;
+  mln_delivery_batch_release(batch);
+  mln_delivery_queue_release(probe.queue);
+  const auto released = mln_test_wait_for_flag(&probe.released);
+  TEST_ASSERT_TRUE(pushed);
+  TEST_ASSERT_TRUE(retried);
+  TEST_ASSERT_TRUE(released);
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, probe.status.load());
+  MLN_TEST_OK(recovered);
+  MLN_TEST_OK(viewed);
+  TEST_ASSERT_EQUAL_size_t(1, count);
+  TEST_ASSERT_EQUAL_INT(1, probe.maximum_depth.load());
+  TEST_ASSERT_EQUAL_INT(2, probe.calls.load());
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_log_queue_wake_may_log_itself);
+  RUN_TEST(a_log_queue_wakes_inline);
+  RUN_TEST(failed_inline_drains_get_one_deferred_retry_without_reentry);
   RUN_TEST(a_failed_drain_wakes_the_queue_again);
+  RUN_TEST(failed_batch_reservations_retain_the_queued_prefix);
 }

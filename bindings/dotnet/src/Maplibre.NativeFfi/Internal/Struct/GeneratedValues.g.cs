@@ -2028,6 +2028,7 @@ internal static unsafe class GeneratedValues
     private static readonly string[] AllowedResourceProviderCallback =
     [
         "mln_resource_request_complete",
+        "mln_resource_request_pass_through",
         "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
@@ -2188,6 +2189,7 @@ internal static unsafe class GeneratedValues
     private static readonly string[] AllowedResourceRequestCancelHandlerCallback =
     [
         "mln_resource_request_complete",
+        "mln_resource_request_pass_through",
         "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
@@ -2293,6 +2295,7 @@ internal static unsafe class GeneratedValues
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.CString(value.Url);
+        native.url_stage = (uint)value.UrlStage;
         return native;
     }
 

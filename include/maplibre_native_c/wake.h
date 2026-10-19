@@ -34,8 +34,10 @@ typedef void (*mln_wake_callback)(void* user_data);
  * or when several sessions share a graphics thread, so a host that does either
  * schedules service to run after the callback returns.
  *
- * The callback must not destroy the object that owns the wake. Native code
- * calls release_user_data after all callback invocations have returned. It may
+ * The callback may release a delivery queue that owns its wake. For every
+ * other owner, the callback must not destroy the object that owns the wake.
+ * Native code calls release_user_data after all callback invocations have
+ * returned. It may
  * run on any thread that invoked callback and must not wait for another thread.
  *
  * A descriptor whose callback is null disables waking, and a disabled wake

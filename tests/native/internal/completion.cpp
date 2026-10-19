@@ -268,9 +268,12 @@ void queue_resolution_falls_back_without_allocation() {
   completion->set_retirement_callback([&retired] { retired = true; });
   completion->accept();
   completion->retire_work();
+  auto text = std::string(1024, 'x');
   {
     const auto faults = mln::native_tests::AllocationFaults{};
-    succeed(completion);
+    mln::core::CompletionValue<&mln_map_get_loaded_style_json>::complete(
+      completion, mln_buffer_view{.data = text.data(), .size = text.size()}
+    );
   }
   TEST_ASSERT_TRUE(retired);
   const auto drained = drain_completions(queue);
@@ -278,6 +281,40 @@ void queue_resolution_falls_back_without_allocation() {
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, drained.status);
   TEST_ASSERT_EQUAL_PTR(&tag, drained.user_data);
   mln_delivery_queue_release(queue);
+}
+
+void small_queue_completions_reuse_reserved_storage() {
+  const auto queue = create_queue();
+  for (const auto has_value : {false, true}) {
+    auto completion = created(queued_descriptor(queue, nullptr));
+    completion->accept();
+    {
+      const auto faults = mln::native_tests::AllocationFaults{};
+      if (has_value) {
+        mln::core::CompletionValue<&mln_map_get_style_transition_options>::
+          complete(completion, mln_style_transition_options{});
+      } else {
+        succeed(completion);
+      }
+    }
+    const auto drained = drain_completions(queue);
+    TEST_ASSERT_EQUAL_size_t(1, drained.count);
+    MLN_TEST_OK(drained.status);
+  }
+  mln_delivery_queue_release(queue);
+}
+
+void a_delivery_that_throws_after_the_sink_reports_once() {
+  auto probe = CompletionProbe{};
+  auto completion = created(descriptor_for(probe));
+  completion->accept();
+  completion->resolve([](const mln::core::CompletionSink& sink) {
+    mln::core::valueless_completion<&mln_runtime_barrier>().deliver(sink);
+    throw std::runtime_error{"delivery failed after the sink"};
+  });
+  TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
+  TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
+  MLN_TEST_OK(probe.status.load());
 }
 
 // A revoked queue completion pushes nothing.
@@ -323,6 +360,8 @@ MLN_TEST_GROUP {
   RUN_TEST(racing_resolutions_deliver_once);
   RUN_TEST(a_throwing_delivery_reports_a_native_error);
   RUN_TEST(queue_resolution_falls_back_without_allocation);
+  RUN_TEST(small_queue_completions_reuse_reserved_storage);
+  RUN_TEST(a_delivery_that_throws_after_the_sink_reports_once);
   RUN_TEST(revoked_queue_completion_pushes_nothing);
   RUN_TEST(abandoned_queue_completion_pushes_cancelled);
 }

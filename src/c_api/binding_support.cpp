@@ -85,7 +85,8 @@ struct OwnerToken {
 
 auto dispose_handle(std::uint64_t handle) noexcept -> mln_status {
   return mln::delivery::dispose_owner(
-    mln::core::handle_kind_name(mln::core::handle_kind_of(handle)), handle
+    static_cast<mln::core::HandleKind>(mln::core::handle_kind_of(handle)),
+    handle
   );
 }
 

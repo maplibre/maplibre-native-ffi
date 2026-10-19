@@ -19,6 +19,22 @@ public sealed class ResourceProviderTests
     // The admission policy forbids runtime calls inside the callback and allows answering the
     // request, which claims the handle even though the callback then passes the request on.
     [Fact]
+    public async Task AProviderPassesADeferredRequestToNativeLoading()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        handle.PassThrough();
+        Assert.Throws<InvalidStateException>(handle.PassThrough);
+        handle.Close();
+        var failure = await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        Assert.Contains("declined", failure.Message);
+    }
+
+    [Fact]
     public async Task AProviderMayAnswerButNotReenterTheRuntime()
     {
         NativeFixture? owner = null;
@@ -125,9 +141,10 @@ public sealed class ResourceProviderTests
                     new ResourceRoute(
                         ResourceKindMask.Tile,
                         UrlMatchFlags.Glob,
-                        "unrouted-test://**"
+                        "unrouted-test://**",
+                        ResourceRouteUrl.Resolved
                     ),
-                    new ResourceRoute(ResourceKindMask.Any, UrlMatchFlags.Glob, "routed-test://**"),
+                    new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "routed-test://**" },
                 ],
             }
         );

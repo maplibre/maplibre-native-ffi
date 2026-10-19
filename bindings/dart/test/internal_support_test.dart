@@ -9,6 +9,8 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
+
+import 'support/runtime_probes.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
 

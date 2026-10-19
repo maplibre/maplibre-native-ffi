@@ -1165,6 +1165,8 @@ internal actual object C {
     Ffm.downcall("mln_resource_request_complete", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_resource_request_is_cancelled =
     Ffm.downcall("mln_resource_request_is_cancelled", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_resource_request_pass_through =
+    Ffm.downcall("mln_resource_request_pass_through", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_resource_request_release =
     Ffm.downcall("mln_resource_request_release", null, JAVA_LONG)
   private val mln_resource_request_set_cancel_callback =
@@ -3231,6 +3233,9 @@ internal actual object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int = mln_resource_request_is_cancelled.invokeExact(handle, outCancelled, outDiagnostic) as Int
+
+  actual fun mln_resource_request_pass_through(handle: Long, outDiagnostic: Long): Int =
+    mln_resource_request_pass_through.invokeExact(handle, outDiagnostic) as Int
 
   actual fun mln_resource_request_release(handle: Long) {
     mln_resource_request_release.invoke(handle)

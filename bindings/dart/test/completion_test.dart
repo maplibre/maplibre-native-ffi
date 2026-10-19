@@ -10,8 +10,7 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/callback/delivery_queue.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
-import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show adoptOwnedForTesting;
+import 'support/runtime_probes.dart';
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';

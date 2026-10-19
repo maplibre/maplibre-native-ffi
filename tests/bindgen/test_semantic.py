@@ -256,7 +256,7 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
             ],
         )
 
-    def test_field_defaults_state_only_nonzero_values_that_a_default_returns(self):
+    def test_field_defaults_state_nonzero_plain_values(self):
         source = """
 typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
 typedef struct extent { unsigned width; } extent;
@@ -305,24 +305,23 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
                 'BIND("kind=reserved;default=1")',
                 "is fixed",
             ),
-            (
-                "typedef struct loose { unsigned width; }",
-                'typedef struct loose { unsigned width BIND("default=1"); }',
-                "default function returns",
-            ),
-            # The default leaves an optional member absent, so no case checks
-            # the defaults of a record reached only through one.
-            (
-                "typedef struct turn { double w; }",
-                'typedef struct turn { double w BIND("default=1.0"); }',
-                "default function returns",
-            ),
         ):
             with (
                 self.subTest(after=after),
                 self.assertRaisesRegex(ModelError, message),
             ):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
+        loose = source.replace(
+            "typedef struct loose { unsigned width; }",
+            'typedef struct loose { unsigned width BIND("default=1"); }',
+        )
+        self.assertEqual(
+            bind(self.parse(loose), require_complete=True)
+            .values["loose"]
+            .fields[0]
+            .initial.value,
+            1,
+        )
         # A record nested by value in a default may state its own defaults.
         nested = source.replace(
             "typedef struct extent { unsigned width; }",
@@ -907,6 +906,17 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             (decision.parameter, decision.accept, decision.complete),
             ("ticket", "CLAIM", "answer"),
         )
+        self.assertIsNone(decision.resume)
+        resumed = (
+            source.replace("complete=answer;", "complete=answer;resume=resume_request;")
+            + "\nmln_status resume_request(request value, mln_diagnostic *out_diagnostic);\n"
+        )
+        resumed_decision = (
+            bind(self.parse(resumed), require_complete=True)
+            .callbacks["provider"]
+            .decision
+        )
+        self.assertEqual(resumed_decision.resume, "resume_request")
         self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
         (registration,) = model.operations_by_name["on_cancel"].registrations

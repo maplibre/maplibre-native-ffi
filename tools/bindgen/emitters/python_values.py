@@ -559,7 +559,15 @@ class Values:
                 public_copies.append(f'{member}=raw["{member}"]')
                 continue
             public_type = self.type(value)
-            if optional(value):
+            if field.initial is not None:
+                initial = field.initial
+                expression = (
+                    f"{public_name(value.native)}.{initial.member.upper()}"
+                    if value.kind == "enum"
+                    else repr(initial.value)
+                )
+                default = f" = {expression}"
+            elif optional(value):
                 default = " = None"
             elif registration and value.kind == "array":
                 # A registration's routes or rules default to none.

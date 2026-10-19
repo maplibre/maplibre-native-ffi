@@ -112,10 +112,9 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
 /// See `mln_http_header_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderRule: Equatable, Hashable, Sendable {
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   public var kinds: ResourceKindMask
-  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  /// A bitwise OR of `mln_url_match_flags` values.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
   public var url: String
@@ -127,7 +126,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kinds: ResourceKindMask = .init(rawValue: 0),
+    kinds: ResourceKindMask = ResourceKindMask.all,
     flags: UrlMatchFlags = .init(rawValue: 0),
     url: String = "",
     headers: [HttpHeader] = []
@@ -464,7 +463,8 @@ public struct ResourceKind: RawRepresentable, NativeOpenValue, Equatable,
 }
 
 /// The resource kinds that a route or rule matches, one bit per
-/// `mln_resource_kind` value.
+/// `mln_resource_kind` value. Registration requires at least one known bit.
+/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
 ///
 /// See `mln_resource_kind_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -476,8 +476,6 @@ public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  /// Matches every resource kind.
-  public static let any: ResourceKindMask = []
   public static let unknown: ResourceKindMask = .init(rawValue: 1)
   public static let style: ResourceKindMask = .init(rawValue: 2)
   public static let source: ResourceKindMask = .init(rawValue: 4)
@@ -486,6 +484,7 @@ public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let spriteImage: ResourceKindMask = .init(rawValue: 32)
   public static let spriteJson: ResourceKindMask = .init(rawValue: 64)
   public static let image: ResourceKindMask = .init(rawValue: 128)
+  public static let all: ResourceKindMask = .init(rawValue: 255)
 }
 
 public struct ResourceLoadingMethod: RawRepresentable, NativeOpenValue,
@@ -554,6 +553,7 @@ public struct ResourceProvider: Sendable {
 
 private let allowedResourceProviderCallback: Set<String> = [
   "mln_resource_request_complete",
+  "mln_resource_request_pass_through",
   "mln_resource_request_is_cancelled",
   "mln_resource_request_set_cancel_callback",
   "mln_resource_request_release",
@@ -784,6 +784,7 @@ public struct ResourceRequestCancelHandler: Sendable {
 
 private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
   "mln_resource_request_complete",
+  "mln_resource_request_pass_through",
   "mln_resource_request_is_cancelled",
   "mln_resource_request_set_cancel_callback",
   "mln_resource_request_release",
@@ -964,21 +965,20 @@ public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
 /// See `mln_resource_rewrite_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   public var kinds: ResourceKindMask
-  /// A bitwise OR of `mln_url_match_flags` values other than REQUESTED_URL.
+  /// A bitwise OR of `mln_url_match_flags` values.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
   public var url: String
-  /// The replacement URL, or null to leave a matching URL unchanged.
+  /// The replacement URL, or null to keep the URL and stop the search.
   public var replacementUrl: String?
   public static var `default`: Self {
     Self()
   }
 
   public init(
-    kinds: ResourceKindMask = .init(rawValue: 0),
+    kinds: ResourceKindMask = ResourceKindMask.all,
     flags: UrlMatchFlags = .init(rawValue: 0),
     url: String = "",
     replacementUrl: String? = nil
@@ -1017,25 +1017,28 @@ public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRoute: Equatable, Hashable, Sendable {
-  /// A bitwise OR of `mln_resource_kind_mask` values. Registration rejects an
-  /// unknown bit.
+  /// The resource kinds to match.
   public var kinds: ResourceKindMask
   /// A bitwise OR of `mln_url_match_flags` values.
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
   public var url: String
+  /// The URL stage to compare.
+  public var urlStage: ResourceRouteUrl
   public static var `default`: Self {
     Self()
   }
 
   public init(
-    kinds: ResourceKindMask = .init(rawValue: 0),
+    kinds: ResourceKindMask = ResourceKindMask.all,
     flags: UrlMatchFlags = .init(rawValue: 0),
-    url: String = ""
+    url: String = "",
+    urlStage: ResourceRouteUrl = .init(rawValue: 0)
   ) {
     self.kinds = kinds
     self.flags = flags
     self.url = url
+    self.urlStage = urlStage
   }
 
   init(
@@ -1045,6 +1048,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
     url = try NativeString.copyCString(raw.url)
+    urlStage = ResourceRouteUrl(rawValue: raw.url_stage)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
@@ -1052,8 +1056,25 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = try arena.cString(url)
+    raw.url_stage = urlStage.rawValue
     return raw
   }
+}
+
+/// The URL stage that a provider route compares.
+///
+/// See `mln_resource_route_url` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRouteUrl: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let resolved: ResourceRouteUrl = .init(rawValue: 0)
+  public static let requested: ResourceRouteUrl = .init(rawValue: 1)
 }
 
 public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
@@ -1769,9 +1790,7 @@ public struct UrlMatchFlags: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let flagsNone: UrlMatchFlags = []
+  public static let exact: UrlMatchFlags = []
   /// Reads url as a glob pattern.
   public static let glob: UrlMatchFlags = .init(rawValue: 1)
-  /// Routes only: compare requested_url instead of resolved_url.
-  public static let requestedUrl: UrlMatchFlags = .init(rawValue: 2)
 }

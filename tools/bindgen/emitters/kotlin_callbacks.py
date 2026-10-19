@@ -490,7 +490,7 @@ def operation(plan, values, native):
         (
             decision
             for decision in values.bound.decisions.values()
-            if plan.name in (decision.complete, decision.cancelled)
+            if plan.name in (decision.complete, decision.resume, decision.cancelled)
         ),
         None,
     )

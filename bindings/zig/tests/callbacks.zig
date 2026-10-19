@@ -544,3 +544,17 @@ test "a camera end handler inside a command is released after it runs" {
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));
 }
+
+test "a provider passes a deferred request to native loading" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    var provider = DeferringProvider{ .url = "custom://native.json" };
+    try provider.install(fixture);
+    const handle = try provider.take(fixture);
+    defer maplibre.resourceRequestRelease(handle) catch {};
+    try maplibre.resourceRequestPassThrough(handle, null);
+    try testing.expectError(error.AlreadyCompleted, maplibre.resourceRequestPassThrough(handle, null));
+    var failed = try fixture.waitForEvent(.map_loading_failed);
+    defer failed.deinit();
+    try testing.expect(std.mem.indexOf(u8, failed.value.message, "declined") != null);
+}

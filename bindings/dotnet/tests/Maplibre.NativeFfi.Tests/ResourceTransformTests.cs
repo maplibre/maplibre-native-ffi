@@ -58,7 +58,7 @@ public sealed class ResourceTransformTests
         await using var fixture = await NativeFixture.CreateAsync(
             provider: NativeFixture.DenyingProvider with
             {
-                Routes = [new ResourceRoute(ResourceKindMask.Any, UrlMatchFlags.Glob, "deny://**")],
+                Routes = [new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "deny://**" }],
             }
         );
         await fixture.Runtime.SetResourceTransformAsync(
@@ -69,13 +69,13 @@ public sealed class ResourceTransformTests
                     // Another kind: no match.
                     new ResourceRewriteRule(
                         ResourceKindMask.Tile,
-                        UrlMatchFlags.FlagsNone,
+                        UrlMatchFlags.Exact,
                         original,
                         server.Url("/tile.json")
                     ),
                     new ResourceRewriteRule(
                         ResourceKindMask.Style,
-                        UrlMatchFlags.FlagsNone,
+                        UrlMatchFlags.Exact,
                         original,
                         server.Url("/rewritten.json")
                     ),

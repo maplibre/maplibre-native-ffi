@@ -97,6 +97,7 @@ internal object Upcalls {
   private val resourceRequestCancelHandlerCallbackAllowed: Set<String> =
     setOf(
       "mln_resource_request_complete",
+      "mln_resource_request_pass_through",
       "mln_resource_request_is_cancelled",
       "mln_resource_request_set_cancel_callback",
       "mln_resource_request_release",
@@ -138,6 +139,7 @@ internal object Upcalls {
   private val resourceProviderCallbackAllowed: Set<String> =
     setOf(
       "mln_resource_request_complete",
+      "mln_resource_request_pass_through",
       "mln_resource_request_is_cancelled",
       "mln_resource_request_set_cancel_callback",
       "mln_resource_request_release",

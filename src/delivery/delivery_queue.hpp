@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -9,6 +10,7 @@
 #include <vector>
 
 #include "delivery/capture.hpp"
+#include "execution/retirement.hpp"
 #include "maplibre_native_c.h"
 #include "wake/wake.hpp"
 
@@ -69,10 +71,8 @@ struct CompletionCapture {
   void (*measure)(Arena<false>& arena, const void* values, std::size_t count);
   auto (*write)(Arena<true>& arena, const void* values, std::size_t count)
     -> const void*;
-  void (*discard)(const void* values, std::size_t count) noexcept;
-  // Disposes the values a queued completion owns, or null when its values own
-  // no handle.
-  void (*discard_item)(DeliveryItem& item) noexcept;
+  // Disposes a completion's values, or null when they own no handle.
+  void (*discard)(DeliveryItem& item) noexcept;
 };
 
 template <class T>
@@ -117,10 +117,9 @@ template <class T>
 inline constexpr auto completion_capture = CompletionCapture{
   .measure = &measure_values<T>,
   .write = &write_values<T>,
-  .discard = &discard_values<T>,
-  .discard_item = element_owns_handles(static_cast<const T*>(nullptr))
-                    ? &discard_completion_item<T>
-                    : nullptr,
+  .discard = element_owns_handles(static_cast<const T*>(nullptr))
+               ? &discard_completion_item<T>
+               : nullptr,
 };
 
 // A delivery with no copied payload, such as MLN_DELIVERY_TYPE_RETIRED or a
@@ -129,9 +128,10 @@ auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr;
 
 // The queue behind one mln_delivery_queue handle. Registrations hold it, so a
 // released queue stays alive, closed, until the last of them retires.
-class DeliveryQueueState final {
+class DeliveryQueueState final
+    : public std::enable_shared_from_this<DeliveryQueueState> {
  public:
-  explicit DeliveryQueueState(std::shared_ptr<core::Wake> wake) noexcept;
+  explicit DeliveryQueueState(std::shared_ptr<core::Wake> wake);
   DeliveryQueueState(const DeliveryQueueState&) = delete;
   DeliveryQueueState(DeliveryQueueState&&) = delete;
   auto operator=(const DeliveryQueueState&) -> DeliveryQueueState& = delete;
@@ -149,22 +149,28 @@ class DeliveryQueueState final {
   [[nodiscard]] auto push_without_wake(ItemPtr& item, bool& needs_wake) noexcept
     -> bool;
 
-  // Moves every queued item into out, in push order, after reserving room in
-  // out and views. Allocation failure throws and leaves the items queued.
+  // Reserves once for a captured prefix, then detaches it in push order.
+  // Allocation failure throws and leaves the items queued.
   auto drain(std::vector<ItemPtr>& out, std::vector<mln_delivery>& views)
     -> void;
   // Whether nothing is queued, so a drain can return without allocating.
   [[nodiscard]] auto empty() noexcept -> bool;
-  // Wakes the receiver when deliveries are queued. Pushes wake only on the
-  // empty-to-nonempty transition, so a drain that fails after that wake calls
-  // this to keep them from being stranded.
+  // Wakes the receiver inline when deliveries are queued.
   auto rewake() noexcept -> void;
+  // Arms at most one deferred wake until a drain succeeds.
+  auto retry_later() noexcept -> void;
 
   // Refuses later pushes, stops the wake, and discards queued items.
   auto close() noexcept -> void;
 
  private:
+  static auto run_retry(core::RetirementTask* task) noexcept -> void;
   std::mutex mutex_;
+  std::condition_variable condition_;
+  core::RetirementTask retry_task_;
+  std::shared_ptr<DeliveryQueueState> pending_retry_;
+  std::size_t waking_ = 0;
+  bool retry_armed_ = false;
   DeliveryItem* head_ = nullptr;
   DeliveryItem* tail_ = nullptr;
   std::size_t count_ = 0;

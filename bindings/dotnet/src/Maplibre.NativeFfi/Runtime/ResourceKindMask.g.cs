@@ -3,7 +3,8 @@ namespace Maplibre.NativeFfi;
 
 /// <summary>
 /// The resource kinds that a route or rule matches, one bit per
-/// <c>mln_resource_kind</c> value.
+/// <c>mln_resource_kind</c> value. Registration requires at least one known
+/// bit. <c>MLN_RESOURCE_KIND_MASK_ALL</c> selects every resource kind.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_kind_mask</c> in the <see
@@ -12,10 +13,6 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum ResourceKindMask : uint
 {
-    /// <summary>
-    /// Matches every resource kind.
-    /// </summary>
-    Any = 0,
     Unknown = 1,
     Style = 2,
     Source = 4,
@@ -24,4 +21,5 @@ public enum ResourceKindMask : uint
     SpriteImage = 32,
     SpriteJson = 64,
     Image = 128,
+    All = 255,
 }

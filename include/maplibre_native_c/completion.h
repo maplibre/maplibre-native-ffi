@@ -118,6 +118,10 @@ typedef struct mln_completion {
    * Required in callback mode; null in queue mode.
    */
   mln_completion_callback callback;
+  /**
+   * Opaque host token in queue mode; native code never dereferences or releases
+   * it. Keep token state until delivery is handled or the queue is abandoned.
+   */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the completing thread after the completion

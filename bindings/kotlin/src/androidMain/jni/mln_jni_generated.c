@@ -2151,6 +2151,15 @@ static jint mln_resource_request_is_cancelled_jni(
   );
 }
 
+static jint mln_resource_request_pass_through_jni(
+  JNIEnv* env, jclass type, jlong handle, jlong out_diagnostic
+) {
+  return (jint)mln_resource_request_pass_through(
+    (mln_resource_request_handle)handle,
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static void mln_resource_request_release_jni(
   JNIEnv* env, jclass type, jlong handle
 ) {
@@ -2954,6 +2963,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",
    (void*)mln_resource_request_is_cancelled_jni},
+  {"mln_resource_request_pass_through", "(JJ)I",
+   (void*)mln_resource_request_pass_through_jni},
   {"mln_resource_request_release", "(J)V",
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",
@@ -3390,6 +3401,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",
    (void*)mln_resource_request_is_cancelled_jni},
+  {"mln_resource_request_pass_through", "(JJ)I",
+   (void*)mln_resource_request_pass_through_jni},
   {"mln_resource_request_release", "(J)V",
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",

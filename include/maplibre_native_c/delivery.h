@@ -14,10 +14,9 @@
  * mln_resource_provider. Runtime events keep their own queue and wake; see
  * mln_runtime_drain_events().
  *
- * A queue is FIFO in push order. It is not ordered against any runtime's event
- * queue. A map command still queues its runtime events before it pushes its
- * completion, so a host that wants a command's events after its completion
- * drains the runtime's events when it handles the completion.
+ * A queue is FIFO in push order. A map command queues the runtime events it
+ * raises before pushing its completion. The host chooses when to drain each
+ * queue and can drain runtime events when it handles a command completion.
  *
  * A queue has no bound. A host that stops draining keeps every pushed item in
  * memory until it drains or releases the queue.
@@ -61,8 +60,7 @@ typedef enum mln_delivery_type : uint32_t {
   MLN_DELIVERY_TYPE_RETIRED = 4,
 } mln_delivery_type;
 
-/** Copied mln_log_callback arguments; fields mirror the callback's parameters.
- */
+/** Copied mln_log_callback arguments; fields mirror the callback parameters. */
 typedef struct mln_log_delivery {
   /** One of mln_log_severity. */
   uint32_t severity MLN_BINDING("enum=mln_log_severity");
@@ -108,7 +106,11 @@ typedef struct mln_delivery {
   /** One of mln_delivery_type. */
   uint32_t type MLN_BINDING("enum=mln_delivery_type");
   uint32_t reserved MLN_BINDING("kind=reserved");
-  /** user_data of the registration or completion, returned unchanged. */
+  /**
+   * Opaque host token from the registration or completion, returned unchanged.
+   * Native code never dereferences or releases it. The host keeps token state
+   * until it handles the delivery or abandons the queue.
+   */
   void* user_data MLN_BINDING("kind=context");
   /** Typed payload selected by type. */
   mln_delivery_payload payload
@@ -176,8 +178,7 @@ MLN_API mln_status mln_delivery_queue_create(
  *
  * Registrations that still name the queue keep working, but the queue refuses
  * their later pushes: a completion is discarded and its owned value disposed,
- * a log record goes to the platform logger, and a provider request passes
- * through to native loading.
+ * a log record goes to the platform logger, and a provider request fails.
  *
  * No wake call starts after release. The wake's release_user_data runs once
  * in-flight wake calls return, on whichever thread finishes last. The host may
@@ -187,12 +188,14 @@ MLN_API mln_status mln_delivery_queue_create(
 MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
 
 /**
- * Moves every queued delivery into a new owned batch.
+ * Moves a captured prefix of queued deliveries into a new owned batch.
  *
- * Deliveries that arrive later enter the next batch, and the wake fires again
- * when the first of them arrives. This function may be called from any
- * thread. Concurrent drains are serialized and each delivery enters exactly
- * one returned batch. Release each batch with mln_delivery_batch_release().
+ * Each drain captures a count, reserves storage once, and detaches up to that
+ * many deliveries. Later arrivals remain queued and receive a deferred wake.
+ * Drain until MLN_STATUS_NOT_READY. This function may be called from any
+ * thread. Concurrent drains detach disjoint prefixes, and each delivery enters
+ * exactly one returned batch. Release each batch with
+ * mln_delivery_batch_release().
  *
  * Returns:
  * - MLN_STATUS_OK when a batch holding at least one delivery is published in
@@ -204,7 +207,10 @@ MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when the batch could not be allocated. The
- *   deliveries stay queued, and the wake fires again so the receiver retries.
+ *   deliveries stay queued. The first failure arms one deferred wake after
+ *   any active wake returns. Failures before a successful drain coalesce into
+ *   that retry. If the retry also fails, the host schedules another drain;
+ *   native code waits for a successful drain before arming another retry.
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_delivery_queue_drain(

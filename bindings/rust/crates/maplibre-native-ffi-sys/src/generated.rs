@@ -255,7 +255,6 @@ pub const MLN_RESOURCE_KIND_SPRITE_IMAGE: mln_resource_kind = 5;
 pub const MLN_RESOURCE_KIND_SPRITE_JSON: mln_resource_kind = 6;
 pub const MLN_RESOURCE_KIND_IMAGE: mln_resource_kind = 7;
 pub type mln_resource_kind_mask = u32;
-pub const MLN_RESOURCE_KIND_MASK_ANY: mln_resource_kind_mask = 0;
 pub const MLN_RESOURCE_KIND_MASK_UNKNOWN: mln_resource_kind_mask = 1;
 pub const MLN_RESOURCE_KIND_MASK_STYLE: mln_resource_kind_mask = 2;
 pub const MLN_RESOURCE_KIND_MASK_SOURCE: mln_resource_kind_mask = 4;
@@ -264,6 +263,7 @@ pub const MLN_RESOURCE_KIND_MASK_GLYPHS: mln_resource_kind_mask = 16;
 pub const MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE: mln_resource_kind_mask = 32;
 pub const MLN_RESOURCE_KIND_MASK_SPRITE_JSON: mln_resource_kind_mask = 64;
 pub const MLN_RESOURCE_KIND_MASK_IMAGE: mln_resource_kind_mask = 128;
+pub const MLN_RESOURCE_KIND_MASK_ALL: mln_resource_kind_mask = 255;
 pub type mln_resource_loading_method = u32;
 pub const MLN_RESOURCE_LOADING_METHOD_ALL: mln_resource_loading_method = 0;
 pub const MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY: mln_resource_loading_method = 1;
@@ -287,6 +287,9 @@ pub const MLN_RESOURCE_RESPONSE_STATUS_OK: mln_resource_response_status = 0;
 pub const MLN_RESOURCE_RESPONSE_STATUS_ERROR: mln_resource_response_status = 1;
 pub const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT: mln_resource_response_status = 2;
 pub const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED: mln_resource_response_status = 3;
+pub type mln_resource_route_url = u32;
+pub const MLN_RESOURCE_ROUTE_URL_RESOLVED: mln_resource_route_url = 0;
+pub const MLN_RESOURCE_ROUTE_URL_REQUESTED: mln_resource_route_url = 1;
 pub type mln_resource_storage_policy = u32;
 pub const MLN_RESOURCE_STORAGE_POLICY_PERMANENT: mln_resource_storage_policy = 0;
 pub const MLN_RESOURCE_STORAGE_POLICY_VOLATILE: mln_resource_storage_policy = 1;
@@ -448,9 +451,8 @@ pub const MLN_TILE_OPERATION_ERROR: mln_tile_operation = 6;
 pub const MLN_TILE_OPERATION_CANCELLED: mln_tile_operation = 7;
 pub const MLN_TILE_OPERATION_NULL: mln_tile_operation = 8;
 pub type mln_url_match_flags = u32;
-pub const MLN_URL_MATCH_FLAGS_NONE: mln_url_match_flags = 0;
+pub const MLN_URL_MATCH_EXACT: mln_url_match_flags = 0;
 pub const MLN_URL_MATCH_GLOB: mln_url_match_flags = 1;
-pub const MLN_URL_MATCH_REQUESTED_URL: mln_url_match_flags = 2;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
@@ -1204,6 +1206,7 @@ pub struct mln_resource_route {
     pub kinds: u32,
     pub flags: u32,
     pub url: *const std::ffi::c_char,
+    pub url_stage: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2687,6 +2690,10 @@ unsafe extern "C" {
     pub fn mln_resource_request_is_cancelled(
         handle: mln_resource_request_handle,
         out_cancelled: *mut bool,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_resource_request_pass_through(
+        handle: mln_resource_request_handle,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_request_release(handle: mln_resource_request_handle);

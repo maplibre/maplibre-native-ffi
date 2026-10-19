@@ -214,17 +214,17 @@ Nine keys state what a C shape cannot:
   passes a callback registration, because an absent call publishes nothing.
   Dart, Go, Rust, Swift, and Zig return any output as absent; .NET, Kotlin, and
   Python return only an owned handle as absent.
-- `default=` on a field states the nonzero value that the field holds in its
-  record's native default: a decimal integer, a decimal with a point, `true`, or
-  a constant of the field's enum. Dart, Kotlin, and Zig build a record from
-  language defaults instead of calling its default function, so they read this
-  value, and an unannotated field defaults to zero. The generated cases in
-  `tests/native/abi/base/defaults.c` check every default function against these
-  values. The schema accepts the key only on a plain scalar or enum field of a
-  record that a default function returns, directly or nested by value through
-  required fields. The cases skip optional fields, unions, union tags, buffer
-  views, and arrays, so those fields take no `default=`, and neither does a
-  record that only those fields reach.
+- `default=` on a plain scalar or enum field sets its binding constructor's
+  nonzero initial value: a decimal integer, a decimal with a point, `true`, or a
+  constant of the field's enum. Go exposes these values through its
+  `Default<Type>()` factory; a Go struct literal keeps Go's zero values. When a
+  native default function exists, the generated cases in
+  `tests/native/abi/base/defaults.c` check it against these annotations.
+  Optional fields, unions, union tags, buffer views, and arrays take no
+  `default=`.
+- `resume=` on a decision callback optionally names a second terminal operation
+  on its handle. Bindings treat it like completion for handle ownership and
+  callback admission; it takes only the handle and diagnostic.
 - `accepted_unless=` on a function names a boolean output that, when set on
   success, reports that native kept nothing from the function's one callback
   registration, as `out_cancelled` does for

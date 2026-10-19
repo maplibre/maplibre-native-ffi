@@ -36,6 +36,17 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
     }
 
   /**
+   * Hands an outstanding provider request to the built-in network loader.
+   *
+   * See `mln_resource_request_pass_through` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun passThrough(): Unit =
+    nativeComplete(this, binding, "mln_resource_request_pass_through") {
+      check(C.mln_resource_request_pass_through(handle, diagnostic))
+    }
+
+  /**
    * Releases the provider's reference to a resource request handle.
    *
    * See `mln_resource_request_release` in the

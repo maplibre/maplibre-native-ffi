@@ -33,6 +33,19 @@ public extension ResourceRequestHandle {
     } result: { value0 }
   }
 
+  /// Hands an outstanding provider request to the built-in network loader.
+  ///
+  /// See `mln_resource_request_pass_through` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func passThrough() throws {
+    try nativeInvoke("mln_resource_request_pass_through",
+                     .claim)
+    { raw, _, diagnostic in mln_resource_request_pass_through(
+      raw,
+      diagnostic
+    ) }
+  }
+
   /// Releases the provider's reference to a resource request handle.
   ///
   /// See `mln_resource_request_release` in the

@@ -11,15 +11,10 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum UrlMatchFlags : uint
 {
-    FlagsNone = 0,
+    Exact = 0,
 
     /// <summary>
     /// Reads url as a glob pattern.
     /// </summary>
     Glob = 1,
-
-    /// <summary>
-    /// Routes only: compare requested_url instead of resolved_url.
-    /// </summary>
-    RequestedUrl = 2,
 }

@@ -2193,6 +2193,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_resource_request_pass_through(handle: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_resource_request_pass_through(
+      handle.toULong(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_resource_request_release(handle: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_resource_request_release(handle.toULong())
   }
