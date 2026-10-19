@@ -1,7 +1,7 @@
 // Frame demands: result batches and the frame wake, the texture ring's
 // backpressure, barriers and resizes ordered with demands, demands past the
-// ring depth, the keep-alive demands a still image needs, and demands that
-// wait for a map update.
+// ring depth, the keep-alive demands a still image needs, demands that wait
+// for a map update, and the one frame that a burst of commands renders.
 
 #include "support/frames.h"
 #include "support/test_support.h"
@@ -568,6 +568,72 @@ static void a_waiting_demand_renders_the_next_map_update(void) {
   detach(runtime, map, &fixture);
 }
 
+static const char eight_layer_style_json[] =
+  "{\"version\":8,\"transition\":{\"duration\":0,\"delay\":0},"
+  "\"sources\":{},\"layers\":["
+  "{\"id\":\"0\",\"type\":\"background\"},"
+  "{\"id\":\"1\",\"type\":\"background\"},"
+  "{\"id\":\"2\",\"type\":\"background\"},"
+  "{\"id\":\"3\",\"type\":\"background\"},"
+  "{\"id\":\"4\",\"type\":\"background\"},"
+  "{\"id\":\"5\",\"type\":\"background\"},"
+  "{\"id\":\"6\",\"type\":\"background\"},"
+  "{\"id\":\"7\",\"type\":\"background\"}]}";
+
+// Commands that the runtime worker already holds announce their render
+// updates once, after the last of them, so a waiting demand renders them in
+// one frame rather than a frame for the first and another for the rest.
+static void a_burst_of_held_commands_renders_in_one_frame(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(eight_layer_style_json))
+  );
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  request_waiting(&fixture, 621);
+  expect_waiting(&fixture);
+
+  // A query publishes no render update, so parking the worker in its
+  // completion queues the burst behind it with nothing announced ahead.
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+  static const char layer_ids[] = "01234567";
+  mln_test_completion commands[sizeof(layer_ids) - 1];
+  for (size_t index = 0; index < sizeof(layer_ids) - 1; index += 1) {
+    commands[index] = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_map_set_style_layer_property(
+      map, mln_test_buffer_view(&layer_ids[index], 1),
+      MLN_BUFFER_LITERAL("background-color"), MLN_BUFFER_LITERAL("\"#336699\""),
+      &commands[index].descriptor, NULL
+    ));
+  }
+  mln_test_gate_release(&gate);
+  for (size_t index = 0; index < sizeof(layer_ids) - 1; index += 1) {
+    MLN_TEST_OK(mln_test_completion_finish(&commands[index]));
+    mln_test_completion_destroy(&commands[index]);
+  }
+
+  mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  const mln_render_frame_result rendered = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(621, rendered.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, rendered.disposition);
+  TEST_ASSERT_EQUAL_UINT64(
+    snapshot.latest_render_update_generation, rendered.map_update_generation
+  );
+  request_waiting(&fixture, 622);
+  expect_waiting(&fixture);
+  detach(runtime, map, &fixture);
+}
+
 // A newer matching demand supersedes a waiting one, a barrier ends the wait
 // with no update, and detach ends it with target not ready. A demand that
 // waits must also render only if needed.
@@ -627,4 +693,5 @@ MLN_TEST_GROUP {
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
   RUN_TEST(a_waiting_demand_renders_the_next_map_update);
   RUN_TEST(a_waiting_demand_ends_by_supersession_barrier_or_detach);
+  RUN_TEST(a_burst_of_held_commands_renders_in_one_frame);
 }

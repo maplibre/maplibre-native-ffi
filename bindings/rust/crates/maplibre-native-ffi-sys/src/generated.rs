@@ -793,7 +793,6 @@ pub struct mln_map_snapshot {
     pub viewport: mln_map_viewport_options,
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
-    pub repaint_demand: bool,
     pub gesture_in_progress: bool,
     pub event_mask: u64,
     pub latest_render_update_generation: u64,

@@ -1163,7 +1163,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// True once every requested style and tile resource finished loading.
   public var fullyLoaded: Bool
   public var renderingStatsViewEnabled: Bool
-  public var repaintDemand: Bool
   /// True while the map is inside a gesture.
   public var gestureInProgress: Bool
   public var eventMask: RuntimeEventMask
@@ -1188,7 +1187,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     fullyLoaded: Bool = MapSnapshot.default.fullyLoaded,
     renderingStatsViewEnabled: Bool = MapSnapshot.default
       .renderingStatsViewEnabled,
-    repaintDemand: Bool = MapSnapshot.default.repaintDemand,
     gestureInProgress: Bool = MapSnapshot.default.gestureInProgress,
     eventMask: RuntimeEventMask = MapSnapshot.default.eventMask,
     latestRenderUpdateGeneration: UInt64 = MapSnapshot.default
@@ -1205,7 +1203,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     self.viewport = viewport
     self.fullyLoaded = fullyLoaded
     self.renderingStatsViewEnabled = renderingStatsViewEnabled
-    self.repaintDemand = repaintDemand
     self.gestureInProgress = gestureInProgress
     self.eventMask = eventMask
     self.latestRenderUpdateGeneration = latestRenderUpdateGeneration
@@ -1223,7 +1220,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     viewport = MapViewportOptions(raw: raw.viewport)
     fullyLoaded = raw.fully_loaded
     renderingStatsViewEnabled = raw.rendering_stats_view_enabled
-    repaintDemand = raw.repaint_demand
     gestureInProgress = raw.gesture_in_progress
     eventMask = RuntimeEventMask(rawValue: raw.event_mask)
     latestRenderUpdateGeneration = raw.latest_render_update_generation
@@ -1243,7 +1239,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     raw.viewport = viewport.nativeValue()
     raw.fully_loaded = fullyLoaded
     raw.rendering_stats_view_enabled = renderingStatsViewEnabled
-    raw.repaint_demand = repaintDemand
     raw.gesture_in_progress = gestureInProgress
     raw.event_mask = eventMask.rawValue
     raw.latest_render_update_generation = latestRenderUpdateGeneration

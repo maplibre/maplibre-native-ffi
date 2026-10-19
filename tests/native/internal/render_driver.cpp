@@ -58,6 +58,36 @@ void block_driver(const Fixture& fixture, DriverBlocker& blocker) {
   }
 }
 
+void a_resize_queued_before_detach_completes_as_failed() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  auto resize = mln_test_completion_default(0);
+  const auto extent = mln_logical_extent{32, 48, 1.0};
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.render.session, extent, &resize.descriptor, nullptr
+  ));
+  auto detach = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_detach(
+    fixture.render.session, &detach.descriptor, nullptr
+  ));
+  MLN_TEST_OK(blocker.finish(fixture.render));
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_test_render_fixture_finish_operation(&fixture.render, &resize)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&resize)
+  );
+  mln_test_completion_destroy(&resize);
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &detach)
+  );
+  mln_test_completion_destroy(&detach);
+  destroy_fixture(fixture);
+}
+
 auto wait_for_results(const Fixture& fixture, std::size_t minimum)
   -> mln_render_frame_batch {
   return mln_test_render_wait_for_results(&fixture.render, minimum);
@@ -1046,6 +1076,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
 }  // namespace
 
 MLN_TEST_GROUP {
+  RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(demand_coalescing_preserves_boundaries_and_generations);
   RUN_TEST(a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy);

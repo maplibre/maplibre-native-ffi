@@ -550,8 +550,6 @@ final class mln_map_snapshot extends Struct {
   @Bool()
   external bool rendering_stats_view_enabled;
   @Bool()
-  external bool repaint_demand;
-  @Bool()
   external bool gesture_in_progress;
   @Uint64()
   external int event_mask;

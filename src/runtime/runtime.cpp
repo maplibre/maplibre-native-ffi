@@ -819,8 +819,6 @@ auto lease_runtime(mln_runtime runtime) -> std::shared_ptr<RuntimeObject> {
 
 namespace {
 
-auto runtime_disposal_lane() -> RetirementLane&;
-
 // Called with terminal_mutex held. Ordinary completion needs no extra lock.
 auto mark_runtime_disposal_ready(RuntimeObject& runtime) noexcept -> bool {
   if (
@@ -832,16 +830,37 @@ auto mark_runtime_disposal_ready(RuntimeObject& runtime) noexcept -> bool {
   return true;
 }
 
+// Called with terminal_mutex held.
+auto take_ready_runtime_barrier(RuntimeObject& runtime)
+  -> std::shared_ptr<OperationObject> {
+  const auto pending = runtime.pending_barriers.begin();
+  if (
+    pending == runtime.pending_barriers.end() ||
+    (!runtime.pending_submissions.empty() &&
+     *runtime.pending_submissions.begin() < pending->first)
+  ) {
+    return {};
+  }
+  auto barrier = std::move(pending->second);
+  runtime.pending_barriers.erase(pending);
+  return barrier;
+}
+
 auto erase_tracked_submission(
   const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
-) noexcept -> void {
+) noexcept -> std::shared_ptr<OperationObject> {
   bool dispose;
+  auto barrier = std::shared_ptr<OperationObject>{};
   {
     const std::scoped_lock lock(runtime->terminal_mutex);
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
+    if (!runtime->pending_barriers.empty()) {
+      barrier = take_ready_runtime_barrier(*runtime);
+    }
   }
-  if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
+  if (dispose) runtime->executor.invoke_retirement(runtime->disposal_task);
+  return barrier;
 }
 
 auto erase_runtime_barrier(
@@ -854,7 +873,7 @@ auto erase_runtime_barrier(
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
-  if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
+  if (dispose) runtime->executor.invoke_retirement(runtime->disposal_task);
 }
 
 auto complete_ready_runtime_barriers(
@@ -864,29 +883,31 @@ auto complete_ready_runtime_barriers(
     auto barrier = std::shared_ptr<OperationObject>{};
     {
       const std::scoped_lock lock(runtime->terminal_mutex);
-      const auto pending = runtime->pending_barriers.begin();
-      if (
-        pending == runtime->pending_barriers.end() ||
-        (!runtime->pending_submissions.empty() &&
-         *runtime->pending_submissions.begin() < pending->first)
-      ) {
-        return;
-      }
-      barrier = std::move(pending->second);
-      runtime->pending_barriers.erase(pending);
+      barrier = take_ready_runtime_barrier(*runtime);
     }
+    if (barrier == nullptr) return;
     barrier->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
   }
 }
 
-auto finish_tracked_submission(
-  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
-) noexcept -> void {
-  erase_tracked_submission(runtime, sequence);
-  complete_ready_runtime_barriers(runtime);
+}  // namespace
+
+auto track_runtime_submission(RuntimeObject& runtime) -> uint64_t {
+  const auto sequence = runtime.next_submission_sequence;
+  const auto lock = std::scoped_lock{runtime.terminal_mutex};
+  runtime.pending_submissions.insert(sequence);
+  ++runtime.next_submission_sequence;
+  return sequence;
 }
 
-}  // namespace
+auto finish_runtime_submission(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  if (auto barrier = erase_tracked_submission(runtime, sequence)) {
+    barrier->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+    complete_ready_runtime_barriers(runtime);
+  }
+}
 
 auto submit_runtime_command(
   const std::shared_ptr<RuntimeObject>& runtime,
@@ -899,20 +920,16 @@ auto submit_runtime_command(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   {
-    const std::scoped_lock commit_lock(runtime->submission_mutex);
+    auto commit_lock = std::unique_lock{runtime->submission_mutex};
     if (!runtime->control.acquire()) {
       set_thread_error("runtime is closing");
       return MLN_STATUS_INVALID_STATE;
     }
     auto lease = ControlLease{&runtime->control};
-    const auto sequence = runtime->next_submission_sequence++;
+    const auto sequence = track_runtime_submission(*runtime);
     auto superseded = uint64_t{0};
     if (latest_submission != nullptr) {
       superseded = latest_submission->exchange(sequence);
-    }
-    {
-      const std::scoped_lock terminal_lock(runtime->terminal_mutex);
-      runtime->pending_submissions.insert(sequence);
     }
     try {
       runtime->executor.invoke(
@@ -928,7 +945,7 @@ auto submit_runtime_command(
           // Retire command-owned state before barriers observe the submission
           // as terminal.
           function = {};
-          finish_tracked_submission(runtime, sequence);
+          finish_runtime_submission(runtime, sequence);
         }
       );
     } catch (...) {
@@ -938,7 +955,8 @@ auto submit_runtime_command(
         auto expected = sequence;
         latest_submission->compare_exchange_strong(expected, superseded);
       }
-      finish_tracked_submission(runtime, sequence);
+      commit_lock.unlock();
+      finish_runtime_submission(runtime, sequence);
       completion->reject();
       set_thread_error("runtime command submission failed");
       return MLN_STATUS_NATIVE_ERROR;
@@ -954,24 +972,20 @@ auto submit_runtime_command(
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,
-  std::function<void()> function, bool child_retirement
+  std::function<void()> function
 ) -> mln_status {
   if (runtime == nullptr || operation == nullptr) {
     set_thread_error("runtime and operation must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const std::scoped_lock commit_lock(runtime->submission_mutex);
-  if (!runtime->control.acquire(child_retirement)) {
+  auto commit_lock = std::unique_lock{runtime->submission_mutex};
+  if (!runtime->control.acquire()) {
     return MLN_STATUS_INVALID_STATE;
   }
   auto lease = ControlLease{&runtime->control};
-  const auto sequence = runtime->next_submission_sequence++;
-  {
-    const std::scoped_lock terminal_lock(runtime->terminal_mutex);
-    runtime->pending_submissions.insert(sequence);
-  }
+  const auto sequence = track_runtime_submission(*runtime);
   operation->set_terminal_callback([runtime, sequence]() noexcept -> void {
-    finish_tracked_submission(runtime, sequence);
+    finish_runtime_submission(runtime, sequence);
   });
   try {
     runtime->executor.invoke(
@@ -989,6 +1003,7 @@ auto submit_runtime_operation(
       }
     );
   } catch (...) {
+    commit_lock.unlock();
     operation->complete(
       MLN_STATUS_NATIVE_ERROR, "runtime operation submission failed",
       std::any{std::monostate{}}
@@ -1000,11 +1015,6 @@ auto submit_runtime_operation(
 }
 
 namespace {
-
-auto runtime_disposal_lane() -> RetirementLane& {
-  static auto* lane = new RetirementLane{};
-  return *lane;
-}
 
 struct RuntimeCreationGuard {
   RuntimeCreationGuard() = default;
@@ -1052,7 +1062,6 @@ auto create_runtime(
   watch_process_exit();
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
-  static_cast<void>(runtime_disposal_lane());
   RuntimeCreationGuard result;
   result.runtime = std::make_shared<RuntimeObject>();
   auto asset_path = options->asset_path == nullptr
@@ -1143,8 +1152,6 @@ auto submit_resource_configuration_command(
   const std::shared_ptr<RuntimeObject>& runtime,
   const mln_completion* descriptor, Mutation&& mutation
 ) -> mln_status {
-  const auto status = validate_completion(descriptor);
-  if (status != MLN_STATUS_OK) return status;
   auto completion = std::shared_ptr<Completion>{};
   if (
     const auto accepted = accept_completion(descriptor, completion);
@@ -2659,20 +2666,6 @@ auto runtime_barrier_start(
     state->set_terminal_callback([live, sequence]() noexcept -> void {
       erase_runtime_barrier(live, sequence);
     });
-    try {
-      live->executor.invoke([lease = std::move(lease)]() mutable -> void {
-        static_cast<void>(lease);
-      });
-    } catch (...) {
-      state->complete(
-        MLN_STATUS_NATIVE_ERROR,
-        exception_message(std::current_exception(), "runtime barrier failed"),
-        std::any{std::monostate{}}
-      );
-      completion_state->reject();
-      set_thread_error("runtime barrier submission failed");
-      return MLN_STATUS_NATIVE_ERROR;
-    }
   }
   complete_ready_runtime_barriers(live);
   completion_state->accept();
@@ -2681,11 +2674,9 @@ auto runtime_barrier_start(
 
 namespace {
 
-// Retires a runtime whose close has begun: once its submission leases,
-// children, and pending submissions have drained, the disposal lane removes
-// its handle, releases the state its worker reaches, stops the worker, and
-// then reports `completion` when one is given. Nothing here blocks the caller
-// or the lane while the runtime drains.
+// Submission leases, children, and pending operations drain before this node
+// reaches the worker. The same node finishes retirement after its run loop
+// has been destroyed, so host callbacks cannot block another runtime.
 auto retire_runtime(
   std::shared_ptr<RuntimeObject> live, std::shared_ptr<Completion> completion
 ) noexcept -> void {
@@ -2694,41 +2685,22 @@ auto retire_runtime(
   live->disposal_task.context = live.get();
   live->disposal_task.run = [](RetirementTask* task) noexcept {
     auto* retiring = static_cast<RuntimeObject*>(task->context);
-    auto owned = std::move(retiring->disposal_owner);
-    static_cast<void>(handle_table<RuntimeObject>().remove(owned->self));
-    unregister_platform_context(owned->platform_context);
-    owned->disposal_worker_task.context = owned.get();
-    owned->disposal_worker_task.run = [](RetirementTask* node) noexcept {
+    static_cast<void>(handle_table<RuntimeObject>().remove(retiring->self));
+    unregister_platform_context(retiring->platform_context);
+    release_runtime_reachable_state(retiring);
+    task->run = [](RetirementTask* node) noexcept {
       auto* state = static_cast<RuntimeObject*>(node->context);
-      // The cleanup lane keeps this object alive until the worker reports.
-      release_runtime_reachable_state(state);
-      {
-        const auto lock = std::scoped_lock{state->terminal_mutex};
-        state->disposal_state_retired = true;
+      auto owned = std::move(state->disposal_owner);
+      auto release_completion = std::move(owned->release_completion);
+      owned.reset();
+      if (release_completion) {
+        valueless_completion<&mln_runtime_release>().complete(
+          release_completion
+        );
       }
-      state->terminal_condition.notify_all();
     };
-    owned->executor.invoke_retirement(owned->disposal_worker_task);
-    {
-      auto lock = std::unique_lock{owned->terminal_mutex};
-      owned->terminal_condition.wait(lock, [&] {
-        return owned->disposal_state_retired;
-      });
-    }
-    owned->executor.stop();
-    // Drop the lane's reference before reporting, so a host that waits for
-    // the completion and then exits cannot race member destruction. Nothing
-    // after the completion touches library state.
-    auto release_completion = std::move(owned->release_completion);
-    owned.reset();
-    if (release_completion) {
-      valueless_completion<&mln_runtime_release>().complete(release_completion);
-    }
+    retiring->executor.retire(*task);
   };
-  {
-    const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
-    live->disposal_requested = true;
-  }
   auto* retiring = live.get();
   live.reset();
   const auto drained = retiring->control.notify_when_drained(
@@ -2740,7 +2712,7 @@ auto retire_runtime(
         state.disposal_drained = true;
         dispose = mark_runtime_disposal_ready(state);
       }
-      if (dispose) runtime_disposal_lane().submit(state.disposal_task);
+      if (dispose) state.executor.invoke_retirement(state.disposal_task);
     },
     retiring
   );
@@ -2758,6 +2730,8 @@ auto dispose_runtime(mln_runtime runtime) -> mln_status {
     const auto lock = std::scoped_lock{live->submission_mutex};
     const auto status = live->control.begin_close(true);
     if (status != MLN_STATUS_OK) return status;
+    const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
+    live->disposal_requested = true;
   }
   retire_runtime(std::move(live), nullptr);
   return MLN_STATUS_OK;
@@ -2785,10 +2759,14 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
       release_completion->reject();
       return release_status;
     }
+    {
+      const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
+      live->disposal_requested = true;
+    }
     static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
   // Nothing after close can fail. Accepting first keeps the completion on the
-  // disposal lane even when the runtime has already drained. Close rejects
+  // worker even when the runtime has already drained. Close rejects
   // every later submission, so retirement, which waits for the pending ones,
   // reports after every earlier accepted submission has finished.
   release_completion->accept();
@@ -2819,11 +2797,14 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   // loses no events: nothing after the swap can throw. The handle stays
   // private until this call returns it.
   const auto owned = std::make_shared<EventBatchObject>();
+  owned->queue = queue;
   const auto handle = handle_table<EventBatchObject>().insert(owned);
   {
     const std::scoped_lock lock(queue->mutex);
     owned->storage.events.swap(queue->pending.events);
     owned->storage.messages.swap(queue->pending.messages);
+    queue->pending.events.swap(queue->recycled.events);
+    queue->pending.messages.swap(queue->recycled.messages);
   }
   // A concurrent drain can empty the queue between the two locks.
   if (owned->storage.events.empty()) {
@@ -2852,6 +2833,20 @@ auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
     .messages_size = live->storage.messages.size()
   };
   return MLN_STATUS_OK;
+}
+
+EventBatchObject::~EventBatchObject() {
+  const auto state = queue.lock();
+  if (state == nullptr) return;
+  storage.events.clear();
+  storage.messages.clear();
+  const auto lock = std::scoped_lock{state->mutex};
+  if (storage.events.capacity() > state->recycled.events.capacity()) {
+    storage.events.swap(state->recycled.events);
+  }
+  if (storage.messages.capacity() > state->recycled.messages.capacity()) {
+    storage.messages.swap(state->recycled.messages);
+  }
 }
 
 auto release_event_batch(mln_event_batch batch) noexcept -> void {
@@ -3077,22 +3072,14 @@ auto map_event(
 // Producers test their subscription mask before they call this, so it holds no
 // mask test of its own.
 auto push_runtime_map_event_payload(
-  mln_runtime runtime, mln_map map, uint64_t generation, uint32_t type,
-  uint32_t payload_type, const mln_runtime_event_payload& payload, int32_t code,
-  std::string message
+  const std::shared_ptr<RuntimeEventQueueState>& event_queue, mln_map map,
+  uint64_t generation, uint32_t type, uint32_t payload_type,
+  const mln_runtime_event_payload& payload, int32_t code, std::string message
 ) -> void {
-  // Observer callbacks may race close; the lease keeps the queue object
-  // reachable, and the queue lock decides whether this event still has a wake
-  // to notify.
-  auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return;
-  }
-
   auto wake = std::shared_ptr<Wake>{};
   {
-    const std::scoped_lock lock(live->event_queue->mutex);
-    auto& queue = *live->event_queue;
+    const std::scoped_lock lock(event_queue->mutex);
+    auto& queue = *event_queue;
     if (!queue.event_maps.contains(map)) return;
     if (coalesce_render_update(queue.pending, map, generation, type)) return;
     if (queue.pending.events.empty()) {
@@ -3108,19 +3095,14 @@ auto push_runtime_map_event_payload(
 }
 
 auto push_runtime_map_events(
-  mln_runtime runtime, mln_map map, uint64_t generation,
-  std::vector<HeldMapEvent>& events
+  const std::shared_ptr<RuntimeEventQueueState>& event_queue, mln_map map,
+  uint64_t generation, std::vector<HeldMapEvent>& events
 ) -> void {
   if (events.empty()) return;
-  auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return;
-  }
-
   auto wake = std::shared_ptr<Wake>{};
   {
-    const std::scoped_lock lock(live->event_queue->mutex);
-    auto& queue = *live->event_queue;
+    const std::scoped_lock lock(event_queue->mutex);
+    auto& queue = *event_queue;
     if (!queue.event_maps.contains(map)) return;
     const auto was_empty = queue.pending.events.empty();
     for (auto& held : events) {

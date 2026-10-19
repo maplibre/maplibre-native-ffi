@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "delivery/delivery_queue.hpp"
 #include "maplibre_native_c/completion.h"
@@ -73,12 +74,40 @@ class Completion final {
 
   auto accept() noexcept -> void;
   auto reject() noexcept -> void;
-  auto resolve(Delivery delivery) noexcept -> void;
+  template <typename Function>
+  auto resolve(Function&& delivery) noexcept -> void {
+    {
+      const std::scoped_lock lock(mutex_);
+      switch (state_) {
+        case State::Pending:
+          if (!pending_) pending_ = std::forward<Function>(delivery);
+          return;
+        case State::Accepted:
+          state_ = State::Resolved;
+          break;
+        case State::Rejected:
+        case State::Resolved:
+          return;
+      }
+    }
+    deliver(std::forward<Function>(delivery));
+  }
 
  private:
   enum class State : std::uint8_t { Pending, Accepted, Rejected, Resolved };
 
-  auto deliver(Delivery delivery) noexcept -> void;
+  template <typename Function>
+  auto deliver(Function&& delivery) noexcept -> void {
+    try {
+      std::invoke(std::forward<Function>(delivery), sink_);
+    } catch (...) {
+      // Completion delivery cannot reopen terminal native work, but a delivery
+      // that threw before reaching the sink still owes the host its result.
+      deliver_undelivered();
+    }
+    release();
+  }
+  auto deliver_undelivered() noexcept -> void;
   auto release() noexcept -> void;
 
   std::mutex mutex_;

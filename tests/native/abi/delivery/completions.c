@@ -71,7 +71,7 @@ static void command_and_barrier_completions_reach_the_queue(void) {
   result = await_completion(queue.handle, &command_tag, &batch);
   MLN_TEST_STATUS(MLN_STATUS_NOT_FOUND, result->status);
   TEST_ASSERT_EQUAL_UINT32(MLN_COMMAND_DISPOSITION_FAILED, result->disposition);
-  TEST_ASSERT_TRUE(view_contains(result->diagnostic, "absent-layer"));
+  TEST_ASSERT_TRUE(view_contains(result->diagnostic, "layer does not exist"));
   mln_delivery_batch_release(batch);
 
   mln_test_destroy_map(map);

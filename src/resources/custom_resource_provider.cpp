@@ -236,9 +236,9 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
-// Answers a claimed request the host released without a response, so MapLibre
-// does not wait on it forever. The caller holds object.mutex.
-void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
+// The caller holds object.mutex and keeps the object alive after handle
+// release.
+void fail_locked(ResourceRequestObject& object, const char* message) noexcept {
   if (object.completed || object.cancelled) {
     return;
   }
@@ -246,13 +246,10 @@ void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
   try {
     object.actor.invoke(
       &mln::FileSourceRequest::setResponse,
-      error_response(
-        "resource request was released without a response",
-        mln::Response::Error::Reason::Other
-      )
+      error_response(message, mln::Response::Error::Reason::Other)
     );
   } catch (...) {
-    // The request already went away, so nothing is waiting on it.
+    // Failure delivery must not unwind through provider or release callbacks.
   }
 }
 
@@ -425,7 +422,7 @@ struct CustomProviderInvocation {
   // Held for the whole invocation, so a host that releases inline cannot free
   // the object out from under the code that runs after the callback returns.
   std::shared_ptr<ResourceRequestObject> object;
-  mln::Resource resource;
+  const mln::Resource& resource;
   std::string resolved_url;
   mln_resource_provider_callback callback = nullptr;
   void* user_data = nullptr;
@@ -433,47 +430,21 @@ struct CustomProviderInvocation {
 
 // Answers a request that the provider did not answer with an error, and
 // retires it.
-auto fail_request(
-  mln_resource_request_handle handle, const char* message
-) noexcept -> void {
-  const auto response = mln_resource_response{
-    .size = sizeof(mln_resource_response),
-    .fields = 0,
-    .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-    .bytes = nullptr,
-    .byte_count = 0,
-    .error_message = message,
-    .must_revalidate = false,
-    .modified_unix_ms = 0,
-    .expires_unix_ms = 0,
-    .etag = nullptr,
-    .retry_after_unix_ms = 0,
-  };
-  try {
-    static_cast<void>(complete_resource_request(handle, &response));
-  } catch (...) {
-    // The request retires whether or not the response landed.
+auto fail_request(ResourceRequestObject& object, const char* message) noexcept
+  -> void {
+  {
+    const std::scoped_lock lock(object.mutex);
+    object.deciding = false;
+    fail_locked(object, message);
   }
-  retire_request(handle);
+  retire_request(object.handle);
 }
 
 auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
   -> bool {
   try {
-    auto was_cancelled = false;
-    {
-      const std::scoped_lock lock(invocation.object->mutex);
-      if (invocation.object->cancelled) {
-        was_cancelled = true;
-      }
-    }
-    if (was_cancelled) {
-      retire_request(invocation.handle);
-      return true;
-    }
     if (process_exiting()) {
-      fail_request(invocation.handle, "the process is exiting");
+      fail_request(*invocation.object, "the process is exiting");
       return true;
     }
     const auto request =
@@ -490,7 +461,10 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
         invocation.object->claimed = true;
         if (invocation.object->released_while_deciding) {
-          fail_unanswered_locked(*invocation.object);
+          fail_locked(
+            *invocation.object,
+            "resource request was released without a response"
+          );
         }
       }
     }
@@ -500,14 +474,14 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
       fail_request(
-        invocation.handle, "resource provider returned an unknown decision"
+        *invocation.object, "resource provider returned an unknown decision"
       );
       return true;
     }
     // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
-    fail_request(invocation.handle, "resource provider threw an exception");
+    fail_request(*invocation.object, "resource provider threw an exception");
     return true;
   }
 }
@@ -535,37 +509,17 @@ auto request_custom_resource(
     run_cancel_callback(*object);
     mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelled);
   });
-  try {
-    const auto handled = invoke_custom_provider(
-      CustomProviderInvocation{
-        .handle = handle,
-        .object = object,
-        .resource = resource,
-        .resolved_url = std::move(resolved_url),
-        .callback = provider_callback,
-        .user_data = user_data,
-      }
-    );
-    return handled ? std::move(request) : nullptr;
-  } catch (...) {
-    auto response = mln_resource_response{
-      .size = sizeof(mln_resource_response),
-      .fields = 0,
-      .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-      .bytes = nullptr,
-      .byte_count = 0,
-      .error_message = "resource request setup failed",
-      .must_revalidate = false,
-      .modified_unix_ms = 0,
-      .expires_unix_ms = 0,
-      .etag = nullptr,
-      .retry_after_unix_ms = 0,
-    };
-    static_cast<void>(complete_resource_request(handle, &response));
-    retire_request(handle);
-    return request;
-  }
+  const auto handled = invoke_custom_provider(
+    CustomProviderInvocation{
+      .handle = handle,
+      .object = object,
+      .resource = resource,
+      .resolved_url = std::move(resolved_url),
+      .callback = provider_callback,
+      .user_data = user_data,
+    }
+  );
+  return handled ? std::move(request) : nullptr;
 }
 
 auto complete_resource_request(
@@ -577,14 +531,6 @@ auto complete_resource_request(
   }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto native_response = response_from_abi(*response);
-  // A requester whose cached copy had to be revalidated has not seen that copy
-  // yet, so NOT_MODIFIED delivers it, as MapLibre's online source does for a
-  // 304.
-  if (native_response.notModified && live->prior_data != nullptr) {
-    native_response.data = live->prior_data;
-    native_response.notModified = false;
-  }
   {
     const std::scoped_lock lock(live->mutex);
     if (live->retired) {
@@ -599,6 +545,13 @@ auto complete_resource_request(
     if (live->cancelled) {
       set_thread_error("resource request is cancelled");
       return MLN_STATUS_INVALID_STATE;
+    }
+    auto native_response = response_from_abi(*response);
+    // Revalidation delivers the cached bytes that MapLibre withheld, as its
+    // online source does for a 304.
+    if (native_response.notModified && live->prior_data != nullptr) {
+      native_response.data = live->prior_data;
+      native_response.notModified = false;
     }
     live->completed = true;
     try {
@@ -711,7 +664,9 @@ void release_resource_request(mln_resource_request_handle handle) noexcept {
     const std::scoped_lock lock(object->mutex);
     if (!object->retired) {
       if (object->claimed) {
-        fail_unanswered_locked(*object);
+        fail_locked(
+          *object, "resource request was released without a response"
+        );
       } else if (object->deciding) {
         object->released_while_deciding = true;
       }

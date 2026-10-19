@@ -421,6 +421,26 @@ void a_pending_operation_keeps_only_its_runtime_alive() {
   MLN_TEST_OK(result.status.load());
 }
 
+void dropping_a_pending_operation_cancels_and_retires_its_runtime() {
+  const auto runtime = create_runtime();
+  auto weak = std::weak_ptr{mln::core::lease_runtime(runtime)};
+  auto result = Result{};
+  const auto completion = descriptor(result);
+  auto operation = std::shared_ptr<mln::core::OperationObject>{};
+  auto entered = std::atomic_bool{false};
+  MLN_TEST_OK(
+    submit_pending_operation(runtime, completion, entered, operation)
+  );
+  TEST_ASSERT_TRUE(await([&] { return entered.load(); }, "the operation"));
+  auto closed = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_runtime_release(runtime, &closed.descriptor, nullptr));
+  operation.reset();
+  MLN_TEST_OK(mln_test_completion_settle(&closed));
+  TEST_ASSERT_TRUE(expired(weak));
+  TEST_ASSERT_TRUE(released(result));
+  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, result.status.load());
+}
+
 void disposal_retires_an_attached_graph_after_driver_quiescence() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
@@ -681,7 +701,11 @@ void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync()
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 1;
-  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
+  MLN_TEST_OK(
+    mln::core::map_attach_render_target_session(
+      map, session.get(), session->map_object
+    )
+  );
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   const auto handle =
@@ -724,7 +748,11 @@ void borrowed_views_survive_sibling_frame_disposal() {
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 2;
-  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
+  MLN_TEST_OK(
+    mln::core::map_attach_render_target_session(
+      map, session.get(), session->map_object
+    )
+  );
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   auto frame_id =
@@ -807,7 +835,11 @@ auto attach_fake_texture_session(mln_map map) -> FakeTextureSession {
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 1;
-  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
+  MLN_TEST_OK(
+    mln::core::map_attach_render_target_session(
+      map, session.get(), session->map_object
+    )
+  );
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   const auto frame_id =
@@ -1071,4 +1103,5 @@ MLN_TEST_GROUP {
   RUN_TEST(disposed_parent_allows_observed_child_release);
   RUN_TEST(disposal_waits_for_pending_child_creation);
   RUN_TEST(a_pending_operation_keeps_only_its_runtime_alive);
+  RUN_TEST(dropping_a_pending_operation_cancels_and_retires_its_runtime);
 }

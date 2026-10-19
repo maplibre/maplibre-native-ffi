@@ -26,6 +26,7 @@ auto QueueLock::lock() const noexcept -> bool {
     descriptor_.lock(descriptor_.user_data);
   } catch (...) {
     // Host lock callbacks must not unwind through the C boundary.
+    return false;
   }
   return true;
 }

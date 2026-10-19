@@ -272,7 +272,11 @@ const (
 	// the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY. A
 	// waiting demand's result can follow the results of demands accepted after it.
 	// The flag does not pace: a host that re-arms a waiting demand as each result
-	// arrives renders every update the map publishes.
+	// arrives renders every update the map publishes. The map publishes one update
+	// for the commands that its runtime worker runs back to back, but a command
+	// that reaches the worker while a frame renders appears in a later frame. To
+	// show several commands in one frame, submit them in a command group, or arm
+	// demands once per display frame.
 	FrameDemandFlagWaitForUpdate FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_WAIT_FOR_UPDATE)
 )
 
@@ -2525,7 +2529,6 @@ type MapSnapshot struct {
 	// True once every requested style and tile resource finished loading.
 	FullyLoaded               bool
 	RenderingStatsViewEnabled bool
-	RepaintDemand             bool
 	// True while the map is inside a gesture.
 	GestureInProgress bool
 	EventMask         RuntimeEventMask
@@ -2548,7 +2551,6 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.Viewport = copyMapViewportOptions(raw.viewport)
 	result.FullyLoaded = bool(raw.fully_loaded)
 	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
-	result.RepaintDemand = bool(raw.repaint_demand)
 	result.GestureInProgress = bool(raw.gesture_in_progress)
 	result.EventMask = RuntimeEventMask(raw.event_mask)
 	result.LatestRenderUpdateGeneration = uint64(raw.latest_render_update_generation)

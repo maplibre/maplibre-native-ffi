@@ -1,13 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <exception>
 #include <functional>
-#include <future>
-#include <memory>
 #include <mutex>
-#include <thread>
-#include <type_traits>
+#include <stdexcept>
 #include <utility>
 
 #include <mln/util/run_loop.hpp>
@@ -31,20 +29,18 @@ class RuntimeExecutor {
   auto start(std::function<void()> initialize = std::function<void()>{})
     -> void;
   auto stop() noexcept -> void;
+  // Called on the worker after every lease and operation has retired. Runs
+  // completion after the run loop is destroyed and the worker is detached;
+  // completion may destroy this executor.
+  auto retire(RetirementTask& completion) noexcept -> void;
   // Queues task without allocating. The caller must guarantee the executor has
   // not stopped: a map holds MapObject::runtime_cleanup_lease until it is
   // destroyed, which keeps runtime disposal from draining and stopping this
-  // executor, and runtime disposal itself queues before it calls stop().
+  // executor, and runtime disposal itself queues before it calls retire().
   auto invoke_retirement(RetirementTask& task) noexcept -> void;
 
-  [[nodiscard]] auto is_worker_thread() const noexcept -> bool {
-    const std::scoped_lock lock(mutex_);
-    return std::this_thread::get_id() == worker_id_;
-  }
-
   [[nodiscard]] auto run_loop() const noexcept -> mln::util::RunLoop* {
-    const std::scoped_lock lock(mutex_);
-    return run_loop_;
+    return run_loop_.load();
   }
 
   template <typename Function>
@@ -62,49 +58,17 @@ class RuntimeExecutor {
     });
   }
 
-  template <typename Function>
-  auto invoke_sync(Function&& function) -> std::invoke_result_t<Function> {
-    using Result = std::invoke_result_t<Function>;
-    if (is_worker_thread()) {
-      if constexpr (std::is_void_v<Result>) {
-        std::invoke(std::forward<Function>(function));
-        return;
-      } else {
-        return std::invoke(std::forward<Function>(function));
-      }
-    }
-
-    auto promise = std::make_shared<std::promise<Result>>();
-    auto result = promise->get_future();
-    invoke(
-      [promise, function = std::forward<Function>(function)]() mutable -> void {
-        try {
-          if constexpr (std::is_void_v<Result>) {
-            std::invoke(std::move(function));
-            promise->set_value();
-          } else {
-            promise->set_value(std::invoke(std::move(function)));
-          }
-        } catch (...) {
-          promise->set_exception(std::current_exception());
-        }
-      }
-    );
-    return result.get();
-  }
-
  private:
-  mutable std::mutex mutex_;
+  std::mutex mutex_;
   std::condition_variable started_;
   WorkerThread worker_;
-  std::thread::id worker_id_;
-  mln::util::RunLoop* run_loop_ = nullptr;
+  std::atomic<mln::util::RunLoop*> run_loop_ = nullptr;
   std::exception_ptr startup_error_;
   bool starting_ = false;
   bool stopping_ = false;
-  RetirementTask* retirement_first_ = nullptr;
-  RetirementTask* retirement_last_ = nullptr;
+  RetirementQueue retirement_queue_;
   RetirementWake* retirement_wake_ = nullptr;
+  RetirementTask* retirement_completion_ = nullptr;
   auto drain_retirement() noexcept -> void;
 };
 

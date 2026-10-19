@@ -23,6 +23,7 @@ class MapProjection;
 namespace mln::core {
 
 class CallbackSourceRegistry;
+class Completion;
 class HeadlessFrontend;
 class HeadlessObserver;
 struct MapEventState;
@@ -33,6 +34,8 @@ struct MapObject {
   ControlState control;
   RetirementTask disposal_task;
   std::shared_ptr<MapObject> disposal_owner;
+  std::shared_ptr<Completion> release_completion;
+  uint64_t release_sequence = 0;
   std::atomic_bool disposal_requested = false;
   // This map's own handle, so worker-side code that already holds the object
   // can name it in an event without resolving the table again.
@@ -54,6 +57,8 @@ struct MapObject {
   mln::TransformState snapshot_transform;
   uint64_t next_snapshot_generation = 1;
   std::atomic<uint64_t> latest_resize_submission{0};
+  // A rejected direct resize cannot supersede the session's extent command.
+  std::atomic<uint64_t> latest_session_resize_submission{0};
   bool still_image_request_pending = false;
   // Any-thread map-owned feature state; render sessions pull coalesced
   // snapshots and push diffs into their renderer.

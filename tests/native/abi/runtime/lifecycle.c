@@ -375,6 +375,128 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&released));
 }
 
+typedef struct retirement_wait {
+  atomic_bool entered;
+  atomic_bool other_released;
+  atomic_bool observed_other;
+} retirement_wait;
+
+static void wait_for_other_retirement(void* user_data) {
+  retirement_wait* wait = user_data;
+  mln_test_flag_set(&wait->entered);
+  atomic_store(
+    &wait->observed_other, mln_test_wait_for_flag(&wait->other_released)
+  );
+}
+
+typedef struct retirement_result {
+  atomic_int status;
+  atomic_bool released;
+  retirement_wait* wait;
+} retirement_result;
+
+static void record_retirement(
+  void* user_data, const mln_completion_result* result
+) {
+  retirement_result* probe = user_data;
+  atomic_store(&probe->status, result->status);
+  if (probe->wait != NULL) wait_for_other_retirement(probe->wait);
+}
+
+static void release_retirement(void* user_data) {
+  retirement_result* result = user_data;
+  mln_test_flag_set(&result->released);
+}
+
+static void complete_other_retirement(void* user_data) {
+  mln_test_flag_set(&((retirement_wait*)user_data)->other_released);
+}
+
+static void retirement_callbacks_can_wait(bool during_state_release) {
+  retirement_wait wait = {0};
+  retirement_result result = {.status = MLN_STATUS_NATIVE_ERROR};
+  mln_runtime_options options = mln_runtime_options_default();
+  if (during_state_release) {
+    options.event_wake.callback = ignore_wake;
+    options.event_wake.user_data = &wait;
+    options.event_wake.release_user_data = wait_for_other_retirement;
+  } else {
+    result.wait = &wait;
+  }
+  mln_runtime waiting = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_runtime_create(&options, &waiting, NULL));
+  const mln_runtime other = create_untracked_runtime();
+  const mln_completion waiting_close = {
+    .size = sizeof(waiting_close),
+    .callback = record_retirement,
+    .user_data = &result,
+    .release_user_data = release_retirement,
+  };
+  MLN_TEST_OK(mln_runtime_release(waiting, &waiting_close, NULL));
+  const bool entered = mln_test_wait_for_flag(&wait.entered);
+  mln_completion other_close = mln_test_discard_completion();
+  other_close.user_data = &wait;
+  other_close.release_user_data = complete_other_retirement;
+  const mln_status other_status =
+    mln_runtime_release(other, &other_close, NULL);
+  const bool other_released = mln_test_wait_for_flag(&wait.other_released);
+  const bool waiting_released = mln_test_wait_for_flag(&result.released);
+  TEST_ASSERT_TRUE(entered);
+  MLN_TEST_OK(other_status);
+  TEST_ASSERT_TRUE(other_released);
+  TEST_ASSERT_TRUE(waiting_released);
+  MLN_TEST_OK(atomic_load(&result.status));
+  TEST_ASSERT_TRUE(atomic_load(&wait.observed_other));
+}
+
+static void runtime_state_release_can_wait_for_another_runtime(void) {
+  retirement_callbacks_can_wait(true);
+}
+
+static void runtime_release_completion_can_wait_for_another_runtime(void) {
+  retirement_callbacks_can_wait(false);
+}
+
+typedef struct release_parent {
+  mln_runtime runtime;
+  const mln_completion* completion;
+  atomic_int map_status;
+  atomic_int submission_status;
+} release_parent;
+
+static void release_runtime_from_map_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  release_parent* parent = user_data;
+  atomic_store(&parent->map_status, result->status);
+  atomic_store(
+    &parent->submission_status,
+    mln_runtime_release(parent->runtime, parent->completion, NULL)
+  );
+}
+
+static void a_map_release_completion_can_release_its_runtime(void) {
+  const mln_runtime runtime = create_untracked_runtime();
+  mln_map map = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  mln_test_completion runtime_close = mln_test_completion_default(0);
+  release_parent parent = {
+    .runtime = runtime,
+    .completion = &runtime_close.descriptor,
+    .map_status = MLN_STATUS_NATIVE_ERROR,
+    .submission_status = MLN_STATUS_NATIVE_ERROR,
+  };
+  const mln_completion map_close = {
+    .size = sizeof(map_close),
+    .callback = release_runtime_from_map_completion,
+    .user_data = &parent,
+  };
+  MLN_TEST_OK(mln_map_release(map, &map_close, NULL));
+  MLN_TEST_OK(mln_test_completion_settle(&runtime_close));
+  MLN_TEST_OK(atomic_load(&parent.map_status));
+  MLN_TEST_OK(atomic_load(&parent.submission_status));
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(runtime_creation_returns_a_runtime);
   RUN_TEST(runtime_creation_validates_its_options);
@@ -387,4 +509,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_barrier_completes_after_preceding_work);
   RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);
   RUN_TEST(runtime_and_map_outlive_the_creating_host_thread);
+  RUN_TEST(runtime_state_release_can_wait_for_another_runtime);
+  RUN_TEST(runtime_release_completion_can_wait_for_another_runtime);
+  RUN_TEST(a_map_release_completion_can_release_its_runtime);
 }

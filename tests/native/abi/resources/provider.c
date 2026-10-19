@@ -282,6 +282,36 @@ static void releasing_a_request_inside_its_callback_then_claiming_fails_it(
   expect_dropped_request_fails(true);
 }
 
+static uint32_t release_then_unknown_decision_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)user_data;
+  (void)request;
+  mln_resource_request_release(handle);
+  return UINT32_MAX;
+}
+
+static void releasing_a_request_before_an_unknown_decision_fails_it(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = release_then_unknown_decision_provider,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(
+    mln_test_map_set_style_url(map, "custom://unknown-decision.json")
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "unknown decision"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A resource request is not a child of its runtime. Releasing a claimed request
 // unanswered sends its failure to the map on the runtime's worker, and that
 // failure still being queued holds neither the map nor the runtime open: both
@@ -1017,6 +1047,7 @@ MLN_TEST_GROUP {
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
   RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
+  RUN_TEST(releasing_a_request_before_an_unknown_decision_fails_it);
   RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
   RUN_TEST(a_held_request_does_not_hold_its_runtime_open);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);

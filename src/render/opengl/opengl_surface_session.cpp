@@ -123,7 +123,8 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       auto guard = mln::gfx::BackendScope{*this};
       cleanup();
       return;
-    } catch (...) {  // NOLINT(bugprone-empty-catch)
+    } catch (...) {
+      // Retry teardown with the context's original drawable.
     }
     fallback_drawable_ = true;
     try {

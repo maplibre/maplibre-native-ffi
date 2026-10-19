@@ -1535,8 +1535,9 @@ auto start_attach_render_session(
   session->driver_wake = driver_wake;
   session->queue_lock = queue_lock;
   session->state = MLN_RENDER_SESSION_STATE_ATTACHING;
-  const auto attach_status =
-    map_attach_render_target_session(session->map, session.get());
+  const auto attach_status = map_attach_render_target_session(
+    session->map, session.get(), session->map_object
+  );
   if (attach_status != MLN_STATUS_OK) {
     async.completion->reject();
     return attach_status;
@@ -1563,6 +1564,7 @@ auto start_attach_render_session(
       static_cast<void>(
         map_detach_render_target_session(session->map, session.get())
       );
+      session->map_object = nullptr;
       if (session->self != MLN_HANDLE_NULL) {
         static_cast<void>(
           handle_table<mln_render_session_object>().remove(session->self)
@@ -1575,9 +1577,9 @@ auto start_attach_render_session(
   session->self = register_render_session(session);
   const auto weak_session = std::weak_ptr<mln_render_session_object>{session};
   const auto publish_status = map_set_render_session_publish_callback(
-    session->map, [weak_session]() noexcept {
+    session->map, [weak_session](uint64_t update_generation) noexcept {
       if (const auto live = weak_session.lock()) {
-        notify_render_session_map_update(live.get());
+        notify_render_session_map_update(live.get(), update_generation);
       }
     }
   );
@@ -1688,7 +1690,7 @@ auto start_attach_render_session(
 }
 
 auto notify_render_session_map_update(
-  mln_render_session_object* session
+  mln_render_session_object* session, uint64_t update_generation
 ) noexcept -> void {
   if (session == nullptr) {
     return;
@@ -1696,23 +1698,18 @@ auto notify_render_session_map_update(
   mln::testing::hit(mln::testing::SyncPoint::RenderSessionUpdateNoticed);
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{session->control_mutex};
-  session->map_update_generation = map_latest_update_generation(session->map);
+  session->map_update_generation = update_generation;
   // A demand can render an update between the map storing it and this notice,
   // which then brings nothing the session has not drawn.
-  if (session->map_update_generation != session->rendered_generation)
+  if (update_generation != session->rendered_update_generation)
     session->pending_changes = true;
+  // Queueing work publishes it to the driver. A demand parked by a full ring
+  // keeps no work item, and an update frees no slot, so it needs no wake here.
   if (!session->waiting_update_work.empty()) {
     splice_work(session->waiting_update_work, session->driver_work);
     publish_driver_work_locked(*session, wakes);
   }
   resume_update_waiting_demands_locked(*session, wakes);
-  if (
-    !session->demands.empty() &&
-    session->capabilities.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
-  ) {
-    wakes.driver(session->driver_wake);
-  }
-  session->worker_condition.notify_one();
 }
 
 auto validate_render_session(
@@ -1861,7 +1858,7 @@ auto render_session_set_target(
     // across the sibling resize path.
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
-    live->rendered_generation = 0;
+    live->rendered_update_generation = 0;
     live->rendered_target_generation = 0;
     live->rendered_transform.reset();
     live->width = extent.width;
@@ -2022,13 +2019,14 @@ auto render_session_render_update_on_driver(
   // stay ahead of the early returns below, or a frame with no update to render
   // strands them.
   live->scheduler.drain();
-  map_run_render_jobs(live->map);
+  map_run_render_jobs(*live->map_object);
 
   // Fetch the update and its generation as one snapshot so the frame result
   // reports the generation of the update actually rendered, not one published
   // in between.
   auto update_generation = uint64_t{0};
-  auto update = map_latest_update_snapshot(live->map, update_generation);
+  auto update =
+    map_latest_update_snapshot(*live->map_object, update_generation);
   if (out_map_update_generation != nullptr) {
     *out_map_update_generation = update_generation;
   }
@@ -2083,7 +2081,9 @@ auto render_session_render_update_on_driver(
         live->renderer->enableAndroidEmulatorGoldfishMitigation(true);
       }
 #endif
-      live->frame_observer.set_delegate(map_renderer_observer(live->map));
+      live->frame_observer.set_delegate(
+        map_renderer_observer(*live->map_object)
+      );
       live->renderer->setObserver(&live->frame_observer);
     } catch (const std::exception& exception) {
       set_native_stage_error("creating renderer", exception);
@@ -2110,7 +2110,7 @@ auto render_session_render_update_on_driver(
     return std::nullopt;
   };
 
-  auto desired = map_feature_state_snapshot(live->map);
+  auto desired = map_feature_state_snapshot(*live->map_object);
   const auto warmup =
     feature_state_needs_warmup(*desired, live->rendered_source_ids, *update);
   if (warmup) {
@@ -2133,7 +2133,7 @@ auto render_session_render_update_on_driver(
   }
   remember_rendered_sources(live->rendered_source_ids, *update);
 
-  map_begin_render(live->map, update_generation);
+  map_begin_render(*live->map_object, update_generation);
   if (const auto early = render_once()) {
     return *early;
   }
@@ -2163,6 +2163,8 @@ auto render_session_render_update_on_driver(
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_transform = update->transformState;
     live->rendered_target_generation = live->generation;
+    live->rendered_update_generation = update_generation;
+    live->pending_changes = false;
   }
   *out_result = MLN_RENDER_RESULT_RENDERED;
   *out_needs_repaint = live->frame_observer.needs_repaint();
@@ -2218,9 +2220,10 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
     return detach_status;
   }
   live->attached = false;
+  live->map_object = nullptr;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    live->rendered_generation = 0;
+    live->rendered_update_generation = 0;
     live->rendered_target_generation = 0;
     live->rendered_transform.reset();
     ++live->generation;
@@ -2655,23 +2658,23 @@ auto settle_barriers(
   }
 }
 
-// Delivers queued worker results and forwarded observer messages to the
-// session and the map without rendering. Tile and placement continuations,
-// and the observer deliveries that complete a still image, run on the session
-// scheduler, so delivering them must not wait for a demand that happens to
+// Delivers queued worker results to the renderer without rendering. Tile and
+// placement continuations run on the session scheduler, and the renderer
+// reports what they change to the map's run loop, which publishes the next
+// update, so delivering them must not wait for a demand that happens to
 // render.
 auto deliver_pending_session_work(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
   auto* backend = renderer_backend(session.get());
-  if (backend == nullptr) {
+  if (backend == nullptr || session->map_object == nullptr) {
     return;
   }
   try {
     auto current = ScopedCurrentScheduler{session->scheduler};
     auto guard = mln::gfx::BackendScope{*backend};
     session->scheduler.drain();
-    map_run_render_jobs(session->map);
+    map_run_render_jobs(*session->map_object);
   } catch (...) {
     // Delivery is best-effort here; the next rendering demand drains again.
   }
@@ -2682,10 +2685,10 @@ auto run_frame_demand(
 ) noexcept -> void;
 
 // Driver work posted by the scheduler's repaint hook: drain the queued
-// results, then let a pending demand re-evaluate against whatever the drain
-// published. Without this, a session whose demands all resolve on the
-// render-if-needed fast path never drains, stranding still-image completion
-// and tile results behind a demand that happens to render.
+// results, then let a pending demand re-evaluate. Without this, a session
+// whose demands all resolve on the render-if-needed fast path never drains,
+// stranding the tile results that a still image or the next update needs
+// behind a demand that happens to render.
 auto service_scheduler_work(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
@@ -2733,7 +2736,7 @@ auto wait_for_map_update(
     // stores an update, so an update this read misses finds the demand
     // waiting. The session's own generation can lag the map's, and comparing
     // with it would run the demand again until notify catches up.
-    if (map_latest_update_generation(session->map) == evaluated) {
+    if (map_latest_update_generation(*session->map_object) == evaluated) {
       session->update_waiting_demands.push_back(pending);
       return false;
     }
@@ -2784,16 +2787,15 @@ auto run_frame_demand(
       }
     }
   } active_demand{session, pending.barrier_epoch};
-  // Deliver queued worker results first so the render-if-needed check below
-  // and the reported generation observe them; this is also what publishes a
-  // new update when a transition frame asked for a repaint.
-  deliver_pending_session_work(session);
+  // A rendering demand delivers queued worker results inside its render. Every
+  // path that does not render delivers them first, so they still reach the
+  // renderer and the map.
   const auto demand = pending.demand;
   auto result = mln_render_frame_result{
     .size = sizeof(mln_render_frame_result),
     .disposition = MLN_RENDER_RESULT_NO_UPDATE,
     .token = demand.token,
-    .map_update_generation = map_latest_update_generation(session->map),
+    .map_update_generation = map_latest_update_generation(*session->map_object),
     .extent_generation = session->extent_generation,
     .frame_generation = 0,
     .needs_repaint = false,
@@ -2808,6 +2810,7 @@ auto run_frame_demand(
     static_cast<std::uint64_t>(elapsed_ns) >= demand.timeout_ns
   ) {
     result.disposition = MLN_RENDER_RESULT_DEADLINE_MISSED;
+    deliver_pending_session_work(session);
     publish_frame_result(session, result);
     return;
   }
@@ -2817,14 +2820,16 @@ auto run_frame_demand(
     auto unchanged = false;
     {
       const auto lock = std::scoped_lock{session->control_mutex};
-      unchanged = !session->pending_changes &&
-                  result.map_update_generation == session->rendered_generation;
+      unchanged =
+        !session->pending_changes &&
+        result.map_update_generation == session->rendered_update_generation;
     }
     if (unchanged) {
       // Nothing newer than the last rendered update exists, so honor the
       // render-if-needed contract without touching the target. A repaint
       // demand during an animation publishes a new update, which bumps the
       // generation and sets pending_changes before the next demand runs.
+      deliver_pending_session_work(session);
       result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
       if (
         waits_for_update &&
@@ -2895,10 +2900,12 @@ auto run_frame_demand(
     }
   }
   if (ring_quarantined) {
+    deliver_pending_session_work(session);
     mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
     return;
   }
   if (ring_full) {
+    deliver_pending_session_work(session);
     mln::testing::hit(mln::testing::SyncPoint::RenderFrameDemandParked);
     return;
   }
@@ -2911,6 +2918,7 @@ auto run_frame_demand(
       const auto lock = std::scoped_lock{session->control_mutex};
       session->texture.slots[*selected_slot].rendering = false;
     }
+    deliver_pending_session_work(session);
     result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
     publish_frame_result(session, result);
     return;
@@ -2918,6 +2926,12 @@ auto run_frame_demand(
   auto disposition = MLN_RENDER_RESULT_NO_UPDATE;
   auto needs_repaint = false;
   auto rendered_map_generation = result.map_update_generation;
+  auto metadata = std::any{};
+  // One backend scope spans the render and the frame's metadata, so the
+  // scopes they open themselves nest in it and activate the backend once.
+  auto scope = std::optional<mln::gfx::BackendScope>{};
+  if (auto* backend = renderer_backend(session.get()); backend != nullptr)
+    scope.emplace(*backend);
   {
     // A demand without MLN_FRAME_DEMAND_PRESENT still draws; the target keeps
     // whatever it presented last. Only a presenting target can honor this.
@@ -2941,8 +2955,6 @@ auto run_frame_demand(
     {
       const auto lock = std::scoped_lock{session->control_mutex};
       result.frame_generation = ++session->frame_generation;
-      session->rendered_generation = result.map_update_generation;
-      session->pending_changes = false;
       metadata_request = RenderFrameMetadata{
         .generation = session->generation,
         .frame_id = result.frame_generation,
@@ -2955,7 +2967,6 @@ auto run_frame_demand(
     // Backend metadata is recorded here, on the driver thread, while the slot
     // is still the one that was rendered into. The acquiring host thread only
     // copies it, so no graphics state is touched under the session lock.
-    auto metadata = std::any{};
     const auto acquirable =
       selected_slot && session->texture.backend != nullptr &&
       (session->capabilities.flags &
@@ -2967,15 +2978,20 @@ auto run_frame_demand(
     ) {
       metadata.reset();
     }
+    scope.reset();
     const auto lock = std::scoped_lock{session->control_mutex};
     if (selected_slot) {
       auto& slot = session->texture.slots[*selected_slot];
       slot.result = result;
+      // A frame without its metadata cannot be acquired, so its slot stays
+      // unavailable rather than hold back the newer frames behind it, and the
+      // next demand renders into it first.
+      slot.available = !acquirable || metadata.has_value();
       slot.backend_metadata = std::move(metadata);
-      slot.available = true;
       slot.rendering = false;
     }
   }
+  scope.reset();
   if (result.disposition != MLN_RENDER_RESULT_RENDERED && selected_slot) {
     const auto lock = std::scoped_lock{session->control_mutex};
     session->texture.slots[*selected_slot].rendering = false;
@@ -3032,7 +3048,7 @@ auto render_session_get_snapshot(
     ),
     .generation = live->generation,
     .map_update_generation = live->map_update_generation,
-    .rendered_update_generation = live->rendered_generation,
+    .rendered_update_generation = live->rendered_update_generation,
     .extent_generation = live->extent_generation,
     .frame_generation = live->frame_generation,
     .latest_demand_token = live->latest_demand_token,
@@ -3598,7 +3614,7 @@ auto make_ordered_resize_work(
           session->pending_extent.reset();
           next = Next::Detaching;
         } else if (continuous) {
-          const auto update = map_latest_update(session->map);
+          const auto update = map_latest_update(*session->map_object);
           if (
             !update || update->transformState.getSize() !=
                          mln::Size{extent.width, extent.height}
@@ -3723,7 +3739,9 @@ auto render_session_resize_start(
       const auto* disposition = std::any_cast<std::uint32_t>(&result);
       complete_command(
         state,
-        disposition != nullptr
+        status != MLN_STATUS_OK
+          ? static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_FAILED)
+        : disposition != nullptr
           ? *disposition
           : static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_COMMITTED),
         status, 0, std::move(diagnostic)
@@ -4233,6 +4251,7 @@ auto abandon_render_session(
                       ? objects.keep()
                       : retire_abandoned_objects(*live, objects, keep_ring);
   static_cast<void>(map_detach_render_target_session(live->map, live.get()));
+  live->map_object = nullptr;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     live->abandonment_complete = true;

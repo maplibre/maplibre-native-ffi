@@ -7,13 +7,14 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include <mln/actor/scheduler.hpp>
 #include <mln/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
-#include <mln/style/conversion/json.hpp>
 #include <mln/style/conversion_impl.hpp>
+#include <mln/style/rapidjson_conversion.hpp>
 #include <mln/tile/tile_id.hpp>
 #include <mln/util/geometry.hpp>
 #include <mln/util/identity.hpp>
@@ -279,9 +280,14 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
   return result;
 }
 
-auto validate_geojson_source_options(const mln_geojson_source_options* options)
-  -> mln_status {
+namespace {
+
+auto validate_and_resolve_geojson_source_options(
+  const mln_geojson_source_options* options,
+  mln_geojson_source_options& effective
+) -> mln_status {
   if (options == nullptr) {
+    effective = geojson_source_options_default();
     return MLN_STATUS_OK;
   }
   if (options->size < sizeof(mln_geojson_source_options)) {
@@ -303,7 +309,7 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto effective = effective_geojson_source_options(options);
+  effective = effective_geojson_source_options(options);
   if (
     !std::isfinite(effective.max_zoom) || effective.max_zoom < 0.0 ||
     effective.max_zoom > 24.0 ||
@@ -312,15 +318,16 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     set_thread_error("max_zoom must be an integer within [0, 24]");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  for (const auto& [zoom, name] : {
-         std::pair{effective.min_zoom, "min_zoom"},
-         std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
+  for (const auto& [zoom, maximum, name] : {
+         std::tuple{effective.min_zoom, 24.0, "min_zoom"},
+         std::tuple{effective.cluster_max_zoom, 255.0, "cluster_max_zoom"},
        }) {
     if (
-      !std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0 ||
+      !std::isfinite(zoom) || zoom < 0.0 || zoom > maximum ||
       std::floor(zoom) != zoom
     ) {
-      auto message = std::string{name} + " must be an integer within [0, 255]";
+      auto message = std::string{name} + " must be an integer within [0, " +
+                     std::to_string(static_cast<int>(maximum)) + "]";
       set_thread_error(message.c_str());
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -355,6 +362,14 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
   return MLN_STATUS_OK;
 }
 
+}  // namespace
+
+auto validate_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_status {
+  auto effective = mln_geojson_source_options{};
+  return validate_and_resolve_geojson_source_options(options, effective);
+}
+
 // Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
 // which is what parses the aggregation expressions.
 auto to_native_geojson_source_options(const mln_geojson_source_options& options)
@@ -382,16 +397,15 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
       set_thread_error("cluster_properties must contain a JSON object");
       return std::nullopt;
     }
-    auto wrapper = std::string{"{\"clusterProperties\":"};
-    wrapper.append(
-      static_cast<const char*>(options.cluster_properties.data),
-      options.cluster_properties.size
-    );
-    wrapper.push_back('}');
+    auto wrapper = mln::JSValue{rapidjson::kObjectType};
+    wrapper.AddMember("clusterProperties", document, document.GetAllocator());
     auto error = mln::style::conversion::Error{};
     auto converted =
-      mln::style::conversion::convertJSON<mln::style::GeoJSONOptions>(
-        wrapper, error
+      mln::style::conversion::convert<mln::style::GeoJSONOptions>(
+        mln::style::conversion::Convertible{
+          static_cast<const mln::JSValue*>(&wrapper)
+        },
+        error
       );
     if (!converted) {
       set_style_conversion_error("GeoJSON source options", error);
@@ -467,7 +481,9 @@ auto geojson_source_data_create(
     set_thread_error("*out_data must be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto options_status = validate_geojson_source_options(options);
+  auto effective = mln_geojson_source_options{};
+  const auto options_status =
+    validate_and_resolve_geojson_source_options(options, effective);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
@@ -477,7 +493,6 @@ auto geojson_source_data_create(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto effective = effective_geojson_source_options(options);
   if (effective.cluster && !validate_clustered_geojson(*geojson)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }

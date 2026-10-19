@@ -1,4 +1,6 @@
+#include <cassert>
 #include <exception>
+#include <memory>
 #include <utility>
 
 #include "execution/runtime_executor.hpp"
@@ -25,7 +27,6 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
           auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
           {
             const std::scoped_lock lock(mutex_);
-            worker_id_ = std::this_thread::get_id();
             run_loop_ = &loop;
           }
           auto retirement_wake =
@@ -56,7 +57,6 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
             const std::scoped_lock lock(mutex_);
             retirement_wake_ = nullptr;
             run_loop_ = nullptr;
-            worker_id_ = {};
           }
         } catch (...) {
           {
@@ -64,10 +64,15 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
             startup_error_ = std::current_exception();
             retirement_wake_ = nullptr;
             run_loop_ = nullptr;
-            worker_id_ = {};
             starting_ = false;
           }
           started_.notify_all();
+        }
+        if (auto* completion = retirement_completion_; completion != nullptr) {
+          worker_.detach();
+          // The callback may destroy this executor. No worker code accesses
+          // its state after this point.
+          run_retirement_task(completion);
         }
       }
     );
@@ -96,12 +101,16 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
 
 auto RuntimeExecutor::invoke_retirement(RetirementTask& task) noexcept -> void {
   const auto lock = std::scoped_lock{mutex_};
-  if (retirement_last_ != nullptr)
-    retirement_last_->next = &task;
-  else
-    retirement_first_ = &task;
-  retirement_last_ = &task;
+  retirement_queue_.push(task);
   retirement_wake_->send();
+}
+
+auto RuntimeExecutor::retire(RetirementTask& completion) noexcept -> void {
+  assert(worker_.is_current());
+  const auto lock = std::scoped_lock{mutex_};
+  assert(retirement_completion_ == nullptr);
+  retirement_completion_ = &completion;
+  stopping_ = true;
 }
 
 auto RuntimeExecutor::drain_retirement() noexcept -> void {
@@ -109,16 +118,13 @@ auto RuntimeExecutor::drain_retirement() noexcept -> void {
     RetirementTask* task;
     {
       const auto lock = std::scoped_lock{mutex_};
-      task = retirement_first_;
+      task = retirement_queue_.pop();
       if (task == nullptr) {
-        if (stopping_) run_loop_->stop();
+        if (stopping_) run_loop_.load()->stop();
         return;
       }
-      retirement_first_ = task->next;
-      if (retirement_first_ == nullptr) retirement_last_ = nullptr;
-      task->next = nullptr;
     }
-    task->run(task);
+    run_retirement_task(task);
   }
 }
 

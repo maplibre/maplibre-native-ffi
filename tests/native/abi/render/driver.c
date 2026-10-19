@@ -97,6 +97,28 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   TEST_ASSERT_EQUAL_STRING(
     "map still has an attached render session", mln_test_last_error()
   );
+  mln_map_snapshot before_resize = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &before_resize, NULL));
+  mln_test_completion resize = mln_test_completion_default(0);
+  const mln_logical_extent extent = {
+    .width = 32, .height = 48, .scale_factor = 1.0
+  };
+  MLN_TEST_OK(mln_map_resize(map, extent, &resize.descriptor, NULL));
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE, mln_test_completion_finish(&resize)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&resize)
+  );
+  mln_test_completion_destroy(&resize);
+  mln_map_snapshot after_resize = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &after_resize, NULL));
+  TEST_ASSERT_EQUAL_UINT32(
+    before_resize.logical_extent.width, after_resize.logical_extent.width
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    before_resize.logical_extent.height, after_resize.logical_extent.height
+  );
   MLN_TEST_OK(mln_test_map_request_repaint(map));
 
   MLN_TEST_STATUS(

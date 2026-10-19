@@ -2175,8 +2175,6 @@ class MapSnapshot:
 
     rendering_stats_view_enabled: bool
 
-    repaint_demand: bool
-
     gesture_in_progress: bool
     """True while the map is inside a gesture."""
 
@@ -2206,7 +2204,6 @@ class MapSnapshot:
             viewport=MapViewportOptions._from_native(raw["viewport"]),
             fully_loaded=raw["fully_loaded"],
             rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
-            repaint_demand=raw["repaint_demand"],
             gesture_in_progress=raw["gesture_in_progress"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
             latest_render_update_generation=raw["latest_render_update_generation"],

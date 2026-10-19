@@ -1,5 +1,6 @@
 #include <cassert>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -176,14 +177,11 @@ Completion::~Completion() {
     abandoned = state_ == State::Accepted;
   }
   if (abandoned) {
-    resolve([diagnostic = std::string{"asynchronous work was abandoned"}](
-              const CompletionSink& sink
-            ) {
-      sink.deliver(
-        MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, 0, diagnostic,
-        nullptr, 0, 0, nullptr
-      );
-    });
+    sink_.deliver(
+      MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, 0,
+      "asynchronous work was abandoned", nullptr, 0, 0, nullptr
+    );
+    release();
   }
 }
 
@@ -218,42 +216,11 @@ auto Completion::reject() noexcept -> void {
   }
 }
 
-auto Completion::resolve(Delivery delivery) noexcept -> void {
-  auto invoke_now = false;
-  {
-    const std::scoped_lock lock(mutex_);
-    switch (state_) {
-      case State::Pending:
-        if (!pending_) {
-          pending_ = std::move(delivery);
-        }
-        return;
-      case State::Accepted:
-        state_ = State::Resolved;
-        invoke_now = true;
-        break;
-      case State::Rejected:
-      case State::Resolved:
-        return;
-    }
-  }
-  if (invoke_now) {
-    deliver(std::move(delivery));
-  }
-}
-
-auto Completion::deliver(Delivery delivery) noexcept -> void {
-  try {
-    delivery(sink_);
-  } catch (...) {
-    // Completion delivery cannot reopen terminal native work, but a delivery
-    // that threw before reaching the sink still owes the host its result.
-    sink_.deliver(
-      MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, 0,
-      "the completion result could not be delivered", nullptr, 0, 0, nullptr
-    );
-  }
-  release();
+auto Completion::deliver_undelivered() noexcept -> void {
+  sink_.deliver(
+    MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, 0,
+    "the completion result could not be delivered", nullptr, 0, 0, nullptr
+  );
 }
 
 auto Completion::release() noexcept -> void {
@@ -341,6 +308,11 @@ auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
   mln_status status, std::uint64_t generation, std::string diagnostic
 ) noexcept -> void {
+  if (status != MLN_STATUS_OK) {
+    disposition = status == MLN_STATUS_CANCELLED
+                    ? MLN_COMMAND_DISPOSITION_CANCELLED
+                    : MLN_COMMAND_DISPOSITION_FAILED;
+  }
   completion->resolve([disposition, status, generation,
                        diagnostic =
                          std::move(diagnostic)](const CompletionSink& sink) {

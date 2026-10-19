@@ -9,6 +9,8 @@ namespace mln::core {
 OperationObject::OperationObject(ResultCallback result)
     : result_callback_(std::move(result)) {}
 
+OperationObject::~OperationObject() { complete(MLN_STATUS_CANCELLED, {}, {}); }
+
 auto OperationObject::set_terminal_callback(TerminalCallback callback) noexcept
   -> void {
   auto invoke_now = false;

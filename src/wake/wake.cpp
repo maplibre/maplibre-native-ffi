@@ -68,8 +68,8 @@ auto Wake::notify() noexcept -> void {
   {
     const auto lock = std::scoped_lock{mutex_};
     --in_flight_;
+    if (closing_ && in_flight_ == 0) condition_.notify_all();
   }
-  condition_.notify_all();
 }
 
 auto validate_wake(const mln_wake* wake) -> mln_status {

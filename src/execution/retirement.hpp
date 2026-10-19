@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "c_api/autorelease_pool.hpp"
 #include "execution/worker_thread.hpp"
 
 namespace mln::core {
@@ -14,6 +15,44 @@ struct RetirementTask {
   void (*run)(RetirementTask*) noexcept = nullptr;
   void* context = nullptr;
 };
+
+// The caller serializes access to this intrusive queue.
+class RetirementQueue {
+ public:
+  auto push(RetirementTask& task) noexcept -> void {
+    if (last_ != nullptr)
+      last_->next = &task;
+    else
+      first_ = &task;
+    last_ = &task;
+  }
+
+  auto pop() noexcept -> RetirementTask* {
+    auto* task = first_;
+    if (task != nullptr) {
+      first_ = task->next;
+      if (first_ == nullptr) last_ = nullptr;
+      task->next = nullptr;
+    }
+    return task;
+  }
+
+  [[nodiscard]] auto empty() const noexcept -> bool {
+    return first_ == nullptr;
+  }
+
+ private:
+  RetirementTask* first_ = nullptr;
+  RetirementTask* last_ = nullptr;
+};
+
+inline auto run_retirement_task(RetirementTask* task) noexcept -> void {
+  auto pooled = [task]() -> mln_status {
+    task->run(task);
+    return MLN_STATUS_OK;
+  };
+  static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
+}
 
 // Reserve this lane before publishing any object that needs it. Queueing an
 // embedded node requires neither allocation nor a new thread.
@@ -27,13 +66,10 @@ class RetirementLane {
         RetirementTask* task;
         {
           auto lock = std::unique_lock{mutex_};
-          condition_.wait(lock, [this] { return first_ != nullptr; });
-          task = first_;
-          first_ = task->next;
-          if (first_ == nullptr) last_ = nullptr;
-          task->next = nullptr;
+          condition_.wait(lock, [this] { return !queue_.empty(); });
+          task = queue_.pop();
         }
-        task->run(task);
+        run_retirement_task(task);
       }
     }).detach();
   }
@@ -41,11 +77,7 @@ class RetirementLane {
   auto submit(RetirementTask& task) noexcept -> void {
     {
       const auto lock = std::scoped_lock{mutex_};
-      if (last_ != nullptr)
-        last_->next = &task;
-      else
-        first_ = &task;
-      last_ = &task;
+      queue_.push(task);
     }
     condition_.notify_one();
   }
@@ -53,8 +85,7 @@ class RetirementLane {
  private:
   std::mutex mutex_;
   std::condition_variable condition_;
-  RetirementTask* first_ = nullptr;
-  RetirementTask* last_ = nullptr;
+  RetirementQueue queue_;
 };
 
 }  // namespace mln::core

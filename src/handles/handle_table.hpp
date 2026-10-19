@@ -236,7 +236,6 @@ class HandleTable {
     const auto index = handle_index_of(handle);
     auto& slot = slots_[index];
     auto object = std::move(slot.object);
-    slot.object.reset();
     ++slot.generation;
     // A slot whose generation is exhausted is retired instead of recycled, so
     // a handle value is never reused.

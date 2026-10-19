@@ -2076,7 +2076,6 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   viewport: _readMapViewportOptions(source.viewport),
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
-  repaintDemand: source.repaint_demand,
   gestureInProgress: source.gesture_in_progress,
   eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
   latestRenderUpdateGeneration: uint64FromNative(

@@ -703,6 +703,31 @@ static void a_delta_carries_its_gesture_phase(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct transition_close_order {
+  mln_test_transition_end* transition;
+  mln_completion completion;
+  atomic_bool closed_before_completion;
+} transition_close_order;
+
+static void observe_transition_close(
+  void* user_data, const mln_completion_result* result
+) {
+  transition_close_order* order = user_data;
+  atomic_store(
+    &order->closed_before_completion,
+    atomic_load(&order->transition->calls) == 1 &&
+      atomic_load(&order->transition->releases) == 1 &&
+      atomic_load(&order->transition->outcome) ==
+        MLN_CAMERA_TRANSITION_OUTCOME_CLOSED
+  );
+  order->completion.callback(order->completion.user_data, result);
+}
+
+static void release_transition_close(void* user_data) {
+  transition_close_order* order = user_data;
+  order->completion.release_user_data(order->completion.user_data);
+}
+
 // Closing a map ends each command that it still animates as closed, with no
 // generation, before the release completes. Disposal does the same.
 static void a_map_close_ends_running_transitions(void) {
@@ -714,9 +739,21 @@ static void a_map_close_ends_running_transitions(void) {
   const mln_camera_update eased = ease_to_zoom(6.0, 60000.0, &released);
   update_camera(map, &eased);
   mln_test_completion release = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_release(map, &release.descriptor, NULL));
+  transition_close_order order = {
+    .transition = &released,
+    .completion = release.descriptor,
+  };
+  atomic_init(&order.closed_before_completion, false);
+  const mln_completion observed = {
+    .size = sizeof(observed),
+    .callback = observe_transition_close,
+    .user_data = &order,
+    .release_user_data = release_transition_close,
+  };
+  MLN_TEST_OK(mln_map_release(map, &observed, NULL));
   MLN_TEST_OK(mln_test_completion_finish(&release));
   mln_test_completion_destroy(&release);
+  TEST_ASSERT_TRUE(atomic_load(&order.closed_before_completion));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&released.calls));
   assert_ended(&released, MLN_CAMERA_TRANSITION_OUTCOME_CLOSED, "release");
   TEST_ASSERT_EQUAL_UINT64(0, atomic_load(&released.generation));

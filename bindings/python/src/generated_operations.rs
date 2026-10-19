@@ -850,7 +850,6 @@ fn generated_copy_mln_map_snapshot(
         "rendering_stats_view_enabled",
         generated_value(py, value.rendering_stats_view_enabled)?,
     )?;
-    dict.set_item("repaint_demand", generated_value(py, value.repaint_demand)?)?;
     dict.set_item(
         "gesture_in_progress",
         generated_value(py, value.gesture_in_progress)?,

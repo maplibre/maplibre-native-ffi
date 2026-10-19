@@ -3,10 +3,14 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstring>
+#include <stdexcept>
 
 #include "internal/support/resources.hpp"
 #include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
+#include "support/map.h"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 namespace {
@@ -25,6 +29,36 @@ auto style_response() -> mln_resource_response {
     .bytes = inline_style_json,
     .byte_count = sizeof(inline_style_json) - 1,
   };
+}
+
+auto release_then_throw_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) -> uint32_t {
+  static_cast<void>(user_data);
+  static_cast<void>(request);
+  mln_resource_request_release(handle);
+  throw std::runtime_error{"provider failed"};
+}
+
+void releasing_a_request_before_throwing_fails_it() {
+  auto runtime = mln_test_create_runtime();
+  const auto provider = mln_resource_provider{
+    .size = sizeof(mln_resource_provider),
+    .callback = release_then_throw_provider,
+  };
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, provider));
+  auto map = mln_test_create_map(runtime);
+  MLN_TEST_OK(
+    mln_test_map_set_style_url(map, "custom://throwing-provider.json")
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(std::strstr(message, "provider threw an exception"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 struct CompletedRequest {
@@ -374,6 +408,7 @@ void a_second_retirement_waits_for_an_unrun_registrations_release() {
 }  // namespace
 
 MLN_TEST_GROUP {
+  RUN_TEST(releasing_a_request_before_throwing_fails_it);
   RUN_TEST(cancel_callback_skips_a_completed_request);
   RUN_TEST(release_waits_for_in_flight_cancel_callback);
   RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);

@@ -1079,7 +1079,11 @@ pub const FrameDemandFlag = struct {
     /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
     /// follow the results of demands accepted after it. The flag does not pace:
     /// a host that re-arms a waiting demand as each result arrives renders
-    /// every update the map publishes.
+    /// every update the map publishes. The map publishes one update for the
+    /// commands that its runtime worker runs back to back, but a command that
+    /// reaches the worker while a frame renders appears in a later frame. To
+    /// show several commands in one frame, submit them in a command group, or
+    /// arm demands once per display frame.
     wait_for_update: bool = false,
     unknown_bits: u32 = 0,
     pub const native_bits = [_]u32{ 1, 2, 4 };
@@ -1749,7 +1753,6 @@ pub const MapSnapshot = struct {
     /// True once every requested style and tile resource finished loading.
     fully_loaded: bool = std.mem.zeroes(bool),
     rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
-    repaint_demand: bool = std.mem.zeroes(bool),
     /// True while the map is inside a gesture.
     gesture_in_progress: bool = std.mem.zeroes(bool),
     event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
@@ -1772,7 +1775,6 @@ pub const MapSnapshot = struct {
         raw.viewport = self.viewport.toNative();
         raw.fully_loaded = self.fully_loaded;
         raw.rendering_stats_view_enabled = self.rendering_stats_view_enabled;
-        raw.repaint_demand = self.repaint_demand;
         raw.gesture_in_progress = self.gesture_in_progress;
         raw.event_mask = self.event_mask.toNative();
         raw.latest_render_update_generation = self.latest_render_update_generation;
@@ -1791,7 +1793,6 @@ pub const MapSnapshot = struct {
             .viewport = MapViewportOptions.fromNative(raw.viewport),
             .fully_loaded = raw.fully_loaded,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
-            .repaint_demand = raw.repaint_demand,
             .gesture_in_progress = raw.gesture_in_progress,
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
             .latest_render_update_generation = raw.latest_render_update_generation,

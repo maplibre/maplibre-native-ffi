@@ -983,7 +983,6 @@ typedef struct mln_map_snapshot {
   /** True once every requested style and tile resource finished loading. */
   bool fully_loaded;
   bool rendering_stats_view_enabled;
-  bool repaint_demand;
   /**
    * True while the map is inside a gesture.
    *
@@ -1077,11 +1076,10 @@ MLN_API mln_status mln_map_get_snapshot(
  * then refuses, leaves the map at the size that the target named. While a
  * render session is attached, a direct map resize completes with
  * MLN_STATUS_INVALID_STATE; size the map through the session instead.
- * The completion reports terminal disposition and
- * the snapshot generation that the resize published. A resize that a later
- * one replaces before it runs completes as superseded, including a resize
- * that an attach replaces. A resize to the map's current width and
- * height changes nothing and publishes no render update.
+ * The completion reports terminal disposition and the snapshot generation
+ * that the resize published. A resize that a later direct resize replaces
+ * before it runs completes as superseded. A resize to the map's current
+ * width and height changes nothing and publishes no render update.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.

@@ -75,53 +75,6 @@ struct OwnedTileOptions {
   }
 };
 
-struct OwnedImage {
-  mln_premultiplied_rgba8_image value{};
-  std::vector<uint8_t> pixels;
-
-  explicit OwnedImage(const mln_premultiplied_rgba8_image* image)
-      : value(
-          image == nullptr ? mln::core::premultiplied_rgba8_image_default()
-                           : *image
-        ),
-        pixels(
-          image == nullptr || image->pixels == nullptr
-            ? std::vector<uint8_t>{}
-            : std::vector<uint8_t>{
-                image->pixels, image->pixels + image->byte_length
-              }
-        ) {
-    value.pixels = pixels.data();
-  }
-};
-
-struct OwnedImageOptions {
-  mln_style_image_options value{};
-  std::vector<mln_image_stretch> stretch_x;
-  std::vector<mln_image_stretch> stretch_y;
-
-  explicit OwnedImageOptions(const mln_style_image_options* options)
-      : value(
-          options == nullptr ? mln::core::style_image_options_default()
-                             : *options
-        ),
-        stretch_x(
-          value.stretch_x == nullptr
-            ? std::vector<mln_image_stretch>{}
-            : std::vector<
-                mln_image_stretch>{value.stretch_x, value.stretch_x + value.stretch_x_count}
-        ),
-        stretch_y(
-          value.stretch_y == nullptr
-            ? std::vector<mln_image_stretch>{}
-            : std::vector<mln_image_stretch>{
-                value.stretch_y, value.stretch_y + value.stretch_y_count
-              }
-        ) {
-    value.stretch_x = stretch_x.data();
-    value.stretch_y = stretch_y.data();
-  }
-};
 template <typename Options>
 struct OwnedCallbackSourceOptions {
   enum class Ownership : std::uint8_t {
@@ -412,7 +365,7 @@ auto mln_map_list_style_sources(
       if (                                                                   \
         !valid_non_empty_view(source_id, "source_id") ||                     \
         !valid_non_empty_view(url, "url") ||                                 \
-        mln::core::validate_tile_command_options(options, KIND) !=           \
+        mln::core::validate_tile_source_options(options, KIND) !=            \
           MLN_STATUS_OK                                                      \
       ) {                                                                    \
         return MLN_STATUS_INVALID_ARGUMENT;                                  \
@@ -445,7 +398,7 @@ auto mln_map_list_style_sources(
       if (                                                                   \
         !valid_non_empty_view(source_id, "source_id") ||                     \
         !valid_tile_urls(tiles, tile_count) ||                               \
-        mln::core::validate_tile_command_options(options, KIND) !=           \
+        mln::core::validate_tile_source_options(options, KIND) !=            \
           MLN_STATUS_OK                                                      \
       ) {                                                                    \
         return MLN_STATUS_INVALID_ARGUMENT;                                  \
@@ -486,7 +439,7 @@ auto mln_map_add_geojson_source_url(
     if (
       !valid_non_empty_view(source_id, "source_id") ||
       !valid_non_empty_view(url, "url") ||
-      mln::core::validate_geojson_command_options(options) != MLN_STATUS_OK
+      mln::core::validate_geojson_source_options(options) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -682,7 +635,7 @@ auto mln_map_add_custom_geometry_source(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return add_callback_source(
       map, source_id, options,
-      mln::core::validate_custom_geometry_command_options,
+      mln::core::validate_custom_geometry_source_options,
       mln::core::map_add_custom_geometry_source, completion
     );
   });
@@ -764,7 +717,8 @@ auto mln_map_add_custom_mvt_vector_source(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return add_callback_source(
-      map, source_id, options, mln::core::validate_custom_mvt_command_options,
+      map, source_id, options,
+      mln::core::validate_custom_mvt_vector_source_options,
       mln::core::map_add_custom_mvt_vector_source, completion
     );
   });
@@ -856,25 +810,16 @@ auto mln_map_set_style_image(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(image_id, "image_id") ||
-      mln::core::validate_style_image_command_input(image, options) !=
-        MLN_STATUS_OK
+      mln::core::validate_style_image_input(image, options) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    auto id = OwnedView{image_id};
-    auto owned_image = OwnedImage{image};
-    auto owned_options = OwnedImageOptions{options};
     return mln::core::submit_map_command(
       map,
-      [id = std::move(id), image = std::move(owned_image),
-       options = std::move(owned_options)](mln::core::MapObject& live) mutable
-        -> mln_status {
-        image.value.pixels = image.pixels.data();
-        options.value.stretch_x = options.stretch_x.data();
-        options.value.stretch_y = options.stretch_y.data();
-        return mln::core::map_set_style_image(
-          live, id.view(), &image.value, &options.value
-        );
+      [image = mln::core::make_style_image(image_id, *image, options)](
+        mln::core::MapObject& live
+      ) mutable -> mln_status {
+        return mln::core::map_set_style_image(live, std::move(image));
       },
       completion
     );
@@ -932,7 +877,7 @@ auto mln_map_add_image_source_url(
     if (
       !valid_non_empty_view(source_id, "source_id") ||
       !valid_non_empty_view(url, "url") ||
-      mln::core::validate_image_source_command_coordinates(
+      mln::core::validate_image_source_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK
     ) {
@@ -947,7 +892,7 @@ auto mln_map_add_image_source_url(
       [id = std::move(id), value = std::move(value),
        points = std::move(points)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_add_image_source_url(
-          live, id.view(), points.data(), points.size(), value.view()
+          live, id.view(), points.data(), value.view()
         );
       },
       completion
@@ -963,16 +908,17 @@ auto mln_map_add_image_source_image(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(source_id, "source_id") ||
-      mln::core::validate_image_source_command_coordinates(
+      mln::core::validate_image_source_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK ||
-      mln::core::validate_style_image_command_input(image, nullptr) !=
-        MLN_STATUS_OK
+      mln::core::validate_style_image_input(image, nullptr) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    auto owned = OwnedImage{image};
+    auto owned = std::make_shared<mln::PremultipliedImage>(
+      mln::core::to_native_premultiplied_rgba8_image(*image)
+    );
     auto points =
       std::vector<mln_lat_lng>(coordinates, coordinates + coordinate_count);
     return mln::core::submit_map_command(
@@ -980,9 +926,8 @@ auto mln_map_add_image_source_image(
       [id = std::move(id), owned = std::move(owned),
        points =
          std::move(points)](mln::core::MapObject& live) mutable -> mln_status {
-        owned.value.pixels = owned.pixels.data();
         return mln::core::map_add_image_source_image(
-          live, id.view(), points.data(), points.size(), &owned.value
+          live, id.view(), points.data(), std::move(*owned)
         );
       },
       completion
@@ -1024,21 +969,21 @@ auto mln_map_set_image_source_image(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(source_id, "source_id") ||
-      mln::core::validate_style_image_command_input(image, nullptr) !=
-        MLN_STATUS_OK
+      mln::core::validate_style_image_input(image, nullptr) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    auto owned = OwnedImage{image};
+    auto owned = std::make_shared<mln::PremultipliedImage>(
+      mln::core::to_native_premultiplied_rgba8_image(*image)
+    );
     return mln::core::submit_map_command(
       map,
       [id = std::move(id),
        owned =
          std::move(owned)](mln::core::MapObject& live) mutable -> mln_status {
-        owned.value.pixels = owned.pixels.data();
         return mln::core::map_set_image_source_image(
-          live, id.view(), &owned.value
+          live, id.view(), std::move(*owned)
         );
       },
       completion
@@ -1054,7 +999,7 @@ auto mln_map_set_image_source_coordinates(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       !valid_non_empty_view(source_id, "source_id") ||
-      mln::core::validate_image_source_command_coordinates(
+      mln::core::validate_image_source_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK
     ) {
@@ -1068,7 +1013,7 @@ auto mln_map_set_image_source_coordinates(
       [id = std::move(id),
        points = std::move(points)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_image_source_coordinates(
-          live, id.view(), points.data(), points.size()
+          live, id.view(), points.data()
         );
       },
       completion
@@ -1390,9 +1335,8 @@ auto mln_map_get_style_layer_json(
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        mln::core::map_get_style_layer_json(
-          live, id.view(), result.bytes, result.found
-        );
+        result.found =
+          mln::core::map_get_style_layer_json(live, id.view(), result.bytes);
         return MLN_STATUS_OK;
       },
       completion
@@ -1548,10 +1492,8 @@ auto mln_map_get_style_transition_options(
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         result.transition_options =
-          mln::core::style_transition_options_default();
-        return mln::core::map_get_style_transition_options(
-          live, &result.transition_options
-        );
+          mln::core::map_get_style_transition_options(live);
+        return MLN_STATUS_OK;
       },
       completion
     );

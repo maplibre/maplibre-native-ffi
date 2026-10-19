@@ -49,6 +49,8 @@ class UpdateParameters;
 
 namespace mln::core {
 
+struct MapObject;
+
 enum class RenderSessionKind : uint8_t { Surface, Texture };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
@@ -677,6 +679,10 @@ struct mln_render_session_object
   mln::core::RetirementTask disposal_task;
   std::shared_ptr<mln_render_session_object> disposal_owner;
   mln_map map = MLN_HANDLE_NULL;
+  // The map object while `attached` holds, for the render-facing map helpers.
+  // Set by attach and cleared by detach, on the thread that claims or releases
+  // the map; driver work reads it only while the session is attached.
+  mln::core::MapObject* map_object = nullptr;
   uint32_t width = 0;
   uint32_t height = 0;
   uint32_t physical_width = 0;
@@ -693,7 +699,8 @@ struct mln_render_session_object
   mln_render_session_capabilities capabilities{};
   uint64_t generation = 1;
   uint64_t map_update_generation = 0;
-  uint64_t rendered_generation = 0;
+  // The map update generation of the last rendered frame.
+  uint64_t rendered_update_generation = 0;
   uint64_t rendered_target_generation = 0;
   std::optional<mln::TransformState> rendered_transform;
   uint64_t extent_generation = 1;
@@ -837,8 +844,10 @@ auto start_attach_render_session(
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
   const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status;
+// Called on the runtime worker when the attached map announces the render
+// update of `update_generation`.
 auto notify_render_session_map_update(
-  mln_render_session_object* session
+  mln_render_session_object* session, uint64_t update_generation
 ) noexcept -> void;
 
 auto register_render_session(std::shared_ptr<mln_render_session_object> session)

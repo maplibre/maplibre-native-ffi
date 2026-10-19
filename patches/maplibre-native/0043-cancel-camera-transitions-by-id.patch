@@ -18,12 +18,13 @@ diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
 index d5dca349dedb..19dd8288bc05 100644
 --- a/include/mln/map/map.hpp
 +++ b/include/mln/map/map.hpp
-@@ -63,6 +63,9 @@ public:
+@@ -63,6 +63,10 @@ public:
  
      // Transition
      void cancelTransitions();
 +    /// Cancels the commands whose AnimationOptions::transitionId equals
-+    /// `transitionId`, and leaves the others running.
++    /// `transitionId`, and leaves the others running. Requests an update only
++    /// when a command ended.
 +    void cancelTransitions(uint64_t transitionId);
      void setGestureInProgress(bool);
      bool isGestureInProgress() const;
@@ -32,13 +33,12 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
 index ef034b4bd8b1..89a4b90737db 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
-@@ -120,6 +120,11 @@ void Map::cancelTransitions() {
+@@ -120,6 +120,10 @@ void Map::cancelTransitions() {
      impl->onUpdate();
  }
  
 +void Map::cancelTransitions(uint64_t transitionId) {
-+    impl->transform.cancelTransitions(transitionId);
-+    impl->onUpdate();
++    if (impl->transform.cancelTransitions(transitionId)) impl->onUpdate();
 +}
 +
  void Map::setGestureInProgress(bool inProgress) {
@@ -48,20 +48,21 @@ diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
 index f091f2d5cf35..793b44a3f7ad 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
-@@ -718,6 +718,18 @@ void Transform::cancelTransitions() {
+@@ -718,6 +718,19 @@ void Transform::cancelTransitions() {
      finishTransitions(finished);
  }
  
-+void Transform::cancelTransitions(uint64_t transitionId) {
++bool Transform::cancelTransitions(uint64_t transitionId) {
 +    std::vector<std::shared_ptr<Transition>> finished;
 +    std::erase_if(transitions, [&](const auto& transition) {
 +        if (transition->animation.transitionId != transitionId) return false;
 +        finished.push_back(transition);
 +        return true;
 +    });
-+    if (finished.empty()) return;
++    if (finished.empty()) return false;
 +    updateMovementFlags();
 +    finishTransitions(finished);
++    return true;
 +}
 +
  void Transform::setGestureInProgress(bool inProgress) {
@@ -71,13 +72,14 @@ diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
 index 3107c308b74b..73ff1457b174 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
-@@ -120,6 +120,9 @@ public:
+@@ -120,6 +120,10 @@ public:
      TimePoint getLatestTransitionStart() const { return latestTransitionStart; }
      Duration getLatestTransitionDuration() const { return latestTransitionDuration; }
      void cancelTransitions();
 +    // Cancels the commands whose AnimationOptions::transitionId equals
-+    // `transitionId`, and leaves the others running.
-+    void cancelTransitions(uint64_t transitionId);
++    // `transitionId`, leaves the others running, and returns whether any
++    // command ended.
++    bool cancelTransitions(uint64_t transitionId);
  
      // Gesture
      void setGestureInProgress(bool);
@@ -119,7 +121,7 @@ index 8547b69fcdf2..d018e7366bbd 100644
 +
 +    // Only the command with the identity finishes, once, and the other keeps
 +    // animating.
-+    transform.cancelTransitions(1);
++    EXPECT_TRUE(transform.cancelTransitions(1));
 +    EXPECT_EQ(zoomFinished, 1u);
 +    EXPECT_EQ(bearingFinished, 0u);
 +    EXPECT_EQ(observer.changes, 1u);
@@ -129,8 +131,8 @@ index 8547b69fcdf2..d018e7366bbd 100644
 +
 +    // An identity that no running command carries finishes nothing and
 +    // reports no change.
-+    transform.cancelTransitions(1);
-+    transform.cancelTransitions(3);
++    EXPECT_FALSE(transform.cancelTransitions(1));
++    EXPECT_FALSE(transform.cancelTransitions(3));
 +    EXPECT_EQ(zoomFinished, 1u);
 +    EXPECT_EQ(observer.changes, 1u);
 +    EXPECT_TRUE(transform.inTransition());

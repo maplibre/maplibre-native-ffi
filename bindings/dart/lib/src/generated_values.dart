@@ -242,7 +242,11 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   /// `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
   /// the results of demands accepted after it. The flag does not pace: a host
   /// that re-arms a waiting demand as each result arrives renders every update
-  /// the map publishes.
+  /// the map publishes. The map publishes one update for the commands that its
+  /// runtime worker runs back to back, but a command that reaches the worker
+  /// while a frame renders appears in a later frame. To show several commands
+  /// in one frame, submit them in a command group, or arm demands once per
+  /// display frame.
   static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
@@ -3503,7 +3507,6 @@ final class MapSnapshot extends _Value {
     this.viewport = const MapViewportOptions(),
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
-    this.repaintDemand = false,
     this.gestureInProgress = false,
     this.eventMask = const RuntimeEventMask.fromRawValue(0),
     required this.latestRenderUpdateGeneration,
@@ -3523,7 +3526,6 @@ final class MapSnapshot extends _Value {
   /// True once every requested style and tile resource finished loading.
   final bool fullyLoaded;
   final bool renderingStatsViewEnabled;
-  final bool repaintDemand;
 
   /// True while the map is inside a gesture.
   final bool gestureInProgress;
@@ -3547,7 +3549,6 @@ final class MapSnapshot extends _Value {
     viewport,
     fullyLoaded,
     renderingStatsViewEnabled,
-    repaintDemand,
     gestureInProgress,
     eventMask,
     latestRenderUpdateGeneration,

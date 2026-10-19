@@ -22,7 +22,7 @@ class OperationObject final {
   OperationObject(OperationObject&&) = delete;
   auto operator=(const OperationObject&) -> OperationObject& = delete;
   auto operator=(OperationObject&&) -> OperationObject& = delete;
-  ~OperationObject() = default;
+  ~OperationObject();
 
   auto set_terminal_callback(TerminalCallback callback) noexcept -> void;
   auto complete(

@@ -991,7 +991,6 @@ internal static unsafe class GeneratedValues
             CopyMapViewportOptions(value.viewport),
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,
-            value.repaint_demand != 0,
             value.gesture_in_progress != 0,
             (RuntimeEventMask)value.event_mask,
             value.latest_render_update_generation,
@@ -1018,7 +1017,6 @@ internal static unsafe class GeneratedValues
         native.viewport = NativeMapViewportOptions(value.Viewport);
         native.fully_loaded = (byte)(value.FullyLoaded ? 1 : 0);
         native.rendering_stats_view_enabled = (byte)(value.RenderingStatsViewEnabled ? 1 : 0);
-        native.repaint_demand = (byte)(value.RepaintDemand ? 1 : 0);
         native.gesture_in_progress = (byte)(value.GestureInProgress ? 1 : 0);
         native.event_mask = (ulong)value.EventMask;
         native.latest_render_update_generation = value.LatestRenderUpdateGeneration;

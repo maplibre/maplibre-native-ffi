@@ -1269,7 +1269,11 @@ pub struct FrameDemandFlag: u32 {
     /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
     /// follow the results of demands accepted after it. The flag does not pace:
     /// a host that re-arms a waiting demand as each result arrives renders
-    /// every update the map publishes.
+    /// every update the map publishes. The map publishes one update for the
+    /// commands that its runtime worker runs back to back, but a command that
+    /// reaches the worker while a frame renders appears in a later frame. To
+    /// show several commands in one frame, submit them in a command group, or
+    /// arm demands once per display frame.
     const WAIT_FOR_UPDATE = 4;
 }
 }
@@ -2176,7 +2180,6 @@ pub struct MapSnapshot {
     /// True once every requested style and tile resource finished loading.
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
-    pub repaint_demand: bool,
     /// True while the map is inside a gesture.
     pub gesture_in_progress: bool,
     pub event_mask: RuntimeEventMask,
@@ -2199,7 +2202,6 @@ impl MapSnapshot {
         viewport: MapViewportOptions,
         fully_loaded: bool,
         rendering_stats_view_enabled: bool,
-        repaint_demand: bool,
         gesture_in_progress: bool,
         event_mask: RuntimeEventMask,
         latest_render_update_generation: u64,
@@ -2216,7 +2218,6 @@ impl MapSnapshot {
             viewport,
             fully_loaded,
             rendering_stats_view_enabled,
-            repaint_demand,
             gesture_in_progress,
             event_mask,
             latest_render_update_generation,
@@ -2237,7 +2238,6 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
             viewport: unsafe { from_native(raw.viewport) }?,
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
-            repaint_demand: raw.repaint_demand,
             gesture_in_progress: raw.gesture_in_progress,
             event_mask: unsafe { from_native(raw.event_mask) }?,
             latest_render_update_generation: raw.latest_render_update_generation,

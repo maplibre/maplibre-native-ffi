@@ -217,23 +217,28 @@ auto start_style_operation(
     map, &deliver_style_result<Function>, std::move(work), completion
   );
 }
-auto validate_geojson_command_options(const mln_geojson_source_options* options)
-  -> mln_status;
 enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
-auto validate_tile_command_options(
+auto validate_tile_source_options(
   const mln_style_tile_source_options* options, TileSourceOptionKind kind
 ) -> mln_status;
-auto validate_custom_geometry_command_options(
+auto validate_custom_geometry_source_options(
   const mln_custom_geometry_source_options* options
 ) -> mln_status;
-auto validate_custom_mvt_command_options(
+auto validate_custom_mvt_vector_source_options(
   const mln_custom_mvt_vector_source_options* options
 ) -> mln_status;
-auto validate_style_image_command_input(
+auto validate_style_image_input(
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status;
-auto validate_image_source_command_coordinates(
+auto to_native_premultiplied_rgba8_image(
+  const mln_premultiplied_rgba8_image& image
+) -> mln::PremultipliedImage;
+auto make_style_image(
+  mln_buffer_view image_id, const mln_premultiplied_rgba8_image& image,
+  const mln_style_image_options* options
+) -> mln::style::Image;
+auto validate_image_source_coordinates(
   const mln_lat_lng* coordinates, size_t coordinate_count
 ) -> mln_status;
 auto validate_location_indicator_location_command(
@@ -369,11 +374,8 @@ auto map_set_custom_mvt_vector_source_tile_error(
 auto map_invalidate_custom_mvt_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
-auto map_set_style_image(
-  MapObject& live, mln_buffer_view image_id,
-  const mln_premultiplied_rgba8_image* image,
-  const mln_style_image_options* options
-) -> mln_status;
+auto map_set_style_image(MapObject& live, mln::style::Image&& image)
+  -> mln_status;
 auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   -> mln_status;
 auto map_get_style_image(
@@ -381,22 +383,20 @@ auto map_get_style_image(
 ) -> bool;
 auto map_add_image_source_url(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_buffer_view url
+  mln_buffer_view url
 ) -> mln_status;
 auto map_add_image_source_image(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, const mln_premultiplied_rgba8_image* image
+  mln::PremultipliedImage image
 ) -> mln_status;
 auto map_set_image_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
 auto map_set_image_source_image(
-  MapObject& live, mln_buffer_view source_id,
-  const mln_premultiplied_rgba8_image* image
+  MapObject& live, mln_buffer_view source_id, mln::PremultipliedImage image
 ) -> mln_status;
 auto map_set_image_source_coordinates(
-  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count
+  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates
 ) -> mln_status;
 auto map_get_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id,
@@ -439,9 +439,8 @@ auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_get_style_layer_json(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
-  bool& out_found
-) -> void;
+  MapObject& live, mln_buffer_view layer_id, std::string& out_layer
+) -> bool;
 auto map_set_global_state_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
@@ -459,9 +458,8 @@ auto map_get_style_light_property(
 auto map_set_style_transition_options(
   MapObject& live, const mln_style_transition_options* options
 ) -> mln_status;
-auto map_get_style_transition_options(
-  MapObject& live, mln_style_transition_options* out_options
-) -> mln_status;
+auto map_get_style_transition_options(MapObject& live)
+  -> mln_style_transition_options;
 auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
@@ -654,30 +652,45 @@ auto map_native(MapObject& map) -> mln::Map&;
 auto map_post_resize(mln_map map, uint32_t width, uint32_t height)
   -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
-auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
-auto map_latest_update_generation(mln_map map) noexcept -> uint64_t;
-auto map_latest_update_snapshot(mln_map map, uint64_t& out_generation)
-  -> std::shared_ptr<mln::UpdateParameters>;
+// Installs the hook through which the map announces each render update to its
+// attached session, with the update's generation. The map calls it on the
+// runtime worker; an empty function removes it.
 auto map_set_render_session_publish_callback(
-  mln_map map, std::function<void()> callback
+  mln_map map, std::function<void(uint64_t)> callback
 ) -> mln_status;
-// Copies the map's coalesced feature-state snapshot. Callable from a render
-// session's owner thread while the map is attached to that session.
-auto map_feature_state_snapshot(mln_map map)
+
+// The render-facing helpers below take the map object that
+// map_attach_render_target_session() returned. The attachment holds a child of
+// the map's control state, so the object stays alive until the session
+// detaches, and they are callable from the session's driver thread meanwhile.
+auto map_latest_update(MapObject& map)
+  -> std::shared_ptr<mln::UpdateParameters>;
+auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t;
+// The latest update and its generation, read under one lock so a frame result
+// reports the generation of the update it rendered.
+auto map_latest_update_snapshot(MapObject& map, uint64_t& out_generation)
+  -> std::shared_ptr<mln::UpdateParameters>;
+// Copies the map's coalesced feature-state snapshot.
+auto map_feature_state_snapshot(MapObject& map)
   -> std::shared_ptr<const FeatureStateSnapshot>;
-auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
+auto map_renderer_observer(MapObject& map) -> mln::RendererObserver*;
 // Tells the map which update generation the session is about to render, so a
 // frame of an update older than a pending still image request cannot complete
-// it. Called on the rendering thread.
-auto map_begin_render(mln_map map, uint64_t update_generation) noexcept -> void;
-auto map_run_render_jobs(mln_map map) -> void;
+// it.
+auto map_begin_render(MapObject& map, uint64_t update_generation) noexcept
+  -> void;
+auto map_run_render_jobs(MapObject& map) -> void;
 // Blocks until the map's queued and running tile-worker jobs drain. Abandon
 // uses it so a host may destroy its graphics device as soon as abandon
 // returns. Leases the map for the wait, so the caller need only hold a handle
 // that was live when the call began. Must not be called from a MapLibre worker
 // thread.
 auto map_quiesce_render_workers(mln_map map) -> void;
-auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;
+// Claims the map for `session` and returns the map object that the
+// render-facing helpers above take.
+auto map_attach_render_target_session(
+  mln_map map, void* session, MapObject*& out_map
+) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;
 
 }  // namespace mln::core

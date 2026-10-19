@@ -2,7 +2,6 @@
 
 #include <any>
 #include <atomic>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -43,6 +42,7 @@ struct RuntimeObject;
 class Wake;
 class OperationObject;
 class Completion;
+struct RuntimeEventQueueState;
 
 // A map event raised inside a map transaction. It waits there for the
 // generation that the transaction publishes.
@@ -85,6 +85,9 @@ struct CameraTransitionCancellation {
 struct MapEventState {
   // Any thread reads the mask; map commands write it on the runtime worker.
   std::atomic<uint64_t> mask;
+  // Fixed before the map's producers start. The queue outlives the runtime
+  // handle and serializes event publication with map retirement.
+  std::shared_ptr<RuntimeEventQueueState> event_queue;
 
   // Every field below is runtime-worker only, and only the map that owns this
   // state calls publish() or queues events through it.
@@ -93,7 +96,6 @@ struct MapEventState {
   // subscription mask can never change their return status.
   std::string style_load_failure;
   bool style_load_failed = false;
-  mln_runtime runtime = MLN_HANDLE_NULL;
   mln_map map = MLN_HANDLE_NULL;
   std::weak_ptr<MapObject> owner;
   uint64_t published_generation = 0;
@@ -312,12 +314,15 @@ struct RuntimeEventQueueState {
   std::mutex mutex;
   std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
   RuntimeEventStorage pending;
+  RuntimeEventStorage recycled;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
   std::shared_ptr<mln::core::Wake> wake;
 };
 
 struct EventBatchObject {
   RuntimeEventStorage storage;
+  std::weak_ptr<RuntimeEventQueueState> queue;
+  ~EventBatchObject();
 };
 
 struct RuntimeObject {
@@ -325,11 +330,9 @@ struct RuntimeObject {
   void* platform_context = nullptr;
   ControlState control;
   RetirementTask disposal_task;
-  RetirementTask disposal_worker_task;
   std::shared_ptr<RuntimeObject> disposal_owner;
-  // Reported by the disposal lane once retirement finishes; null for dispose.
+  // Reported by the worker after its run loop retires; null for dispose.
   std::shared_ptr<Completion> release_completion;
-  bool disposal_state_retired = false;
   std::atomic_bool disposal_requested = false;
   bool disposal_drained = false;
   bool disposal_scheduled = false;
@@ -337,9 +340,6 @@ struct RuntimeObject {
   // The single commit point for commands, operations, barriers, and close.
   std::mutex submission_mutex;
   std::mutex terminal_mutex;
-  // Signals only disposal_state_retired, to the disposal lane task that waits
-  // for the worker to release its reachable state.
-  std::condition_variable terminal_condition;
   uint64_t next_submission_sequence = 1;
   std::set<uint64_t> pending_submissions;
   std::map<uint64_t, std::shared_ptr<mln::core::OperationObject>>
@@ -473,6 +473,11 @@ auto retain_runtime_map(mln_runtime runtime) -> mln_status;
 auto release_runtime_map(mln_runtime runtime) noexcept -> void;
 [[nodiscard]] auto lease_runtime(mln_runtime runtime)
   -> std::shared_ptr<RuntimeObject>;
+// The caller holds submission_mutex and a lease that keeps the executor live.
+auto track_runtime_submission(RuntimeObject& runtime) -> uint64_t;
+auto finish_runtime_submission(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void;
 auto submit_runtime_command(
   const std::shared_ptr<RuntimeObject>& runtime,
   std::function<void(uint64_t)> function,
@@ -482,7 +487,7 @@ auto submit_runtime_command(
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,
-  std::function<void()> function, bool child_retirement = false
+  std::function<void()> function
 ) -> mln_status;
 
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;
@@ -511,13 +516,14 @@ auto has_resource_transform_for_platform_context(
 // holds a transaction's events and stamps every event's generation. Producers
 // test their subscription mask before they build an event.
 auto push_runtime_map_event_payload(
-  mln_runtime runtime, mln_map map, uint64_t generation, uint32_t type,
-  uint32_t payload_type, const mln_runtime_event_payload& payload,
-  int32_t code = 0, std::string message = {}
+  const std::shared_ptr<RuntimeEventQueueState>& queue, mln_map map,
+  uint64_t generation, uint32_t type, uint32_t payload_type,
+  const mln_runtime_event_payload& payload, int32_t code = 0,
+  std::string message = {}
 ) -> void;
 auto push_runtime_map_events(
-  mln_runtime runtime, mln_map map, uint64_t generation,
-  std::vector<HeldMapEvent>& events
+  const std::shared_ptr<RuntimeEventQueueState>& queue, mln_map map,
+  uint64_t generation, std::vector<HeldMapEvent>& events
 ) -> void;
 auto register_runtime_map_events(
   mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state

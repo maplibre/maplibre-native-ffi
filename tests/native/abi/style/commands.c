@@ -67,7 +67,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   );
   TEST_ASSERT_FALSE(source_exists(map, "owned-source"));
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "owned-source",
+    MLN_STATUS_NOT_FOUND, "source does not exist",
     mln_map_remove_style_source(map, source, &completion.descriptor, NULL)
   );
 
@@ -109,7 +109,7 @@ static void missing_style_ids_report_not_found(void) {
   const char* missing_source = "source does not exist";
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "absent-layer",
+    MLN_STATUS_NOT_FOUND, missing_layer,
     mln_map_remove_style_layer(map, layer, &completion.descriptor, NULL)
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
@@ -173,7 +173,7 @@ static void missing_style_ids_report_not_found(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "absent-source",
+    MLN_STATUS_NOT_FOUND, missing_source,
     mln_map_remove_style_source(map, source, &completion.descriptor, NULL)
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
@@ -204,7 +204,7 @@ static void missing_style_ids_report_not_found(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "absent-source",
+    MLN_STATUS_NOT_FOUND, missing_source,
     mln_map_set_style_source_volatile(
       map, source, true, &completion.descriptor, NULL
     )
