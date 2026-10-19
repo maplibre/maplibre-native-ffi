@@ -1161,6 +1161,38 @@ checksum = "sha256:0c395ccfbdbfaf7f0f6459729284c30fb18391a9e7a95c2b64573fd2edd1c
 url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-windows-amd64.tar.gz"
 url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584158"
 
+[[tools."github:nicklockwood/SwiftFormat"]]
+version = "0.64.0"
+backend = "github:nicklockwood/SwiftFormat"
+
+[tools."github:nicklockwood/SwiftFormat".options]
+no_app = "true"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.linux-arm64"]
+checksum = "sha256:6b53c985b3849be0c9544bf93a378c12aaa761a7225f05f0b9948f827dd7db52"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux_aarch64.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824031"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.linux-x64"]
+checksum = "sha256:599eb5d2d8cf43e1128e79cd72f3bc2fec1b3189c3ac7593fbe732f2568fed36"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824032"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.macos-arm64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.windows-arm64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.windows-x64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
 backend = "github:sargunv/jvl"
@@ -1407,38 +1439,6 @@ url = "https://download.swift.org/swift-6.4.1-release/windows10-arm64/swift-6.4.
 
 [tools.swift."platforms.windows-x64"]
 url = "https://download.swift.org/swift-6.4.1-release/windows10/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-windows10.exe"
-
-[[tools."github:nicklockwood/SwiftFormat"]]
-version = "0.64.0"
-backend = "github:nicklockwood/SwiftFormat"
-
-[tools."github:nicklockwood/SwiftFormat".options]
-no_app = "true"
-
-[tools."github:nicklockwood/SwiftFormat"."platforms.linux-arm64"]
-checksum = "sha256:6b53c985b3849be0c9544bf93a378c12aaa761a7225f05f0b9948f827dd7db52"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux_aarch64.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824031"
-
-[tools."github:nicklockwood/SwiftFormat"."platforms.linux-x64"]
-checksum = "sha256:599eb5d2d8cf43e1128e79cd72f3bc2fec1b3189c3ac7593fbe732f2568fed36"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824032"
-
-[tools."github:nicklockwood/SwiftFormat"."platforms.macos-arm64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
-
-[tools."github:nicklockwood/SwiftFormat"."platforms.windows-arm64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
-
-[tools."github:nicklockwood/SwiftFormat"."platforms.windows-x64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
 
 [[tools.zig]]
 version = "0.17.0"
