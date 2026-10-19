@@ -382,8 +382,19 @@ runs:
         restore-keys: |
           ${{ steps.toolchain-key.outputs.prefix }}-
 
+    # Windows stays on mise 2026.8.2 for the Flutter zip extract (#844). That
+    # release does not verify github-attestations provenance that 2026.10.13
+    # records in mise.lock (aqua:dprint/dprint@0.63.0), so skip the lockfile
+    # for the rest of the Windows job. Unix keeps lockfile installs.
+    - name: Skip lockfile on Windows mise 2026.8.2
+      if: runner.os == 'Windows'
+      shell: bash
+      run: echo "MISE_LOCKFILE=false" >> "$GITHUB_ENV"
+
     - name: Bootstrap repository
       uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       with:
         # Windows uses 2026.8.2. mise 2026.10.13 extracts http:flutter into
         # installs\flutter\.mise-tmp-* and fails with Access is denied (os
