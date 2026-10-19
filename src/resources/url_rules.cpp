@@ -1,3 +1,4 @@
+#include <array>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -59,8 +60,16 @@ CompiledGlob::CompiledGlob(std::string_view pattern) {
 
 auto CompiledGlob::matches(std::string_view candidate, std::size_t* steps) const
   -> bool {
-  thread_local auto states = std::vector<std::uint8_t>{};
-  states.resize(tokens_.size() + 1);
+  // The library builds without static and thread-local destructors, so the
+  // state row lives on the stack and only an unusually long pattern allocates.
+  constexpr auto inline_state_count = std::size_t{256};
+  auto inline_states = std::array<std::uint8_t, inline_state_count>{};
+  auto heap_states = std::vector<std::uint8_t>{};
+  auto* states = inline_states.data();
+  if (tokens_.size() + 1 > inline_state_count) {
+    heap_states.resize(tokens_.size() + 1);
+    states = heap_states.data();
+  }
   if (steps != nullptr) *steps = 0;
   states[0] = 1;
   for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
@@ -92,7 +101,7 @@ auto CompiledGlob::matches(std::string_view candidate, std::size_t* steps) const
       previous = old;
     }
   }
-  return states.back() != 0;
+  return states[tokens_.size()] != 0;
 }
 
 UrlPattern::UrlPattern(
