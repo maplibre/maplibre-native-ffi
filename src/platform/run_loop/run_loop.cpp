@@ -62,22 +62,10 @@ void RunLoop::run() {
       remaining = defaultQueue.size() + highPriorityQueue.size();
     }
 
-    std::unique_lock wake_lock(impl->wake.wake_mutex);
     if (!impl->running) {
       break;
     }
-
-    if (remaining == 0 && !impl->wake.notified) {
-      auto const predicate = [&] {
-        return impl->wake.notified || !impl->running;
-      };
-      if (timeout.count() < 0) {
-        impl->wake.cv.wait(wake_lock, predicate);
-      } else {
-        impl->wake.cv.wait_for(wake_lock, timeout, predicate);
-      }
-    }
-    impl->wake.notified = false;
+    impl->wake.wait(remaining == 0 ? timeout : mln::Milliseconds::zero());
   }
 }
 

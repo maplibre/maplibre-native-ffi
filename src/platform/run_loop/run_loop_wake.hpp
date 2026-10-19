@@ -24,14 +24,32 @@ struct RunLoopWake {
   std::mutex wake_mutex;
   std::condition_variable cv;
   bool notified = false;
+  bool waiting = false;
 
   std::mutex runnables_mutex;
   std::list<std::shared_ptr<Runnable>> runnables;
 
   void notify() {
     const std::lock_guard lock(wake_mutex);
+    // Record work even during dispatch; the worker consumes it before waiting.
+    const auto signal = waiting && !notified;
     notified = true;
-    cv.notify_one();
+    if (signal) cv.notify_one();
+  }
+
+  void wait(mln::Milliseconds timeout) {
+    auto lock = std::unique_lock{wake_mutex};
+    if (!notified && timeout != mln::Milliseconds::zero()) {
+      waiting = true;
+      const auto predicate = [&] { return notified; };
+      if (timeout.count() < 0) {
+        cv.wait(lock, predicate);
+      } else {
+        cv.wait_for(lock, timeout, predicate);
+      }
+      waiting = false;
+    }
+    notified = false;
   }
 
   void addRunnable(std::shared_ptr<Runnable> runnable) {
