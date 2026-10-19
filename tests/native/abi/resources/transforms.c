@@ -142,6 +142,7 @@ static void header_transform_with_zero_size(void* descriptor) {
   ((mln_http_header_transform*)descriptor)->size = 0;
 }
 
+#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static const mln_http_header_rule unused_header_rule = {
   .url = MLN_BUFFER_LITERAL("http://127.0.0.1/unused"),
 };
@@ -150,6 +151,7 @@ static void header_transform_with_rules(void* descriptor) {
   ((mln_http_header_transform*)descriptor)->rules = &unused_header_rule;
   ((mln_http_header_transform*)descriptor)->rule_count = 1;
 }
+#endif
 
 // A transport that cannot drop a transformed header when a redirect changes
 // origin reports MLN_STATUS_UNSUPPORTED rather than leak the credential to the
