@@ -384,12 +384,15 @@ runs:
 
     # Windows stays on mise 2026.8.2 for the Flutter zip extract (#844). That
     # release does not verify github-attestations provenance that 2026.10.13
-    # records in mise.lock (aqua:dprint/dprint@0.63.0), so skip the lockfile
-    # for the rest of the Windows job. Unix keeps lockfile installs.
+    # records in mise.lock (aqua:dprint/dprint@0.63.0). Skip the lockfile on
+    # Windows, and do not let mise-action pass --locked (it conflicts with
+    # lockfile=false). Unix keeps lockfile installs.
     - name: Skip lockfile on Windows mise 2026.8.2
       if: runner.os == 'Windows'
       shell: bash
-      run: echo "MISE_LOCKFILE=false" >> "$GITHUB_ENV"
+      run: |
+        echo "MISE_LOCKFILE=false" >> "$GITHUB_ENV"
+        echo "MISE_LOCKED=false" >> "$GITHUB_ENV"
 
     - name: Bootstrap repository
       uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
@@ -403,10 +406,18 @@ runs:
         # windows-2022 image (#844).
         version: ${{ runner.os == 'Windows' && '2026.8.2' || '2026.10.13' }}
         cache: false
-        bootstrap: true
-        # The repository declares no managed files. Skip that unused Unix-only
-        # files phase on Windows so bootstrap does not validate an empty config.
-        bootstrap_skip: ${{ runner.os == 'Windows' && 'files' || '' }}
+        # Unix: mise-action runs locked bootstrap. Windows: install the mise
+        # binary only; the next step bootstraps without --locked.
+        bootstrap: ${{ runner.os != 'Windows' }}
+        install: ${{ runner.os != 'Windows' }}
+
+    - name: Bootstrap repository (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        MISE_NO_HOOKS: "1"
+      run: mise bootstrap --skip files
 
     # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
     # every `[monorepo].config_roots` entry, which is what the jobs run against.
