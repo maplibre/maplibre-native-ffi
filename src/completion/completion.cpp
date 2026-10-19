@@ -1,8 +1,11 @@
 #include <cassert>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
+
+#include <mln/util/logging.hpp>
 
 #include "completion/completion.hpp"
 
@@ -171,12 +174,7 @@ auto ValuelessCompletion::complete(
 Completion::Completion(CompletionSink sink) noexcept : sink_(std::move(sink)) {}
 
 Completion::~Completion() {
-  auto abandoned = false;
-  {
-    const std::scoped_lock lock(mutex_);
-    abandoned = state_ == State::Accepted;
-  }
-  if (abandoned) {
+  if (state_.load() == State::Accepted) {
     sink_.deliver(
       MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, 0,
       "asynchronous work was abandoned", nullptr, 0, 0, nullptr
@@ -186,33 +184,39 @@ Completion::~Completion() {
 }
 
 auto Completion::accept() noexcept -> void {
-  auto pending = Delivery{};
-  {
-    const std::scoped_lock lock(mutex_);
-    if (state_ != State::Pending) {
-      return;
-    }
-    if (pending_) {
-      state_ = State::Resolved;
-      pending = std::move(pending_);
-    } else {
-      state_ = State::Accepted;
-    }
-  }
-  if (pending) {
-    deliver(std::move(pending));
-  }
+  auto expected = State::Created;
+  state_.compare_exchange_strong(expected, State::Accepted);
 }
 
 auto Completion::reject() noexcept -> void {
-  auto discarded = CompletionSink{};
-  {
-    const std::scoped_lock lock(mutex_);
-    if (state_ == State::Pending) {
-      state_ = State::Rejected;
-      pending_ = {};
-      discarded = std::move(sink_);
-    }
+  auto expected = State::Created;
+  state_.compare_exchange_strong(expected, State::Rejected);
+}
+
+auto Completion::revoke() noexcept -> void {
+  auto expected = State::Accepted;
+  if (state_.compare_exchange_strong(expected, State::Rejected)) {
+    retirement_callback_ = {};
+  }
+}
+
+auto Completion::set_retirement_callback(
+  std::function<void()> callback
+) noexcept -> void {
+  assert(state_.load() == State::Created);
+  retirement_callback_ = std::move(callback);
+}
+
+auto Completion::retire_work() noexcept -> void { retire_part(); }
+
+auto Completion::retire_part() noexcept -> void {
+  if (retirement_parts_.fetch_sub(1) != 1) return;
+  auto callback = std::move(retirement_callback_);
+  if (!callback) return;
+  try {
+    callback();
+  } catch (...) {
+    // Retirement observation cannot reopen completed native work.
   }
 }
 
@@ -224,19 +228,24 @@ auto Completion::deliver_undelivered() noexcept -> void {
 }
 
 auto Completion::release() noexcept -> void {
-  auto sink = std::move(sink_);
-  sink_ = CompletionSink{};
-  // A queue completion owns nothing of the host's to release.
-  if (sink.queue_ != nullptr) return;
-  const auto release_user_data = sink.descriptor_.release_user_data;
-  const auto user_data = sink.descriptor_.user_data;
-  if (release_user_data != nullptr && !process_exiting()) {
-    try {
-      release_user_data(user_data);
-    } catch (...) {
-      // Release callbacks must not unwind through the C boundary.
+  {
+    // The sink's queue reference and unused fallback item go before
+    // retirement, so an observer of retirement sees the delivery finished.
+    auto sink = std::move(sink_);
+    sink_ = CompletionSink{};
+    // A queue completion owns nothing of the host's to release.
+    const auto release_user_data =
+      sink.queue_ == nullptr ? sink.descriptor_.release_user_data : nullptr;
+    const auto user_data = sink.descriptor_.user_data;
+    if (release_user_data != nullptr && !process_exiting()) {
+      try {
+        release_user_data(user_data);
+      } catch (...) {
+        // Release callbacks must not unwind through the C boundary.
+      }
     }
   }
+  retire_part();
 }
 
 auto validate_completion(const mln_completion* completion) -> mln_status {
@@ -267,7 +276,13 @@ auto validate_completion(const mln_completion* completion) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto accept_completion(
+auto validate_command_completion(const mln_completion* completion)
+  -> mln_status {
+  return completion == nullptr ? MLN_STATUS_OK
+                               : validate_completion(completion);
+}
+
+auto make_completion(
   const mln_completion* descriptor, std::shared_ptr<Completion>& out
 ) -> mln_status {
   const auto status = validate_completion(descriptor);
@@ -295,6 +310,16 @@ auto accept_completion(
   return MLN_STATUS_OK;
 }
 
+auto make_command_completion(
+  const mln_completion* descriptor, std::shared_ptr<Completion>& out
+) -> mln_status {
+  if (descriptor == nullptr) {
+    out = nullptr;
+    return MLN_STATUS_OK;
+  }
+  return make_completion(descriptor, out);
+}
+
 auto complete_failure(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic
@@ -312,6 +337,18 @@ auto complete_command(
     disposition = status == MLN_STATUS_CANCELLED
                     ? MLN_COMMAND_DISPOSITION_CANCELLED
                     : MLN_COMMAND_DISPOSITION_FAILED;
+  }
+  if (completion == nullptr) {
+    if (disposition == MLN_COMMAND_DISPOSITION_FAILED) {
+      try {
+        mln::Log::Warning(
+          mln::Event::General, "discarded command failed (status " +
+                                 std::to_string(status) + "): " + diagnostic
+        );
+      } catch (...) {
+      }
+    }
+    return;
   }
   completion->resolve([disposition, status, generation,
                        diagnostic =

@@ -45,9 +45,15 @@ Loading another style replaces the style's contents; host additions must be
 applied again.
 
 Map mutations are asynchronous commands. Acceptance means that native code
-copied and queued the input. A completion reports the command's outcome; the
-host observes that outcome even when it continues without waiting. Cancelling a
-binding's wait ends the wait, while native work continues.
+copied and queued the input. A completion reports the command's outcome. A host
+can discard that outcome by omitting the completion; failed discarded commands
+log a warning. Cancelling a binding's wait ends the wait, while native work
+continues.
+
+A later command completion on the same map or a runtime barrier fences discarded
+commands. A snapshot read after that completion observes their changes. A render
+session barrier fences its discarded resizes. A snapshot generation alone does
+not fence a command, because other work also publishes generations.
 
 Published snapshots give UI and display threads a synchronous copy of map state.
 Their generations connect commands, events, and rendered frames when a host

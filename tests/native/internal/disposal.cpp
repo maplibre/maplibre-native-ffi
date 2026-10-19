@@ -20,6 +20,7 @@
 #include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
+#include "support/camera.h"
 #include "support/frames.h"
 #include "support/harness.h"
 #include "support/status.h"
@@ -124,6 +125,27 @@ void park_worker(mln::core::RuntimeObject& runtime, WorkerGate& gate) {
   TEST_ASSERT_TRUE(await([&] { return gate.entered.load(); }, "the worker"));
 }
 
+void discarded_commands_keep_the_graph_alive_until_the_worker_drains() {
+  const auto runtime = create_runtime();
+  const auto map = create_map(runtime);
+  auto live = mln::core::lease_runtime(runtime);
+  auto weak = std::weak_ptr{live};
+  auto worker = WorkerGate{};
+  park_worker(*live, worker);
+  const auto submitted = mln_map_set_debug_options(
+    map, MLN_MAP_DEBUG_TILE_BORDERS, nullptr, nullptr
+  );
+  const auto map_disposed = mln_map_dispose(map, nullptr);
+  const auto runtime_disposed = mln_runtime_dispose(runtime, nullptr);
+  worker.release = true;
+  mln_test_pulse();
+  live.reset();
+  MLN_TEST_OK(submitted);
+  MLN_TEST_OK(map_disposed);
+  MLN_TEST_OK(runtime_disposed);
+  TEST_ASSERT_TRUE(expired(weak));
+}
+
 void runtime_barriers_observe_retired_command_captures() {
   struct Probe {
     std::atomic_bool retired = false;
@@ -140,7 +162,7 @@ void runtime_barriers_observe_retired_command_captures() {
   auto result = Result{};
   const auto descriptor_value = descriptor(result);
   auto completion = std::shared_ptr<mln::core::Completion>{};
-  MLN_TEST_OK(mln::core::accept_completion(&descriptor_value, completion));
+  MLN_TEST_OK(mln::core::make_completion(&descriptor_value, completion));
   auto capture = std::shared_ptr<Capture>(new Capture{probe});
   MLN_TEST_OK(
     mln::core::submit_runtime_command(
@@ -377,17 +399,15 @@ auto submit_pending_operation(
     pending
   );
   if (created != MLN_STATUS_OK) return created;
-  const auto status =
-    mln::core::submit_runtime_operation(live, pending.operation, [&entered] {
+  const auto status = mln::core::submit_runtime_operation(
+    live, pending.operation,
+    [&entered] {
       entered = true;
       mln_test_pulse();
-    });
-  if (status == MLN_STATUS_OK) {
-    out_operation = pending.operation;
-    pending.completion->accept();
-  } else {
-    pending.completion->reject();
-  }
+    },
+    pending.completion
+  );
+  if (status == MLN_STATUS_OK) out_operation = pending.operation;
   return status;
 }
 
@@ -1080,9 +1100,67 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   });
 }
 
+void map_query_admission_failure_releases_its_map_lease() {
+  auto leaked_leases = unsigned{0};
+  for (const auto query : {mln_map_get_camera, mln_map_get_style_url}) {
+    const auto runtime = create_runtime();
+    auto creation = mln_test_completion_default(sizeof(mln_map));
+    MLN_TEST_OK(
+      mln_runtime_create_map(runtime, nullptr, &creation.descriptor, nullptr)
+    );
+    auto map = mln_map{MLN_HANDLE_NULL};
+    MLN_TEST_OK(mln_test_completion_finish_value(&creation, &map, sizeof(map)));
+    auto live = mln::core::handle_table<mln::core::MapObject>().lease(map);
+    auto transition = mln_test_transition_end{};
+    mln_test_transition_end_init(&transition);
+    auto camera = mln_camera_update_default();
+    camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+    camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+    camera.camera.zoom = 6;
+    camera.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+    camera.animation.duration_ms = 60000;
+    camera.animation.end_handler = mln_test_transition_end_handler(&transition);
+    MLN_TEST_AWAIT_OK(
+      mln_map_update_camera(map, &camera, &completion.descriptor, nullptr)
+    );
+    const auto discard = mln_test_discard_completion();
+    auto status = MLN_STATUS_OK;
+    {
+      const auto fault = AllocationFaults{};
+      status = query(map, &discard, nullptr);
+    }
+    auto release = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_map_release(map, &release.descriptor, nullptr));
+    const auto cancelled = mln_test_wait_transition_end(&transition);
+    auto close_stage_finished = std::atomic_bool{false};
+    live->runtime_state->executor.invoke([&close_stage_finished] {
+      mln_test_flag_set(&close_stage_finished);
+    });
+    const auto close_fenced = mln_test_wait_for_flag(&close_stage_finished);
+    const auto release_pending = !mln_test_completion_poll(&release);
+    if (status != MLN_STATUS_OK && release_pending) {
+      ++leaked_leases;
+      // Return the leaked count so this failing review test can clean up.
+      live->control.release();
+    }
+    live.reset();
+    MLN_TEST_OK(mln_test_completion_settle(&release));
+    MLN_TEST_OK(mln_test_runtime_close(runtime));
+    TEST_ASSERT_TRUE(cancelled);
+    TEST_ASSERT_TRUE(close_fenced);
+    MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+  }
+  TEST_ASSERT_EQUAL_UINT_MESSAGE(
+    0, leaked_leases, "a rejected map query leaked its submission lease"
+  );
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
+  RUN_TEST(map_query_admission_failure_releases_its_map_lease);
+
+  RUN_TEST(discarded_commands_keep_the_graph_alive_until_the_worker_drains);
   RUN_TEST(runtime_barriers_observe_retired_command_captures);
   RUN_TEST(borrowed_views_survive_sibling_frame_disposal);
   RUN_TEST(a_held_view_parks_its_retirements_without_stalling_others);

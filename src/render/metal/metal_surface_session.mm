@@ -174,7 +174,9 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
 
     void bind() override {
       if (!try_bind()) {
-        throw std::runtime_error("Metal surface did not provide a drawable");
+        throw mln::core::RenderTargetNotReady(
+          "Metal surface did not provide a drawable"
+        );
       }
     }
 

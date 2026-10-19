@@ -261,38 +261,33 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_lat_lng map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, bool unwrapped
+static mln_lat_lng coordinate_for_pixel(
+  mln_map_projection projection, mln_screen_point point, bool unwrapped
 ) {
-  mln_test_completion query = mln_test_completion_default(sizeof(mln_lat_lng));
-  MLN_TEST_OK(
-    unwrapped
-      ? mln_map_lat_lng_for_pixel_unwrapped(map, point, &query.descriptor, NULL)
-      : mln_map_lat_lng_for_pixel(map, point, &query.descriptor, NULL)
-  );
   mln_lat_lng coordinate = {0};
   MLN_TEST_OK(
-    mln_test_completion_finish_value(&query, &coordinate, sizeof(coordinate))
+    unwrapped ? mln_map_projection_lat_lng_for_pixel_unwrapped(
+                  projection, point, &coordinate, NULL
+                )
+              : mln_map_projection_lat_lng_for_pixel(
+                  projection, point, &coordinate, NULL
+                )
   );
   return coordinate;
 }
 
-static void map_lat_lngs_for_pixels(
-  mln_map map, const mln_screen_point* points, size_t count, bool unwrapped,
-  mln_lat_lng* out_coordinates
+static void coordinates_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points, size_t count,
+  bool unwrapped, mln_lat_lng* out_coordinates
 ) {
-  mln_test_completion query =
-    mln_test_completion_default(count * sizeof(mln_lat_lng));
   MLN_TEST_OK(
-    unwrapped
-      ? mln_map_lat_lngs_for_pixels_unwrapped(
-          map, points, count, &query.descriptor, NULL
-        )
-      : mln_map_lat_lngs_for_pixels(map, points, count, &query.descriptor, NULL)
+    unwrapped ? mln_map_projection_lat_lngs_for_pixels_unwrapped(
+                  projection, points, count, out_coordinates, NULL
+                )
+              : mln_map_projection_lat_lngs_for_pixels(
+                  projection, points, count, out_coordinates, NULL
+                )
   );
-  MLN_TEST_OK(mln_test_completion_finish_value(
-    &query, out_coordinates, count * sizeof(mln_lat_lng)
-  ));
 }
 
 static void jump_to(mln_map map, double longitude, double zoom) {
@@ -308,8 +303,7 @@ static void jump_to(mln_map map, double longitude, double zoom) {
 
 // A viewport wider than one world copy, or one across the antimeridian, shows
 // longitudes that the wrapped conversions fold into -180 to 180 and that the
-// unwrapped ones keep in the visible copy. The map's ordered conversions, in
-// single and batch form, and a projection of the same camera agree.
+// unwrapped ones keep in the visible copy. Single and batch conversions agree.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
@@ -335,8 +329,8 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   };
   mln_lat_lng wrapped[3] = {0};
   mln_lat_lng unwrapped[3] = {0};
-  map_lat_lngs_for_pixels(map, points, 3, false, wrapped);
-  map_lat_lngs_for_pixels(map, points, 3, true, unwrapped);
+  coordinates_for_pixels(projection, points, 3, false, wrapped);
+  coordinates_for_pixels(projection, points, 3, true, unwrapped);
   for (size_t index = 0; index < 3; index++) {
     TEST_ASSERT_TRUE(wrapped[index].longitude >= -180.0);
     TEST_ASSERT_TRUE(wrapped[index].longitude <= 180.0);
@@ -345,16 +339,16 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   TEST_ASSERT_TRUE(unwrapped[2].longitude - unwrapped[0].longitude > 360.0);
 
   const mln_lat_lng wrapped_right =
-    map_lat_lng_for_pixel(map, points[2], false);
+    coordinate_for_pixel(projection, points[2], false);
   TEST_ASSERT_TRUE(wrapped_right.longitude >= -180.0);
   TEST_ASSERT_TRUE(wrapped_right.longitude <= 180.0);
   const mln_lat_lng unwrapped_right =
-    map_lat_lng_for_pixel(map, points[2], true);
+    coordinate_for_pixel(projection, points[2], true);
   TEST_ASSERT_EQUAL_DOUBLE(unwrapped[2].longitude, unwrapped_right.longitude);
 
   // The right edge sits a full world east of the left edge, so the projection
   // folds it back across the antimeridian or keeps the visible copy, exactly
-  // as the map does.
+  // as the batch does.
   mln_lat_lng projected = {0};
   MLN_TEST_OK(mln_map_projection_lat_lng_for_pixel(
     projection, points[2], &projected, NULL
@@ -380,11 +374,13 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   // At zoom 2 the viewport spans less than a world but still crosses the
   // antimeridian, so its edges unwrap onto either side of 180.
   jump_to(map, 179.0, 2.0);
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  projection = create_projection(map);
   const mln_screen_point edges[] = {points[0], points[2]};
   mln_lat_lng edges_wrapped[2] = {0};
   mln_lat_lng edges_unwrapped[2] = {0};
-  map_lat_lngs_for_pixels(map, edges, 2, false, edges_wrapped);
-  map_lat_lngs_for_pixels(map, edges, 2, true, edges_unwrapped);
+  coordinates_for_pixels(projection, edges, 2, false, edges_wrapped);
+  coordinates_for_pixels(projection, edges, 2, true, edges_unwrapped);
   TEST_ASSERT_TRUE(edges_unwrapped[0].longitude < edges_unwrapped[1].longitude);
   TEST_ASSERT_TRUE(edges_unwrapped[0].longitude < 180.0);
   TEST_ASSERT_TRUE(edges_unwrapped[1].longitude > 180.0);
@@ -491,15 +487,10 @@ static double projection_meters_per_pixel(
   return meters;
 }
 
-static double map_meters_per_pixel(mln_map map, double latitude) {
-  mln_test_completion query = mln_test_completion_default(sizeof(double));
-  MLN_TEST_OK(
-    mln_map_meters_per_pixel_at_latitude(map, latitude, &query.descriptor, NULL)
-  );
-  double meters = 0.0;
-  MLN_TEST_OK(
-    mln_test_completion_finish_value(&query, &meters, sizeof(meters))
-  );
+static double snapshot_meters_per_pixel(mln_map map, double latitude) {
+  mln_map_projection projection = create_projection(map);
+  double meters = projection_meters_per_pixel(projection, latitude);
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   return meters;
 }
 
@@ -517,7 +508,7 @@ static void meters_per_pixel_follows_the_projection_camera(void) {
   );
   mln_map_projection projection = create_projection(map);
 
-  const double at_creation = map_meters_per_pixel(map, 45.0);
+  const double at_creation = snapshot_meters_per_pixel(map, 45.0);
   TEST_ASSERT_EQUAL_DOUBLE(
     at_creation, projection_meters_per_pixel(projection, 45.0)
   );
@@ -530,7 +521,7 @@ static void meters_per_pixel_follows_the_projection_camera(void) {
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
   TEST_ASSERT_DOUBLE_WITHIN(
-    at_creation * 1e-9, at_creation / 2.0, map_meters_per_pixel(map, 45.0)
+    at_creation * 1e-9, at_creation / 2.0, snapshot_meters_per_pixel(map, 45.0)
   );
   TEST_ASSERT_EQUAL_DOUBLE(
     at_creation, projection_meters_per_pixel(projection, 45.0)
@@ -732,7 +723,126 @@ static void projection_setters_reject_invalid_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Each zoom level halves the ground distance a pixel covers, and at one zoom a
+// pixel covers less ground the farther it is from the equator, in proportion
+// to the cosine of the latitude.
+static void meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles(
+  void
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = 3.0;
+  mln_map_projection projection = create_projection(map);
+  MLN_TEST_OK(mln_map_projection_set_camera(projection, &camera, NULL));
+
+  const double equator = projection_meters_per_pixel(projection, 0.0);
+  const double mid = projection_meters_per_pixel(projection, 45.0);
+  const double high = projection_meters_per_pixel(projection, -60.0);
+  TEST_ASSERT_GREATER_THAN_DOUBLE(mid, equator);
+  TEST_ASSERT_GREATER_THAN_DOUBLE(high, mid);
+  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * sqrt(0.5), mid);
+  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * 0.5, high);
+
+  camera.zoom = 4.0;
+  MLN_TEST_OK(mln_map_projection_set_camera(projection, &camera, NULL));
+  TEST_ASSERT_DOUBLE_WITHIN(
+    mid * 1e-9, mid / 2.0, projection_meters_per_pixel(projection, 45.0)
+  );
+
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_projection projection = create_projection(map);
+  const mln_lat_lng coordinates[] = {{0.0, 0.0}, {10.0, 20.0}, {91.0, 0.0}};
+  mln_screen_point output[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  const mln_screen_point before[3] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    projection, coordinates, 3, output, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(before, output, sizeof(output));
+  MLN_TEST_INVALID(
+    mln_map_projection_pixels_for_lat_lngs(projection, NULL, 1, output, NULL)
+  );
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    projection, coordinates, 1, NULL, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    MLN_HANDLE_NULL, coordinates, 1, output, NULL
+  ));
+  MLN_TEST_INVALID(
+    mln_map_projection_pixels_for_lat_lngs(MLN_HANDLE_NULL, NULL, 0, NULL, NULL)
+  );
+  MLN_TEST_INVALID(
+    mln_map_projection_pixel_for_lat_lng(projection, coordinates[0], NULL, NULL)
+  );
+  MLN_TEST_INVALID(mln_map_projection_pixel_for_lat_lng(
+    projection, coordinates[2], output, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_projection_pixel_for_lat_lng(
+    projection, (mln_lat_lng){.longitude = INFINITY}, output, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(before, output, sizeof(output));
+
+  typedef mln_status (*convert_points)(
+    mln_map_projection, const mln_screen_point*, size_t, mln_lat_lng*,
+    mln_diagnostic*
+  );
+  const convert_points conversions[] = {
+    mln_map_projection_lat_lngs_for_pixels,
+    mln_map_projection_lat_lngs_for_pixels_unwrapped,
+  };
+  const mln_screen_point invalid[] = {{0.0, 0.0}, {20.0, 10.0}, {0.0, NAN}};
+  mln_lat_lng converted[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  const mln_lat_lng original[3] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  for (size_t index = 0; index < 2; ++index) {
+    MLN_TEST_INVALID(
+      conversions[index](projection, invalid, 3, converted, NULL)
+    );
+    TEST_ASSERT_EQUAL_MEMORY(original, converted, sizeof(converted));
+    MLN_TEST_INVALID(conversions[index](projection, NULL, 1, converted, NULL));
+    MLN_TEST_INVALID(conversions[index](projection, invalid, 1, NULL, NULL));
+    MLN_TEST_INVALID(
+      conversions[index](MLN_HANDLE_NULL, invalid, 1, converted, NULL)
+    );
+    MLN_TEST_INVALID(conversions[index](MLN_HANDLE_NULL, NULL, 0, NULL, NULL));
+  }
+  MLN_TEST_INVALID(
+    mln_map_projection_lat_lng_for_pixel(projection, invalid[0], NULL, NULL)
+  );
+  MLN_TEST_INVALID(mln_map_projection_lat_lng_for_pixel(
+    projection, invalid[2], converted, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(original, converted, sizeof(converted));
+
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_INVALID_STATE(mln_map_projection_pixels_for_lat_lngs(
+    projection, coordinates, 1, output, NULL
+  ));
+  MLN_TEST_INVALID_STATE(
+    mln_map_projection_pixels_for_lat_lngs(projection, NULL, 0, NULL, NULL)
+  );
+  TEST_ASSERT_EQUAL_MEMORY(before, output, sizeof(output));
+  for (size_t index = 0; index < 2; ++index) {
+    MLN_TEST_INVALID_STATE(
+      conversions[index](projection, invalid, 1, converted, NULL)
+    );
+    MLN_TEST_INVALID_STATE(conversions[index](projection, NULL, 0, NULL, NULL));
+  }
+  TEST_ASSERT_EQUAL_MEMORY(original, converted, sizeof(converted));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
+  RUN_TEST(conversions_reject_invalid_inputs_without_writing_outputs);
+  RUN_TEST(meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles);
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(projection_follows_committed_extent_viewport_and_mode);

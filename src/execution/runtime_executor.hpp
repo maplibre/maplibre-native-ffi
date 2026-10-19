@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <exception>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
@@ -30,7 +31,7 @@ class RuntimeExecutor {
     -> void;
   auto stop() noexcept -> void;
   // Called on the worker after every lease and operation has retired. Runs
-  // completion after the run loop is destroyed and the worker is detached;
+  // completion on the reserved finalizer after joining the worker;
   // completion may destroy this executor.
   auto retire(RetirementTask& completion) noexcept -> void;
   // Queues task without allocating. The caller must guarantee the executor has
@@ -61,14 +62,14 @@ class RuntimeExecutor {
  private:
   std::mutex mutex_;
   std::condition_variable started_;
-  WorkerThread worker_;
+  struct Finalization;
+  std::shared_ptr<Finalization> finalization_;
   std::atomic<mln::util::RunLoop*> run_loop_ = nullptr;
   std::exception_ptr startup_error_;
   bool starting_ = false;
   bool stopping_ = false;
   RetirementQueue retirement_queue_;
   RetirementWake* retirement_wake_ = nullptr;
-  RetirementTask* retirement_completion_ = nullptr;
   auto drain_retirement() noexcept -> void;
 };
 

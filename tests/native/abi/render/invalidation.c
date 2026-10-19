@@ -268,6 +268,59 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"version\":8,\"transition\":{\"duration\":0},\"sources\":{\"point\":"
+      "{\"type\":\"geojson\",\"data\":{\"type\":\"Feature\",\"id\":1,"
+      "\"properties\":{},\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]"
+      "}}}},"
+      "\"layers\":[{\"id\":\"point\",\"type\":\"circle\",\"source\":\"point\","
+      "\"paint\":{\"circle-radius\":20,\"circle-color\":[\"case\","
+      "[\"boolean\",[\"feature-state\",\"selected\"],false],\"#00ff00\",\"#"
+      "ff0000\"]}}]}"
+    )
+  ));
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  expect_center_pixel(&fixture, red, "before the feature-state group");
+  mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
+  MLN_TEST_AWAIT_OK(
+    mln_map_begin_command_group(map, &completion.descriptor, NULL)
+  );
+  set_selected(map, "{\"selected\":true}");
+  mln_test_render_request_forced(&fixture, 9001);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture, 1);
+  const mln_render_frame_result held = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  uint8_t inside[4];
+  read_center_pixel(&fixture, inside);
+  MLN_TEST_AWAIT_OK(
+    mln_map_end_command_group(map, &completion.descriptor, NULL)
+  );
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  uint8_t after[4];
+  read_center_pixel(&fixture, after);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_HEX8_ARRAY_MESSAGE(
+    red, inside, 4, "inside the feature-state group"
+  );
+  TEST_ASSERT_EQUAL_HEX8_ARRAY_MESSAGE(
+    green, after, 4, "after the feature-state group"
+  );
+  TEST_ASSERT_EQUAL_UINT64(
+    before.latest_render_update_generation, held.map_update_generation
+  );
+}
+
 // How many render updates the map published for the commands before the
 // barrier.
 static size_t take_updates(mln_runtime runtime) {
@@ -659,6 +712,7 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
 MLN_TEST_GROUP {
   RUN_TEST(each_mutation_reaches_the_pixels_of_an_update_driven_host);
   RUN_TEST(a_frame_shows_a_command_group_whole_or_not_at_all);
+  RUN_TEST(feature_state_stays_with_the_update_held_by_a_command_group);
   RUN_TEST(each_mutation_publishes_a_render_update_only_when_it_changes);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
 #ifdef COUNTS_DRAWS_PER_FRAME

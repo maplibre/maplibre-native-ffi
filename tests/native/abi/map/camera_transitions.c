@@ -396,7 +396,8 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   MLN_TEST_INVALID(
     mln_map_cancel_transitions(MLN_HANDLE_NULL, &rejected, NULL)
   );
-  MLN_TEST_INVALID(mln_map_cancel_transitions(map, NULL, NULL));
+  mln_completion invalid_completion = {.size = sizeof(mln_completion)};
+  MLN_TEST_INVALID(mln_map_cancel_transitions(map, &invalid_completion, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -472,7 +473,10 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   MLN_TEST_INVALID(
     mln_map_cancel_camera_transition(MLN_HANDLE_NULL, 7, &rejected, NULL)
   );
-  MLN_TEST_INVALID(mln_map_cancel_camera_transition(map, 7, NULL, NULL));
+  mln_completion invalid_completion = {.size = sizeof(mln_completion)};
+  MLN_TEST_INVALID(
+    mln_map_cancel_camera_transition(map, 7, &invalid_completion, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

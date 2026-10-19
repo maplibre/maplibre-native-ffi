@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 // Allocation fault injection for the internal suite. The suite links the
 // static library, so its replacement operator new covers the library's own
 // allocations without changing the shipped library.
@@ -15,6 +17,8 @@ namespace mln::native_tests {
 class AllocationFaults {
  public:
   AllocationFaults() noexcept;
+  // Fails one allocation after this many successes, then permits allocations.
+  explicit AllocationFaults(std::size_t successful_allocations) noexcept;
   ~AllocationFaults();
   AllocationFaults(const AllocationFaults&) = delete;
   auto operator=(const AllocationFaults&) -> AllocationFaults& = delete;

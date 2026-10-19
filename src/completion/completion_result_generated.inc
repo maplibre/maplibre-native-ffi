@@ -174,34 +174,6 @@ struct CompletionResult<&mln_map_lat_lng_bounds_for_camera_unwrapped> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_lat_lng_for_pixel> {
-  static constexpr bool has_value = true;
-  using type = mln_lat_lng;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_lat_lng_for_pixel_unwrapped> {
-  static constexpr bool has_value = true;
-  using type = mln_lat_lng;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_lat_lngs_for_pixels> {
-  static constexpr bool has_value = true;
-  using type = mln_lat_lng;
-  static constexpr bool array = true;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_lat_lngs_for_pixels_unwrapped> {
-  static constexpr bool has_value = true;
-  using type = mln_lat_lng;
-  static constexpr bool array = true;
-  static constexpr bool nullable = false;
-};
-template <>
 struct CompletionResult<&mln_map_list_style_layers> {
   static constexpr bool has_value = true;
   using type = mln_style_layer_info;
@@ -212,27 +184,6 @@ template <>
 struct CompletionResult<&mln_map_list_style_sources> {
   static constexpr bool has_value = true;
   using type = mln_style_source_info;
-  static constexpr bool array = true;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_meters_per_pixel_at_latitude> {
-  static constexpr bool has_value = true;
-  using type = double;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_pixel_for_lat_lng> {
-  static constexpr bool has_value = true;
-  using type = mln_screen_point;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_pixels_for_lat_lngs> {
-  static constexpr bool has_value = true;
-  using type = mln_screen_point;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };

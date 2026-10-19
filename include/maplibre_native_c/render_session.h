@@ -514,9 +514,9 @@ MLN_API void mln_acquired_frame_view_end(
  * Returns:
  * - MLN_STATUS_OK when the resize is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; completion
- *   is null or undersized; extent has a zero width or height, or a
- *   scale_factor that is not finite and positive; or extent.scale_factor
- *   differs from the session's current value.
+ *   is undersized or sets both or neither of callback and queue; extent has a
+ *   zero width or height, or a scale_factor that is not finite and positive; or
+ *   extent.scale_factor differs from the session's current value.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when the target is a caller-owned texture, which its

@@ -1,10 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -17,7 +17,7 @@ namespace mln::core {
 class Completion;
 
 // Where one completion's terminal result goes: the host's callback, or a
-// delivery queue. accept_completion() makes the only sinks that deliver, so a
+// delivery queue. make_completion() makes the only sinks that deliver, so a
 // submission that does not pass through it cannot construct a Completion.
 class CompletionSink final {
  public:
@@ -39,7 +39,7 @@ class CompletionSink final {
   CompletionSink() = default;
 
   friend class Completion;
-  friend auto accept_completion(
+  friend auto make_completion(
     const mln_completion* descriptor, std::shared_ptr<Completion>& out
   ) -> mln_status;
 
@@ -63,8 +63,6 @@ class CompletionSink final {
 
 class Completion final {
  public:
-  using Delivery = std::function<void(const CompletionSink&)>;
-
   explicit Completion(CompletionSink sink) noexcept;
   Completion(const Completion&) = delete;
   Completion(Completion&&) = delete;
@@ -74,32 +72,25 @@ class Completion final {
 
   auto accept() noexcept -> void;
   auto reject() noexcept -> void;
+  auto revoke() noexcept -> void;
+  // Installed before acceptance. Retirement covers both native work and the
+  // delivery to the sink plus release, including cancellation on abandonment.
+  auto set_retirement_callback(std::function<void()> callback) noexcept -> void;
+  auto retire_work() noexcept -> void;
   template <typename Function>
   auto resolve(Function&& delivery) noexcept -> void {
-    {
-      const std::scoped_lock lock(mutex_);
-      switch (state_) {
-        case State::Pending:
-          if (!pending_) pending_ = std::forward<Function>(delivery);
-          return;
-        case State::Accepted:
-          state_ = State::Resolved;
-          break;
-        case State::Rejected:
-        case State::Resolved:
-          return;
-      }
-    }
+    auto expected = State::Accepted;
+    if (!state_.compare_exchange_strong(expected, State::Resolved)) return;
     deliver(std::forward<Function>(delivery));
   }
 
  private:
-  enum class State : std::uint8_t { Pending, Accepted, Rejected, Resolved };
+  enum class State : std::uint8_t { Created, Accepted, Rejected, Resolved };
 
   template <typename Function>
   auto deliver(Function&& delivery) noexcept -> void {
     try {
-      std::invoke(std::forward<Function>(delivery), sink_);
+      std::invoke(std::forward<Function>(delivery), std::as_const(sink_));
     } catch (...) {
       // Completion delivery cannot reopen terminal native work, but a delivery
       // that threw before reaching the sink still owes the host its result.
@@ -109,21 +100,30 @@ class Completion final {
   }
   auto deliver_undelivered() noexcept -> void;
   auto release() noexcept -> void;
+  auto retire_part() noexcept -> void;
 
-  std::mutex mutex_;
   CompletionSink sink_;
-  State state_ = State::Pending;
-  Delivery pending_;
+  std::atomic<State> state_ = State::Created;
+  std::atomic_uint retirement_parts_ = 2;
+  std::function<void()> retirement_callback_;
 };
 
-// Checks a completion descriptor's shape and, in queue mode, that its queue is
-// live. A submission that validates early calls this, then constructs its
-// Completion through accept_completion().
+// Checks a completion descriptor's shape: exactly one of a callback and a
+// delivery queue, and in queue mode, a live queue and no release_user_data.
 auto validate_completion(const mln_completion* completion) -> mln_status;
+// As validate_completion(), except that a command accepts a null completion,
+// which discards its outcome.
+auto validate_command_completion(const mln_completion* completion)
+  -> mln_status;
 
 // Validates a completion descriptor and constructs the Completion that
 // delivers to its callback or queue.
-auto accept_completion(
+auto make_completion(
+  const mln_completion* descriptor, std::shared_ptr<Completion>& out
+) -> mln_status;
+// As make_completion(), except that a null descriptor succeeds with a null
+// Completion, which complete_command() discards.
+auto make_command_completion(
   const mln_completion* descriptor, std::shared_ptr<Completion>& out
 ) -> mln_status;
 

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <mln/style/image.hpp>
+#include <mln/util/feature.hpp>
 
 #include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
@@ -264,7 +265,7 @@ auto map_request_still_image_start(
 ) -> mln_status;
 auto map_set_feature_state(
   MapObject& live, const mln_feature_state_selector* selector,
-  mln_buffer_view state
+  mln::FeatureState state
 ) -> mln_status;
 auto map_get_feature_state_start(
   mln_map map, const mln_feature_state_selector* selector,
@@ -458,27 +459,6 @@ auto map_set_viewport_options(
 ) -> mln_status;
 auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
   -> mln_status;
-auto map_pixel_for_lat_lng_start(
-  mln_map map, mln_lat_lng coordinate, const mln_completion* completion
-) -> mln_status;
-auto map_lat_lng_for_pixel_start(
-  mln_map map, mln_screen_point point, const mln_completion* completion
-) -> mln_status;
-auto map_lat_lng_for_pixel_unwrapped_start(
-  mln_map map, mln_screen_point point, const mln_completion* completion
-) -> mln_status;
-auto map_pixels_for_lat_lngs_start(
-  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  const mln_completion* completion
-) -> mln_status;
-auto map_lat_lngs_for_pixels_start(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion
-) -> mln_status;
-auto map_lat_lngs_for_pixels_unwrapped_start(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion
-) -> mln_status;
 auto map_camera_for_lat_lng_bounds_start(
   mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, const mln_completion* completion
@@ -532,13 +512,22 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) -> mln_status;
-auto map_meters_per_pixel_at_latitude(
-  mln_map map, double latitude, const mln_completion* completion
-) -> mln_status;
 auto map_list_style_layers(
   MapObject& live, std::vector<StyleLayerRecord>& layers
 ) -> mln_status;
 
+auto map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_screen_point* out_points
+) -> mln_status;
+auto map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status;
+auto map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status;
 auto map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;
@@ -612,13 +601,13 @@ auto map_set_render_session_publish_callback(
 auto map_latest_update(MapObject& map)
   -> std::shared_ptr<mln::UpdateParameters>;
 auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t;
-// The latest update and its generation, read under one lock so a frame result
-// reports the generation of the update it rendered.
-auto map_latest_update_snapshot(MapObject& map, uint64_t& out_generation)
-  -> std::shared_ptr<mln::UpdateParameters>;
-// Copies the map's coalesced feature-state snapshot.
-auto map_feature_state_snapshot(MapObject& map)
-  -> std::shared_ptr<const FeatureStateSnapshot>;
+struct RenderUpdateSnapshot {
+  std::shared_ptr<mln::UpdateParameters> update;
+  std::shared_ptr<const FeatureStateSnapshot> feature_state;
+  uint64_t generation;
+};
+// The update, feature state, and generation share one publication boundary.
+auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot;
 auto map_renderer_observer(MapObject& map) -> mln::RendererObserver*;
 // Tells the map which update generation the session is about to render, so a
 // frame of an update older than a pending still image request cannot complete

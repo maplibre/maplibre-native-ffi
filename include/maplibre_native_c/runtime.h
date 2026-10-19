@@ -1580,10 +1580,14 @@ MLN_API mln_status mln_runtime_barrier(
  * its release callback runs. This function may be called from any thread.
  *
  * The completion runs after every earlier accepted submission, including
- * released maps' teardown, has finished and the runtime's threads and
- * resources are gone. The completion must not block. This runtime's retirement
- * touches no library state after the callback returns. A host that outlives
- * its runtimes may pass a discarding completion.
+ * released maps' teardown and each submission's completion and release
+ * callback, has finished. The runtime's worker has exited, including its
+ * thread-local cleanup, and runtime-owned callback and resource state has
+ * retired. A reserved finalizer delivers the completion after joining that
+ * worker. The completion must not block. Shared native services and the
+ * finalizer's own return remain outside this guarantee; release completion does
+ * not permit unloading the library. A host that outlives its runtimes may pass
+ * a discarding completion.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their

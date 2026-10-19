@@ -418,7 +418,7 @@ class CameraTransitionEnd final {
     } catch (...) {
       // Host callbacks must not unwind through the C boundary.
     }
-    if (handler_.release_user_data == nullptr) return;
+    if (handler_.release_user_data == nullptr || process_exiting()) return;
     try {
       handler_.release_user_data(handler_.user_data);
     } catch (...) {
@@ -1028,10 +1028,12 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   // setObserver() from the map constructor; it outlives the map.
   HeadlessFrontend(
     mln::util::RunLoop& run_loop,
-    std::shared_ptr<mln::core::MapEventState> event_state
+    std::shared_ptr<mln::core::MapEventState> event_state,
+    FeatureStateStore& feature_state
   )
       : run_loop_(run_loop),
         event_state_(std::move(event_state)),
+        feature_state_(feature_state),
         thread_pool_(
           mln::Scheduler::GetBackground(), mln::util::SimpleIdentity{}
         ) {}
@@ -1040,6 +1042,8 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     const std::scoped_lock lock(latest_update_mutex_);
     latest_update_.reset();
     held_update_.reset();
+    latest_feature_state_.reset();
+    held_feature_state_.reset();
   }
 
   // mln::Map calls this once from its constructor on the runtime worker.
@@ -1053,13 +1057,16 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   // newest held one is kept. Otherwise the update is stored at once, and its
   // event and session notice wait for the announcement task.
   void update(std::shared_ptr<mln::UpdateParameters> update) override {
+    auto feature_state = feature_state_.snapshot();
     {
       const std::scoped_lock lock(latest_update_mutex_);
       if (event_state_->in_transaction() || command_group_depth_ > 0) {
         held_update_ = std::move(update);
+        held_feature_state_ = std::move(feature_state);
         return;
       }
       latest_update_ = std::move(update);
+      latest_feature_state_ = std::move(feature_state);
       ++latest_update_generation_;
     }
     schedule_announcement();
@@ -1074,6 +1081,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       const std::scoped_lock lock(latest_update_mutex_);
       if (held_update_ == nullptr) return;
       latest_update_ = std::move(held_update_);
+      latest_feature_state_ = std::move(held_feature_state_);
       announced_generation_ = ++latest_update_generation_;
     }
     update_stored_ = true;
@@ -1126,13 +1134,9 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     const std::scoped_lock lock(latest_update_mutex_);
     return latest_update_;
   }
-  // One lock hold keeps the pair coherent: a frame result must report the
-  // generation of the update that was actually rendered.
-  [[nodiscard]] auto latest_update_snapshot(uint64_t& out_generation) const
-    -> std::shared_ptr<mln::UpdateParameters> {
+  [[nodiscard]] auto latest_update_snapshot() const -> RenderUpdateSnapshot {
     const std::scoped_lock lock(latest_update_mutex_);
-    out_generation = latest_update_generation_;
-    return latest_update_;
+    return {latest_update_, latest_feature_state_, latest_update_generation_};
   }
   auto set_session_publish_callback(std::function<void(uint64_t)> publish)
     -> void {
@@ -1216,6 +1220,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 
   mln::util::RunLoop& run_loop_;
   std::shared_ptr<mln::core::MapEventState> event_state_;
+  FeatureStateStore& feature_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mln::TaggedScheduler thread_pool_;
   // Guards every field from latest_update_ through latest_update_generation_.
@@ -1225,6 +1230,8 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mln::UpdateParameters> latest_update_;
   std::shared_ptr<mln::UpdateParameters> held_update_;
+  std::shared_ptr<const FeatureStateSnapshot> latest_feature_state_;
+  std::shared_ptr<const FeatureStateSnapshot> held_feature_state_;
   std::function<void(uint64_t)> session_publish_;
   uint64_t latest_update_generation_ = 0;
   // Runtime-worker only.
@@ -2365,18 +2372,6 @@ auto from_native_screen_point(const mln::ScreenCoordinate& point)
   return mln_screen_point{.x = point.x, .y = point.y};
 }
 
-auto to_native_screen_points(const mln_screen_point* points, size_t point_count)
-  -> std::vector<mln::ScreenCoordinate> {
-  auto result = std::vector<mln::ScreenCoordinate>{};
-  result.reserve(point_count);
-  const auto point_span =
-    std::span<const mln_screen_point>{points, point_count};
-  for (const auto point : point_span) {
-    result.emplace_back(to_native_screen_point(point));
-  }
-  return result;
-}
-
 auto to_native_edge_insets(mln_edge_insets padding) -> mln::EdgeInsets {
   return mln::EdgeInsets{
     padding.top, padding.left, padding.bottom, padding.right
@@ -3021,7 +3016,7 @@ template <typename Work>
 auto submit_map_command_impl(
   mln_map map, Work work, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  const auto completion_status = validate_command_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
@@ -3030,10 +3025,10 @@ auto submit_map_command_impl(
   }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -3064,10 +3059,10 @@ auto start_style_operation(
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto result_callback = [completion_state, delivery](
                            mln_status status, std::string diagnostic,
@@ -3109,12 +3104,9 @@ auto start_style_operation(
           MLN_STATUS_NATIVE_ERROR, "style operation failed", result
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submission == MLN_STATUS_OK)
-    completion_state->accept();
-  else
-    completion_state->reject();
   return submission;
 }
 
@@ -3138,10 +3130,10 @@ auto start_geometry_operation(
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
@@ -3191,12 +3183,9 @@ auto start_geometry_operation(
           std::any{std::move(result)}
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submission == MLN_STATUS_OK)
-    completion_state->accept();
-  else
-    completion_state->reject();
   return submission;
 }
 
@@ -3278,7 +3267,8 @@ auto create_map(
       owned_map->event_state, owned_map->callback_sources
     );
     owned_map->frontend = std::make_unique<HeadlessFrontend>(
-      runtime_run_loop(live_runtime), owned_map->event_state
+      runtime_run_loop(live_runtime), owned_map->event_state,
+      owned_map->feature_state
     );
     // Construction is a transaction, so the events that MapLibre raises from
     // its constructor carry the first published generation.
@@ -3331,10 +3321,10 @@ auto create_map_start(
   }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state =
     std::make_shared<OperationObject>([completion_state](
@@ -3358,7 +3348,8 @@ auto create_map_start(
       CompletionValue<&mln_runtime_create_map>::complete(completion_state, map);
     });
   const auto submit_status = submit_runtime_operation(
-    runtime_state, state, [runtime, effective, state]() mutable -> void {
+    runtime_state, state,
+    [runtime, effective, state]() mutable -> void {
       auto result = mln_map{MLN_HANDLE_NULL};
       auto status = MLN_STATUS_NATIVE_ERROR;
       auto diagnostic = std::string{};
@@ -3383,14 +3374,10 @@ auto create_map_start(
           diagnostic.empty() ? "map creation failed" : std::move(diagnostic), {}
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submit_status != MLN_STATUS_OK) {
-    completion_state->reject();
-  } else {
-    reserve_guard.dismiss();
-    completion_state->accept();
-  }
+  if (submit_status == MLN_STATUS_OK) reserve_guard.dismiss();
   return submit_status;
 }
 
@@ -3421,7 +3408,7 @@ auto submit_map_resize(
   mln_map map, mln_logical_extent extent, const mln_completion* completion,
   bool from_session
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  const auto completion_status = validate_command_completion(completion);
   if (completion_status != MLN_STATUS_OK) {
     return completion_status;
   }
@@ -3447,10 +3434,10 @@ auto submit_map_resize(
                               : &context.map->latest_resize_submission;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   const auto status = submit_runtime_command(
     context.runtime,
@@ -3510,8 +3497,6 @@ auto map_resize(
 }
 
 namespace {
-auto discarded_completion() noexcept -> mln_completion;
-
 // Pool shutdown can block, so maps reserve a separate lane before creation.
 auto map_teardown_lane() -> RetirementLane& {
   static auto* lane = new RetirementLane{};
@@ -3601,10 +3586,10 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   if (owned == nullptr) return recorded_handle_fault_status();
   auto release_completion = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, release_completion);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, release_completion);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto sequence = uint64_t{0};
   auto close_status = MLN_STATUS_OK;
@@ -3655,7 +3640,7 @@ PendingMapResult::~PendingMapResult() {
 
 auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  const auto completion_status = validate_command_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
@@ -3670,10 +3655,10 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
   }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -3745,10 +3730,10 @@ auto map_request_still_image_start(
   };
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
@@ -3805,13 +3790,9 @@ auto map_request_still_image_start(
           {}
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submit_status != MLN_STATUS_OK) {
-    completion_state->reject();
-  } else {
-    completion_state->accept();
-  }
   return submit_status;
 }
 
@@ -3828,41 +3809,23 @@ auto map_is_continuous(mln_map map) -> bool {
 
 auto map_native(MapObject& map) -> mln::Map& { return *map.map; }
 
-namespace {
-
-void discard_completion(void*, const mln_completion_result*) noexcept {}
-
-auto discarded_completion() noexcept -> mln_completion {
-  return mln_completion{
-    .size = sizeof(mln_completion),
-    .callback = discard_completion,
-    .user_data = nullptr,
-    .release_user_data = nullptr,
-    .queue = MLN_HANDLE_NULL,
-  };
-}
-
-}  // namespace
-
 // A render session sizes its map through the same ordered extent command as
 // public resize, so one path owns the logical extent after map creation. The
 // map keeps the scale factor it was created with, which may differ from the
 // session's.
 auto map_post_resize(mln_map map, uint32_t width, uint32_t height)
   -> mln_status {
-  const auto completion = discarded_completion();
   return submit_map_resize(
     map,
     mln_logical_extent{
       .width = width, .height = height, .scale_factor = map_scale_factor(map)
     },
-    &completion, true
+    nullptr, true
   );
 }
 
 auto map_post_trigger_repaint(mln_map map) -> mln_status {
-  const auto completion = discarded_completion();
-  return map_request_repaint(map, &completion);
+  return map_request_repaint(map, nullptr);
 }
 
 auto map_set_render_session_publish_callback(
@@ -3883,14 +3846,8 @@ auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t {
   return map.frontend->latest_update_generation();
 }
 
-auto map_latest_update_snapshot(MapObject& map, uint64_t& out_generation)
-  -> std::shared_ptr<mln::UpdateParameters> {
-  return map.frontend->latest_update_snapshot(out_generation);
-}
-
-auto map_feature_state_snapshot(MapObject& map)
-  -> std::shared_ptr<const FeatureStateSnapshot> {
-  return map.feature_state.snapshot();
+auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot {
+  return map.frontend->latest_update_snapshot();
 }
 
 auto map_begin_render(MapObject& map, uint64_t update_generation) noexcept
@@ -4027,13 +3984,14 @@ auto start_map_string_operation(
     set_thread_error("map is closing");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto guard = ControlLease{&live->control};
+  auto submission = std::make_shared<ControlLease>(std::move(guard));
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state =
     std::make_shared<OperationObject>([completion_state](
@@ -4073,12 +4031,9 @@ auto start_map_string_operation(
           {}
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submit_status == MLN_STATUS_OK)
-    completion_state->accept();
-  else
-    completion_state->reject();
   return submit_status;
 }
 
@@ -4092,23 +4047,13 @@ auto feature_state_string_from_view(mln_buffer_view value) -> std::string {
 
 auto map_set_feature_state(
   MapObject& live, const mln_feature_state_selector* selector,
-  mln_buffer_view state
+  mln::FeatureState state
 ) -> mln_status {
-  auto native_state = to_native_json_value(state);
-  if (!native_state) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto* state_object = native_state->getObject();
-  if (state_object == nullptr) {
-    set_thread_error("feature state value must be a JSON object");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   if (
     live.feature_state.set(
       feature_state_string_from_view(selector->source_id),
       feature_state_source_layer(*selector),
-      feature_state_string_from_view(selector->feature_id), *state_object
+      feature_state_string_from_view(selector->feature_id), std::move(state)
     )
   ) {
     live.map->triggerRepaint();
@@ -4177,7 +4122,7 @@ auto map_style_url_start(mln_map map, const mln_completion* completion)
 auto map_set_event_mask(
   mln_map map, uint64_t mask, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  const auto completion_status = validate_command_completion(completion);
   if (
     completion_status != MLN_STATUS_OK ||
     (mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U
@@ -4193,10 +4138,10 @@ auto map_set_event_mask(
   }
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -4221,17 +4166,17 @@ template <typename Mutation>
 auto submit_camera_command(
   mln_map map, Mutation mutation, const mln_completion* completion
 ) -> mln_status {
-  const auto completion_status = validate_completion(completion);
+  const auto completion_status = validate_command_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) return acquire_status;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_command_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   return submit_runtime_command(
     context.runtime,
@@ -4508,13 +4453,14 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
     set_thread_error("map is closing");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto guard = ControlLease{&live->control};
+  auto submission = std::make_shared<ControlLease>(std::move(guard));
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state =
     std::make_shared<OperationObject>([completion_state](
@@ -4553,12 +4499,9 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
           {}
         );
       }
-    }
+    },
+    completion_state
   );
-  if (submit_status == MLN_STATUS_OK)
-    completion_state->accept();
-  else
-    completion_state->reject();
   return submit_status;
 }
 
@@ -4637,225 +4580,6 @@ auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
     live.map->setTileLodMode(to_native_tile_lod_mode(options->lod_mode));
   }
   return MLN_STATUS_OK;
-}
-
-auto map_pixel_for_lat_lng(
-  MapObject& live, mln_lat_lng coordinate, mln_screen_point* out_point
-) -> mln_status {
-  if (out_point == nullptr) {
-    set_thread_error("out_point must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinate_status = validate_lat_lng(coordinate);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-
-  *out_point = from_native_screen_point(
-    live.map->pixelForLatLng(to_native_lat_lng(coordinate))
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_lat_lng_for_pixel(
-  MapObject& live, mln_screen_point point, mln_lat_lng* out_coordinate,
-  mln::LatLng::WrapMode wrap_mode
-) -> mln_status {
-  if (out_coordinate == nullptr) {
-    set_thread_error("out_coordinate must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto point_status = validate_screen_point(point);
-  if (point_status != MLN_STATUS_OK) {
-    return point_status;
-  }
-
-  *out_coordinate = from_native_lat_lng(
-    live.map->latLngForPixel(to_native_screen_point(point), wrap_mode)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_pixels_for_lat_lngs(
-  MapObject& live, const mln_lat_lng* coordinates, size_t coordinate_count,
-  mln_screen_point* out_points
-) -> mln_status {
-  if (coordinate_count != 0 && out_points == nullptr) {
-    set_thread_error(
-      "out_points must not be null when coordinate_count is nonzero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinates_status =
-    validate_lat_lng_array(coordinates, coordinate_count, true);
-  if (coordinates_status != MLN_STATUS_OK) {
-    return coordinates_status;
-  }
-  if (coordinate_count == 0) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto native_coordinates =
-    to_native_lat_lngs(coordinates, coordinate_count);
-  const auto pixels = live.map->pixelsForLatLngs(native_coordinates);
-  auto output = std::span<mln_screen_point>{out_points, pixels.size()};
-  auto output_position = output.begin();
-  for (const auto& pixel : pixels) {
-    *output_position = from_native_screen_point(pixel);
-    ++output_position;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_lat_lngs_for_pixels(
-  MapObject& live, const mln_screen_point* points, size_t point_count,
-  mln_lat_lng* out_coordinates, mln::LatLng::WrapMode wrap_mode
-) -> mln_status {
-  if (point_count != 0 && out_coordinates == nullptr) {
-    set_thread_error(
-      "out_coordinates must not be null when point_count is nonzero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto points_status = validate_screen_point_array(points, point_count);
-  if (points_status != MLN_STATUS_OK) {
-    return points_status;
-  }
-  if (point_count == 0) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto native_points = to_native_screen_points(points, point_count);
-  const auto coordinates = live.map->latLngsForPixels(native_points, wrap_mode);
-  auto output = std::span<mln_lat_lng>{out_coordinates, coordinates.size()};
-  auto output_position = output.begin();
-  for (const auto& coordinate : coordinates) {
-    *output_position = from_native_lat_lng(coordinate);
-    ++output_position;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_pixel_for_lat_lng_start(
-  mln_map map, mln_lat_lng coordinate, const mln_completion* completion
-) -> mln_status {
-  if (validate_lat_lng(coordinate) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return start_geometry_operation<&mln_map_pixel_for_lat_lng>(
-    map,
-    [coordinate](MapObject& live, mln_screen_point& result) {
-      return map_pixel_for_lat_lng(live, coordinate, &result);
-    },
-    completion
-  );
-}
-
-template <auto Function>
-auto start_coordinate_for_pixel(
-  mln_map map, mln_screen_point point, bool unwrapped,
-  const mln_completion* completion
-) -> mln_status {
-  if (validate_screen_point(point) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto wrap_mode =
-    unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
-  return start_geometry_operation<Function>(
-    map,
-    [point, wrap_mode](MapObject& live, mln_lat_lng& result) {
-      return map_lat_lng_for_pixel(live, point, &result, wrap_mode);
-    },
-    completion
-  );
-}
-
-auto map_lat_lng_for_pixel_start(
-  mln_map map, mln_screen_point point, const mln_completion* completion
-) -> mln_status {
-  return start_coordinate_for_pixel<&mln_map_lat_lng_for_pixel>(
-    map, point, false, completion
-  );
-}
-
-auto map_lat_lng_for_pixel_unwrapped_start(
-  mln_map map, mln_screen_point point, const mln_completion* completion
-) -> mln_status {
-  return start_coordinate_for_pixel<&mln_map_lat_lng_for_pixel_unwrapped>(
-    map, point, true, completion
-  );
-}
-
-auto map_pixels_for_lat_lngs_start(
-  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  const mln_completion* completion
-) -> mln_status {
-  if (
-    validate_lat_lng_array(coordinates, coordinate_count, true) != MLN_STATUS_OK
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto copied = std::vector<mln_lat_lng>{};
-  if (coordinate_count != 0) {
-    copied.assign(coordinates, coordinates + coordinate_count);
-  }
-  return start_geometry_operation<&mln_map_pixels_for_lat_lngs>(
-    map,
-    [copied = std::move(copied)](
-      MapObject& live, std::vector<mln_screen_point>& result
-    ) {
-      result.resize(copied.size());
-      return map_pixels_for_lat_lngs(
-        live, copied.data(), copied.size(), result.data()
-      );
-    },
-    completion
-  );
-}
-
-template <auto Function>
-auto start_coordinates_for_pixels(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  bool unwrapped, const mln_completion* completion
-) -> mln_status {
-  if (validate_screen_point_array(points, point_count) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto copied = std::vector<mln_screen_point>{};
-  if (point_count != 0) {
-    copied.assign(points, points + point_count);
-  }
-  const auto wrap_mode =
-    unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
-  return start_geometry_operation<Function>(
-    map,
-    [copied = std::move(copied),
-     wrap_mode](MapObject& live, std::vector<mln_lat_lng>& result) {
-      result.resize(copied.size());
-      return map_lat_lngs_for_pixels(
-        live, copied.data(), copied.size(), result.data(), wrap_mode
-      );
-    },
-    completion
-  );
-}
-
-auto map_lat_lngs_for_pixels_start(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion
-) -> mln_status {
-  return start_coordinates_for_pixels<&mln_map_lat_lngs_for_pixels>(
-    map, points, point_count, false, completion
-  );
-}
-
-auto map_lat_lngs_for_pixels_unwrapped_start(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion
-) -> mln_status {
-  return start_coordinates_for_pixels<&mln_map_lat_lngs_for_pixels_unwrapped>(
-    map, points, point_count, true, completion
-  );
 }
 
 auto map_projection_create_from_transform(
@@ -5056,6 +4780,80 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
   );
 }
 
+auto map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_screen_point* out_points
+) -> mln_status {
+  if (coordinate_count != 0 && out_points == nullptr) {
+    set_thread_error(
+      "out_points must not be null when coordinate_count is nonzero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto status =
+    validate_lat_lng_array(coordinates, coordinate_count, true);
+  if (status != MLN_STATUS_OK) return status;
+  auto converted = std::vector<mln_screen_point>(coordinate_count);
+  return with_projection(projection, [&](mln::MapProjection& value) {
+    for (size_t index = 0; index < coordinate_count; ++index) {
+      converted[index] = from_native_screen_point(
+        value.pixelForLatLng(to_native_lat_lng(coordinates[index]))
+      );
+    }
+    if (coordinate_count != 0) {
+      std::copy(converted.begin(), converted.end(), out_points);
+    }
+  });
+}
+
+namespace {
+
+auto projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates,
+  mln::LatLng::WrapMode wrap_mode
+) -> mln_status {
+  if (point_count != 0 && out_coordinates == nullptr) {
+    set_thread_error(
+      "out_coordinates must not be null when point_count is nonzero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto status = validate_screen_point_array(points, point_count);
+  if (status != MLN_STATUS_OK) return status;
+  auto converted = std::vector<mln_lat_lng>(point_count);
+  return with_projection(projection, [&](mln::MapProjection& value) {
+    for (size_t index = 0; index < point_count; ++index) {
+      converted[index] = from_native_lat_lng(
+        value.latLngForPixel(to_native_screen_point(points[index]), wrap_mode)
+      );
+    }
+    if (point_count != 0) {
+      std::copy(converted.begin(), converted.end(), out_coordinates);
+    }
+  });
+}
+
+}  // namespace
+
+auto map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status {
+  return projection_lat_lngs_for_pixels(
+    projection, points, point_count, out_coordinates, mln::LatLng::Wrapped
+  );
+}
+
+auto map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status {
+  return projection_lat_lngs_for_pixels(
+    projection, points, point_count, out_coordinates, mln::LatLng::Unwrapped
+  );
+}
+
 namespace {
 
 auto validate_latitude(double latitude) -> mln_status {
@@ -5066,41 +4864,7 @@ auto validate_latitude(double latitude) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto meters_per_pixel_at_latitude(
-  const mln::CameraOptions& camera, double latitude,
-  double* out_meters_per_pixel
-) -> mln_status {
-  if (out_meters_per_pixel == nullptr) {
-    set_thread_error("out_meters_per_pixel must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto latitude_status = validate_latitude(latitude);
-  if (latitude_status != MLN_STATUS_OK) {
-    return latitude_status;
-  }
-  *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
-    latitude, camera.zoom.value_or(0.0)
-  );
-  return MLN_STATUS_OK;
-}
-
 }  // namespace
-
-auto map_meters_per_pixel_at_latitude(
-  mln_map map, double latitude, const mln_completion* completion
-) -> mln_status {
-  const auto status = validate_latitude(latitude);
-  if (status != MLN_STATUS_OK) return status;
-  return start_geometry_operation<&mln_map_meters_per_pixel_at_latitude>(
-    map,
-    [latitude](MapObject& live, double& result) {
-      return meters_per_pixel_at_latitude(
-        live.map->getCameraOptions(), latitude, &result
-      );
-    },
-    completion
-  );
-}
 
 auto map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude, double* out_meters_per_pixel

@@ -153,26 +153,21 @@ auto mln_map_set_feature_state(
       mln::core::set_thread_error("state must not be empty");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    // The header promises validation before return, so parse here; the
-    // command parses again on the worker, which stays cheap for the small
-    // objects feature state carries.
-    const auto parsed = mln::core::to_native_json_value(state);
+    auto parsed = mln::core::to_native_json_value(state);
     if (!parsed || parsed->getObject() == nullptr) {
       mln::core::set_thread_error("feature state value must be a JSON object");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto owned_selector = OwnedFeatureStateSelector{*selector};
-    auto owned_state =
-      std::string{static_cast<const char*>(state.data), state.size};
+    auto owned_state = std::move(parsed->get<mln::FeatureState>());
     return mln::core::submit_map_command(
       map,
       [owned_selector = std::move(owned_selector),
-       owned_state =
-         std::move(owned_state)](mln::core::MapObject& live) -> mln_status {
+       owned_state = std::move(owned_state)](mln::core::MapObject& live) mutable
+        -> mln_status {
         const auto selector = owned_selector.view();
         return mln::core::map_set_feature_state(
-          live, &selector,
-          {.data = owned_state.data(), .size = owned_state.size()}
+          live, &selector, std::move(owned_state)
         );
       },
       completion

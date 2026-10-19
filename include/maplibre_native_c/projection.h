@@ -37,7 +37,7 @@ extern "C" {
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or
  *   out_projection is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_create_projection(
@@ -205,6 +205,90 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Converts geographic coordinates to screen points.
+ *
+ * The output uses logical map pixels with an origin at the top-left of the
+ * projection viewport.
+ * The caller provides space for coordinate_count outputs, written in input
+ * order. An empty batch is valid, and both arrays may be null when
+ * coordinate_count is zero. The whole input is validated before any output is
+ * written. On failure, the output is unchanged. One projection lease covers the
+ * whole batch, which observes every earlier projection setter. This function
+ * may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero coordinate_count, or a coordinate is out of
+ * range.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count,
+  mln_screen_point* out_points
+    MLN_BINDING("direction=out;length=coordinate_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Converts screen points to geographic coordinates.
+ *
+ * The input uses logical map pixels with an origin at the top-left of the
+ * projection viewport. Output longitudes are wrapped to -180 to 180.
+ * The caller provides space for point_count outputs, written in input order.
+ * An empty batch is valid, and both arrays may be null when point_count is
+ * zero. The whole input is validated before any output is written. On failure,
+ * the output is unchanged. One projection lease covers the whole batch, which
+ * observes every earlier projection setter. This function may be called from
+ * any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero point_count, or a point is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection,
+  const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count,
+  mln_lat_lng* out_coordinates MLN_BINDING("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Converts screen points to unwrapped geographic coordinates.
+ *
+ * The input uses logical map pixels with an origin at the top-left of the
+ * projection viewport. Each longitude preserves the visible world copy and
+ * may fall outside -180 to 180.
+ * The caller provides space for point_count outputs, written in input order.
+ * An empty batch is valid, and both arrays may be null when point_count is
+ * zero. The whole input is validated before any output is written. On failure,
+ * the output is unchanged. One projection lease covers the whole batch, which
+ * observes every earlier projection setter. This function may be called from
+ * any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero point_count, or a point is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection,
+  const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count,
+  mln_lat_lng* out_coordinates MLN_BINDING("direction=out;length=point_count"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

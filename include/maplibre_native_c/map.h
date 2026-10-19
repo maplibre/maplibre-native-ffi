@@ -967,9 +967,9 @@ typedef struct mln_map_tile_options {
  *
  * Every field is unkeyed, fixed-size map state that changes only through this
  * map's own commands or through load progress. Each map command that runs
- * publishes a new generation and reports it through its completion, even when
- * the command changes nothing or fails, so a snapshot whose generation is at
- * or past a completion observes that command.
+ * publishes a new generation and reports it through its completion, when it has
+ * one, even when the command changes nothing or fails, so a snapshot whose
+ * generation is at or past a completion observes that command.
  */
 typedef struct mln_map_snapshot {
   uint32_t size;

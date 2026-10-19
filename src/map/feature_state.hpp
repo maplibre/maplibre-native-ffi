@@ -93,9 +93,9 @@ void apply_feature_state_diff(
   const std::unordered_set<std::string>& rendered_source_ids
 );
 
-void remember_rendered_sources(
+void reconcile_feature_state_sources(
   std::unordered_set<std::string>& rendered_source_ids,
-  const mln::UpdateParameters& update
+  FeatureStateSnapshot& applied, const mln::UpdateParameters& update
 );
 
 }  // namespace mln::core

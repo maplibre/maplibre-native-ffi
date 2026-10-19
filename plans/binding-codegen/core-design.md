@@ -27,10 +27,11 @@ accepts live children; private registry entries remain available for their
 cleanup while public calls report that the parent is closed.
 
 Each map and runtime embeds a retirement node and retains itself while that node
-is reachable. Creation reserves the executor wake and the shared map pool
-shutdown lane. Disposal admission and scheduling use those reserved objects;
-release also allocates completion state and a tracked runtime submission for a
-map. Native destruction and host callbacks may allocate.
+is reachable. Creation reserves the executor wake, a finalizer for each runtime,
+and the shared map pool shutdown lane. Disposal admission and scheduling use
+those reserved objects; release also allocates completion state and a tracked
+runtime submission for a map. Native destruction and host callbacks may
+allocate.
 
 Map retirement first cancels pending still images and closes camera transitions
 on the runtime worker. It waits for children and submission leases, including a
@@ -42,16 +43,25 @@ later runtime barriers cover it. Pool shutdown then runs on the map cleanup
 lane. The map retains a runtime cleanup lease until its resources and pool have
 retired.
 
-Runtime retirement waits for children, submission leases, and terminal outcomes
-of earlier operations. An operation destroyed without an outcome completes as
-cancelled. The runtime worker removes the private registry entry and releases
-reachable callback and resource state. It then stops and destroys its run loop,
-detaches its thread, retires the runtime's self-reference, and reports release
-completion. The worker accesses no executor state after that final stage.
-Runtime retirement uses no shared waiting thread, so a blocked runtime callback
-cannot prevent another runtime from retiring. Map pool cleanup remains separate
-from runtime work, and the cleanup lease preserves the executor until maps
-finish.
+Runtime submissions remain pending until native work retires and the completion
+and its release callback return. A queue-mode completion retires once its result
+is pushed to the queue, or discarded because the queue was released or the
+process is exiting; the host's drain is outside the submission. Completion
+acceptance precedes worker publication. Resolution allocates no storage in the
+completion: a callback runs inline, and a queue item that cannot be allocated
+falls back to one reserved at submission. An operation destroyed without an
+outcome completes as cancelled. Terminal observers run outside locks.
+
+Runtime retirement waits for children and pending submissions. The worker
+removes the private registry entry, releases reachable callback and resource
+state, and destroys its run loop. Its reserved finalizer joins the worker,
+including thread-local cleanup, before retiring the runtime's self-reference and
+reporting completion. Runtime destruction drains its autorelease pool before
+that completion. Each runtime has an independent finalizer, so a blocked join or
+callback cannot delay another runtime. This guarantee covers runtime-owned
+state; shared services and the finalizer's return prevent treating completion as
+a library-unload boundary. Map pool cleanup remains separate, and its runtime
+lease preserves the executor until maps finish.
 
 Render sessions retain their maps until driver calls and attachment cleanup
 retire. Graphics detach needs driver progress; abandonment can quarantine

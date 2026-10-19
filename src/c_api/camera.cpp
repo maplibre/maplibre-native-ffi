@@ -184,68 +184,6 @@ auto mln_map_set_tile_options(
   });
 }
 
-auto mln_map_pixel_for_lat_lng(
-  mln_map map, mln_lat_lng coordinate, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_pixel_for_lat_lng_start(map, coordinate, completion);
-  });
-}
-
-auto mln_map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_lat_lng_for_pixel_start(map, point, completion);
-  });
-}
-
-auto mln_map_lat_lng_for_pixel_unwrapped(
-  mln_map map, mln_screen_point point, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_lat_lng_for_pixel_unwrapped_start(
-      map, point, completion
-    );
-  });
-}
-
-auto mln_map_pixels_for_lat_lngs(
-  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_pixels_for_lat_lngs_start(
-      map, coordinates, coordinate_count, completion
-    );
-  });
-}
-
-auto mln_map_lat_lngs_for_pixels(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_lat_lngs_for_pixels_start(
-      map, points, point_count, completion
-    );
-  });
-}
-
-auto mln_map_lat_lngs_for_pixels_unwrapped(
-  mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_lat_lngs_for_pixels_unwrapped_start(
-      map, points, point_count, completion
-    );
-  });
-}
-
 auto mln_map_camera_for_lat_lng_bounds(
   mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, const mln_completion* completion,
@@ -337,17 +275,6 @@ auto mln_map_set_free_camera_options(
         return mln::core::map_set_free_camera_options(live, &copied);
       },
       completion
-    );
-  });
-}
-
-auto mln_map_meters_per_pixel_at_latitude(
-  mln_map map, double latitude, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_meters_per_pixel_at_latitude(
-      map, latitude, completion
     );
   });
 }

@@ -331,7 +331,8 @@ struct RuntimeObject {
   ControlState control;
   RetirementTask disposal_task;
   std::shared_ptr<RuntimeObject> disposal_owner;
-  // Reported by the worker after its run loop retires; null for dispose.
+  // Reported by the reserved finalizer after joining the worker; null for
+  // dispose.
   std::shared_ptr<Completion> release_completion;
   std::atomic_bool disposal_requested = false;
   bool disposal_drained = false;
@@ -487,7 +488,8 @@ auto submit_runtime_command(
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,
-  std::function<void()> function
+  std::function<void()> function,
+  const std::shared_ptr<Completion>& completion = nullptr
 ) -> mln_status;
 
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;

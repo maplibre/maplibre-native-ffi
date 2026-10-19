@@ -62,6 +62,8 @@ struct ResourceRequestObject {
   // The cached bytes MapLibre withheld from the requester until this request
   // revalidates them. Set before the provider sees the handle, then only read.
   std::shared_ptr<const std::string> prior_data;
+  std::optional<mln::Timestamp> prior_modified;
+  std::optional<std::string> prior_etag;
 };
 
 // Host code may complete a request from any thread, and mbgl's cancel path runs
@@ -497,6 +499,8 @@ auto request_custom_resource(
     std::make_unique<mln::FileSourceRequest>(std::move(file_source_callback));
   auto object = std::make_shared<ResourceRequestObject>(request->actor());
   object->prior_data = resource.priorData;
+  object->prior_modified = resource.priorModified;
+  object->prior_etag = resource.priorEtag;
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
   object->handle = handle;
   // mbgl runs this on every request destruction, including after a response
@@ -551,6 +555,9 @@ auto complete_resource_request(
     // online source does for a 304.
     if (native_response.notModified && live->prior_data != nullptr) {
       native_response.data = live->prior_data;
+      if (!native_response.modified)
+        native_response.modified = live->prior_modified;
+      if (!native_response.etag) native_response.etag = live->prior_etag;
       native_response.notModified = false;
     }
     live->completed = true;

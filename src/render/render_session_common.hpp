@@ -14,7 +14,9 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -25,6 +27,7 @@
 #include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
+#include <mln/renderer/update_parameters.hpp>
 #include <mln/util/feature.hpp>
 #include <mln/util/size.hpp>
 
@@ -91,6 +94,11 @@ using OpenGLBorrowedTarget = BorrowedTarget<
   mln_opengl_borrowed_texture_descriptor, mln_opengl_borrowed_texture>;
 using WebGPUBorrowedTarget = BorrowedTarget<
   mln_webgpu_borrowed_texture_descriptor, mln_webgpu_borrowed_texture>;
+
+class RenderTargetNotReady : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
 
 class SurfaceSessionBackend {
  public:
@@ -285,8 +293,8 @@ class TextureSessionBackend {
   }
   // Records the backend metadata a host reads back from an acquired frame.
   // Runs on the driver thread, right after the render, for the slot the
-  // backend still has selected, so it may touch graphics state; the acquiring
-  // thread only copies what this stored. NOT_READY reports a slot with no
+  // backend still has selected, so it may touch graphics state; acquisition
+  // transfers the stored metadata. NOT_READY reports a slot with no
   // publishable texture yet.
   virtual auto record_frame_metadata(const RenderFrameMetadata&, std::any&)
     -> mln_status {
@@ -361,6 +369,7 @@ class RenderSessionScheduler final : public mln::Scheduler {
 
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
+  std::vector<std::function<void()>> drain_batch_;
   std::function<void()> work_available_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};
@@ -738,6 +747,7 @@ struct mln_render_session_object
   uint64_t resize_submission = 0;
 
   std::vector<mln_render_frame_result> frame_results;
+  std::vector<mln_render_frame_result> recycled_frame_results;
   std::deque<mln::core::PendingFrameDemand> demands;
   // Demands with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE that found nothing to render,
   // in the order they began waiting. Each carries the current barrier epoch,
@@ -770,6 +780,7 @@ struct mln_render_session_object
   bool accepts_queue_lock = false;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
+  bool scheduler_service_queued = false;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
   // down while the scheduler its mailboxes point at is still alive.
@@ -778,6 +789,8 @@ struct mln_render_session_object
   mln::core::SessionFrameObserver frame_observer;
   std::unique_ptr<mln::Renderer> renderer = nullptr;
   std::unordered_set<std::string> rendered_source_ids;
+  std::optional<std::remove_const_t<decltype(mln::UpdateParameters::sources)>>
+    rendered_sources;
   mln::core::FeatureStateSnapshot applied_feature_state;
   std::shared_ptr<const mln::core::FeatureStateSnapshot> pushed_feature_state;
   mln::core::RenderSurfaceState surface;
@@ -785,6 +798,8 @@ struct mln_render_session_object
 };
 
 struct mln_render_frame_batch_object {
+  ~mln_render_frame_batch_object();
+  std::weak_ptr<mln_render_session_object> session;
   std::vector<mln_render_frame_result> results;
 };
 

@@ -915,8 +915,8 @@ auto submit_runtime_command(
   const std::shared_ptr<Completion>& completion,
   std::atomic<uint64_t>* latest_submission
 ) -> mln_status {
-  if (runtime == nullptr || completion == nullptr) {
-    set_thread_error("runtime and completion must not be null");
+  if (runtime == nullptr) {
+    set_thread_error("runtime must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   {
@@ -926,14 +926,25 @@ auto submit_runtime_command(
       return MLN_STATUS_INVALID_STATE;
     }
     auto lease = ControlLease{&runtime->control};
+    const auto next_sequence = runtime->next_submission_sequence;
+    auto retired = std::function<void()>{};
+    if (completion) {
+      retired = [runtime, next_sequence]() noexcept {
+        finish_runtime_submission(runtime, next_sequence);
+      };
+    }
     const auto sequence = track_runtime_submission(*runtime);
     auto superseded = uint64_t{0};
     if (latest_submission != nullptr) {
       superseded = latest_submission->exchange(sequence);
     }
+    if (completion) {
+      completion->set_retirement_callback(std::move(retired));
+      completion->accept();
+    }
     try {
       runtime->executor.invoke(
-        [runtime, lease = std::move(lease), sequence,
+        [runtime, completion, lease = std::move(lease), sequence,
          function = std::move(function)]() mutable -> void {
           static_cast<void>(lease);
           try {
@@ -945,10 +956,15 @@ auto submit_runtime_command(
           // Retire command-owned state before barriers observe the submission
           // as terminal.
           function = {};
-          finish_runtime_submission(runtime, sequence);
+          lease.reset();
+          if (completion)
+            completion->retire_work();
+          else
+            finish_runtime_submission(runtime, sequence);
         }
       );
     } catch (...) {
+      if (completion) completion->revoke();
       // A rejected submission supersedes nothing, so the earlier accepted one
       // stays latest unless a newer submission already replaced it.
       if (latest_submission != nullptr) {
@@ -957,22 +973,17 @@ auto submit_runtime_command(
       }
       commit_lock.unlock();
       finish_runtime_submission(runtime, sequence);
-      completion->reject();
       set_thread_error("runtime command submission failed");
       return MLN_STATUS_NATIVE_ERROR;
     }
   }
-  // Accepting can deliver a completion the worker already resolved, on this
-  // thread, so the commit lock is released first: that host callback may submit
-  // more work.
-  completion->accept();
   return MLN_STATUS_OK;
 }
 
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,
-  std::function<void()> function
+  std::function<void()> function, const std::shared_ptr<Completion>& completion
 ) -> mln_status {
   if (runtime == nullptr || operation == nullptr) {
     set_thread_error("runtime and operation must not be null");
@@ -983,10 +994,23 @@ auto submit_runtime_operation(
     return MLN_STATUS_INVALID_STATE;
   }
   auto lease = ControlLease{&runtime->control};
-  const auto sequence = track_runtime_submission(*runtime);
-  operation->set_terminal_callback([runtime, sequence]() noexcept -> void {
+  // Construct the observer before inserting tracking that needs rollback.
+  const auto sequence = runtime->next_submission_sequence;
+  auto retired = std::function<void()>{[runtime, sequence]() noexcept {
     finish_runtime_submission(runtime, sequence);
-  });
+  }};
+  auto terminal = OperationObject::TerminalCallback{};
+  if (completion) {
+    terminal = [completion]() noexcept { completion->retire_work(); };
+  } else {
+    terminal = std::move(retired);
+  }
+  static_cast<void>(track_runtime_submission(*runtime));
+  operation->set_terminal_callback(std::move(terminal), true);
+  if (completion) {
+    completion->set_retirement_callback(std::move(retired));
+    completion->accept();
+  }
   try {
     runtime->executor.invoke(
       [operation, lease = std::move(lease),
@@ -1000,14 +1024,20 @@ auto submit_runtime_operation(
             std::any{std::monostate{}}
           );
         }
+        function = {};
+        lease.reset();
+        operation->retire_work();
       }
     );
   } catch (...) {
+    if (completion) completion->revoke();
     commit_lock.unlock();
     operation->complete(
       MLN_STATUS_NATIVE_ERROR, "runtime operation submission failed",
       std::any{std::monostate{}}
     );
+    operation->retire_work();
+    if (completion) finish_runtime_submission(runtime, sequence);
     set_thread_error("runtime operation submission failed");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -1154,10 +1184,10 @@ auto submit_resource_configuration_command(
 ) -> mln_status {
   auto completion = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(descriptor, completion);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(descriptor, completion);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   return submit_runtime_command(
     runtime,
@@ -1740,10 +1770,10 @@ auto submit_offline_operation(
   if (validation != MLN_STATUS_OK) return validation;
   auto completion = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(descriptor, completion);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(descriptor, completion);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state = std::make_shared<OperationObject>(
     offline_operation_result_callback(completion, present)
@@ -1770,14 +1800,10 @@ auto submit_offline_operation(
           std::any{std::monostate{}}
         );
       }
-    }
+    },
+    completion
   );
-  if (status != MLN_STATUS_OK) {
-    completion->reject();
-    return status;
-  }
-  completion->accept();
-  return MLN_STATUS_OK;
+  return status;
 }
 
 using OfflineOperationState = std::shared_ptr<OperationObject>;
@@ -2635,10 +2661,10 @@ auto runtime_barrier_start(
   if (live == nullptr) return recorded_handle_fault_status();
   auto completion_state = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, completion_state);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, completion_state);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
@@ -2649,34 +2675,55 @@ auto runtime_barrier_start(
   );
 
   auto sequence = uint64_t{0};
-  {
-    const std::scoped_lock commit_lock(live->submission_mutex);
-    if (!live->control.acquire()) {
-      set_thread_error("runtime is closing");
-      completion_state->reject();
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto lease = ControlLease{&live->control};
-    sequence = live->next_submission_sequence++;
-    {
-      const std::scoped_lock terminal_lock(live->terminal_mutex);
+  auto commit_lock = std::unique_lock{live->submission_mutex};
+  if (!live->control.acquire()) {
+    set_thread_error("runtime is closing");
+    completion_state->reject();
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto lease = ControlLease{&live->control};
+  sequence = live->next_submission_sequence++;
+  auto retired = std::function<void()>{[live, sequence]() noexcept {
+    erase_runtime_barrier(live, sequence);
+  }};
+  state->set_terminal_callback(
+    [completion_state]() noexcept -> void { completion_state->retire_work(); },
+    true
+  );
+  completion_state->set_retirement_callback(std::move(retired));
+  completion_state->accept();
+  try {
+    // Keep readiness private until both the completion and its worker task
+    // are ready. Earlier work may otherwise settle this barrier immediately.
+    const std::scoped_lock terminal_lock(live->terminal_mutex);
+    try {
       live->pending_submissions.insert(sequence);
       live->pending_barriers.emplace(sequence, state);
+      live->executor.invoke([live, state, lease = std::move(lease)]() mutable {
+        complete_ready_runtime_barriers(live);
+        lease.reset();
+        state->retire_work();
+        complete_ready_runtime_barriers(live);
+      });
+    } catch (...) {
+      completion_state->revoke();
+      live->pending_barriers.erase(sequence);
+      live->pending_submissions.erase(sequence);
+      throw;
     }
-    state->set_terminal_callback([live, sequence]() noexcept -> void {
-      erase_runtime_barrier(live, sequence);
-    });
+  } catch (...) {
+    commit_lock.unlock();
+    set_thread_error("runtime barrier submission failed");
+    return MLN_STATUS_NATIVE_ERROR;
   }
-  complete_ready_runtime_barriers(live);
-  completion_state->accept();
   return MLN_STATUS_OK;
 }
 
 namespace {
 
 // Submission leases, children, and pending operations drain before this node
-// reaches the worker. The same node finishes retirement after its run loop
-// has been destroyed, so host callbacks cannot block another runtime.
+// reaches the worker. The reserved finalizer joins that worker before the
+// same node finishes retirement and reports the completion.
 auto retire_runtime(
   std::shared_ptr<RuntimeObject> live, std::shared_ptr<Completion> completion
 ) noexcept -> void {
@@ -2692,7 +2739,11 @@ auto retire_runtime(
       auto* state = static_cast<RuntimeObject*>(node->context);
       auto owned = std::move(state->disposal_owner);
       auto release_completion = std::move(owned->release_completion);
-      owned.reset();
+      auto destroy = [&owned]() -> mln_status {
+        owned.reset();
+        return MLN_STATUS_OK;
+      };
+      static_cast<void>(mln::c_api::with_autorelease_pool(destroy));
       if (release_completion) {
         valueless_completion<&mln_runtime_release>().complete(
           release_completion
@@ -2747,10 +2798,10 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   if (live == nullptr) return recorded_handle_fault_status();
   auto release_completion = std::shared_ptr<Completion>{};
   if (
-    const auto accepted = accept_completion(completion, release_completion);
-    accepted != MLN_STATUS_OK
+    const auto made = make_completion(completion, release_completion);
+    made != MLN_STATUS_OK
   ) {
-    return accepted;
+    return made;
   }
   {
     const std::scoped_lock commit_lock(live->submission_mutex);
@@ -2766,7 +2817,7 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
     static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
   // Nothing after close can fail. Accepting first keeps the completion on the
-  // worker even when the runtime has already drained. Close rejects
+  // finalizer even when the runtime has already drained. Close rejects
   // every later submission, so retirement, which waits for the pending ones,
   // reports after every earlier accepted submission has finished.
   release_completion->accept();
@@ -3100,28 +3151,35 @@ auto push_runtime_map_events(
 ) -> void {
   if (events.empty()) return;
   auto wake = std::shared_ptr<Wake>{};
+  auto failure = std::exception_ptr{};
   {
     const std::scoped_lock lock(event_queue->mutex);
     auto& queue = *event_queue;
     if (!queue.event_maps.contains(map)) return;
     const auto was_empty = queue.pending.events.empty();
-    for (auto& held : events) {
-      if (coalesce_render_update(queue.pending, map, generation, held.type)) {
-        continue;
+    try {
+      for (auto& held : events) {
+        if (coalesce_render_update(queue.pending, map, generation, held.type)) {
+          continue;
+        }
+        append_runtime_event(
+          queue.pending,
+          map_event(
+            map, generation, held.type, held.payload_type, held.payload,
+            held.code
+          ),
+          std::move(held.message)
+        );
       }
-      append_runtime_event(
-        queue.pending,
-        map_event(
-          map, generation, held.type, held.payload_type, held.payload, held.code
-        ),
-        std::move(held.message)
-      );
+    } catch (...) {
+      failure = std::current_exception();
     }
     if (was_empty && !queue.pending.events.empty()) {
       wake = queue.wake;
     }
   }
   if (wake != nullptr) wake->notify();
+  if (failure) std::rethrow_exception(failure);
 }
 
 auto register_runtime_map_events(

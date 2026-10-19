@@ -7,12 +7,22 @@
 
 namespace mln::core {
 
+struct RuntimeExecutor::Finalization {
+  WorkerThread worker;
+  std::mutex mutex;
+  std::condition_variable condition;
+  RetirementTask* completion = nullptr;
+  bool reserved = false;
+  bool requested = false;
+  bool joined = false;
+};
+
 RuntimeExecutor::~RuntimeExecutor() { stop(); }
 
 auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
   {
     const std::scoped_lock lock(mutex_);
-    if (starting_ || run_loop_ != nullptr || worker_.joinable()) {
+    if (starting_ || run_loop_ != nullptr || finalization_ != nullptr) {
       throw std::runtime_error{"runtime executor is already running"};
     }
     starting_ = true;
@@ -21,7 +31,8 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
   }
 
   try {
-    worker_ = WorkerThread(
+    finalization_ = std::make_shared<Finalization>();
+    finalization_->worker = WorkerThread(
       [this, initialize = std::move(initialize)]() mutable noexcept -> void {
         try {
           auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
@@ -68,12 +79,6 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
           }
           started_.notify_all();
         }
-        if (auto* completion = retirement_completion_; completion != nullptr) {
-          worker_.detach();
-          // The callback may destroy this executor. No worker code accesses
-          // its state after this point.
-          run_retirement_task(completion);
-        }
       }
     );
   } catch (...) {
@@ -84,6 +89,7 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
       starting_ = false;
       startup_error_ = nullptr;
     }
+    finalization_.reset();
     throw;
   }
 
@@ -92,10 +98,33 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
   if (startup_error_ != nullptr) {
     auto error = std::exchange(startup_error_, nullptr);
     lock.unlock();
-    if (worker_.joinable()) {
-      worker_.join();
-    }
+    finalization_->worker.join();
+    finalization_.reset();
     std::rethrow_exception(error);
+  }
+  lock.unlock();
+  try {
+    WorkerThread([state = finalization_]() noexcept {
+      RetirementTask* completion;
+      {
+        auto final_lock = std::unique_lock{state->mutex};
+        state->condition.wait(final_lock, [&] { return state->requested; });
+        completion = state->completion;
+      }
+      state->worker.join();
+      {
+        const auto final_lock = std::scoped_lock{state->mutex};
+        state->joined = true;
+      }
+      state->condition.notify_all();
+      // Runtime destruction drains its pool before delivering the host
+      // completion. This stage therefore runs outside a retirement-task pool.
+      if (completion != nullptr) completion->run(completion);
+    }).detach();
+    finalization_->reserved = true;
+  } catch (...) {
+    stop();
+    throw;
   }
 }
 
@@ -106,11 +135,16 @@ auto RuntimeExecutor::invoke_retirement(RetirementTask& task) noexcept -> void {
 }
 
 auto RuntimeExecutor::retire(RetirementTask& completion) noexcept -> void {
-  assert(worker_.is_current());
+  assert(finalization_->worker.is_current());
   const auto lock = std::scoped_lock{mutex_};
-  assert(retirement_completion_ == nullptr);
-  retirement_completion_ = &completion;
   stopping_ = true;
+  {
+    const auto final_lock = std::scoped_lock{finalization_->mutex};
+    assert(!finalization_->requested);
+    finalization_->completion = &completion;
+    finalization_->requested = true;
+  }
+  finalization_->condition.notify_one();
 }
 
 auto RuntimeExecutor::drain_retirement() noexcept -> void {
@@ -136,12 +170,17 @@ auto RuntimeExecutor::stop() noexcept -> void {
       retirement_wake_->send();
     }
   }
-  if (worker_.joinable()) {
-    // The owner joins from outside the worker before destroying this object.
-    // The worker still accesses executor state after its run loop stops.
-    if (worker_.is_current()) std::terminate();
-    worker_.join();
+  const auto state = finalization_;
+  if (state == nullptr) return;
+  if (!state->reserved) {
+    state->worker.join();
+  } else {
+    auto lock = std::unique_lock{state->mutex};
+    state->requested = true;
+    state->condition.notify_one();
+    state->condition.wait(lock, [&] { return state->joined; });
   }
+  finalization_.reset();
 }
 
 }  // namespace mln::core

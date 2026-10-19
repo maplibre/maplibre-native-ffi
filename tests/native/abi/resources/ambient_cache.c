@@ -167,6 +167,61 @@ static void ambient_cache_changes_reach_the_next_request(void) {
   }
 }
 
+static void revalidation_keeps_omitted_cache_validators(void) {
+  static const mln_test_provided_resource resources[] = {
+    {.url = cached_style_url,
+     .response =
+       {.fields =
+          MLN_RESOURCE_RESPONSE_MODIFIED | MLN_RESOURCE_RESPONSE_EXPIRES,
+        .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+        .bytes = (const uint8_t*)cached_style_json,
+        .byte_count = sizeof(cached_style_json) - 1,
+        .modified_unix_ms = 1700000000000,
+        .expires_unix_ms = 4102444800000,
+        .etag = "\"validator\""},
+     .has_later_response = true,
+     .later_response = {
+       .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
+       .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
+       .expires_unix_ms = 4102444800000,
+     }},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map first = load_style(runtime);
+  const cache_case invalidate = {
+    "invalidate before revalidation", CHANGE_OPERATION,
+    MLN_AMBIENT_CACHE_OPERATION_INVALIDATE, 0, ENTRY_INVALIDATED
+  };
+  apply_change(runtime, &invalidate);
+  mln_map second = load_style(runtime);
+  const mln_test_provider_request* revalidation =
+    mln_test_provider_request_at(provider, cached_style_url, 1);
+  TEST_ASSERT_NOT_NULL(revalidation);
+  TEST_ASSERT_EQUAL_size_t(
+    sizeof(cached_style_json) - 1, revalidation->prior_data_size
+  );
+  mln_map third = load_style(runtime);
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, cached_style_url, 3)
+  );
+  const mln_test_provider_request* next =
+    mln_test_provider_request_at(provider, cached_style_url, 2);
+  const bool kept_etag = next != NULL && next->has_prior_etag;
+  const bool kept_modified =
+    next != NULL && (next->fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0;
+  mln_test_destroy_map(third);
+  mln_test_destroy_map(second);
+  mln_test_destroy_map(first);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+  TEST_ASSERT_TRUE_MESSAGE(kept_etag, "304 keeps the cached ETag");
+  TEST_ASSERT_TRUE_MESSAGE(
+    kept_modified, "304 keeps the cached modification time"
+  );
+}
+
 typedef struct shared_cache_probe {
   const char* cache_path;
   // How many threads have a runtime with an operation in flight. Each thread
@@ -250,5 +305,6 @@ static void two_runtimes_can_use_the_same_cache_database(void) {
 MLN_TEST_GROUP {
   RUN_TEST(ambient_cache_calls_validate_their_arguments);
   RUN_TEST(ambient_cache_changes_reach_the_next_request);
+  RUN_TEST(revalidation_keeps_omitted_cache_validators);
   RUN_TEST(two_runtimes_can_use_the_same_cache_database);
 }

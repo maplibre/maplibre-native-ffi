@@ -40,14 +40,6 @@ auto selector_has_field(
   return (selector.fields & field) != 0;
 }
 
-auto update_has_source(
-  const mln::UpdateParameters& update, const std::string& source_id
-) -> bool {
-  return std::ranges::any_of(*update.sources, [&](const auto& source) {
-    return source->id == source_id;
-  });
-}
-
 auto merge_state(mln::FeatureState& target, const mln::FeatureState& source)
   -> void {
   for (const auto& [key, value] : source) {
@@ -390,22 +382,19 @@ void apply_feature_state_diff(
       applied.sources[source->id] = *desired_layers;
     }
   }
-
-  std::erase_if(applied.sources, [&](const auto& entry) {
-    return !update_has_source(update, entry.first);
-  });
 }
 
-void remember_rendered_sources(
+void reconcile_feature_state_sources(
   std::unordered_set<std::string>& rendered_source_ids,
-  const mln::UpdateParameters& update
+  FeatureStateSnapshot& applied, const mln::UpdateParameters& update
 ) {
-  std::erase_if(rendered_source_ids, [&](const auto& source_id) {
-    return !update_has_source(update, source_id);
-  });
+  rendered_source_ids.clear();
   for (const auto& source : *update.sources) {
     rendered_source_ids.insert(source->id);
   }
+  std::erase_if(applied.sources, [&](const auto& entry) {
+    return !rendered_source_ids.contains(entry.first);
+  });
 }
 
 }  // namespace mln::core

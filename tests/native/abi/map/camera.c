@@ -50,25 +50,14 @@ static mln_camera_query_result query_camera(mln_map map) {
 }
 
 static mln_lat_lng coordinate_at(mln_map map, mln_screen_point point) {
-  mln_test_completion query = mln_test_completion_default(sizeof(mln_lat_lng));
-  MLN_TEST_OK(mln_map_lat_lng_for_pixel(map, point, &query.descriptor, NULL));
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_map_create_projection(map, &projection, NULL));
   mln_lat_lng coordinate = {0};
   MLN_TEST_OK(
-    mln_test_completion_finish_value(&query, &coordinate, sizeof(coordinate))
+    mln_map_projection_lat_lng_for_pixel(projection, point, &coordinate, NULL)
   );
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   return coordinate;
-}
-
-static double meters_per_pixel(mln_map map, double latitude) {
-  mln_test_completion query = mln_test_completion_default(sizeof(double));
-  MLN_TEST_OK(
-    mln_map_meters_per_pixel_at_latitude(map, latitude, &query.descriptor, NULL)
-  );
-  double meters = 0.0;
-  MLN_TEST_OK(
-    mln_test_completion_finish_value(&query, &meters, sizeof(meters))
-  );
-  return meters;
 }
 
 static mln_status submit_update_row(
@@ -1098,37 +1087,8 @@ static const mln_lat_lng san_francisco = {
   .latitude = 37.7749, .longitude = -122.4194
 };
 
-// Each zoom level halves the ground distance a pixel covers, and at one zoom a
-// pixel covers less ground the farther it is from the equator, in proportion
-// to the cosine of the latitude.
-static void meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles(
-  void
-) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.zoom = 3.0;
-  jump(map, camera);
-
-  const double equator = meters_per_pixel(map, 0.0);
-  const double mid = meters_per_pixel(map, 45.0);
-  const double high = meters_per_pixel(map, -60.0);
-  TEST_ASSERT_GREATER_THAN_DOUBLE(mid, equator);
-  TEST_ASSERT_GREATER_THAN_DOUBLE(high, mid);
-  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * sqrt(0.5), mid);
-  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * 0.5, high);
-
-  camera.zoom = 4.0;
-  jump(map, camera);
-  TEST_ASSERT_DOUBLE_WITHIN(mid * 1e-9, mid / 2.0, meters_per_pixel(map, 45.0));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Every camera entry point checks its arguments before it submits: updates,
-// deltas, fits, constraints, free camera options, and conversions.
+// deltas, fits, constraints, and free camera options.
 static void camera_calls_reject_what_they_cannot_express(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1258,40 +1218,6 @@ static void camera_calls_reject_what_they_cannot_express(void) {
       map, &options, &completion, MLN_TEST_DIAGNOSTIC
     ));
     TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "zero length"));
-  }
-  {
-    mln_completion operation = mln_test_discard_completion();
-    MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(map, san_francisco, NULL, NULL));
-    MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(
-      map, (mln_lat_lng){.latitude = 91.0}, &operation, NULL
-    ));
-    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
-      map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
-    ));
-    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
-      map, (mln_screen_point){.x = NAN, .y = 0.0}, &operation, NULL
-    ));
-    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel_unwrapped(
-      map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
-    ));
-    MLN_TEST_INVALID(
-      mln_map_pixels_for_lat_lngs(map, NULL, 1, &operation, NULL)
-    );
-    MLN_TEST_INVALID(
-      mln_map_lat_lngs_for_pixels(map, NULL, 1, &operation, NULL)
-    );
-    MLN_TEST_INVALID(
-      mln_map_lat_lngs_for_pixels_unwrapped(map, NULL, 1, &operation, NULL)
-    );
-    MLN_TEST_INVALID(
-      mln_map_meters_per_pixel_at_latitude(map, 0.0, NULL, NULL)
-    );
-    MLN_TEST_INVALID(
-      mln_map_meters_per_pixel_at_latitude(map, 91.0, &operation, NULL)
-    );
-    MLN_TEST_INVALID(
-      mln_map_meters_per_pixel_at_latitude(map, NAN, &operation, NULL)
-    );
   }
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -1450,5 +1376,4 @@ MLN_TEST_GROUP {
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
   RUN_TEST(camera_constraints_and_free_camera_reach_later_commands);
-  RUN_TEST(meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles);
 }

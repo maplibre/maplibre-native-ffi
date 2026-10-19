@@ -1,18 +1,24 @@
 // Raw C ABI coverage for one-shot completions and direct queue wakes.
 
+#include "support/camera.h"
+#include "support/frames.h"
 #include "support/test_support.h"
+
+static MLN_TEST_THREAD_LOCAL char completion_thread_marker;
 
 typedef struct callback_probe {
   atomic_uint calls;
   atomic_uint releases;
   atomic_int status;
   atomic_uint_fast64_t value;
+  const void* thread;
 } callback_probe;
 
 static void record_completion(
   void* user_data, const mln_completion_result* result
 ) {
   callback_probe* probe = user_data;
+  probe->thread = &completion_thread_marker;
   atomic_store(&probe->status, result->status);
   if (result->value != NULL && result->value_count == 1) {
     atomic_store(&probe->value, *(const mln_map*)result->value);
@@ -46,6 +52,7 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
   MLN_TEST_OK(atomic_load(&probe.status));
+  TEST_ASSERT_NOT_EQUAL(&completion_thread_marker, probe.thread);
 
   const mln_map map = (mln_map)atomic_load(&probe.value);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
@@ -69,6 +76,18 @@ static void record_wake(void* user_data) {
   atomic_fetch_add((atomic_uint*)user_data, 1);
 }
 
+static void an_idle_barrier_completes_on_the_worker(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  callback_probe probe = {0};
+  const mln_completion completion = probed_completion(&probe);
+  MLN_TEST_OK(mln_runtime_barrier(runtime, &completion, NULL));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
+  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
+  TEST_ASSERT_NOT_EQUAL(&completion_thread_marker, probe.thread);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void runtime_events_wake_the_receiver_directly(void) {
   atomic_uint wakes;
   atomic_init(&wakes, 0);
@@ -89,8 +108,136 @@ static void runtime_events_wake_the_receiver_directly(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void discarded_commands_publish_state_and_events_before_a_barrier(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  mln_test_drain_all(runtime);
+
+  mln_map_snapshot before = {.size = sizeof(before)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
+  const mln_logical_extent extent = {
+    .width = 96, .height = 80, .scale_factor = 1
+  };
+  mln_camera_update camera = mln_camera_update_default();
+  mln_test_transition_end end;
+  mln_test_transition_end_init(&end);
+  camera.animation.end_handler = mln_test_transition_end_handler(&end);
+  camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.camera.zoom = 4;
+  MLN_TEST_OK(mln_map_begin_command_group(map, NULL, NULL));
+  MLN_TEST_OK(mln_map_resize(map, extent, NULL, NULL));
+  MLN_TEST_OK(
+    mln_map_set_debug_options(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
+  );
+  MLN_TEST_OK(mln_map_update_camera(map, &camera, NULL, NULL));
+  MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
+  MLN_TEST_OK(mln_map_request_repaint(map, NULL, NULL));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+
+  TEST_ASSERT_TRUE(mln_test_wait_transition_end(&end));
+  mln_map_snapshot after = {.size = sizeof(after)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &after, NULL));
+  TEST_ASSERT_GREATER_THAN_UINT64(before.generation, after.generation);
+  TEST_ASSERT_EQUAL_UINT32(96, after.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(80, after.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, after.debug_options);
+  mln_camera_options observed;
+  MLN_TEST_OK(mln_test_map_get_camera(map, &observed));
+  TEST_ASSERT_EQUAL_DOUBLE(4, observed.zoom);
+  TEST_ASSERT_GREATER_THAN_size_t(
+    0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void a_later_command_completion_fences_discarded_commands(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_map_set_event_mask(map, 0, NULL, NULL));
+  MLN_TEST_OK(
+    mln_map_set_debug_options(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
+  );
+  MLN_TEST_AWAIT_OK(mln_map_request_repaint(map, &completion.descriptor, NULL));
+  mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  TEST_ASSERT_EQUAL_UINT64(0, snapshot.event_mask);
+  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, snapshot.debug_options);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void discarded_commands_keep_synchronous_validation(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  MLN_TEST_INVALID(mln_map_set_event_mask(map, UINT64_MAX, NULL, &diagnostic));
+  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "mask"));
+  MLN_TEST_INVALID(mln_map_resize(map, (mln_logical_extent){0}, NULL, NULL));
+  mln_completion undersized = {.size = sizeof(mln_completion) - 1};
+  MLN_TEST_INVALID(mln_map_request_repaint(map, &undersized, NULL));
+  mln_completion without_callback = {.size = sizeof(mln_completion)};
+  MLN_TEST_INVALID(mln_map_request_repaint(map, &without_callback, NULL));
+  mln_test_destroy_map(map);
+  MLN_TEST_INVALID_STATE(mln_map_request_repaint(map, NULL, NULL));
+  mln_test_destroy_runtime(runtime);
+}
+
+static void queries_operations_and_lifecycle_require_a_completion(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_INVALID(mln_map_get_camera(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_request_still_image(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_runtime_clear_resource_provider(runtime, NULL, NULL));
+  MLN_TEST_INVALID(mln_runtime_barrier(runtime, NULL, NULL));
+  MLN_TEST_INVALID(mln_runtime_create_map(runtime, NULL, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_release(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_runtime_release(runtime, NULL, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void a_session_barrier_fences_a_discarded_resize(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  mln_render_session_snapshot before = {.size = sizeof(before)};
+  MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
+  const mln_logical_extent extent = {
+    .width = 96, .height = 80, .scale_factor = 1
+  };
+  MLN_TEST_OK(mln_render_session_resize(fixture.session, extent, NULL, NULL));
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(80, snapshot.extent.height);
+  TEST_ASSERT_EQUAL_UINT64(
+    before.extent_generation + 1, snapshot.extent_generation
+  );
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(an_accepted_completion_runs_and_releases_exactly_once);
   RUN_TEST(a_rejected_submission_leaves_callback_state_with_the_caller);
+  RUN_TEST(an_idle_barrier_completes_on_the_worker);
   RUN_TEST(runtime_events_wake_the_receiver_directly);
+  RUN_TEST(discarded_commands_publish_state_and_events_before_a_barrier);
+  RUN_TEST(a_later_command_completion_fences_discarded_commands);
+  RUN_TEST(discarded_commands_keep_synchronous_validation);
+  RUN_TEST(queries_operations_and_lifecycle_require_a_completion);
+  RUN_TEST(a_session_barrier_fences_a_discarded_resize);
 }

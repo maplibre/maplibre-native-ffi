@@ -24,7 +24,10 @@ class OperationObject final {
   auto operator=(OperationObject&&) -> OperationObject& = delete;
   ~OperationObject();
 
-  auto set_terminal_callback(TerminalCallback callback) noexcept -> void;
+  auto set_terminal_callback(
+    TerminalCallback callback, bool work_pending = false
+  ) noexcept -> void;
+  auto retire_work() noexcept -> void;
   auto complete(
     mln_status status, std::string diagnostic, std::any result
   ) noexcept -> void;
@@ -32,6 +35,8 @@ class OperationObject final {
  private:
   std::mutex mutex_;
   bool completed_ = false;
+  bool delivery_finished_ = false;
+  bool work_pending_ = false;
   TerminalCallback terminal_callback_;
   ResultCallback result_callback_;
 };
@@ -49,7 +54,7 @@ struct CompletionOperation {
 // operation's result. deliver must not be empty.
 auto create_completion_operation(
   const mln_completion* descriptor, CompletionOperation::Delivery deliver,
-  CompletionOperation& out
+  CompletionOperation& out, bool command = false
 ) -> mln_status;
 
 auto create_completion_operation(

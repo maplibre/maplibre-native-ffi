@@ -122,6 +122,72 @@ static void a_rejected_submission_queues_nothing(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A command accepts a null completion, but a present one still names exactly
+// one of a callback and a queue, and a released queue reports as a released
+// handle.
+static void a_command_validates_a_present_completion(void) {
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  mln_completion completion = (mln_completion){.size = sizeof(mln_completion)};
+  MLN_TEST_INVALID(mln_map_set_debug_options(map, 0, &completion, NULL));
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, NULL, NULL));
+
+  mln_test_delivery_queue_release(&queue);
+  completion = mln_test_queue_completion(queue.handle, NULL);
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_map_set_debug_options(map, 0, &completion, NULL)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A barrier's completion reaches the queue after every earlier submission's,
+// including across a discarded command.
+static void a_barrier_completion_follows_earlier_queued_completions(void) {
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  int command_tag = 0;
+  int barrier_tag = 0;
+
+  const mln_completion command =
+    mln_test_queue_completion(queue.handle, &command_tag);
+  MLN_TEST_OK(
+    mln_map_set_style_json(map, mln_test_background_style_json, &command, NULL)
+  );
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, NULL, NULL));
+  const mln_completion barrier =
+    mln_test_queue_completion(queue.handle, &barrier_tag);
+  MLN_TEST_OK(mln_runtime_barrier(runtime, &barrier, NULL));
+
+  void* order[2] = {NULL, NULL};
+  size_t seen = 0;
+  while (seen < 2) {
+    const mln_delivery_batch batch =
+      mln_test_delivery_await_batch(queue.handle);
+    const mln_delivery_batch_view view = mln_test_delivery_view(batch);
+    for (size_t index = 0; index < view.delivery_count; index += 1) {
+      const mln_delivery* delivery = mln_test_delivery_at(&view, index);
+      TEST_ASSERT_TRUE(seen < 2);
+      TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
+      MLN_TEST_OK(delivery->payload.completion.status);
+      order[seen++] = delivery->user_data;
+    }
+    mln_delivery_batch_release(batch);
+  }
+  TEST_ASSERT_EQUAL_PTR(&command_tag, order[0]);
+  TEST_ASSERT_EQUAL_PTR(&barrier_tag, order[1]);
+
+  mln_test_destroy_map(map);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_destroy_runtime(runtime);
+}
+
 static mln_map create_map_through(
   mln_runtime runtime, mln_delivery_queue queue, mln_delivery_batch* out_batch
 ) {
@@ -240,6 +306,8 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
 MLN_TEST_GROUP {
   RUN_TEST(command_and_barrier_completions_reach_the_queue);
   RUN_TEST(a_rejected_submission_queues_nothing);
+  RUN_TEST(a_command_validates_a_present_completion);
+  RUN_TEST(a_barrier_completion_follows_earlier_queued_completions);
   RUN_TEST(an_untaken_map_is_disposed_with_its_batch);
   RUN_TEST(list_results_outlive_the_runtime);
   RUN_TEST(runtime_release_completes_through_the_queue);

@@ -41,25 +41,6 @@ static inline bool mln_delivery_copy_case_string(
   return copy != NULL && copy != source && strcmp(copy, source) == 0;
 }
 
-static const void* mln_delivery_copy_case_double_value(size_t* count) {
-  static double values[2];
-  values[0] = 1.5;
-  values[1] = 2.5;
-  *count = 2;
-  return values;
-}
-
-static bool mln_delivery_copy_case_double_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const double* copy = (const double*)copy_value;
-  const double* source = (const double*)source_value;
-  for (size_t index = 0; index < count; ++index) {
-    if (copy[index] != source[index]) return false;
-  }
-  return true;
-}
-
 static const void* mln_delivery_copy_case_buffer_view_value(size_t* count) {
   static mln_buffer_view values[2];
   static const char text_1[] = "mln_buffer_view[0]";
@@ -585,28 +566,6 @@ static bool mln_delivery_copy_case_queried_feature_matches(
   return true;
 }
 
-static const void* mln_delivery_copy_case_screen_point_value(size_t* count) {
-  static mln_screen_point values[2];
-  values[0].x = 1.5;
-  values[0].y = 2.5;
-  values[1].x = 3.5;
-  values[1].y = 4.5;
-  *count = 2;
-  return values;
-}
-
-static bool mln_delivery_copy_case_screen_point_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const mln_screen_point* copy = (const mln_screen_point*)copy_value;
-  const mln_screen_point* source = (const mln_screen_point*)source_value;
-  for (size_t index = 0; index < count; ++index) {
-    if (copy[index].x != source[index].x) return false;
-    if (copy[index].y != source[index].y) return false;
-  }
-  return true;
-}
-
 static const void* mln_delivery_copy_case_style_image_info_value(
   size_t* count
 ) {
@@ -1048,9 +1007,6 @@ static bool mln_delivery_copy_case_texture_readback_result_matches(
 }
 
 static const mln_delivery_copy_case mln_delivery_copy_cases[] = {
-  {"double", sizeof(double), mln_delivery_copy_case_double_value,
-   mln_delivery_copy_case_double_matches,
-   &mln::delivery::completion_capture<double>},
   {"mln_buffer_view", sizeof(mln_buffer_view),
    mln_delivery_copy_case_buffer_view_value,
    mln_delivery_copy_case_buffer_view_matches,
@@ -1085,10 +1041,6 @@ static const mln_delivery_copy_case mln_delivery_copy_cases[] = {
    mln_delivery_copy_case_queried_feature_value,
    mln_delivery_copy_case_queried_feature_matches,
    &mln::delivery::completion_capture<mln_queried_feature>},
-  {"mln_screen_point", sizeof(mln_screen_point),
-   mln_delivery_copy_case_screen_point_value,
-   mln_delivery_copy_case_screen_point_matches,
-   &mln::delivery::completion_capture<mln_screen_point>},
   {"mln_style_image_info", sizeof(mln_style_image_info),
    mln_delivery_copy_case_style_image_info_value,
    mln_delivery_copy_case_style_image_info_matches,

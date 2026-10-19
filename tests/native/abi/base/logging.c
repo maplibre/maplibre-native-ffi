@@ -142,6 +142,52 @@ LOG_STATE_CASE(the_async_mask_accepts_only_severity_bits) {
   }
 }
 
+typedef struct discarded_failure_probe {
+  atomic_uint warnings;
+  uint32_t severity;
+  uint32_t event;
+  char message[256];
+} discarded_failure_probe;
+
+static uint32_t record_discarded_failure(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)code;
+  discarded_failure_probe* probe = user_data;
+  if (message != NULL && strstr(message, "discarded command failed") != NULL) {
+    probe->severity = severity;
+    probe->event = event;
+    snprintf(probe->message, sizeof(probe->message), "%s", message);
+    atomic_fetch_add(&probe->warnings, 1);
+  }
+  return 1;
+}
+
+LOG_STATE_CASE(a_failed_discarded_command_logs_one_warning) {
+  static discarded_failure_probe probe;
+  memset(&probe, 0, sizeof(probe));
+  atomic_init(&probe.warnings, 0);
+  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
+  const mln_log_handler handler =
+    log_handler(record_discarded_failure, &probe, NULL);
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
+  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.warnings));
+  TEST_ASSERT_EQUAL_UINT32(MLN_LOG_SEVERITY_WARNING, probe.severity);
+  TEST_ASSERT_EQUAL_UINT32(MLN_LOG_EVENT_GENERAL, probe.event);
+  char status[32];
+  snprintf(status, sizeof(status), "status %d", MLN_STATUS_INVALID_STATE);
+  TEST_ASSERT_NOT_NULL(strstr(probe.message, status));
+  TEST_ASSERT_NOT_NULL(strstr(probe.message, "map has no open command group"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // The records mln_map_dump_debug_logs writes for a map whose style has no URL
 // and no source: a separator, the empty style URL, and a separator.
 static const char dump_separator[] =
@@ -173,8 +219,7 @@ typedef struct dump_probe {
   atomic_bool completed;
 } dump_probe;
 
-// A camera command's transition-end handler runs on the runtime worker even
-// when its completion is delivered inline on the submitting thread.
+// A camera command's transition-end handler identifies its runtime worker.
 static void record_command_thread(
   void* user_data, const mln_camera_transition_end* end
 ) {
@@ -401,6 +446,7 @@ MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
   RUN_TEST(a_rejected_handler_keeps_the_installed_one);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
+  RUN_TEST(a_failed_discarded_command_logs_one_warning);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
   RUN_TEST(a_rejected_async_mask_leaves_the_previous_one);

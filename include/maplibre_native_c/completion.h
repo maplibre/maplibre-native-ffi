@@ -74,12 +74,28 @@ typedef void (*mln_completion_callback)(
 /**
  * Callback or queue state for one asynchronous submission.
  *
- * The struct itself is borrowed for the submission call. Exactly one of
- * callback and queue is set. MLN_STATUS_OK transfers callback, user_data, and
- * release_user_data to the C API. The completion runs exactly once and may run
- * before the submission returns. The release callback runs after the
- * completion returns. A non-OK submission invokes neither callback and leaves
- * user_data owned by the caller.
+ * The struct itself is borrowed for the submission call. A non-null completion
+ * sets exactly one of callback and queue. MLN_STATUS_OK transfers callback,
+ * user_data, and release_user_data to the C API. The completion runs exactly
+ * once and may run before the submission returns. The release callback runs
+ * after the completion returns. A non-OK submission invokes neither callback
+ * and leaves user_data owned by the caller.
+ *
+ * A command, which the header marks MLN_BINDING("execution=command"), also
+ * accepts a null completion, which discards its outcome: native allocates no
+ * completion state and runs no callback. The command otherwise behaves as it
+ * would with a completion. It returns the same status and diagnostic, runs in
+ * acceptance order, publishes its snapshot generation, and queues its events.
+ * A discarded command that fails logs its status and diagnostic as a warning
+ * through the log handler. Queries, operations, and lifecycle functions require
+ * a completion.
+ *
+ * A later completion fences discarded commands. The completion of a later
+ * command on the same map, or of mln_runtime_barrier(), follows every earlier
+ * discarded command, and a snapshot read after it observes them;
+ * mln_render_session_barrier() fences a discarded mln_render_session_resize().
+ * A snapshot generation alone does not, because other work also publishes
+ * generations.
  *
  * The completion thread is unspecified and may be the submitting thread. It
  * can differ from the thread that ran the command. The completion may call
@@ -89,6 +105,10 @@ typedef void (*mln_completion_callback)(
  * In queue mode, no callback runs. The terminal result reaches queue exactly
  * once as an MLN_DELIVERY_TYPE_COMPLETION delivery, unless the host releases
  * the queue before the result arrives, which discards it. See delivery.h.
+ * Where another function waits for a completion and its release to return, a
+ * queue-mode completion has returned once native has pushed its result and
+ * woken the queue, or has discarded the result because the queue was released
+ * or the process is exiting. Draining the queue is the host's step.
  */
 typedef struct mln_completion {
   uint32_t size;

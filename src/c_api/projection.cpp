@@ -125,3 +125,39 @@ auto mln_map_projection_meters_per_pixel_at_latitude(
     );
   });
 }
+
+auto mln_map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_screen_point* out_points,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::map_projection_pixels_for_lat_lngs(
+      projection, coordinates, coordinate_count, out_points
+    );
+  });
+}
+
+auto mln_map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::map_projection_lat_lngs_for_pixels(
+      projection, points, point_count, out_coordinates
+    );
+  });
+}
+
+auto mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::map_projection_lat_lngs_for_pixels_unwrapped(
+      projection, points, point_count, out_coordinates
+    );
+  });
+}
