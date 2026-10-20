@@ -39,7 +39,6 @@ shared = [
   "mise.ohos.lock",
   ".miserc.toml",
   ".mise/**",
-  ".config/**",
   # The CI definitions that shape every snapshot artifact.
   ".github/workflows/**",
   "!.github/workflows/*-release.yml",
@@ -72,7 +71,6 @@ shared = [
   "!Directory.Packages.props",
   "!global.json",
   "!Maplibre.NativeFfi.slnx",
-  "!.config/dotnet-tools.json",
   "!Package.swift",
   "!Package.resolved",
   "!build.zig",
@@ -150,7 +148,6 @@ paths = [
   "Directory.Packages.props",
   "global.json",
   "Maplibre.NativeFfi.slnx",
-  ".config/dotnet-tools.json",
 ]
 
 [components.docs]
@@ -172,7 +169,6 @@ paths = [
   "Directory.Packages.props",
   "global.json",
   "Maplibre.NativeFfi.slnx",
-  ".config/dotnet-tools.json",
   "Package.swift",
   "Package.resolved",
   "build.zig",

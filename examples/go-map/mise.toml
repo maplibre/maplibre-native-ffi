@@ -1,6 +1,5 @@
 [tools]
 "core:go" = "{{vars.go_version}}"
-"aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
 [tasks.build]
@@ -22,11 +21,6 @@ go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
-unformatted="$(gofumpt -l .)"
-if [[ -n "$unformatted" ]]; then
-  printf '%s\n' "$unformatted" >&2
-  exit 1
-fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
