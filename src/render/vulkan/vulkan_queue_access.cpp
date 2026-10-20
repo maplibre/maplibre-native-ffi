@@ -307,6 +307,9 @@ void VulkanQueueAccess::release_queue_access() noexcept {
   if (index == no_slot) {
     return;
   }
+  // Destroyed after the registry lock, because dropping the last share of the
+  // host's queue lock runs the host's release.
+  auto retired = std::optional<Slot>{};
   auto& state = registry();
   const auto lock = std::scoped_lock{state.mutex};
   // install_queue_access() took the slot, so the index is in bounds, and this
@@ -316,9 +319,9 @@ void VulkanQueueAccess::release_queue_access() noexcept {
   if (!slot) {
     return;
   }
-  const VkQueue queue = slot->queue;
-  slot.reset();
-  const auto found = state.submit_mutexes.find(queue);
+  retired = std::exchange(slot, std::nullopt);
+  retired->submit_mutex.reset();
+  const auto found = state.submit_mutexes.find(retired->queue);
   if (found != state.submit_mutexes.end() && found->second.expired()) {
     state.submit_mutexes.erase(found);
   }

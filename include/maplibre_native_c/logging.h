@@ -90,8 +90,8 @@ typedef struct mln_log_handler {
    * Optional. Releases user_data after the final callback returns, when the
    * handler is replaced or cleared.
    *
-   * It runs on the thread that replaces or clears the handler, and must not
-   * call this C API or MapLibre Native APIs. Null in queue mode.
+   * It runs on the thread that replaces or clears the handler, under the
+   * same restrictions as the callback. Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**
@@ -101,8 +101,8 @@ typedef struct mln_log_handler {
    * could not be allocated, goes to the platform logger instead. Replacing or
    * clearing the handler queues one MLN_DELIVERY_TYPE_RETIRED delivery carrying
    * user_data after the handler's final record. The queue wakes inline under
-   * the log mutex. Its wake and wake release callback follow the log callback
-   * reentry rules: they must not call this C API or MapLibre Native APIs.
+   * the log mutex. Its wake and wake release callback follow the same
+   * restrictions as the log callback.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
@@ -120,11 +120,14 @@ typedef struct mln_log_handler {
  * and invokes no release. mln_log_clear_callback() clears the handler.
  *
  * The callback may run on any thread, according to the async severity mask. It
- * must be thread-safe, return promptly, and must not call this C API or
- * MapLibre Native APIs.
+ * must be thread-safe and return promptly. MapLibre Native holds its log mutex,
+ * which is not recursive, while the callback runs, and nearly every native call
+ * can log. So the callback must not call this C API or MapLibre Native APIs.
+ * Each status-returning function of this API returns MLN_STATUS_INVALID_STATE
+ * when the callback calls it.
  *
  * In queue mode the handler's records reach the queue and its wake runs inline
- * on the logging thread. The wake follows the same reentry restrictions.
+ * on the logging thread. The wake follows the same restrictions.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

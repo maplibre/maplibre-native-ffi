@@ -184,6 +184,70 @@ LOG_STATE_CASE(a_failed_discarded_command_logs_one_warning) {
   mln_test_destroy_runtime(runtime);
 }
 
+// What a log callback and its release saw when they called back into the
+// logging API, which MapLibre Native runs under a mutex that is not recursive.
+typedef struct reentry_probe {
+  atomic_int callback_status;
+  atomic_int release_status;
+  char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
+} reentry_probe;
+
+static uint32_t clear_from_log_callback(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)severity;
+  (void)event;
+  (void)code;
+  reentry_probe* probe = user_data;
+  if (message != NULL && strstr(message, "discarded command failed") != NULL) {
+    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+    const mln_status status = mln_log_clear_callback(&diagnostic);
+    snprintf(
+      probe->diagnostic, sizeof(probe->diagnostic), "%s", diagnostic.message
+    );
+    atomic_store(&probe->callback_status, status);
+  }
+  return 1;
+}
+
+static void clear_from_log_release(void* user_data) {
+  reentry_probe* probe = user_data;
+  atomic_store(&probe->release_status, mln_log_clear_callback(NULL));
+}
+
+// A log callback and its release that call back into the C API get an
+// invalid-state status, and the handler stays installed until the host
+// replaces it.
+LOG_STATE_CASE(a_log_callback_cannot_call_back_into_the_c_api) {
+  static reentry_probe probe;
+  memset(&probe, 0, sizeof(probe));
+  atomic_init(&probe.callback_status, MLN_STATUS_OK);
+  atomic_init(&probe.release_status, MLN_STATUS_OK);
+  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
+  const mln_log_handler handler =
+    log_handler(clear_from_log_callback, &probe, clear_from_log_release);
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
+  MLN_TEST_OK(mln_test_map_fence(map));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, atomic_load(&probe.callback_status)
+  );
+  TEST_ASSERT_NOT_NULL(strstr(probe.diagnostic, "log callback"));
+
+  // Replacing the handler releases its user data under the log mutex.
+  const mln_log_handler replacement =
+    log_handler(ignore_log_record, NULL, NULL);
+  MLN_TEST_OK(mln_log_set_callback(&replacement, NULL));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, atomic_load(&probe.release_status)
+  );
+}
+
 // The records mln_map_dump_debug_logs writes for a map whose style has no URL
 // and no source: a separator, the empty style URL, and a separator.
 static const char dump_separator[] =
@@ -429,6 +493,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_rejected_handler_keeps_the_installed_one);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
   RUN_TEST(a_failed_discarded_command_logs_one_warning);
+  RUN_TEST(a_log_callback_cannot_call_back_into_the_c_api);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
 #if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)

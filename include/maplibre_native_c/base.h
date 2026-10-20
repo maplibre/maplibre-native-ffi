@@ -52,7 +52,16 @@
 extern "C" {
 #endif
 
-/** Status values returned by status-returning functions. */
+/**
+ * Status values returned by status-returning functions.
+ *
+ * A few host callbacks run while native code holds a lock that a call into
+ * this API can take again: the log handler's callback, queue wake, and
+ * release_user_data, and the callbacks of an mln_queue_lock. Inside those
+ * callbacks, every status-returning function returns MLN_STATUS_INVALID_STATE
+ * without running, and its diagnostic names the callback. Each other callback
+ * states which calls it may make.
+ */
 typedef enum mln_status : int32_t {
   MLN_STATUS_OK = 0,
   /** A pointer, size field, mask, or handle argument was invalid. */

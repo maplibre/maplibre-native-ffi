@@ -74,9 +74,11 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * lock must not carry release_user_data. A session without a lock assumes that
  * the host leaves the queue alone while the session is attached.
  *
- * The callbacks must not call the C API. The host must not hold the lock while
- * calling the C API or waiting on a thread that does. Sessions sharing a queue
- * must use the same host mutex.
+ * The callbacks run inside a native lock that every session's submissions to
+ * the queue take, so they must not call the C API. Each status-returning
+ * function returns MLN_STATUS_INVALID_STATE when a callback calls it. The host
+ * must not hold the lock while calling the C API or waiting on a thread that
+ * does. Sessions sharing a queue must use the same host mutex.
  *
  * Native code calls release_user_data once, after the session can no longer
  * invoke the callbacks.

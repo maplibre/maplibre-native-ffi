@@ -11,11 +11,17 @@
 
 #include "delivery/delivery_queue.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/forbid_reentry.hpp"
 #include "execution/process_exit.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
 namespace {
+
+// MapLibre Native runs each observer call under its log mutex, which is not
+// recursive, and nearly every C API call can log.
+constexpr auto log_reentry_diagnostic =
+  "the C API cannot be called from a log callback, wake, or release";
 
 class CallbackLogObserver final : public mln::Log::Observer {
  public:
@@ -31,6 +37,7 @@ class CallbackLogObserver final : public mln::Log::Observer {
     if (release_user_data_ == nullptr || mln::core::process_exiting()) {
       return;
     }
+    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     try {
       release_user_data_(user_data_);
     } catch (...) {
@@ -47,6 +54,7 @@ class CallbackLogObserver final : public mln::Log::Observer {
       return true;
     }
 
+    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     return callback_(
              user_data_, static_cast<std::uint32_t>(severity),
              static_cast<std::uint32_t>(event), code, message.c_str()
@@ -78,13 +86,17 @@ class QueueLogObserver final : public mln::Log::Observer {
 
   // Retirement follows the handler's final record, where callback mode runs
   // release_user_data. A replacement destroys this observer under the log
-  // mutex, so its wake follows the log callback restrictions.
+  // mutex, so its wake follows the log callback restrictions. So does the
+  // wake's release, which runs here when this observer holds the last share
+  // of a released queue.
   ~QueueLogObserver() override {
+    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     if (mln::core::process_exiting()) {
       mln::delivery::forget_item(std::move(retired_));
-      return;
+    } else {
+      static_cast<void>(queue_->push(retired_));
     }
-    push(retired_);
+    queue_.reset();
   }
 
   auto onRecord(
@@ -101,6 +113,7 @@ class QueueLogObserver final : public mln::Log::Observer {
       .code = code,
       .message = message.c_str(),
     };
+    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     try {
       auto item = mln::delivery::make_item(
         MLN_DELIVERY_TYPE_LOG_RECORD, user_data_,
@@ -109,17 +122,13 @@ class QueueLogObserver final : public mln::Log::Observer {
             mln::delivery::capture_mln_log_delivery(arena, record);
         }
       );
-      return push(item);
+      return queue_->push(item);
     } catch (...) {
       return false;
     }
   }
 
  private:
-  auto push(mln::delivery::ItemPtr& item) noexcept -> bool {
-    return queue_->push(item);
-  }
-
   std::shared_ptr<mln::delivery::DeliveryQueueState> queue_;
   void* user_data_ = nullptr;
   mln::delivery::ItemPtr retired_;

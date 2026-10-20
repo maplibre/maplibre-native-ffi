@@ -46,8 +46,8 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
     return MLN_STATUS_INVALID_ARGUMENT;
   };
   if (kind == core::HandleKind::Map || kind == core::HandleKind::Runtime)
-    return c_api::status_boundary<false>(nullptr, dispose);
-  return c_api::status_boundary(nullptr, dispose);
+    return c_api::native_boundary<false>(nullptr, dispose);
+  return c_api::native_boundary(nullptr, dispose);
 }
 
 }  // namespace mln::delivery

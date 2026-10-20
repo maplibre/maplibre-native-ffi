@@ -319,6 +319,8 @@ typedef struct host_queue_lock {
   atomic_uint locks;
   atomic_uint unlocks;
   atomic_uint releases;
+  // The status of a C API call from inside the lock callback.
+  atomic_int reentry_status;
 } host_queue_lock;
 
 static void host_queue_lock_take(host_queue_lock* lock) {
@@ -336,7 +338,12 @@ static void host_queue_lock_give(host_queue_lock* lock) {
 static void session_takes_queue_lock(void* user_data) {
   host_queue_lock* lock = user_data;
   host_queue_lock_take(lock);
-  atomic_fetch_add(&lock->locks, 1);
+  if (atomic_fetch_add(&lock->locks, 1) == 0) {
+    uint32_t network_status = 0;
+    atomic_store(
+      &lock->reentry_status, mln_network_get_status(&network_status, NULL)
+    );
+  }
 }
 
 static void session_gives_queue_lock(void* user_data) {
@@ -389,6 +396,7 @@ static mln_queue_lock reset_shared_lock(void) {
   atomic_store(&shared_lock.locks, 0);
   atomic_store(&shared_lock.unlocks, 0);
   atomic_store(&shared_lock.releases, 0);
+  atomic_store(&shared_lock.reentry_status, MLN_STATUS_OK);
   return (mln_queue_lock){
     .lock = session_takes_queue_lock,
     .unlock = session_gives_queue_lock,
@@ -399,7 +407,8 @@ static mln_queue_lock reset_shared_lock(void) {
 
 // A host that submits on the session's queue passes a lock, and the session
 // holds it around every call on the queue, its teardown drain included, so
-// both can use one queue at once. The lock's release runs once the session is
+// both can use one queue at once. A C API call from the lock callback returns
+// an invalid-state status. The lock's release runs once the session is
 // destroyed.
 static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   observer_reset(&first_observer);
@@ -451,6 +460,9 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   );
   TEST_ASSERT_EQUAL_UINT(
     atomic_load(&shared_lock.locks), atomic_load(&shared_lock.unlocks)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, atomic_load(&shared_lock.reentry_status)
   );
   TEST_ASSERT_EQUAL_UINT(0, atomic_load(&shared_lock.releases));
 

@@ -1,9 +1,19 @@
 #include "render/queue_lock.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/forbid_reentry.hpp"
 #include "execution/process_exit.hpp"
 
 namespace mln::core {
+
+namespace {
+
+// The callbacks run inside the queue's submission mutex, which a session on
+// the same queue takes again to submit.
+constexpr auto queue_lock_reentry_diagnostic =
+  "the C API cannot be called from a queue lock callback";
+
+}  // namespace
 
 QueueLock::QueueLock(const mln_queue_lock& descriptor) noexcept
     : descriptor_(descriptor) {}
@@ -22,6 +32,7 @@ QueueLock::~QueueLock() {
 
 auto QueueLock::lock() const noexcept -> bool {
   if (process_exiting()) return false;
+  const auto forbid = ForbidReentry{queue_lock_reentry_diagnostic};
   try {
     descriptor_.lock(descriptor_.user_data);
   } catch (...) {
@@ -32,6 +43,7 @@ auto QueueLock::lock() const noexcept -> bool {
 }
 
 auto QueueLock::unlock() const noexcept -> void {
+  const auto forbid = ForbidReentry{queue_lock_reentry_diagnostic};
   try {
     descriptor_.unlock(descriptor_.user_data);
   } catch (...) {
