@@ -175,11 +175,9 @@ and request operations in the header, and resolution checks their types and
 relationships. Entering completion or release commits the callback to handling
 the request, including when completion returns an error. Pass-through
 invalidates the provisional owner. Request release waits for in-flight request
-calls and retires cancellation roots after native release returns. The
-decision's `wait_retired` relationship is verified: the compiler rejects a
-different receiver, extra parameters, a consuming operation, and callback
-reentry into that wait. A cancellation registration's boolean output identifies
-the already-cancelled path, which keeps no callback.
+calls and retires cancellation roots after native release returns. A
+cancellation registration's boolean output identifies the already-cancelled
+path, which keeps no callback.
 
 Direct registrations identify their context and either a release callback or
 owner release. The value model carries callback registration descriptors through
@@ -236,8 +234,6 @@ items using the declared stride. Encoded character and byte pointers resolve as
 buffers that keep their declared UTF-8, JSON, or bytes representation. Strided
 and arena-backed records support output copies, and input use fails compilation.
 
-`handle_access=issued` keeps access to an issued generation identifier for
-quiescence waits after owner release, and other operations require a live owner.
 Tagged union fields can declare `empty_variant` for a verified tag value with no
 payload, and unknown tags stay separate from that empty case. Enum plans include
 the declared underlying integer type, with its width and signedness.

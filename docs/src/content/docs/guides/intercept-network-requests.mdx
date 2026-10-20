@@ -90,7 +90,7 @@ callback.
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
 Register routes to restrict which requests reach the provider. Routes compare
-normalized URLs by default and can select the original requested URL. Select
+the normalized resolved URL that native loading fetches. Select
 all resource kinds explicitly in C; binding constructors provide that default.
 Go uses its `DefaultResourceRoute()` factory. Register the provider before
 loading its resources.
