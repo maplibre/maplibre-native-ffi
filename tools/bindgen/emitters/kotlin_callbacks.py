@@ -43,9 +43,8 @@ def check(value, values):
         callback = values.bound.callbacks[value.native]
         if not callback.context:
             raise Unsupported("callback needs its context parameter")
-        for parameter in callback.parameters:
-            if parameter.name != callback.context:
-                values.check(parameter.value)
+        for parameter in callback.arguments:
+            values.check(parameter.value)
         if callback.result.native != "void" and not status_callback(callback):
             values.check(callback.result)
     elif value.registration:
@@ -68,8 +67,7 @@ def common(values):
             callback = values.bound.callbacks[value.native]
             parameters = ", ".join(
                 f"{identifier(p.name)}: {values.public(p.value)}"
-                for p in callback.parameters
-                if p.name != callback.context
+                for p in callback.arguments
             )
             returns = (
                 "Unit"
@@ -244,9 +242,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
     owner = None
-    if callback.reentry_policy and callback.reentry_policy.owner_parameter is None:
-        owner = "{ it.owner }"
-    elif callback.reentry_policy and callback.reentry_policy.owner_parameter:
+    if callback.reentry_policy:
         owner = "{ " + identifier(callback.reentry_policy.owner_parameter) + " }"
     allowed = (
         "null"
@@ -276,9 +272,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
     arguments = []
     lines = []
     decision = callback.decision
-    for parameter in callback.parameters:
-        if parameter.name == callback.context:
-            continue
+    for parameter in callback.arguments:
         if decision and parameter.name == decision.parameter:
             lines.append(
                 f"val decisionOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
@@ -417,11 +411,8 @@ def put_function(value, values):
             + " && ".join(f"value.{identifier(f.name)} == null" for f in callbacks)
             + ") return"
         )
-    # A callback that calls back only into the receiver that registered it
-    # roots that receiver's handle with the value.
-    owner = ", handle" if value.registration.receiver_owned else ""
     lines.append(
-        f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value{owner}))"
+        f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value))"
     )
     for field in callbacks:
         site = callback_site(

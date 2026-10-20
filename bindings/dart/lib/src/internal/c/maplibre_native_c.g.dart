@@ -70,7 +70,7 @@ typedef mln_resource_provider_callbackFunction =
 typedef mln_resource_request_cancel_callback =
     Pointer<NativeFunction<mln_resource_request_cancel_callbackFunction>>;
 typedef mln_resource_request_cancel_callbackFunction =
-    Void Function(Pointer<Void> user_data);
+    Void Function(Pointer<Void> user_data, mln_resource_request handle);
 typedef mln_resource_transform_callback =
     Pointer<NativeFunction<mln_resource_transform_callbackFunction>>;
 typedef mln_resource_transform_callbackFunction =

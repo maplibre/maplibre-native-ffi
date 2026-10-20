@@ -40,7 +40,7 @@ def parts(values, value):
         plan = values.bound.callbacks[field.value.native]
         local = identifier(field.name)
         names = {p.name: f"native_arg_{i}" for i, p in enumerate(plan.parameters)}
-        parameters = [p for p in plan.parameters if p.name != plan.context]
+        parameters = list(plan.arguments)
         result = (
             "void"
             if plan.result.ctype.kind == "void" or plan.status

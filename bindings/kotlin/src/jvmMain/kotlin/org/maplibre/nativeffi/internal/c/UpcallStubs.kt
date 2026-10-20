@@ -18,7 +18,7 @@ internal actual object UpcallStubs {
   actual val customMvtVectorSourceOptionsCancelTile: Long =
     Ffm.upcall("customMvtVectorSourceOptionsCancelTile", null, JAVA_LONG, mln_canonical_tile_id)
   actual val resourceRequestCancelHandlerCallback: Long =
-    Ffm.upcall("resourceRequestCancelHandlerCallback", null, JAVA_LONG)
+    Ffm.upcall("resourceRequestCancelHandlerCallback", null, JAVA_LONG, JAVA_LONG)
   actual val httpHeaderTransformCallback: Long =
     Ffm.upcall("httpHeaderTransformCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
   actual val resourceProviderCallback: Long =

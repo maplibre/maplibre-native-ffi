@@ -388,7 +388,7 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
   }
   if (!process_exiting()) {
     try {
-      callback(user_data);
+      callback(user_data, object.handle);
     } catch (...) {
       // Host callbacks must not unwind through MapLibre's cancel path.
     }

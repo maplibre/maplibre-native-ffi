@@ -104,13 +104,13 @@ internal object Upcalls {
     )
 
   @JvmStatic
-  fun resourceRequestCancelHandlerCallback(userData: Long): Unit =
+  fun resourceRequestCancelHandlerCallback(userData: Long, handle: Long): Unit =
     upcall<ResourceRequestCancelHandler, Unit>(
       "mln_resource_request_cancel_callback",
       userData,
       Unit,
       resourceRequestCancelHandlerCallbackAllowed,
-      { it.owner },
+      { handle },
     ) { value, scope ->
       value.callback()
     }

@@ -17,6 +17,10 @@ const UNKNOWN_DECISION: u32 = u32::MAX;
 /// A notification that native calls with its registration context.
 pub type ContextCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
+/// A cancellation notification, which native calls with its registration
+/// context and the cancelled handle.
+pub type CancelCallback<H> = Option<unsafe extern "C" fn(*mut c_void, H)>;
+
 /// Registers a one-shot cancellation notification on a decision handle and
 /// reports whether the handle was already cancelled.
 ///
@@ -24,7 +28,7 @@ pub type ContextCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 /// and the release in the protocol's registration record.
 pub type CancelRegistrationFn<H> = unsafe fn(
     H,
-    ContextCallback,
+    CancelCallback<H>,
     *mut c_void,
     ContextCallback,
     *mut bool,
@@ -232,15 +236,14 @@ impl<H: NativeHandle> DecisionHandleState<H> {
         callback: Option<Box<dyn FnOnce() + Send + 'static>>,
     ) -> Result<bool> {
         type Registration = (
-            u64,
             &'static [&'static str],
             Option<Box<dyn FnOnce() + Send + 'static>>,
         );
-        unsafe extern "C" fn invoke(user_data: *mut c_void) {
+        unsafe extern "C" fn invoke<H: NativeHandle>(user_data: *mut c_void, handle: H) {
             // SAFETY: native passes the registration it owns and invokes it at
             // most once, before its release.
-            let (owner, reentry, callback) = unsafe { &mut *user_data.cast::<Registration>() };
-            let _policy = crate::callback::PolicyScope::enter(reentry, *owner);
+            let (reentry, callback) = unsafe { &mut *user_data.cast::<Registration>() };
+            let _policy = crate::callback::PolicyScope::enter(reentry, handle.to_raw());
             if let Some(callback) = callback.take() {
                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback));
             }
@@ -255,15 +258,14 @@ impl<H: NativeHandle> DecisionHandleState<H> {
         }
         let handle = self.native_for_call()?;
         let present = callback.is_some();
-        let registration: Box<Registration> =
-            Box::new((handle.to_raw(), self.fns.reentry, callback));
+        let registration: Box<Registration> = Box::new((self.fns.reentry, callback));
         let user_data = Box::into_raw(registration).cast();
         let mut cancelled = false;
         let register = self.fns.cancel_registration;
         let registered = crate::check(|diagnostic| unsafe {
             register(
                 handle,
-                present.then_some(invoke as unsafe extern "C" fn(*mut c_void)),
+                present.then_some(invoke::<H> as unsafe extern "C" fn(*mut c_void, H)),
                 user_data,
                 Some(release),
                 &mut cancelled,
@@ -471,7 +473,7 @@ mod tests {
 
     unsafe fn fake_cancel_registration(
         _handle: sys::mln_resource_request,
-        _callback: ContextCallback,
+        _callback: CancelCallback<sys::mln_resource_request>,
         _user_data: *mut c_void,
         _release: ContextCallback,
         _cancelled: *mut bool,

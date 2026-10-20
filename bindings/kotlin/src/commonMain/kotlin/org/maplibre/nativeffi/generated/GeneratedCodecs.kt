@@ -925,7 +925,7 @@ internal fun NativeCall.putResourceRequestCancelHandler(
   value: ResourceRequestCancelHandler,
 ) {
   writeU32(target, w(16, 32).toUInt())
-  writeAddress(target + w(8, 16), registrations.register(value, handle))
+  writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }

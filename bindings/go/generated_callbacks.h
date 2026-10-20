@@ -27,7 +27,9 @@ void binding_mln_camera_transition_handler_callback(
 void binding_mln_wake_callback(void* user_data);
 void binding_mln_queue_lock_lock(void* user_data);
 void binding_mln_queue_lock_unlock(void* user_data);
-void binding_mln_resource_request_cancel_handler_callback(void* user_data);
+void binding_mln_resource_request_cancel_handler_callback(
+  void* user_data, mln_resource_request handle
+);
 mln_status binding_mln_http_header_transform_callback(
   void* user_data, uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response

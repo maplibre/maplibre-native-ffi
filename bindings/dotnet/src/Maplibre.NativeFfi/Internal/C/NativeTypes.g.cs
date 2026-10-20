@@ -749,7 +749,7 @@ internal unsafe struct mln_resource_range
 internal unsafe struct mln_resource_request_cancel_handler
 {
     public uint size;
-    public delegate* unmanaged[Cdecl]<void*, void> callback;
+    public delegate* unmanaged[Cdecl]<void*, MlnResourceRequest, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }

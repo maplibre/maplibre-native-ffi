@@ -76,9 +76,8 @@ class Values:
         self.public(value)
         if value.kind == "callback":
             callback = self.bound.callbacks[value.native]
-            for parameter in callback.parameters:
-                if parameter.name != callback.context:
-                    self.add(parameter.value)
+            for parameter in callback.arguments:
+                self.add(parameter.value)
             if callback.result.native != "void":
                 self.add(callback.result)
             return

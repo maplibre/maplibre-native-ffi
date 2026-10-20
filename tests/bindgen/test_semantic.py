@@ -1123,12 +1123,17 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
             (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
         )
-        # The cancel callback names its owner by handle type, so it calls back
-        # only into the ticket that registers it.
-        policy = model.callbacks["mln_ticket_cancel"].reentry_policy
+        # The cancel callback borrows its owner, which the host never
+        # receives, so it calls back only into the ticket that registers it.
+        callback = model.callbacks["mln_ticket_cancel"]
         self.assertEqual(
-            (policy.owner_parameter, policy.owner_type), (None, "mln_ticket")
+            (
+                callback.reentry_policy.owner_parameter,
+                callback.reentry_policy.owner_type,
+            ),
+            ("ticket", "mln_ticket"),
         )
+        self.assertEqual(callback.arguments, ())
         self.assertTrue(
             model.values["mln_ticket_cancel_handler"].registration.receiver_owned
         )

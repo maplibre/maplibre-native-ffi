@@ -520,8 +520,8 @@ typedef enum mln_delivery_type : uint32_t {
 
 #ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
 // A callback registration that native may decline through an output. The
-// cancel callback names no owner parameter, so it may call back only into the
-// ticket that registers it.
+// cancel callback's owner is a ticket it borrows, so it may call back only into
+// the ticket that registers it.
 typedef unsigned long long mln_ticket
   BIND("kind=handle;release=mln_ticket_release");
 typedef void (*mln_ticket_release_context)(void* context);
@@ -532,8 +532,8 @@ typedef void (*mln_ticket_release_context)(void* context);
 #else
 #define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
 #endif
-typedef void (*mln_ticket_cancel)(void* context) BIND(
-  "reentry=protocol;reentry_owner=mln_ticket;"
+typedef void (*mln_ticket_cancel)(void* context, mln_ticket ticket) BIND(
+  "reentry=protocol;reentry_owner=ticket;"
   "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS
 );
 typedef struct mln_ticket_cancel_handler {

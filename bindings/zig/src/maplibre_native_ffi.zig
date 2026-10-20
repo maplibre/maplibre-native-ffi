@@ -3634,22 +3634,22 @@ pub const ResourceRequestCancelHandler = struct {
         }
         return raw;
     }
-    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 1)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
                 const state = callback.Registration(ResourceRequestCancelHandler).get(callback_arg_0);
                 const host = state.value.callback orelse {
                     return;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.owner);
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_1);
                 defer scope.leave();
                 host(state.value.context) catch |err| {
                     callback.reportError("mln_resource_request_cancel_callback", err);
                     return;
                 };
             }
-        }.invoke(native_arg_0) catch |err| {
+        }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_resource_request_cancel_callback", err);
             return;
         };

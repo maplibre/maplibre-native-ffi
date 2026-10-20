@@ -64,9 +64,7 @@ def payload(callback):
     if not callback.context or callback.result.native != "void" or callback.synchronous:
         return None
     result = []
-    for parameter in callback.parameters:
-        if parameter.name == callback.context:
-            continue
+    for parameter in callback.arguments:
         children = flattened(parameter.value, parameter.name)
         if parameter.direction != "in" or children is None:
             return None
@@ -108,7 +106,9 @@ def generate(bound):
         name = constant(owner, field)
         header.append(f"  {name} = {callback_id}U,")
         arguments = ", ".join(
-            f"{p.value.ctype.spelling} {p.name}" for p in callback.parameters
+            ("[[maybe_unused]] " if p.name == callback.borrowed_owner else "")
+            + f"{p.value.ctype.spelling} {p.name}"
+            for p in callback.parameters
         )
         items = ", ".join(
             [name, *(f"static_cast<std::int64_t>({item})" for item in values)]

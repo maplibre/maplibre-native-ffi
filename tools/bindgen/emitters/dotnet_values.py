@@ -118,9 +118,8 @@ class Values:
             callback = self.bound.callbacks[plan.native]
             if callback.result.kind == "enum":
                 self.supported(callback.result)
-            for parameter in callback.parameters:
-                if parameter.name != callback.context:
-                    self.supported(parameter.value)
+            for parameter in callback.arguments:
+                self.supported(parameter.value)
             return
         if plan.kind == "enum":
             self.enum_names.add(plan.native)
@@ -234,9 +233,7 @@ class Values:
         if plan.kind == "callback":
             callback = self.bound.callbacks[plan.native]
             arguments = [
-                self.public_type(parameter.value)
-                for parameter in callback.parameters
-                if parameter.name != callback.context
+                self.public_type(parameter.value) for parameter in callback.arguments
             ]
             if callback.result.ctype.kind != "void" and not callback.status:
                 arguments.append(self.public_type(callback.result))
@@ -821,7 +818,7 @@ class Values:
                     "owned"
                     if callback.decision
                     else "receiver.Owner"
-                    if policy.owner_parameter is None
+                    if plan.registration.receiver_owned
                     else "response" + pascal(policy.owner_parameter)
                 )
                 restriction = f"            using var restriction = NativeCallbackGuard.Restrict({owner_expression}, {table});\n"
@@ -843,8 +840,7 @@ class Values:
                     "owned"
                     if parameter.name == decision.parameter
                     else self.copy(parameter.value, member(parameter.name))
-                    for parameter in callback.parameters
-                    if parameter.name != callback.context
+                    for parameter in callback.arguments
                 )
                 accept = self.constant(decision.accept)
                 raw = self.raw_type(callback.result)
@@ -871,8 +867,7 @@ class Values:
                 "response" + pascal(parameter.name)
                 if parameter in responses
                 else self.copy(parameter.value, f"{member(parameter.name)}")
-                for parameter in callback.parameters
-                if parameter.name != callback.context
+                for parameter in callback.arguments
             )
             setup = "".join(
                 f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.element.native)}({member(parameter.name)});\n"

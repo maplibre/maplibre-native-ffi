@@ -684,7 +684,8 @@ private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
   "mln_resource_request_release",
 ]
 private func invokeResourceRequestCancelHandlerCallback(
-  user_data: UnsafeMutableRawPointer?
+  user_data: UnsafeMutableRawPointer?,
+  handle _: mln_resource_request
 ) {
   guard let user_data else { return }
   let box =

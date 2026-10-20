@@ -151,14 +151,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
         }
 
         /// The owner that a registration the call retains calls back into.
-        fn ownerId(receiver: T) u64 {
-            return switch (access) {
-                .none => 0,
-                .scoped => @intFromPtr(receiver.native),
-                else => receiver.raw,
-            };
-        }
-
         fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
             return .{ .state = switch (access) {
                 .none => {},
@@ -247,7 +239,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
             return .{
                 .receiver = hold,
-                .roots = .{ .owner = Hold.ownerId(receiver) },
+                .roots = .{},
                 .diagnostic = diagnostic,
                 .arena = if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator.init(allocator) else {},
             };

@@ -3482,7 +3482,7 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
   {"customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
   {"customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
-  {"resourceRequestCancelHandlerCallback", "(J)V", NULL},
+  {"resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
   {"httpHeaderTransformCallback", "(JIJJ)I", NULL},
   {"resourceProviderCallback", "(JJJ)I", NULL},
   {"resourceTransformCallback", "(JIJJ)I", NULL},
@@ -3563,8 +3563,10 @@ static void mln_jni_customMvtVectorSourceOptionsCancelTile(
   mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
 }
 
-static void mln_jni_resourceRequestCancelHandlerCallback(void* userData) {
-  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+static void mln_jni_resourceRequestCancelHandlerCallback(
+  void* userData, mln_resource_request handle
+) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}, {.j = (jlong)handle}};
   mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
 }
 

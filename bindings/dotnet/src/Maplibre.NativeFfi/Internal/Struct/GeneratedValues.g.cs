@@ -2125,7 +2125,10 @@ internal static unsafe class GeneratedValues
     ];
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void InvokeResourceRequestCancelHandlerCallback(void* user_data)
+    private static void InvokeResourceRequestCancelHandlerCallback(
+        void* user_data,
+        MlnResourceRequest handle
+    )
     {
         try
         {

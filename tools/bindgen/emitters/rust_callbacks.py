@@ -38,9 +38,8 @@ def validate(values, value):
             for parameter in callback.parameters
         ):
             raise Unsupported("callback output requires scoped response metadata")
-        for parameter in callback.parameters:
-            if parameter.name != callback.context:
-                values.check(parameter.value)
+        for parameter in callback.arguments:
+            values.check(parameter.value)
         if callback.result.ctype.kind != "void":
             values.check(callback.result)
     for field in value.fields:
@@ -60,9 +59,8 @@ def add(values, value):
     validate(values, value)
     values.used[value.native] = value
     for field, callback in callbacks(values, value):
-        for parameter in callback.parameters:
-            if parameter.name != callback.context:
-                values.add(parameter.value, "out")
+        for parameter in callback.arguments:
+            values.add(parameter.value, "out")
         if callback.result.ctype.kind != "void":
             values.add(callback.result, "in")
     for field in value.fields:
@@ -87,11 +85,6 @@ def reentry(callback, locals_by_name):
     policy = callback.reentry_policy
     if not policy:
         return "Some((&[], 0))"
-    if policy.owner_parameter is None:
-        raise Unsupported(
-            f"{callback.native}: a callback without an owner parameter needs its "
-            "registration's receiver, which only a decision handle records"
-        )
     owner_parameter = next(
         p for p in callback.parameters if p.name == policy.owner_parameter
     )
@@ -130,7 +123,7 @@ def trampoline(values, callback, name, host, state="Self"):
         else identifier(parameter.name)
         for parameter in callback.parameters
     }
-    arguments = [p for p in callback.parameters if p.name != callback.context]
+    arguments = callback.arguments
     raw_arguments = ", ".join(
         f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
         for p in callback.parameters
@@ -182,7 +175,7 @@ def declaration(values, value):
     fields, writes, copies, trampolines, constructors = [], [], [], [], []
     for index, (field, callback) in enumerate(callbacks(values, value)):
         public = identifier(field.name)
-        arguments = [p for p in callback.parameters if p.name != callback.context]
+        arguments = callback.arguments
         signature = ", ".join(callback_parameter_type(values, p) for p in arguments)
         code, output = trampoline(
             values,
@@ -306,7 +299,7 @@ def decision_trampoline(values, callback, name, public):
     locals_by_name = {
         parameter.name: identifier(parameter.name) for parameter in callback.parameters
     }
-    arguments = [p for p in callback.parameters if p.name != callback.context]
+    arguments = callback.arguments
     raw_arguments = ", ".join(
         f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
         for p in callback.parameters
@@ -450,10 +443,11 @@ def cancel_notification(bound, decision):
     field = next(f for f in record.fields if f.name == registration.callbacks[0])
     callback = bound.callbacks[field.value.native]
     if (
-        [p.name for p in callback.parameters] != [callback.context]
+        callback.arguments
         or callback.result.ctype.kind != "void"
         or not callback.reentry_policy
-        or callback.reentry_policy.owner_parameter is not None
+        or [p.name for p in callback.parameters]
+        != [callback.context, callback.reentry_policy.owner_parameter]
     ):
         raise Unsupported(
             f"{plan.name}: cancel callback must be a request notification"
@@ -516,7 +510,7 @@ def decision_table(bound, decision, owner: str) -> str:
     arguments = [sources[p.name] for p in plan.function.parameters if p.name in sources]
     return (
         f"unsafe fn {register}(handle: sys::{handle}, "
-        "callback: maplibre_core::decision::ContextCallback, "
+        f"callback: maplibre_core::decision::CancelCallback<sys::{handle}>, "
         "user_data: *mut std::ffi::c_void, "
         "release: maplibre_core::decision::ContextCallback, "
         "out_cancelled: *mut bool, out_diagnostic: *mut sys::mln_diagnostic) "

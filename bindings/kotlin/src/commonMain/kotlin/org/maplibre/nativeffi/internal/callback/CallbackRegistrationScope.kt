@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.WeakBox
 import org.maplibre.nativeffi.internal.lifecycle.yieldThread
 
 @OptIn(ExperimentalAtomicApi::class)
-internal class CallbackRoot(value: Any, val owner: Long? = null) {
+internal class CallbackRoot(value: Any) {
   private val stored = AtomicReference<Any?>(value)
   val value: Any?
     get() = stored.load()
@@ -103,8 +103,8 @@ internal class CallbackRegistrationScope : AutoCloseable {
   private val roots = mutableListOf<Pair<Long, CallbackRoot>>()
   private var accepted = false
 
-  fun register(value: Any, owner: Long? = null): Long {
-    val root = CallbackRoot(value, owner)
+  fun register(value: Any): Long {
+    val root = CallbackRoot(value)
     val token = CallbackRoots.retain(root)
     try {
       roots.add(token to root)

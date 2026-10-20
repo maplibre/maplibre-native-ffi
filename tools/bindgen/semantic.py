@@ -105,8 +105,9 @@ class RegistrationDescriptorPlan:
     # Whether the release runs where host code must not call back into the
     # C API: "forbid", or "allow".
     release_reentry: str = "allow"
-    # Whether a callback has no owner parameter and calls back only into the
-    # receiver of the call that registers it, which the binding records.
+    # Whether a callback's reentry owner is a handle that only names the
+    # receiver of the call that registers it, which the host's callback
+    # already holds.
     receiver_owned: bool = False
     # The member that names a delivery queue in place of the callback, or None.
     queue: str | None = None
@@ -235,9 +236,8 @@ class ParameterPlan:
 
 @dataclass(frozen=True)
 class CallbackReentryPlan:
-    # The callback parameter that identifies the owner, or None when the
-    # callback has none and its registration's receiver is the owner.
-    owner_parameter: str | None
+    # The callback parameter that identifies the owner.
+    owner_parameter: str
     owner_type: str
     operations: tuple[str, ...]
 
@@ -273,6 +273,29 @@ class CallbackPlan:
     # returns, so a binding must run it on the calling thread rather than
     # deliver it later, even when it returns nothing.
     synchronous: bool = False
+
+    @property
+    def borrowed_owner(self) -> str | None:
+        """The handle parameter that only names the reentry owner, which the
+        host's callback already holds, or None. A decision handle is the
+        host's to adopt, so it is not one."""
+        policy = self.reentry_policy
+        if policy is None or (
+            self.decision and self.decision.parameter == policy.owner_parameter
+        ):
+            return None
+        owner = next(p for p in self.parameters if p.name == policy.owner_parameter)
+        return owner.name if owner.value.kind == "handle" else None
+
+    @property
+    def arguments(self) -> tuple[ParameterPlan, ...]:
+        """The parameters that host code receives: all but the context and a
+        borrowed owner."""
+        return tuple(
+            p
+            for p in self.parameters
+            if p.name not in {self.context, self.borrowed_owner}
+        )
 
 
 @dataclass(frozen=True)
@@ -945,7 +968,7 @@ class Binder:
                         record_metadata["release"],
                         record_metadata.get("release_reentry", "allow"),
                         any(
-                            self.receiver_owned(member.value.native)
+                            self.callbacks[member.value.native].borrowed_owner
                             for member in fields
                             if member.value.kind == "callback"
                             and member.name != record_metadata["release"]
@@ -1109,12 +1132,12 @@ class Binder:
             (outputs if direction == "out" else inputs).append(plan)
 
             def validate_owned_reentry(descriptor):
-                """A callback without an owner parameter may call back only
-                into the receiver that registered it."""
+                """A callback whose owner its host never receives may call
+                back only into the receiver that registered it."""
                 for member in descriptor.fields:
                     callback = self.callbacks.get(member.value.native)
                     policy = callback.reentry_policy if callback else None
-                    if policy is None or policy.owner_parameter is not None:
+                    if policy is None or callback.borrowed_owner is None:
                         continue
                     owner = next(
                         (
@@ -1581,24 +1604,21 @@ class Binder:
         )
         return DeliveryPlan(constant, member.name, type_name(member.type))
 
-    def receiver_owned(self, name: str) -> bool:
-        """Whether a protocol callback names its owner by handle type rather
-        than by one of its parameters."""
-        typedef = self.typedefs.get(name)
-        if typedef is None or typedef.metadata.get("reentry") != "protocol":
-            return False
-        owner = typedef.metadata["reentry_owner"]
-        return all(p.name != owner for p in typedef.parameters)
-
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:
         metadata = typedef.metadata
         if metadata.get("reentry") != "protocol":
             return None
         owner = metadata["reentry_owner"]
         parameter = next((p for p in typedef.parameters if p.name == owner), None)
+        if parameter is None:
+            raise ModelError(
+                [
+                    f"{typedef.location}: {typedef.name}: reentry_owner names no parameter"
+                ]
+            )
         return CallbackReentryPlan(
-            parameter.name if parameter else None,
-            type_name(parameter.type.pointee or parameter.type) if parameter else owner,
+            parameter.name,
+            type_name(parameter.type.pointee or parameter.type),
             tuple(metadata["reentry_calls"].split(",")),
         )
 

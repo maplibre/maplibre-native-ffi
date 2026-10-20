@@ -71,10 +71,6 @@ type bindingArena struct {
 	allocations []unsafe.Pointer
 	callbacks   []*bindingCallbackTicket
 	leases      []func()
-	// identity is the issued id of the call's receiver, or zero for a global
-	// call. A registration whose callback may call back only into the
-	// receiver records it.
-	identity uint64
 }
 
 func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
@@ -361,15 +357,14 @@ type bindingCallbackTicket struct {
 	id cgo.Handle
 	// cell is the C memory holding id, whose address native stores as the
 	// registration's user data.
-	cell     unsafe.Pointer
-	value    any
-	owner    weak.Pointer[bindingOwner]
-	identity uint64
-	retired  bool
+	cell    unsafe.Pointer
+	value   any
+	owner   weak.Pointer[bindingOwner]
+	retired bool
 }
 
-func (arena *bindingArena) register(value any, identity uint64) unsafe.Pointer {
-	ticket := &bindingCallbackTicket{value: value, identity: identity}
+func (arena *bindingArena) register(value any) unsafe.Pointer {
+	ticket := &bindingCallbackTicket{value: value}
 	ticket.id = cgo.NewHandle(weak.Make(ticket))
 	ticket.cell = bindingHandleCell(ticket.id)
 	arena.callbacks = append(arena.callbacks, ticket)
@@ -428,9 +423,6 @@ func bindingCallbackValue[T any](pointer unsafe.Pointer) (T, bool) {
 	ticket.mu.Lock()
 	defer ticket.mu.Unlock()
 	value, ok := ticket.value.(T)
-	if ticket.identity != 0 {
-		ticket.value = nil
-	}
 	return value, ok
 }
 
@@ -448,7 +440,7 @@ func bindingReportCallbackPanic(callback string, failure any) {
 	slog.Error("maplibre: callback panicked", "callback", callback, "panic", failure, "stack", string(debug.Stack()))
 }
 
-// Native threads enter the two exports below, so a panic must not cross cgo:
+// Native threads enter the export below, so a panic must not cross cgo:
 // it would abort the process. Like the generated trampolines, they recover.
 
 //export mlnGoCallbackRelease
@@ -465,19 +457,6 @@ func mlnGoCallbackRelease(pointer unsafe.Pointer) {
 		bindingHandleOf(pointer).Delete()
 		C.binding_handle_free(pointer)
 	}
-}
-
-//export mlnGoCallbackOwner
-func mlnGoCallbackOwner(pointer unsafe.Pointer) (owner C.uint64_t) {
-	defer func() {
-		if recover() != nil {
-			owner = 0
-		}
-	}()
-	if ticket := bindingTicket(pointer); ticket != nil {
-		return C.uint64_t(ticket.identity)
-	}
-	return 0
 }
 
 // bindingAdmission needs no thread pin: a goroutine inside a cgo callback is

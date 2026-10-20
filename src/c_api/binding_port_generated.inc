@@ -50,7 +50,7 @@ void port_MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE(
   dart_port_notify(user_data, values);
 }
 void port_MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK(
-  void* user_data
+  void* user_data, [[maybe_unused]] mln_resource_request handle
 ) {
   const std::int64_t values[] = {
     MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK

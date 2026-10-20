@@ -26,11 +26,11 @@ internal inline fun <reified V : Any, T> upcall(
   token: Long,
   failure: T,
   allowed: Set<String>?,
-  owner: (CallbackRoot) -> Long? = { null },
+  owner: () -> Long? = { null },
   block: (V, CallbackScope) -> T,
 ): T =
   contain(callback, failure) {
     val root = CallbackRoots.get(token) ?: return failure
     val value = root.value as? V ?: return failure
-    CallbackAdmission.scope(owner(root), allowed).use { scope -> block(value, scope) }
+    CallbackAdmission.scope(owner(), allowed).use { scope -> block(value, scope) }
   }

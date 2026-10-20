@@ -12,11 +12,7 @@ def contains_callback(value):
 
 
 def closure_type(values, callback):
-    parameters = [
-        values.public(parameter.value)
-        for parameter in callback.parameters
-        if parameter.name != callback.context
-    ]
+    parameters = [values.public(parameter.value) for parameter in callback.arguments]
     result = (
         "Void"
         if callback.result.native == "void"
@@ -190,8 +186,7 @@ def descriptor(values, plan):
             else "response" + name(parameter.name)
             if parameter in responses
             else decode(values, parameter.value, identifier(parameter.name))
-            for parameter in callback.parameters
-            if parameter.name != callback.context
+            for parameter in callback.arguments
         )
         typed_enum = callback.result.ctype.canonical.startswith("enum ")
         # A failure that names a constant of a C enum converts to the raw
@@ -217,7 +212,7 @@ def descriptor(values, plan):
                 "decisionOwner"
                 if callback.decision
                 else "receiver"
-                if policy.owner_parameter is None
+                if registration.receiver_owned
                 else "response" + name(policy.owner_parameter)
             )
             guard = f"  let admission = NativeCallbackGuard.enter(owner: {policy_owner}, operations: allowed{public}{name(field.name)})\n  defer {{ admission.end() }}\n"

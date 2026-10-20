@@ -10371,7 +10371,7 @@ impl ResourceRequestHandle {
 }
 unsafe fn register_resource_request_cancel(
     handle: sys::mln_resource_request,
-    callback: maplibre_core::decision::ContextCallback,
+    callback: maplibre_core::decision::CancelCallback<sys::mln_resource_request>,
     user_data: *mut std::ffi::c_void,
     release: maplibre_core::decision::ContextCallback,
     out_cancelled: *mut bool,

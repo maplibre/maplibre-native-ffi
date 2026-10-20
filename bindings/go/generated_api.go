@@ -1730,7 +1730,7 @@ type CameraTransitionHandler struct{ Callback func(CameraTransitionEnd) }
 func nativeCameraTransitionHandler(input CameraTransitionHandler, arena *bindingArena) C.mln_camera_transition_handler {
 	raw := C.mln_camera_transition_handler{}
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_camera_transition_end_callback(C.binding_mln_camera_transition_handler_callback)
@@ -1842,7 +1842,7 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP, &raw.clip, input.Clip, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, input.Wrap, arena, bindingBool[bool, C.bool])
 	if input.FetchTile != nil || input.CancelTile != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
 			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
@@ -1886,7 +1886,7 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
 			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
@@ -2294,7 +2294,7 @@ func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C
 		}
 	}
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_http_header_transform_callback(C.binding_mln_http_header_transform_callback)
@@ -2433,7 +2433,7 @@ func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
 	raw := C.mln_log_handler{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.Callback != nil {
 			raw.callback = C.mln_log_callback(C.binding_mln_log_handler_callback)
@@ -3458,7 +3458,7 @@ type QueueLock struct {
 func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw := C.mln_queue_lock{}
 	if input.Lock != nil || input.Unlock != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Lock != nil {
 			raw.lock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_lock)
@@ -3840,7 +3840,7 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 		}
 	}
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_provider_callback(C.binding_mln_resource_provider_callback)
@@ -3880,7 +3880,7 @@ func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, aren
 	raw := C.mln_resource_request_cancel_handler{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, arena.identity)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
@@ -4066,7 +4066,7 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 		}
 	}
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_transform_callback(C.binding_mln_resource_transform_callback)
@@ -5231,7 +5231,7 @@ type Wake struct{ Callback func() }
 func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}
 	if input.Callback != nil {
-		raw.user_data = arena.register(input, 0)
+		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_wake_callback(C.binding_mln_wake_callback)
@@ -9060,7 +9060,7 @@ func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
 }
 
 //export mlnGo_mln_resource_request_cancel_handler_callback
-func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.Pointer) {
+func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.Pointer, native_handle C.mln_resource_request) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {

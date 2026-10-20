@@ -101,7 +101,7 @@ def sources(values, plan):
     for index, name in enumerate(descriptor.callbacks):
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]
-        parameters = [p for p in callback.parameters if p.name != callback.context]
+        parameters = list(callback.arguments)
         decision_owner = (
             OWNERS[callback.decision.handle.native] if callback.decision else None
         )

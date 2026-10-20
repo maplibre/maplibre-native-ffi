@@ -1650,7 +1650,7 @@ pub type mln_resource_provider_callback = Option<
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_resource_request(pub u64);
 pub type mln_resource_request_cancel_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, handle: mln_resource_request)>;
 pub type mln_resource_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,

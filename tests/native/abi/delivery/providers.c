@@ -177,7 +177,10 @@ static bool request_cancelled(void* context) {
          cancelled;
 }
 
-static void ignore_cancel(void* user_data) { (void)user_data; }
+static void ignore_cancel(void* user_data, mln_resource_request handle) {
+  (void)user_data;
+  (void)handle;
+}
 
 // MapLibre may cancel a queued request before the host drains it. The host
 // still takes the handle, sees the cancellation, and registers nothing.

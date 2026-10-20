@@ -117,7 +117,8 @@ void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
 int main() {
   const auto callback = reinterpret_cast<mln_ticket_cancel>(dart_port_function(MLN_BINDING_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK));
   assert(callback);
-  callback(reinterpret_cast<void*>(17));
+  // The borrowed ticket only names the reentry owner, so the port posts none.
+  callback(reinterpret_cast<void*>(17), 5);
   assert(deliveries == 1);
 }
 """,

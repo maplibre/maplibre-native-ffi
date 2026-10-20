@@ -110,13 +110,12 @@ class Values:
                 )
             if callback.synchronous:
                 raise Unsupported("callback must finish on its native thread")
-            for parameter in callback.parameters:
-                if parameter.name != callback.context:
-                    if native_ports.flattened(parameter.value, parameter.name) is None:
-                        raise Unsupported(
-                            "callback payload needs another native port copy rule"
-                        )
-                    self.check(parameter.value)
+            for parameter in callback.arguments:
+                if native_ports.flattened(parameter.value, parameter.name) is None:
+                    raise Unsupported(
+                        "callback payload needs another native port copy rule"
+                    )
+                self.check(parameter.value)
             self.used[value.native] = value
             return
         if value.registration and (
@@ -660,9 +659,7 @@ class Values:
                 callback, _ = ports[field.name]
                 key = f"(raw.{native_ports.constant(value.native, field.name)} & 0xffffffff)"
                 decoded, offset = [], 1
-                for parameter in callback.parameters:
-                    if parameter.name == callback.context:
-                        continue
+                for parameter in callback.arguments:
                     expression, offset = self.port_copy(parameter.value, offset)
                     decoded.append(expression)
                 invoke = f"value.{name}{'!' if field.value.nullable else ''}({', '.join(decoded)})"
@@ -1031,11 +1028,7 @@ class Values:
             public = public_name(value.native)
             if value.kind == "callback":
                 callback = self.bound.callbacks[value.native]
-                parameters = ", ".join(
-                    self.public(p.value)
-                    for p in callback.parameters
-                    if p.name != callback.context
-                )
+                parameters = ", ".join(self.public(p.value) for p in callback.arguments)
                 declarations.append(f"typedef {public} = void Function({parameters});")
                 if callback.delivery:
                     conversions.append(self.render_delivery(callback))

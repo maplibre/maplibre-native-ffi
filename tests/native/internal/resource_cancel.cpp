@@ -37,7 +37,8 @@ struct CompletedRequest {
   std::atomic<mln_resource_request> handle = MLN_HANDLE_NULL;
 };
 
-void count_cancel(void* user_data) {
+void count_cancel(void* user_data, mln_resource_request handle) {
+  static_cast<void>(handle);
   ++static_cast<CompletedRequest*>(user_data)->cancel_count;
   mln_test_pulse();
 }
@@ -130,10 +131,9 @@ struct BlockingCancel {
   std::atomic_bool callback_returned = false;
 };
 
-void block_in_cancel(void* user_data) {
+void block_in_cancel(void* user_data, mln_resource_request handle) {
   auto& probe = *static_cast<BlockingCancel*>(user_data);
   if (probe.self_release) {
-    const auto handle = probe.handle.load();
     mln_resource_request_release(handle);
     // The entry outlives this callback, but the handle is released: every
     // other entry point reports it as such.
@@ -269,7 +269,10 @@ struct BlockingRegistrationRelease {
   std::atomic_bool release_returned = false;
 };
 
-void never_cancelled(void* user_data) { static_cast<void>(user_data); }
+void never_cancelled(void* user_data, mln_resource_request handle) {
+  static_cast<void>(user_data);
+  static_cast<void>(handle);
+}
 
 void block_in_registration_release(void* user_data) {
   auto& probe = *static_cast<BlockingRegistrationRelease*>(user_data);

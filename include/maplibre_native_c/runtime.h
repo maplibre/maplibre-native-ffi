@@ -1087,10 +1087,13 @@ typedef uint32_t (*mln_resource_provider_callback)(
  * must be thread-safe, return quickly, and must not call map or runtime C API
  * functions. It may call resource request handle functions for the cancelled
  * handle, including mln_resource_request_release().
+ *
+ * handle is the cancelled request, borrowed for the callback; the provider's
+ * own reference to it is unchanged.
  */
 MLN_BINDING(
   "reentry=protocol;"
-  "reentry_owner=mln_resource_request;"
+  "reentry_owner=handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
   "mln_resource_request_pass_through,"
@@ -1098,7 +1101,9 @@ MLN_BINDING(
   "mln_resource_request_set_cancel_callback,"
   "mln_resource_request_release"
 )
-typedef void (*mln_resource_request_cancel_callback)(void* user_data);
+typedef void (*mln_resource_request_cancel_callback)(
+  void* user_data, mln_resource_request handle
+);
 
 /**
  * Cancel callback state for one handled resource request.

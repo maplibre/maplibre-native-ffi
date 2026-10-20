@@ -50,7 +50,8 @@ typedef struct pending_fetch pending_fetch;
 // handle exactly once, whether the fetch finished or was aborted.
 void pending_fetch_abort(pending_fetch* fetch);
 
-static void abort_pending_fetch(void* user_data) {
+static void abort_pending_fetch(void* user_data, mln_resource_request handle) {
+  (void)handle;
   pending_fetch_abort(user_data);
 }
 

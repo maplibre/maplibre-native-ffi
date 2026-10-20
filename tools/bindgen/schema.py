@@ -1114,13 +1114,13 @@ def validate(api: Api) -> None:
                 if key in {"dispose", "abandon"} and has_completion(operation):
                     errors.append(f"{context}: {key} must have synchronous acceptance")
         if typedef.metadata.get("reentry") == "protocol":
-            owner = reentry_owner(api, typedef)
+            owner = reentry_owner(typedef)
             names = tuple(
                 filter(None, typedef.metadata.get("reentry_calls", "").split(","))
             )
             if owner is None or not names:
                 errors.append(
-                    f"{context}: protocol reentry requires an owner parameter or handle and operations"
+                    f"{context}: protocol reentry requires an owner parameter and operations"
                 )
             for name in names:
                 operation = api.functions_by_name.get(name)
@@ -1582,8 +1582,6 @@ def reference_errors(api: Api) -> list[str]:
         parameters = {parameter.name for parameter in declaration.parameters}
         for key in PARAMETER_REFERENCES[site]:
             name = metadata.get(key)
-            if key == "reentry_owner" and is_handle(api, name):
-                continue  # A callback without an owner parameter names its handle.
             if name is not None and name not in parameters:
                 errors.append(f"{context}: {key} names an absent parameter {name!r}")
 
@@ -1594,24 +1592,14 @@ def reference_errors(api: Api) -> list[str]:
     return errors
 
 
-def is_handle(api: Api, name: str | None) -> bool:
-    typedef = api.typedefs_by_name.get(name or "")
-    return typedef is not None and typedef.metadata.get("kind") == "handle"
-
-
-def reentry_owner(api: Api, typedef):
+def reentry_owner(typedef):
     """The type whose operations a protocol callback may call: the type of its
-    `reentry_owner` parameter, or the handle that the key names when the
-    callback has no parameter that identifies its owner."""
+    `reentry_owner` parameter."""
     name = typedef.metadata.get("reentry_owner")
-    owner = next(
+    return next(
         (p.type.pointee or p.type for p in typedef.parameters if p.name == name),
         None,
     )
-    if owner is None and is_handle(api, name):
-        owner = api.typedefs_by_name[name].type
-        owner = CType("typedef", name, owner.canonical, name)
-    return owner
 
 
 def registration_parameters(api: Api, function: Function) -> list:

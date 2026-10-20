@@ -187,7 +187,7 @@ typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;
                 )
             )
 
-    def test_a_callback_without_an_owner_parameter_calls_back_into_its_receiver(
+    def test_a_callback_that_borrows_its_owner_calls_back_into_its_receiver(
         self,
     ):
         source = """
@@ -195,7 +195,7 @@ typedef unsigned long long request BIND("kind=handle;release=request_close");
 typedef unsigned long long other BIND("kind=handle;release=other_close");
 void request_close(request value);
 void other_close(other value);
-typedef void (*cancel)(void *context) BIND("reentry=protocol;reentry_owner=request;reentry_calls=request_close");
+typedef void (*cancel)(void *context, request owner) BIND("reentry=protocol;reentry_owner=owner;reentry_calls=request_close");
 typedef void (*release)(void *context);
 typedef struct watcher { unsigned size; cancel callback; void *context BIND("kind=context"); release retire; } watcher BIND("kind=callback_registration;release=retire");
 mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diagnostic);
@@ -204,7 +204,7 @@ mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diag
         self.assertTrue(bound.values["watcher"].registration.receiver_owned)
         for before, after, error in (
             (
-                "reentry_owner=request",
+                "reentry_owner=owner",
                 "reentry_owner=missing",
                 "reentry_owner names an absent parameter 'missing'",
             ),

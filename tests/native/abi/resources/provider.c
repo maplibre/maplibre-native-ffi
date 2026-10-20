@@ -31,7 +31,10 @@ static void count_runtime_callback_release(void* user_data) {
   mln_test_pulse();
 }
 
-static void ignore_cancel(void* user_data) { (void)user_data; }
+static void ignore_cancel(void* user_data, mln_resource_request handle) {
+  (void)user_data;
+  (void)handle;
+}
 
 static mln_resource_request_cancel_handler cancel_handler(
   mln_resource_request_cancel_callback callback, void* user_data,
@@ -496,14 +499,16 @@ typedef struct cancel_probe {
   _Atomic mln_resource_request handle;
 } cancel_probe;
 
-static void count_cancel(void* user_data) {
+static void count_cancel(void* user_data, mln_resource_request handle) {
   cancel_probe* probe = user_data;
   if (atomic_load(&probe->release_count) != 0) {
     mln_test_flag_set(&probe->released_before_cancel);
   }
-  atomic_fetch_add(&probe->cancel_count, 1);
+  if (handle == atomic_load(&probe->handle)) {
+    atomic_fetch_add(&probe->cancel_count, 1);
+  }
   if (atomic_load(&probe->release_inside_callback)) {
-    mln_resource_request_release(atomic_load(&probe->handle));
+    mln_resource_request_release(handle);
   }
   mln_test_pulse();
 }

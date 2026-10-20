@@ -27,12 +27,8 @@ def validate(values, plan):
         ]
         if not callback.context:
             raise ModelError([f"{plan.native}: callback requires a context"])
-        for p in callback.parameters:
-            if (
-                p.name == callback.context
-                or callback.decision
-                and p.name == callback.decision.parameter
-            ):
+        for p in callback.arguments:
+            if callback.decision and p.name == callback.decision.parameter:
                 continue
             values.require(p.value)
         if callback.result.native != "void":
@@ -40,9 +36,7 @@ def validate(values, plan):
 
 
 def signature(values, callback):
-    args = [
-        values.type(p.value) for p in callback.parameters if p.name != callback.context
-    ]
+    args = [values.type(p.value) for p in callback.arguments]
     result = (
         "" if callback.result.native == "void" else " " + values.type(callback.result)
     )
@@ -86,13 +80,7 @@ def sources(values, plan):
         if callback.reentry != "allow":
             operations = policy.operations if policy else ()
             names = ", ".join("binding_operation_" + op for op in operations) or "0"
-            owner = (
-                f"mlnGoCallbackOwner({callback.context})"
-                if policy and policy.owner_parameter is None
-                else f"(uint64_t)(uintptr_t){policy.owner_parameter}"
-                if policy
-                else "0"
-            )
+            owner = f"(uint64_t)(uintptr_t){policy.owner_parameter}" if policy else "0"
             guard = f"static const uint32_t operations[] = {{{names}}}; binding_policy policy = {{NULL, operations, {len(operations)}, {owner}}}; binding_policy_enter(&policy);"
             unguard = "binding_policy_leave(&policy);"
         call = f"{export}({arguments})"
@@ -102,7 +90,7 @@ def sources(values, plan):
             else f"{ret} result = {call}; {unguard} return result;"
         )
         c.append(f"{ret} {symbol}({params}) {{ {guard} {body} }}")
-        parameters = [p for p in callback.parameters if p.name != callback.context]
+        parameters = list(callback.arguments)
         go_params = ", ".join(
             "native_" + native_identifier(p.name) + " " + values.c_type(p.value)
             for p in callback.parameters
@@ -176,12 +164,9 @@ def registration_input(values, plan):
         if descriptor.release_reentry == "forbid"
         else "binding_release"
     )
-    # A callback without an owner parameter calls back only into the receiver
-    # that registered it, which the ticket records.
-    identity = "arena.identity" if descriptor.receiver_owned else "0"
     lines = [
         f"if {enabled} {{",
-        f"raw.{native_identifier(descriptor.user_data)} = arena.register(input, {identity})",
+        f"raw.{native_identifier(descriptor.user_data)} = arena.register(input)",
         f"raw.{native_identifier(descriptor.release)} = (C.{release_type})(C.{release})",
     ]
     for member in descriptor.callbacks:

@@ -79,9 +79,6 @@ pub fn liveRegistrations() usize {
 pub const Roots = struct {
     items: std.ArrayList(Entry) = .empty,
     accepted: bool = false,
-    /// The receiver of the call that retains these roots. A callback without
-    /// an owner parameter calls back only into this receiver.
-    owner: u64 = 0,
     pub const Entry = struct {
         context: *anyopaque,
         accept: *const fn (*anyopaque) void,
@@ -95,7 +92,7 @@ pub const Roots = struct {
         const RegistrationType = Registration(T);
         const state = try std.heap.smp_allocator.create(RegistrationType);
         errdefer std.heap.smp_allocator.destroy(state);
-        state.* = .{ .value = value, .owner = self.owner };
+        state.* = .{ .value = value };
         try self.items.append(std.heap.smp_allocator, .{ .context = state, .accept = RegistrationType.accept, .release = RegistrationType.releaseErased, .native_release = RegistrationType.releaseNativeErased });
         if (builtin.is_test) _ = live_registrations.fetchAdd(1, .acq_rel);
         return state;
@@ -119,7 +116,6 @@ pub fn Registration(comptime T: type) type {
         accepted: bool = false,
         native_released: std.atomic.Value(bool) = .init(false),
         value: T,
-        owner: u64 = 0,
         token: usize = 0,
         fn accept(context: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(context));
