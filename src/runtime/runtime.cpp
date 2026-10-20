@@ -2724,7 +2724,11 @@ auto runtime_barrier_start(
   );
   completion_state->set_retirement_callback(std::move(retired));
   completion_state->accept();
-  try {
+  // A flag carries the failure out of the catch. Returning from a catch that
+  // follows a rethrow released the lease through a stale pointer in clang-cl
+  // builds for Windows.
+  auto submitted = false;
+  {
     // Keep readiness private until both the completion and its worker task
     // are ready. Earlier work may otherwise settle this barrier immediately.
     const std::scoped_lock terminal_lock(live->terminal_mutex);
@@ -2737,13 +2741,14 @@ auto runtime_barrier_start(
         state->retire_work();
         complete_ready_runtime_barriers(live);
       });
+      submitted = true;
     } catch (...) {
       completion_state->revoke();
       live->pending_barriers.erase(sequence);
       live->pending_submissions.erase(sequence);
-      throw;
     }
-  } catch (...) {
+  }
+  if (!submitted) {
     commit_lock.unlock();
     set_thread_error("runtime barrier submission failed");
     return MLN_STATUS_NATIVE_ERROR;
