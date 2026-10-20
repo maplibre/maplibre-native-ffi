@@ -189,6 +189,25 @@ ramp reads had changed. A write to an unrelated key in the same update therefore
 left an added layer with an empty ramp, and a changed layer with outdated
 colors. Native map pixel regressions cover both cases for all three layer types.
 
+`0042-vulkan-fill-extrusion-plugin.patch` extends the plugin API with ordered
+draw passes, 3D and light inputs, layer evaluation, layout and image properties,
+pattern atlases, and instancing. It also adds the opt-in fill-extrusion plugin
+that those APIs enable. Registering the plugin before a style load replaces the
+built-in extrusion implementation. The patch is the draft
+[maplibre-native#4685](https://github.com/maplibre/maplibre-native/pull/4685)
+rebased onto this pin, at commit `c068ede8bd4a3c859c449bd073c0da3a67857f46`.
+
+`0043-plugin-filter-global-state.patch` evaluates plugin layer filters with the
+style's global state, so a `["global-state", ...]` filter sees the current
+values. Upstream:
+[maplibre-native#4807](https://github.com/maplibre/maplibre-native/pull/4807),
+at commit `0809b7910ad84b9833da3138e8f6e978f7a9ae18`.
+
+`0044-plugin-property-transition-opt-in.patch` applies plugin paint updates
+immediately when the property sets `supports_transitions` to false. Upstream:
+[maplibre-native#4808](https://github.com/maplibre/maplibre-native/pull/4808),
+at commit `f6fddd9750e647b4f2bf5d4e042bfee628e37c1d`.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 query-filter patch preserves the preceding camera-zoom fix. Tests reuse includes

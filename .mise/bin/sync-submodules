@@ -79,6 +79,9 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0036-platform-locale-expression-options.patch"
   "$repo_root/patches/maplibre-native/0038-apple-locale-expressions.patch"
   "$repo_root/patches/maplibre-native/0039-color-ramp-global-state.patch"
+  "$repo_root/patches/maplibre-native/0042-vulkan-fill-extrusion-plugin.patch"
+  "$repo_root/patches/maplibre-native/0043-plugin-filter-global-state.patch"
+  "$repo_root/patches/maplibre-native/0044-plugin-property-transition-opt-in.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

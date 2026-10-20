@@ -1,0 +1,85 @@
+diff --git a/src/mln/layout/plugin_layout.cpp b/src/mln/layout/plugin_layout.cpp
+index 5fe6f0e..f89b958 100644
+--- a/src/mln/layout/plugin_layout.cpp
++++ b/src/mln/layout/plugin_layout.cpp
+@@ -28,6 +28,7 @@ PluginLayout::PluginLayout(const BucketParameters& parameters,
+                            plugin::RegisteredLayerPtr registration_,
+                            const LayoutParameters* layoutParameters)
+     : zoom(parameters.tileID.overscaledZ),
++      globalState(parameters.globalState),
+       layers(std::move(layers_)),
+       sourceLayer(std::move(sourceLayer_)),
+       registration(std::move(registration_)) {
+@@ -108,7 +109,9 @@ void PluginLayout::createBucket(const ImagePositions& imagePositions,
+         if (!feature) continue;
+         const auto type = plugin::geometryType(feature->getType());
+         if (type == 0 || (registration->geometryTypeMask & type) == 0) continue;
+-        if (!leader.filter(style::expression::EvaluationContext(zoom, feature.get()).withCanonicalTileID(&canonical))) {
++        if (!leader.filter(style::expression::EvaluationContext(zoom, feature.get())
++                               .withCanonicalTileID(&canonical)
++                               .withGlobalState(globalState.get()))) {
+             continue;
+         }
+ 
+diff --git a/src/mln/layout/plugin_layout.hpp b/src/mln/layout/plugin_layout.hpp
+index 384a8ef..7d6364f 100644
+--- a/src/mln/layout/plugin_layout.hpp
++++ b/src/mln/layout/plugin_layout.hpp
+@@ -27,6 +27,7 @@ public:
+ private:
+     bool needsImages = false;
+     const float zoom;
++    const std::shared_ptr<const GlobalStateMap> globalState;
+     std::vector<Immutable<style::LayerProperties>> layers;
+     std::unique_ptr<GeometryTileLayer> sourceLayer;
+     plugin::RegisteredLayerPtr registration;
+diff --git a/test/plugin/rendering.test.cpp b/test/plugin/rendering.test.cpp
+index 4fa4f45..ee7997d 100644
+--- a/test/plugin/rendering.test.cpp
++++ b/test/plugin/rendering.test.cpp
+@@ -326,10 +326,16 @@ fragment half4 triangleFragment(Output in [[stage_in]]) { return half4(in.color)
+             *instance = new (std::nothrow) int(0);
+             return *instance ? MLN_PLUGIN_STATUS_OK : MLN_PLUGIN_STATUS_CALLBACK_ERROR;
+         };
+-        layer.layout_feature = [](void*, const mln_plugin_feature_v1*) {
++        layer.layout_feature = [](void* instance, const mln_plugin_feature_v1*) {
++            ++*static_cast<int*>(instance);
+             return MLN_PLUGIN_STATUS_OK;
+         };
+-        layer.finish_layout = [](void*, mln_plugin_bucket_v1* output) {
++        layer.finish_layout = [](void* instance, mln_plugin_bucket_v1* output) {
++            if (*static_cast<int*>(instance) == 0) {
++                *output = {};
++                output->struct_size = sizeof(*output);
++                return MLN_PLUGIN_STATUS_OK;
++            }
+             *output = {sizeof(*output), &stream, 1, indices, 3, &drawable, 1, 0, &range, 1};
+             return MLN_PLUGIN_STATUS_OK;
+         };
+@@ -388,6 +394,26 @@ TEST(PluginRendering, LayerLocalShaderIDsProduceDifferentPrograms) {
+     test.expectTriangles("test.shader-identity");
+ }
+ 
++TEST(PluginRendering, FilterUsesGlobalStateDefaultsAndUpdates) {
++    ASSERT_NO_FATAL_FAILURE(registerTriangles("test.global-state-filter"));
++    RenderTest test;
++    auto& style = test.map.getStyle();
++    style.loadJSON(R"({"version":8,"state":{"show":{"default":true}},"sources":{"points":{"type":"geojson","data":{
++        "type":"Point","coordinates":[0,0]}}},"layers":[{"id":"left","type":"test.global-state-filter.left",
++        "source":"points","filter":["==",["global-state","show"],true]}]})");
++    const auto expectVisible = [&](bool visible) {
++        const auto result = test.frontend.render(test.map);
++        const auto* pixel = result.image.data.get() + (32 * 64 + 16) * 4;
++        EXPECT_EQ(visible ? 255 : 0, pixel[0]);
++        EXPECT_EQ(visible ? 255 : 0, pixel[3]);
++    };
++    expectVisible(true);
++    style.setGlobalStateProperty("show", false);
++    expectVisible(false);
++    style.setGlobalStateProperty("show", NullValue());
++    expectVisible(true);
++}
++
+ TEST(PluginRendering, AnimationCallbackReceivesPaintWithoutLayoutProperties) {
+     animationCalls = 0;
+     animationRadius = 0;

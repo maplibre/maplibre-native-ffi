@@ -1,0 +1,62 @@
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+index 0b5958d..9c3dfc0 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+@@ -68,6 +68,11 @@ void RenderPluginStyleLayer::transition(const TransitionParameters& parameters)
+         const auto property = impl.pluginProperties.find(definition.name);
+         auto value = property == impl.pluginProperties.end() ? style::defaultPluginPropertyValue(definition)
+                                                              : property->second;
++        if (!definition.supportsTransitions) {
++            transitioningPaintProperties.insert_or_assign(definition.name,
++                                                          style::PluginTransitioningPropertyValue{std::move(value)});
++            continue;
++        }
+         auto prior = transitioningPaintProperties.find(definition.name);
+         auto priorValue = prior == transitioningPaintProperties.end()
+                               ? style::PluginTransitioningPropertyValue{style::defaultPluginPropertyValue(definition)}
+diff --git a/test/plugin/property_binding.test.cpp b/test/plugin/property_binding.test.cpp
+index e6b5d42..83225bc 100644
+--- a/test/plugin/property_binding.test.cpp
++++ b/test/plugin/property_binding.test.cpp
+@@ -1,4 +1,6 @@
+ #include <mln/renderer/buckets/plugin_bucket.hpp>
++#include <mln/renderer/layers/render_plugin_style_layer.hpp>
++#include <mln/renderer/transition_parameters.hpp>
+ #include <mln/style/rapidjson_conversion.hpp>
+ #include <mln/tile/geojson_tile_data.hpp>
+ #include <mln/tile/vector_mvt_tile_data.hpp>
+@@ -163,6 +165,34 @@ TEST(PluginProperties, NativeTransitionsHandleDelayInterruptionAndCompletion) {
+     EXPECT_FALSE(immediate.hasTransition());
+ }
+ 
++TEST(PluginProperties, NonTransitionablePaintUpdatesImmediately) {
++    auto definition = numberDefinition();
++    definition.supportsTransitions = false;
++    plugin::LayerType registration;
++    registration.type = "test-transitions";
++    registration.properties.push_back(definition);
++    Immutable<style::PluginStyleLayer::Impl> impl = makeMutable<style::PluginStyleLayer::Impl>(
++        "layer", "points", std::make_shared<const plugin::RegisteredLayer>(std::move(registration)));
++    RenderPluginStyleLayer renderLayer(impl);
++    RenderLayer& layer = renderLayer;
++
++    auto changed = makeMutable<style::PluginStyleLayer::Impl>(*impl);
++    changed->pluginProperties.emplace(definition.name, expression(definition, "30"));
++    style::TransitionOptions options;
++    options.duration = std::chrono::milliseconds(100);
++    options.delay = std::chrono::milliseconds(100);
++    layer.transition({TimePoint{}, options}, std::move(changed));
++    PropertyEvaluationParameters parameters(0);
++    parameters.now = TimePoint{};
++    layer.evaluate(parameters);
++
++    const auto properties = staticImmutableCast<style::PluginStyleLayerProperties>(layer.evaluatedProperties);
++    style::PluginPropertyValue::EvaluationStorage storage;
++    const auto value = properties->evaluatedPaintProperties.at(definition.name).evaluate(0, definition, storage);
++    EXPECT_FLOAT_EQ(30, value.data.float_value);
++    EXPECT_FALSE(layer.hasTransition());
++}
++
+ TEST(PluginProperties, NativeTransitionsPreserveFeatureExpressionsAndEvaluateCameraExpressions) {
+     const auto definition = numberDefinition();
+     const auto start = TimePoint{};
