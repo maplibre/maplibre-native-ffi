@@ -384,8 +384,55 @@ def retry_workflow() -> dict:
     }
 
 
+def label_workflow() -> dict:
+    # pull_request_target gets secrets and a write token for fork pull requests
+    # too. Its checkout is the trusted base branch, and the labeler only fetches
+    # and diffs the pull request's commits, never running its code.
+    return {
+        "name": "Label",
+        "on": {
+            "issues": {"types": ["opened"]},
+            "pull_request_target": {"types": ["opened"]},
+        },
+        "permissions": {},
+        "jobs": {
+            "label": {
+                "runs-on": "ubuntu-slim",
+                "timeout-minutes": 10,
+                "permissions": {
+                    "contents": "read",
+                    "issues": "write",
+                    "pull-requests": "write",
+                },
+                "steps": [
+                    action(
+                        "actions/checkout",
+                        {
+                            "persist-credentials": False,
+                            "fetch-depth": 0,
+                            "filter": "blob:none",
+                        },
+                    ),
+                    run(
+                        "python3 -m ci.label",
+                        name="Label with Jev",
+                        env={
+                            "GH_TOKEN": "${{ github.token }}",
+                            "TYPESAFE_API_KEY": "${{ secrets.TYPESAFE_API_KEY }}",
+                        },
+                    ),
+                ],
+            }
+        },
+    }
+
+
 def workflows(source: dict, presets: dict) -> dict[str, dict]:
-    return {"ci.yml": ci_workflow(source, presets), "ci-retry.yml": retry_workflow()}
+    return {
+        "ci.yml": ci_workflow(source, presets),
+        "ci-retry.yml": retry_workflow(),
+        "label.yml": label_workflow(),
+    }
 
 
 def serialize(workflow: dict) -> str:

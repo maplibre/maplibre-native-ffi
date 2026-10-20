@@ -205,6 +205,7 @@ def replay(pr: dict, config: dict, owned: dict, needs: dict, choose) -> list[dic
             "pull_request": {
                 "number": pr["number"],
                 "title": pr["title"],
+                "state": "open",
                 "labels": [],
                 "head": {"sha": head, "ref": pr["headRefName"]},
                 "base": {"sha": pr["baseRefOid"]},
@@ -265,7 +266,7 @@ def prs(args, config: dict, cache: pathlib.Path) -> None:
         return
     spent = sum(minutes[job] for push in pushes for job in push["jobs"])
     fallbacks = sum(
-        push["decisions"][HYGIENE]["reason"].startswith("selection failed")
+        push["decisions"][HYGIENE]["rule"].startswith("full: selection failed")
         for push in pushes
     )
     print(

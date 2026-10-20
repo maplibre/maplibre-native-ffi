@@ -140,7 +140,26 @@ plan job's log shows each unit's decision and the full prompt sent to Jev.
 Before changing `ci/select.toml`, evaluate the change against history with
 `uv run python -m ci.select_eval commits`, which compares answers with the
 labeled commits in `ci/select_cases.toml`. `ci.select_eval prs` replays merged
-pull requests and estimates runner time. Both need `TYPESAFE_API_KEY`.
+pull requests and estimates runner time. Both need `TYPESAFE_API_KEY`. To call
+Jev through a proxy such as LiteLLM's TypeSafe pass-through, set
+`TYPESAFE_BASE_URL` to the proxy's TypeSafe URL and `TYPESAFE_API_KEY` to the
+proxy's key.
+
+## Labels
+
+When an issue or a pull request opens, the Label workflow asks Jev which labels
+from the scheme in AGENTS.md it needs. Jev reads the title, the description, and
+for a pull request the first chunk of the change description that coverage
+selection reads. The workflow adds labels only to groups that have none yet. A
+kind or an area from an issue template, from Dependabot, or from the author
+therefore stays as set. The workflow runs once per item, and it never removes a
+label, so later edits by maintainers are final. The job summary lists each
+label's score.
+
+`ci/labels.toml` defines the groups, each label's meaning, and the thresholds.
+Before changing it, run `uv run python -m ci.label_eval`, which judges the
+hand-labeled items in `ci/label_cases.toml` as if they had just opened and
+reports misses and extra labels at each threshold.
 
 ## Tests and examples
 
