@@ -217,11 +217,11 @@ repository-wide formatting defaults.
 GitHub Actions runs those checks. `ci/workflow.toml` declares the baseline and
 ready targets and the suites each target runs. `ci/generate_workflow.py` builds
 workflow objects and serializes them as YAML. `mise run ci:generate-workflow`
-updates the generated callers and reusable workflows under `.github/workflows/`;
-`--check` verifies that the checked-in files match. `ci/snapshots.toml` declares
-the input scope of each component the daily snapshot workflow publishes, so a
-component republishes only when the paths it consumes changed;
-`mise run ci:check-snapshot-scopes` keeps every tracked path classified.
+updates the generated workflows under `.github/workflows/`; `--check` verifies
+that the checked-in files match. `ci/snapshots.toml` declares the input scope of
+each component the daily snapshot workflow publishes, so a component republishes
+only when the paths it consumes changed; `mise run ci:check-snapshot-scopes`
+keeps every tracked path classified.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
@@ -229,42 +229,46 @@ build the documentation site. Generated API reference HTML is installed into
 
 ## CI coverage
 
-CI has three required checks:
+One workflow, `CI` (`ci.yml`), runs every check, and `ci-required` is its one
+required status check. Its first job plans the run by choosing coverage units,
+and every other job runs only when its unit is selected. Hygiene always runs
+when the pull request head changes. `ci/select.toml` defines the other units,
+each a group of jobs such as every Windows target, along with a description of
+what each unit catches.
 
-| Check                    | Coverage                                                          |
-| ------------------------ | ----------------------------------------------------------------- |
-| `ci-required (baseline)` | Hygiene, docs, and Linux x64 EGL/Vulkan on every PR code update   |
-| `ci-required (ready)`    | Additional representative targets when a PR leaves draft status   |
-| `ci-required`            | Requested platforms or full verification in the extended workflow |
+Main pushes and manual runs select every unit. For a pull request, the planner
+asks [Jev](https://docs.typesafe.ai/) one question per unit: whether a reviewer
+would want that unit to run to verify the change. The question carries the diff,
+the commit messages, and the descriptions from `ci/select.toml`. A unit runs
+when Jev answers yes with a probability of at least 0.5, when a changed file
+matches one of the unit's `paths`, or when the pull request has the `ci:<unit>`
+label. The `ci:full` label selects every unit.
 
-Promotion starts ready coverage while baseline results remain valid. The
-extended workflow combines platform labels into one selection. It builds each
-selected target once and includes every producer needed by Android multi-ABI
-packaging and by the Apple XCFramework. Extended coverage can repeat targets
-covered by baseline or ready CI.
+Each unit judges only what changed since it last passed for the pull request.
+The planner reads the jobs of earlier runs on the same pull request, and a unit
+passed in a run when every one of its jobs succeeded there. A push that only
+fixes a formatting nit after broad coverage therefore reruns hygiene alone. A
+cancelled or failed unit keeps its older base and runs again once the change
+puts it at risk.
 
-State changes reuse actual success, or a failure after its one retry, only for
-the same tested merge commit and complete coverage scope. Adding or removing a
-platform changes the scope; unrelated labels preserve it. Omitted checks and
-restated verdicts never prove that tests ran. Missing or cancelled coverage
-executes again, as does an explicit workflow rerun. An attempt-1 failure is also
-missing evidence, because CI retry may replace it. Selected jobs must succeed;
-only unselected jobs may be skipped.
+The planner selects every unit when it cannot ask Jev. That covers fork and
+Dependabot pull requests, which receive no `TYPESAFE_API_KEY` secret, any API
+failure or timeout, and a change too large for eight requests. Main CI runs
+every unit after merge, so a selection that misses a regression surfaces on main
+rather than in a release.
 
-The extended workflow, `CI` (`ci.yml`), runs every target and complete packaging
-verification on main, manual runs, Dependabot PRs, and PRs with `ci:full`. All
-native packages, the Apple XCFramework, and the verified Maven repository belong
-to that run. Snapshot publishing consumes that single successful main run. Main
-and manual runs have independent concurrency groups; a new PR commit cancels
-obsolete work in each PR workflow.
+Selecting a packaging job also selects the target jobs that produce its inputs.
+All native packages, the Apple XCFramework, and the verified Maven repository
+belong to the full main run, and snapshot publishing consumes that run. CI
+retries one primary failure once, along with `ci-required`.
 
-Branch protection must require all three checks. Add baseline and ready
-alongside the existing `ci-required` before merging these workflows. An
-unrequested tier passes its check without running targets.
-
-`mise run ci:test` exercises coverage transitions, result reuse, generated job
-dependencies, required checks, retries, and release tooling. CI retries one
-primary failure once, including its dependent verification and required checks.
+`mise run ci:test` exercises unit ownership, planning, the required check,
+retries, and release tooling without network access. To evaluate a change to
+`ci/select.toml` against history, set `TYPESAFE_API_KEY` and run
+`uv run python -m ci.select_backtest` for the labeled commits in
+`ci/select_cases.toml`, or add `--range origin/main --since <date>` for every
+commit in that range. `uv run python -m ci.select_replay --since <date>` replays
+the pushes of merged pull requests and estimates runner time.
 
 ## Tests And Examples
 

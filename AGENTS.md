@@ -96,36 +96,14 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-Every PR code update runs baseline coverage: hygiene, docs, and Linux x64
-EGL/Vulkan with their binding suites. Promotion adds macOS Metal, Windows x64
-WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU in a separate ready
-workflow. Main, manual runs, Dependabot-authored PRs, and `ci:full` run complete
-coverage and packaging verification in one workflow.
+CI selects coverage for each pull request push from the diff. Jev judges which
+coverage units the change puts at risk, and each unit judges only what changed
+since it last passed. Hygiene always runs, and main runs every unit after merge.
+See [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage).
 
-Use persistent PR labels to add coverage to either PR tier:
-
-| Label        | Additional coverage                                               |
-| ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
-| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
-| `ci:linux`   | Linux ARM64 and musl variants                                     |
-| `ci:windows` | Windows ARM64 variants                                            |
-| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
-| `ci:full`    | Every target and complete packaging verification, including Maven |
-
-Labels combine and persist across pushes. The extended workflow combines the
-requested platforms, including the producers needed by its packaging checks.
-Readiness and label changes reuse actual coverage for the same tested merge
-commit and coverage scope; missing evidence runs coverage again. An explicit
-workflow rerun also executes coverage again. Every job in a selected group must
-succeed.
-
-Extended CI retains `ci-required`; baseline and ready each have one additional
-required check; see
-[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
-branch protection configuration. For CI, shared toolchain, dependency, or
-publishing changes, request full coverage with
-`gh pr edit <number> --add-label 'ci:full'`.
+To force a unit, add its label with
+`gh pr edit <number> --add-label 'ci:<unit>'`, using a unit ID from
+`ci/select.toml`, such as `ci:windows`. `ci:full` selects every unit.
 
 ## Project Invariants
 

@@ -1,4 +1,4 @@
-"""Retry one primary CI failure and its dependent checks once."""
+"""Retry one primary CI failure and the required check once."""
 
 from __future__ import annotations
 
@@ -12,17 +12,8 @@ def retryable(jobs: list[dict]) -> bool:
     if any(job["conclusion"] not in {"success", "failure", "skipped"} for job in jobs):
         return False
     failed = [job["name"] for job in jobs if job["conclusion"] == "failure"]
-    required = [
-        name
-        for name in failed
-        if name == "ci-required" or name.startswith("ci-required (")
-    ]
-    primary = [
-        name
-        for name in failed
-        if name not in required and not name.startswith("coverage / verified (")
-    ]
-    return len(required) == 1 and len(primary) == 1
+    primary = [name for name in failed if name != "ci-required"]
+    return "ci-required" in failed and len(primary) == 1
 
 
 def retry_failed_run(run_id: str) -> None:
