@@ -118,9 +118,9 @@ static void a_rejected_submission_queues_nothing(void) {
 
   MLN_TEST_OK(mln_test_runtime_fence(runtime));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_test_delivery_drain drain;
   MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_drain(queue.handle, &batch, NULL)
+    MLN_STATUS_NOT_READY, mln_test_delivery_drain_into(queue.handle, &drain)
   );
 
   // A released queue reports as a released handle.
@@ -169,17 +169,16 @@ static void a_later_completion_follows_earlier_queued_completions(void) {
   void* order[2] = {NULL, NULL};
   size_t seen = 0;
   while (seen < 2) {
-    const mln_delivery_batch batch =
+    const mln_test_delivery_drain drain =
       mln_test_delivery_await_batch(queue.handle);
-    const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-    for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery = mln_test_delivery_at(&view, index);
+    for (size_t index = 0; index < drain.view.delivery_count; index += 1) {
+      const mln_delivery* delivery = mln_test_delivery_at(&drain.view, index);
       TEST_ASSERT_TRUE(seen < 2);
       TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
       MLN_TEST_OK(delivery->payload.completion.status);
       order[seen++] = delivery->user_data;
     }
-    mln_delivery_batch_release(batch);
+    mln_delivery_batch_release(drain.batch);
   }
   TEST_ASSERT_EQUAL_PTR(&command_tag, order[0]);
   TEST_ASSERT_EQUAL_PTR(&later_tag, order[1]);
@@ -307,11 +306,10 @@ static void runtime_release_can_finish_before_queued_results_are_drained(void) {
   const mln_completion queued = mln_test_queue_completion(queue.handle, NULL);
   MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &queued, NULL));
   MLN_TEST_AWAIT_OK(mln_runtime_release(runtime, &completion.descriptor, NULL));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_delivery_queue_drain(queue.handle, &batch, NULL));
-  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-  const size_t count = view.delivery_count;
-  mln_delivery_batch_release(batch);
+  mln_test_delivery_drain drain;
+  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
+  const size_t count = drain.view.delivery_count;
+  mln_delivery_batch_release(drain.batch);
   mln_test_delivery_queue_release(&queue);
   TEST_ASSERT_EQUAL_size_t(1, count);
 }

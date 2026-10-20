@@ -29,20 +29,23 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   sync_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&queue.wakes));
 
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_delivery_queue_drain(queue.handle, &batch, NULL));
-  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-  TEST_ASSERT_EQUAL_size_t(2, view.delivery_count);
-  TEST_ASSERT_EQUAL_PTR((void*)1, mln_test_delivery_at(&view, 0)->user_data);
-  TEST_ASSERT_EQUAL_PTR((void*)2, mln_test_delivery_at(&view, 1)->user_data);
-  mln_delivery_batch_release(batch);
-
-  // An empty queue reports NOT_READY and leaves the output alone.
-  mln_delivery_batch empty = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_drain(queue.handle, &empty, NULL)
+  mln_test_delivery_drain drain;
+  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
+  TEST_ASSERT_EQUAL_size_t(2, drain.view.delivery_count);
+  TEST_ASSERT_EQUAL_PTR(
+    (void*)1, mln_test_delivery_at(&drain.view, 0)->user_data
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
+  TEST_ASSERT_EQUAL_PTR(
+    (void*)2, mln_test_delivery_at(&drain.view, 1)->user_data
+  );
+  mln_delivery_batch_release(drain.batch);
+
+  // An empty queue reports NOT_READY and leaves the outputs alone.
+  MLN_TEST_STATUS(
+    MLN_STATUS_NOT_READY, mln_test_delivery_drain_into(queue.handle, &drain)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, drain.batch);
+  TEST_ASSERT_NULL(drain.view.deliveries);
 
   // The drain re-armed the wake.
   submit_queued_command(runtime, queue.handle, (void*)3);
@@ -67,21 +70,19 @@ static void drain_until_all_seen(void* argument) {
   while (atomic_load(&drain->total) < concurrent_completions &&
          !mln_test_deadline_passed(deadline)) {
     mln_delivery_batch batch = MLN_HANDLE_NULL;
-    const mln_status status =
-      mln_delivery_queue_drain(drain->queue, &batch, NULL);
-    if (status != MLN_STATUS_OK) continue;
     mln_delivery_batch_view view = {.size = sizeof(view)};
-    if (mln_delivery_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
-      for (size_t index = 0; index < view.delivery_count; index += 1) {
-        const mln_delivery* delivery =
-          (const mln_delivery*)((const unsigned char*)view.deliveries +
-                                index * view.delivery_size);
-        const uintptr_t slot = (uintptr_t)delivery->user_data - 1;
-        if (slot < concurrent_completions) {
-          atomic_fetch_add(&drain->seen[slot], 1);
-        }
-        atomic_fetch_add(&drain->total, 1);
+    const mln_status status =
+      mln_delivery_queue_drain(drain->queue, &batch, &view, NULL);
+    if (status != MLN_STATUS_OK) continue;
+    for (size_t index = 0; index < view.delivery_count; index += 1) {
+      const mln_delivery* delivery =
+        (const mln_delivery*)((const unsigned char*)view.deliveries +
+                              index * view.delivery_size);
+      const uintptr_t slot = (uintptr_t)delivery->user_data - 1;
+      if (slot < concurrent_completions) {
+        atomic_fetch_add(&drain->seen[slot], 1);
       }
+      atomic_fetch_add(&drain->total, 1);
     }
     mln_delivery_batch_release(batch);
   }
@@ -131,8 +132,6 @@ static void a_batch_outlives_its_queue_and_runtime(void) {
   mln_test_delivery_queue_release(&queue);
   mln_test_destroy_runtime(runtime);
 
-  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-  delivery = mln_test_delivery_at(&view, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
   TEST_ASSERT_EQUAL_PTR((void*)7, delivery->user_data);
   MLN_TEST_OK(delivery->payload.completion.status);
@@ -215,7 +214,10 @@ static void releasing_a_queue_disposes_its_pending_owned_values(void) {
 
 static void handles_report_their_status(void) {
   mln_delivery_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_delivery_queue_drain(MLN_HANDLE_NULL, &batch, NULL));
+  mln_delivery_batch_view view = {.size = sizeof(view)};
+  MLN_TEST_INVALID(
+    mln_delivery_queue_drain(MLN_HANDLE_NULL, &batch, &view, NULL)
+  );
   mln_delivery_queue_release(MLN_HANDLE_NULL);
   mln_delivery_batch_release(MLN_HANDLE_NULL);
 
@@ -234,19 +236,24 @@ static void handles_report_their_status(void) {
   MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, NULL));
   mln_delivery_queue occupied = queue;
   MLN_TEST_INVALID(mln_delivery_queue_create(&options, &occupied, NULL));
-  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, NULL, NULL));
+  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, NULL, &view, NULL));
+  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, &batch, NULL, NULL));
+  view.size = 1;
+  MLN_TEST_INVALID(mln_delivery_queue_drain(queue, &batch, &view, NULL));
+  view.size = sizeof(view);
   MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_drain(queue, &batch, NULL)
+    MLN_STATUS_NOT_READY, mln_delivery_queue_drain(queue, &batch, &view, NULL)
   );
   mln_delivery_queue_release(queue);
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_delivery_queue_drain(queue, &batch, NULL)
+    MLN_STATUS_INVALID_STATE,
+    mln_delivery_queue_drain(queue, &batch, &view, NULL)
   );
   // Release of a released handle is a no-op.
   mln_delivery_queue_release(queue);
   // A handle of another type is invalid.
   mln_runtime runtime = mln_test_create_runtime();
-  MLN_TEST_INVALID(mln_delivery_queue_drain(runtime, &batch, NULL));
+  MLN_TEST_INVALID(mln_delivery_queue_drain(runtime, &batch, &view, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -266,10 +273,6 @@ static void take_reports_its_status(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_delivery_batch_take(batch, 0, NULL)
   );
-  mln_delivery_batch_view view = {.size = sizeof(view)};
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_delivery_batch_get(batch, &view, NULL)
-  );
 
   // An owned map takes once.
   const mln_completion completion =
@@ -282,8 +285,6 @@ static void take_reports_its_status(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_delivery_batch_take(batch, 0, NULL)
   );
-  view.size = 1;
-  MLN_TEST_INVALID(mln_delivery_batch_get(batch, &view, NULL));
   mln_delivery_batch_release(batch);
   TEST_ASSERT_TRUE(mln_test_map_is_live(map));
   mln_test_destroy_map(map);

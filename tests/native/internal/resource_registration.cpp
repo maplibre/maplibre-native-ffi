@@ -42,12 +42,12 @@ void rejected_provider_registration_queues_no_retirement() {
       mln_test_completion_reject(&completion);
       mln_test_completion_destroy(&completion);
       auto batch = MLN_HANDLE_NULL;
-      const auto drained = mln_delivery_queue_drain(queue, &batch, nullptr);
+      auto view = mln_delivery_batch_view{
+        .size = sizeof(mln_delivery_batch_view),
+      };
+      const auto drained =
+        mln_delivery_queue_drain(queue, &batch, &view, nullptr);
       if (drained == MLN_STATUS_OK) {
-        auto view = mln_delivery_batch_view{
-          .size = sizeof(mln_delivery_batch_view),
-        };
-        MLN_TEST_OK(mln_delivery_batch_get(batch, &view, nullptr));
         unexpected_retirements += view.delivery_count;
         mln_delivery_batch_release(batch);
       }

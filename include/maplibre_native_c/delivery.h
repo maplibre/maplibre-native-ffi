@@ -118,7 +118,8 @@ typedef struct mln_delivery {
 } mln_delivery;
 
 /**
- * A borrowed view of one owned delivery batch.
+ * A borrowed view of one owned delivery batch, which
+ * mln_delivery_queue_drain() writes.
  *
  * Every pointer in the view, including those inside each delivery's payload,
  * stays valid until the batch is released, independent of the queue, the
@@ -188,48 +189,31 @@ MLN_API mln_status mln_delivery_queue_create(
 MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
 
 /**
- * Moves a captured prefix of queued deliveries into a new owned batch.
+ * Moves every queued delivery into a new owned batch and borrows its view.
  *
- * Each drain captures a count, reserves storage once, and detaches up to that
- * many deliveries. Later arrivals remain queued and receive a deferred wake.
- * Drain until MLN_STATUS_NOT_READY. This function may be called from any
- * thread. Concurrent drains detach disjoint prefixes, and each delivery enters
- * exactly one returned batch. Release each batch with
- * mln_delivery_batch_release().
+ * Deliveries that arrive later enter the next batch, and the wake fires again
+ * when the first of them arrives. This function may be called from any
+ * thread. Concurrent drains are serialized, and each delivery enters exactly
+ * one returned batch. Release each batch with mln_delivery_batch_release().
  *
  * Returns:
  * - MLN_STATUS_OK when a batch holding at least one delivery is published in
- *   *out_batch.
+ *   *out_batch and its view in *out_view.
  * - MLN_STATUS_NOT_READY when no delivery is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, and the caller drains
- *   again after the next wake.
- * - MLN_STATUS_INVALID_ARGUMENT when queue is an invalid handle, or out_batch
- *   is null or does not point to the null handle.
+ *   *out_batch and *out_view are left unchanged, no batch is allocated, and
+ *   the caller drains again after the next wake.
+ * - MLN_STATUS_INVALID_ARGUMENT when queue is an invalid handle, out_batch is
+ *   null or does not point to the null handle, or out_view is null or
+ *   out_view->size is too small.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
  * - MLN_STATUS_NATIVE_ERROR when the batch could not be allocated. The
- *   deliveries stay queued. The first failure arms one deferred wake after
- *   any active wake returns. Failures before a successful drain coalesce into
- *   that retry. If the retry also fails, the host schedules another drain;
- *   native code waits for a successful drain before arming another retry.
+ *   deliveries stay queued in order, and the next push wakes the queue even
+ *   though it is not empty. A host that cannot wait for that push drains
+ *   again on its own schedule.
  */
-MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_delivery_queue_drain(
   mln_delivery_queue queue,
   mln_delivery_batch* out_batch MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Borrows the delivery view stored by an owned delivery batch.
- *
- * Returns:
- * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
- *   null or out_view->size is too small.
- * - MLN_STATUS_INVALID_STATE when batch has been released.
- */
-MLN_API mln_status mln_delivery_batch_get(
-  mln_delivery_batch batch,
   mln_delivery_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

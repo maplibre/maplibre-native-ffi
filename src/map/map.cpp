@@ -3604,17 +3604,14 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   {
     const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
     if (handle_table<MapObject>().resolve_locked(map) != owned.get()) {
-      release_completion->reject();
       return recorded_handle_fault_status();
     }
     if (owned->render_target_session != nullptr) {
-      release_completion->reject();
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
     const auto close_status = owned->control.begin_close();
     if (close_status != MLN_STATUS_OK) {
-      release_completion->reject();
       return close_status;
     }
     owned->disposal_requested = true;

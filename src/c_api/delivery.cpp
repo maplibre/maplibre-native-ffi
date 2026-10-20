@@ -21,19 +21,10 @@ void mln_delivery_queue_release(mln_delivery_queue queue) noexcept {
 
 auto mln_delivery_queue_drain(
   mln_delivery_queue queue, mln_delivery_batch* out_batch,
-  mln_diagnostic* out_diagnostic
+  mln_delivery_batch_view* out_view, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::delivery::drain_delivery_queue(queue, out_batch);
-  });
-}
-
-auto mln_delivery_batch_get(
-  mln_delivery_batch batch, mln_delivery_batch_view* out_view,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::delivery::get_delivery_batch(batch, out_view);
+    return mln::delivery::drain_delivery_queue(queue, out_batch, out_view);
   });
 }
 

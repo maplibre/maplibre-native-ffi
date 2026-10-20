@@ -81,13 +81,12 @@ typedef struct seen_deliveries {
 
 static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
   while (true) {
-    mln_delivery_batch batch = MLN_HANDLE_NULL;
-    const mln_status status = mln_delivery_queue_drain(queue, &batch, NULL);
+    mln_test_delivery_drain drain;
+    const mln_status status = mln_test_delivery_drain_into(queue, &drain);
     if (status == MLN_STATUS_NOT_READY) return;
     MLN_TEST_OK(status);
-    const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-    for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery = mln_test_delivery_at(&view, index);
+    for (size_t index = 0; index < drain.view.delivery_count; index += 1) {
+      const mln_delivery* delivery = mln_test_delivery_at(&drain.view, index);
       // Keep only this case's dump records and every retirement.
       if (
         delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD &&
@@ -108,7 +107,7 @@ static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
         seen->records[slot].message = seen->messages[slot];
       }
     }
-    mln_delivery_batch_release(batch);
+    mln_delivery_batch_release(drain.batch);
   }
 }
 

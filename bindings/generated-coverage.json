@@ -327,7 +327,7 @@
     "tests/native/abi/base/default_cases_generated.inc",
     "tests/native/internal/delivery_copy_cases_generated.inc"
   ],
-  "function_count": 250,
+  "function_count": 249,
   "languages": {
     "dart": {
       "discarding": [
@@ -2886,7 +2886,6 @@
     "mln_binding_owner_token_create",
     "mln_binding_owner_token_destroy",
     "mln_binding_render_session_abandon_at_exit",
-    "mln_delivery_batch_get",
     "mln_delivery_batch_release",
     "mln_delivery_batch_take",
     "mln_delivery_queue_create",
@@ -2930,9 +2929,6 @@
       },
       "mln_custom_mvt_vector_source_options_default": {
         "default": "mln_custom_mvt_vector_source_options"
-      },
-      "mln_delivery_batch_get": {
-        "delivery": "runtime delivery protocol"
       },
       "mln_delivery_batch_release": {
         "delivery": "runtime delivery protocol"

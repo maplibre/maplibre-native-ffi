@@ -2,8 +2,8 @@
 #define MLN_NATIVE_TESTS_DELIVERY_H
 
 // Helpers that the queue delivery cases share: a queue whose wake counts its
-// calls, waits for the next drained batch, indexed access by the delivery
-// stride, and queue-mode completions.
+// calls, drains that keep their views, waits for the next drained batch,
+// indexed access by the delivery stride, and queue-mode completions.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -66,15 +66,33 @@ static inline void mln_test_delivery_queue_release(
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue->wake_releases, 1));
 }
 
+// One drained batch and the view that the drain wrote.
 typedef struct mln_test_delivery_drain {
   mln_delivery_queue queue;
   mln_delivery_batch batch;
+  mln_delivery_batch_view view;
 } mln_test_delivery_drain;
+
+// Drains queue into drain, checking the view on success.
+static inline mln_status mln_test_delivery_drain_into(
+  mln_delivery_queue queue, mln_test_delivery_drain* drain
+) {
+  drain->queue = queue;
+  drain->batch = MLN_HANDLE_NULL;
+  drain->view = (mln_delivery_batch_view){
+    .size = sizeof(mln_delivery_batch_view),
+  };
+  const mln_status status =
+    mln_delivery_queue_drain(queue, &drain->batch, &drain->view, NULL);
+  if (status == MLN_STATUS_OK) {
+    TEST_ASSERT_TRUE(drain->view.delivery_size >= sizeof(mln_delivery));
+  }
+  return status;
+}
 
 static inline bool mln_test_delivery_try_drain(void* context) {
   mln_test_delivery_drain* drain = context;
-  const mln_status status =
-    mln_delivery_queue_drain(drain->queue, &drain->batch, NULL);
+  const mln_status status = mln_test_delivery_drain_into(drain->queue, drain);
   if (status == MLN_STATUS_NOT_READY) return false;
   MLN_TEST_OK(status);
   return true;
@@ -82,7 +100,7 @@ static inline bool mln_test_delivery_try_drain(void* context) {
 
 // Waits for the queue to hold a delivery and drains it. The wait re-checks on
 // every pulse, which the counting wake sends.
-static inline mln_delivery_batch mln_test_delivery_await_batch(
+static inline mln_test_delivery_drain mln_test_delivery_await_batch(
   mln_delivery_queue queue
 ) {
   mln_test_delivery_drain drain = {.queue = queue};
@@ -93,16 +111,7 @@ static inline mln_delivery_batch mln_test_delivery_await_batch(
     ),
     "no delivery arrived"
   );
-  return drain.batch;
-}
-
-static inline mln_delivery_batch_view mln_test_delivery_view(
-  mln_delivery_batch batch
-) {
-  mln_delivery_batch_view view = {.size = sizeof(mln_delivery_batch_view)};
-  MLN_TEST_OK(mln_delivery_batch_get(batch, &view, NULL));
-  TEST_ASSERT_TRUE(view.delivery_size >= sizeof(mln_delivery));
-  return view;
+  return drain;
 }
 
 // Steps to one delivery by the stride that native reports.
@@ -118,11 +127,10 @@ static inline const mln_delivery* mln_test_delivery_at(
 static inline mln_delivery_batch mln_test_delivery_await_single(
   mln_delivery_queue queue, const mln_delivery** out_delivery
 ) {
-  const mln_delivery_batch batch = mln_test_delivery_await_batch(queue);
-  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-  TEST_ASSERT_EQUAL_size_t(1, view.delivery_count);
-  *out_delivery = mln_test_delivery_at(&view, 0);
-  return batch;
+  const mln_test_delivery_drain drain = mln_test_delivery_await_batch(queue);
+  TEST_ASSERT_EQUAL_size_t(1, drain.view.delivery_count);
+  *out_delivery = mln_test_delivery_at(&drain.view, 0);
+  return drain.batch;
 }
 
 // A completion that delivers to queue with user_data.

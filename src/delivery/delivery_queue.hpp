@@ -1,16 +1,13 @@
 #pragma once
 
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <type_traits>
-#include <vector>
 
 #include "delivery/capture.hpp"
-#include "execution/retirement.hpp"
 #include "maplibre_native_c.h"
 #include "wake/wake.hpp"
 
@@ -128,8 +125,7 @@ auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr;
 
 // The queue behind one mln_delivery_queue handle. Registrations hold it, so a
 // released queue stays alive, closed, until the last of them retires.
-class DeliveryQueueState final
-    : public std::enable_shared_from_this<DeliveryQueueState> {
+class DeliveryQueueState final {
  public:
   explicit DeliveryQueueState(std::shared_ptr<core::Wake> wake);
   DeliveryQueueState(const DeliveryQueueState&) = delete;
@@ -138,42 +134,30 @@ class DeliveryQueueState final
   auto operator=(DeliveryQueueState&&) -> DeliveryQueueState& = delete;
   ~DeliveryQueueState();
 
-  // Appends an item and wakes the receiver when the queue was empty. Returns
-  // false and leaves the item with the caller when the queue is closed.
-  // During process exit the item is dropped without disposal and this
-  // reports true.
+  // Appends an item and wakes the receiver when the queue was empty or the
+  // last drain failed. Returns false and leaves the item with the caller when
+  // the queue is closed. During process exit the item is dropped without
+  // disposal and this reports true.
   [[nodiscard]] auto push(ItemPtr& item) noexcept -> bool;
-  // Appends like push() but leaves the wake to the caller: needs_wake reports
-  // whether the queue was empty, and the caller calls rewake() later from a
-  // context where host code may run.
-  [[nodiscard]] auto push_without_wake(ItemPtr& item, bool& needs_wake) noexcept
-    -> bool;
 
-  // Reserves once for a captured prefix, then detaches it in push order.
-  // Allocation failure throws and leaves the items queued.
-  auto drain(std::vector<ItemPtr>& out, std::vector<mln_delivery>& views)
-    -> void;
-  // Whether nothing is queued, so a drain can return without allocating.
-  [[nodiscard]] auto empty() noexcept -> bool;
-  // Wakes the receiver inline when deliveries are queued.
-  auto rewake() noexcept -> void;
-  // Arms at most one deferred wake until a drain succeeds.
-  auto retry_later() noexcept -> void;
+  // Moves every queued item, in push order, into a new owned batch, writes
+  // its view, and returns its handle; or returns the null handle when nothing
+  // is queued. Allocation failure throws, leaves every item queued in order,
+  // and makes the next push wake the receiver.
+  auto drain(mln_delivery_batch_view& view) -> mln_delivery_batch;
 
   // Refuses later pushes, stops the wake, and discards queued items.
   auto close() noexcept -> void;
 
  private:
-  static auto run_retry(core::RetirementTask* task) noexcept -> void;
+  // Serializes drains, so a failed drain returns its items to the head of
+  // the queue ahead of any later push.
+  std::mutex drain_mutex_;
   std::mutex mutex_;
-  std::condition_variable condition_;
-  core::RetirementTask retry_task_;
-  std::shared_ptr<DeliveryQueueState> pending_retry_;
-  std::size_t waking_ = 0;
-  bool retry_armed_ = false;
   DeliveryItem* head_ = nullptr;
   DeliveryItem* tail_ = nullptr;
   std::size_t count_ = 0;
+  bool wake_on_push_ = false;
   bool closed_ = false;
   std::shared_ptr<core::Wake> wake_;
 };
@@ -187,10 +171,10 @@ auto create_delivery_queue(
   const mln_delivery_queue_options* options, mln_delivery_queue* out_queue
 ) -> mln_status;
 auto release_delivery_queue(mln_delivery_queue queue) noexcept -> void;
-auto drain_delivery_queue(mln_delivery_queue queue, mln_delivery_batch* out)
-  -> mln_status;
-auto get_delivery_batch(mln_delivery_batch batch, mln_delivery_batch_view* out)
-  -> mln_status;
+auto drain_delivery_queue(
+  mln_delivery_queue queue, mln_delivery_batch* out_batch,
+  mln_delivery_batch_view* out_view
+) -> mln_status;
 auto take_delivery(mln_delivery_batch batch, std::size_t index) -> mln_status;
 auto release_delivery_batch(mln_delivery_batch batch) noexcept -> void;
 

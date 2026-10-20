@@ -230,8 +230,8 @@ static void an_owner_token_disposes_its_owner_only_when_finalized(void) {
   TEST_ASSERT_NOT_NULL(token);
   mln_binding_owner_finalize(token);
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wake_releases, 1));
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID_STATE(mln_delivery_queue_drain(queue.handle, &batch, NULL));
+  mln_test_delivery_drain drain;
+  MLN_TEST_INVALID_STATE(mln_test_delivery_drain_into(queue.handle, &drain));
   mln_test_destroy_runtime(runtime);
 }
 

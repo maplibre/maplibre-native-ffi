@@ -96,11 +96,10 @@ struct QueuedCompletions {
 
 auto drain_completions(mln_delivery_queue queue) -> QueuedCompletions {
   auto batch = mln_delivery_batch{MLN_HANDLE_NULL};
-  const auto status = mln_delivery_queue_drain(queue, &batch, nullptr);
+  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+  const auto status = mln_delivery_queue_drain(queue, &batch, &view, nullptr);
   if (status == MLN_STATUS_NOT_READY) return {};
   MLN_TEST_OK(status);
-  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
-  MLN_TEST_OK(mln_delivery_batch_get(batch, &view, nullptr));
   auto drained = QueuedCompletions{.count = view.delivery_count};
   const auto* bytes = static_cast<const unsigned char*>(
     static_cast<const void*>(view.deliveries)

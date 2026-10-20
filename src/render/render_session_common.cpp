@@ -1322,14 +1322,12 @@ auto submit_driver_work(
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-      async.completion->reject();
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
     if (admit.check) {
       const auto admitted = admit.check(*live);
       if (admitted != MLN_STATUS_OK) {
-        async.completion->reject();
         return admitted;
       }
     }
@@ -1550,7 +1548,6 @@ auto start_attach_render_session(
     session->map, session.get(), session->map_object
   );
   if (attach_status != MLN_STATUS_OK) {
-    async.completion->reject();
     return attach_status;
   }
   session->attached = true;
@@ -1559,7 +1556,6 @@ auto start_attach_render_session(
   // hook, and the handle, so the map never keeps a dangling session pointer.
   struct AttachUnwind {
     std::shared_ptr<mln_render_session_object> session;
-    std::shared_ptr<Completion> completion;
     bool committed = false;
     ~AttachUnwind() {
       if (committed) return;
@@ -1581,9 +1577,8 @@ auto start_attach_render_session(
           handle_table<mln_render_session_object>().remove(session->self)
         );
       }
-      completion->reject();
     }
-  } unwind{session, async.completion};
+  } unwind{session};
 
   session->self = register_render_session(session);
   const auto weak_session = std::weak_ptr<mln_render_session_object>{session};
@@ -3999,7 +3994,6 @@ auto render_session_barrier_start(
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-      async.completion->reject();
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
@@ -4156,7 +4150,6 @@ auto render_session_detach_start(
       live->state != MLN_RENDER_SESSION_STATE_ATTACHED ||
       live->acquired_frame_count != 0
     ) {
-      async.completion->reject();
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }

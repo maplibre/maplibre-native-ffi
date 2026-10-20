@@ -207,14 +207,9 @@ auto Completion::accept() noexcept -> void {
   state_.compare_exchange_strong(expected, State::Accepted);
 }
 
-auto Completion::reject() noexcept -> void {
-  auto expected = State::Created;
-  state_.compare_exchange_strong(expected, State::Rejected);
-}
-
 auto Completion::revoke() noexcept -> void {
   auto expected = State::Accepted;
-  if (state_.compare_exchange_strong(expected, State::Rejected)) {
+  if (state_.compare_exchange_strong(expected, State::Created)) {
     submission_lease_.reset();
   }
 }

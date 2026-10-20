@@ -211,26 +211,24 @@ final class DeliveryQueue implements Finalizable {
   void _drain() {
     try {
       while (true) {
-        final batch = withNativeArena((arena) {
-          final output = arena<Uint64>();
+        final drained = withNativeArena((arena) {
+          final batch = arena<Uint64>();
+          final view = arena<raw.mln_delivery_batch_view>();
+          view.ref.size = sizeOf<raw.mln_delivery_batch_view>();
           final status = raw.mln_delivery_queue_drain(
             _handle,
-            output,
+            batch,
+            view,
             nativeDiagnostic,
           );
-          // A failed drain retains deliveries and arms one deferred wake.
-          // A failed retry leaves service to the host's schedule.
-          if (status != nativeStatusOk) return 0;
-          return output.value;
-        });
-        if (batch == 0) return;
-        try {
-          withNativeArena((arena) {
-            final view = arena<raw.mln_delivery_batch_view>();
-            view.ref.size = sizeOf<raw.mln_delivery_batch_view>();
-            checkNativeCall(
-              raw.mln_delivery_batch_get(batch, view, nativeDiagnostic),
-            );
+          if (status == nativeStatusNativeError) {
+            // The deliveries stay queued. A pending completion may get no
+            // later push to wake the queue, so drain again on the next turn.
+            Timer.run(_drain);
+            return false;
+          }
+          if (status != nativeStatusOk) return false;
+          try {
             final stride = view.ref.delivery_size;
             if (stride < sizeOf<raw.mln_delivery>()) {
               throw StateError('native delivery stride is too small');
@@ -238,15 +236,17 @@ final class DeliveryQueue implements Finalizable {
             final base = view.ref.deliveries.cast<Uint8>();
             for (var index = 0; index < view.ref.delivery_count; index++) {
               _dispatch(
-                batch,
+                batch.value,
                 index,
                 (base + index * stride).cast<raw.mln_delivery>(),
               );
             }
-          });
-        } finally {
-          raw.mln_delivery_batch_release(batch);
-        }
+          } finally {
+            raw.mln_delivery_batch_release(batch.value);
+          }
+          return true;
+        });
+        if (!drained) return;
       }
     } finally {
       _updateLiveness();

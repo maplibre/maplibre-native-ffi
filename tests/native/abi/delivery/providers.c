@@ -118,28 +118,26 @@ typedef struct completing_wake {
 static void complete_from_wake(void* user_data) {
   completing_wake* wake = user_data;
   mln_delivery_batch batch = MLN_HANDLE_NULL;
-  while (mln_delivery_queue_drain(wake->queue, &batch, NULL) == MLN_STATUS_OK) {
-    mln_delivery_batch_view view = {.size = sizeof(view)};
-    if (mln_delivery_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
-      for (size_t index = 0; index < view.delivery_count; index += 1) {
-        const mln_delivery* delivery =
-          (const mln_delivery*)((const unsigned char*)view.deliveries +
-                                index * view.delivery_size);
-        if (delivery->type != MLN_DELIVERY_TYPE_RESOURCE_REQUEST) continue;
-        const mln_resource_request handle =
-          delivery->payload.resource_request.handle;
-        if (mln_delivery_batch_take(batch, index, NULL) != MLN_STATUS_OK) {
-          continue;
-        }
-        const mln_resource_response response = style_response();
-        if (
-          mln_resource_request_complete(handle, &response, NULL) ==
-          MLN_STATUS_OK
-        ) {
-          atomic_fetch_add(&wake->completed, 1);
-        }
-        mln_resource_request_release(handle);
+  mln_delivery_batch_view view = {.size = sizeof(view)};
+  while (mln_delivery_queue_drain(wake->queue, &batch, &view, NULL) ==
+         MLN_STATUS_OK) {
+    for (size_t index = 0; index < view.delivery_count; index += 1) {
+      const mln_delivery* delivery =
+        (const mln_delivery*)((const unsigned char*)view.deliveries +
+                              index * view.delivery_size);
+      if (delivery->type != MLN_DELIVERY_TYPE_RESOURCE_REQUEST) continue;
+      const mln_resource_request handle =
+        delivery->payload.resource_request.handle;
+      if (mln_delivery_batch_take(batch, index, NULL) != MLN_STATUS_OK) {
+        continue;
       }
+      const mln_resource_response response = style_response();
+      if (
+        mln_resource_request_complete(handle, &response, NULL) == MLN_STATUS_OK
+      ) {
+        atomic_fetch_add(&wake->completed, 1);
+      }
+      mln_resource_request_release(handle);
     }
     mln_delivery_batch_release(batch);
     batch = MLN_HANDLE_NULL;
@@ -240,9 +238,9 @@ static void retirement_follows_the_last_request(void) {
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
 
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_delivery_queue_drain(queue.handle, &batch, NULL));
-  const mln_delivery_batch_view view = mln_test_delivery_view(batch);
+  mln_test_delivery_drain drain;
+  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
+  const mln_delivery_batch_view view = drain.view;
   TEST_ASSERT_EQUAL_size_t(3, view.delivery_count);
   const mln_delivery* request = mln_test_delivery_at(&view, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RESOURCE_REQUEST, request->type);
@@ -255,7 +253,7 @@ static void retirement_follows_the_last_request(void) {
     MLN_DELIVERY_TYPE_RETIRED, mln_test_delivery_at(&view, 2)->type
   );
   TEST_ASSERT_EQUAL_PTR(&second, mln_test_delivery_at(&view, 2)->user_data);
-  mln_delivery_batch_release(batch);
+  mln_delivery_batch_release(drain.batch);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

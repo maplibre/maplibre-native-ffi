@@ -2308,19 +2308,6 @@ mln_custom_geometry_source_options_default();
 external mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default();
 
-@Native<
-  Int32 Function(
-    mln_delivery_batch,
-    Pointer<mln_delivery_batch_view>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_delivery_batch_get(
-  int batch,
-  Pointer<mln_delivery_batch_view> out_view,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Void Function(mln_delivery_batch)>()
 external void mln_delivery_batch_release(int batch);
 
@@ -2348,12 +2335,14 @@ external int mln_delivery_queue_create(
   Int32 Function(
     mln_delivery_queue,
     Pointer<mln_delivery_batch>,
+    Pointer<mln_delivery_batch_view>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_delivery_queue_drain(
   int queue,
   Pointer<mln_delivery_batch> out_batch,
+  Pointer<mln_delivery_batch_view> out_view,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

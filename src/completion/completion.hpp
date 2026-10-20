@@ -75,7 +75,6 @@ class Completion final {
   ~Completion();
 
   auto accept() noexcept -> void;
-  auto reject() noexcept -> void;
   auto revoke() noexcept -> void;
   // Installed before acceptance. The completion holds its submission's lease
   // until the sink has its result and release_user_data has run, including
@@ -89,7 +88,7 @@ class Completion final {
   }
 
  private:
-  enum class State : std::uint8_t { Created, Accepted, Rejected, Resolved };
+  enum class State : std::uint8_t { Created, Accepted, Resolved };
 
   template <typename Function>
   auto deliver(Function&& delivery) noexcept -> void {

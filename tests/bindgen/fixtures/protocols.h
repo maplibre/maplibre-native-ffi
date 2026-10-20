@@ -646,13 +646,8 @@ typedef struct mln_delivery_batch_view {
   size_t delivery_count;
 } mln_delivery_batch_view;
 void mln_delivery_queue_release(mln_delivery_queue queue);
-BIND("execution=event_batch")
 mln_status mln_delivery_queue_drain(
   mln_delivery_queue queue, mln_delivery_batch* out_batch BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-mln_status mln_delivery_batch_get(
-  mln_delivery_batch batch,
   mln_delivery_batch_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );

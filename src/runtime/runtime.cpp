@@ -2570,7 +2570,6 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   }
   const auto release_status = live->control.begin_close();
   if (release_status != MLN_STATUS_OK) {
-    release_completion->reject();
     return release_status;
   }
   live->disposal_requested = true;

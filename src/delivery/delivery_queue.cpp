@@ -14,11 +14,6 @@
 namespace mln::delivery {
 namespace {
 
-auto retry_lane() -> core::RetirementLane& {
-  static auto* lane = new core::RetirementLane{};
-  return *lane;
-}
-
 struct DeliveryQueueObject {
   std::shared_ptr<DeliveryQueueState> state;
 };
@@ -86,130 +81,83 @@ auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr {
 }
 
 DeliveryQueueState::DeliveryQueueState(std::shared_ptr<core::Wake> wake)
-    : wake_(std::move(wake)) {
-  static_cast<void>(retry_lane());
-  retry_task_.run = &DeliveryQueueState::run_retry;
-  retry_task_.context = this;
-}
+    : wake_(std::move(wake)) {}
 
 DeliveryQueueState::~DeliveryQueueState() { close(); }
 
 auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
-  auto needs_wake = false;
-  if (!push_without_wake(item, needs_wake)) return false;
-  if (needs_wake) rewake();
-  return true;
-}
-
-auto DeliveryQueueState::push_without_wake(
-  ItemPtr& item, bool& needs_wake
-) noexcept -> bool {
-  needs_wake = false;
   if (core::process_exiting()) {
     forget_item(std::move(item));
     return true;
   }
-  const auto lock = std::scoped_lock{mutex_};
-  if (closed_) return false;
-  auto* raw = item.release();
-  raw->next = nullptr;
-  if (tail_ == nullptr) {
-    head_ = raw;
-    needs_wake = true;
-  } else {
-    tail_->next = raw;
-  }
-  tail_ = raw;
-  ++count_;
-  return true;
-}
-
-auto DeliveryQueueState::drain(
-  std::vector<ItemPtr>& out, std::vector<mln_delivery>& views
-) -> void {
-  auto limit = std::size_t{};
-  {
-    const auto lock = std::scoped_lock{mutex_};
-    limit = count_;
-  }
-  out.reserve(out.size() + limit);
-  views.reserve(views.size() + limit);
-  auto* prefix = static_cast<DeliveryItem*>(nullptr);
-  auto remainder = false;
-  {
-    const auto lock = std::scoped_lock{mutex_};
-    prefix = limit == 0 ? nullptr : head_;
-    auto* last = static_cast<DeliveryItem*>(nullptr);
-    for (auto index = std::size_t{}; index < limit && head_ != nullptr;
-         ++index) {
-      last = head_;
-      head_ = head_->next;
-      --count_;
-    }
-    if (last != nullptr) last->next = nullptr;
-    if (head_ == nullptr) tail_ = nullptr;
-    remainder = head_ != nullptr;
-    retry_armed_ = false;
-  }
-  while (prefix != nullptr) {
-    auto* next = prefix->next;
-    prefix->next = nullptr;
-    views.push_back(prefix->view);
-    out.emplace_back(prefix);
-    prefix = next;
-  }
-  if (remainder) retry_later();
-}
-
-auto DeliveryQueueState::empty() noexcept -> bool {
-  const auto lock = std::scoped_lock{mutex_};
-  return head_ == nullptr;
-}
-
-auto DeliveryQueueState::rewake() noexcept -> void {
   auto wake = std::shared_ptr<core::Wake>{};
   {
     const auto lock = std::scoped_lock{mutex_};
-    if (head_ == nullptr) return;
-    // Copying the wake under the lock keeps it alive across the call, even
-    // when the receiver releases the queue from inside the wake.
-    wake = wake_;
-    ++waking_;
+    if (closed_) return false;
+    auto* raw = item.release();
+    raw->next = nullptr;
+    if (tail_ == nullptr) {
+      head_ = raw;
+    } else {
+      tail_->next = raw;
+    }
+    if (tail_ == nullptr || wake_on_push_) {
+      wake_on_push_ = false;
+      // Copying the wake under the lock keeps it alive across the call, even
+      // when the receiver releases the queue from inside the wake.
+      wake = wake_;
+    }
+    tail_ = raw;
+    ++count_;
   }
   if (wake != nullptr) wake->notify();
+  return true;
+}
+
+auto DeliveryQueueState::drain(mln_delivery_batch_view& view)
+  -> mln_delivery_batch {
+  const auto drain_lock = std::scoped_lock{drain_mutex_};
+  auto* items = static_cast<DeliveryItem*>(nullptr);
+  auto* last = static_cast<DeliveryItem*>(nullptr);
+  auto count = std::size_t{};
   {
     const auto lock = std::scoped_lock{mutex_};
-    --waking_;
-    if (waking_ == 0) condition_.notify_all();
+    items = std::exchange(head_, nullptr);
+    last = std::exchange(tail_, nullptr);
+    count = std::exchange(count_, 0);
   }
-}
-
-auto DeliveryQueueState::retry_later() noexcept -> void {
-  const auto lock = std::scoped_lock{mutex_};
-  if (closed_ || head_ == nullptr || retry_armed_ || pending_retry_ != nullptr)
-    return;
-  retry_armed_ = true;
-  pending_retry_ = shared_from_this();
-  retry_lane().submit(retry_task_);
-}
-
-auto DeliveryQueueState::run_retry(core::RetirementTask* task) noexcept
-  -> void {
-  auto* state = static_cast<DeliveryQueueState*>(task->context);
-  auto self = std::shared_ptr<DeliveryQueueState>{};
-  {
-    auto lock = std::unique_lock{state->mutex_};
-    state->condition_.wait(lock, [state] { return state->waking_ == 0; });
-    self = state->pending_retry_;
+  if (items == nullptr) return MLN_HANDLE_NULL;
+  auto batch = std::shared_ptr<DeliveryBatchObject>{};
+  auto handle = MLN_HANDLE_NULL;
+  try {
+    batch = std::make_shared<DeliveryBatchObject>();
+    batch->items.reserve(count);
+    batch->views.reserve(count);
+    handle = handle_table<DeliveryBatchObject>().insert(batch);
+  } catch (...) {
+    // Pushes only append and drains are serialized, so the items go back
+    // ahead of everything pushed since.
+    const auto lock = std::scoped_lock{mutex_};
+    last->next = head_;
+    head_ = items;
+    if (tail_ == nullptr) tail_ = last;
+    count_ += count;
+    wake_on_push_ = true;
+    throw;
   }
-  self->rewake();
-  auto remainder = false;
-  {
-    const auto lock = std::scoped_lock{self->mutex_};
-    self->pending_retry_.reset();
-    remainder = !self->retry_armed_ && self->head_ != nullptr;
+  while (items != nullptr) {
+    auto* next = std::exchange(items->next, nullptr);
+    batch->views.push_back(items->view);
+    batch->items.emplace_back(items);
+    items = next;
   }
-  if (remainder) self->retry_later();
+  view = mln_delivery_batch_view{
+    .size = sizeof(mln_delivery_batch_view),
+    .delivery_size = sizeof(mln_delivery),
+    .deliveries = batch->views.data(),
+    .delivery_count = batch->views.size(),
+  };
+  return handle;
 }
 
 auto DeliveryQueueState::close() noexcept -> void {
@@ -290,55 +238,27 @@ auto release_delivery_queue(mln_delivery_queue queue) noexcept -> void {
   if (object != nullptr) object->state->close();
 }
 
-auto drain_delivery_queue(mln_delivery_queue queue, mln_delivery_batch* out)
-  -> mln_status {
-  if (out == nullptr || *out != MLN_HANDLE_NULL) {
+auto drain_delivery_queue(
+  mln_delivery_queue queue, mln_delivery_batch* out_batch,
+  mln_delivery_batch_view* out_view
+) -> mln_status {
+  if (out_batch == nullptr || *out_batch != MLN_HANDLE_NULL) {
     core::set_thread_error("out_batch must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto state = resolve_delivery_queue(queue);
-  if (state == nullptr) return core::recorded_handle_fault_status();
-  if (state->empty()) return MLN_STATUS_NOT_READY;
-  // Allocating and registering the batch before the swap means a failure
-  // loses no deliveries. The handle stays private until this call returns it.
-  auto handle = MLN_HANDLE_NULL;
-  auto batch = std::shared_ptr<DeliveryBatchObject>{};
-  try {
-    batch = std::make_shared<DeliveryBatchObject>();
-    handle = handle_table<DeliveryBatchObject>().insert(batch);
-    state->drain(batch->items, batch->views);
-  } catch (...) {
-    if (handle != MLN_HANDLE_NULL) {
-      static_cast<void>(handle_table<DeliveryBatchObject>().remove(handle));
-    }
-    // The deliveries stay queued; the wake asks the receiver to drain again.
-    state->retry_later();
-    throw;
-  }
-  if (batch->items.empty()) {
-    static_cast<void>(handle_table<DeliveryBatchObject>().remove(handle));
-    return MLN_STATUS_NOT_READY;
-  }
-  *out = handle;
-  return MLN_STATUS_OK;
-}
-
-auto get_delivery_batch(mln_delivery_batch batch, mln_delivery_batch_view* out)
-  -> mln_status {
-  if (out == nullptr || out->size < sizeof(mln_delivery_batch_view)) {
+  if (out_view == nullptr || out_view->size < sizeof(mln_delivery_batch_view)) {
     core::set_thread_error(
       "out_view must not be null and must have a valid size"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto live = handle_table<DeliveryBatchObject>().lease(batch);
-  if (live == nullptr) return core::recorded_handle_fault_status();
-  *out = mln_delivery_batch_view{
-    .size = sizeof(mln_delivery_batch_view),
-    .delivery_size = sizeof(mln_delivery),
-    .deliveries = live->views.data(),
-    .delivery_count = live->views.size(),
-  };
+  const auto state = resolve_delivery_queue(queue);
+  if (state == nullptr) return core::recorded_handle_fault_status();
+  auto view = mln_delivery_batch_view{};
+  const auto batch = state->drain(view);
+  if (batch == MLN_HANDLE_NULL) return MLN_STATUS_NOT_READY;
+  *out_batch = batch;
+  *out_view = view;
   return MLN_STATUS_OK;
 }
 
