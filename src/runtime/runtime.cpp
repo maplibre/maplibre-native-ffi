@@ -2576,9 +2576,9 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   live->disposal_requested = true;
   static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   // Accepting first keeps the completion on the finalizer even when the
-  // runtime has already drained. Close rejects
-  // every later submission, so retirement, which waits for the pending ones,
-  // reports after every earlier accepted submission has finished.
+  // runtime has already drained. Close rejects every later submission, so
+  // retirement, which waits for the pending ones, reports after every earlier
+  // accepted submission has finished.
   release_completion->accept();
   retire_runtime(std::move(live), std::move(release_completion));
   return MLN_STATUS_OK;

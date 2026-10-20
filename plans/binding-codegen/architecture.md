@@ -37,6 +37,5 @@ callback that captures its owner remains collectable. Rust and Swift use
 reference counting, so their callers use weak captures when a retained callback
 refers to its owner.
 
-Native disposal admission and scheduling are allocation-free. Teardown on other
-threads may allocate, as
-[native ownership](core-design.md#boundaries-of-the-guarantee) describes.
+Native teardown may allocate. Allocation failure after acceptance terminates the
+process, as [native ownership](core-design.md#retirement) describes.

@@ -27,10 +27,8 @@ accepts live children; private registry entries remain available for their
 cleanup while public calls report that the parent is closed.
 
 Each map and runtime embeds a retirement node and retains itself while that node
-is reachable. Creation reserves the executor wake, a finalizer for each runtime,
-and the shared map pool shutdown lane. Disposal admission and scheduling use
-those reserved objects; release also allocates completion state. Native
-destruction and host callbacks may allocate.
+is reachable. Teardown may allocate. Allocation failure after acceptance
+terminates the process.
 
 Map retirement first cancels pending still images and closes camera transitions
 on the runtime worker. It waits for children and submission leases, including a
@@ -51,14 +49,14 @@ submission. An operation destroyed without an outcome completes as cancelled.
 
 Runtime retirement waits for children and pending submissions. The worker
 removes the private registry entry, releases reachable callback and resource
-state, and destroys its run loop. Its reserved finalizer joins the worker,
+state, and destroys its run loop. One shared finalizer lane joins the worker,
 including thread-local cleanup, before retiring the runtime's self-reference and
 reporting completion. Runtime destruction drains its autorelease pool before
-that completion. Each runtime has an independent finalizer, so a blocked join or
-callback cannot delay another runtime. This guarantee covers runtime-owned
-state; shared services and the finalizer's return prevent treating completion as
-a library-unload boundary. Map pool cleanup remains separate, and its runtime
-lease preserves the executor until maps finish.
+that completion. A worker that exits slowly delays other runtimes' release
+completions. Release completions must not block. This guarantee covers
+runtime-owned state; shared services and the finalizer's return prevent treating
+completion as a library-unload boundary. Map pool cleanup remains separate, and
+its runtime lease preserves the executor until maps finish.
 
 Render sessions retain their maps until driver calls and attachment cleanup
 retire. Graphics detach needs driver progress; abandonment can quarantine
@@ -69,10 +67,9 @@ independently from runtime retirement.
 ## Validation
 
 Native tests cover callback replacement and reentrancy, abandoned creation
-results, disposal with allocation failures, pending operations, and map pool
-shutdown. Ordering tests check transition closure inside map release completion,
-commands queued after close cancellation, runtime release from a map completion,
-and one runtime's callbacks waiting for another runtime to retire. Capture tests
-cover nested borrowed storage and partially adopted owned results. Graphics
-tests cover driver quiescence, attachment failure, abandonment, and acquired
-frame synchronization.
+results, pending operations, and map pool shutdown. Ordering tests check
+transition closure inside map release completion, commands queued after close
+cancellation, runtime release from a map completion, and one runtime's callbacks
+waiting for another runtime to retire. Capture tests cover nested borrowed
+storage and partially adopted owned results. Graphics tests cover driver
+quiescence, attachment failure, abandonment, and acquired frame synchronization.
