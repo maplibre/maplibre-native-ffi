@@ -9,7 +9,6 @@ static app_error create_runtime(map_state* state) {
   mln_runtime_options options = mln_runtime_options_default();
   options.cache_path =
     (mln_buffer_view){.data = ":memory:", .size = sizeof(":memory:") - 1};
-  options.event_wake = app_event_wake(APP_EVENT_RUNTIME_EVENTS);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_runtime_create(&options, &state->runtime, &diagnostic);
@@ -24,9 +23,7 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent = render_target_extent(initial_viewport);
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
-  // The render loop re-arms from the frame result's repaint flag, so the map
-  // only has to report updates that arrive between frames.
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
+  options.event_mask = MLN_RUNTIME_EVENT_MASK_NONE;
 
   awaited_completion created;
   mln_completion completion;
@@ -189,40 +186,5 @@ app_error map_state_cancel_transitions(map_state* state) {
     );
     return APP_ERROR_CAMERA_COMMAND_FAILED;
   }
-  return APP_OK;
-}
-
-app_error map_state_drain_events(map_state* state, bool* out_render_update) {
-  *out_render_update = false;
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_status status =
-    mln_runtime_drain_events(state->runtime, &batch, &diagnostic);
-  if (status == MLN_STATUS_NOT_READY) return APP_OK;
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("event drain failed", status, &diagnostic);
-    return APP_ERROR_EVENT_DRAIN_FAILED;
-  }
-  mln_event_batch_view view = {
-    .size = sizeof(mln_event_batch_view),
-  };
-  status = mln_event_batch_get(batch, &view, &diagnostic);
-  if (status != MLN_STATUS_OK) {
-    mln_event_batch_release(batch);
-    diagnostics_log_status("event batch read failed", status, &diagnostic);
-    return APP_ERROR_EVENT_DRAIN_FAILED;
-  }
-  for (size_t index = 0; index < view.event_count; index += 1) {
-    const char* bytes = (const char*)view.events + index * view.event_size;
-    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
-    if (
-      event->source_type == MLN_RUNTIME_EVENT_SOURCE_MAP &&
-      event->source == state->map &&
-      event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-    ) {
-      *out_render_update = true;
-    }
-  }
-  mln_event_batch_release(batch);
   return APP_OK;
 }

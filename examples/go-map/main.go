@@ -123,8 +123,7 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 
 	// Every native wake pushes this SDL event to end the loop's wait.
 	wakeEvent := sdl.RegisterEvents(1)
-	events := newLoopWake(wakeEvent)
-	mapState, err := newRuntimeMapState(view, smoke, events.wake())
+	mapState, err := newRuntimeMapState(view, smoke)
 	if err != nil {
 		_ = graphics.Close()
 		return err
@@ -149,7 +148,7 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 
 	// The SDL thread sleeps until input or a native wake arrives. Input
 	// becomes map commands, a map update becomes a frame demand, and the
-	// wakes have the thread drain events, service driver work, and drain frame
+	// wakes have the thread service driver work and drain frame
 	// results.
 	input := inputController{}
 	smokeDeadline := time.Now().Add(smokeTimeout)
@@ -198,17 +197,7 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 				return err
 			}
 		}
-		if events.consume() {
-			update, err := mapState.drainRenderUpdates()
-			if err != nil {
-				return err
-			}
-			if update && !view.empty() {
-				if err := target.RequestFrame(false); err != nil {
-					return err
-				}
-			}
-		}
+
 		presented, err := target.HandleWakes()
 		if err != nil {
 			return err

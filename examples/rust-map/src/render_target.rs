@@ -80,7 +80,6 @@ pub struct FrameResults {
     /// A demand rendered a frame.
     pub rendered: bool,
     /// The map asked for another frame while it rendered one.
-    pub needs_repaint: bool,
     /// The target could not produce a frame, so the loop retries later.
     pub target_not_ready: bool,
 }
@@ -182,7 +181,10 @@ impl Session {
     pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<()> {
         self.next_token += 1;
         let mut flags = FrameDemandFlag::empty();
-        flags.set(FrameDemandFlag::IF_NEEDED, !force);
+        flags.set(
+            FrameDemandFlag::IF_NEEDED | FrameDemandFlag::WAIT_FOR_UPDATE,
+            !force,
+        );
         flags.set(FrameDemandFlag::PRESENT, self.presents);
         self.session.request_frame(&FrameDemand {
             flags,
@@ -206,7 +208,6 @@ impl Session {
             match result.disposition {
                 RenderResult::Rendered => {
                     results.rendered = true;
-                    results.needs_repaint = result.needs_repaint;
                 }
                 RenderResult::TargetNotReady => results.target_not_ready = true,
                 _ => {}

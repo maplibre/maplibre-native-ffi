@@ -13,7 +13,6 @@ pub const FrameResults = struct {
     /// A demand rendered a frame.
     rendered: bool = false,
     /// The map asked for another frame while it rendered one.
-    needs_repaint: bool = false,
     /// The target could not produce a frame, so the loop retries later.
     target_not_ready: bool = false,
 };
@@ -106,7 +105,7 @@ pub const Session = struct {
         self.next_token += 1;
         var diagnostic: maplibre.Diagnostic = .{};
         maplibre.renderSessionRequestFrame(std.heap.smp_allocator, self.handle.?, .{
-            .flags = .{ .if_needed = !force, .present = self.presents },
+            .flags = .{ .if_needed = !force, .wait_for_update = !force, .present = self.presents },
             .token = self.next_token,
         }, &diagnostic) catch |err| {
             diagnostics.logError("frame demand failed", err, &diagnostic);
@@ -128,7 +127,6 @@ pub const Session = struct {
             switch (result.disposition) {
                 .rendered => {
                     results.rendered = true;
-                    results.needs_repaint = result.needs_repaint;
                 },
                 .target_not_ready => results.target_not_ready = true,
                 else => {},

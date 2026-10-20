@@ -1,8 +1,8 @@
 // App shell: command-line parsing, the SDL window, and the render loop.
 //
 // The render loop only reacts to SDL events. Input submits camera commands,
-// and native wakes post app events: a runtime event drain demands a frame for
-// each map update, and a frame-result drain shows what the session rendered.
+// and native wakes post app events. Each rendered frame re-arms a demand
+// that waits for the next update.
 // A caller-driver session also gets driver wakes, which service it.
 
 #include <SDL3/SDL.h>
@@ -62,12 +62,11 @@ static app_error show_frame_results(app* app) {
     return APP_OK;
   }
   if (results.target_not_ready || (results.rendered && !presented)) {
-    // Neither a target that was not ready nor a frame that missed the window
-    // causes a map-update event, so the retry waits about one display
-    // refresh. It forces the frame, because a frame that missed the window
-    // consumed its update.
+    // A target that was not ready or a frame that missed the window retries
+    // after about one display refresh. It forces the frame, because a frame
+    // that missed the window consumed its update.
     app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
-  } else if (results.needs_repaint) {
+  } else if (results.rendered) {
     MAP_TRY(render_session_request_frame(session, false));
   }
   return APP_OK;
@@ -76,12 +75,6 @@ static app_error show_frame_results(app* app) {
 static app_error handle_app_event(app* app, app_event_code code) {
   render_session* session = render_target_session(app->target);
   switch (code) {
-    case APP_EVENT_RUNTIME_EVENTS: {
-      bool render_update = false;
-      MAP_TRY(map_state_drain_events(&app->map, &render_update));
-      return render_update ? render_session_request_frame(session, false)
-                           : APP_OK;
-    }
     case APP_EVENT_DRIVER_WORK:
       return render_session_service(session);
     case APP_EVENT_TARGET_REPLACED:

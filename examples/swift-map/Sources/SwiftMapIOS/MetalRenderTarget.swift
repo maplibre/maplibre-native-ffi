@@ -43,7 +43,6 @@ struct FrameResults {
   /// A demand rendered and presented a frame.
   var rendered = false
   /// The map asked for another frame while it rendered one.
-  var needsRepaint = false
   /// The target could not produce a frame, so the loop retries later.
   var targetNotReady = false
 }
@@ -121,7 +120,6 @@ final class MetalRenderTarget {
     for result in try batch.get().results {
       if result.disposition == .rendered {
         results.rendered = true
-        results.needsRepaint = result.needsRepaint
       } else if result.disposition == .targetNotReady {
         results.targetNotReady = true
       }

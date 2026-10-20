@@ -106,8 +106,8 @@ pub fn main(init_args: std.process.Init) !void {
 }
 
 /// The render loop only reacts to SDL events. Input submits camera commands,
-/// and native wakes post app events: a runtime event drain demands a frame for
-/// each map update, and a frame-result drain shows what the session rendered.
+/// and native wakes post app events. Each rendered frame re-arms a demand
+/// that waits for the next update.
 /// A caller-driver session also gets driver wakes, which service it.
 const App = struct {
     window: *c.SDL_Window,
@@ -157,9 +157,6 @@ const App = struct {
     fn handleAppEvent(self: *App, code: events.Code) !void {
         const session = self.target.session();
         switch (code) {
-            .runtime_events => if (try self.map.drainEvents()) {
-                try session.requestFrame(false);
-            },
             .driver_work => try session.service(),
             .target_replaced => try self.target.retireReplaced(),
             .frame_results => try self.showFrameResults(),
@@ -181,12 +178,11 @@ const App = struct {
             return;
         }
         if (results.target_not_ready or (results.rendered and !presented)) {
-            // Neither a target that was not ready nor a frame that missed the
-            // window causes a map-update event, so the retry waits about one
-            // display refresh. It forces the frame, because a frame that
-            // missed the window consumed its update.
+            // A target that was not ready or a frame that missed the window
+            // retries after about one display refresh. The retry forces the
+            // frame, because a frame that missed the window consumed its update.
             events.pushAfter(.retry_frame, frame_retry_ms);
-        } else if (results.needs_repaint) {
+        } else if (results.rendered) {
             try session.requestFrame(false);
         }
     }

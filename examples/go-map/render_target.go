@@ -121,6 +121,8 @@ func (driver *callerDriver) RequestFrame(force bool) error {
 	demand.Token = driver.nextToken
 	if force {
 		demand.Flags &^= maplibre.FrameDemandFlagIfNeeded
+	} else {
+		demand.Flags |= maplibre.FrameDemandFlagWaitForUpdate
 	}
 	if driver.presents {
 		demand.Flags |= maplibre.FrameDemandFlagPresent
@@ -162,12 +164,11 @@ func (driver *callerDriver) drainFrameResults() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	rendered, retry, repaint := false, false, false
+	rendered, retry := false, false
 	for _, result := range view.Results {
 		switch result.Disposition {
 		case maplibre.RenderResultRendered:
 			rendered = true
-			repaint = repaint || result.NeedsRepaint
 		case maplibre.RenderResultTargetNotReady:
 			retry = true
 		}
@@ -182,7 +183,7 @@ func (driver *callerDriver) drainFrameResults() (bool, error) {
 	switch {
 	case retry:
 		driver.retryAt = time.Now().Add(retryDelay)
-	case repaint:
+	case rendered:
 		err = driver.RequestFrame(false)
 	}
 	return shown, err

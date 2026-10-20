@@ -17,17 +17,11 @@ import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
-import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
-/**
- * The runtime and its map. Commands go straight to the runtime's own thread, and the runtime raises
- * [eventWake] when it has events to drain.
- */
-internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson: String? = null) :
-  AutoCloseable {
+/** The runtime and its map. Commands run on the runtime's scheduler thread. */
+internal class MapState(initialExtent: SurfaceExtent, styleJson: String? = null) : AutoCloseable {
   private var closed = false
   private var currentSize = initialExtent.toLogicalExtent()
   private val initialCamera =
@@ -35,7 +29,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
 
   private val runtime =
     GeneratedApi.runtimeCreate(
-      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake),
+      GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"),
     )
   private lateinit var ownedMap: MapHandle
   val map: MapHandle
@@ -50,7 +44,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
               .copy(
                 initialExtent = currentSize,
                 mapMode = MapMode.CONTINUOUS,
-                eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
+                eventMask = RuntimeEventMask.NONE,
               ),
           )
           .await()
@@ -160,12 +154,6 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
   }
 
   private fun animation(durationMs: Double) = AnimationOptions(durationMs = durationMs)
-
-  /** Drains every runtime event, and reports whether the map published an update to render. */
-  fun drainRenderUpdates(): Boolean =
-    runtime.drainEvents()?.use {
-      it.get().events.any { event -> event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE }
-    } ?: false
 
   override fun close() {
     if (closed) return

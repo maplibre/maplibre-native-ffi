@@ -4,8 +4,8 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>
 /// App shell. GLFW, the graphics context, and the render session stay on the main thread, which
-/// sleeps until input arrives or a native wake posts an empty event. Input becomes map commands, a
-/// map update becomes a frame demand, and the wakes have the thread drain events and frame results.
+/// sleeps until input arrives or a native wake posts an empty event. Input becomes map commands,
+/// waiting frame demands render map updates, and wakes have the thread drain frame results.
 /// </summary>
 internal static class Shell
 {
@@ -34,12 +34,7 @@ internal static class Shell
             backends,
             visible: !smoke
         );
-        var events = new GlfwWake(graphics.Window.Glfw);
-        using var state = MapState.Create(
-            graphics.ReadViewport(),
-            events.Wake,
-            smoke ? SmokeStyle : null
-        );
+        using var state = MapState.Create(graphics.ReadViewport(), smoke ? SmokeStyle : null);
         using var input = new InputController(graphics.Window, state);
 
         var viewport = graphics.ReadViewport();
@@ -70,10 +65,6 @@ internal static class Shell
                         target = Attach(graphics, state.Map, mode);
                         attachedScale = viewport.ScaleFactor;
                     }
-                }
-                if (events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
-                {
-                    target.RequestFrame();
                 }
                 if (target.HandleWakes() && smoke)
                 {

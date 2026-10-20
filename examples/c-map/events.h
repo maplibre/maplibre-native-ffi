@@ -11,8 +11,6 @@
 
 /// The work an app event asks the render loop to do.
 typedef enum app_event_code : int32_t {
-  /// The runtime event queue has events to drain.
-  APP_EVENT_RUNTIME_EVENTS,
   /// The render session has frame results to drain.
   APP_EVENT_FRAME_RESULTS,
   /// The render session has caller-driver work to service.

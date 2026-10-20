@@ -24,8 +24,6 @@ const SMOKE_DEADLINE: Duration = Duration::from_secs(60);
 /// The work a native wake asks the event loop to do.
 #[derive(Clone, Copy, Debug)]
 pub enum AppEvent {
-    /// The runtime event queue has events to drain.
-    RuntimeEvents,
     /// The render session has frame results to drain.
     FrameResults,
     /// The render session has caller-driver work to service.

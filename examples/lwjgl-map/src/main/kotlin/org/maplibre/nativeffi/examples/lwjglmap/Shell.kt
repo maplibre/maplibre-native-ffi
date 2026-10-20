@@ -13,8 +13,8 @@ import org.maplibre.nativeffi.generated.RenderBackendFlag
  * The GLFW-thread shell that owns the window, graphics context, and render session.
  *
  * The thread sleeps in `glfwWaitEvents` until input arrives or a native wake posts an empty event.
- * Input becomes map commands, a map update becomes a frame demand, and the wakes have the thread
- * drain events and frame results.
+ * Input becomes map commands, and waiting frame demands render each update. Wakes have the thread
+ * drain frame results.
  */
 internal object Shell {
   private const val INITIAL_WIDTH = 960
@@ -39,13 +39,12 @@ internal object Shell {
       .use { graphics ->
         val viewport = ViewportHolder(Viewport.read(graphics.window()))
         viewport.value.log("initial viewport")
-        val events = GlfwWake()
         val style = if (smoke) MapState.SMOKE_STYLE else null
-        MapState.create(viewport.value, events.wake, style).use { state ->
+        MapState.create(viewport.value, style).use { state ->
           InputController(graphics.window(), state) { viewport.value }
             .use {
               installResizeCallbacks(graphics.window(), viewport)
-              renderLoop(graphics, viewport, state, events, mode, smoke)
+              renderLoop(graphics, viewport, state, mode, smoke)
             }
         }
       }
@@ -55,7 +54,6 @@ internal object Shell {
     graphics: GraphicsContext,
     viewport: ViewportHolder,
     state: MapState,
-    events: GlfwWake,
     mode: RenderTargetMode,
     smoke: Boolean,
   ) {
@@ -78,9 +76,6 @@ internal object Shell {
             target = attach(graphics, state, next, mode)
             attachedScale = next.scaleFactor()
           }
-        }
-        if (events.consume() && state.drainRenderUpdates() && !viewport.value.empty()) {
-          target.requestFrame()
         }
         if (target.handleWakes() && smoke) {
           println("smoke: rendered a frame")

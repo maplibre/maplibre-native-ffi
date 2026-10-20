@@ -97,7 +97,7 @@ internal open class RenderTarget(
   /** Demands a frame. A forced frame renders even when the map has no newer update. */
   fun requestFrame(force: Boolean = false) {
     var flags = FrameDemandFlag(0u)
-    if (!force) flags = flags or FrameDemandFlag.IF_NEEDED
+    if (!force) flags = flags or FrameDemandFlag.IF_NEEDED or FrameDemandFlag.WAIT_FOR_UPDATE
     if (presents) flags = flags or FrameDemandFlag.PRESENT
     session.requestFrame(FrameDemand(flags = flags, token = ++nextToken))
   }
@@ -127,13 +127,11 @@ internal open class RenderTarget(
     val batch = session.drainFrameResults() ?: return false
     var rendered = false
     var retry = false
-    var repaint = false
     batch.use { results ->
       for (result in results.get().results) {
         when (result.disposition) {
           RenderResult.RENDERED -> {
             rendered = true
-            repaint = repaint || result.needsRepaint
           }
           RenderResult.TARGET_NOT_READY -> retry = true
         }
@@ -143,7 +141,7 @@ internal open class RenderTarget(
     if (rendered && !shown) retry = true
     if (retry) {
       retryAtNanos = System.nanoTime() + RETRY_DELAY_NANOS
-    } else if (repaint) {
+    } else if (rendered) {
       requestFrame()
     }
     return shown

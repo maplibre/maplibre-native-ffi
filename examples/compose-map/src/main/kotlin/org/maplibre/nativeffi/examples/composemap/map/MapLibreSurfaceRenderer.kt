@@ -37,8 +37,8 @@ import org.maplibre.nativeffi.generated.Wake
  * the texture the bridge draws: every bridge lends a ring of two, and the session renders into the
  * other texture meanwhile.
  *
- * Input becomes map commands on the Compose thread. The runtime's event wake asks Compose for a
- * draw when a map update is ready to render.
+ * Input becomes map commands on the Compose thread. A waiting frame demand renders each update, and
+ * its frame wake asks Compose to draw the result.
  */
 internal class MapLibreSurfaceRenderer(
   private val styleJson: String? = null,
@@ -61,21 +61,16 @@ internal class MapLibreSurfaceRenderer(
    */
   private val frameForced = AtomicBoolean(false)
 
-  /** Set by the runtime's event wake until the next draw drains the events. */
-  private val eventsPending = AtomicBoolean(false)
-
   /** Set while a draw waits on the session, so a driver-work wake needs no further draw. */
   private val drawing = AtomicBoolean(false)
 
   /** Released by the session's wakes and by the completions that a draw waits on. */
   private val sessionWork = Semaphore(0)
 
-  private val eventWake = Wake {
-    eventsPending.set(true)
+  private val frameWake = Wake {
+    sessionWork.release()
     surfaceSession?.requestFrame()
   }
-
-  private val frameWake = Wake { sessionWork.release() }
 
   /** Caller-driver work that arrives outside a draw asks for one, which services it. */
   private val driverWorkWake = Wake {
@@ -114,7 +109,6 @@ internal class MapLibreSurfaceRenderer(
 
     val state = ensureMapState(frame.extent)
     state.resize(frame.extent)
-    if (eventsPending.getAndSet(false) && state.drainRenderUpdates()) frameWanted.set(true)
     drawing.set(true)
     val result =
       try {
@@ -136,18 +130,34 @@ internal class MapLibreSurfaceRenderer(
     val session = ensureAttachedRenderSession(map, frame).session
     if (callerDriver) session.serviceDriverWork(0uL)
     val forced = frameForced.getAndSet(false)
-    if (!frameWanted.getAndSet(false) && !forced) return NativeSurfaceRenderResult.Skipped
-    val token = ++nextToken
-    session.requestFrame(
-      FrameDemand(
-        flags = if (forced) FrameDemandFlag(0u) else FrameDemandFlag.IF_NEEDED,
-        token = token,
-      ),
-    )
-    val result = awaitResult(session, token)
-    // The result carries the map's own follow-up demand, so an ongoing transition needs no runtime
-    // event round trip.
-    if (result.needsRepaint) requestRender()
+    val wanted = frameWanted.getAndSet(false)
+    val ready =
+      session.drainFrameResults()?.use {
+        val results = it.get().results
+        results.lastOrNull { result -> result.disposition == RenderResult.RENDERED }
+          ?: results.lastOrNull { result -> result.disposition == RenderResult.TARGET_NOT_READY }
+      }
+    val result =
+      if (forced) {
+        // Release the previous frame before another forced render needs its slot.
+        if (ready?.disposition == RenderResult.RENDERED) acquireNewest(session)
+        val token = ++nextToken
+        session.requestFrame(
+          FrameDemand(
+            flags = FrameDemandFlag(0u),
+            token = token,
+          ),
+        )
+        awaitResult(session, token)
+      } else if (ready != null) {
+        ready
+      } else if (wanted) {
+        val token = ++nextToken
+        session.requestFrame(FrameDemand(flags = FrameDemandFlag.IF_NEEDED, token = token))
+        awaitResult(session, token)
+      } else {
+        return NativeSurfaceRenderResult.Skipped
+      }
     return when (result.disposition) {
       RenderResult.RENDERED -> {
         val slot = acquireNewest(session)
@@ -157,12 +167,18 @@ internal class MapLibreSurfaceRenderer(
           requestRender(force = true)
           return NativeSurfaceRenderResult.Skipped
         }
+        session.requestFrame(
+          FrameDemand(
+            flags = FrameDemandFlag.IF_NEEDED or FrameDemandFlag.WAIT_FOR_UPDATE,
+            token = ++nextToken,
+          ),
+        )
         onRendered()
         NativeSurfaceRenderResult.Rendered(frame.target.slot(slot))
       }
       RenderResult.TARGET_NOT_READY -> {
-        // A target that was not ready does not cause a map-update event, so the next Compose frame
-        // retries. The retry keeps the force, because the demand that failed may have been forced.
+        // The next Compose frame retries a target that was not ready. The retry keeps the force,
+        // because the demand that failed may have been forced.
         requestRender(force = true)
         NativeSurfaceRenderResult.Skipped
       }
@@ -297,7 +313,7 @@ internal class MapLibreSurfaceRenderer(
   /**
    * Submits one camera command against the live map. The producer thread closes the map under the
    * same monitor, so a handler on the Compose thread sees a live map or none at all. The map's
-   * update reaches the next draw through the event wake.
+   * waiting demand renders the update and wakes the next draw.
    */
   private fun updateMap(action: (MapState) -> Unit) {
     synchronized(mapStateLock) {
@@ -313,7 +329,7 @@ internal class MapLibreSurfaceRenderer(
     mapState?.let {
       return it
     }
-    return MapState(extent, eventWake, styleJson).also {
+    return MapState(extent, styleJson).also {
       synchronized(mapStateLock) { mapState = it }
     }
   }

@@ -12,10 +12,8 @@ import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
-import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.generated.Wake
 
 /** The runtime and its map. Commands go straight to the runtime's own thread. */
 internal class MapState
@@ -72,12 +70,6 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   private fun animation(durationMs: Double?): AnimationOptions =
     AnimationOptions(durationMs = durationMs)
 
-  /** Drains every runtime event, and reports whether the map published an update to render. */
-  fun drainRenderUpdates(): Boolean =
-    runtime.drainEvents()?.use { owner ->
-      owner.get().events.any { event -> event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE }
-    } ?: false
-
   override fun close() {
     runBlocking {
       try {
@@ -97,12 +89,11 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
 
     /**
      * Creates the runtime and map, loading [styleJson] when given and the default URL otherwise.
-     * The runtime raises [eventWake] when it has events to drain.
      */
-    fun create(viewport: Viewport, eventWake: Wake, styleJson: String? = null): MapState {
+    fun create(viewport: Viewport, styleJson: String? = null): MapState {
       val runtime =
         GeneratedApi.runtimeCreate(
-          GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:", eventWake = eventWake),
+          GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"),
         )
       val initialCamera =
         CameraOptions(
@@ -120,7 +111,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
                   .copy(
                     initialExtent = RenderTarget.extent(viewport),
                     mapMode = MapMode.CONTINUOUS,
-                    eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
+                    eventMask = RuntimeEventMask.NONE,
                   ),
               )
               .await()

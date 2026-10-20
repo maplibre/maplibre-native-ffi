@@ -2,13 +2,13 @@ import Foundation
 import MaplibreNativeFFI
 
 /// The render loop for one map and its surface. Native wakes reach it on the
-/// main actor: a runtime event drain demands a frame for each map update, and
-/// a frame-result drain re-arms demand. The session renders on its own core
-/// worker. Gestures submit camera commands to `mapState` directly.
+/// main actor: a frame-result drain re-arms a demand that waits for an update.
+/// The session renders on its own core worker. Gestures submit camera commands
+/// to `mapState` directly.
 @MainActor
 final class RenderLoop {
   /// How long the loop waits before it retries a target that was not ready,
-  /// about one display refresh. No map-update event prompts that retry.
+  /// about one display refresh.
   private static let frameRetryNanoseconds: UInt64 = 16_000_000
 
   let mapState: MapState
@@ -39,10 +39,7 @@ final class RenderLoop {
   ) async throws -> RenderLoop {
     // The wakes exist before the loop does, so a relay forwards them.
     let relay = WakeRelay()
-    let mapState = try await MapState(
-      viewport: viewport,
-      eventWake: relay.wake { $0.drainEvents() }
-    )
+    let mapState = try await MapState(viewport: viewport)
     let target: MetalRenderTarget
     do {
       target = try await MetalRenderTarget.attach(
@@ -60,7 +57,6 @@ final class RenderLoop {
     relay.loop = loop
     // Wakes that arrived before the relay knew the loop found nothing to
     // forward to, so drain and demand once now.
-    loop.drainEvents()
     loop.showFrameResults()
     loop.requestFrame()
     return loop
@@ -111,30 +107,19 @@ final class RenderLoop {
     target.abandon()
   }
 
-  private func drainEvents() {
-    guard !isClosed else { return }
-    do {
-      if try mapState.drainEvents() {
-        requestFrame()
-      }
-    } catch {
-      fail(error)
-    }
-  }
-
   private func showFrameResults() {
     guard !isClosed else { return }
     do {
       let results = try target.drainResults()
       if results.targetNotReady {
-        // A target that was not ready does not cause a map-update event, so
-        // the retry waits about one display refresh. The retry keeps the force,
-        // because the demand that failed may have been forced.
+        // A target that was not ready retries after about one display refresh.
+        // The retry keeps the force, because the failed demand may have been
+        // forced.
         Task { @MainActor [weak self] in
           try? await Task.sleep(nanoseconds: Self.frameRetryNanoseconds)
           self?.requestFrame(force: true)
         }
-      } else if results.needsRepaint {
+      } else if results.rendered {
         requestFrame()
       }
     } catch {

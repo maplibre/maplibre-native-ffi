@@ -9,8 +9,6 @@ const types = @import("types.zig");
 
 /// The work an app event asks the render loop to do.
 pub const Code = enum(i32) {
-    /// The runtime event queue has events to drain.
-    runtime_events,
     /// The render session has frame results to drain.
     frame_results,
     /// The render session has caller-driver work to service.

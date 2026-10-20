@@ -26,7 +26,6 @@ typedef struct frame_results {
   /// A demand rendered a frame.
   bool rendered;
   /// The map asked for another frame while it rendered one.
-  bool needs_repaint;
   /// The target could not produce a frame. The loop retries later, because
   /// this result does not cause a map-update event.
   bool target_not_ready;

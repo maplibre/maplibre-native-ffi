@@ -16,9 +16,8 @@ import org.maplibre.nativeffi.generated.Wake
  * The map view. The UI thread owns the surface, touch input, viewport, graphics context, and render
  * session.
  *
- * Touch input becomes map commands. A map update schedules one frame demand on the next
- * Choreographer frame. Native wakes post the work they announce to the UI thread: runtime events to
- * drain, frame results to drain, and, for a caller driver, driver work to service.
+ * Touch input becomes map commands. Choreographer arms a waiting frame demand after each rendered
+ * frame. Native wakes post frame results and caller-driver work to the UI thread.
  */
 internal class AndroidMapView(
   context: Context,
@@ -46,7 +45,6 @@ internal class AndroidMapView(
   private var closed = false
   private val pendingDrawingFinished = ArrayDeque<Runnable>()
 
-  private val eventWake = UiWake { if (mapState?.drainRenderUpdates() == true) scheduleFrame() }
   private val frameWake = UiWake(::drainFrameResults)
   private val driverWake = UiWake { renderTarget?.serviceDriverWork() }
 
@@ -137,10 +135,9 @@ internal class AndroidMapView(
       finishPendingDrawing()
       onRendered()
     }
-    // A target that was not ready does not cause a map-update event, so the next Choreographer
-    // frame retries. The result otherwise carries the map's own follow-up demand, so an ongoing
-    // transition needs no runtime event round trip.
-    if (drained.targetNotReady) requestRedraw() else if (drained.needsRepaint) scheduleFrame()
+    // Choreographer retries a target that was not ready. Each rendered frame
+    // arms a demand that waits for the next map update.
+    if (drained.targetNotReady) requestRedraw() else if (drained.rendered) scheduleFrame()
   }
 
   private fun surfaceAvailable(holder: SurfaceHolder) {
@@ -162,7 +159,7 @@ internal class AndroidMapView(
     }
     val state = mapState
     if (state == null) {
-      mapState = MapState(nextViewport, eventWake.wake, styleJson)
+      mapState = MapState(nextViewport, styleJson)
     } else if (renderTarget == null) {
       // With no session attached the map is the only extent authority; a live session carries the
       // extent through followSurface below.

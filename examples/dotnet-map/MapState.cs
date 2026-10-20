@@ -20,16 +20,9 @@ internal sealed class MapState : IDisposable
     /// Creates the map with the example's style, or with <paramref name="styleJson" /> in its
     /// place, which the smoke run passes so that it needs no network.
     /// </summary>
-    /// <remarks>The runtime raises <paramref name="eventWake" /> when it has events to drain.</remarks>
-    public static MapState Create(Viewport viewport, Wake eventWake, byte[]? styleJson = null)
+    public static MapState Create(Viewport viewport, byte[]? styleJson = null)
     {
-        var runtime = RuntimeHandle.Create(
-            RuntimeOptions.Default with
-            {
-                CachePath = ":memory:",
-                EventWake = eventWake,
-            }
-        );
+        var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { CachePath = ":memory:" });
         MapHandle? map = null;
         try
         {
@@ -39,7 +32,7 @@ internal sealed class MapState : IDisposable
                     {
                         InitialExtent = viewport.LogicalExtent,
                         MapMode = MapMode.Continuous,
-                        EventMask = RuntimeEventMask.MapRenderUpdateAvailable,
+                        EventMask = 0,
                     }
                 )
                 .GetAwaiter()
@@ -130,25 +123,6 @@ internal sealed class MapState : IDisposable
     public void ResetOrientation(AnimationOptions animation)
     {
         Update(new CameraOptions { Bearing = 0, Pitch = 0 }, animation);
-    }
-
-    /// <summary>Drains every runtime event, and reports whether the map published an update to render.</summary>
-    public bool DrainRenderUpdates()
-    {
-        var requested = false;
-        using var batch = runtime.DrainEvents();
-        if (batch is null)
-        {
-            return false;
-        }
-        foreach (var runtimeEvent in batch.Get().Events)
-        {
-            if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable)
-            {
-                requested = true;
-            }
-        }
-        return requested;
     }
 
     public void Dispose()

@@ -2,13 +2,13 @@ import Foundation
 import MaplibreNativeFFI
 
 /// The render loop for one map and render target. Native wakes reach it on the
-/// main actor: a runtime event drain demands a frame for each map update, and
-/// a frame-result drain shows what rendered. The session renders on its own
-/// core worker. Input submits camera commands to `mapState` directly.
+/// main actor: each rendered frame re-arms a demand that waits for an update.
+/// The session renders on its own core worker. Input submits camera commands to
+/// `mapState` directly.
 @MainActor
 final class RenderLoop {
   /// How long the loop waits before it retries a frame that did not reach the
-  /// layer, about one display refresh. No map-update event prompts that retry.
+  /// layer, about one display refresh.
   private static let frameRetry = Duration.milliseconds(16)
 
   let mapState: MapState
@@ -46,7 +46,6 @@ final class RenderLoop {
     let relay = WakeRelay()
     let mapState = try await MapState(
       viewport: viewport,
-      eventWake: relay.wake { $0.drainEvents() },
       styleJSON: styleJSON
     )
     let target: MetalRenderTarget
@@ -72,7 +71,6 @@ final class RenderLoop {
     logStartupStatus(mode: mode, driver: target.driver)
     // Wakes that arrived before the relay knew the loop found nothing to
     // forward to, so drain and demand once now.
-    loop.drainEvents()
     loop.showFrameResults()
     loop.requestFrame()
     return loop
@@ -122,17 +120,6 @@ final class RenderLoop {
     try await mapState.close()
   }
 
-  private func drainEvents() {
-    guard !isClosed else { return }
-    do {
-      if try mapState.drainEvents() {
-        requestFrame()
-      }
-    } catch {
-      fail(error)
-    }
-  }
-
   private func showFrameResults() {
     guard !isClosed else { return }
     do {
@@ -142,15 +129,15 @@ final class RenderLoop {
         onPresented?()
       }
       if results.targetNotReady || (results.rendered && !presented) {
-        // Neither a target that was not ready nor a frame that missed the
-        // layer causes a map-update event, so the retry waits about one display
-        // refresh. It forces the frame, because a frame that missed the layer
+        // A target that was not ready or a frame that missed the layer
+        // retries after about one display refresh. It forces the frame, because
+        // a frame that missed the layer
         // consumed its update.
         Task { @MainActor [weak self] in
           try? await Task.sleep(for: Self.frameRetry)
           self?.requestFrame(force: true)
         }
-      } else if results.needsRepaint {
+      } else if results.rendered {
         requestFrame()
       }
     } catch {

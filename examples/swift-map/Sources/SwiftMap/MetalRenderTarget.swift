@@ -45,7 +45,6 @@ struct FrameResults {
   /// A demand rendered a frame.
   var rendered = false
   /// The map asked for another frame while it rendered one.
-  var needsRepaint = false
   /// The target could not produce a frame, so the loop retries later.
   var targetNotReady = false
 }
@@ -149,7 +148,7 @@ final class MetalRenderTarget {
   /// update, which a retry after a frame that missed the layer needs.
   func requestFrame(force: Bool = false) throws {
     nextToken += 1
-    var flags: FrameDemandFlag = force ? [] : [.ifNeeded]
+    var flags: FrameDemandFlag = force ? [] : [.ifNeeded, .waitForUpdate]
     if case .nativeSurface = kind {
       flags.insert(.present)
     }
@@ -172,7 +171,6 @@ final class MetalRenderTarget {
     for result in view.results {
       if result.disposition == .rendered {
         results.rendered = true
-        results.needsRepaint = result.needsRepaint
       } else if result.disposition == .targetNotReady {
         results.targetNotReady = true
       }

@@ -1,8 +1,7 @@
 //! The winit event loop owns the window, graphics context, and render session.
 //! Input submits camera commands, and native wakes reach the app as user
-//! events: a runtime event drain demands a frame for each map update, and a
-//! frame-result drain shows what rendered. A caller-driver session also gets
-//! driver wakes, which service it.
+//! events. Each rendered frame re-arms a demand that waits for the next update.
+//! A caller-driver session also gets driver wakes, which service it.
 
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -50,7 +49,7 @@ impl App {
         }
         viewport.log("initial viewport");
 
-        let map = MapState::new(viewport, wakes)?;
+        let map = MapState::new(viewport)?;
         let mut target =
             match RenderTarget::attach(mode, map.map_handle(), &graphics, viewport, wakes) {
                 Ok(target) => target,
@@ -124,7 +123,6 @@ impl App {
             return;
         }
         let result = match event {
-            AppEvent::RuntimeEvents => self.drain_events(),
             AppEvent::DriverWork => self
                 .target_mut()
                 .session_mut()
@@ -162,13 +160,6 @@ impl App {
         self.target.as_mut().expect("render target is open")
     }
 
-    fn drain_events(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.map.as_ref().expect("map is open").drain_events()? {
-            self.target_mut().session_mut().request_frame(false)?;
-        }
-        Ok(())
-    }
-
     fn show_frame_results(&mut self) -> Result<(), Box<dyn Error>> {
         let target = self.target.as_mut().expect("render target is open");
         let results = target.session_mut().drain_results()?;
@@ -179,12 +170,11 @@ impl App {
             return Ok(());
         }
         if results.target_not_ready || (results.rendered && !presented) {
-            // Neither a target that was not ready nor a frame that missed the
-            // window causes a map-update event, so the retry waits about one
-            // display refresh. It forces the frame, because a frame that
-            // missed the window consumed its update.
+            // A target that was not ready or a frame that missed the window
+            // retries after about one display refresh. The retry forces the
+            // frame, because a frame that missed the window consumed its update.
             self.retry_at = Some(Instant::now() + FRAME_RETRY);
-        } else if results.needs_repaint {
+        } else if results.rendered {
             target.session_mut().request_frame(false)?;
         }
         Ok(())

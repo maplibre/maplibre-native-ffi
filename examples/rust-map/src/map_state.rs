@@ -6,12 +6,11 @@ use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase,
-    LatLng, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeEventType, RuntimeHandle,
-    RuntimeOptions, ScreenPoint,
+    LatLng, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeHandle, RuntimeOptions,
+    ScreenPoint,
 };
 
 use crate::render_target::extent;
-use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
@@ -24,12 +23,10 @@ pub struct MapState {
 }
 
 impl MapState {
-    /// Creates the runtime, whose event wake posts runtime-event drains to the
-    /// event loop, and the map.
-    pub fn new(viewport: Viewport, wakes: &Wakes) -> Result<Self, Box<dyn Error>> {
+    /// Creates the runtime and map.
+    pub fn new(viewport: Viewport) -> Result<Self, Box<dyn Error>> {
         let runtime_options = RuntimeOptions {
             cache_path: Some(":memory:".into()),
-            event_wake: wakes.wake(AppEvent::RuntimeEvents),
             ..Default::default()
         };
         let runtime = maplibre_native_ffi::runtime_create(&runtime_options)
@@ -38,6 +35,7 @@ impl MapState {
         let map_options = MapOptions {
             initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
+            event_mask: RuntimeEventMask::empty(),
             ..MapOptions::default()
         };
         let map = match runtime.create_map(&map_options).and_then(|future| {
@@ -159,18 +157,6 @@ impl MapState {
         Ok(())
     }
 
-    /// Drains every queued runtime event and reports whether the map published
-    /// a render update.
-    pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
-        let source = self.map.id();
-        let Some(batch) = self.runtime.drain_events()? else {
-            return Ok(false);
-        };
-        Ok(batch.get()?.events.iter().any(|event| {
-            event.source == source && event.r#type == RuntimeEventType::MapRenderUpdateAvailable
-        }))
-    }
-
     pub fn close(self) -> Result<(), Box<dyn Error>> {
         let Self { map, runtime, .. } = self;
         let mut first_error = None;
@@ -187,10 +173,6 @@ impl MapState {
     }
 
     fn configure(&mut self) -> Result<(), Box<dyn Error>> {
-        // The render loop re-arms from the frame result's repaint flag, so the
-        // map only has to report updates that arrive between frames.
-        self.map
-            .set_event_mask(RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE)?;
         if crate::smoke_test() {
             self.map.set_style_json(SMOKE_STYLE_JSON.as_bytes())?;
         } else {

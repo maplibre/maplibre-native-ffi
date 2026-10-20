@@ -40,21 +40,21 @@ final class MapState {
   /// Reports a command that failed after native code accepted it.
   var onFailure: (@MainActor (Error) -> Void)?
 
-  /// Creates the map. `eventWake` reports queued runtime events.
-  init(viewport: Viewport, eventWake: Wake) async throws {
+  /// Creates the map.
+  init(viewport: Viewport) async throws {
     precondition(
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
     )
     let runtime = try Maplibre.runtimeCreate(
-      options: RuntimeOptions(cachePath: ":memory:", eventWake: eventWake)
+      options: RuntimeOptions(cachePath: ":memory:")
     )
     let map: MapHandle
     do {
       map = try await runtime.createMap(options: MapOptions(
         initialExtent: viewport.extent,
         mapMode: .continuous,
-        eventMask: [.mapRenderUpdateAvailable]
+        eventMask: []
       ))
     } catch {
       try? await runtime.close()
@@ -80,17 +80,6 @@ final class MapState {
     // app tears down state that the callbacks use.
     try await map.close()
     try await runtime.close()
-  }
-
-  /// Drains every queued runtime event and reports whether the map published
-  /// a render update.
-  func drainEvents() throws -> Bool {
-    guard !isClosed, let batch = try runtime.drainEvents() else { return false }
-    defer { try? batch.close() }
-    return try batch.get().events.contains {
-      $0.sourceType == .map && $0.source == map.id &&
-        $0.type == .mapRenderUpdateAvailable
-    }
   }
 
   func setGestureInProgress(_ inProgress: Bool) {

@@ -2,7 +2,6 @@ const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 const diagnostics = @import("diagnostics.zig");
-const events = @import("events.zig");
 const render_target = @import("render_target.zig");
 const types = @import("types.zig");
 
@@ -14,12 +13,11 @@ pub const MapState = struct {
     runtime: maplibre.Runtime,
     map: maplibre.Map,
 
-    /// Creates the runtime, whose event wake posts `runtime_events` app
-    /// events, and the map. A smoke run loads an inline style instead of
-    /// fetching one, so it needs no network.
+    /// Creates the runtime and map. A smoke run loads an inline style, so it
+    /// needs no network.
     pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, smoke: bool) !MapState {
         var diagnostic: maplibre.Diagnostic = .{};
-        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = events.wake(.runtime_events) }, &diagnostic) catch |err| {
+        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic) catch |err| {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
@@ -30,14 +28,10 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| {};
 
-        // Selecting the event mask at creation puts it ahead of the style
-        // load, so the map queues render updates from the first tile response.
-        // The render loop re-arms from the frame result's repaint flag, so the
-        // map only has to report updates that arrive between frames.
         var map_future = maplibre.runtimeCreateMap(allocator, runtime, .{
             .initial_extent = render_target.extent(viewport),
             .map_mode = .continuous,
-            .event_mask = .{ .map_render_update_available = true },
+            .event_mask = .{},
         }, &diagnostic) catch |err| {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
@@ -140,20 +134,6 @@ pub const MapState = struct {
     /// from it rather than fighting it.
     pub fn cancelTransitions(self: *MapState) !void {
         try self.cameraMutation(maplibre.mapCancelTransitions(self.map, &self.diagnostic));
-    }
-
-    /// Drains every queued runtime event and reports whether the map published
-    /// a render update.
-    pub fn drainEvents(self: *MapState) !bool {
-        var batch = try maplibre.runtimeDrainEvents(self.runtime, null) orelse return false;
-        defer batch.deinit();
-        var queued = try maplibre.eventBatchGet(self.allocator, batch, null);
-        defer queued.deinit();
-        for (queued.value.events) |event| {
-            if (event.source_type != .map or event.source != self.map.raw) continue;
-            if (event.type == .map_render_update_available) return true;
-        }
-        return false;
     }
 
     fn cameraMutation(self: *MapState, result: anytype) !void {

@@ -48,7 +48,8 @@ private constructor(
   /** Demands a frame. A forced frame renders and presents even when the map has no newer update. */
   fun requestFrame(force: Boolean) {
     val flags =
-      if (force) FrameDemandFlag.PRESENT else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.PRESENT
+      if (force) FrameDemandFlag.PRESENT
+      else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.WAIT_FOR_UPDATE or FrameDemandFlag.PRESENT
     session.requestFrame(FrameDemand(flags = flags, token = ++nextToken))
   }
 
@@ -61,14 +62,13 @@ private constructor(
    * What one frame-result drain saw. A target that was not ready does not cause a map-update event,
    * so the view retries on its next frame.
    */
-  data class Drained(val rendered: Boolean, val needsRepaint: Boolean, val targetNotReady: Boolean)
+  data class Drained(val rendered: Boolean, val targetNotReady: Boolean)
 
   /** Drains every frame result. */
   fun drainFrameResults(): Drained {
-    val batch = session.drainFrameResults() ?: return Drained(false, false, false)
+    val batch = session.drainFrameResults() ?: return Drained(false, false)
     return batch.use { results ->
       var rendered = false
-      var needsRepaint = false
       var targetNotReady = false
       for (result in results.get().results) {
         when (result.disposition) {
@@ -76,9 +76,8 @@ private constructor(
           RenderResult.TARGET_NOT_READY -> targetNotReady = true
           else -> continue
         }
-        needsRepaint = needsRepaint || result.needsRepaint
       }
-      Drained(rendered, needsRepaint, targetNotReady)
+      Drained(rendered, targetNotReady)
     }
   }
 

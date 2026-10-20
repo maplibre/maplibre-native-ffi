@@ -203,7 +203,9 @@ internal abstract class RenderTarget : IDisposable
     /// <summary>Demands a frame. A forced frame renders even when the map has no newer update.</summary>
     public void RequestFrame(bool force = false)
     {
-        FrameDemandFlag flags = force ? 0 : FrameDemandFlag.IfNeeded;
+        FrameDemandFlag flags = force
+            ? 0
+            : FrameDemandFlag.IfNeeded | FrameDemandFlag.WaitForUpdate;
         if (Presents)
         {
             flags |= FrameDemandFlag.Present;
@@ -290,7 +292,6 @@ internal abstract class RenderTarget : IDisposable
 
         var rendered = false;
         var retry = false;
-        var repaint = false;
         using (results)
         {
             foreach (var result in results.Get().Results)
@@ -299,7 +300,6 @@ internal abstract class RenderTarget : IDisposable
                 {
                     case RenderResult.Rendered:
                         rendered = true;
-                        repaint |= result.NeedsRepaint;
                         break;
                     case RenderResult.TargetNotReady:
                         retry = true;
@@ -315,7 +315,7 @@ internal abstract class RenderTarget : IDisposable
             RetryAt =
                 Stopwatch.GetTimestamp() + Stopwatch.Frequency * RetryDelayMilliseconds / 1000;
         }
-        else if (repaint)
+        else if (rendered)
         {
             RequestFrame();
         }

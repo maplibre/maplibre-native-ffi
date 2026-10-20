@@ -11,20 +11,17 @@ import (
 type runtimeMapState struct {
 	runtime *maplibre.RuntimeHandle
 	mapRef  *maplibre.MapHandle
-	mapID   uint64
 }
 
 // smokeStyle is the style a smoke run renders, so it reaches no network.
 const smokeStyle = `{"version":8,"sources":{},"layers":[` +
 	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
 
-// newRuntimeMapState creates the runtime and its map. The runtime raises
-// eventWake when it has events to drain.
-func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runtimeMapState, error) {
+// newRuntimeMapState creates the runtime and its map.
+func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	runtimeOptions := maplibre.DefaultRuntimeOptions()
 	cachePath := ":memory:"
 	runtimeOptions.CachePath = &cachePath
-	runtimeOptions.EventWake = eventWake
 	runtimeHandle, err := maplibre.RuntimeCreate(runtimeOptions)
 	if err != nil {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
@@ -32,9 +29,7 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.DefaultMapOptions()
 	mapOptions.InitialExtent = v.extent()
-	// A map update becomes a frame demand; the frame result's repaint flag
-	// covers updates that a rendering frame asks for.
-	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
+	mapOptions.EventMask = 0
 	mapFuture, err := runtimeHandle.CreateMap(mapOptions)
 	if err != nil {
 		_ = state.Close()
@@ -46,7 +41,6 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
 	state.mapRef = mapHandle
-	state.mapID = mapHandle.Id()
 	if smoke {
 		_, err = mapHandle.SetStyleJson([]byte(smokeStyle))
 	} else {
@@ -158,30 +152,4 @@ func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.
 
 func animationOptions(durationMS *float64) maplibre.AnimationOptions {
 	return maplibre.AnimationOptions{DurationMs: durationMS}
-}
-
-// drainRenderUpdates drains every runtime event, and reports whether the map
-// published an update to render.
-func (state *runtimeMapState) drainRenderUpdates() (bool, error) {
-	batch, err := state.runtime.DrainEvents()
-	if err != nil {
-		return false, fmt.Errorf("runtime event drain failed: %w", err)
-	}
-	if batch == nil {
-		return false, nil
-	}
-	defer batch.Close()
-	events, err := batch.Get()
-	if err != nil {
-		return false, err
-	}
-	for _, event := range events.Events {
-		if event.SourceType != maplibre.RuntimeEventSourceTypeMap || event.Source != state.mapID {
-			continue
-		}
-		if event.Type == maplibre.RuntimeEventTypeMapRenderUpdateAvailable {
-			return true, nil
-		}
-	}
-	return false, nil
 }
