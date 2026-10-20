@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -91,23 +90,14 @@ public sealed class LeakReportTests
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
     }
 
-    // The creation's completion roots its result until native releases it, so the map can be
-    // collected only after that release. This collection runs alone, so the release is the
-    // creation's.
+    // The creation's completion roots its result until native releases it on the runtime
+    // worker. An ordered query on the map runs after that release.
+    [MethodImpl(MethodImplOptions.NoInlining)]
     private static MapHandle CreateMapReleased(RuntimeHandle runtime)
     {
-        using var released = new SemaphoreSlim(0);
-        NativeCompletion.ReleasedForTesting = () => released.Release();
-        try
-        {
-            var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
-            TestWaits.Wait(released, Stopwatch.StartNew(), "the creation's completion release");
-            return map;
-        }
-        finally
-        {
-            NativeCompletion.ReleasedForTesting = null;
-        }
+        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        map.GetStyleUrlAsync(TestWaits.Token).GetAwaiter().GetResult();
+        return map;
     }
 
     private static int Occurrences(string text, string value)

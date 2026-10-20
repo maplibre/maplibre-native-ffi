@@ -104,8 +104,8 @@ void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
 
 // Applies an inline style and waits for the map to finish loading it, so a test
-// that needs a loaded style depends on neither the network nor a fixed barrier
-// count. Fails the test when the style never loads.
+// that needs a loaded style does not depend on the network. Fails the test when
+// the style never loads.
 void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json);
 
 // Destroys everything this thread still has tracked, render session first, then

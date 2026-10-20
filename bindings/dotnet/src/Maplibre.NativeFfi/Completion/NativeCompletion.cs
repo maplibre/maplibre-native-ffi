@@ -21,12 +21,6 @@ internal unsafe delegate T CompletionConverter<T>(mln_completion_result* result)
 
 internal static unsafe class NativeCompletion
 {
-    /// <summary>
-    /// Runs after native code releases a completion's state, for a test that
-    /// waits until the state no longer roots its result.
-    /// </summary>
-    internal static Action? ReleasedForTesting;
-
     internal static T Value<T>(mln_completion_result* result)
         where T : unmanaged
     {
@@ -146,7 +140,6 @@ internal static unsafe class NativeCompletion
     private static void Release(void* userData)
     {
         GCHandle.FromIntPtr((nint)userData).Free();
-        ReleasedForTesting?.Invoke();
     }
 
     private abstract class StateBase

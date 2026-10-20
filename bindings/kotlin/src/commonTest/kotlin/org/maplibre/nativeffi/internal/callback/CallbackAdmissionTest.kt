@@ -11,7 +11,7 @@ class CallbackAdmissionTest {
     CallbackAdmission.scope(owner = 1L, allowed = setOf("complete", "release")).use {
       CallbackAdmission.check(1L, "complete")
       assertFailsWith<InvalidStateException> { CallbackAdmission.check(2L, "complete") }
-      assertFailsWith<InvalidStateException> { CallbackAdmission.check(1L, "barrier") }
+      assertFailsWith<InvalidStateException> { CallbackAdmission.check(1L, "resize") }
 
       CallbackAdmission.scope(owner = 1L, allowed = setOf("release")).use {
         CallbackAdmission.check(1L, "release")
@@ -21,6 +21,6 @@ class CallbackAdmissionTest {
       CallbackAdmission.check(1L, "complete")
     }
     // Outside every scope, any call is admitted.
-    CallbackAdmission.check(2L, "barrier")
+    CallbackAdmission.check(2L, "resize")
   }
 }
