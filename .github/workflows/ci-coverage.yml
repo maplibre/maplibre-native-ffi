@@ -18,13 +18,13 @@ concurrency:
   cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 jobs:
   plan:
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     if: github.event.pull_request.state != 'closed'
     outputs:
       jobs: ${{ steps.plan.outputs.jobs }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -36,11 +36,11 @@ jobs:
         run: bash .mise/tasks/ci/plan
   hygiene:
     name: hygiene
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -66,11 +66,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'hygiene')
   docs:
     name: docs
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
           fetch-tags: true
@@ -88,11 +88,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'docs')
   target-linux-gnu-x64-egl:
     name: target / linux-gnu-x64-egl
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -174,11 +174,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-x64-egl')
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -262,11 +262,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-x64-vulkan')
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -348,11 +348,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-arm64-egl')
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -430,11 +430,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-arm64-vulkan')
   target-linux-musl-x64-egl:
     name: target / linux-musl-x64-egl
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -468,11 +468,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-x64-egl')
   target-linux-musl-x64-vulkan:
     name: target / linux-musl-x64-vulkan
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -506,11 +506,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-x64-vulkan')
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -544,11 +544,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-arm64-egl')
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -582,11 +582,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-arm64-vulkan')
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -596,7 +596,6 @@ jobs:
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: emscripten-wasm32-webgl
           gradle: false
-          save-toolchains: true
       - run: mise run test emscripten-wasm32-webgl
       - name: Archive native artifact
         run: mise run archive-native emscripten-wasm32-webgl
@@ -617,11 +616,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-emscripten-wasm32-webgl')
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -651,11 +650,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-emscripten-wasm32-webgpu')
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -733,11 +732,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-metal')
   target-macos-arm64-vulkan:
     name: target / macos-arm64-vulkan
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -811,11 +810,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-vulkan')
   target-macos-arm64-egl:
     name: target / macos-arm64-egl
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -886,11 +885,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-egl')
   target-ios-arm64-metal:
     name: target / ios-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -928,11 +927,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-arm64-metal')
   target-ios-simulator-arm64-metal:
     name: target / ios-simulator-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -970,11 +969,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-simulator-arm64-metal')
   target-ios-maccatalyst-arm64-metal:
     name: target / ios-maccatalyst-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1004,11 +1003,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-maccatalyst-arm64-metal')
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1040,11 +1039,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-tvos-arm64-metal')
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1076,11 +1075,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-tvos-simulator-arm64-metal')
   target-android-arm-egl:
     name: target / android-arm-egl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1127,11 +1126,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm-egl')
   target-android-arm-vulkan:
     name: target / android-arm-vulkan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1178,11 +1177,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm-vulkan')
   target-android-arm64-egl:
     name: target / android-arm64-egl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1229,11 +1228,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm64-egl')
   target-android-arm64-vulkan:
     name: target / android-arm64-vulkan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1280,11 +1279,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm64-vulkan')
   target-android-x64-egl:
     name: target / android-x64-egl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1334,11 +1333,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-x64-egl')
   target-android-x64-vulkan:
     name: target / android-x64-vulkan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1388,11 +1387,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-x64-vulkan')
   target-ohos-arm64-egl:
     name: target / ohos-arm64-egl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1425,11 +1424,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-arm64-egl')
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1462,11 +1461,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-arm64-vulkan')
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1499,11 +1498,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-x64-egl')
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1790,7 +1789,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-arm64-vulkan')
   android-multi:
     name: Android multi-ABI packaging
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     needs:
@@ -1802,7 +1801,7 @@ jobs:
       - target-android-x64-egl
       - target-android-x64-vulkan
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1820,7 +1819,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'android-multi')
   apple-xcframework:
     name: Apple XCFramework
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     needs:
@@ -1832,7 +1831,7 @@ jobs:
       - target-tvos-arm64-metal
       - target-tvos-simulator-arm64-metal
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1894,7 +1893,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'kotlin-maven')
   required:
     name: ci-required
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     if: always() && github.event.pull_request.state != 'closed'
     needs:

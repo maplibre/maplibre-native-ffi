@@ -2,11 +2,12 @@ include_guard(GLOBAL)
 
 function(mln_ffi_configure_apple_toolchain_defaults)
   # MapLibre Native defaults and enforces the macOS floor itself, but it leaves
-  # iOS and tvOS to the caller. Default both to its iOS floor before the Apple
-  # toolchain derives compiler targets from this value.
+  # iOS and tvOS to the caller. Default both to 15.0, the first release with
+  # Metal Shading Language 2.4, before the Apple toolchain derives compiler
+  # targets from this value.
   if(NOT CMAKE_OSX_DEPLOYMENT_TARGET
      AND CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.5"
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0"
         CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
   endif()
 endfunction()
@@ -174,6 +175,17 @@ function(mln_ffi_configure_platform target)
   target_link_libraries(
     ${target}
     PRIVATE mbgl-vendor-icu mbgl-vendor-metal-cpp MLN_FFI::PlatformDependencies)
+
+  # MapLibre Native warnings don't fail the build, but a call to an Apple API
+  # newer than the deployment target must: it would fail at run time on the
+  # oldest supported OS. This covers MapLibre Native's core and the platform
+  # sources that this target compiles.
+  set(MLN_FFI_APPLE_AVAILABILITY_ERROR
+      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-Werror=unguarded-availability-new>)
+  target_compile_options(
+    mbgl-compiler-options
+    INTERFACE ${MLN_FFI_APPLE_AVAILABILITY_ERROR})
+  target_compile_options(${target} PRIVATE ${MLN_FFI_APPLE_AVAILABILITY_ERROR})
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(

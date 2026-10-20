@@ -55,6 +55,19 @@ Platform support is still filling in -- see the
 [Overview](https://maplibre.org/maplibre-native-ffi/#status) page for full
 platform status.
 
+## Sponsors
+
+CI is provided by [Blacksmith](https://www.blacksmith.sh/) under its open source
+program.
+
+<a href="https://www.blacksmith.sh/">
+  <img
+    alt="CI powered by Blacksmith"
+    src="https://github.com/user-attachments/assets/7d8455df-0b86-4676-9df8-fefe1f69ae4b"
+    width="240"
+  >
+</a>
+
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).

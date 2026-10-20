@@ -92,9 +92,9 @@ let package = Package(
   name: "maplibre-native-ffi",
   platforms: [
     .macOS("14.3"),
-    .iOS("15.5"),
-    .macCatalyst("15.5"),
-    .tvOS("15.5"),
+    .iOS("15.0"),
+    .macCatalyst("15.0"),
+    .tvOS("15.0"),
   ],
   products: products,
   dependencies: [

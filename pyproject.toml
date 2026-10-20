@@ -11,4 +11,4 @@ package = false
 members = ["bindings/python"]
 
 [dependency-groups]
-dev = ["ruamel-yaml==0.19.1", "ruff==0.17.0", "ty==0.0.86"]
+dev = ["ruamel-yaml==0.19.1", "ruff==0.17.1", "ty==0.0.89"]
