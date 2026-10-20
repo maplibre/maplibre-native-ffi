@@ -3776,9 +3776,20 @@ auto make_ordered_resize_work(
           next = Next::Detaching;
         } else if (continuous) {
           const auto update = map_latest_update(*session->map_object);
+          // The map transaction stores its render update before publishing
+          // its snapshot. Wait for both before completing the resize; the
+          // update notice follows snapshot publication and resumes this work.
+          const auto published_extent = [&] {
+            const auto lock =
+              std::scoped_lock{session->map_object->snapshot_mutex};
+            return session->map_object->snapshot.logical_extent;
+          }();
           if (
-            !update || update->transformState.getSize() !=
-                         mln::Size{extent.width, extent.height}
+            !update ||
+            update->transformState.getSize() !=
+              mln::Size{extent.width, extent.height} ||
+            published_extent.width != extent.width ||
+            published_extent.height != extent.height
           ) {
             session->waiting_update_work.push_back(
               make_ordered_resize_work(session, operation, extent, ticket)
