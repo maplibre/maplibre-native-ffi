@@ -221,7 +221,10 @@ void barrier_admission_failure_retires_its_sequence() {
   auto failures_with_pending = unsigned{0};
   for (auto index = std::size_t{0}; index != 12; ++index) {
 #if defined(_WIN32)
-    std::fprintf(stderr, "barrier fault index=%zu begin\n", index);
+    std::fprintf(
+      stderr, "barrier fault index=%zu begin thread=%lu\n", index,
+      GetCurrentThreadId()
+    );
     std::fflush(stderr);
 #endif
     const auto runtime = create_runtime();

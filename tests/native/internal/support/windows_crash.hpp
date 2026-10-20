@@ -12,6 +12,29 @@
 
 namespace mln::native_tests {
 
+inline void print_symbol(const char* label, DWORD64 address) {
+  alignas(SYMBOL_INFO) char storage[sizeof(SYMBOL_INFO) + MAX_SYM_NAME]{};
+  auto* symbol = reinterpret_cast<SYMBOL_INFO*>(storage);
+  symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+  symbol->MaxNameLen = MAX_SYM_NAME;
+  auto displacement = DWORD64{0};
+  std::fprintf(
+    stderr, "%s 0x%llx", label, static_cast<unsigned long long>(address)
+  );
+  if (SymFromAddr(GetCurrentProcess(), address, &displacement, symbol))
+    std::fprintf(
+      stderr, " %s+0x%llx", symbol->Name,
+      static_cast<unsigned long long>(displacement)
+    );
+  auto line = IMAGEHLP_LINE64{};
+  line.SizeOfStruct = sizeof(line);
+  auto line_offset = DWORD{0};
+  if (SymGetLineFromAddr64(GetCurrentProcess(), address, &line_offset, &line))
+    std::fprintf(stderr, " %s:%lu", line.FileName, line.LineNumber);
+  std::fprintf(stderr, "\n");
+  std::fflush(stderr);
+}
+
 inline LONG CALLBACK report_access_violation(EXCEPTION_POINTERS* exception) {
   if (exception->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION)
     return EXCEPTION_CONTINUE_SEARCH;
@@ -30,6 +53,17 @@ inline LONG CALLBACK report_access_violation(EXCEPTION_POINTERS* exception) {
     );
   std::fprintf(stderr, "\n");
   std::fflush(stderr);
+  if (record.NumberParameters >= 2)
+    print_symbol("data", static_cast<DWORD64>(record.ExceptionInformation[1]));
+  // The handler runs on the faulting thread's stack, so a backtrace from here
+  // passes through the frames that faulted.
+  void* frames[62]{};
+  const auto captured = RtlCaptureStackBackTrace(0, 62, frames, nullptr);
+  for (USHORT index = 0; index != captured; ++index) {
+    char label[16]{};
+    std::snprintf(label, sizeof(label), "bt%u", static_cast<unsigned>(index));
+    print_symbol(label, reinterpret_cast<DWORD64>(frames[index]));
+  }
   auto context = *exception->ContextRecord;
   auto frame = STACKFRAME64{};
 #if defined(_M_ARM64) || defined(__aarch64__)
