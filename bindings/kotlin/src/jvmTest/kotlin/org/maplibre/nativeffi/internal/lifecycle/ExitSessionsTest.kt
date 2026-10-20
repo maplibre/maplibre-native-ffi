@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
 import org.maplibre.nativeffi.render.withOwnedTexture
 import org.maplibre.nativeffi.runSuspendTest
@@ -18,11 +17,10 @@ class ExitSessionsTest {
       session
     }
     withOwnedTexture {
-      sessions.enroll(session)
-      // A fresh report stands in for a session that its host destroys after abandonAll takes its
+      sessions.enroll(session.binding)
+      // A fresh state stands in for a session that its host destroys after abandonAll takes its
       // snapshot, so abandonAll passes the destroyed handle to native.
-      val handle = destroyed.binding.issued()
-      sessions.enroll(handle, HandleStateCore.LeakReport("RenderSessionHandle", handle))
+      sessions.enroll(HandleState("RenderSessionHandle", destroyed.binding.handle) {})
       sessions.abandonAll()
       assertEquals(RenderSessionState.ABANDONED, session.getSnapshot().state)
     }
@@ -33,11 +31,8 @@ class ExitSessionsTest {
     val sessions = ExitSessions()
     sessions.abandonAll()
     withOwnedTexture {
-      sessions.enroll(session)
+      sessions.enroll(session.binding)
       assertEquals(RenderSessionState.ABANDONED, session.getSnapshot().state)
     }
   }
-
-  private fun ExitSessions.enroll(session: RenderSessionHandle) =
-    enroll(session.binding.issued(), session.binding.leakReport)
 }

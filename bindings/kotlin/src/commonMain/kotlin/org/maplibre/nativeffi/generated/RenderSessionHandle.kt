@@ -12,21 +12,20 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 public class RenderSessionHandle
 internal constructor(
   handle: Long,
-  parent: MapHandle,
-  dispose: (Long) -> Unit = GeneratedOwnerDisposal::renderSession,
+  @Suppress("unused") private val parent: MapHandle,
 ) : GeneratedRenderSessionOperations(), AutoCloseable {
   internal override val binding =
-    HandleStateCore("RenderSessionHandle", handle, parent, dispose = dispose)
-  @Suppress("unused") private val cleanup = trackLeak(this, binding.leakReport)
-  public val isClosed: Boolean
-    get() = binding.isReleased()
-
+    HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)
+  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after
    * close, so events drained later still match this handle.
    */
   public val id: ULong
-    get() = binding.issued().toULong()
+    get() = binding.handle.toULong()
+
+  public val isClosed: Boolean
+    get() = binding.isReleased
 
   public override fun close() {
     release()

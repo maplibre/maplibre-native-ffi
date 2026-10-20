@@ -12,19 +12,19 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 public class MapProjectionHandle
 internal constructor(
   handle: Long,
-  dispose: (Long) -> Unit = GeneratedOwnerDisposal::mapProjection,
 ) : GeneratedMapProjectionOperations(), AutoCloseable {
-  internal override val binding = HandleStateCore("MapProjectionHandle", handle, dispose = dispose)
-  @Suppress("unused") private val cleanup = trackLeak(this, binding.leakReport)
-  public val isClosed: Boolean
-    get() = binding.isReleased()
-
+  internal override val binding =
+    HandleState("MapProjectionHandle", handle, GeneratedOwnerDisposal::mapProjection)
+  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after
    * close, so events drained later still match this handle.
    */
   public val id: ULong
-    get() = binding.issued().toULong()
+    get() = binding.handle.toULong()
+
+  public val isClosed: Boolean
+    get() = binding.isReleased
 
   public override fun close() {
     release()

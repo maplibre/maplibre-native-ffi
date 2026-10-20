@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedGeojsonSourceDataOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
 
   /**
    * Releases prepared GeoJSON source data.
@@ -16,7 +16,5 @@ public abstract class GeneratedGeojsonSourceDataOperations internal constructor(
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun release(): Unit =
-    nativeClose(this, binding, "mln_geojson_source_data_release") {
-      C.mln_geojson_source_data_release(handle)
-    }
+    nativeClose(this, binding) { C.mln_geojson_source_data_release(handle) }
 }

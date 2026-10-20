@@ -1,12 +1,7 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-internal actual fun trackLeak(owner: Any, report: HandleStateCore.LeakReport): Any {
-  HandleLeakCleaner.register(owner, report)
-  return Unit
-}
-
-internal actual fun closeWhenUnreachable(owner: Any, core: DecisionOwnerCore): Any {
-  UnreachableActions.register(owner, Runnable { core.close() })
+internal actual fun disposeWhenUnreachable(owner: Any, state: HandleState): Any {
+  HandleLeakCleaner.register(owner, state)
   return Unit
 }
 
@@ -14,14 +9,8 @@ internal actual fun closeWhenUnreachable(owner: Any, core: DecisionOwnerCore): A
 internal object HandleLeakCleaner {
   private val leakReportActions = UnreachableActions.isolated("maplibre-leak-reports")
 
-  /** Runs native disposal when [handle] becomes unreachable before explicit release. */
-  fun register(handle: Any, leakReport: HandleStateCore.LeakReport) {
-    leakReportActions.register(handle, LeakReportAction(leakReport))
-  }
-
-  private class LeakReportAction(private val leakReport: HandleStateCore.LeakReport) : Runnable {
-    override fun run() {
-      leakReport.report()
-    }
+  /** Disposes and reports [state]'s handle when [owner] becomes unreachable unreleased. */
+  fun register(owner: Any, state: HandleState) {
+    leakReportActions.register(owner, Runnable { state.disposeLeaked() })
   }
 }

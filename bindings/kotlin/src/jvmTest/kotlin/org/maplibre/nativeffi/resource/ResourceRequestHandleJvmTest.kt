@@ -22,7 +22,7 @@ class ResourceRequestHandleJvmTest {
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       // Only the request's own cancel callback references it once the provider returns.
       handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
-      claimed.complete(handle.binding.issued() to TestWeakReference(handle))
+      claimed.complete(handle.binding.handle to TestWeakReference(handle))
       ResourceProviderDecision.HANDLE
     }
     withMap(provider = provider) {

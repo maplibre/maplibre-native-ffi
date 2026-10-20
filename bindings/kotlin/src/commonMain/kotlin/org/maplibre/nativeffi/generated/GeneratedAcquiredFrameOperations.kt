@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedAcquiredFrameOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
 
   /**
    * Consumes an acquired frame and quarantines its slot of the texture ring.
@@ -16,9 +16,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun dispose(): Unit =
-    nativeClose(this, binding, "mln_acquired_frame_dispose") {
-      check(C.mln_acquired_frame_dispose(handle, diagnostic))
-    }
+    nativeClose(this, binding) { check(C.mln_acquired_frame_dispose(handle, diagnostic)) }
 
   /**
    * Copies Metal-native metadata from an acquired frame.
@@ -27,7 +25,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun <T> withMetalTexture(block: (MetalTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_metal_texture", Access.READ) {
+    nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
@@ -45,7 +43,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun <T> withOpenglTexture(block: (OpenglTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture", Access.READ) {
+    nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
@@ -63,7 +61,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun <T> withProducerSync(block: (GpuSync) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_producer_sync", Access.READ) {
+    nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
@@ -81,7 +79,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun getResult(): RenderFrameResult =
-    nativeCall(this, binding, "mln_acquired_frame_get_result") {
+    nativeCall(this, binding) {
       val out = sized(48, 8)
       check(C.mln_acquired_frame_get_result(handle, out, diagnostic))
       readRenderFrameResult(out)
@@ -94,7 +92,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun <T> withVulkanTexture(block: (VulkanTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture", Access.READ) {
+    nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
@@ -112,7 +110,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun <T> withWebgpuTexture(block: (WebgpuTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture", Access.READ) {
+    nativeCall(this, binding) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
@@ -130,7 +128,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun release(consumerCompletion: GpuSync = GeneratedApi.gpuSyncDefault()): Unit =
-    nativeClose(this, binding, "mln_acquired_frame_release") {
+    nativeClose(this, binding) {
       check(C.mln_acquired_frame_release(handle, writeGpuSync(consumerCompletion), diagnostic))
     }
 }

@@ -373,7 +373,7 @@ class Values:
                                 f"  public operator fun contains(other: {public}): Boolean = (rawValue and other.rawValue) == other.rawValue",
                             ]
                             if value.enum_kind == "bitmask"
-                            else []
+                            else [enum_label(public, value, prefix, scalar)]
                         ),
                         "  public companion object {",
                         *constants,
@@ -753,7 +753,7 @@ class Values:
                 + " }"
             )
         lines.append(
-            f'    is {public}.Unknown -> throw Status.invalidArgument("unknown native union variants cannot be submitted")'
+            f'    is {public}.Unknown -> throw invalidArgument("unknown native union variants cannot be submitted")'
         )
         lines.append("  }")
         return lines
@@ -997,7 +997,7 @@ class Values:
             "import org.maplibre.nativeffi.internal.c.C\n"
             "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
             "import org.maplibre.nativeffi.internal.call.NativeCall\n"
-            "import org.maplibre.nativeffi.internal.status.Status\n"
+            "import org.maplibre.nativeffi.internal.status.invalidArgument\n"
             "import org.maplibre.nativeffi.render.NativePointer\n"
             + (
                 "import org.maplibre.nativeffi.internal.lifecycle.ViewScope\n"
@@ -1008,6 +1008,17 @@ class Values:
             + "\n\n".join(functions)
             + "\n"
         )
+
+
+def enum_label(public, value, prefix, scalar):
+    """A `toString` that names an open enum's constant and keeps an unknown value's number."""
+    labels = {}
+    for native, number in value.enum_values:
+        labels.setdefault(number, native.removeprefix(prefix))
+    branches = "; ".join(
+        f'{literal(number, scalar)} -> "{label}"' for number, label in labels.items()
+    )
+    return f'  override fun toString(): String = when (rawValue) {{ {branches}; else -> "{public}($rawValue)" }}'
 
 
 def generated_owners(bound) -> list[str]:

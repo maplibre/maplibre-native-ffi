@@ -3,8 +3,8 @@ package org.maplibre.nativeffi.internal.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.c.UpcallStubs
@@ -39,17 +39,11 @@ internal object CompletionBridge {
     fun complete(result: Long) {
       try {
         val status = readI32(result + CompletionResultLayout.STATUS)
-        if (status == MaplibreStatus.OK.nativeCode || acceptErrorStatus) {
+        if (status == Status.OK.rawValue || acceptErrorStatus) {
           val value = convert(result)
           if (!deferred.complete(value)) closeDropped(value)
         } else {
-          deferred.completeExceptionally(
-            MaplibreException.forStatus(
-              MaplibreStatus.fromNative(status),
-              status,
-              diagnostic(result),
-            ),
-          )
+          deferred.completeExceptionally(MaplibreException(Status(status), diagnostic(result)))
         }
       } catch (failure: Throwable) {
         deferred.completeExceptionally(failure)
@@ -123,7 +117,7 @@ internal object CompletionBridge {
     CommandCompletion(
       CommandDisposition(readU32(result + CompletionResultLayout.DISPOSITION)),
       readU64(result + CompletionResultLayout.GENERATION),
-      MaplibreStatus.fromNative(readI32(result + CompletionResultLayout.STATUS)),
+      Status(readI32(result + CompletionResultLayout.STATUS)),
       diagnostic(result),
     )
 

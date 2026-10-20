@@ -10,14 +10,12 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.TestThread
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.generated.GpuSync
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionState
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
 
 /** The render session shapes over a caller-driven owned texture on the build's backend. */
@@ -75,11 +73,8 @@ class OwnedTextureSessionTest {
         escaped = sync
         val kind = sync.kind
         // The view borrows the frame, so neither the frame nor its session can go away under it.
-        assertInUse(assertFailsWith<InvalidStateException> { frame.release() })
-        assertEquals(
-          MaplibreStatus.BUSY,
-          assertFailsWith<MaplibreException> { session.abandon() }.status,
-        )
+        assertFailsWithStatus(Status.BUSY) { frame.release() }
+        assertFailsWithStatus(Status.BUSY) { session.abandon() }
         // Disposing another frame leaves this view readable until its block ends.
         sibling.dispose()
         assertEquals(kind, sync.kind)
@@ -107,7 +102,7 @@ class OwnedTextureSessionTest {
       }
       try {
         entered.awaitWithin("the borrow to start on the other thread")
-        assertInUse(assertFailsWith<InvalidStateException> { frame.release() })
+        assertFailsWithStatus(Status.BUSY) { frame.release() }
         assertFalse(frame.isClosed)
       } finally {
         leave.complete(Unit)
@@ -126,8 +121,7 @@ class OwnedTextureSessionTest {
       // session's driver-work and frame wakes, while this test runs on another thread.
       renderStill()
 
-      val failure = assertFailsWith<WrongThreadException> { session.serviceDriverWork() }
-      assertEquals(MaplibreStatus.WRONG_THREAD, failure.status)
+      assertFailsWithStatus(Status.WRONG_THREAD) { session.serviceDriverWork() }
     }
   }
 
@@ -135,10 +129,4 @@ class OwnedTextureSessionTest {
     const val RED_BACKGROUND_STYLE =
       """{"version":8,"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":"#ff0000"}}]}"""
   }
-}
-
-/** Checks that the binding refused a close because a borrow still holds the frame. */
-private fun assertInUse(error: InvalidStateException) {
-  assertEquals("AcquiredFrameHandle is in use", error.diagnostic)
-  assertNull(error.nativeStatusCode)
 }

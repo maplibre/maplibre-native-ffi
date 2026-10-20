@@ -4,23 +4,21 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.TestWeakReference
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.smallMapOptions
@@ -36,13 +34,11 @@ class HandleLifecycleTest {
     assertTrue(data.isClosed)
 
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val teardown = runtime.release()
-    // A second release reports the same native teardown instead of starting another.
-    assertSame(teardown, runtime.release())
-    teardown.awaitWithin("the runtime teardown")
-    val failure = assertFailsWith<InvalidStateException> { runtime.clearResourceTransform() }
-    assertEquals("RuntimeHandle is closed", failure.diagnostic)
-    assertNull(failure.nativeStatusCode)
+    runtime.release().awaitWithin("the runtime teardown")
+    assertTrue(runtime.isClosed)
+    // Native refuses a released handle, whether to release it again or to use it.
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.clearResourceTransform() }
   }
 
   @Test
@@ -52,7 +48,7 @@ class HandleLifecycleTest {
 
     // Native refuses to release a runtime with a live map, so the call throws and the handle rolls
     // back to live.
-    assertFailsWith<InvalidStateException> { runtime.release() }
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     assertFalse(runtime.isClosed)
     runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
 

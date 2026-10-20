@@ -3,14 +3,12 @@ package org.maplibre.nativeffi.values
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraTransitionEnd
@@ -27,6 +25,7 @@ import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.RenderedQueryGeometry
 import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
@@ -44,12 +43,7 @@ class GeneratedShapesTest {
   fun submittingAnUnknownUnionVariantUsesTheBindingError() {
     NativeArena().use { arena ->
       val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))
-      val error =
-        assertFailsWith<InvalidArgumentException> {
-          arena.writeRenderedQueryGeometry(geometry)
-        }
-      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
-      assertNull(error.nativeStatusCode)
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) { arena.writeRenderedQueryGeometry(geometry) }
     }
   }
 
@@ -60,8 +54,7 @@ class GeneratedShapesTest {
     }
     withMap {
       // Native rejects an embedded NUL in the URL view before a C-string consumer.
-      val error = assertFailsWith<InvalidArgumentException> { map.setStyleUrl("custom://a\u0000b") }
-      assertNotNull(error.nativeStatusCode)
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) { map.setStyleUrl("custom://a\u0000b") }
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = "a\u0000b")
@@ -143,11 +136,9 @@ class GeneratedShapesTest {
   fun openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits(): Unit = runSuspendTest {
     withMap {
       // The binding passes an unknown enum value through unchanged, and native rejects it.
-      val error =
-        assertFailsWith<InvalidArgumentException> {
-          GeneratedApi.networkSetStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
-        }
-      assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, error.nativeStatusCode)
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
+        GeneratedApi.networkSetStatus(org.maplibre.nativeffi.generated.NetworkStatus(900u))
+      }
 
       // Cancelling the largest identity ends the ease that carries it, so the identity crossed
       // whole both times.

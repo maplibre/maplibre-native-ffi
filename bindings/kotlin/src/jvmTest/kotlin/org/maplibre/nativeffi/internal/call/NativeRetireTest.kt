@@ -5,10 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CameraTransitionEnd
 import org.maplibre.nativeffi.generated.CameraTransitionHandler
 import org.maplibre.nativeffi.generated.CameraTransitionOutcome
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.async.callCompletion
 import org.maplibre.nativeffi.internal.async.callCompletionRelease
 import org.maplibre.nativeffi.internal.c.CompletionLayout
@@ -17,7 +17,7 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope
 import org.maplibre.nativeffi.internal.callback.CallbackRoots
 import org.maplibre.nativeffi.internal.callback.NativeRoots
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.writeI32
@@ -39,7 +39,7 @@ class NativeRetireTest {
       NativeArena().use { arena ->
         val result = arena.allocate(CompletionResultLayout.SIZEOF)
         writeU32(result + CompletionResultLayout.SIZE, CompletionResultLayout.SIZEOF.toUInt())
-        writeI32(result + CompletionResultLayout.STATUS, MaplibreStatus.OK.nativeCode)
+        writeI32(result + CompletionResultLayout.STATUS, Status.OK.rawValue)
         callCompletion(complete, token, result)
       }
       assertRetainedOwner(token)
@@ -65,7 +65,7 @@ class NativeRetireTest {
         }
       }
     var completion: Triple<Long, Long, Long>? = null
-    nativeRetire(owner, HandleStateCore("MapHandle", 1L), "mln_map_release") {
+    nativeRetire(owner, HandleState("MapHandle", 1L) {}) {
       completion =
         Triple(
           readAddress(this.completion + CompletionLayout.CALLBACK),

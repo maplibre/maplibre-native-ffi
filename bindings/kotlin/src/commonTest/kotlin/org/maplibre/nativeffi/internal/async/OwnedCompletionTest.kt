@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.internal.async
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readU64
@@ -36,7 +36,7 @@ class OwnedCompletionTest {
         disposeUnadopted = { disposed += it },
         convert = { throw failure },
       )
-    completion.deliver(MaplibreStatus.OK.nativeCode, 7u)
+    completion.deliver(Status.OK.rawValue, 7u)
     completion.release()
     assertEquals(
       failure.message,
@@ -56,7 +56,7 @@ class OwnedCompletionTest {
         convert = { it.toString() },
       )
     completion.deferred.cancel()
-    completion.deliver(MaplibreStatus.OK.nativeCode, 17u)
+    completion.deliver(Status.OK.rawValue, 17u)
     completion.release()
     assertEquals(2, closed)
     assertEquals(0, disposed)

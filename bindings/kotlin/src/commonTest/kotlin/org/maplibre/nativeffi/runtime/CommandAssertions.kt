@@ -3,8 +3,8 @@ package org.maplibre.nativeffi.runtime
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
+import org.maplibre.nativeffi.generated.Status
 
 /** Awaits one ordered command and asserts that it committed. */
 internal suspend fun Deferred<CommandCompletion>.awaitCommitted(): CommandCompletion {
@@ -15,7 +15,7 @@ internal suspend fun Deferred<CommandCompletion>.awaitCommitted(): CommandComple
 
 /** Awaits one ordered command and asserts that its body rejected the work with [status]. */
 internal suspend fun Deferred<CommandCompletion>.awaitFailed(
-  status: MaplibreStatus,
+  status: Status,
 ): CommandCompletion {
   val completion = await()
   assertEquals(CommandDisposition.FAILED, completion.disposition)
@@ -27,5 +27,5 @@ internal suspend fun Deferred<CommandCompletion>.awaitFailed(
 /** Asserts that an already-awaited command committed. */
 internal fun assertCommitted(completion: CommandCompletion) {
   assertEquals(CommandDisposition.COMMITTED, completion.disposition)
-  assertEquals(MaplibreStatus.OK, completion.status)
+  assertEquals(Status.OK, completion.status)
 }

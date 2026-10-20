@@ -12,26 +12,19 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 public class ResourceRequestHandle
 internal constructor(
   handle: Long,
-  dispose: (Long) -> Unit = GeneratedOwnerDisposal::resourceRequest,
 ) : GeneratedResourceRequestOperations(), AutoCloseable {
   internal override val binding =
-    DecisionOwnerState(
-      "ResourceRequestHandle",
-      handle,
-      accept = 1u,
-      passThrough = 0u,
-      dispose = dispose,
-    )
-  @Suppress("unused") private val cleanup = closeWhenUnreachable(this, binding.core)
-  public val isClosed: Boolean
-    get() = binding.isClosed
-
+    HandleState("ResourceRequestHandle", handle, GeneratedOwnerDisposal::resourceRequest)
+  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after
    * close, so events drained later still match this handle.
    */
   public val id: ULong
-    get() = binding.issued().toULong()
+    get() = binding.handle.toULong()
+
+  public val isClosed: Boolean
+    get() = binding.isReleased
 
   public override fun close() {
     release()

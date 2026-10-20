@@ -47,7 +47,7 @@
 "COMP-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aDiscardedCommandIsFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelCallbackIsRootedUntilNativeReleasesIt"
 "CB-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CallbackLifetimeTest.kt::aCallbackCapturingItsReceiverDoesNotKeepItReachable"
-"CB-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aForbiddenCallInsideACallbackFailsAndAnAllowedOneSucceeds"
+"CB-03" = { na = "The binding has no admission policy of its own: native refuses the calls that a callback must not make, which tests/native covers, and every other call reaches native" }
 "CB-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking"
 "CB-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aClaimedRequestCanBeAnsweredAfterTheProviderReturns"
 "CB-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread"

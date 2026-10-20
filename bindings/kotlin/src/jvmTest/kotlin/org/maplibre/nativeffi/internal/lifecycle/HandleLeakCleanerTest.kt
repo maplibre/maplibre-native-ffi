@@ -22,11 +22,11 @@ class HandleLeakCleanerTest {
     }
   }
 
-  /** Registers a diagnostic that blocks after its handle becomes unreachable. */
+  /** Registers a disposal that blocks after its owner becomes unreachable. */
   private fun registerBlockingLeakReport(started: CountDownLatch, unblock: CountDownLatch) {
     HandleLeakCleaner.register(
       Any(),
-      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L) {
+      HandleState("RuntimeHandle", 0x1234L) {
         started.countDown()
         unblock.await()
       },

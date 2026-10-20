@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public abstract class GeneratedMapOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
@@ -25,7 +25,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_custom_geometry_source", bindingCallbacks) {
+    nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_geometry_source(
           handle,
@@ -47,7 +47,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     options: CustomMvtVectorSourceOptions,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_custom_mvt_vector_source", bindingCallbacks) {
+    nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_mvt_vector_source(
           handle,
@@ -69,7 +69,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     data: GeojsonSourceDataHandle,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_geojson_source_data") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_geojson_source_data(
           handle,
@@ -92,7 +92,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     url: String,
     options: GeojsonSourceOptions? = null,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_geojson_source_url") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_geojson_source_url(
           handle,
@@ -116,7 +116,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_image_source_image") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_image_source_image(
           handle,
@@ -141,7 +141,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     coordinates: List<LatLng>,
     url: String,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_image_source_url") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_image_source_url(
           handle,
@@ -165,7 +165,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     layerJson: ByteArray,
     beforeLayerId: String? = null,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_style_layer_json") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_style_layer_json(
           handle,
@@ -187,7 +187,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     sourceJson: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_add_style_source_json") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_add_style_source_json(
           handle,
@@ -206,7 +206,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_apply_camera_delta", bindingCallbacks) {
+    nativeCommand(this, binding, bindingCallbacks) {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
 
@@ -220,7 +220,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_metal_borrowed_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_metal_borrowed_texture(
@@ -250,7 +250,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_metal_owned_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_metal_owned_texture(
@@ -280,7 +280,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_metal_surface") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_metal_surface(
@@ -310,7 +310,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: OpenglBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_opengl_borrowed_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_opengl_borrowed_texture(
@@ -340,7 +340,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: OpenglOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_opengl_owned_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_opengl_owned_texture(
@@ -370,7 +370,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: OpenglSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_opengl_surface") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_opengl_surface(
@@ -400,7 +400,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_vulkan_borrowed_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_vulkan_borrowed_texture(
@@ -430,7 +430,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_vulkan_owned_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_vulkan_owned_texture(
@@ -460,7 +460,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_vulkan_surface") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_vulkan_surface(
@@ -490,7 +490,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: WebgpuBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_webgpu_borrowed_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_webgpu_borrowed_texture(
@@ -520,7 +520,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: WebgpuOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_webgpu_owned_texture") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_webgpu_owned_texture(
@@ -550,7 +550,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     descriptor: WebgpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_map_attach_webgpu_surface") {
+    nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_map_attach_webgpu_surface(
@@ -577,7 +577,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun beginCommandGroup(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_begin_command_group") {
+    nativeCommand(this, binding) {
       check(C.mln_map_begin_command_group(handle, completion, diagnostic))
     }
 
@@ -591,12 +591,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     geometry: ByteArray,
     fitOptions: CameraFitOptions? = null,
   ): Deferred<CameraOptions> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_camera_for_geometry",
-      { result -> readCameraOptions(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_geometry(
           handle,
@@ -618,12 +613,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions? = null,
   ): Deferred<CameraOptions> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_camera_for_lat_lng_bounds",
-      { result -> readCameraOptions(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_lat_lng_bounds(
           handle,
@@ -645,12 +635,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions? = null,
   ): Deferred<CameraOptions> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_camera_for_lat_lngs",
-      { result -> readCameraOptions(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_lat_lngs(
           handle,
@@ -671,7 +656,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cancelCameraTransition(transitionId: ULong): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_cancel_camera_transition") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic),
       )
@@ -684,7 +669,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cancelTransitions(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_cancel_transitions") {
+    nativeCommand(this, binding) {
       check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
     }
 
@@ -695,7 +680,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun createProjection(): MapProjectionHandle =
-    nativeCall(this, binding, "mln_map_create_projection") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       check(C.mln_map_create_projection(handle, out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
@@ -708,7 +693,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun dispose(): Unit =
-    nativeClose(this, binding, "mln_map_dispose") { check(C.mln_map_dispose(handle, diagnostic)) }
+    nativeClose(this, binding) { check(C.mln_map_dispose(handle, diagnostic)) }
 
   /**
    * Submits an ordered debug-log command.
@@ -717,7 +702,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun dumpDebugLogs(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_dump_debug_logs") {
+    nativeCommand(this, binding) {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
     }
 
@@ -728,7 +713,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun endCommandGroup(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_end_command_group") {
+    nativeCommand(this, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
     }
 
@@ -742,7 +727,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_camera",
       { result -> readCameraQueryResult(CompletionBridge.value(result)) },
     ) {
       check(C.mln_map_get_camera(handle, completion, diagnostic))
@@ -755,12 +739,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_feature_state",
-      { result -> readView(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_get_feature_state(
           handle,
@@ -779,12 +758,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun getGlobalState(): Deferred<ByteArray> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_global_state",
-      { result -> readView(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_global_state(handle, completion, diagnostic))
     }
 
@@ -798,7 +772,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_image_source_coordinates",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -820,12 +793,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun getLoadedStyleJson(): Deferred<ByteArray> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_loaded_style_json",
-      { result -> readView(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic))
     }
 
@@ -836,7 +804,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun getSnapshot(): MapSnapshot =
-    nativeCall(this, binding, "mln_map_get_snapshot") {
+    nativeCall(this, binding) {
       val out = sized(456, 8)
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
@@ -852,7 +820,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_image",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readStyleImageInfo(CompletionBridge.value(result))
@@ -871,7 +838,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_layer",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readStyleLayerInfo(CompletionBridge.value(result))
@@ -890,7 +856,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_layer_json",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readView(CompletionBridge.value(result))
@@ -909,7 +874,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_layer_property",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readView(CompletionBridge.value(result))
@@ -936,7 +900,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_light_property",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readView(CompletionBridge.value(result))
@@ -955,7 +918,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_source",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readStyleSourceInfo(CompletionBridge.value(result))
@@ -974,7 +936,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_transition_options",
       { result -> readStyleTransitionOptions(CompletionBridge.value(result)) },
     ) {
       check(C.mln_map_get_style_transition_options(handle, completion, diagnostic))
@@ -987,12 +948,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun getStyleUrl(): Deferred<String> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_style_url",
-      { result -> readViewString(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_style_url(handle, completion, diagnostic))
     }
 
@@ -1006,7 +962,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     bounds: LatLngBounds,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_invalidate_custom_geometry_source_region") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_region(
           handle,
@@ -1028,7 +984,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     tileId: CanonicalTileId,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_invalidate_custom_geometry_source_tile") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_tile(
           handle,
@@ -1050,7 +1006,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     tileId: CanonicalTileId,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_invalidate_custom_mvt_vector_source_tile") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_mvt_vector_source_tile(
           handle,
@@ -1069,12 +1025,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_lat_lng_bounds_for_camera",
-      { result -> readLatLngBounds(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readLatLngBounds(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_lat_lng_bounds_for_camera(
           handle,
@@ -1092,12 +1043,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): Deferred<LatLngBounds> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_lat_lng_bounds_for_camera_unwrapped",
-      { result -> readLatLngBounds(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readLatLngBounds(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_lat_lng_bounds_for_camera_unwrapped(
           handle,
@@ -1118,7 +1064,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_list_style_layers",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -1143,7 +1088,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_map_list_style_sources",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -1168,7 +1112,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     layerId: String,
     beforeLayerId: String? = null,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_move_style_layer") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_move_style_layer(
           handle,
@@ -1187,9 +1131,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun release(): Deferred<Unit> =
-    nativeRetire(this, binding, "mln_map_release") {
-      check(C.mln_map_release(handle, completion, diagnostic))
-    }
+    nativeRetire(this, binding) { check(C.mln_map_release(handle, completion, diagnostic)) }
 
   /**
    * Removes per-feature state from this map.
@@ -1198,7 +1140,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun removeFeatureState(selector: FeatureStateSelector): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_remove_feature_state") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_remove_feature_state(
           handle,
@@ -1216,7 +1158,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_remove_style_image") {
+    nativeCommand(this, binding) {
       check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
     }
 
@@ -1227,7 +1169,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_remove_style_layer") {
+    nativeCommand(this, binding) {
       check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
     }
 
@@ -1238,7 +1180,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_remove_style_source") {
+    nativeCommand(this, binding) {
       check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
@@ -1249,7 +1191,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun requestRepaint(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_request_repaint") {
+    nativeCommand(this, binding) {
       check(C.mln_map_request_repaint(handle, completion, diagnostic))
     }
 
@@ -1260,7 +1202,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun requestStillImage(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_map_request_still_image") {
+    nativeUnit(this, binding) {
       check(C.mln_map_request_still_image(handle, completion, diagnostic))
     }
 
@@ -1271,7 +1213,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_resize") {
+    nativeCommand(this, binding) {
       check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
@@ -1282,7 +1224,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setBounds(options: BoundOptions): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_bounds") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
     }
 
@@ -1297,7 +1239,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     tileId: CanonicalTileId,
     data: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_custom_geometry_source_tile_data") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_geometry_source_tile_data(
           handle,
@@ -1321,7 +1263,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     tileId: CanonicalTileId,
     data: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_custom_mvt_vector_source_tile_data") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_mvt_vector_source_tile_data(
           handle,
@@ -1345,7 +1287,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     tileId: CanonicalTileId,
     message: String,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_custom_mvt_vector_source_tile_error") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_mvt_vector_source_tile_error(
           handle,
@@ -1365,7 +1307,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setDebugOptions(options: MapDebugOption): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_debug_options") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
 
@@ -1376,7 +1318,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun setEventMask(mask: RuntimeEventMask): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_event_mask") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
 
@@ -1390,7 +1332,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     selector: FeatureStateSelector,
     state: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_feature_state") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_feature_state(
           handle,
@@ -1409,7 +1351,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_free_camera_options") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_free_camera_options(
           handle,
@@ -1430,7 +1372,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     data: GeojsonSourceDataHandle,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_geojson_source_data") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_geojson_source_data(
           handle,
@@ -1452,7 +1394,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     enabled: Boolean,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_geojson_source_synchronous_tiling") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_geojson_source_synchronous_tiling(
           handle,
@@ -1471,7 +1413,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setGeojsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_geojson_source_url") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
@@ -1487,7 +1429,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     propertyName: String,
     value: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_global_state_property") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_global_state_property(
           handle,
@@ -1509,7 +1451,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     coordinates: List<LatLng>,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_image_source_coordinates") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_coordinates(
           handle,
@@ -1532,7 +1474,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     image: PremultipliedRgba8Image,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_image_source_image") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_image(
           handle,
@@ -1551,7 +1493,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_image_source_url") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
@@ -1564,7 +1506,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setProjectionMode(mode: ProjectionMode): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_projection_mode") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic),
       )
@@ -1577,7 +1519,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_rendering_stats_view_enabled") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
 
@@ -1592,7 +1534,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     image: PremultipliedRgba8Image,
     options: StyleImageOptions? = null,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_image") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_image(
           handle,
@@ -1612,7 +1554,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_json") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
 
@@ -1627,7 +1569,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     propertyName: String,
     value: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_layer_property") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_layer_property(
           handle,
@@ -1647,7 +1589,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_light_json") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
@@ -1661,7 +1603,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     propertyName: String,
     value: ByteArray,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_light_property") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_light_property(
           handle,
@@ -1683,7 +1625,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     sourceId: String,
     isVolatile: Boolean,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_source_volatile") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_source_volatile(
           handle,
@@ -1704,7 +1646,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setStyleTransitionOptions(
     options: StyleTransitionOptions,
   ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_transition_options") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_transition_options(
           handle,
@@ -1722,7 +1664,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun setStyleUrl(url: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_style_url") {
+    nativeCommand(this, binding) {
       check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
 
@@ -1733,7 +1675,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setTileOptions(options: MapTileOptions): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_tile_options") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
       )
@@ -1746,7 +1688,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun setViewportOptions(options: MapViewportOptions): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_viewport_options") {
+    nativeCommand(this, binding) {
       check(
         C.mln_map_set_viewport_options(
           handle,
@@ -1764,7 +1706,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_update_camera", bindingCallbacks) {
+    nativeCommand(this, binding, bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
 
@@ -1781,7 +1723,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     get() = owner.bindingCallbacks
 
   public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_custom_geometry_source", bindingCallbacks) {
+    nativeDiscard(owner, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_geometry_source(
           handle,
@@ -1797,7 +1739,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     sourceId: String,
     options: CustomMvtVectorSourceOptions,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_custom_mvt_vector_source", bindingCallbacks) {
+    nativeDiscard(owner, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_mvt_vector_source(
           handle,
@@ -1810,7 +1752,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun addGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_geojson_source_data") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_geojson_source_data(
           handle,
@@ -1827,7 +1769,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     url: String,
     options: GeojsonSourceOptions? = null,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_geojson_source_url") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_geojson_source_url(
           handle,
@@ -1845,7 +1787,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_image_source_image") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_image_source_image(
           handle,
@@ -1860,7 +1802,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_image_source_url") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_image_source_url(
           handle,
@@ -1875,7 +1817,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String? = null): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_style_layer_json") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_layer_json(
           handle,
@@ -1888,7 +1830,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_add_style_source_json") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_source_json(
           handle,
@@ -1901,39 +1843,39 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun applyCameraDelta(delta: CameraDelta): Unit =
-    nativeDiscard(owner, binding, "mln_map_apply_camera_delta", bindingCallbacks) {
+    nativeDiscard(owner, binding, bindingCallbacks) {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
 
   public fun beginCommandGroup(): Unit =
-    nativeDiscard(owner, binding, "mln_map_begin_command_group") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_begin_command_group(handle, completion, diagnostic))
     }
 
   public fun cancelCameraTransition(transitionId: ULong): Unit =
-    nativeDiscard(owner, binding, "mln_map_cancel_camera_transition") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic),
       )
     }
 
   public fun cancelTransitions(): Unit =
-    nativeDiscard(owner, binding, "mln_map_cancel_transitions") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
     }
 
   public fun dumpDebugLogs(): Unit =
-    nativeDiscard(owner, binding, "mln_map_dump_debug_logs") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
     }
 
   public fun endCommandGroup(): Unit =
-    nativeDiscard(owner, binding, "mln_map_end_command_group") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
     }
 
   public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): Unit =
-    nativeDiscard(owner, binding, "mln_map_invalidate_custom_geometry_source_region") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_region(
           handle,
@@ -1946,7 +1888,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
-    nativeDiscard(owner, binding, "mln_map_invalidate_custom_geometry_source_tile") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_tile(
           handle,
@@ -1959,7 +1901,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
-    nativeDiscard(owner, binding, "mln_map_invalidate_custom_mvt_vector_source_tile") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_invalidate_custom_mvt_vector_source_tile(
           handle,
@@ -1972,7 +1914,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit =
-    nativeDiscard(owner, binding, "mln_map_move_style_layer") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_move_style_layer(
           handle,
@@ -1985,7 +1927,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun removeFeatureState(selector: FeatureStateSelector): Unit =
-    nativeDiscard(owner, binding, "mln_map_remove_feature_state") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_remove_feature_state(
           handle,
@@ -1997,32 +1939,32 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun removeStyleImage(imageId: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_remove_style_image") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
     }
 
   public fun removeStyleLayer(layerId: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_remove_style_layer") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
     }
 
   public fun removeStyleSource(sourceId: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_remove_style_source") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
   public fun requestRepaint(): Unit =
-    nativeDiscard(owner, binding, "mln_map_request_repaint") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_request_repaint(handle, completion, diagnostic))
     }
 
   public fun resize(extent: LogicalExtent): Unit =
-    nativeDiscard(owner, binding, "mln_map_resize") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   public fun setBounds(options: BoundOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_bounds") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
     }
 
@@ -2031,7 +1973,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     tileId: CanonicalTileId,
     data: ByteArray,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_custom_geometry_source_tile_data") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_custom_geometry_source_tile_data(
           handle,
@@ -2049,7 +1991,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     tileId: CanonicalTileId,
     data: ByteArray,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_custom_mvt_vector_source_tile_data") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_custom_mvt_vector_source_tile_data(
           handle,
@@ -2067,7 +2009,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     tileId: CanonicalTileId,
     message: String,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_custom_mvt_vector_source_tile_error") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_custom_mvt_vector_source_tile_error(
           handle,
@@ -2081,17 +2023,17 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setDebugOptions(options: MapDebugOption): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_debug_options") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
 
   public fun setEventMask(mask: RuntimeEventMask): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_event_mask") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
 
   public fun setFeatureState(selector: FeatureStateSelector, state: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_feature_state") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_feature_state(
           handle,
@@ -2104,7 +2046,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setFreeCameraOptions(options: FreeCameraOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_free_camera_options") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_free_camera_options(
           handle,
@@ -2116,7 +2058,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_geojson_source_data") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_data(
           handle,
@@ -2129,7 +2071,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setGeojsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_geojson_source_synchronous_tiling") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_synchronous_tiling(
           handle,
@@ -2142,14 +2084,14 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setGeojsonSourceUrl(sourceId: String, url: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_geojson_source_url") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geojson_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
     }
 
   public fun setGlobalStateProperty(propertyName: String, value: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_global_state_property") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_global_state_property(
           handle,
@@ -2162,7 +2104,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_image_source_coordinates") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_image_source_coordinates(
           handle,
@@ -2176,7 +2118,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_image_source_image") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_image_source_image(
           handle,
@@ -2189,21 +2131,21 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setImageSourceUrl(sourceId: String, url: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_image_source_url") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
       )
     }
 
   public fun setProjectionMode(mode: ProjectionMode): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_projection_mode") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic),
       )
     }
 
   public fun setRenderingStatsViewEnabled(enabled: Boolean): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_rendering_stats_view_enabled") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
 
@@ -2212,7 +2154,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     image: PremultipliedRgba8Image,
     options: StyleImageOptions? = null,
   ): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_image") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_image(
           handle,
@@ -2226,12 +2168,12 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setStyleJson(json: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_json") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
 
   public fun setStyleLayerProperty(layerId: String, propertyName: String, value: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_layer_property") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_layer_property(
           handle,
@@ -2245,12 +2187,12 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setStyleLightJson(lightJson: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_light_json") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
   public fun setStyleLightProperty(propertyName: String, value: ByteArray): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_light_property") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_light_property(
           handle,
@@ -2263,7 +2205,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_source_volatile") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_source_volatile(
           handle,
@@ -2276,7 +2218,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setStyleTransitionOptions(options: StyleTransitionOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_transition_options") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_transition_options(
           handle,
@@ -2288,19 +2230,19 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun setStyleUrl(url: String): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_style_url") {
+    nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
 
   public fun setTileOptions(options: MapTileOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_tile_options") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
       )
     }
 
   public fun setViewportOptions(options: MapViewportOptions): Unit =
-    nativeDiscard(owner, binding, "mln_map_set_viewport_options") {
+    nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_viewport_options(
           handle,
@@ -2312,7 +2254,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
     }
 
   public fun updateCamera(update: CameraUpdate): Unit =
-    nativeDiscard(owner, binding, "mln_map_update_camera", bindingCallbacks) {
+    nativeDiscard(owner, binding, bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
 }

@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public abstract class GeneratedRenderSessionOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
@@ -22,7 +22,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun abandon(): RenderAbandonResult =
-    nativeCall(this, binding, "mln_render_session_abandon") {
+    nativeCall(this, binding) {
       val out = sized(16, 4)
       check(C.mln_render_session_abandon(handle, out, diagnostic))
       readRenderAbandonResult(out)
@@ -36,7 +36,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun acquireFrame(): AcquiredFrameHandle? =
-    nativeCall(this, binding, "mln_render_session_acquire_frame") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       if (present(C.mln_render_session_acquire_frame(handle, out, diagnostic), absent = -9))
         adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
@@ -55,7 +55,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun barrier(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_barrier") {
+    nativeUnit(this, binding) {
       check(C.mln_render_session_barrier(handle, completion, diagnostic))
     }
 
@@ -66,7 +66,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun clearData(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_clear_data") {
+    nativeUnit(this, binding) {
       check(C.mln_render_session_clear_data(handle, completion, diagnostic))
     }
 
@@ -80,7 +80,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun createProjection(): MapProjectionHandle =
-    nativeCall(this, binding, "mln_render_session_create_projection") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       check(C.mln_render_session_create_projection(handle, out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
@@ -93,9 +93,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun detach(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_detach") {
-      check(C.mln_render_session_detach(handle, completion, diagnostic))
-    }
+    nativeUnit(this, binding) { check(C.mln_render_session_detach(handle, completion, diagnostic)) }
 
   /**
    * Consumes a session and schedules its retirement and destruction.
@@ -104,9 +102,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun dispose(): Unit =
-    nativeClose(this, binding, "mln_render_session_dispose") {
-      check(C.mln_render_session_dispose(handle, diagnostic))
-    }
+    nativeClose(this, binding) { check(C.mln_render_session_dispose(handle, diagnostic)) }
 
   /**
    * Drains every currently queued terminal frame result into an independently owned batch. The
@@ -116,7 +112,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun drainFrameResults(): RenderFrameBatchHandle? =
-    nativeCall(this, binding, "mln_render_session_drain_frame_results") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       if (present(C.mln_render_session_drain_frame_results(handle, out, diagnostic), absent = -9))
         adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
@@ -130,7 +126,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun dumpDebugLogs(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_dump_debug_logs") {
+    nativeUnit(this, binding) {
       check(C.mln_render_session_dump_debug_logs(handle, completion, diagnostic))
     }
 
@@ -141,7 +137,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun getCapabilities(): RenderSessionCapabilities =
-    nativeCall(this, binding, "mln_render_session_get_capabilities") {
+    nativeCall(this, binding) {
       val out = sized(16, 4)
       check(C.mln_render_session_get_capabilities(handle, out, diagnostic))
       readRenderSessionCapabilities(out)
@@ -154,7 +150,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun getSnapshot(): RenderSessionSnapshot =
-    nativeCall(this, binding, "mln_render_session_get_snapshot") {
+    nativeCall(this, binding) {
       val out = sized(64, 8)
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
@@ -174,12 +170,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     extensionField: String,
     arguments: ByteArray? = null,
   ): Deferred<ByteArray> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_render_session_query_feature_extensions",
-      { result -> readView(CompletionBridge.value(result)) },
-    ) {
+    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
       check(
         C.mln_render_session_query_feature_extensions(
           handle,
@@ -207,7 +198,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_render_session_query_rendered_features",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -243,7 +233,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_render_session_query_source_features",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -276,7 +265,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_render_session_read_texture",
       { result -> readTextureReadbackResult(CompletionBridge.value(result)) },
     ) {
       check(C.mln_render_session_read_texture(handle, completion, diagnostic))
@@ -289,7 +277,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun reduceMemoryUse(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_reduce_memory_use") {
+    nativeUnit(this, binding) {
       check(C.mln_render_session_reduce_memory_use(handle, completion, diagnostic))
     }
 
@@ -302,9 +290,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun release(): Unit =
-    nativeClose(this, binding, "mln_render_session_release") {
-      check(C.mln_render_session_release(handle, diagnostic))
-    }
+    nativeClose(this, binding) { check(C.mln_render_session_release(handle, diagnostic)) }
 
   /**
    * Requests a frame without waiting. Every accepted demand produces one terminal result record.
@@ -315,7 +301,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun requestFrame(demand: FrameDemand): Unit =
-    nativeCall(this, binding, "mln_render_session_request_frame") {
+    nativeCall(this, binding) {
       check(C.mln_render_session_request_frame(handle, writeFrameDemand(demand), diagnostic))
     }
 
@@ -330,7 +316,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_render_session_resize") {
+    nativeCommand(this, binding) {
       check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
@@ -344,7 +330,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun serviceDriverWork(): Unit =
-    nativeCall(this, binding, "mln_render_session_service_driver_work") {
+    nativeCall(this, binding) {
       check(C.mln_render_session_service_driver_work(handle, diagnostic))
     }
 
@@ -357,7 +343,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor,
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_metal_borrowed_texture_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_metal_borrowed_texture_target(
           handle,
@@ -375,7 +361,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_metal_surface_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_metal_surface_target(
           handle,
@@ -395,7 +381,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun setOpenglBorrowedTextureTarget(
     descriptor: OpenglBorrowedTextureDescriptor,
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_opengl_borrowed_texture_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_opengl_borrowed_texture_target(
           handle,
@@ -413,7 +399,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun setOpenglSurfaceTarget(descriptor: OpenglSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_opengl_surface_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_opengl_surface_target(
           handle,
@@ -433,7 +419,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor,
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_vulkan_borrowed_texture_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_vulkan_borrowed_texture_target(
           handle,
@@ -451,7 +437,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_vulkan_surface_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_vulkan_surface_target(
           handle,
@@ -471,7 +457,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun setWebgpuBorrowedTextureTarget(
     descriptor: WebgpuBorrowedTextureDescriptor,
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_webgpu_borrowed_texture_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_webgpu_borrowed_texture_target(
           handle,
@@ -489,7 +475,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun setWebgpuSurfaceTarget(descriptor: WebgpuSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_render_session_set_webgpu_surface_target") {
+    nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_webgpu_surface_target(
           handle,
@@ -511,7 +497,7 @@ internal constructor(private val owner: GeneratedRenderSessionOperations) {
     get() = owner.binding
 
   public fun resize(extent: LogicalExtent): Unit =
-    nativeDiscard(owner, binding, "mln_render_session_resize") {
+    nativeDiscard(owner, binding) {
       check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 }

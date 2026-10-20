@@ -4,9 +4,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.readLatLng
 import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
@@ -117,10 +117,9 @@ class CompletionBridgeTest {
   @Test
   fun aFailedStatusBecomesItsExceptionWithTheDiagnostic(): Unit = runSuspendTest {
     val completion = handDeliveredGeneration()
-    completion.deliver(MaplibreStatus.INVALID_ARGUMENT.nativeCode, 0u, "the zoom is out of range")
+    completion.deliver(Status.INVALID_ARGUMENT.rawValue, 0u, "the zoom is out of range")
     completion.release()
-    val failure = assertFailsWith<InvalidArgumentException> { completion.deferred.await() }
-    assertEquals(MaplibreStatus.INVALID_ARGUMENT, failure.status)
+    val failure = assertFailsWithStatus(Status.INVALID_ARGUMENT) { completion.deferred.await() }
     assertEquals("the zoom is out of range", failure.diagnostic)
   }
 }

@@ -1,8 +1,8 @@
 """Lower each operation plan to one common Kotlin function over the runtime helpers.
 
 A generated operation names its C function, maps its parameters, and decodes
-its result. Admission, keep-alive, arenas, completions, status checks, and
-callback acceptance live in the handwritten `internal/call/NativeCall.kt`.
+its result. Keep-alive, arenas, completions, status checks, and callback
+acceptance live in the handwritten `internal/call/NativeCall.kt`.
 """
 
 from __future__ import annotations
@@ -119,10 +119,10 @@ def receiver_arguments(plan):
     return "this, binding" if plan.receiver else "null, null"
 
 
-def access(plan):
-    if needs_read(plan):
-        return ", Access.READ"
-    return ""
+def call_helper(plan):
+    """The helper that runs [plan]'s call: a read holds off its receiver's release."""
+    helper = "nativeRead" if needs_read(plan) else "nativeCall"
+    return f"{helper}({receiver_arguments(plan)})"
 
 
 def signature(plan, values):
@@ -367,13 +367,15 @@ def operation(plan, values, native, *, discard=False):
     callbacks = ", bindingCallbacks" if plan.registrations else ""
     if discard:
         head = f"  public fun {method}({declaration(params)}): Unit ="
-        helper = f'nativeDiscard({owners}, "{plan.name}"{callbacks})'
+        helper = f"nativeDiscard({owners}{callbacks})"
     elif plan.execution == "command":
-        helper = f'nativeCommand({owners}, "{plan.name}"{callbacks})'
+        helper = f"nativeCommand({owners}{callbacks})"
     elif result is None:
-        helper = f'nativeUnit({owners}, "{plan.name}"{callbacks})'
+        helper = f"nativeUnit({owners}{callbacks})"
     else:
-        helper = f'nativeSubmit({owners}, "{plan.name}", {completion_decode(result, values)}{callbacks})'
+        helper = (
+            f"nativeSubmit({owners}, {completion_decode(result, values)}{callbacks})"
+        )
     return f"{head} {helper} {{ {body} }}\n"
 
 
@@ -401,7 +403,7 @@ def immediate(plan, values, native):
         setup.append(native.checked(plan.function, arguments))
     if decoded:
         setup.append(decoded)
-    helper = f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access(plan)})'
+    helper = call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -417,7 +419,7 @@ def multiple_outputs(plan, values, native):
         copied.append(f"{field} = " + decoded.replace("{out}", f"out{index}"))
     setup.append(native.checked(plan.function, arguments))
     setup.append(f"{result_type}({', '.join(copied)})")
-    helper = f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access(plan)})'
+    helper = call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -472,7 +474,7 @@ def owned(plan, values, native):
         body = encodings(plan) + native.checked(plan.function, arguments)
         drop = "it." + disposal_method(handle) + "()"
         return (
-            f'{head} nativeSubmitOwned({owners}, "{plan.name}", {create}, {disposal(handle)}, '
+            f"{head} nativeSubmitOwned({owners}, {create}, {disposal(handle)}, "
             f"{{ {drop} }}) {{ {body} }}\n"
         )
     arguments.append("out")
@@ -503,15 +505,11 @@ def owned(plan, values, native):
             head = head.removesuffix(" =") + "? ="
         else:
             body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"
-    return f'{head} nativeCall({owners}, "{plan.name}") {{ {encodings(plan)}{body} }}\n'
+    return f"{head} nativeCall({owners}) {{ {encodings(plan)}{body} }}\n"
 
 
 def lifecycle(plan, values, native):
     method, params, inputs, _result, _result_type = signature(plan, values)
-    if receiver_value(plan).native in {
-        decision.handle.native for decision in values.bound.decisions.values()
-    }:
-        return f"  public fun {method}(): Unit = binding.close()\n"
     defaults = {}
     for (local, _typ), parameter in zip(params, inputs, strict=True):
         value = parameter.value.unwrapped
@@ -541,11 +539,11 @@ def lifecycle(plan, values, native):
     if plan.completion:
         return (
             f"  public fun {method}({declaration(params, defaults)}): Deferred<Unit> = "
-            f'nativeRetire(this, binding, "{plan.name}") {{ {body} }}\n'
+            f"nativeRetire(this, binding) {{ {body} }}\n"
         )
     return (
         f"  public fun {method}({declaration(params, defaults)}): Unit = "
-        f'nativeClose(this, binding, "{plan.name}") {{ {body} }}\n'
+        f"nativeClose(this, binding) {{ {body} }}\n"
     )
 
 
@@ -559,12 +557,10 @@ def view(plan, values, native):
     end = native.checked(functions[plan.view.end], ["it"])
     read = native.checked(plan.function, ["handle", "out"])
     decoded = values.decode(result, "out", "scope")
-    # The view holds a read, so the binding refuses to close its owner until
-    # the block returns.
-    held = ", Access.READ" if plan.receiver else ""
+    # Native refuses to release the owner while the view is open.
     return (
         f"  public fun <T> {method}(block: ({result_type}) -> T): T = "
-        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{held}) {{ '
+        f"nativeCall({receiver_arguments(plan)}) {{ "
         f"borrowView({{ {begin} }}, {{ {end} }}) {{ scope -> "
         f"val out = {allocation}; {read}; block({decoded}) }} }}\n"
     )
@@ -586,7 +582,5 @@ def owner_disposal(bound, native):
         )
         if function.diagnostic:
             call = "NativeDiagnostics.check { diagnostic -> " + call + " }"
-        lines.append(
-            f'  fun {method}(handle: Long) {{ CallbackAdmission.check(handle, "{handle.dispose}"); {call} }}'
-        )
+        lines.append(f"  fun {method}(handle: Long) {{ {call} }}")
     return "internal object GeneratedOwnerDisposal {\n" + "\n".join(lines) + "\n}\n"

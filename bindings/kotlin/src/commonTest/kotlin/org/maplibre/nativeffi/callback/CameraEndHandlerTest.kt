@@ -2,11 +2,10 @@ package org.maplibre.nativeffi.callback
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
 import org.maplibre.nativeffi.generated.CameraOptions
@@ -15,6 +14,7 @@ import org.maplibre.nativeffi.generated.CameraTransitionHandler
 import org.maplibre.nativeffi.generated.CameraTransitionOutcome
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.CameraUpdateMode
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.withMap
@@ -56,7 +56,7 @@ class CameraEndHandlerTest {
           scale = -1.0,
           animation = AnimationOptions(endHandler = CameraTransitionHandler {}),
         )
-      assertFailsWith<InvalidArgumentException> { map.applyCameraDelta(rejected) }
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) { map.applyCameraDelta(rejected) }
       assertEquals(base, roots.rootCountForTesting())
     }
   }

@@ -3408,7 +3408,7 @@ static uint32_t mln_jni_resourceProviderCallback(
     {.j = MLN_JNI_ADDRESS(request)},
     {.j = (jlong)handle}
   };
-  jint result = 0;
+  jint result = -1;
   mln_jni_upcall_int(&mln_jni_upcalls[11], arguments, &result);
   return (uint32_t)result;
 }

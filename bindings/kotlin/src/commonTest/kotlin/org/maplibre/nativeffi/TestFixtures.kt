@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi
 
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
@@ -27,6 +30,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
@@ -42,6 +46,19 @@ internal const val EMPTY_STYLE_JSON: String = """{"version":8,"sources":{},"laye
 internal fun <T> runSuspendTest(block: suspend CoroutineScope.() -> T): T = runBlocking {
   withTimeout(TEST_TIMEOUT) { block() }
 }
+
+/** Whether a release of this owner has ended its handle. */
+private val AsyncReleasable.isReleased: Boolean
+  get() =
+    when (this) {
+      is RuntimeHandle -> isClosed
+      is MapHandle -> isClosed
+      else -> false
+    }
+
+/** Asserts that [block] fails with [status], and returns the failure. */
+internal inline fun assertFailsWithStatus(status: Status, block: () -> Unit): MaplibreException =
+  assertFailsWith<MaplibreException> { block() }.also { assertEquals(status, it.status) }
 
 /** Awaits this deferred, failing the test when it does not complete within [WAIT_TIMEOUT]. */
 internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
@@ -181,8 +198,8 @@ internal suspend fun <T> withMap(
   }
 
 /**
- * Runs [block], then releases [owners] in order. Every release runs, and the first failure wins, so
- * a teardown failure never hides the failure that caused it.
+ * Runs [block], then releases [owners] in order, except one that [block] released. Every release
+ * runs, and the first failure wins, so a teardown failure never hides the failure that caused it.
  */
 internal suspend fun <T> runThenRelease(owners: List<AsyncReleasable>, block: suspend () -> T): T {
   var failure: Throwable? = null
@@ -195,6 +212,7 @@ internal suspend fun <T> runThenRelease(owners: List<AsyncReleasable>, block: su
     }
   withContext(NonCancellable) {
     for (owner in owners) {
+      if (owner.isReleased) continue
       try {
         owner.release().awaitWithin("the release of $owner")
       } catch (error: Throwable) {

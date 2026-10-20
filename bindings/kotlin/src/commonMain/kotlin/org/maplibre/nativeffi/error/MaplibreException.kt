@@ -1,52 +1,8 @@
 package org.maplibre.nativeffi.error
 
-/**
- * Base unchecked exception for errors reported by the native MapLibre C ABI or raised by the
- * binding.
- */
+import org.maplibre.nativeffi.generated.Status
+
+/** Error for a status that the native MapLibre C ABI reported, or that the binding raised. */
 public open class MaplibreException
-internal constructor(
-  public val status: MaplibreStatus,
-  /** The C status code, or null for an error the binding raised without calling native code. */
-  public val nativeStatusCode: Int?,
-  public val diagnostic: String = "",
-) : RuntimeException(message(status, nativeStatusCode, diagnostic)) {
-  internal companion object {
-    /** Creates the stable exception subtype for a native status category. */
-    fun forStatus(
-      status: MaplibreStatus,
-      nativeStatusCode: Int,
-      diagnostic: String = "",
-    ): MaplibreException =
-      when (status) {
-        MaplibreStatus.INVALID_ARGUMENT -> InvalidArgumentException(nativeStatusCode, diagnostic)
-        MaplibreStatus.INVALID_STATE -> InvalidStateException(nativeStatusCode, diagnostic)
-        MaplibreStatus.WRONG_THREAD -> WrongThreadException(nativeStatusCode, diagnostic)
-        MaplibreStatus.UNSUPPORTED -> UnsupportedFeatureException(nativeStatusCode, diagnostic)
-        MaplibreStatus.NATIVE_ERROR -> NativeErrorException(nativeStatusCode, diagnostic)
-        else -> MaplibreException(status, nativeStatusCode, diagnostic)
-      }
-  }
-}
-
-private fun message(status: MaplibreStatus, nativeStatusCode: Int?, diagnostic: String): String {
-  val detail = diagnostic.ifBlank { "No native diagnostic available." }
-  val code = if (nativeStatusCode == null) "" else " ($nativeStatusCode)"
-  return "${statusLabel(status)}$code: $detail"
-}
-
-private fun statusLabel(status: MaplibreStatus): String =
-  when (status) {
-    MaplibreStatus.OK -> "OK"
-    MaplibreStatus.INVALID_ARGUMENT -> "INVALID_ARGUMENT"
-    MaplibreStatus.INVALID_STATE -> "INVALID_STATE"
-    MaplibreStatus.WRONG_THREAD -> "WRONG_THREAD"
-    MaplibreStatus.UNSUPPORTED -> "UNSUPPORTED"
-    MaplibreStatus.NATIVE_ERROR -> "NATIVE_ERROR"
-    MaplibreStatus.CANCELLED -> "CANCELLED"
-    MaplibreStatus.BUSY -> "BUSY"
-    MaplibreStatus.TARGET_LOST -> "TARGET_LOST"
-    MaplibreStatus.NOT_READY -> "NOT_READY"
-    MaplibreStatus.NOT_FOUND -> "NOT_FOUND"
-    else -> "MaplibreStatus(${status.nativeCode})"
-  }
+internal constructor(public val status: Status, public val diagnostic: String = "") :
+  RuntimeException("$status: ${diagnostic.ifBlank { "No native diagnostic available." }}")

@@ -5,6 +5,15 @@ import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.render.NativePointer
 
 public data class AmbientCacheOperation(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "RESET_DATABASE"
+      2u -> "PACK_DATABASE"
+      3u -> "INVALIDATE"
+      4u -> "CLEAR"
+      else -> "AmbientCacheOperation($rawValue)"
+    }
+
   public companion object {
     public val RESET_DATABASE: AmbientCacheOperation = AmbientCacheOperation(1u)
     public val PACK_DATABASE: AmbientCacheOperation = AmbientCacheOperation(2u)
@@ -81,6 +90,13 @@ public data class BoundOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class CameraChangeMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "IMMEDIATE"
+      1u -> "ANIMATED"
+      else -> "CameraChangeMode($rawValue)"
+    }
+
   public companion object {
     /** The camera reached its new value without an animated transition. */
     public val IMMEDIATE: CameraChangeMode = CameraChangeMode(0u)
@@ -173,6 +189,14 @@ public data class CameraOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraTransitionOutcome(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "COMPLETED"
+      1u -> "CANCELLED"
+      2u -> "CLOSED"
+      else -> "CameraTransitionOutcome($rawValue)"
+    }
+
   public companion object {
     /** Every property of the command reached its target, or a later camera write replaced it. */
     public val COMPLETED: CameraTransitionOutcome = CameraTransitionOutcome(0u)
@@ -194,6 +218,14 @@ public data class CameraTransitionOutcome(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraUpdateMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "JUMP"
+      1u -> "EASE"
+      2u -> "FLY"
+      else -> "CameraUpdateMode($rawValue)"
+    }
+
   public companion object {
     public val JUMP: CameraUpdateMode = CameraUpdateMode(0u)
     public val EASE: CameraUpdateMode = CameraUpdateMode(1u)
@@ -208,6 +240,15 @@ public data class CameraUpdateMode(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
  */
 public data class CommandDisposition(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "COMMITTED"
+      1u -> "SUPERSEDED"
+      2u -> "FAILED"
+      3u -> "CANCELLED"
+      else -> "CommandDisposition($rawValue)"
+    }
+
   public companion object {
     public val COMMITTED: CommandDisposition = CommandDisposition(0u)
     public val SUPERSEDED: CommandDisposition = CommandDisposition(1u)
@@ -223,6 +264,15 @@ public data class CommandDisposition(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class ConstrainMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "HEIGHT_ONLY"
+      2u -> "WIDTH_AND_HEIGHT"
+      3u -> "SCREEN"
+      else -> "ConstrainMode($rawValue)"
+    }
+
   public companion object {
     public val NONE: ConstrainMode = ConstrainMode(0u)
     public val HEIGHT_ONLY: ConstrainMode = ConstrainMode(1u)
@@ -406,6 +456,16 @@ public data class GeojsonSourceOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class GesturePhase(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "BEGIN"
+      2u -> "UPDATE"
+      3u -> "END"
+      4u -> "CANCEL"
+      else -> "GesturePhase($rawValue)"
+    }
+
   public companion object {
     /** The update carries no gesture boundary and leaves the flag as it is. */
     public val NONE: GesturePhase = GesturePhase(0u)
@@ -430,6 +490,13 @@ public data class GesturePhase(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class GpuSyncKind(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "CPU_COMPLETE"
+      3u -> "OPENGL_FENCE"
+      else -> "GpuSyncKind($rawValue)"
+    }
+
   public companion object {
     /**
      * The host needs no synchronization object. The work completed, or on WebGPU was submitted to
@@ -451,6 +518,28 @@ public data class GpuSyncKind(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogEvent(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "GENERAL"
+      1u -> "SETUP"
+      2u -> "SHADER"
+      3u -> "PARSE_STYLE"
+      4u -> "PARSE_TILE"
+      5u -> "RENDER"
+      6u -> "STYLE"
+      7u -> "DATABASE"
+      8u -> "HTTP_REQUEST"
+      9u -> "SPRITE"
+      10u -> "IMAGE"
+      11u -> "GRAPHICS_BACKEND"
+      12u -> "JNI"
+      13u -> "ANDROID"
+      14u -> "CRASH"
+      15u -> "GLYPH"
+      16u -> "TIMING"
+      else -> "LogEvent($rawValue)"
+    }
+
   public companion object {
     public val GENERAL: LogEvent = LogEvent(0u)
     public val SETUP: LogEvent = LogEvent(1u)
@@ -479,6 +568,14 @@ public data class LogEvent(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogSeverity(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "INFO"
+      2u -> "WARNING"
+      3u -> "ERROR"
+      else -> "LogSeverity($rawValue)"
+    }
+
   public companion object {
     public val INFO: LogSeverity = LogSeverity(1u)
     public val WARNING: LogSeverity = LogSeverity(2u)
@@ -545,6 +642,14 @@ public data class MapDebugOption(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "CONTINUOUS"
+      1u -> "STATIC"
+      2u -> "TILE"
+      else -> "MapMode($rawValue)"
+    }
+
   public companion object {
     /** Continuously updates as data arrives and map state changes. */
     public val CONTINUOUS: MapMode = MapMode(0u)
@@ -606,6 +711,13 @@ public data class MapViewportOptionField(public val rawValue: UInt) {
 }
 
 public data class NetworkStatus(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "ONLINE"
+      2u -> "OFFLINE"
+      else -> "NetworkStatus($rawValue)"
+    }
+
   public companion object {
     public val ONLINE: NetworkStatus = NetworkStatus(1u)
     public val OFFLINE: NetworkStatus = NetworkStatus(2u)
@@ -619,6 +731,15 @@ public data class NetworkStatus(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class NorthOrientation(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UP"
+      1u -> "RIGHT"
+      2u -> "DOWN"
+      3u -> "LEFT"
+      else -> "NorthOrientation($rawValue)"
+    }
+
   public companion object {
     public val UP: NorthOrientation = NorthOrientation(0u)
     public val RIGHT: NorthOrientation = NorthOrientation(1u)
@@ -628,6 +749,13 @@ public data class NorthOrientation(public val rawValue: UInt) {
 }
 
 public data class OfflineRegionDefinitionType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "TILE_PYRAMID"
+      2u -> "GEOMETRY"
+      else -> "OfflineRegionDefinitionType($rawValue)"
+    }
+
   public companion object {
     public val TILE_PYRAMID: OfflineRegionDefinitionType = OfflineRegionDefinitionType(1u)
     public val GEOMETRY: OfflineRegionDefinitionType = OfflineRegionDefinitionType(2u)
@@ -635,6 +763,13 @@ public data class OfflineRegionDefinitionType(public val rawValue: UInt) {
 }
 
 public data class OfflineRegionDownloadState(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "INACTIVE"
+      1u -> "ACTIVE"
+      else -> "OfflineRegionDownloadState($rawValue)"
+    }
+
   public companion object {
     public val INACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(0u)
     public val ACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(1u)
@@ -648,6 +783,14 @@ public data class OfflineRegionDownloadState(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class OpenglClientApi(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UNSPECIFIED"
+      1u -> "GL"
+      2u -> "GLES"
+      else -> "OpenglClientApi($rawValue)"
+    }
+
   public companion object {
     /** No client API is named. */
     public val UNSPECIFIED: OpenglClientApi = OpenglClientApi(0u)
@@ -665,6 +808,13 @@ public data class OpenglClientApi(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class OpenglContextOwnership(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "SHARED"
+      1u -> "DEDICATED"
+      else -> "OpenglContextOwnership($rawValue)"
+    }
+
   public companion object {
     /** The session shares its thread with host graphics work. */
     public val SHARED: OpenglContextOwnership = OpenglContextOwnership(0u)
@@ -680,6 +830,15 @@ public data class OpenglContextOwnership(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class OpenglContextPlatform(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UNSPECIFIED"
+      1u -> "WGL"
+      2u -> "EGL"
+      3u -> "WEBGL"
+      else -> "OpenglContextPlatform($rawValue)"
+    }
+
   public companion object {
     /** No OpenGL context provider is selected. */
     public val UNSPECIFIED: OpenglContextPlatform = OpenglContextPlatform(0u)
@@ -767,6 +926,13 @@ public data class QueriedFeatureField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderAbandonDisposition(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "CLEAN"
+      1u -> "QUARANTINED"
+      else -> "RenderAbandonDisposition($rawValue)"
+    }
+
   public companion object {
     /** Abandon destroyed every graphics resource, or none remained. */
     public val CLEAN: RenderAbandonDisposition = RenderAbandonDisposition(0u)
@@ -806,6 +972,13 @@ public data class RenderBackendFlag(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class RenderDriverKind(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "CORE_WORKER"
+      2u -> "CALLER_GRAPHICS_THREAD"
+      else -> "RenderDriverKind($rawValue)"
+    }
+
   public companion object {
     /**
      * Native code initializes, services, and tears down transferable graphics state on a
@@ -826,6 +999,13 @@ public data class RenderDriverKind(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RenderMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "PARTIAL"
+      1u -> "FULL"
+      else -> "RenderMode($rawValue)"
+    }
+
   public companion object {
     public val PARTIAL: RenderMode = RenderMode(0u)
     public val FULL: RenderMode = RenderMode(1u)
@@ -839,6 +1019,15 @@ public data class RenderMode(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderResult(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "RENDERED"
+      1u -> "NO_UPDATE"
+      3u -> "TARGET_NOT_READY"
+      4u -> "SUPERSEDED"
+      else -> "RenderResult($rawValue)"
+    }
+
   public companion object {
     /** A frame was rendered for acquisition, presentation, or ordered readback. */
     public val RENDERED: RenderResult = RenderResult(0u)
@@ -891,6 +1080,17 @@ public data class RenderSessionCapabilityFlag(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderSessionState(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "ATTACHING"
+      2u -> "ATTACHED"
+      3u -> "DETACHING"
+      4u -> "DETACHED"
+      5u -> "TARGET_LOST"
+      6u -> "ABANDONED"
+      else -> "RenderSessionState($rawValue)"
+    }
+
   public companion object {
     public val ATTACHING: RenderSessionState = RenderSessionState(1u)
     public val ATTACHED: RenderSessionState = RenderSessionState(2u)
@@ -930,6 +1130,14 @@ public data class RenderedFeatureQueryOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedQueryGeometryType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "POINT"
+      2u -> "BOX"
+      3u -> "LINE_STRING"
+      else -> "RenderedQueryGeometryType($rawValue)"
+    }
+
   public companion object {
     public val POINT: RenderedQueryGeometryType = RenderedQueryGeometryType(1u)
     public val BOX: RenderedQueryGeometryType = RenderedQueryGeometryType(2u)
@@ -938,6 +1146,17 @@ public data class RenderedQueryGeometryType(public val rawValue: UInt) {
 }
 
 public data class ResourceErrorReason(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "NOT_FOUND"
+      2u -> "SERVER"
+      3u -> "CONNECTION"
+      4u -> "RATE_LIMIT"
+      5u -> "OTHER"
+      else -> "ResourceErrorReason($rawValue)"
+    }
+
   public companion object {
     public val NONE: ResourceErrorReason = ResourceErrorReason(0u)
     public val NOT_FOUND: ResourceErrorReason = ResourceErrorReason(1u)
@@ -949,6 +1168,19 @@ public data class ResourceErrorReason(public val rawValue: UInt) {
 }
 
 public data class ResourceKind(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UNKNOWN"
+      1u -> "STYLE"
+      2u -> "SOURCE"
+      3u -> "TILE"
+      4u -> "GLYPHS"
+      5u -> "SPRITE_IMAGE"
+      6u -> "SPRITE_JSON"
+      7u -> "IMAGE"
+      else -> "ResourceKind($rawValue)"
+    }
+
   public companion object {
     public val UNKNOWN: ResourceKind = ResourceKind(0u)
     public val STYLE: ResourceKind = ResourceKind(1u)
@@ -993,6 +1225,14 @@ public data class ResourceKindMask(public val rawValue: UInt) {
 }
 
 public data class ResourceLoadingMethod(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "ALL"
+      1u -> "CACHE_ONLY"
+      2u -> "NETWORK_ONLY"
+      else -> "ResourceLoadingMethod($rawValue)"
+    }
+
   public companion object {
     public val ALL: ResourceLoadingMethod = ResourceLoadingMethod(0u)
     public val CACHE_ONLY: ResourceLoadingMethod = ResourceLoadingMethod(1u)
@@ -1001,6 +1241,13 @@ public data class ResourceLoadingMethod(public val rawValue: UInt) {
 }
 
 public data class ResourcePriority(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "REGULAR"
+      1u -> "LOW"
+      else -> "ResourcePriority($rawValue)"
+    }
+
   public companion object {
     public val REGULAR: ResourcePriority = ResourcePriority(0u)
     public val LOW: ResourcePriority = ResourcePriority(1u)
@@ -1008,6 +1255,13 @@ public data class ResourcePriority(public val rawValue: UInt) {
 }
 
 public data class ResourceProviderDecision(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "PASS_THROUGH"
+      1u -> "HANDLE"
+      else -> "ResourceProviderDecision($rawValue)"
+    }
+
   public companion object {
     public val PASS_THROUGH: ResourceProviderDecision = ResourceProviderDecision(0u)
     public val HANDLE: ResourceProviderDecision = ResourceProviderDecision(1u)
@@ -1073,6 +1327,15 @@ public data class ResourceResponseField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceResponseStatus(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "OK"
+      1u -> "ERROR"
+      2u -> "NO_CONTENT"
+      3u -> "NOT_MODIFIED"
+      else -> "ResourceResponseStatus($rawValue)"
+    }
+
   public companion object {
     public val OK: ResourceResponseStatus = ResourceResponseStatus(0u)
     public val ERROR: ResourceResponseStatus = ResourceResponseStatus(1u)
@@ -1082,6 +1345,13 @@ public data class ResourceResponseStatus(public val rawValue: UInt) {
 }
 
 public data class ResourceStoragePolicy(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "PERMANENT"
+      1u -> "VOLATILE"
+      else -> "ResourceStoragePolicy($rawValue)"
+    }
+
   public companion object {
     public val PERMANENT: ResourceStoragePolicy = ResourceStoragePolicy(0u)
     public val VOLATILE: ResourceStoragePolicy = ResourceStoragePolicy(1u)
@@ -1089,6 +1359,13 @@ public data class ResourceStoragePolicy(public val rawValue: UInt) {
 }
 
 public data class ResourceUsage(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "ONLINE"
+      1u -> "OFFLINE"
+      else -> "ResourceUsage($rawValue)"
+    }
+
   public companion object {
     public val ONLINE: ResourceUsage = ResourceUsage(0u)
     public val OFFLINE: ResourceUsage = ResourceUsage(1u)
@@ -1150,6 +1427,18 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventPayloadType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "RENDER_FRAME"
+      2u -> "RENDER_MAP"
+      4u -> "TILE_ACTION"
+      5u -> "OFFLINE_REGION_STATUS"
+      6u -> "OFFLINE_REGION_RESPONSE_ERROR"
+      7u -> "OFFLINE_REGION_TILE_COUNT_LIMIT"
+      else -> "RuntimeEventPayloadType($rawValue)"
+    }
+
   public companion object {
     public val NONE: RuntimeEventPayloadType = RuntimeEventPayloadType(0u)
     public val RENDER_FRAME: RuntimeEventPayloadType = RuntimeEventPayloadType(1u)
@@ -1169,6 +1458,13 @@ public data class RuntimeEventPayloadType(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventSourceType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "RUNTIME"
+      1u -> "MAP"
+      else -> "RuntimeEventSourceType($rawValue)"
+    }
+
   public companion object {
     public val RUNTIME: RuntimeEventSourceType = RuntimeEventSourceType(0u)
     public val MAP: RuntimeEventSourceType = RuntimeEventSourceType(1u)
@@ -1182,6 +1478,30 @@ public data class RuntimeEventSourceType(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "MAP_CAMERA_WILL_CHANGE"
+      2u -> "MAP_CAMERA_IS_CHANGING"
+      3u -> "MAP_CAMERA_DID_CHANGE"
+      4u -> "MAP_STYLE_LOADED"
+      5u -> "MAP_LOADING_STARTED"
+      6u -> "MAP_LOADING_FINISHED"
+      7u -> "MAP_LOADING_FAILED"
+      8u -> "MAP_IDLE"
+      10u -> "MAP_RENDER_ERROR"
+      13u -> "MAP_RENDER_FRAME_STARTED"
+      14u -> "MAP_RENDER_FRAME_FINISHED"
+      15u -> "MAP_RENDER_MAP_STARTED"
+      16u -> "MAP_RENDER_MAP_FINISHED"
+      17u -> "MAP_STYLE_IMAGE_MISSING"
+      18u -> "MAP_TILE_ACTION"
+      19u -> "OFFLINE_REGION_STATUS_CHANGED"
+      20u -> "OFFLINE_REGION_RESPONSE_ERROR"
+      21u -> "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
+      23u -> "MAP_SOURCE_CHANGED"
+      else -> "RuntimeEventType($rawValue)"
+    }
+
   public companion object {
     public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType = RuntimeEventType(1u)
     public val MAP_CAMERA_IS_CHANGING: RuntimeEventType = RuntimeEventType(2u)
@@ -1234,6 +1554,22 @@ public data class SourceFeatureQueryOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public data class Status(public val rawValue: Int) {
+  override fun toString(): String =
+    when (rawValue) {
+      0 -> "OK"
+      -1 -> "INVALID_ARGUMENT"
+      -2 -> "INVALID_STATE"
+      -3 -> "WRONG_THREAD"
+      -4 -> "UNSUPPORTED"
+      -5 -> "NATIVE_ERROR"
+      -6 -> "CANCELLED"
+      -7 -> "BUSY"
+      -8 -> "TARGET_LOST"
+      -9 -> "NOT_READY"
+      -10 -> "NOT_FOUND"
+      else -> "Status($rawValue)"
+    }
+
   public companion object {
     public val OK: Status = Status(0)
     /** A pointer, size field, mask, or handle argument was invalid. */
@@ -1319,6 +1655,14 @@ public data class StyleImageOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleImageTextFit(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "STRETCH_OR_SHRINK"
+      1u -> "STRETCH_ONLY"
+      2u -> "PROPORTIONAL"
+      else -> "StyleImageTextFit($rawValue)"
+    }
+
   public companion object {
     public val STRETCH_OR_SHRINK: StyleImageTextFit = StyleImageTextFit(0u)
     public val STRETCH_ONLY: StyleImageTextFit = StyleImageTextFit(1u)
@@ -1333,6 +1677,13 @@ public data class StyleImageTextFit(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleLayerVisibility(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "VISIBLE"
+      1u -> "NONE"
+      else -> "StyleLayerVisibility($rawValue)"
+    }
+
   public companion object {
     public val VISIBLE: StyleLayerVisibility = StyleLayerVisibility(0u)
     public val NONE: StyleLayerVisibility = StyleLayerVisibility(1u)
@@ -1346,6 +1697,13 @@ public data class StyleLayerVisibility(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleRasterDemEncoding(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "MAPBOX"
+      1u -> "TERRARIUM"
+      else -> "StyleRasterDemEncoding($rawValue)"
+    }
+
   public companion object {
     public val MAPBOX: StyleRasterDemEncoding = StyleRasterDemEncoding(0u)
     public val TERRARIUM: StyleRasterDemEncoding = StyleRasterDemEncoding(1u)
@@ -1393,6 +1751,21 @@ public data class StyleSourceInfoField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceType(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UNKNOWN"
+      1u -> "VECTOR"
+      2u -> "RASTER"
+      3u -> "RASTER_DEM"
+      4u -> "GEOJSON"
+      5u -> "IMAGE"
+      6u -> "VIDEO"
+      7u -> "ANNOTATIONS"
+      8u -> "CUSTOM_VECTOR"
+      9u -> "CUSTOM_MVT_VECTOR"
+      else -> "StyleSourceType($rawValue)"
+    }
+
   public companion object {
     public val UNKNOWN: StyleSourceType = StyleSourceType(0u)
     public val VECTOR: StyleSourceType = StyleSourceType(1u)
@@ -1414,6 +1787,13 @@ public data class StyleSourceType(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleTileScheme(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "XYZ"
+      1u -> "TMS"
+      else -> "StyleTileScheme($rawValue)"
+    }
+
   public companion object {
     public val XYZ: StyleTileScheme = StyleTileScheme(0u)
     public val TMS: StyleTileScheme = StyleTileScheme(1u)
@@ -1451,6 +1831,13 @@ public data class StyleTransitionOptionField(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleVectorTileEncoding(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "MVT"
+      1u -> "MLT"
+      else -> "StyleVectorTileEncoding($rawValue)"
+    }
+
   public companion object {
     public val MVT: StyleVectorTileEncoding = StyleVectorTileEncoding(0u)
     public val MLT: StyleVectorTileEncoding = StyleVectorTileEncoding(1u)
@@ -1464,6 +1851,13 @@ public data class StyleVectorTileEncoding(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class TileLodMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "DEFAULT"
+      1u -> "DISTANCE"
+      else -> "TileLodMode($rawValue)"
+    }
+
   public companion object {
     public val DEFAULT: TileLodMode = TileLodMode(0u)
     public val DISTANCE: TileLodMode = TileLodMode(1u)
@@ -1477,6 +1871,20 @@ public data class TileLodMode(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class TileOperation(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "REQUESTED_FROM_CACHE"
+      1u -> "REQUESTED_FROM_NETWORK"
+      2u -> "LOAD_FROM_NETWORK"
+      3u -> "LOAD_FROM_CACHE"
+      4u -> "START_PARSE"
+      5u -> "END_PARSE"
+      6u -> "ERROR"
+      7u -> "CANCELLED"
+      8u -> "NULL"
+      else -> "TileOperation($rawValue)"
+    }
+
   public companion object {
     public val REQUESTED_FROM_CACHE: TileOperation = TileOperation(0u)
     public val REQUESTED_FROM_NETWORK: TileOperation = TileOperation(1u)
@@ -1520,6 +1928,13 @@ public data class UrlMatchFlags(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class ViewportMode(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "DEFAULT"
+      1u -> "FLIPPED_Y"
+      else -> "ViewportMode($rawValue)"
+    }
+
   public companion object {
     public val DEFAULT: ViewportMode = ViewportMode(0u)
     public val FLIPPED_Y: ViewportMode = ViewportMode(1u)
@@ -1533,6 +1948,13 @@ public data class ViewportMode(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WebglContextKind(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "EXISTING"
+      1u -> "TRANSFERRED_CANVAS"
+      else -> "WebglContextKind($rawValue)"
+    }
+
   public companion object {
     /** Use a host-created context on its current browser agent. */
     public val EXISTING: WebglContextKind = WebglContextKind(0u)

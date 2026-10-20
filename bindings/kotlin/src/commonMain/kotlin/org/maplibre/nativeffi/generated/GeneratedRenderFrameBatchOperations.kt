@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedRenderFrameBatchOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
 
   /**
    * Borrows the result view stored by an owned frame-result batch.
@@ -16,7 +16,7 @@ public abstract class GeneratedRenderFrameBatchOperations internal constructor()
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun get(): RenderFrameBatchView =
-    nativeCall(this, binding, "mln_render_frame_batch_get", Access.READ) {
+    nativeRead(this, binding) {
       val out = sized(w(16, 24), w(4, 8))
       check(C.mln_render_frame_batch_get(handle, out, diagnostic))
       readRenderFrameBatchView(out)
@@ -29,7 +29,5 @@ public abstract class GeneratedRenderFrameBatchOperations internal constructor()
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun release(): Unit =
-    nativeClose(this, binding, "mln_render_frame_batch_release") {
-      C.mln_render_frame_batch_release(handle)
-    }
+    nativeClose(this, binding) { C.mln_render_frame_batch_release(handle) }
 }

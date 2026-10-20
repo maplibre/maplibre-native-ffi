@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedRuntimeOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
@@ -20,7 +20,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun clearEventHandler(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_clear_event_handler") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_clear_event_handler(handle, completion, diagnostic))
     }
 
@@ -31,7 +31,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun clearHttpHeaderTransform(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_clear_http_header_transform") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_clear_http_header_transform(handle, completion, diagnostic))
     }
 
@@ -42,7 +42,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun clearResourceProvider(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_clear_resource_provider") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_clear_resource_provider(handle, completion, diagnostic))
     }
 
@@ -53,7 +53,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun clearResourceTransform(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_clear_resource_transform") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_clear_resource_transform(handle, completion, diagnostic))
     }
 
@@ -67,7 +67,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmitOwned(
       this,
       binding,
-      "mln_runtime_create_map",
       { MapHandle(it, this@GeneratedRuntimeOperations as RuntimeHandle) },
       GeneratedOwnerDisposal::map,
       { it.dispose() },
@@ -88,7 +87,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_create_offline_region",
       { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
     ) {
       check(
@@ -110,7 +108,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun deleteOfflineRegion(regionId: Long): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_delete_offline_region") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_delete_offline_region(handle, regionId, completion, diagnostic))
     }
 
@@ -121,9 +119,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun dispose(): Unit =
-    nativeClose(this, binding, "mln_runtime_dispose") {
-      check(C.mln_runtime_dispose(handle, diagnostic))
-    }
+    nativeClose(this, binding) { check(C.mln_runtime_dispose(handle, diagnostic)) }
 
   /**
    * Reports which runtime-scoped event types this runtime queues.
@@ -132,7 +128,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun getEventMask(): RuntimeEventMask =
-    nativeCall(this, binding, "mln_runtime_get_event_mask") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       check(C.mln_runtime_get_event_mask(handle, out, diagnostic))
       RuntimeEventMask(readU64(out))
@@ -148,7 +144,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_get_offline_region",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readOfflineRegionInfo(CompletionBridge.value(result))
@@ -167,7 +162,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_get_offline_region_status",
       { result -> readOfflineRegionStatus(CompletionBridge.value(result)) },
     ) {
       check(C.mln_runtime_get_offline_region_status(handle, regionId, completion, diagnostic))
@@ -180,7 +174,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun invalidateOfflineRegion(regionId: Long): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_invalidate_offline_region") {
+    nativeUnit(this, binding) {
       check(C.mln_runtime_invalidate_offline_region(handle, regionId, completion, diagnostic))
     }
 
@@ -194,7 +188,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_list_offline_regions",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -219,7 +212,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_merge_offline_regions",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -243,9 +235,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun release(): Deferred<Unit> =
-    nativeRetire(this, binding, "mln_runtime_release") {
-      check(C.mln_runtime_release(handle, completion, diagnostic))
-    }
+    nativeRetire(this, binding) { check(C.mln_runtime_release(handle, completion, diagnostic)) }
 
   /**
    * Starts a MapLibre ambient cache maintenance operation for this runtime.
@@ -254,7 +244,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_run_ambient_cache_operation") {
+    nativeUnit(this, binding) {
       check(
         C.mln_runtime_run_ambient_cache_operation(
           handle,
@@ -272,7 +262,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setEventHandler(handler: RuntimeEventHandler): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_event_handler", bindingCallbacks) {
+    nativeUnit(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_event_handler(
           handle,
@@ -290,7 +280,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setEventMask(mask: RuntimeEventMask): Unit =
-    nativeCall(this, binding, "mln_runtime_set_event_mask") {
+    nativeCall(this, binding) {
       check(C.mln_runtime_set_event_mask(handle, mask.rawValue.toLong(), diagnostic))
     }
 
@@ -301,7 +291,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setHttpHeaderTransform(transform: HttpHeaderTransform): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_http_header_transform", bindingCallbacks) {
+    nativeUnit(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_http_header_transform(
           handle,
@@ -319,7 +309,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setMaximumAmbientCacheSize(size: ULong): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_maximum_ambient_cache_size") {
+    nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_maximum_ambient_cache_size(handle, size.toLong(), completion, diagnostic),
       )
@@ -335,7 +325,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     regionId: Long,
     state: OfflineRegionDownloadState,
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_offline_region_download_state") {
+    nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_offline_region_download_state(
           handle,
@@ -354,7 +344,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun setOfflineRegionObserved(regionId: Long, observed: Boolean): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_offline_region_observed") {
+    nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_offline_region_observed(
           handle,
@@ -373,7 +363,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setResourceProvider(provider: ResourceProvider): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_resource_provider", bindingCallbacks) {
+    nativeUnit(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_provider(
           handle,
@@ -391,7 +381,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setResourceTransform(transform: ResourceTransform): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_set_resource_transform", bindingCallbacks) {
+    nativeUnit(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_transform(
           handle,
@@ -415,7 +405,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_update_offline_region_metadata",
       { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
     ) {
       check(

@@ -12,7 +12,7 @@ private val exitSessions = ExitSessions()
 
 private val exitHookInstalled = AtomicBoolean(false)
 
-internal actual fun endGraphicsAtExit(handle: Long, report: HandleStateCore.LeakReport) {
+internal actual fun endGraphicsAtExit(state: HandleState) {
   if (exitHookInstalled.compareAndSet(false, true)) {
     try {
       Runtime.getRuntime().addShutdownHook(Thread(::runExitHook, "maplibre-render-session-exit"))
@@ -22,7 +22,7 @@ internal actual fun endGraphicsAtExit(handle: Long, report: HandleStateCore.Leak
       exitSessions.abandonAll()
     }
   }
-  exitSessions.enroll(handle, report)
+  exitSessions.enroll(state)
 }
 
 /**
@@ -59,31 +59,28 @@ private fun insideCallback(stack: Array<StackTraceElement>, from: Int = 0): Bool
 /**
  * The render sessions to abandon at exit.
  *
- * Each entry holds a session's handle and its leak report, never its wrapper, so the leak cleaner
- * still runs for an unreachable session. Entries whose report shows a release are pruned as the
- * list grows.
+ * Each entry holds a session's state, never its wrapper, so the leak cleaner still runs for an
+ * unreachable session. Released entries are pruned as the list grows.
  */
 internal class ExitSessions {
-  private class Entry(val handle: Long, val report: HandleStateCore.LeakReport)
-
   private val lock = Any()
-  private var entries = ArrayList<Entry>()
+  private var entries = ArrayList<HandleState>()
   private var pruneAt = PRUNE_FLOOR
   private var exiting = false
 
-  /** Holds [handle] until [abandonAll], or abandons it now when [abandonAll] has already run. */
-  fun enroll(handle: Long, report: HandleStateCore.LeakReport) {
+  /** Holds [state] until [abandonAll], or abandons it now when [abandonAll] has already run. */
+  fun enroll(state: HandleState) {
     synchronized(lock) {
       if (!exiting) {
         if (entries.size >= pruneAt) {
-          entries.removeAll { it.report.isReleased() }
+          entries.removeAll { it.isReleased }
           pruneAt = maxOf(entries.size * 2, PRUNE_FLOOR)
         }
-        entries.add(Entry(handle, report))
+        entries.add(state)
         return
       }
     }
-    if (!insideCallback(Thread.currentThread().stackTrace)) abandonAtExit(handle)
+    if (!insideCallback(Thread.currentThread().stackTrace)) abandonAtExit(state.handle)
   }
 
   /**
@@ -101,8 +98,8 @@ internal class ExitSessions {
         entries.also { entries = ArrayList() }
       }
     if (pending.isEmpty() || insideCallback(Thread.currentThread().stackTrace)) return
-    for (entry in pending) {
-      if (!entry.report.isReleased()) abandonAtExit(entry.handle)
+    for (state in pending) {
+      if (!state.isReleased) abandonAtExit(state.handle)
     }
   }
 

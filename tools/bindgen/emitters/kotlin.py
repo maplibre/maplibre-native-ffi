@@ -17,7 +17,6 @@ from .kotlin_operations import (
     owner_disposal,
     receiver_value,
 )
-from .kotlin_owners import state_type
 from .kotlin_values import Unsupported, Values, doc, generated_owners
 from .kotlin_values import name as value_name
 
@@ -105,9 +104,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         if receiver:
             family = value_name(receiver)
             class_name = f"Generated{family}Operations"
-            members = [
-                f"  internal abstract val binding: {state_type(bound, receiver)}\n"
-            ]
+            members = ["  internal abstract val binding: HandleState\n"]
             if callback_owner(bound, receiver):
                 members.append(
                     "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"
@@ -151,7 +148,6 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         "// Generated from handle disposal relationships by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi.generated\n\n"
         "import org.maplibre.nativeffi.internal.c.C\n"
-        "import org.maplibre.nativeffi.internal.callback.CallbackAdmission\n"
         "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n\n"
         + owner_disposal(bound, native)
     )

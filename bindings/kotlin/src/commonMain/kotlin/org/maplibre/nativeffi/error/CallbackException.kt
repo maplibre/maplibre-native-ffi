@@ -6,8 +6,7 @@ package org.maplibre.nativeffi.error
  * handler for exceptions that no caller can receive.
  *
  * That handler runs on the native thread that called the callback, before native continues, so it
- * should return quickly. The binding refuses every native call that the handler makes with
- * [InvalidStateException].
+ * should return quickly, and it follows the callback's rules for calls into native.
  */
 public class CallbackException
 internal constructor(

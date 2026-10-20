@@ -18,7 +18,7 @@ internal object NativeDiagnostics {
   /** Calls native with this thread's diagnostic and throws the mapped exception on failure. */
   inline fun check(call: (Long) -> Int) {
     val diagnostic = buffer()
-    Status.check(call(diagnostic)) { message(diagnostic) }
+    checkStatus(call(diagnostic)) { message(diagnostic) }
   }
 
   /** Returns this thread's diagnostic, sized for the next call. */

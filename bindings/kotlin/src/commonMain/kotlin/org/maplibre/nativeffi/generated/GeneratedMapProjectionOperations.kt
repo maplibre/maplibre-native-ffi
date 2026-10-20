@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedMapProjectionOperations internal constructor() {
-  internal abstract val binding: HandleStateCore
+  internal abstract val binding: HandleState
 
   /**
    * Copies the projection camera into out_camera.
@@ -16,7 +16,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun getCamera(): CameraOptions =
-    nativeCall(this, binding, "mln_map_projection_get_camera") {
+    nativeCall(this, binding) {
       val out = sized(120, 8)
       check(C.mln_map_projection_get_camera(handle, out, diagnostic))
       readCameraOptions(out)
@@ -29,7 +29,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun latLngForPixel(point: ScreenPoint): LatLng =
-    nativeCall(this, binding, "mln_map_projection_lat_lng_for_pixel") {
+    nativeCall(this, binding) {
       val out = allocate(16, 8)
       check(
         C.mln_map_projection_lat_lng_for_pixel(handle, writeScreenPoint(point), out, diagnostic),
@@ -44,7 +44,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng =
-    nativeCall(this, binding, "mln_map_projection_lat_lng_for_pixel_unwrapped") {
+    nativeCall(this, binding) {
       val out = allocate(16, 8)
       check(
         C.mln_map_projection_lat_lng_for_pixel_unwrapped(
@@ -65,7 +65,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun metersPerPixelAtLatitude(latitude: Double): Double =
-    nativeCall(this, binding, "mln_map_projection_meters_per_pixel_at_latitude") {
+    nativeCall(this, binding) {
       val out = allocate(8, 8)
       check(C.mln_map_projection_meters_per_pixel_at_latitude(handle, latitude, out, diagnostic))
       readF64(out)
@@ -78,7 +78,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint =
-    nativeCall(this, binding, "mln_map_projection_pixel_for_lat_lng") {
+    nativeCall(this, binding) {
       val out = allocate(16, 8)
       check(
         C.mln_map_projection_pixel_for_lat_lng(handle, writeLatLng(coordinate), out, diagnostic),
@@ -93,9 +93,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun release(): Unit =
-    nativeClose(this, binding, "mln_map_projection_release") {
-      check(C.mln_map_projection_release(handle, diagnostic))
-    }
+    nativeClose(this, binding) { check(C.mln_map_projection_release(handle, diagnostic)) }
 
   /**
    * Applies a camera update to a standalone projection.
@@ -104,7 +102,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun setCamera(camera: CameraOptions): Unit =
-    nativeCall(this, binding, "mln_map_projection_set_camera") {
+    nativeCall(this, binding) {
       check(C.mln_map_projection_set_camera(handle, writeCameraOptions(camera), diagnostic))
     }
 }

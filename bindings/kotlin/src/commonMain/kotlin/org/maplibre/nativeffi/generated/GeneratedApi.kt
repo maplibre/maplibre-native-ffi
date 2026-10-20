@@ -16,7 +16,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
    */
   public fun androidInit(jniEnv: NativePointer, context: NativePointer): Unit =
-    nativeCall(null, null, "mln_android_init") {
+    nativeCall(null, null) {
       check(C.mln_android_init(jniEnv.address, context.address, diagnostic))
     }
 
@@ -27,7 +27,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun animationOptionsDefault(): AnimationOptions =
-    nativeCall(null, null, "mln_animation_options_default") {
+    nativeCall(null, null) {
       val out = allocate(w(96, 104), 8)
       C.mln_animation_options_default(out)
       readAnimationOptions(out)
@@ -40,7 +40,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun boundOptionsDefault(): BoundOptions =
-    nativeCall(null, null, "mln_bound_options_default") {
+    nativeCall(null, null) {
       val out = sized(72, 8)
       C.mln_bound_options_default(out)
       readBoundOptions(out)
@@ -54,7 +54,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
    */
   public fun cVersion(): UInt =
-    nativeCall(null, null, "mln_c_version") {
+    nativeCall(null, null) {
       val raw = C.mln_c_version()
       raw.toUInt()
     }
@@ -66,7 +66,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cameraDeltaDefault(): CameraDelta =
-    nativeCall(null, null, "mln_camera_delta_default") {
+    nativeCall(null, null) {
       val out = sized(w(168, 176), 8)
       C.mln_camera_delta_default(out)
       readCameraDelta(out)
@@ -79,7 +79,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cameraFitOptionsDefault(): CameraFitOptions =
-    nativeCall(null, null, "mln_camera_fit_options_default") {
+    nativeCall(null, null) {
       val out = sized(56, 8)
       C.mln_camera_fit_options_default(out)
       readCameraFitOptions(out)
@@ -92,7 +92,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cameraOptionsDefault(): CameraOptions =
-    nativeCall(null, null, "mln_camera_options_default") {
+    nativeCall(null, null) {
       val out = sized(120, 8)
       C.mln_camera_options_default(out)
       readCameraOptions(out)
@@ -105,7 +105,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cameraUpdateDefault(): CameraUpdate =
-    nativeCall(null, null, "mln_camera_update_default") {
+    nativeCall(null, null) {
       val out = sized(w(232, 240), 8)
       C.mln_camera_update_default(out)
       readCameraUpdate(out)
@@ -118,7 +118,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun customGeometrySourceOptionsDefault(): CustomGeometrySourceOptions =
-    nativeCall(null, null, "mln_custom_geometry_source_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(72, 88), 8)
       C.mln_custom_geometry_source_options_default(out)
       readCustomGeometrySourceOptions(out)
@@ -131,7 +131,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun customMvtVectorSourceOptionsDefault(): CustomMvtVectorSourceOptions =
-    nativeCall(null, null, "mln_custom_mvt_vector_source_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 64), 8)
       C.mln_custom_mvt_vector_source_options_default(out)
       readCustomMvtVectorSourceOptions(out)
@@ -144,7 +144,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   public fun frameDemandDefault(): FrameDemand =
-    nativeCall(null, null, "mln_frame_demand_default") {
+    nativeCall(null, null) {
       val out = sized(16, 8)
       C.mln_frame_demand_default(out)
       readFrameDemand(out)
@@ -157,7 +157,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun freeCameraOptionsDefault(): FreeCameraOptions =
-    nativeCall(null, null, "mln_free_camera_options_default") {
+    nativeCall(null, null) {
       val out = sized(64, 8)
       C.mln_free_camera_options_default(out)
       readFreeCameraOptions(out)
@@ -173,7 +173,7 @@ public object GeneratedApi {
     data: ByteArray,
     options: GeojsonSourceOptions? = null,
   ): GeojsonSourceDataHandle =
-    nativeCall(null, null, "mln_geojson_source_data_create") {
+    nativeCall(null, null) {
       val out = allocate(8, 8)
       check(
         C.mln_geojson_source_data_create(
@@ -193,7 +193,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun geojsonSourceOptionsDefault(): GeojsonSourceOptions =
-    nativeCall(null, null, "mln_geojson_source_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(64, 72), 8)
       C.mln_geojson_source_options_default(out)
       readGeojsonSourceOptions(out)
@@ -206,7 +206,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
   public fun gpuSyncDefault(): GpuSync =
-    nativeCall(null, null, "mln_gpu_sync_default") {
+    nativeCall(null, null) {
       val out = sized(16, 8)
       C.mln_gpu_sync_default(out)
       readGpuSync(out)
@@ -219,7 +219,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun httpHeaderRuleDefault(): HttpHeaderRule =
-    nativeCall(null, null, "mln_http_header_rule_default") {
+    nativeCall(null, null) {
       val out = allocate(w(24, 40), w(4, 8))
       C.mln_http_header_rule_default(out)
       readHttpHeaderRule(out)
@@ -236,11 +236,7 @@ public object GeneratedApi {
     name: String,
     value: String,
   ): Unit =
-    nativeRespond(
-      response.bindingScope,
-      response.bindingAddress,
-      "mln_http_header_transform_response_set_header",
-    ) {
+    nativeRespond(response.bindingScope, response.bindingAddress) {
       check(
         C.mln_http_header_transform_response_set_header(
           handle,
@@ -258,7 +254,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng =
-    nativeCall(null, null, "mln_lat_lng_for_projected_meters") {
+    nativeCall(null, null) {
       val out = allocate(16, 8)
       check(C.mln_lat_lng_for_projected_meters(writeProjectedMeters(meters), out, diagnostic))
       readLatLng(out)
@@ -271,7 +267,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
   public fun logClearCallback(): Unit =
-    nativeCall(null, null, "mln_log_clear_callback") { check(C.mln_log_clear_callback(diagnostic)) }
+    nativeCall(null, null) { check(C.mln_log_clear_callback(diagnostic)) }
 
   /**
    * Controls which log severities MapLibre Native may dispatch asynchronously.
@@ -280,7 +276,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
   public fun logSetAsyncSeverityMask(mask: LogSeverityMask): Unit =
-    nativeCall(null, null, "mln_log_set_async_severity_mask") {
+    nativeCall(null, null) {
       check(C.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic))
     }
 
@@ -291,7 +287,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
   public fun logSetCallback(handler: LogHandler): Unit =
-    nativeCall(null, null, "mln_log_set_callback") {
+    nativeCall(null, null) {
       check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
       accept(CallbackOwner.global)
     }
@@ -303,7 +299,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun logicalExtentDefault(): LogicalExtent =
-    nativeCall(null, null, "mln_logical_extent_default") {
+    nativeCall(null, null) {
       val out = allocate(16, 8)
       C.mln_logical_extent_default(out)
       readLogicalExtent(out)
@@ -316,7 +312,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
   public fun logicalExtentPhysicalSize(extent: LogicalExtent): LogicalExtentPhysicalSizeResult =
-    nativeCall(null, null, "mln_logical_extent_physical_size") {
+    nativeCall(null, null) {
       val out0 = allocate(4, 4)
       val out1 = allocate(4, 4)
       check(C.mln_logical_extent_physical_size(writeLogicalExtent(extent), out0, out1, diagnostic))
@@ -330,7 +326,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
   public fun mapOptionsDefault(): MapOptions =
-    nativeCall(null, null, "mln_map_options_default") {
+    nativeCall(null, null) {
       val out = sized(40, 8)
       C.mln_map_options_default(out)
       readMapOptions(out)
@@ -343,7 +339,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun mapTileOptionsDefault(): MapTileOptions =
-    nativeCall(null, null, "mln_map_tile_options_default") {
+    nativeCall(null, null) {
       val out = sized(56, 8)
       C.mln_map_tile_options_default(out)
       readMapTileOptions(out)
@@ -356,7 +352,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun mapViewportOptionsDefault(): MapViewportOptions =
-    nativeCall(null, null, "mln_map_viewport_options_default") {
+    nativeCall(null, null) {
       val out = sized(56, 8)
       C.mln_map_viewport_options_default(out)
       readMapViewportOptions(out)
@@ -369,7 +365,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun metalBorrowedTextureDescriptorDefault(): MetalBorrowedTextureDescriptor =
-    nativeCall(null, null, "mln_metal_borrowed_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(40, 48), 8)
       C.mln_metal_borrowed_texture_descriptor_default(out)
       readMetalBorrowedTextureDescriptor(out)
@@ -382,7 +378,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun metalOwnedTextureDescriptorDefault(): MetalOwnedTextureDescriptor =
-    nativeCall(null, null, "mln_metal_owned_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(32, 8)
       C.mln_metal_owned_texture_descriptor_default(out)
       readMetalOwnedTextureDescriptor(out)
@@ -395,7 +391,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun metalSurfaceDescriptorDefault(): MetalSurfaceDescriptor =
-    nativeCall(null, null, "mln_metal_surface_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(32, 40), 8)
       C.mln_metal_surface_descriptor_default(out)
       readMetalSurfaceDescriptor(out)
@@ -408,7 +404,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun networkGetStatus(): NetworkStatus =
-    nativeCall(null, null, "mln_network_get_status") {
+    nativeCall(null, null) {
       val out = allocate(4, 4)
       check(C.mln_network_get_status(out, diagnostic))
       NetworkStatus(readU32(out))
@@ -421,9 +417,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun networkSetStatus(status: NetworkStatus): Unit =
-    nativeCall(null, null, "mln_network_set_status") {
-      check(C.mln_network_set_status(status.rawValue.toInt(), diagnostic))
-    }
+    nativeCall(null, null) { check(C.mln_network_set_status(status.rawValue.toInt(), diagnostic)) }
 
   /**
    * Returns OpenGL borrowed-texture descriptor defaults for this C API version.
@@ -432,7 +426,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun openglBorrowedTextureDescriptorDefault(): OpenglBorrowedTextureDescriptor =
-    nativeCall(null, null, "mln_opengl_borrowed_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(72, 104), 8)
       C.mln_opengl_borrowed_texture_descriptor_default(out)
       readOpenglBorrowedTextureDescriptor(out)
@@ -445,7 +439,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun openglOwnedTextureDescriptorDefault(): OpenglOwnedTextureDescriptor =
-    nativeCall(null, null, "mln_opengl_owned_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 72), 8)
       C.mln_opengl_owned_texture_descriptor_default(out)
       readOpenglOwnedTextureDescriptor(out)
@@ -458,7 +452,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
   public fun openglSupportedContextProviderMask(): OpenglContextProviderFlag =
-    nativeCall(null, null, "mln_opengl_supported_context_provider_mask") {
+    nativeCall(null, null) {
       val raw = C.mln_opengl_supported_context_provider_mask()
       OpenglContextProviderFlag(raw.toUInt())
     }
@@ -470,7 +464,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun openglSurfaceDescriptorDefault(): OpenglSurfaceDescriptor =
-    nativeCall(null, null, "mln_opengl_surface_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 80), 8)
       C.mln_opengl_surface_descriptor_default(out)
       readOpenglSurfaceDescriptor(out)
@@ -483,7 +477,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
    */
   public fun pluginGetRegisterFunctionV1(): NativePointer =
-    nativeCall(null, null, "mln_plugin_get_register_function_v1") {
+    nativeCall(null, null) {
       val raw = C.mln_plugin_get_register_function_v1()
       NativePointer.ofAddress(raw)
     }
@@ -495,7 +489,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun premultipliedRgba8ImageDefault(): PremultipliedRgba8Image =
-    nativeCall(null, null, "mln_premultiplied_rgba8_image_default") {
+    nativeCall(null, null) {
       val out = sized(w(24, 32), w(4, 8))
       C.mln_premultiplied_rgba8_image_default(out)
       readPremultipliedRgba8Image(out)
@@ -508,7 +502,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
   public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters =
-    nativeCall(null, null, "mln_projected_meters_for_lat_lng") {
+    nativeCall(null, null) {
       val out = allocate(16, 8)
       check(C.mln_projected_meters_for_lat_lng(writeLatLng(coordinate), out, diagnostic))
       readProjectedMeters(out)
@@ -521,7 +515,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun projectionModeDefault(): ProjectionMode =
-    nativeCall(null, null, "mln_projection_mode_default") {
+    nativeCall(null, null) {
       val out = sized(32, 8)
       C.mln_projection_mode_default(out)
       readProjectionMode(out)
@@ -535,7 +529,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
    */
   public fun renderSessionAttachOptionsDefault(): RenderSessionAttachOptions =
-    nativeCall(null, null, "mln_render_session_attach_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 96), w(4, 8))
       C.mln_render_session_attach_options_default(out)
       readRenderSessionAttachOptions(out)
@@ -548,7 +542,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
    */
   public fun renderedFeatureQueryOptionsDefault(): RenderedFeatureQueryOptions =
-    nativeCall(null, null, "mln_rendered_feature_query_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(24, 40), w(4, 8))
       C.mln_rendered_feature_query_options_default(out)
       readRenderedFeatureQueryOptions(out)
@@ -561,7 +555,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun resourceRouteDefault(): ResourceRoute =
-    nativeCall(null, null, "mln_resource_route_default") {
+    nativeCall(null, null) {
       val out = allocate(w(16, 24), w(4, 8))
       C.mln_resource_route_default(out)
       readResourceRoute(out)
@@ -574,7 +568,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun runtimeCreate(options: RuntimeOptions): RuntimeHandle =
-    nativeCall(null, null, "mln_runtime_create") {
+    nativeCall(null, null) {
       val out = allocate(8, 8)
       check(C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
@@ -587,7 +581,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun runtimeOptionsDefault(): RuntimeOptions =
-    nativeCall(null, null, "mln_runtime_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(20, 40), w(4, 8))
       C.mln_runtime_options_default(out)
       readRuntimeOptions(out)
@@ -600,7 +594,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
    */
   public fun sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions =
-    nativeCall(null, null, "mln_source_feature_query_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(24, 40), w(4, 8))
       C.mln_source_feature_query_options_default(out)
       readSourceFeatureQueryOptions(out)
@@ -613,7 +607,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun styleImageOptionsDefault(): StyleImageOptions =
-    nativeCall(null, null, "mln_style_image_options_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 72), w(4, 8))
       C.mln_style_image_options_default(out)
       readStyleImageOptions(out)
@@ -626,7 +620,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun styleTransitionOptionsDefault(): StyleTransitionOptions =
-    nativeCall(null, null, "mln_style_transition_options_default") {
+    nativeCall(null, null) {
       val out = sized(32, 8)
       C.mln_style_transition_options_default(out)
       readStyleTransitionOptions(out)
@@ -639,7 +633,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
    */
   public fun supportedRenderBackendMask(): RenderBackendFlag =
-    nativeCall(null, null, "mln_supported_render_backend_mask") {
+    nativeCall(null, null) {
       val raw = C.mln_supported_render_backend_mask()
       RenderBackendFlag(raw.toUInt())
     }
@@ -651,7 +645,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor =
-    nativeCall(null, null, "mln_vulkan_borrowed_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(80, 120), 8)
       C.mln_vulkan_borrowed_texture_descriptor_default(out)
       readVulkanBorrowedTextureDescriptor(out)
@@ -664,7 +658,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun vulkanOwnedTextureDescriptorDefault(): VulkanOwnedTextureDescriptor =
-    nativeCall(null, null, "mln_vulkan_owned_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 80), 8)
       C.mln_vulkan_owned_texture_descriptor_default(out)
       readVulkanOwnedTextureDescriptor(out)
@@ -677,7 +671,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun vulkanSurfaceDescriptorDefault(): VulkanSurfaceDescriptor =
-    nativeCall(null, null, "mln_vulkan_surface_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(64, 88), 8)
       C.mln_vulkan_surface_descriptor_default(out)
       readVulkanSurfaceDescriptor(out)
@@ -690,7 +684,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun webgpuBorrowedTextureDescriptorDefault(): WebgpuBorrowedTextureDescriptor =
-    nativeCall(null, null, "mln_webgpu_borrowed_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(56, 80), 8)
       C.mln_webgpu_borrowed_texture_descriptor_default(out)
       readWebgpuBorrowedTextureDescriptor(out)
@@ -703,7 +697,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun webgpuOwnedTextureDescriptorDefault(): WebgpuOwnedTextureDescriptor =
-    nativeCall(null, null, "mln_webgpu_owned_texture_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(40, 48), 8)
       C.mln_webgpu_owned_texture_descriptor_default(out)
       readWebgpuOwnedTextureDescriptor(out)
@@ -716,7 +710,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   public fun webgpuSurfaceDescriptorDefault(): WebgpuSurfaceDescriptor =
-    nativeCall(null, null, "mln_webgpu_surface_descriptor_default") {
+    nativeCall(null, null) {
       val out = sized(w(48, 64), 8)
       C.mln_webgpu_surface_descriptor_default(out)
       readWebgpuSurfaceDescriptor(out)

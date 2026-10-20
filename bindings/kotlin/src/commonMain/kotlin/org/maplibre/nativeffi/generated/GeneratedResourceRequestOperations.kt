@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedResourceRequestOperations internal constructor() {
-  internal abstract val binding: DecisionOwnerState
+  internal abstract val binding: HandleState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
@@ -18,7 +18,7 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun complete(response: ResourceResponse): Unit =
-    nativeComplete(this, binding, "mln_resource_request_complete") {
+    nativeCall(this, binding) {
       check(C.mln_resource_request_complete(handle, writeResourceResponse(response), diagnostic))
     }
 
@@ -29,8 +29,8 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun isCancelled(): Boolean =
-    nativeCall(this, binding, "mln_resource_request_is_cancelled", Access.READ) {
-      val out = allocate(1)
+    nativeCall(this, binding) {
+      val out = allocate(1, 1)
       check(C.mln_resource_request_is_cancelled(handle, out, diagnostic))
       readBool(out)
     }
@@ -42,9 +42,7 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun passThrough(): Unit =
-    nativeComplete(this, binding, "mln_resource_request_pass_through") {
-      check(C.mln_resource_request_pass_through(handle, diagnostic))
-    }
+    nativeCall(this, binding) { check(C.mln_resource_request_pass_through(handle, diagnostic)) }
 
   /**
    * Releases the provider's reference to a resource request handle.
@@ -52,7 +50,7 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun release(): Unit = binding.close()
+  public fun release(): Unit = nativeClose(this, binding) { C.mln_resource_request_release(handle) }
 
   /**
    * Registers a callback that runs when MapLibre cancels a C API resource provider request.
@@ -61,7 +59,7 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun setCancelCallback(handler: ResourceRequestCancelHandler): Boolean =
-    nativeCall(this, binding, "mln_resource_request_set_cancel_callback", Access.READ) {
+    nativeCall(this, binding) {
       val out = allocate(1)
       check(
         C.mln_resource_request_set_cancel_callback(

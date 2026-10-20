@@ -1,4 +1,4 @@
-"""Derive every Kotlin handle owner from its handle, release, and decision plans."""
+"""Derive every Kotlin handle owner from its handle and release plans."""
 
 from dataclasses import dataclass
 
@@ -23,10 +23,6 @@ class Release:
 
 def receives(plan, native):
     return bool(plan.receiver) and receiver_value(plan).native == native
-
-
-def decision(bound, native):
-    return bound.decisions.get(native)
 
 
 def release(bound, native, plans):
@@ -57,10 +53,6 @@ def defaulted(parameter):
     return bool(parameter.value.nullable or parameter.value.optional or value.default)
 
 
-def state_type(bound, native):
-    return "DecisionOwnerState" if decision(bound, native) else "HandleStateCore"
-
-
 def generate_owners(bound, plans):
     return {
         f"src/commonMain/kotlin/org/maplibre/nativeffi/generated/{owner_name(bound.handles[native])}.kt": owner(
@@ -79,43 +71,25 @@ def owner(bound, native, plans):
     if closes:
         supertypes.append(closes.interface)
     parameters = ["handle: Long"]
-    parents = ""
     if handle.parent:
-        parameters.append(f"parent: {owner_name(bound.handles[handle.parent])}")
-        parents = ", parent"
+        # The owner, not its state, keeps the parent reachable, so leak cleanup
+        # and exit abandonment never hold a parent.
+        parameters.append(
+            f'@Suppress("unused") private val parent: {owner_name(bound.handles[handle.parent])}'
+        )
     dispose = family[0].lower() + family[1:]
-    parameters.append(f"dispose: (Long) -> Unit = GeneratedOwnerDisposal::{dispose}")
-    body = []
-    choice = decision(bound, native)
-    if choice:
-        if handle.parent or handle.dispose != handle.release:
-            raise ValueError(
-                f"{native}: a decision owner releases through its disposal path"
-            )
-        accept = bound.enum_number(choice.accept)
-        pass_through = bound.enum_number(choice.pass_through)
-        body.append(
-            f'  internal override val binding = DecisionOwnerState("{owner_class}", handle, accept = {accept}u, passThrough = {pass_through}u, dispose = dispose)'
-        )
-        body.append(
-            '  @Suppress("unused") private val cleanup = closeWhenUnreachable(this, binding.core)'
-        )
-        body.append("  public val isClosed: Boolean get() = binding.isClosed")
-    else:
-        body.append(
-            f'  internal override val binding = HandleStateCore("{owner_class}", handle{parents}, dispose = dispose)'
-        )
-        body.append(
-            '  @Suppress("unused") private val cleanup = trackLeak(this, binding.leakReport)'
-        )
-        body.append("  public val isClosed: Boolean get() = binding.isReleased()")
-    body.append(
-        "  /**\n"
-        "   * The native handle value, which runtime events report as their source. It stays readable\n"
-        "   * after close, so events drained later still match this handle.\n"
-        "   */\n"
-        "  public val id: ULong get() = binding.issued().toULong()"
-    )
+    body = [
+        f'  internal override val binding = HandleState("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
+        '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)',
+        (
+            "  /**\n"
+            "   * The native handle value, which runtime events report as their source. It stays readable\n"
+            "   * after close, so events drained later still match this handle.\n"
+            "   */\n"
+            "  public val id: ULong get() = binding.handle.toULong()"
+        ),
+        "  public val isClosed: Boolean get() = binding.isReleased",
+    ]
     if closes and not closes.inherited:
         body.append(
             f"  public override fun close() {{ {closes.method}() }}"

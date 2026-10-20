@@ -6,17 +6,16 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.CallbackException
-import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.HttpHeaderTransform
 import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
@@ -32,7 +31,7 @@ import org.maplibre.nativeffi.generated.ResourceRoute
 import org.maplibre.nativeffi.generated.ResourceTransform
 import org.maplibre.nativeffi.generated.ResourceTransformRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.RuntimeHandle
+import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.interceptCallbackFailures
 import org.maplibre.nativeffi.runOnBackgroundThread
@@ -40,10 +39,7 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
 import org.maplibre.nativeffi.withMap
 
-/**
- * The resource provider and transform callbacks: what they root, what they may call, and what they
- * hand out.
- */
+/** The resource provider and transform callbacks: what they root and what they hand out. */
 @OptIn(ExperimentalAtomicApi::class)
 class ResourceCallbackTest {
 
@@ -60,7 +56,7 @@ class ResourceCallbackTest {
       )
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
       // Native keeps the first registration, and the rejected second one keeps no root.
-      assertFailsWith<InvalidStateException> {
+      assertFailsWithStatus(Status.INVALID_STATE) {
         request.setCancelCallback(ResourceRequestCancelHandler {})
       }
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
@@ -89,42 +85,6 @@ class ResourceCallbackTest {
     assertEquals(0, request.bindingCallbacks.rootCountForTesting())
     assertEquals(0, cancels.load())
     request.close()
-  }
-
-  @Test
-  fun aForbiddenCallInsideACallbackFailsAndAnAllowedOneSucceeds(): Unit = runSuspendTest {
-    val outcome = CompletableDeferred<List<Throwable?>>()
-    lateinit var fixtureRuntime: RuntimeHandle
-    val provider = denyingProvider { request, handle ->
-      if (request.requestedUrl != STYLE_URL) return@denyingProvider null
-      val results =
-        listOf(
-          runCatching { fixtureRuntime.clearResourceTransform() }.exceptionOrNull(),
-          runCatching { fixtureRuntime.release() }.exceptionOrNull(),
-          runCatching {
-            handle.complete(
-              ResourceResponse(
-                ResourceResponseStatus.OK,
-                bytes = EMPTY_STYLE_JSON.encodeToByteArray(),
-              ),
-            )
-            handle.close()
-          }
-            .exceptionOrNull(),
-        )
-      outcome.complete(results)
-      ResourceProviderDecision.HANDLE
-    }
-    withMap(provider = provider) {
-      fixtureRuntime = runtime
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      val (command, release, completion) = outcome.awaitWithin("the provider callback")
-      assertTrue(command is InvalidStateException, "command inside the provider: $command")
-      assertTrue(release is InvalidStateException, "release inside the provider: $release")
-      assertEquals(null, completion, "completing the provided request is allowed")
-      assertFalse(runtime.isClosed)
-      awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
-    }
   }
 
   @Test
@@ -157,43 +117,6 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun theHandlerOfAContainedExceptionCannotCallNative(): Unit = runSuspendTest {
-    val thrown = IllegalStateException("transform failure")
-    val reentry = CompletableDeferred<Throwable?>()
-    val restore =
-      interceptCallbackFailures { failure ->
-        // The handler runs on the transform's stack after its admission ends, where the binding
-        // still refuses every native call.
-        if (failure.cause === thrown)
-          reentry.complete(runCatching { GeneratedApi.networkGetStatus() }.exceptionOrNull())
-      } ?: return@runSuspendTest
-    try {
-      withMap(
-        provider =
-          denyingProvider { request, _ ->
-            if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
-          },
-      ) {
-        runtime
-          .setResourceTransform(
-            ResourceTransform(
-              callback = { _, url, request ->
-                if (url == STYLE_URL) throw thrown else request.close()
-              },
-            ),
-          )
-          .awaitWithin("the transform")
-        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-        val refusal = reentry.awaitWithin("the transform's report")
-        assertTrue(refusal is InvalidStateException, "a native call inside the handler: $refusal")
-        runtime.clearResourceTransform().awaitWithin("the transform clear")
-      }
-    } finally {
-      restore()
-    }
-  }
-
-  @Test
   fun aClaimedRequestCanBeAnsweredAfterTheProviderReturns(): Unit = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
@@ -201,7 +124,7 @@ class ResourceCallbackTest {
       val request = claimed.awaitWithin("the provider to claim the request")
 
       // A response the C API cannot represent is refused and leaves the request answerable.
-      assertFailsWith<InvalidArgumentException> {
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
         request.complete(
           ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message"),
         )
@@ -210,7 +133,7 @@ class ResourceCallbackTest {
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
       // A request takes one response.
-      assertFailsWith<InvalidStateException> {
+      assertFailsWithStatus(Status.INVALID_STATE) {
         request.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
       request.close()
@@ -255,11 +178,12 @@ class ResourceCallbackTest {
       map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
       val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
       assertEquals(null, inside, "setting a header inside the callback is allowed")
-      assertTrue(
-        fromAnotherThread is InvalidStateException,
+      assertEquals(
+        Status.INVALID_STATE,
+        (fromAnotherThread as? MaplibreException)?.status,
         "the response from another thread: $fromAnotherThread",
       )
-      assertFailsWith<InvalidStateException> {
+      assertFailsWithStatus(Status.INVALID_STATE) {
         GeneratedApi.httpHeaderTransformResponseSetHeader(escaped!!, "X-Test", "1")
       }
       runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")

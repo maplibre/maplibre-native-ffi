@@ -1,4 +1,4 @@
-"""Lower retained callbacks, decisions, and scoped responses to common Kotlin.
+"""Lower retained callbacks and scoped responses to common Kotlin.
 
 Each callback a registration hands to native gets one upcall site: a common
 `Upcalls` method that finds the registration's root and runs the host
@@ -26,7 +26,6 @@ class Site:
     result_carrier: str
     body: str
     failure: str = "0"
-    allowed: str | None = None
     callback: str | None = None
 
 
@@ -206,10 +205,7 @@ def failure_literal(callback, values):
             raise Unsupported(
                 f"callback failure {symbol} needs a numeric constant"
             ) from error
-    typ = carrier(callback.result, values)
-    if typ == "Long":
-        return f"{number}L"
-    return str(number if number <= 0x7FFFFFFF else number - (1 << 32))
+    return number_literal(number, carrier(callback.result, values))
 
 
 def callback_argument(parameter, values):
@@ -239,27 +235,16 @@ def callback_argument(parameter, values):
     raise Unsupported("callback argument requires another Kotlin rule")
 
 
+# The decision that a provider which throws answers. No decision has this
+# value, so native fails the request rather than pass it to the network.
+UNKNOWN_DECISION = "-1"
+
+
 def callback_site(site_name, callback_value, member, root_type, values):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
-    owner = None
-    if callback.reentry_policy:
-        owner = "{ " + identifier(callback.reentry_policy.owner_parameter) + " }"
-    allowed = (
-        "null"
-        if callback.reentry == "allow"
-        else "setOf("
-        + ", ".join(
-            f'"{operation}"'
-            for operation in (
-                callback.reentry_policy.operations if callback.reentry_policy else ()
-            )
-        )
-        + ")"
-    )
-    allowed_value = allowed
-    allowed = "null" if allowed == "null" else site_name + "Allowed"
-    failure = failure_literal(callback, values)
+    decision = callback.decision
+    failure = UNKNOWN_DECISION if decision else failure_literal(callback, values)
     result = carrier(callback.result, values)
     parameters = []
     for parameter in callback.parameters:
@@ -273,7 +258,6 @@ def callback_site(site_name, callback_value, member, root_type, values):
     arguments = []
     lines = []
     owned = []
-    decision = callback.decision
     for parameter in callback.arguments:
         if decision and parameter.name == decision.parameter:
             lines.append(
@@ -295,14 +279,21 @@ def callback_site(site_name, callback_value, member, root_type, values):
         lines.insert(0, f"val invoke = {invoke} ?: return@upcall {failure}")
         invoke = "invoke"
     invocation = f"{invoke}({', '.join(arguments)})"
+    if any(callback_scoped(p.value) for p in callback.arguments):
+        invocation = f"withCallbackScope {{ scope -> {invocation} }}"
     if owned:
         closes = "; ".join(f"{local}.close()" for local in owned)
         invocation = f"try {{ {invocation} }} catch (failure: Throwable) {{ {closes}; throw failure }}"
     if decision:
+        # Native takes back a request that the provider does not keep, including
+        # when the provider throws.
+        accept = number_literal(values.bound.enum_number(decision.accept), result)
         lines.append(
-            f'decisionOwner.binding.decide(decisionOwner, "{callback.native}") {{ {invocation}.rawValue }}'
-            + (".toInt()" if result == "Int" else "")
+            f"val decision = try {{ {callback_result(callback.result, invocation, values)} }} "
+            "catch (failure: Throwable) { decisionOwner.binding.handOff(); throw failure }"
         )
+        lines.append(f"if (decision != {accept}) decisionOwner.binding.handOff()")
+        lines.append("decision")
     elif callback.result.native == "void":
         lines.append(invocation)
     elif status_callback(callback):
@@ -311,10 +302,9 @@ def callback_site(site_name, callback_value, member, root_type, values):
     else:
         lines.append(callback_result(callback.result, invocation, values))
     context = identifier(callback.context)
-    owner_argument = f", {owner}" if owner else ""
     body = (
-        f'upcall<{root_type}, {result}>("{callback.native}", {context}, {failure}, {allowed}{owner_argument}) '
-        f"{{ value, scope -> {'; '.join(lines)} }}"
+        f'upcall<{root_type}, {result}>("{callback.native}", {context}, {failure}) '
+        f"{{ value -> {'; '.join(lines)} }}"
     )
     sites(values)[site_name] = Site(
         site_name,
@@ -323,10 +313,21 @@ def callback_site(site_name, callback_value, member, root_type, values):
         result,
         body,
         failure,
-        None if allowed_value == "null" else allowed_value,
         callback.native,
     )
     return site_name
+
+
+def callback_scoped(value):
+    """Whether a callback argument is a response that its callback's scope keeps valid."""
+    return value.kind == "reference" and value.element.response
+
+
+def number_literal(number, carrier_type):
+    """A literal of the callback result's [carrier_type] for the integer [number]."""
+    if carrier_type == "Long":
+        return f"{number}L"
+    return str(number if number <= 0x7FFFFFFF else number - (1 << 32))
 
 
 def callback_result(value, expression, values):
@@ -345,10 +346,6 @@ def upcalls(values):
     entries = []
     for site in sites(values).values():
         parameters = ", ".join(f"{local}: {typ}" for local, _c, typ in site.parameters)
-        if site.allowed is not None:
-            entries.append(
-                f"  private val {site.name}Allowed: Set<String> = {site.allowed}"
-            )
         entries.append(
             f"  @JvmStatic fun {site.name}({parameters}): {site.result_carrier} = {site.body}"
         )
@@ -362,6 +359,7 @@ def upcalls(values):
         "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
         "import org.maplibre.nativeffi.internal.callback.contain\n"
         "import org.maplibre.nativeffi.internal.callback.upcall\n"
+        "import org.maplibre.nativeffi.internal.callback.withCallbackScope\n"
         "import org.maplibre.nativeffi.internal.memory.*\n"
         "import org.maplibre.nativeffi.render.NativePointer\n\n"
         "/** The Kotlin side of each C function pointer the binding hands to native. */\n"
@@ -491,15 +489,7 @@ def operation(plan, values, native):
         parameter_name,
     )
 
-    decision = next(
-        (
-            decision
-            for decision in values.bound.decisions.values()
-            if plan.name in (decision.complete, decision.resume, decision.cancelled)
-        ),
-        None,
-    )
-    if plan.scoped_receiver or decision:
+    if plan.scoped_receiver:
         lengths = {p.value.length for p in plan.inputs if p.value.kind == "buffer"}
         inputs = [
             p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths
@@ -509,30 +499,12 @@ def operation(plan, values, native):
         # the whole name that a free function has.
         method = identifier(plan.member if plan.receiver else public_stem(plan.name))
         arguments = call_arguments(plan, values)
-        if decision and plan.name == decision.cancelled:
-            arguments.append("out")
-            body = (
-                encodings(plan)
-                + "val out = allocate(1); "
-                + native.checked(plan.function, arguments)
-                + "; readBool(out)"
-            )
-            return (
-                f"  public fun {method}({declaration(params)}): Boolean = "
-                f'nativeCall(this, binding, "{plan.name}", Access.READ) {{ {body} }}\n'
-            )
-        if decision:
-            return (
-                f"  public fun {method}({declaration(params)}): Unit = "
-                f'nativeComplete(this, binding, "{plan.name}") '
-                f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
-            )
         scoped = parameter_name(plan.scoped_receiver)
         index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
         arguments[index] = "handle"
         return (
             f"  public fun {method}({declaration(params)}): Unit = "
-            f'nativeRespond({scoped}.bindingScope, {scoped}.bindingAddress, "{plan.name}") '
+            f"nativeRespond({scoped}.bindingScope, {scoped}.bindingAddress) "
             f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
         )
     if not plan.registrations or plan.owned_outputs:
@@ -586,10 +558,9 @@ def immediate_registration(plan, values, native):
         )
     else:
         body = f"{native.checked(plan.function, arguments)}; accept({owner})"
-    access = ", Access.READ" if plan.receiver else ""
     return (
         f"  public fun {identifier(plan.member)}({declaration(params)}): "
         f"{'Boolean' if declined else 'Unit'} = "
-        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access}) '
+        f"nativeCall({receiver_arguments(plan)}) "
         f"{{ {encodings(plan)}{body} }}\n"
     )
