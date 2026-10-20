@@ -254,7 +254,8 @@ def ask(
                 time.sleep(float(error.headers.get("retry-after") or 2**attempt))
                 continue
             raise RuntimeError(f"Jev returned {error.code}: {detail}") from error
-        except urllib.error.URLError, TimeoutError:
+        # Connection failures and timeouts are both OSErrors.
+        except OSError:
             if attempt < 5:
                 time.sleep(2**attempt)
                 continue

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import os
@@ -226,6 +227,13 @@ class PlanTest(Fixture):
 
         decisions, _ = self.run_plan(pr(), choose=choose)
         self.assertTrue(all(decisions.values()))
+
+    def test_planner_parses_with_the_runner_system_python(self):
+        # The plan job runs the ubuntu-slim system Python, not the project's.
+        for name in ("plan", "select", "coverage", "workflow"):
+            path = ROOT / "ci" / f"{name}.py"
+            with self.subTest(module=name):
+                ast.parse(path.read_text(), str(path), feature_version=(3, 12))
 
     def test_entrypoint_runs_outside_checkout_without_project_dependencies(self):
         with tempfile.TemporaryDirectory() as directory:
