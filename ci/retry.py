@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import time
 
 # Steps that provision the runner, fetch dependencies, or boot a device. A
 # failure here says nothing about the code under test, so a rerun is worth its
@@ -45,16 +44,8 @@ def retryable(jobs: list[dict]) -> bool:
     if any(job["conclusion"] not in {"success", "failure", "skipped"} for job in jobs):
         return False
     failed = [job for job in jobs if job["conclusion"] == "failure"]
-    required = [
-        job
-        for job in failed
-        if job["name"] == "ci-required" or job["name"].startswith("ci-required (")
-    ]
-    primary = [
-        job
-        for job in failed
-        if job not in required and not job["name"].startswith("coverage / verified (")
-    ]
+    required = [job for job in failed if job["name"] == "ci-required"]
+    primary = [job for job in failed if job not in required]
     return (
         len(required) == 1
         and bool(primary)
@@ -89,18 +80,8 @@ def retry_failed_run(run_id: str) -> None:
 
 
 def main() -> None:
-    for attempt in range(4):
-        try:
-            retry_failed_run(os.environ["CI_RUN_ID"])
-            return
-        except subprocess.CalledProcessError:
-            if attempt == 3:
-                raise
-            # Recheck eligibility as well as retrying the API: a failed POST
-            # response may have arrived after GitHub accepted the rerun.
-            delay = 2 ** (attempt + 1)
-            print(f"GitHub API request failed; checking again in {delay} seconds.")
-            time.sleep(delay)
+    # A retry is an optimization; an API failure leaves the run for a person.
+    retry_failed_run(os.environ["CI_RUN_ID"])
 
 
 if __name__ == "__main__":

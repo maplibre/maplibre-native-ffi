@@ -138,44 +138,28 @@ write to it, and pull request runs read it through the public endpoint.
 
 ## CI coverage
 
-`ci/workflow.toml` declares the targets of each tier and the suites that each
-target runs. `mise run ci:generate-workflow` writes the workflows under
-`.github/workflows/` from it, and `--check` verifies them. CI builds every
-preset in `CMakePresets.json` except a local tool, such as the coverage preset,
-whose `vendor` settings set `maplibre-native-ffi.ci` to false.
+Each pull request push runs only the coverage that the change puts at risk.
+[Jev](https://docs.typesafe.ai/) reads the diff and decides which coverage units
+to run, such as the Windows targets or the docs build. A unit that already
+passed on the pull request runs again only if the newer changes put it at risk.
+Hygiene runs on every push, and `ci-required` is the one required check.
 
-Branch protection requires three checks:
+To force a unit, add its `ci:<unit>` label, such as `ci:windows`. Adding or
+removing a label on a closed pull request does not start a run. `ci:full`
+selects every unit. Main pushes, manual runs, and pull requests from forks or
+Dependabot also run every unit, and so does any planning failure. Because main
+runs every unit after merge, a missed selection surfaces there.
 
-| Check                    | Coverage                                                        |
-| ------------------------ | --------------------------------------------------------------- |
-| `ci-required (baseline)` | Hygiene, docs, and Linux x64 EGL/Vulkan on every PR code update |
-| `ci-required (ready)`    | macOS, Windows x64, Android x64, and browser, once out of draft |
-| `ci-required`            | The extended workflow: requested platforms or full verification |
-
-PR labels add platforms to the extended workflow. Labels combine and persist
-across pushes:
-
-| Label        | Adds                                                              |
-| ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
-| `ci:android` | All Android ABIs and backends, and multi-ABI packaging            |
-| `ci:linux`   | Linux ARM64 and musl                                              |
-| `ci:windows` | Windows ARM64                                                     |
-| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
-| `ci:full`    | Every target and complete packaging verification, including Maven |
-
-Main, manual runs, Dependabot PRs, and `ci:full` run every target and packaging
-check in one workflow, `ci.yml`. Snapshot publishing consumes a successful main
-run. An unrequested tier passes its check without running targets.
-
-A change of draft state or labels reuses earlier results only for the same
-tested merge commit and coverage scope. Missing, cancelled, or first-attempt
-failed coverage runs again, as does an explicit rerun. `mise run ci:test` tests
-these transitions.
+`ci/select.toml` defines the units and the description of CI that Jev reads. The
+plan job's log shows each unit's decision and the full prompt sent to Jev.
+Before changing `ci/select.toml`, evaluate the change against history with
+`uv run python -m ci.select_eval commits`, which compares answers with the
+labeled commits in `ci/select_cases.toml`. `ci.select_eval prs` replays merged
+pull requests and estimates runner time. Both need `TYPESAFE_API_KEY`.
 
 Each target job runs every suite even after one fails, and a final step fails
-the job. CI reruns a failed run once only when every failed job failed in an
-infrastructure step that `ci/retry.py` lists, so a failed test is never retried.
+the job. CI retries a failed run once when every failed job failed in an
+infrastructure step that `ci/retry.py` lists.
 
 `ci/snapshots.toml` declares the inputs of each component that the daily
 snapshot workflow publishes, and `mise run ci:check-snapshot-scopes` keeps every

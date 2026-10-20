@@ -3,8 +3,6 @@ name: CI retry
 on:
   workflow_run:
     workflows:
-      - CI baseline
-      - CI ready
       - CI
     types:
       - completed
