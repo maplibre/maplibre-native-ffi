@@ -306,7 +306,6 @@ pub const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED: mln_runtime_event_mask = 3
 pub const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED: mln_runtime_event_mask = 64;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED: mln_runtime_event_mask = 128;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_IDLE: mln_runtime_event_mask = 256;
-pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE: mln_runtime_event_mask = 512;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR: mln_runtime_event_mask = 1024;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED: mln_runtime_event_mask = 2048;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED: mln_runtime_event_mask = 4096;
@@ -321,9 +320,9 @@ pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_even
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_mask =
     2097152;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED: mln_runtime_event_mask = 8388608;
-pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 8912894;
+pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 8912382;
 pub const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS: mln_runtime_event_mask = 3670016;
-pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 12582910;
+pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 12582398;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
@@ -346,7 +345,6 @@ pub const MLN_RUNTIME_EVENT_MAP_LOADING_STARTED: mln_runtime_event_type = 5;
 pub const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED: mln_runtime_event_type = 6;
 pub const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED: mln_runtime_event_type = 7;
 pub const MLN_RUNTIME_EVENT_MAP_IDLE: mln_runtime_event_type = 8;
-pub const MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE: mln_runtime_event_type = 9;
 pub const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR: mln_runtime_event_type = 10;
 pub const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED: mln_runtime_event_type = 11;
 pub const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED: mln_runtime_event_type = 12;
@@ -1244,6 +1242,15 @@ pub struct mln_runtime_event {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_handler {
+    pub size: u32,
+    pub callback: mln_runtime_event_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_event_offline_region_response_error {
     pub region_id: mln_offline_region_id,
     pub reason: u32,
@@ -1296,7 +1303,6 @@ pub struct mln_runtime_options {
     pub asset_path: mln_buffer_view,
     pub cache_path: mln_buffer_view,
     pub event_mask: u64,
-    pub event_wake: mln_wake,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1610,9 +1616,6 @@ pub type mln_custom_source_fetch_tile_callback =
 pub struct mln_delivery_queue(pub u64);
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_event_batch(pub u64);
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_geojson_source_data(pub u64);
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
@@ -1668,13 +1671,15 @@ pub type mln_resource_transform_callback = Option<
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_runtime(pub u64);
+pub type mln_runtime_event_callback = Option<
+    unsafe extern "C" fn(user_data: *mut std::ffi::c_void, events: *const mln_event_batch_view),
+>;
 pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
-    mln_event_batch,
     mln_geojson_source_data,
     mln_map,
     mln_map_projection,
@@ -1744,12 +1749,6 @@ unsafe extern "C" {
     pub fn mln_camera_update_default() -> mln_camera_update;
     pub fn mln_custom_geometry_source_options_default() -> mln_custom_geometry_source_options;
     pub fn mln_custom_mvt_vector_source_options_default() -> mln_custom_mvt_vector_source_options;
-    pub fn mln_event_batch_get(
-        batch: mln_event_batch,
-        out_view: *mut mln_event_batch_view,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_event_batch_release(batch: mln_event_batch);
     pub fn mln_frame_demand_default() -> mln_frame_demand;
     pub fn mln_free_camera_options_default() -> mln_free_camera_options;
     pub fn mln_geojson_source_data_create(
@@ -2716,6 +2715,11 @@ unsafe extern "C" {
         url: mln_buffer_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_runtime_clear_event_handler(
+        runtime: mln_runtime,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_runtime_clear_http_header_transform(
         runtime: mln_runtime,
         completion: *const mln_completion,
@@ -2758,11 +2762,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_runtime_dispose(
         runtime: mln_runtime,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_drain_events(
-        runtime: mln_runtime,
-        out_batch: *mut mln_event_batch,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_runtime_get_event_mask(
@@ -2808,6 +2807,12 @@ unsafe extern "C" {
     pub fn mln_runtime_run_ambient_cache_operation(
         runtime: mln_runtime,
         operation: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_runtime_set_event_handler(
+        runtime: mln_runtime,
+        handler: *const mln_runtime_event_handler,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

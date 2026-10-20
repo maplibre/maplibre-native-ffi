@@ -20,12 +20,8 @@ Request a frame with a host token to identify its result. Every accepted demand
 produces a terminal result, even when demands coalesce. A timeout limits how long
 a demand may wait to start; the host supplies the cadence.
 
-For rendering on demand, request after an update-available event or a
-frame-finished event with the repaint flag. Alternatively, keep an if-needed
-demand armed with wait-for-update and re-arm it as results arrive. Pace requests
-to the display during animations.
-
-<Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
+For rendering on demand, keep an if-needed demand armed with wait-for-update
+and re-arm it as results arrive. Pace requests to the display during animations.
 
 Use the present flag for a target that presents to a window or view.
 

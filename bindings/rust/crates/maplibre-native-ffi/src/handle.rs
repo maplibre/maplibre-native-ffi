@@ -385,9 +385,9 @@ mod tests {
     fn a_read_on_another_thread_holds_off_close_until_it_ends() {
         let handle = Arc::new(unsafe {
             ConcurrentNativeHandle::from_handle(
-                sys::mln_event_batch(9),
-                "mln_event_batch",
-                "EventBatchHandle",
+                sys::mln_delivery_queue(9),
+                "mln_delivery_queue",
+                "DeliveryQueueHandle",
             )
             .unwrap()
         });
@@ -412,7 +412,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
         assert_eq!(error.raw_status(), None);
-        assert_eq!(error.diagnostic(), "EventBatchHandle is in use");
+        assert_eq!(error.diagnostic(), "DeliveryQueueHandle is in use");
         assert_eq!(handle.live_handle().unwrap().0, 9);
         release.wait();
         reader.join().unwrap();
@@ -425,9 +425,9 @@ mod tests {
     fn a_rejected_or_panicking_close_leaves_the_handle_live() {
         let handle = unsafe {
             ConcurrentNativeHandle::from_handle(
-                sys::mln_event_batch(9),
-                "mln_event_batch",
-                "EventBatchHandle",
+                sys::mln_delivery_queue(9),
+                "mln_delivery_queue",
+                "DeliveryQueueHandle",
             )
             .unwrap()
         };

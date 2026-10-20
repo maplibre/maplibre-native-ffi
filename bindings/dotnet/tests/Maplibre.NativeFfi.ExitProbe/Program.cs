@@ -11,7 +11,7 @@ NativeMaplibre.LogSetCallback(new LogHandler((_, _, _, _) => 0));
 var held = new TaskCompletionSource<ResourceRequestHandle>(
     TaskCreationOptions.RunContinuationsAsynchronously
 );
-var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { EventWake = new Wake(() => { }) });
+var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
 await runtime.SetResourceProviderAsync(
     new ResourceProvider
     {

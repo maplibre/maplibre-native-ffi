@@ -321,15 +321,6 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
   );
 }
 
-// How many render updates the map published for the commands before the
-// fence.
-static size_t take_updates(mln_runtime runtime, mln_map map) {
-  MLN_TEST_OK(mln_test_map_fence(map));
-  return mln_test_drain_counting(
-    runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-  );
-}
-
 typedef struct update_state {
   mln_geojson_source_data data;
   mln_map_tile_options initial_tile;
@@ -476,7 +467,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
            "\"layers\":[{\"id\":\"background\",\"type\":\"background\"}]}"
          )
   ));
-  (void)take_updates(runtime, map);
+  MLN_TEST_OK(mln_test_map_fence(map));
   update_state state = {0};
   MLN_TEST_OK(mln_geojson_source_data_create(
     MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
@@ -489,8 +480,14 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
   for (size_t index = 0; index < sizeof(update_rows) / sizeof(update_rows[0]);
        index += 1) {
     const update_row* row = &update_rows[index];
+    mln_map_snapshot before = {.size = sizeof(before)};
+    MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
     row->mutate(map, &state);
-    const size_t updates = take_updates(runtime, map);
+    MLN_TEST_OK(mln_test_map_fence(map));
+    mln_map_snapshot after = {.size = sizeof(after)};
+    MLN_TEST_OK(mln_map_get_snapshot(map, &after, NULL));
+    const uint64_t updates = after.latest_render_update_generation -
+                             before.latest_render_update_generation;
     if (row->publishes) {
       TEST_ASSERT_GREATER_THAN_size_t_MESSAGE(0, updates, row->label);
     } else {

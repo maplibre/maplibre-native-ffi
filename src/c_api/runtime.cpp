@@ -15,11 +15,6 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
     .asset_path = {},
     .cache_path = {},
     .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
-    .event_wake = mln_wake{
-      .callback = nullptr,
-      .user_data = nullptr,
-      .release_user_data = nullptr,
-    },
   };
 }
 
@@ -298,26 +293,22 @@ auto mln_runtime_release(
   });
 }
 
-auto mln_runtime_drain_events(
-  mln_runtime runtime, mln_event_batch* out_batch,
-  mln_diagnostic* out_diagnostic
+auto mln_runtime_set_event_handler(
+  mln_runtime runtime, const mln_runtime_event_handler* handler,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::drain_runtime_events(runtime, out_batch);
+    return mln::core::set_runtime_event_handler(runtime, handler, completion);
   });
 }
 
-auto mln_event_batch_get(
-  mln_event_batch batch, mln_event_batch_view* out_view,
+auto mln_runtime_clear_event_handler(
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::get_event_batch(batch, out_view);
+    return mln::core::clear_runtime_event_handler(runtime, completion);
   });
-}
-
-auto mln_event_batch_release(mln_event_batch batch) noexcept -> void {
-  mln::core::release_event_batch(batch);
 }
 
 auto mln_runtime_set_event_mask(

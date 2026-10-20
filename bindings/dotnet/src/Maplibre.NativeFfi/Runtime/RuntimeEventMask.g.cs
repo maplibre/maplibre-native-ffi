@@ -23,7 +23,6 @@ public enum RuntimeEventMask : ulong
     MapLoadingFinished = 64,
     MapLoadingFailed = 128,
     MapIdle = 256,
-    MapRenderUpdateAvailable = 512,
     MapRenderError = 1024,
     MapStillImageFinished = 2048,
     MapStillImageFailed = 4096,
@@ -41,7 +40,7 @@ public enum RuntimeEventMask : ulong
     /// <summary>
     /// Selects every map-originated event type this version defines.
     /// </summary>
-    AllMapEvents = 8912894,
+    AllMapEvents = 8912382,
 
     /// <summary>
     /// Selects every runtime-originated event type this version defines.
@@ -51,5 +50,5 @@ public enum RuntimeEventMask : ulong
     /// <summary>
     /// Selects every event type this version defines.
     /// </summary>
-    All = 12582910,
+    All = 12582398,
 }

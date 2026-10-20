@@ -65,29 +65,23 @@ final denyingProvider = ResourceProvider(
   },
 );
 
-/// A runtime whose event wake drives [awaitEvent].
+/// A runtime whose event handler signals [awaitEvent].
 final class RuntimeFixture {
-  RuntimeFixture._(this.runtime, this._events);
+  RuntimeFixture._(this.runtime, this._events, this._pending);
 
   final RuntimeHandle runtime;
   final Signal _events;
+  final List<RuntimeEvent> _pending;
 
-  /// Drains events until one matches, waiting on the event wake between
-  /// drains. Events that do not match are dropped.
+  /// Receives events until one matches, discarding earlier events.
   Future<RuntimeEvent> awaitEvent(
     bool Function(RuntimeEvent event) matches,
     String what,
   ) async {
     while (true) {
-      final batch = runtime.drainEvents();
-      if (batch != null) {
-        try {
-          for (final event in batch.getValue().events) {
-            if (matches(event)) return event;
-          }
-        } finally {
-          batch.close();
-        }
+      while (_pending.isNotEmpty) {
+        final event = _pending.removeAt(0);
+        if (matches(event)) return event;
       }
       await _events.wait(what);
     }
@@ -127,12 +121,20 @@ Future<RuntimeFixture> openRuntime({
       assetPath: defaults.assetPath,
       cachePath: defaults.cachePath,
       eventMask: defaults.eventMask,
-      eventWake: Wake(callback: events.notify),
     ),
   );
   addTearDown(runtime.close);
+  final pending = <RuntimeEvent>[];
+  await runtime.setEventHandler(
+    RuntimeEventHandler(
+      callback: (batch) {
+        pending.addAll(batch.events);
+        events.notify();
+      },
+    ),
+  );
   await runtime.setResourceProvider(provider ?? denyingProvider);
-  return RuntimeFixture._(runtime, events);
+  return RuntimeFixture._(runtime, events, pending);
 }
 
 Future<void> expectCommitted(Future<CommandCompletion> command) async {

@@ -1120,18 +1120,9 @@ MLN_API mln_status mln_map_resize(
  * Requests a repaint for a continuous map.
  *
  * A continuous map also publishes a render update on its own when style data,
- * resources, the camera, or a transition changes. A host learns of each update
- * in one of two ways:
- *
- * - A host that keeps a frame demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE
- *   pending, and arms the next one as each result arrives, renders every
- *   update as the map publishes it. It needs no runtime event to do so.
- * - Any other host selects MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE in
- *   the map's event mask and requests a render-if-needed frame when
- *   mln_runtime_drain_events() reports it. Several mutations can share one
- *   event, and asynchronous work or transitions can publish further updates
- *   after a mutation completes, so the host coalesces events into one pending
- *   frame for the latest state.
+ * resources, the camera, or a transition changes. A host keeps a frame demand
+ * with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE pending and arms the next one as each
+ * result arrives to render updates as the map publishes them.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
@@ -1439,7 +1430,7 @@ MLN_API mln_status mln_map_get_style_url(
 /**
  * Selects which map-originated event types this map queues.
  *
- * An unselected event type reaches no event batch and raises no wake.
+ * Filtering an unselected event type allocates no event storage.
  *
  * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
  * in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
@@ -1450,15 +1441,9 @@ MLN_API mln_status mln_map_get_style_url(
  * library reports, which covers types a caller's header may not declare. A new
  * mask applies to later events and keeps the events already queued.
  *
- * Adjacent unread render-update events for the same map coalesce into one.
- * Suppressing an intervening event can therefore combine render updates.
- *
  * Select every event type the host reads. These types carry state a host
  * reaches no other way:
  *
- * - MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE reports new render
- *   state to a host that keeps no frame demand with
- *   MLN_FRAME_DEMAND_WAIT_FOR_UPDATE pending. See mln_map_request_repaint().
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *

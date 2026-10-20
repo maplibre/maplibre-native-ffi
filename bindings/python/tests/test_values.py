@@ -87,16 +87,13 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     # command reports, before the command completes.
     loaded = result(map_handle.set_style_json(EMPTY_STYLE))
 
-    batch = harness.runtime.drain_events()
-    assert batch is not None
-    with batch:
-        view = batch.get()
-    # The copied records outlive the batch that held them.
-    types = [event.type for event in view.events]
+    # The copied records outlive the native callback that borrowed them.
+    events = harness._pending
+    types = [event.type for event in events]
     assert mln.RuntimeEventType.MAP_STYLE_LOADED in types
     assert len(types) >= 2
-    assert {event.source for event in view.events} == {map_handle.id}
-    assert view.events[-1].generation == loaded.generation
+    assert {event.source for event in events} == {map_handle.id}
+    assert events[-1].generation == loaded.generation
 
     unknown = mln.OfflineRegionDefinition(mln.UnknownVariant(999))
     with pytest.raises(mln.InvalidArgumentError) as raised:

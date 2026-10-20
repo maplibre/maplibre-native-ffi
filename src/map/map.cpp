@@ -472,11 +472,11 @@ auto queue_map_event(
     }
     if (generation == 0) return;
     push_runtime_map_event_payload(
-      events.event_queue, events.map, generation, type, payload_type, payload,
-      code, std::string{message}
+      events.runtime_events, events.map, generation, type, payload_type,
+      payload, code, std::string{message}
     );
   } catch (...) {
-    // Dropped, as the queue drops an event whose runtime is gone.
+    // MapLibre callbacks drop events that cannot be delivered.
   }
 }
 
@@ -487,7 +487,7 @@ auto queue_held_map_events(MapEventState& events, uint64_t generation) -> void {
   if (events.held.empty()) return;
   try {
     push_runtime_map_events(
-      events.event_queue, events.map, generation, events.held
+      events.runtime_events, events.map, generation, events.held
     );
   } catch (...) {
     events.held.clear();
@@ -1092,7 +1092,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 
   // Stores the held update when no command group remains open. A transaction
   // calls this before it publishes its snapshot, so the snapshot reports the
-  // update, and release_held_update() queues its event after the held events.
+  // update.
   auto store_held_update() -> void {
     if (command_group_depth_ > 0) return;
     {
@@ -1100,24 +1100,20 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       if (held_update_ == nullptr) return;
       latest_update_ = std::move(held_update_);
       latest_feature_state_ = std::move(held_feature_state_);
-      announced_generation_ = ++latest_update_generation_;
+      ++latest_update_generation_;
     }
     update_stored_ = true;
   }
 
-  // Queues the event for the update that the closing transaction stored, if
-  // any, with the transaction's generation, because its snapshot includes that
-  // update. The attached session hears of it from the announcement task.
+  // Announces the update that the closing transaction stored to its session.
   auto release_held_update() -> void {
     if (!std::exchange(update_stored_, false)) return;
-    queue_update_event(event_state_->published_generation);
     schedule_announcement();
   }
 
   // Runs after a command burst, before the next non-command work item, so
   // queued commands reach the attached session as one notice and one frame. The
-  // updates stored outside a transaction since the last announcement share the
-  // snapshot and the event that this publishes and queues.
+  // updates stored outside a transaction share the session notice.
   auto announce() noexcept -> void {
     if (!std::exchange(announcement_scheduled_, false)) return;
     auto generation = uint64_t{0};
@@ -1126,11 +1122,6 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       const std::scoped_lock lock(latest_update_mutex_);
       generation = latest_update_generation_;
       notify_session = session_publish_;
-    }
-    if (std::exchange(announced_generation_, generation) != generation) {
-      // A failed publish yields zero, which drops only the update event; the
-      // session still learns of the update.
-      queue_update_event(event_state_->fresh_generation());
     }
     if (notify_session) notify_session(generation);
   }
@@ -1209,18 +1200,6 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   }
 
  private:
-  auto queue_update_event(uint64_t generation) noexcept -> void {
-    if (
-      mln::core::event_selected(
-        event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-      )
-    ) {
-      queue_map_event(
-        *event_state_, generation, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-      );
-    }
-  }
-
   // The task holds only a weak share of the map, and skips a map that retired
   // meanwhile. When the task cannot be queued, the update is announced now.
   auto schedule_announcement() noexcept -> void {
@@ -1259,9 +1238,6 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   // Runtime-worker only.
   bool update_stored_ = false;
   bool announcement_scheduled_ = false;
-  // The latest update generation that an update event already reports, or
-  // would report if the mask selected it.
-  uint64_t announced_generation_ = 0;
   uint32_t command_group_depth_ = 0;
 };
 
@@ -3326,14 +3302,11 @@ auto create_map(
   owned_map->event_state->mask.store(
     effective.event_mask, std::memory_order_relaxed
   );
-  owned_map->event_state->event_queue = owned_map->runtime_state->event_queue;
+  owned_map->event_state->runtime_events =
+    owned_map->runtime_state->event_state;
   owned_map->event_state->map = handle;
   owned_map->event_state->owner = owned_map;
   try {
-    // Registering allocates, so it belongs inside the scope that unpublishes
-    // the handle on failure. Nothing before this point queues an event, and the
-    // observer and frontend below are the first producers that need it.
-    register_runtime_map_events(runtime, handle, owned_map->event_state);
     owned_map->observer = std::make_unique<HeadlessObserver>(
       owned_map->event_state, owned_map->callback_sources
     );
@@ -3363,7 +3336,6 @@ auto create_map(
     close_map_transaction(*owned_map, publish_map_snapshot(*owned_map));
   } catch (...) {
     static_cast<void>(handle_table<MapObject>().remove(handle));
-    unregister_runtime_map_events(runtime, handle);
     throw;
   }
   *out_map = handle;
@@ -3573,10 +3545,6 @@ auto finish_map_retirement(RetirementTask* task) noexcept -> void {
   close_camera_transitions(*map.event_state);
   map.map.reset();
   map.callback_sources->release_all();
-  {
-    const auto lock = std::scoped_lock{map.runtime_state->event_queue->mutex};
-    map.runtime_state->event_queue->event_maps.erase(map.self);
-  }
   if (auto completion = std::move(map.release_completion)) {
     valueless_completion<&mln_map_release>().complete(completion);
   }

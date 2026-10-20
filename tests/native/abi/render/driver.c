@@ -7,6 +7,7 @@
 
 #include "maplibre_native_c/binding_support.h"
 #include "support/frames.h"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -717,7 +718,15 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_test_destroy_runtime(runtime);
 }
 
-static void retirement_wake(void* context) { (void)context; }
+static mln_resource_provider_decision retirement_provider(
+  void* context, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)context;
+  (void)request;
+  (void)handle;
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
 static void retirement_release(void* context) {
   atomic_store((atomic_bool*)context, true);
 }
@@ -725,11 +734,15 @@ static void retirement_release(void* context) {
 static void parent_first_disposal_retires_a_native_render_attachment(void) {
   atomic_bool retired = false;
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake.callback = retirement_wake;
-  options.event_wake.user_data = &retired;
-  options.event_wake.release_user_data = retirement_release;
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
+  const mln_resource_provider provider = {
+    .size = sizeof(provider),
+    .callback = retirement_provider,
+    .user_data = &retired,
+    .release_user_data = retirement_release,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
   mln_test_render_fixture fixture = {0};

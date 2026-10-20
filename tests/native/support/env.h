@@ -69,8 +69,7 @@ const char* mln_test_last_error(void);
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
 mln_runtime mln_test_create_runtime(void);
-// The same, from options the case fills in. The fixture's event wake replaces
-// options->event_wake.
+// The same, from options the case fills in, with an event delivery queue.
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
 // Fences the runtime worker: each helper submits a call that runs on the
 // worker after every earlier submission to it and waits for its completion.
@@ -150,7 +149,14 @@ typedef struct mln_test_event_batch {
 } mln_test_event_batch;
 
 mln_test_event_batch mln_test_event_batch_default(void);
-// Drains like mln_runtime_drain_events(), except that an empty queue returns
+// Installs a queue before event producers start; the test teardown owns it.
+void mln_test_configure_events(mln_runtime runtime, mln_wake wake);
+mln_delivery_queue mln_test_event_queue(mln_runtime runtime);
+mln_status mln_test_drain_event_delivery(
+  mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
+  mln_diagnostic* diagnostic
+);
+// Drains runtime event deliveries; an empty queue returns
 // MLN_STATUS_OK with a batch of no events.
 mln_status mln_test_drain_events(
   mln_runtime runtime, mln_test_event_batch* out_batch

@@ -153,11 +153,6 @@ typedef uint64_t mln_render_session MLN_BINDING(
   "kind=handle;release=mln_render_session_release;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
-/** An owned batch of runtime events from one drain. */
-typedef uint64_t mln_event_batch MLN_BINDING(
-  "kind=handle;release=mln_event_batch_release;"
-  "dispose=mln_event_batch_release"
-);
 /** A rendered frame that a render session lends until its release. */
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"

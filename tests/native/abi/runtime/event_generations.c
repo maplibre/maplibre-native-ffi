@@ -88,26 +88,21 @@ static void record_event(const mln_runtime_event* event) {
 static void recorder_drain(void) {
   recorder_lock();
   while (true) {
-    mln_event_batch batch = MLN_HANDLE_NULL;
+    mln_delivery_batch batch = MLN_HANDLE_NULL;
+    mln_event_batch_view view = {.size = sizeof(view)};
     const mln_status drained =
-      mln_runtime_drain_events(recorder.runtime, &batch, NULL);
+      mln_test_drain_event_delivery(recorder.runtime, &batch, &view, NULL);
     // An empty queue publishes no batch.
     if (drained == MLN_STATUS_NOT_READY) break;
     if (drained != MLN_STATUS_OK) {
       recorder.drain_failed = true;
       break;
     }
-    mln_event_batch_view view = {.size = sizeof(view)};
-    if (mln_event_batch_get(batch, &view, NULL) != MLN_STATUS_OK) {
-      recorder.drain_failed = true;
-      mln_event_batch_release(batch);
-      break;
-    }
     for (size_t index = 0; index < view.event_count; index += 1) {
       record_event((const mln_runtime_event*)((const char*)view.events +
                                               (index * view.event_size)));
     }
-    mln_event_batch_release(batch);
+    mln_delivery_batch_release(batch);
   }
   recorder_unlock();
 }
@@ -223,12 +218,6 @@ static mln_status jump_to_zoom_three(
   return mln_map_update_camera(map, &update, completion, NULL);
 }
 
-static mln_status request_repaint(
-  mln_map map, const mln_completion* completion
-) {
-  return mln_map_request_repaint(map, completion, NULL);
-}
-
 static size_t count_in_range(
   const probed_result* result, mln_map map, uint32_t type
 ) {
@@ -251,8 +240,8 @@ static void assert_range_carries_generation(
 }
 
 // A command's events are queued before its completion runs, all with the
-// generation the completion reports, and they end with the one render update
-// the command raises. Events raised before a command carry a lower generation.
+// generation the completion reports. Events raised before a command carry a
+// lower generation.
 static void a_command_queues_its_events_before_it_completes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -266,14 +255,6 @@ static void a_command_queues_its_events_before_it_completes(void) {
   TEST_ASSERT_GREATER_THAN_UINT64(0, style.generation);
   TEST_ASSERT_EQUAL_size_t(
     1, count_in_range(&style, map, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
-  );
-  TEST_ASSERT_EQUAL_size_t(
-    1,
-    count_in_range(&style, map, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE,
-    recorder.events[style.end - 1].type
   );
   assert_range_carries_generation(&style, map);
   for (size_t index = 0; index < creation_end; index += 1) {
@@ -374,41 +355,6 @@ static void a_command_that_fails_a_still_image_queues_its_event_first(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Render updates that coalesce against the queue tail keep the newest
-// generation, so the one unread update names the later command.
-static void a_coalesced_render_update_carries_the_newest_generation(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_drain_all(runtime);
-
-  mln_test_completion first = mln_test_completion_default(0);
-  MLN_TEST_OK(request_repaint(map, &first.descriptor));
-  MLN_TEST_OK(mln_test_completion_finish(&first));
-  mln_test_completion second = mln_test_completion_default(0);
-  MLN_TEST_OK(request_repaint(map, &second.descriptor));
-  MLN_TEST_OK(mln_test_completion_finish(&second));
-  const uint64_t newest = mln_test_completion_generation(&second);
-  TEST_ASSERT_GREATER_THAN_UINT64(
-    mln_test_completion_generation(&first), newest
-  );
-  mln_test_completion_destroy(&first);
-  mln_test_completion_destroy(&second);
-
-  recorder_reset(runtime, false);
-  recorder_drain();
-  assert_recorder_complete();
-  TEST_ASSERT_EQUAL_size_t(1, recorder.count);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE, recorder.events[0].type
-  );
-  TEST_ASSERT_EQUAL_UINT64(newest, recorder.events[0].generation);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Drains on every wake, so each event is recorded with the snapshot published
 // when the map queued it.
 static void drain_on_wake(void* user_data) {
@@ -447,13 +393,13 @@ static bool animated_change_recorded(void* context) {
 static void state_events_follow_a_snapshot_that_includes_them(void) {
   static const double target_zoom = 5.0;
   mln_runtime_options runtime_options = mln_runtime_options_default();
-  runtime_options.event_wake = (mln_wake){.callback = drain_on_wake};
   // The fixture's runtime helper installs its own wake, so this creates the
   // runtime directly.
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(
     mln_runtime_create(&runtime_options, &runtime, MLN_TEST_DIAGNOSTIC)
   );
+  mln_test_configure_events(runtime, (mln_wake){.callback = drain_on_wake});
   recorder_reset(runtime, true);
   // The extent the render fixture attaches with, so the first frame renders.
   mln_map_options options = mln_map_options_default();
@@ -536,6 +482,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_command_queues_its_events_before_it_completes);
   RUN_TEST(a_failed_command_reports_the_generation_of_its_events);
   RUN_TEST(a_command_that_fails_a_still_image_queues_its_event_first);
-  RUN_TEST(a_coalesced_render_update_carries_the_newest_generation);
   RUN_TEST(state_events_follow_a_snapshot_that_includes_them);
 }

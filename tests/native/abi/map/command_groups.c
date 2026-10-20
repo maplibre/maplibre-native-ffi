@@ -52,33 +52,9 @@ static void end_group(mln_map map) {
   );
 }
 
-typedef struct update_order {
-  mln_map map;
-  size_t updates;
-  uint64_t update_generation;
-  bool event_after_update;
-} update_order;
-
-// Records the map's render updates and whether another event of the map
-// follows one.
-static bool track_update_order(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
-  update_order* order = context;
-  if (event->source != order->map) return false;
-  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
-    order->updates += 1;
-    order->update_generation = event->generation;
-    return true;
-  }
-  if (order->updates > 0) order->event_after_update = true;
-  return false;
-}
-
 // Moving a layer removes and re-adds it inside MapLibre, which publishes one
-// update for each step unless the command holds them. The command announces
-// its one update after its other events, with its own generation.
+// update for each step unless the command holds them. The published snapshot
+// exposes the command's single render update.
 static void a_style_command_publishes_one_render_update(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_loaded_map(runtime);
@@ -93,17 +69,10 @@ static void a_style_command_publishes_one_render_update(void) {
     map, MLN_BUFFER_LITERAL("a"), (mln_buffer_view){0}, &moved.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_completion_finish(&moved));
-  const uint64_t generation = mln_test_completion_generation(&moved);
   mln_test_completion_destroy(&moved);
   TEST_ASSERT_EQUAL_UINT64(before + 1, render_update_generation(map));
 
   MLN_TEST_OK(mln_test_map_fence(map));
-  update_order order = {.map = map};
-  TEST_ASSERT_EQUAL_size_t(
-    1, mln_test_drain_counting_matching(runtime, track_update_order, &order)
-  );
-  TEST_ASSERT_EQUAL_UINT64(generation, order.update_generation);
-  TEST_ASSERT_FALSE(order.event_after_update);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

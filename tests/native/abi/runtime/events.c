@@ -1,6 +1,4 @@
-// Raw C ABI coverage for the batch event drain and the two subscription masks:
-// batch layout and lifetime, mask validation, and the suppression a cleared
-// mask bit causes at push time.
+// Event delivery ownership, ordering, and subscription masks.
 
 #include "support/test_support.h"
 
@@ -13,15 +11,6 @@ static const mln_runtime_event* batch_event(
                                     (index * batch->event_size));
 }
 
-// A drain needs an output, and an owned output must start null.
-static void a_drain_rejects_a_missing_or_nonnull_output(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  MLN_TEST_INVALID(mln_runtime_drain_events(runtime, NULL, NULL));
-  mln_event_batch batch = UINT64_C(1);
-  MLN_TEST_INVALID(mln_runtime_drain_events(runtime, &batch, NULL));
-  mln_test_destroy_runtime(runtime);
-}
-
 typedef struct foreign_thread_probe {
   mln_runtime runtime;
   mln_map map;
@@ -32,9 +21,11 @@ typedef struct foreign_thread_probe {
 
 static void call_event_api_from_a_foreign_thread(void* argument) {
   foreign_thread_probe* probe = argument;
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  probe->drain_status = mln_runtime_drain_events(probe->runtime, &batch, NULL);
-  mln_event_batch_release(batch);
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_event_batch_view view = {.size = sizeof(view)};
+  probe->drain_status =
+    mln_test_drain_event_delivery(probe->runtime, &batch, &view, NULL);
+  mln_delivery_batch_release(batch);
   probe->runtime_mask_status = mln_runtime_set_event_mask(
     probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL
   );
@@ -71,24 +62,20 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_event_mask(
     map, MLN_RUNTIME_EVENT_MASK_ALL &
-           ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE
+           ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED
   ));
   mln_test_drain_all(runtime);
 
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   TEST_ASSERT_EQUAL_size_t(
-    0, mln_test_drain_counting(
-         runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-       )
+    0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
 
   MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
-  MLN_TEST_OK(mln_test_map_request_repaint(map));
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_GREATER_THAN_size_t(
-    0, mln_test_drain_counting(
-         runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-       )
+    0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
 
   mln_test_destroy_map(map);
@@ -103,10 +90,9 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_destroy_map(map);
 
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
-  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
-  MLN_TEST_OK(mln_event_batch_get(batch, &view, NULL));
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_event_batch_view view = {.size = sizeof(view)};
+  MLN_TEST_OK(mln_test_drain_event_delivery(runtime, &batch, &view, NULL));
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
 
   size_t map_sourced = 0;
@@ -126,7 +112,7 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
 
   mln_test_destroy_runtime(runtime);
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
-  mln_event_batch_release(batch);
+  mln_delivery_batch_release(batch);
 }
 
 // Two text-bearing events in one batch point at distinct arena ranges, and each
@@ -233,102 +219,169 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A drain of an empty queue reports not ready, leaves its output null and its
-// diagnostic empty, and consumes nothing: the next event still arrives in a
-// batch. One drain takes the whole queue, so the drain after it is empty again.
-static void an_empty_drain_publishes_no_batch(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  {
-    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    (void)snprintf(
-      diagnostic.message, sizeof(diagnostic.message), "an earlier failure"
-    );
-    mln_event_batch batch = MLN_HANDLE_NULL;
-    MLN_TEST_STATUS(
-      MLN_STATUS_NOT_READY,
-      mln_runtime_drain_events(runtime, &batch, &diagnostic)
-    );
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-    TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
+typedef struct event_completion_order {
+  mln_delivery_queue queue;
+  mln_map map;
+  uint64_t event_generation;
+  uint64_t completion_generation;
+  bool style_loaded;
+  bool completed;
+} event_completion_order;
+
+static bool drain_until_completion(void* context) {
+  event_completion_order* order = context;
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_delivery_batch_view view = {.size = sizeof(view)};
+  const mln_status status =
+    mln_delivery_queue_drain(order->queue, &batch, &view, NULL);
+  if (status == MLN_STATUS_NOT_READY) return false;
+  MLN_TEST_OK(status);
+  for (size_t item = 0; item < view.delivery_count; ++item) {
+    const mln_delivery* delivery =
+      (const mln_delivery*)((const char*)view.deliveries +
+                            item * view.delivery_size);
+    if (delivery->type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS) {
+      const mln_event_batch_view* events =
+        delivery->payload.runtime_events.events;
+      for (size_t index = 0; index < events->event_count; ++index) {
+        const mln_runtime_event* event =
+          (const mln_runtime_event*)((const char*)events->events +
+                                     index * events->event_size);
+        TEST_ASSERT_FALSE(order->completed);
+        TEST_ASSERT_EQUAL_UINT64(order->map, event->source);
+        if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
+          order->style_loaded = true;
+          order->event_generation = event->generation;
+          mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+          MLN_TEST_OK(mln_map_get_snapshot(order->map, &snapshot, NULL));
+          TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+            event->generation, snapshot.generation
+          );
+        }
+      }
+    } else if (delivery->type == MLN_DELIVERY_TYPE_COMPLETION) {
+      TEST_ASSERT_TRUE(order->style_loaded);
+      MLN_TEST_OK(delivery->payload.completion.status);
+      order->completed = true;
+      order->completion_generation = delivery->payload.completion.generation;
+    }
   }
+  mln_delivery_batch_release(batch);
+  return order->completed;
+}
 
+static void events_and_their_completion_share_fifo_order(void) {
+  mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(map, mln_test_background_style_json);
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
-  MLN_TEST_OK(mln_event_batch_get(batch, &view, NULL));
-  TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
-  mln_event_batch_release(batch);
-
-  mln_event_batch empty = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_runtime_drain_events(runtime, &empty, NULL)
+  mln_test_drain_all(runtime);
+  event_completion_order order = {
+    .queue = mln_test_event_queue(runtime), .map = map
+  };
+  const mln_completion completion = {
+    .size = sizeof(completion), .queue = order.queue
+  };
+  MLN_TEST_OK(mln_map_set_style_json(
+    map, mln_test_background_style_json, &completion, NULL
+  ));
+  TEST_ASSERT_TRUE(mln_test_await(
+    drain_until_completion, &order, mln_test_deadline_default(),
+    "events followed by their completion"
+  ));
+  TEST_ASSERT_EQUAL_UINT64(order.event_generation, order.completion_generation);
+  mln_test_completion clear = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_runtime_clear_event_handler(runtime, &clear.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
-
+  MLN_TEST_OK(mln_test_completion_settle(&clear));
+  mln_delivery_batch retired = MLN_HANDLE_NULL;
+  mln_delivery_batch_view retired_view = {.size = sizeof(retired_view)};
+  MLN_TEST_OK(
+    mln_delivery_queue_drain(order.queue, &retired, &retired_view, NULL)
+  );
+  TEST_ASSERT_EQUAL_size_t(1, retired_view.delivery_count);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_DELIVERY_TYPE_RETIRED, retired_view.deliveries[0].type
+  );
+  mln_delivery_batch_release(retired);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// A drained batch is an owned handle that stays readable across later drains.
-static void a_drained_batch_is_an_owned_handle(void) {
+typedef struct callback_events {
+  size_t calls;
+  size_t releases;
+  mln_runtime_event event;
+  mln_status snapshot_status;
+  uint64_t snapshot_generation;
+} callback_events;
+
+static void receive_style_event(
+  void* context, const mln_event_batch_view* events
+) {
+  callback_events* received = context;
+  received->calls += events->event_count;
+  if (events->event_count != 0) {
+    received->event = events->events[0];
+    mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+    received->snapshot_status =
+      mln_map_get_snapshot(received->event.source, &snapshot, NULL);
+    received->snapshot_generation = snapshot.generation;
+  }
+}
+
+static void release_event_context(void* context) {
+  callback_events* received = context;
+  received->releases += 1;
+}
+
+// A callback host copies events during the call and owns rejected contexts.
+// Clear retires accepted callback state before its completion.
+static void callback_event_state_retires_after_its_last_event(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  {
-    mln_test_load_style_and_wait(map, mln_test_background_style_json);
-
-    mln_event_batch first = MLN_HANDLE_NULL;
-    MLN_TEST_OK(mln_runtime_drain_events(runtime, &first, NULL));
-    mln_event_batch_view first_view = {.size = sizeof(mln_event_batch_view)};
-    MLN_TEST_OK(mln_event_batch_get(first, &first_view, NULL));
-    TEST_ASSERT_EQUAL_UINT32(sizeof(mln_runtime_event), first_view.event_size);
-    TEST_ASSERT_GREATER_THAN_size_t(1, first_view.event_count);
-    const size_t first_count = first_view.event_count;
-    const mln_runtime_event first_event = first_view.events[0];
-
-    mln_test_load_style_and_wait(map, mln_test_background_style_json);
-    mln_event_batch second = MLN_HANDLE_NULL;
-    MLN_TEST_OK(mln_runtime_drain_events(runtime, &second, NULL));
-    mln_event_batch_view second_view = {.size = sizeof(mln_event_batch_view)};
-    MLN_TEST_OK(mln_event_batch_get(second, &second_view, NULL));
-    TEST_ASSERT_GREATER_THAN_size_t(0, second_view.event_count);
-    TEST_ASSERT_EQUAL_size_t(first_count, first_view.event_count);
-    TEST_ASSERT_EQUAL_UINT32(first_event.type, first_view.events[0].type);
-
-    mln_event_batch_release(second);
-    mln_event_batch_release(first);
-  }
-  // A drained batch is an owned handle: releasing it twice is a no-op,
-  // releasing the null handle is a no-op, and a released handle is stale.
-  {
-    mln_test_load_style_and_wait(map, mln_test_background_style_json);
-
-    mln_event_batch batch = MLN_HANDLE_NULL;
-    MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
-    TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-    mln_event_batch_release(batch);
-    mln_event_batch_release(batch);
-    mln_event_batch_release(MLN_HANDLE_NULL);
-
-    mln_event_batch_view view = {
-      .size = sizeof(mln_event_batch_view), .event_count = 99
-    };
-    MLN_TEST_INVALID_STATE(mln_event_batch_get(batch, &view, NULL));
-    TEST_ASSERT_EQUAL_size_t(99, view.event_count);
-  }
+  MLN_TEST_OK(
+    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
+  );
+  callback_events received = {0};
+  mln_runtime_event_handler handler = {
+    .size = sizeof(handler),
+    .callback = receive_style_event,
+    .user_data = &received,
+    .release_user_data = release_event_context,
+  };
+  handler.size = 0;
+  MLN_TEST_INVALID(
+    mln_runtime_set_event_handler(runtime, &handler, NULL, NULL)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, received.releases);
+  handler.size = sizeof(handler);
+  MLN_TEST_AWAIT_OK(mln_runtime_set_event_handler(
+    runtime, &handler, &completion.descriptor, NULL
+  ));
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
+  MLN_TEST_AWAIT_OK(
+    mln_runtime_clear_event_handler(runtime, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_size_t(1, received.calls);
+  TEST_ASSERT_EQUAL_size_t(1, received.releases);
+  MLN_TEST_OK(received.snapshot_status);
+  TEST_ASSERT_EQUAL_UINT64(map, received.event.source);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, received.event.type
+  );
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+    received.event.generation, received.snapshot_generation
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_drain_rejects_a_missing_or_nonnull_output);
+  RUN_TEST(callback_event_state_retires_after_its_last_event);
+  RUN_TEST(events_and_their_completion_share_fifo_order);
   RUN_TEST(event_masks_change_from_any_thread_and_keep_foreign_bits);
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
-  RUN_TEST(an_empty_drain_publishes_no_batch);
-  RUN_TEST(a_drained_batch_is_an_owned_handle);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
 }

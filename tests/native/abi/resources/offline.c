@@ -966,7 +966,6 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   // The case releases the runtime itself, so it creates it untracked.
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake = mln_test_pulse_wake();
   options.cache_path =
     (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));

@@ -14,9 +14,7 @@ Uint8List _json(String value) => Uint8List.fromList(utf8.encode(value));
 /// completion is what keeps the isolate alive until it resolves.
 Future<(RuntimeHandle, MapHandle)> _register() async {
   logSetCallback(LogHandler(callback: (_, _, _, _) {}));
-  final runtime = runtimeCreate(
-    RuntimeOptions(eventWake: Wake(callback: () {})),
-  );
+  final runtime = runtimeCreate(runtimeOptionsDefault());
   await runtime.setResourceTransform(
     ResourceTransform(
       rules: const [

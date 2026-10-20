@@ -1,54 +1,50 @@
 #include <atomic>
 #include <memory>
-#include <vector>
+#include <string>
 
+#include "delivery/delivery_queue.hpp"
 #include "internal/support/allocation_faults.hpp"
-#include "map/map_internal.hpp"
-#include "runtime/runtime.hpp"
 #include "support/test_support.h"
 #include "wake/wake.hpp"
 
 namespace {
-using mln::native_tests::AllocationFaults;
 
-void partial_event_publication_still_wakes() {
+void a_failed_event_append_keeps_the_published_events_readable() {
   auto wakes = std::atomic_int{0};
-  auto descriptor = mln_wake{
+  auto wake = std::make_shared<mln::core::Wake>(mln_wake{
     .callback = [](
                   void* context
                 ) { static_cast<std::atomic_int*>(context)->fetch_add(1); },
     .user_data = &wakes,
-  };
-  auto queue = std::make_shared<mln::core::RuntimeEventQueueState>();
-  queue->wake = std::make_shared<mln::core::Wake>(descriptor);
-  queue->wake->accept();
-  constexpr auto map = mln_map{42};
-  queue->event_maps.emplace(map, std::make_shared<mln::core::MapEventState>());
-  queue->pending.events.reserve(1);
-  auto events = std::vector<mln::core::HeldMapEvent>(2);
-  events[0].type = MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE;
-  events[1].type = MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE;
+  });
+  wake->accept();
+  auto queue = mln::delivery::DeliveryQueueState{wake};
+  const auto event =
+    mln_runtime_event{.type = MLN_RUNTIME_EVENT_MAP_LOADING_FAILED};
+  queue.push_event(event, "first", nullptr);
+  const auto message = std::string(65536, 'x');
   auto threw = false;
   {
-    const auto faults = AllocationFaults{};
+    const auto faults = mln::native_tests::AllocationFaults{};
     try {
-      mln::core::push_runtime_map_events(queue, map, 1, events);
+      queue.push_event(event, message, nullptr);
     } catch (const std::bad_alloc&) {
       threw = true;
     }
   }
-  const auto partially_published = queue->pending.events.size();
-  mln::core::push_runtime_map_event_payload(
-    queue, map, 2, MLN_RUNTIME_EVENT_MAP_IDLE, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-    mln::core::zeroed_event_payload()
-  );
+  auto view = mln_delivery_batch_view{};
+  const auto batch = queue.drain(view);
+  const auto& events = *view.deliveries[0].payload.runtime_events.events;
   TEST_ASSERT_TRUE(threw);
-  TEST_ASSERT_EQUAL_UINT(1, partially_published);
-  TEST_ASSERT_GREATER_THAN_INT_MESSAGE(
-    0, wakes.load(), "queued events lost their empty-to-nonempty wake"
-  );
+  TEST_ASSERT_EQUAL_size_t(1, events.event_count);
+  TEST_ASSERT_EQUAL_STRING("first", events.messages);
+  mln::delivery::release_delivery_batch(batch);
+  queue.push_event(event, "later", nullptr);
+  TEST_ASSERT_EQUAL_INT(2, wakes.load());
 }
 
 }  // namespace
 
-MLN_TEST_GROUP { RUN_TEST(partial_event_publication_still_wakes); }
+MLN_TEST_GROUP {
+  RUN_TEST(a_failed_event_append_keeps_the_published_events_readable);
+}

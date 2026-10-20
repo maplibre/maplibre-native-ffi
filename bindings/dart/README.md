@@ -100,10 +100,10 @@ remains usable after its source map and runtime close.
 
 Map creation, commands, ordered queries, and lifecycle operations return
 `Future` values, and a command copies its input before it returns. Snapshot
-methods synchronously copy immutable state. A wake callback reports that events
-are queued and has no part in completing a future. Read queued events with
-`RuntimeHandle.drainEvents()`, and narrow what a map or a runtime queues with
-`setEventMask`.
+methods synchronously copy immutable state. Register a `RuntimeEventHandler`
+with `setEventHandler` to receive event spans on the isolate's shared delivery
+queue, and select event types with `setEventMask`. Events and completions use
+one wake and drain loop.
 
 Runtime, map, camera, and projection calls remain valid when Dart resumes an
 isolate on another native thread after `await`. Attach a render session directly

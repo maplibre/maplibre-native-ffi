@@ -116,23 +116,18 @@ mln_render_frame_result mln_test_render_batch_result(
 typedef struct idle_wait {
   mln_runtime runtime;
   const mln_test_render_fixture* fixture;
-  bool updated;
   bool idle;
   bool has_stats;
   mln_rendering_stats stats;
 } idle_wait;
 
-// An update clears an earlier idle, and an idle after it ends the wait. Each
-// finished frame's statistics replace the ones before.
-static bool note_update_or_idle(
+// Idle ends the wait. Each finished frame's statistics replace the ones before.
+static bool record_idle_or_stats(
   const mln_runtime_event* event, const char* messages, void* context
 ) {
   (void)messages;
   idle_wait* wait = context;
-  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
-    wait->updated = true;
-    wait->idle = false;
-  } else if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
+  if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
     wait->idle = true;
   } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
     wait->has_stats = true;
@@ -141,13 +136,11 @@ static bool note_update_or_idle(
   return false;
 }
 
-static bool update_or_idle_arrived(void* context) {
-  idle_wait* wait = context;
+static void drain_idle_events(idle_wait* wait) {
   (void)mln_test_render_fixture_service(wait->fixture);
   (void)mln_test_drain_counting_matching(
-    wait->runtime, note_update_or_idle, wait
+    wait->runtime, record_idle_or_stats, wait
   );
-  return wait->updated || wait->idle;
 }
 
 bool mln_test_render_until_idle(
@@ -158,13 +151,6 @@ bool mln_test_render_until_idle(
   idle_wait wait = {.runtime = runtime, .fixture = fixture};
   const mln_test_deadline deadline = mln_test_deadline_default();
   for (;;) {
-    wait.updated = false;
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_await(
-        update_or_idle_arrived, &wait, deadline, "a render update or idle"
-      ),
-      "the map never reported idle"
-    );
     if (wait.idle) {
       mln_render_session_snapshot snapshot = {
         .size = sizeof(mln_render_session_snapshot)
@@ -180,11 +166,16 @@ bool mln_test_render_until_idle(
       }
     }
     mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
     mln_render_frame_batch_release(
       mln_test_render_wait_for_results(fixture, 1)
+    );
+    drain_idle_events(&wait);
+    TEST_ASSERT_FALSE_MESSAGE(
+      mln_test_deadline_passed(deadline), "the map never reported idle"
     );
   }
 }

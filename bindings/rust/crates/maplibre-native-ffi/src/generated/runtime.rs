@@ -12,6 +12,20 @@ native_owner! {
 }
 
 impl RuntimeHandle {
+    /// Stops event delivery and retires the previous handler.
+    ///
+    /// See `mln_runtime_clear_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_event_handler(&self) -> Result<NativeFuture<()>> {
+        let call = self.inner.call("mln_runtime_clear_event_handler")?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
+            },
+            completion::unit,
+        )
+    }
+
     /// Clears the runtime-scoped outgoing HTTP header transform.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the
@@ -128,24 +142,6 @@ impl RuntimeHandle {
                 sys::mln_runtime_dispose(runtime, out_diagnostic)
             })
         })
-    }
-
-    /// Drains this runtime's queued events into a new owned batch.
-    ///
-    /// See `mln_runtime_drain_events` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn drain_events(&self) -> Result<Option<EventBatchHandle>> {
-        let mut call = self.inner.call("mln_runtime_drain_events")?;
-        let mut out_batch = sys::mln_event_batch(0);
-        if !call.status_unless(
-            sys::MLN_STATUS_NOT_READY,
-            |runtime, out_diagnostic| unsafe {
-                sys::mln_runtime_drain_events(runtime, &mut out_batch, out_diagnostic)
-            },
-        )? {
-            return Ok(None);
-        }
-        Ok(Some(EventBatchHandle::adopt(out_batch, None)?))
     }
 
     /// Reports which runtime-scoped event types this runtime queues.
@@ -289,6 +285,21 @@ impl RuntimeHandle {
                     completion,
                     out_diagnostic,
                 )
+            },
+            completion::unit,
+        )
+    }
+
+    /// Selects how runtime and map events reach the host.
+    ///
+    /// See `mln_runtime_set_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_event_handler(&self, handler: RuntimeEventHandler) -> Result<NativeFuture<()>> {
+        let mut call = self.inner.call("mln_runtime_set_event_handler")?;
+        let handler = call.reference(&handler)?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
             },
             completion::unit,
         )

@@ -11,11 +11,6 @@ internal object GeneratedOwnerDisposal {
     NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_dispose(handle, diagnostic) }
   }
 
-  fun eventBatch(handle: Long) {
-    CallbackAdmission.check(handle, "mln_event_batch_release")
-    C.mln_event_batch_release(handle)
-  }
-
   fun geojsonSourceData(handle: Long) {
     CallbackAdmission.check(handle, "mln_geojson_source_data_release")
     C.mln_geojson_source_data_release(handle)

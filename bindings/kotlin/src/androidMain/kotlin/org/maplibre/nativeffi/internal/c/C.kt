@@ -96,11 +96,6 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
-  @JvmStatic
-  actual external fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
-
-  @JvmStatic actual external fun mln_event_batch_release(batch: Long): Unit
-
   @CriticalNative @JvmStatic actual external fun mln_frame_demand_default(returned: Long): Unit
 
   @CriticalNative
@@ -1373,6 +1368,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_runtime_clear_event_handler(
+    runtime: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,
@@ -1423,14 +1425,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_runtime_drain_events(
-    runtime: Long,
-    outBatch: Long,
-    outDiagnostic: Long,
-  ): Int
 
   @JvmStatic
   actual external fun mln_runtime_get_event_mask(
@@ -1487,6 +1481,14 @@ internal actual object C {
   actual external fun mln_runtime_run_ambient_cache_operation(
     runtime: Long,
     operation: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_runtime_set_event_handler(
+    runtime: Long,
+    handler: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A borrowed view of one owned runtime-event batch.
+/// A borrowed span of runtime events in one delivery.
 /// </summary>
 /// <remarks>
 /// See <c>mln_event_batch_view</c> in the <see

@@ -22,11 +22,11 @@ import org.maplibre.nativeffi.generated.ResourceRequestInfo
 import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
 import org.maplibre.nativeffi.generated.RuntimeEvent
+import org.maplibre.nativeffi.generated.RuntimeEventHandler
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
@@ -97,24 +97,21 @@ internal fun smallMapOptions(
   }
 
 /**
- * A runtime whose event queue wakes the test, with a resource provider installed before anything
+ * A runtime whose event handler wakes the test, with a resource provider installed before anything
  * can request a resource.
  */
 internal class RuntimeFixture
-private constructor(val runtime: RuntimeHandle, private val wakes: Channel<Unit>) {
+private constructor(val runtime: RuntimeHandle, private val events: Channel<RuntimeEvent>) {
   /**
-   * Drains runtime events until one matches [predicate], blocking on the event wake between drains.
-   * Events drained before the match are dropped.
+   * Receives runtime events until one matches [predicate]. Events drained before the match are
+   * dropped.
    */
   suspend fun awaitEvent(what: String, predicate: (RuntimeEvent) -> Boolean): RuntimeEvent =
     try {
       withTimeout(WAIT_TIMEOUT) {
         var match: RuntimeEvent? = null
         while (match == null) {
-          match = runtime.drainEvents()?.use { it.get().events }?.firstOrNull(predicate)
-          // The wake fires when the queue becomes nonempty, so an event queued after this drain
-          // leaves a wake behind for the receive.
-          if (match == null) wakes.receive()
+          match = events.receive().takeIf(predicate)
         }
         match
       }
@@ -129,18 +126,22 @@ private constructor(val runtime: RuntimeHandle, private val wakes: Channel<Unit>
   companion object {
     /**
      * Runs [block] against a fresh runtime created from [options] with [provider] installed, and
-     * releases the runtime afterwards even when [block] fails. The fixture owns the event wake.
+     * releases the runtime afterwards even when [block] fails. The fixture owns the event receiver.
      */
     suspend fun <T> use(
       provider: ResourceProvider = denyingProvider(),
       options: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
       block: suspend RuntimeFixture.() -> T,
     ): T {
-      val wakes = Channel<Unit>(Channel.CONFLATED)
-      val runtime =
-        GeneratedApi.runtimeCreate(options.copy(eventWake = Wake { wakes.trySend(Unit) }))
-      val fixture = RuntimeFixture(runtime, wakes)
+      val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
+      val runtime = GeneratedApi.runtimeCreate(options)
+      val fixture = RuntimeFixture(runtime, events)
       return runThenRelease(listOf(runtime)) {
+        runtime
+          .setEventHandler(
+            RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
+          )
+          .awaitWithin("the event handler")
         runtime.setResourceProvider(provider).awaitWithin("the resource provider")
         fixture.block()
       }

@@ -103,7 +103,6 @@ typedef struct end_observation {
   mln_runtime runtime;
   mln_map map;
   bool did_change_queued;
-  bool render_update_queued;
   bool snapshot_read;
   uint64_t snapshot_generation;
   double snapshot_zoom;
@@ -111,36 +110,28 @@ typedef struct end_observation {
 
 // Drains the queue and reads the published snapshot from inside the callback.
 // The callback runs after the MapLibre update that ended the transition
-// returns, so the events of that update, its render update included, are
-// queued.
+// returns, so the camera events of that update are queued.
 static void observe_end(
   mln_test_transition_end* probe, const mln_camera_transition_end* end
 ) {
   end_observation* observation = probe->context;
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  while (mln_runtime_drain_events(observation->runtime, &batch, NULL) ==
-         MLN_STATUS_OK) {
-    mln_event_batch_view view = {.size = sizeof(view)};
-    if (mln_event_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
-      for (size_t index = 0; index < view.event_count; index += 1) {
-        const mln_runtime_event* event =
-          (const mln_runtime_event*)((const char*)view.events +
-                                     (index * view.event_size));
-        if (
-          event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
-          event->generation == end->generation
-        ) {
-          observation->did_change_queued = true;
-        }
-        if (
-          event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-          event->generation >= end->generation
-        ) {
-          observation->render_update_queued = true;
-        }
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_event_batch_view view = {.size = sizeof(view)};
+  while (
+    mln_test_drain_event_delivery(observation->runtime, &batch, &view, NULL) ==
+    MLN_STATUS_OK) {
+    for (size_t index = 0; index < view.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)view.events +
+                                   (index * view.event_size));
+      if (
+        event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
+        event->generation == end->generation
+      ) {
+        observation->did_change_queued = true;
       }
     }
-    mln_event_batch_release(batch);
+    mln_delivery_batch_release(batch);
     batch = MLN_HANDLE_NULL;
   }
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
@@ -247,7 +238,6 @@ static void a_rendered_ease_completes_at_its_target(void) {
   const uint64_t generation = atomic_load(&probe.generation);
   TEST_ASSERT_GREATER_THAN_UINT64(started, generation);
   TEST_ASSERT_TRUE(observation.did_change_queued);
-  TEST_ASSERT_TRUE(observation.render_update_queued);
   TEST_ASSERT_TRUE(observation.snapshot_read);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
     generation, observation.snapshot_generation

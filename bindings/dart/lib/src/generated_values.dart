@@ -876,7 +876,6 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const mapLoadingFinished = RuntimeEventMask.fromRawValue(64);
   static const mapLoadingFailed = RuntimeEventMask.fromRawValue(128);
   static const mapIdle = RuntimeEventMask.fromRawValue(256);
-  static const mapRenderUpdateAvailable = RuntimeEventMask.fromRawValue(512);
   static const mapRenderError = RuntimeEventMask.fromRawValue(1024);
   static const mapStillImageFinished = RuntimeEventMask.fromRawValue(2048);
   static const mapStillImageFailed = RuntimeEventMask.fromRawValue(4096);
@@ -897,13 +896,13 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const mapSourceChanged = RuntimeEventMask.fromRawValue(8388608);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventMask.fromRawValue(8912894);
+  static const allMapEvents = RuntimeEventMask.fromRawValue(8912382);
 
   /// Selects every runtime-originated event type this version defines.
   static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventMask.fromRawValue(12582910);
+  static const all = RuntimeEventMask.fromRawValue(12582398);
   @override
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
@@ -949,7 +948,6 @@ final class RuntimeEventType extends _Enum {
   static const mapLoadingFinished = RuntimeEventType.fromRawValue(6);
   static const mapLoadingFailed = RuntimeEventType.fromRawValue(7);
   static const mapIdle = RuntimeEventType.fromRawValue(8);
-  static const mapRenderUpdateAvailable = RuntimeEventType.fromRawValue(9);
   static const mapRenderError = RuntimeEventType.fromRawValue(10);
   static const mapStillImageFinished = RuntimeEventType.fromRawValue(11);
   static const mapStillImageFailed = RuntimeEventType.fromRawValue(12);
@@ -2012,333 +2010,6 @@ final class CustomMvtVectorSourceOptions {
   final CustomSourceCancelTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
-}
-
-/// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
-///
-/// See `mln_rendering_stats` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RenderingStats extends _Value {
-  const RenderingStats({
-    this.encodingTime = 0,
-    this.renderingTime = 0,
-    this.frameCount = 0,
-    this.drawCallCount = 0,
-    this.totalDrawCallCount = 0,
-  });
-
-  /// Frame CPU encoding time in seconds.
-  final double encodingTime;
-
-  /// Frame CPU rendering time in seconds.
-  final double renderingTime;
-
-  /// Number of frames rendered by the native renderer.
-  final int frameCount;
-
-  /// Draw calls executed during the most recent frame.
-  final int drawCallCount;
-
-  /// Total draw calls executed by the native renderer.
-  final int totalDrawCallCount;
-
-  @override
-  List<Object?> get _members => [
-    encodingTime,
-    renderingTime,
-    frameCount,
-    drawCallCount,
-    totalDrawCallCount,
-  ];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
-///
-/// See `mln_runtime_event_render_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventRenderFrame extends _Value {
-  const RuntimeEventRenderFrame({
-    this.mode = const RenderMode.fromRawValue(0),
-    this.needsRepaint = false,
-    this.placementChanged = false,
-    this.stats = const RenderingStats(),
-  });
-
-  /// One of `mln_render_mode`.
-  final RenderMode mode;
-
-  /// Whether MapLibre needs another frame after this one.
-  final bool needsRepaint;
-
-  /// Whether symbol placement changed during this frame.
-  final bool placementChanged;
-  final RenderingStats stats;
-
-  @override
-  List<Object?> get _members => [mode, needsRepaint, placementChanged, stats];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
-///
-/// See `mln_runtime_event_render_map` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventRenderMap extends _Value {
-  const RuntimeEventRenderMap({this.mode = const RenderMode.fromRawValue(0)});
-
-  /// One of `mln_render_mode`.
-  final RenderMode mode;
-
-  @override
-  List<Object?> get _members => [mode];
-}
-
-/// Overscaled tile identity reported in tile observer events.
-///
-/// See `mln_tile_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class TileId extends _Value {
-  const TileId({
-    this.overscaledZ = 0,
-    this.wrap = 0,
-    this.canonicalZ = 0,
-    this.canonicalX = 0,
-    this.canonicalY = 0,
-  });
-  final int overscaledZ;
-  final int wrap;
-  final int canonicalZ;
-  final int canonicalX;
-  final int canonicalY;
-
-  @override
-  List<Object?> get _members => [
-    overscaledZ,
-    wrap,
-    canonicalZ,
-    canonicalX,
-    canonicalY,
-  ];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
-///
-/// See `mln_runtime_event_tile_action` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventTileAction extends _Value {
-  const RuntimeEventTileAction({
-    this.operation = const TileOperation.fromRawValue(0),
-    this.tileId = const TileId(),
-  });
-
-  /// One of `mln_tile_operation`.
-  final TileOperation operation;
-  final TileId tileId;
-
-  @override
-  List<Object?> get _members => [operation, tileId];
-}
-
-/// Offline region status snapshot. Copied result, owned by the caller.
-///
-/// See `mln_offline_region_status` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class OfflineRegionStatus extends _Value {
-  const OfflineRegionStatus({
-    this.downloadState = const OfflineRegionDownloadState.fromRawValue(0),
-    required this.completedResourceCount,
-    required this.completedResourceSize,
-    required this.completedTileCount,
-    required this.requiredTileCount,
-    required this.completedTileSize,
-    required this.requiredResourceCount,
-    this.requiredResourceCountIsPrecise = false,
-    this.complete = false,
-  });
-
-  /// One of `mln_offline_region_download_state`.
-  final OfflineRegionDownloadState downloadState;
-  final BigInt completedResourceCount;
-  final BigInt completedResourceSize;
-  final BigInt completedTileCount;
-  final BigInt requiredTileCount;
-  final BigInt completedTileSize;
-  final BigInt requiredResourceCount;
-  final bool requiredResourceCountIsPrecise;
-  final bool complete;
-
-  @override
-  List<Object?> get _members => [
-    downloadState,
-    completedResourceCount,
-    completedResourceSize,
-    completedTileCount,
-    requiredTileCount,
-    completedTileSize,
-    requiredResourceCount,
-    requiredResourceCountIsPrecise,
-    complete,
-  ];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
-///
-/// See `mln_runtime_event_offline_region_status` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventOfflineRegionStatus extends _Value {
-  const RuntimeEventOfflineRegionStatus({
-    this.regionId = 0,
-    required this.status,
-  });
-  final int regionId;
-  final OfflineRegionStatus status;
-
-  @override
-  List<Object?> get _members => [regionId, status];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
-///
-/// See `mln_runtime_event_offline_region_response_error` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventOfflineRegionResponseError extends _Value {
-  const RuntimeEventOfflineRegionResponseError({
-    this.regionId = 0,
-    this.reason = const ResourceErrorReason.fromRawValue(0),
-  });
-  final int regionId;
-
-  /// One of `mln_resource_error_reason`.
-  final ResourceErrorReason reason;
-
-  @override
-  List<Object?> get _members => [regionId, reason];
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
-///
-/// See `mln_runtime_event_offline_region_tile_count_limit` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
-  const RuntimeEventOfflineRegionTileCountLimit({
-    this.regionId = 0,
-    required this.limit,
-  });
-  final int regionId;
-  final BigInt limit;
-
-  @override
-  List<Object?> get _members => [regionId, limit];
-}
-
-/// One drained runtime event.
-///
-/// See `mln_runtime_event` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEvent {
-  const RuntimeEvent({
-    required this.type,
-    this.sourceType = const RuntimeEventSourceType.fromRawValue(0),
-    required this.source,
-    required this.generation,
-    this.code = 0,
-    required this.messageOffset,
-    this.messageSize = 0,
-    this.message = '',
-    required this.payload,
-  });
-
-  /// One of `mln_runtime_event_type`.
-  final RuntimeEventType type;
-
-  /// One of `mln_runtime_event_source_type`.
-  final RuntimeEventSourceType sourceType;
-
-  /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
-  final BigInt source;
-
-  /// Map snapshot generation that the event reports, or zero when source_type
-  /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
-  final BigInt generation;
-
-  /// Secondary event detail whose meaning type selects. Depending on type it
-  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
-  /// 0. See `mln_runtime_event_type` for the per-type meaning.
-  final int code;
-
-  /// Byte offset of this event's message inside
-  /// `mln_event_batch_view.messages`. Zero when message_size is 0.
-  final BigInt messageOffset;
-
-  /// Number of message bytes, excluding the trailing null terminator that
-  /// follows them in the arena. Zero when this event carries no message.
-  final int messageSize;
-
-  /// Copied text, owned by the caller.
-  final String message;
-  final RuntimeEventPayload payload;
-}
-
-sealed class RuntimeEventPayload {
-  const RuntimeEventPayload._();
-}
-
-final class RuntimeEventPayloadRenderFrame extends RuntimeEventPayload {
-  const RuntimeEventPayloadRenderFrame(this.value) : super._();
-  final RuntimeEventRenderFrame value;
-}
-
-final class RuntimeEventPayloadRenderMap extends RuntimeEventPayload {
-  const RuntimeEventPayloadRenderMap(this.value) : super._();
-  final RuntimeEventRenderMap value;
-}
-
-final class RuntimeEventPayloadTileAction extends RuntimeEventPayload {
-  const RuntimeEventPayloadTileAction(this.value) : super._();
-  final RuntimeEventTileAction value;
-}
-
-final class RuntimeEventPayloadOfflineRegionStatus extends RuntimeEventPayload {
-  const RuntimeEventPayloadOfflineRegionStatus(this.value) : super._();
-  final RuntimeEventOfflineRegionStatus value;
-}
-
-final class RuntimeEventPayloadOfflineRegionResponseError
-    extends RuntimeEventPayload {
-  const RuntimeEventPayloadOfflineRegionResponseError(this.value) : super._();
-  final RuntimeEventOfflineRegionResponseError value;
-}
-
-final class RuntimeEventPayloadOfflineRegionTileCountLimit
-    extends RuntimeEventPayload {
-  const RuntimeEventPayloadOfflineRegionTileCountLimit(this.value) : super._();
-  final RuntimeEventOfflineRegionTileCountLimit value;
-}
-
-final class RuntimeEventPayloadNone extends RuntimeEventPayload {
-  const RuntimeEventPayloadNone() : super._();
-}
-
-final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
-  RuntimeEventPayloadUnknown(this.tag, Uint8List rawRecord)
-    : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(),
-      super._();
-  final int tag;
-  final Uint8List rawRecord;
-}
-
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class EventBatchView extends _Value {
-  EventBatchView({required List<RuntimeEvent> events})
-    : events = List.unmodifiable(events);
-
-  /// Copied value, owned by the caller.
-  final List<RuntimeEvent> events;
-
-  @override
-  List<Object?> get _members => [events];
 }
 
 /// One nonblocking request for a frame.
@@ -4346,7 +4017,6 @@ final class RuntimeOptions extends _Value {
     this.assetPath,
     this.cachePath,
     this.eventMask = RuntimeEventMask.all,
-    this.eventWake = const Wake(),
   });
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
@@ -4362,11 +4032,8 @@ final class RuntimeOptions extends _Value {
   /// `mln_runtime_event_mask` values.
   final RuntimeEventMask eventMask;
 
-  /// Wakes the receiver when the runtime event queue becomes nonempty.
-  final Wake eventWake;
-
   @override
-  List<Object?> get _members => [assetPath, cachePath, eventMask, eventWake];
+  List<Object?> get _members => [assetPath, cachePath, eventMask];
 }
 
 /// Tile-pyramid offline region definition.
@@ -4504,6 +4171,348 @@ final class OfflineRegionInfo extends _Value {
 
   @override
   List<Object?> get _members => [id, definition, metadata];
+}
+
+/// Offline region status snapshot. Copied result, owned by the caller.
+///
+/// See `mln_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class OfflineRegionStatus extends _Value {
+  const OfflineRegionStatus({
+    this.downloadState = const OfflineRegionDownloadState.fromRawValue(0),
+    required this.completedResourceCount,
+    required this.completedResourceSize,
+    required this.completedTileCount,
+    required this.requiredTileCount,
+    required this.completedTileSize,
+    required this.requiredResourceCount,
+    this.requiredResourceCountIsPrecise = false,
+    this.complete = false,
+  });
+
+  /// One of `mln_offline_region_download_state`.
+  final OfflineRegionDownloadState downloadState;
+  final BigInt completedResourceCount;
+  final BigInt completedResourceSize;
+  final BigInt completedTileCount;
+  final BigInt requiredTileCount;
+  final BigInt completedTileSize;
+  final BigInt requiredResourceCount;
+  final bool requiredResourceCountIsPrecise;
+  final bool complete;
+
+  @override
+  List<Object?> get _members => [
+    downloadState,
+    completedResourceCount,
+    completedResourceSize,
+    completedTileCount,
+    requiredTileCount,
+    completedTileSize,
+    requiredResourceCount,
+    requiredResourceCountIsPrecise,
+    complete,
+  ];
+}
+
+/// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+///
+/// See `mln_rendering_stats` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RenderingStats extends _Value {
+  const RenderingStats({
+    this.encodingTime = 0,
+    this.renderingTime = 0,
+    this.frameCount = 0,
+    this.drawCallCount = 0,
+    this.totalDrawCallCount = 0,
+  });
+
+  /// Frame CPU encoding time in seconds.
+  final double encodingTime;
+
+  /// Frame CPU rendering time in seconds.
+  final double renderingTime;
+
+  /// Number of frames rendered by the native renderer.
+  final int frameCount;
+
+  /// Draw calls executed during the most recent frame.
+  final int drawCallCount;
+
+  /// Total draw calls executed by the native renderer.
+  final int totalDrawCallCount;
+
+  @override
+  List<Object?> get _members => [
+    encodingTime,
+    renderingTime,
+    frameCount,
+    drawCallCount,
+    totalDrawCallCount,
+  ];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+///
+/// See `mln_runtime_event_render_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventRenderFrame extends _Value {
+  const RuntimeEventRenderFrame({
+    this.mode = const RenderMode.fromRawValue(0),
+    this.needsRepaint = false,
+    this.placementChanged = false,
+    this.stats = const RenderingStats(),
+  });
+
+  /// One of `mln_render_mode`.
+  final RenderMode mode;
+
+  /// Whether MapLibre needs another frame after this one.
+  final bool needsRepaint;
+
+  /// Whether symbol placement changed during this frame.
+  final bool placementChanged;
+  final RenderingStats stats;
+
+  @override
+  List<Object?> get _members => [mode, needsRepaint, placementChanged, stats];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+///
+/// See `mln_runtime_event_render_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventRenderMap extends _Value {
+  const RuntimeEventRenderMap({this.mode = const RenderMode.fromRawValue(0)});
+
+  /// One of `mln_render_mode`.
+  final RenderMode mode;
+
+  @override
+  List<Object?> get _members => [mode];
+}
+
+/// Overscaled tile identity reported in tile observer events.
+///
+/// See `mln_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class TileId extends _Value {
+  const TileId({
+    this.overscaledZ = 0,
+    this.wrap = 0,
+    this.canonicalZ = 0,
+    this.canonicalX = 0,
+    this.canonicalY = 0,
+  });
+  final int overscaledZ;
+  final int wrap;
+  final int canonicalZ;
+  final int canonicalX;
+  final int canonicalY;
+
+  @override
+  List<Object?> get _members => [
+    overscaledZ,
+    wrap,
+    canonicalZ,
+    canonicalX,
+    canonicalY,
+  ];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+///
+/// See `mln_runtime_event_tile_action` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventTileAction extends _Value {
+  const RuntimeEventTileAction({
+    this.operation = const TileOperation.fromRawValue(0),
+    this.tileId = const TileId(),
+  });
+
+  /// One of `mln_tile_operation`.
+  final TileOperation operation;
+  final TileId tileId;
+
+  @override
+  List<Object?> get _members => [operation, tileId];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+///
+/// See `mln_runtime_event_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventOfflineRegionStatus extends _Value {
+  const RuntimeEventOfflineRegionStatus({
+    this.regionId = 0,
+    required this.status,
+  });
+  final int regionId;
+  final OfflineRegionStatus status;
+
+  @override
+  List<Object?> get _members => [regionId, status];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+///
+/// See `mln_runtime_event_offline_region_response_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventOfflineRegionResponseError extends _Value {
+  const RuntimeEventOfflineRegionResponseError({
+    this.regionId = 0,
+    this.reason = const ResourceErrorReason.fromRawValue(0),
+  });
+  final int regionId;
+
+  /// One of `mln_resource_error_reason`.
+  final ResourceErrorReason reason;
+
+  @override
+  List<Object?> get _members => [regionId, reason];
+}
+
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+///
+/// See `mln_runtime_event_offline_region_tile_count_limit` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
+  const RuntimeEventOfflineRegionTileCountLimit({
+    this.regionId = 0,
+    required this.limit,
+  });
+  final int regionId;
+  final BigInt limit;
+
+  @override
+  List<Object?> get _members => [regionId, limit];
+}
+
+/// One delivered runtime event.
+///
+/// See `mln_runtime_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEvent {
+  const RuntimeEvent({
+    required this.type,
+    this.sourceType = const RuntimeEventSourceType.fromRawValue(0),
+    required this.source,
+    required this.generation,
+    this.code = 0,
+    required this.messageOffset,
+    this.messageSize = 0,
+    this.message = '',
+    required this.payload,
+  });
+
+  /// One of `mln_runtime_event_type`.
+  final RuntimeEventType type;
+
+  /// One of `mln_runtime_event_source_type`.
+  final RuntimeEventSourceType sourceType;
+
+  /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
+  final BigInt source;
+
+  /// Map snapshot generation that the event reports, or zero when source_type
+  /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+  final BigInt generation;
+
+  /// Secondary event detail whose meaning type selects. Depending on type it
+  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
+  /// 0. See `mln_runtime_event_type` for the per-type meaning.
+  final int code;
+
+  /// Byte offset of this event's message inside
+  /// `mln_event_batch_view.messages`. Zero when message_size is 0.
+  final BigInt messageOffset;
+
+  /// Number of message bytes, excluding the trailing null terminator that
+  /// follows them in the arena. Zero when this event carries no message.
+  final int messageSize;
+
+  /// Copied text, owned by the caller.
+  final String message;
+  final RuntimeEventPayload payload;
+}
+
+sealed class RuntimeEventPayload {
+  const RuntimeEventPayload._();
+}
+
+final class RuntimeEventPayloadRenderFrame extends RuntimeEventPayload {
+  const RuntimeEventPayloadRenderFrame(this.value) : super._();
+  final RuntimeEventRenderFrame value;
+}
+
+final class RuntimeEventPayloadRenderMap extends RuntimeEventPayload {
+  const RuntimeEventPayloadRenderMap(this.value) : super._();
+  final RuntimeEventRenderMap value;
+}
+
+final class RuntimeEventPayloadTileAction extends RuntimeEventPayload {
+  const RuntimeEventPayloadTileAction(this.value) : super._();
+  final RuntimeEventTileAction value;
+}
+
+final class RuntimeEventPayloadOfflineRegionStatus extends RuntimeEventPayload {
+  const RuntimeEventPayloadOfflineRegionStatus(this.value) : super._();
+  final RuntimeEventOfflineRegionStatus value;
+}
+
+final class RuntimeEventPayloadOfflineRegionResponseError
+    extends RuntimeEventPayload {
+  const RuntimeEventPayloadOfflineRegionResponseError(this.value) : super._();
+  final RuntimeEventOfflineRegionResponseError value;
+}
+
+final class RuntimeEventPayloadOfflineRegionTileCountLimit
+    extends RuntimeEventPayload {
+  const RuntimeEventPayloadOfflineRegionTileCountLimit(this.value) : super._();
+  final RuntimeEventOfflineRegionTileCountLimit value;
+}
+
+final class RuntimeEventPayloadNone extends RuntimeEventPayload {
+  const RuntimeEventPayloadNone() : super._();
+}
+
+final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
+  RuntimeEventPayloadUnknown(this.tag, Uint8List rawRecord)
+    : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(),
+      super._();
+  final int tag;
+  final Uint8List rawRecord;
+}
+
+/// A borrowed span of runtime events in one delivery.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class EventBatchView extends _Value {
+  EventBatchView({required List<RuntimeEvent> events})
+    : events = List.unmodifiable(events);
+
+  /// Copied value, owned by the caller.
+  final List<RuntimeEvent> events;
+
+  @override
+  List<Object?> get _members => [events];
+}
+
+/// Receives selected events after their snapshots have been published.
+///
+/// See `mln_runtime_event_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+typedef RuntimeEventCallback = void Function(EventBatchView);
+
+/// Runtime and map event delivery. Set either callback or queue.
+///
+/// See `mln_runtime_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventHandler {
+  const RuntimeEventHandler({this.callback});
+  final RuntimeEventCallback? callback;
 }
 
 /// One HTTP header that a header rule supplies.

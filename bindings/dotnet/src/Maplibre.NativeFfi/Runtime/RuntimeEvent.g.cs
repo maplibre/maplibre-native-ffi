@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One drained runtime event.
+/// One delivered runtime event.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event</c> in the <see

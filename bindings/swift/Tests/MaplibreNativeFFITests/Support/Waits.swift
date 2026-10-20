@@ -19,7 +19,7 @@ enum TestTimeout {
 }
 
 /// A process-wide counter that every wake the fixtures install bumps: the
-/// runtime's event wake, a session's frame and driver-work wakes, and the
+/// runtime's event handler, a session's frame and driver-work wakes, and the
 /// flags a test's callbacks set. A waiter blocks until the counter moves, so it
 /// wakes as soon as the library or a callback publishes.
 final class Pulse: @unchecked Sendable {

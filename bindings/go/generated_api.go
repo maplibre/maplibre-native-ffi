@@ -939,7 +939,6 @@ const (
 	RuntimeEventMaskMapLoadingFinished                  RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED)
 	RuntimeEventMaskMapLoadingFailed                    RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED)
 	RuntimeEventMaskMapIdle                             RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_IDLE)
-	RuntimeEventMaskMapRenderUpdateAvailable            RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE)
 	RuntimeEventMaskMapRenderError                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR)
 	RuntimeEventMaskMapStillImageFinished               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED)
 	RuntimeEventMaskMapStillImageFailed                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED)
@@ -1008,7 +1007,6 @@ const (
 	RuntimeEventTypeMapLoadingFinished                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)
 	RuntimeEventTypeMapLoadingFailed                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
 	RuntimeEventTypeMapIdle                             RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
-	RuntimeEventTypeMapRenderUpdateAvailable            RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)
 	RuntimeEventTypeMapRenderError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
 	RuntimeEventTypeMapStillImageFinished               RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED)
 	RuntimeEventTypeMapStillImageFailed                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED)
@@ -1980,8 +1978,8 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	return raw
 }
 
-// EventBatchView corresponds to mln_event_batch_view. A borrowed view of one
-// owned runtime-event batch.
+// EventBatchView corresponds to mln_event_batch_view. A borrowed span of
+// runtime events in one delivery.
 //
 // See mln_event_batch_view in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -4090,7 +4088,7 @@ func (response *ResourceTransformResponseScope) target(operation uint32) binding
 	return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation)
 }
 
-// RuntimeEvent corresponds to mln_runtime_event. One drained runtime event.
+// RuntimeEvent corresponds to mln_runtime_event. One delivered runtime event.
 //
 // See mln_runtime_event in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -4141,6 +4139,26 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 		return UnknownVariant{Tag: uint32(raw.payload_type)}
 	}()
 	return result
+}
+
+// RuntimeEventHandler corresponds to mln_runtime_event_handler. Runtime and map
+// event delivery. Set either callback or queue.
+//
+// See mln_runtime_event_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventHandler struct{ Callback func(EventBatchView) }
+
+func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C.mln_runtime_event_handler {
+	raw := C.mln_runtime_event_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Callback != nil {
+			raw.callback = C.mln_runtime_event_callback(C.binding_mln_runtime_event_handler_callback)
+		}
+	}
+	return raw
 }
 
 // RuntimeEventOfflineRegionResponseError corresponds to
@@ -4272,8 +4290,6 @@ type RuntimeOptions struct {
 	// Runtime-scoped event types this runtime queues, as a bitwise OR of
 	// mln_runtime_event_mask values.
 	EventMask RuntimeEventMask
-	// Wakes the receiver when the runtime event queue becomes nonempty.
-	EventWake Wake
 }
 
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
@@ -4306,7 +4322,6 @@ func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runti
 		raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.CachePath))), size: C.size_t(len((*input.CachePath)))}
 	}
 	raw.event_mask = C.uint64_t(input.EventMask)
-	raw.event_wake = nativeWake(input.EventWake, arena)
 	return raw
 }
 
@@ -5994,26 +6009,6 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
-// EventBatchHandle corresponds to mln_event_batch. An owned batch of runtime
-// events from one drain.
-//
-// See mln_event_batch in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type EventBatchHandle struct{ *bindingOwner }
-
-func adoptEventBatchHandle(raw uint64, parent any) *EventBatchHandle {
-	owner := &EventBatchHandle{bindingAdopt(raw, parent, "EventBatchHandle", func(raw uint64) { C.mln_event_batch_release(C.mln_event_batch(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *EventBatchHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
 // GeojsonSourceDataHandle corresponds to mln_geojson_source_data. Prepared
 // GeoJSON data that sources retain independently of its handle.
 //
@@ -6286,32 +6281,6 @@ func CVersion() (uint32, error) {
 	return bindingDirect(bindingGlobal(C.binding_operation_mln_c_version), func(arena *bindingArena, raw uint64) uint32 {
 		return uint32(C.mln_c_version())
 	})
-}
-
-// Get borrows the event and message view stored by an owned event batch.
-//
-// See mln_event_batch_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *EventBatchHandle) Get() (EventBatchView, error) {
-	var outView C.mln_event_batch_view
-	outView.size = C.uint32_t(unsafe.Sizeof(outView))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_event_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_event_batch_get(C.mln_event_batch(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) EventBatchView {
-		return copyEventBatchView(outView)
-	})
-}
-
-// Close releases an owned event batch. A null handle is a no-op.
-//
-// See mln_event_batch_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *EventBatchHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_event_batch_release), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_event_batch_release(C.mln_event_batch(raw))
-		return struct{}{}
-	})
-	return err
 }
 
 // GeojsonSourceDataCreate prepares GeoJSON source data for installation on a
@@ -8219,6 +8188,16 @@ func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
 	})
 }
 
+// ClearEventHandler stops event delivery and retires the previous handler.
+//
+// See mln_runtime_clear_event_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_event_handler), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_event_handler(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
+}
+
 // ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header
 // transform.
 //
@@ -8261,7 +8240,6 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 		return int32(C.mln_runtime_create(bindingStore(nativeRuntimeOptions(options, arena), arena), &outRuntime, diagnostic))
 	}, func(arena *bindingArena) *RuntimeHandle {
 		adopted := adoptRuntimeHandle(uint64(outRuntime), nil)
-		arena.accept(adopted.bindingOwner)
 		return adopted
 	})
 }
@@ -8294,20 +8272,6 @@ func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[stru
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_delete_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_delete_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
 	}, completionUnit)
-}
-
-// DrainEvents drains this runtime's queued events into a new owned batch.
-//
-// See mln_runtime_drain_events in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) DrainEvents() (*EventBatchHandle, error) {
-	var outBatch C.mln_event_batch
-	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_drain_events(C.mln_runtime(raw), &outBatch, diagnostic))
-	}, func(arena *bindingArena) *EventBatchHandle {
-		adopted := adoptEventBatchHandle(uint64(outBatch), nil)
-		return adopted
-	})
 }
 
 // GetEventMask reports which runtime-scoped event types this runtime queues.
@@ -8394,6 +8358,16 @@ func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_run_ambient_cache_operation), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.uint32_t(operation), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetEventHandler selects how runtime and map events reach the host.
+//
+// See mln_runtime_set_event_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_event_handler), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_event_handler(C.mln_runtime(raw), bindingStore(nativeRuntimeEventHandler(handler, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -9076,6 +9050,23 @@ func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.
 		return
 	}
 	callbacks.Callback()
+	return
+}
+
+//export mlnGo_mln_runtime_event_handler_callback
+func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, native_events *C.mln_event_batch_view) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_runtime_event_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[RuntimeEventHandler](native_user_data)
+	if !ok || callbacks.Callback == nil {
+		return
+	}
+	callbacks.Callback(copyEventBatchView((*native_events)))
 	return
 }
 

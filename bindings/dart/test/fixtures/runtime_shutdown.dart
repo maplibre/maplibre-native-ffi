@@ -103,9 +103,7 @@ Future<void> abandonSession() async {
 /// port that the provider closes.
 Future<void> exitWithLiveCallbacks() async {
   logSetCallback(LogHandler(callback: (_, _, _, _) {}));
-  final runtime = runtimeCreate(
-    RuntimeOptions(eventWake: Wake(callback: () {})),
-  );
+  final runtime = runtimeCreate(runtimeOptionsDefault());
   final waiting = ReceivePort();
   final served = Completer<void>();
   await runtime.setResourceProvider(

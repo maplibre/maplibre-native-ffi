@@ -109,9 +109,10 @@ class Harness:
         self.routes: dict[str, Route] = {}
         self._pending: list[mln.RuntimeEvent] = []
         self._maps: list[mln.MapHandle] = []
-        self.runtime = mln.runtime_create(
-            replace(
-                mln.RuntimeOptions.default(), event_wake=mln.Wake(self.events.notify)
+        self.runtime = mln.runtime_create(mln.RuntimeOptions.default())
+        result(
+            self.runtime.set_event_handler(
+                mln.RuntimeEventHandler(self._receive_events)
             )
         )
         result(
@@ -119,6 +120,10 @@ class Harness:
                 mln.ResourceProvider(callback=self._provide)
             )
         )
+
+    def _receive_events(self, batch: mln.EventBatchView) -> None:
+        self._pending.extend(batch.events)
+        self.events.notify()
 
     def _provide(
         self, request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
@@ -145,13 +150,9 @@ class Harness:
         match: Callable[[mln.RuntimeEvent], bool] = lambda _: True,
     ) -> mln.RuntimeEvent:
         """Return the first event of this type that matches, draining as the
-        runtime's event wake fires."""
+        runtime's event handler receives copies."""
 
         def check() -> mln.RuntimeEvent | None:
-            batch = self.runtime.drain_events()
-            if batch is not None:
-                with batch:
-                    self._pending.extend(batch.get().events)
             for index, event in enumerate(self._pending):
                 if event.type == event_type and match(event):
                     del self._pending[index]

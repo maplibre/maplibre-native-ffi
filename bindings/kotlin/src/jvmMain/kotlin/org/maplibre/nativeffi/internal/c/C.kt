@@ -48,9 +48,6 @@ internal actual object C {
       "mln_custom_mvt_vector_source_options_default",
       mln_custom_mvt_vector_source_options,
     )
-  private val mln_event_batch_get =
-    Ffm.downcall("mln_event_batch_get", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_event_batch_release = Ffm.downcall("mln_event_batch_release", null, JAVA_LONG)
   private val mln_frame_demand_default = Ffm.downcall("mln_frame_demand_default", mln_frame_demand)
   private val mln_free_camera_options_default =
     Ffm.downcall("mln_free_camera_options_default", mln_free_camera_options)
@@ -1193,6 +1190,8 @@ internal actual object C {
       mln_buffer_view,
       JAVA_LONG,
     )
+  private val mln_runtime_clear_event_handler =
+    Ffm.downcall("mln_runtime_clear_event_handler", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_clear_http_header_transform =
     Ffm.downcall(
       "mln_runtime_clear_http_header_transform",
@@ -1231,8 +1230,6 @@ internal actual object C {
     )
   private val mln_runtime_dispose =
     Ffm.downcall("mln_runtime_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
-  private val mln_runtime_drain_events =
-    Ffm.downcall("mln_runtime_drain_events", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_get_event_mask =
     Ffm.downcall("mln_runtime_get_event_mask", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_get_offline_region =
@@ -1283,6 +1280,15 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_runtime_set_event_handler =
+    Ffm.downcall(
+      "mln_runtime_set_event_handler",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1474,13 +1480,6 @@ internal actual object C {
     mln_custom_mvt_vector_source_options_default.invokeExact(
       Ffm.into(returned, mln_custom_mvt_vector_source_options),
     ) as MemorySegment
-  }
-
-  actual fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
-    mln_event_batch_get.invokeExact(batch, outView, outDiagnostic) as Int
-
-  actual fun mln_event_batch_release(batch: Long) {
-    mln_event_batch_release.invoke(batch)
   }
 
   actual fun mln_frame_demand_default(returned: Long) {
@@ -3272,6 +3271,12 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
+  actual fun mln_runtime_clear_event_handler(
+    runtime: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int = mln_runtime_clear_event_handler.invokeExact(runtime, completion, outDiagnostic) as Int
+
   actual fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,
@@ -3331,9 +3336,6 @@ internal actual object C {
 
   actual fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int =
     mln_runtime_dispose.invokeExact(runtime, outDiagnostic) as Int
-
-  actual fun mln_runtime_drain_events(runtime: Long, outBatch: Long, outDiagnostic: Long): Int =
-    mln_runtime_drain_events.invokeExact(runtime, outBatch, outDiagnostic) as Int
 
   actual fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int =
     mln_runtime_get_event_mask.invokeExact(runtime, outMask, outDiagnostic) as Int
@@ -3403,6 +3405,14 @@ internal actual object C {
       completion,
       outDiagnostic,
     ) as Int
+
+  actual fun mln_runtime_set_event_handler(
+    runtime: Long,
+    handler: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_runtime_set_event_handler.invokeExact(runtime, handler, completion, outDiagnostic) as Int
 
   actual fun mln_runtime_set_event_mask(runtime: Long, mask: Long, outDiagnostic: Long): Int =
     mln_runtime_set_event_mask.invokeExact(runtime, mask, outDiagnostic) as Int
@@ -3928,7 +3938,6 @@ internal val mln_runtime_options: GroupLayout =
     mln_buffer_view.withName("asset_path"),
     mln_buffer_view.withName("cache_path"),
     JAVA_LONG.withName("event_mask"),
-    mln_wake.withName("event_wake"),
   )
 internal val mln_source_feature_query_options: GroupLayout =
   Ffm.struct(

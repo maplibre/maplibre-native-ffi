@@ -666,17 +666,6 @@ static void mln_runtime_options_default_holds_its_annotated_values(void) {
     (uint64_t)MLN_RUNTIME_EVENT_MASK_ALL, (uint64_t)value.event_mask,
     "mln_runtime_options.event_mask"
   );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.event_wake.callback == NULL, "mln_runtime_options.event_wake.callback"
-  );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.event_wake.user_data == NULL,
-    "mln_runtime_options.event_wake.user_data"
-  );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.event_wake.release_user_data == NULL,
-    "mln_runtime_options.event_wake.release_user_data"
-  );
 }
 
 static void mln_source_feature_query_options_default_holds_its_annotated_values(

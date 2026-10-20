@@ -113,6 +113,16 @@ void binding_mln_resource_request_cancel_handler_callback(
   mlnGo_mln_resource_request_cancel_handler_callback((void*)user_data, handle);
   binding_policy_leave(&policy);
 }
+extern void mlnGo_mln_runtime_event_handler_callback(
+  void* user_data, mln_event_batch_view* events
+);
+void binding_mln_runtime_event_handler_callback(
+  void* user_data, const mln_event_batch_view* events
+) {
+  mlnGo_mln_runtime_event_handler_callback(
+    (void*)user_data, (mln_event_batch_view*)events
+  );
+}
 extern mln_status mlnGo_mln_http_header_transform_callback(
   void* user_data, uint32_t kind, char* url,
   mln_http_header_transform_response* out_response

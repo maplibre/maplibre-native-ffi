@@ -78,9 +78,9 @@ static void runtime_events_wake_the_receiver_directly(void) {
     .user_data = &wakes,
   };
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake = event_wake;
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
+  mln_test_configure_events(runtime, event_wake);
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
   MLN_TEST_OK(mln_test_map_fence(map));

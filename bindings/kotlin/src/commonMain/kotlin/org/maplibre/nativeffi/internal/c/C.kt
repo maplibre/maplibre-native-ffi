@@ -47,10 +47,6 @@ internal expect object C {
 
   fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
-  fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
-
-  fun mln_event_batch_release(batch: Long): Unit
-
   fun mln_frame_demand_default(returned: Long): Unit
 
   fun mln_free_camera_options_default(returned: Long): Unit
@@ -973,6 +969,8 @@ internal expect object C {
 
   fun mln_resource_transform_response_set_url(response: Long, url: Long, outDiagnostic: Long): Int
 
+  fun mln_runtime_clear_event_handler(runtime: Long, completion: Long, outDiagnostic: Long): Int
+
   fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,
@@ -1014,8 +1012,6 @@ internal expect object C {
 
   fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_drain_events(runtime: Long, outBatch: Long, outDiagnostic: Long): Int
-
   fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int
 
   fun mln_runtime_get_offline_region(
@@ -1055,6 +1051,13 @@ internal expect object C {
   fun mln_runtime_run_ambient_cache_operation(
     runtime: Long,
     operation: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_runtime_set_event_handler(
+    runtime: Long,
+    handler: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

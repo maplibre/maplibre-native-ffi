@@ -1497,10 +1497,8 @@ auto start_attach_render_session(
 
   const auto map = handle_table<MapObject>().lease(session->map);
   if (map == nullptr) return recorded_handle_fault_status();
-  if (
-    map->runtime_state == nullptr || map->runtime_state->event_queue == nullptr
-  ) {
-    set_thread_error("map has no live runtime to report events to");
+  if (map->runtime_state == nullptr) {
+    set_thread_error("map has no live runtime");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto frame_wake_status = validate_wake(&options->frame_wake);

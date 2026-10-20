@@ -11,11 +11,12 @@ import { region } from "../../../snippets";
 import createMap from "../../../../snippets/c/create-map.c?raw";
 
 A map belongs to a runtime. One runtime serves multiple maps and shares their
-scheduler, event queue, network services, and cache database. Any host thread can
+scheduler, event handler, network services, and cache database. Any host thread can
 submit runtime and map work.
 
-Pass an event wake to schedule a drain on the host loop. The wake must return
-without blocking or waiting for the receiver.
+Set an event handler to receive events from the runtime and its maps.
+[Handle events](/maplibre-native-ffi/guides/handle-events/) describes callback
+and delivery queue registration.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 

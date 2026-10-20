@@ -24,7 +24,6 @@ from ._generated_operations import (
 )
 from ._generated_owners import (
     AcquiredFrameHandle,
-    EventBatchHandle,
     GeojsonSourceDataHandle,
     HttpHeaderTransformResponseScope,
     MapHandle,
@@ -175,6 +174,7 @@ from ._generated_values import (
     ResourceTransform,
     ResourceUsage,
     RuntimeEvent,
+    RuntimeEventHandler,
     RuntimeEventMask,
     RuntimeEventOfflineRegionResponseError,
     RuntimeEventOfflineRegionResponseErrorVariant,
@@ -273,7 +273,6 @@ __all__ = [
     "CustomMvtVectorSourceOptions",
     "EdgeInsets",
     "EglContextDescriptor",
-    "EventBatchHandle",
     "EventBatchView",
     "FeatureStateSelector",
     "FeatureStateSelectorField",
@@ -396,6 +395,7 @@ __all__ = [
     "ResourceTransformResponseScope",
     "ResourceUsage",
     "RuntimeEvent",
+    "RuntimeEventHandler",
     "RuntimeEventMask",
     "RuntimeEventOfflineRegionResponseError",
     "RuntimeEventOfflineRegionResponseErrorVariant",

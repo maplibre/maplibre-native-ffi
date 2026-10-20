@@ -2,7 +2,7 @@
 //! shares.
 //!
 //! Every wait here blocks on a signal that native raises: a runtime's event
-//! wake, a session's frame and driver-work wakes, or a completion. The
+//! handler, a session's frame and driver-work wakes, or a completion. The
 //! deadline only bounds a hang.
 
 #[cfg(not(target_os = "emscripten"))]
@@ -94,11 +94,6 @@ impl Signal {
             assert!(now < deadline, "timed out waiting for {what}");
             count = self.changed.wait_timeout(count, deadline - now).unwrap().0;
         }
-    }
-
-    pub fn native_wake(self: &Arc<Self>) -> maplibre_native_ffi::Wake {
-        let signal = Arc::clone(self);
-        maplibre_native_ffi::Wake::new(move || signal.raise())
     }
 }
 
@@ -323,6 +318,7 @@ pub struct Fixture {
     runtime: Option<Arc<RuntimeHandle>>,
     map: Option<MapHandle>,
     events: Arc<Signal>,
+    pending_events: Arc<Mutex<Vec<RuntimeEvent>>>,
 }
 
 impl Fixture {
@@ -336,17 +332,23 @@ impl Fixture {
 
     pub fn with_map_options(map_options: MapOptions) -> Self {
         let events = Arc::new(Signal::default());
-        let runtime = runtime_create(&RuntimeOptions {
-            event_wake: events.native_wake(),
-            ..Default::default()
-        })
-        .unwrap();
+        let runtime = runtime_create(&RuntimeOptions::default()).unwrap();
+        let pending_events = Arc::new(Mutex::new(Vec::new()));
+        let received = Arc::clone(&pending_events);
+        let signal = Arc::clone(&events);
+        wait_for(
+            runtime.set_event_handler(RuntimeEventHandler::new(move |batch| {
+                received.lock().unwrap().extend(batch.events);
+                signal.raise();
+            })),
+        );
         wait_for(runtime.set_resource_provider(denying_provider()));
         let map = wait_for(runtime.create_map(&map_options));
         Self {
             runtime: Some(Arc::new(runtime)),
             map: Some(map),
             events,
+            pending_events,
         }
     }
 
@@ -379,12 +381,7 @@ impl Fixture {
         let source = self.map().id();
         loop {
             let seen = self.events.seen();
-            let events = self
-                .runtime()
-                .drain_events()
-                .unwrap()
-                .map(|batch| batch.get().unwrap().events)
-                .unwrap_or_default();
+            let events = std::mem::take(&mut *self.pending_events.lock().unwrap());
             if let Some(event) = events
                 .into_iter()
                 .find(|event| event.source == source && matches(event))

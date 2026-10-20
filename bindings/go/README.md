@@ -8,13 +8,13 @@ Create a runtime with `RuntimeCreate` and a map with `RuntimeHandle.CreateMap`.
 Closing either handle returns a future for native teardown. Keep servicing a
 caller-driver render session while its attachment or detachment is pending.
 
-`DrainEvents` and `DrainFrameResults` return batch owners. Read their copied
-values, then close the batch. `DrainEvents`, `DrainFrameResults`, and
-`AcquireFrame` return nil and no error when nothing is ready. Acquired GPU
-frames expose callback-scoped views: use the texture inside `WithOpenglTexture`
-or the corresponding backend method, then close the frame with the host's
-completion synchronization. View methods reject access after the callback
-returns or from another OS thread.
+`DrainFrameResults` returns a batch owner. Read its copied values, then close
+the batch. Register a `RuntimeEventHandler` to receive copied event spans.
+`DrainFrameResults` and `AcquireFrame` return nil and no error when nothing is
+ready. Acquired GPU frames expose callback-scoped views: use the texture inside
+`WithOpenglTexture` or the corresponding backend method, then close the frame
+with the host's completion synchronization. View methods reject access after the
+callback returns or from another OS thread.
 
 Callbacks receive copied values and scoped response objects. Their generated
 registration code retains Go closures until native retirement and enforces the

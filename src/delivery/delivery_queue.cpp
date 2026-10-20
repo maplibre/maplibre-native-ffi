@@ -1,7 +1,11 @@
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -25,9 +29,64 @@ struct DeliveryBatchObject {
   std::vector<mln_delivery> views;
 };
 
+struct EventDeliveryItem final : DeliveryItem {
+  std::vector<mln_runtime_event> events;
+  std::string messages;
+
+  mln_event_batch_view batch_view{};
+
+  explicit EventDeliveryItem(void* user_data) {
+    view.type = MLN_DELIVERY_TYPE_RUNTIME_EVENTS;
+    view.user_data = user_data;
+    view.payload.runtime_events.events = &batch_view;
+    destroy = [](DeliveryItem* item) noexcept {
+      delete static_cast<EventDeliveryItem*>(item);
+    };
+  }
+
+  auto append(mln_runtime_event event, std::string_view message) -> void {
+    message =
+      message.substr(0, std::min(message.size(), std::size_t{UINT32_MAX - 1}));
+    event.message_size = static_cast<uint32_t>(message.size());
+    event.message_offset = message.empty() ? 0 : messages.size();
+    // Reserve both before changing their sizes. A failed reserve can move
+    // storage, so refresh the borrowed pointers on either exit.
+    try {
+      if (events.size() == events.capacity()) {
+        events.reserve(std::max(std::size_t{16}, events.size() * 2));
+      }
+      if (!message.empty()) {
+        messages.reserve(messages.size() + message.size() + 1);
+        messages.append(message);
+        messages.push_back('\0');
+      }
+      events.push_back(event);
+    } catch (...) {
+      refresh();
+      throw;
+    }
+    refresh();
+  }
+
+  auto refresh() noexcept -> void {
+    batch_view = mln_event_batch_view{
+      .size = sizeof(mln_event_batch_view),
+      .event_size = sizeof(mln_runtime_event),
+      .events = events.data(),
+      .event_count = events.size(),
+      .messages = messages.empty() ? nullptr : messages.data(),
+      .messages_size = messages.size(),
+    };
+  }
+};
+
 auto destroy_item(DeliveryItem* item) noexcept -> void {
-  item->~DeliveryItem();
-  ::operator delete(item);
+  if (item->destroy != nullptr) {
+    item->destroy(item);
+  } else {
+    item->~DeliveryItem();
+    ::operator delete(item);
+  }
 }
 
 }  // namespace
@@ -112,6 +171,41 @@ auto DeliveryQueueState::push(ItemPtr& item) noexcept -> bool {
   }
   if (wake != nullptr) wake->notify();
   return true;
+}
+
+auto DeliveryQueueState::push_event(
+  mln_runtime_event event, std::string_view message, void* user_data
+) -> void {
+  if (core::process_exiting()) return;
+  auto wake = std::shared_ptr<core::Wake>{};
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    if (closed_) return;
+    if (
+      tail_ != nullptr &&
+      tail_->view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS &&
+      tail_->view.user_data == user_data
+    ) {
+      static_cast<EventDeliveryItem*>(tail_)->append(event, message);
+    } else {
+      auto item = std::make_unique<EventDeliveryItem>(user_data);
+      item->append(event, message);
+      auto* raw = item.release();
+      if (tail_ == nullptr) {
+        head_ = raw;
+        wake = wake_;
+      } else {
+        tail_->next = raw;
+      }
+      tail_ = raw;
+      ++count_;
+    }
+    if (wake_on_push_) {
+      wake_on_push_ = false;
+      wake = wake_;
+    }
+  }
+  if (wake != nullptr) wake->notify();
 }
 
 auto DeliveryQueueState::drain(mln_delivery_batch_view& view)

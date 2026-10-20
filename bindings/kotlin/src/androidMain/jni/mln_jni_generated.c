@@ -201,19 +201,6 @@ static void mln_custom_mvt_vector_source_options_default_jni(
   mln_custom_mvt_vector_source_options_default_critical(returned);
 }
 
-static jint mln_event_batch_get_jni(
-  JNIEnv* env, jclass type, jlong batch, jlong out_view, jlong out_diagnostic
-) {
-  return (jint)mln_event_batch_get(
-    (mln_event_batch)batch, MLN_JNI_POINTER(mln_event_batch_view*, out_view),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static void mln_event_batch_release_jni(JNIEnv* env, jclass type, jlong batch) {
-  mln_event_batch_release((mln_event_batch)batch);
-}
-
 static void mln_frame_demand_default_critical(jlong returned) {
   *MLN_JNI_POINTER(mln_frame_demand*, returned) = mln_frame_demand_default();
 }
@@ -2197,6 +2184,16 @@ static jint mln_resource_transform_response_set_url_jni(
   );
 }
 
+static jint mln_runtime_clear_event_handler_jni(
+  JNIEnv* env, jclass type, jlong runtime, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_runtime_clear_event_handler(
+    (mln_runtime)runtime, MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_runtime_clear_http_header_transform_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong completion,
   jlong out_diagnostic
@@ -2279,21 +2276,6 @@ static jint mln_runtime_dispose_jni(
   return (jint)mln_runtime_dispose(
     (mln_runtime)runtime, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
-}
-
-static jint mln_runtime_drain_events_critical(
-  jlong runtime, jlong out_batch, jlong out_diagnostic
-) {
-  return (jint)mln_runtime_drain_events(
-    (mln_runtime)runtime, MLN_JNI_POINTER(mln_event_batch*, out_batch),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_runtime_drain_events_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong out_batch, jlong out_diagnostic
-) {
-  return mln_runtime_drain_events_critical(runtime, out_batch, out_diagnostic);
 }
 
 static jint mln_runtime_get_event_mask_jni(
@@ -2386,6 +2368,18 @@ static jint mln_runtime_run_ambient_cache_operation_jni(
 ) {
   return (jint)mln_runtime_run_ambient_cache_operation(
     (mln_runtime)runtime, (uint32_t)operation,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_runtime_set_event_handler_jni(
+  JNIEnv* env, jclass type, jlong runtime, jlong handler, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_runtime_set_event_handler(
+    (mln_runtime)runtime,
+    MLN_JNI_POINTER(const mln_runtime_event_handler*, handler),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2638,8 +2632,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_custom_geometry_source_options_default_jni},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_jni},
-  {"mln_event_batch_get", "(JJJ)I", (void*)mln_event_batch_get_jni},
-  {"mln_event_batch_release", "(J)V", (void*)mln_event_batch_release_jni},
   {"mln_frame_demand_default", "(J)V", (void*)mln_frame_demand_default_jni},
   {"mln_free_camera_options_default", "(J)V",
    (void*)mln_free_camera_options_default_jni},
@@ -2963,6 +2955,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_wait_until_retired_jni},
   {"mln_resource_transform_response_set_url", "(JJJ)I",
    (void*)mln_resource_transform_response_set_url_jni},
+  {"mln_runtime_clear_event_handler", "(JJJ)I",
+   (void*)mln_runtime_clear_event_handler_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
    (void*)mln_runtime_clear_http_header_transform_jni},
   {"mln_runtime_clear_resource_provider", "(JJJ)I",
@@ -2976,7 +2970,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_delete_offline_region", "(JJJJ)I",
    (void*)mln_runtime_delete_offline_region_jni},
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
-  {"mln_runtime_drain_events", "(JJJ)I", (void*)mln_runtime_drain_events_jni},
   {"mln_runtime_get_event_mask", "(JJJ)I",
    (void*)mln_runtime_get_event_mask_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
@@ -2994,6 +2987,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_release", "(JJJ)I", (void*)mln_runtime_release_jni},
   {"mln_runtime_run_ambient_cache_operation", "(JIJJ)I",
    (void*)mln_runtime_run_ambient_cache_operation_jni},
+  {"mln_runtime_set_event_handler", "(JJJJ)I",
+   (void*)mln_runtime_set_event_handler_jni},
   {"mln_runtime_set_event_mask", "(JJJ)I",
    (void*)mln_runtime_set_event_mask_jni},
   {"mln_runtime_set_http_header_transform", "(JJJJ)I",
@@ -3075,8 +3070,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_custom_geometry_source_options_default_critical},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_critical},
-  {"mln_event_batch_get", "(JJJ)I", (void*)mln_event_batch_get_jni},
-  {"mln_event_batch_release", "(J)V", (void*)mln_event_batch_release_jni},
   {"mln_frame_demand_default", "(J)V",
    (void*)mln_frame_demand_default_critical},
   {"mln_free_camera_options_default", "(J)V",
@@ -3401,6 +3394,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_wait_until_retired_jni},
   {"mln_resource_transform_response_set_url", "(JJJ)I",
    (void*)mln_resource_transform_response_set_url_jni},
+  {"mln_runtime_clear_event_handler", "(JJJ)I",
+   (void*)mln_runtime_clear_event_handler_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
    (void*)mln_runtime_clear_http_header_transform_jni},
   {"mln_runtime_clear_resource_provider", "(JJJ)I",
@@ -3414,8 +3409,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_delete_offline_region", "(JJJJ)I",
    (void*)mln_runtime_delete_offline_region_jni},
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
-  {"mln_runtime_drain_events", "(JJJ)I",
-   (void*)mln_runtime_drain_events_critical},
   {"mln_runtime_get_event_mask", "(JJJ)I",
    (void*)mln_runtime_get_event_mask_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
@@ -3433,6 +3426,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_release", "(JJJ)I", (void*)mln_runtime_release_jni},
   {"mln_runtime_run_ambient_cache_operation", "(JIJJ)I",
    (void*)mln_runtime_run_ambient_cache_operation_jni},
+  {"mln_runtime_set_event_handler", "(JJJJ)I",
+   (void*)mln_runtime_set_event_handler_jni},
   {"mln_runtime_set_event_mask", "(JJJ)I",
    (void*)mln_runtime_set_event_mask_jni},
   {"mln_runtime_set_http_header_transform", "(JJJJ)I",
@@ -3483,6 +3478,7 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
   {"customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
   {"resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
+  {"runtimeEventHandlerCallback", "(JJ)V", NULL},
   {"httpHeaderTransformCallback", "(JIJJ)I", NULL},
   {"resourceProviderCallback", "(JJJ)I", NULL},
   {"resourceTransformCallback", "(JIJJ)I", NULL},
@@ -3570,6 +3566,15 @@ static void mln_jni_resourceRequestCancelHandlerCallback(
   mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
 }
 
+static void mln_jni_runtimeEventHandlerCallback(
+  void* userData, const mln_event_batch_view* events
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(events)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
+}
+
 static mln_status mln_jni_httpHeaderTransformCallback(
   void* userData, uint32_t kind, const char* url,
   mln_http_header_transform_response* outResponse
@@ -3581,7 +3586,7 @@ static mln_status mln_jni_httpHeaderTransformCallback(
     {.j = MLN_JNI_ADDRESS(outResponse)}
   };
   jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[9], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_upcalls[10], arguments, &result);
   return (mln_status)result;
 }
 
@@ -3595,7 +3600,7 @@ static uint32_t mln_jni_resourceProviderCallback(
     {.j = (jlong)handle}
   };
   jint result = 0;
-  mln_jni_upcall_int(&mln_jni_upcalls[10], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_upcalls[11], arguments, &result);
   return (uint32_t)result;
 }
 
@@ -3610,23 +3615,23 @@ static mln_status mln_jni_resourceTransformCallback(
     {.j = MLN_JNI_ADDRESS(outResponse)}
   };
   jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[11], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_upcalls[12], arguments, &result);
   return (mln_status)result;
 }
 
 static void mln_jni_wakeCallback(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[12], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
 }
 
 static void mln_jni_queueLockLock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
 }
 
 static void mln_jni_queueLockUnlock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
 }
 
 static void mln_jni_cameraTransitionHandlerCallback(
@@ -3635,7 +3640,7 @@ static void mln_jni_cameraTransitionHandlerCallback(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(end)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[16], arguments);
 }
 
 void* const mln_jni_upcall_stubs[] = {
@@ -3648,6 +3653,7 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_customMvtVectorSourceOptionsFetchTile,
   (void*)mln_jni_customMvtVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
+  (void*)mln_jni_runtimeEventHandlerCallback,
   (void*)mln_jni_httpHeaderTransformCallback,
   (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,

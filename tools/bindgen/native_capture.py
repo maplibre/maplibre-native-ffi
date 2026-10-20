@@ -188,6 +188,8 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
                         [f"{plan.native}.{field.name}: capture union requires tag"]
                     )
                 lines.append(f"{indent}switch ({source}.{tag}) {{")
+                if child.empty_variant:
+                    lines.append(f"{indent}  case {child.empty_variant[0]}: break;")
                 for variant in child.fields:
                     if not variant.presence or not variant.presence.variant:
                         raise ModelError(
@@ -227,6 +229,10 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
                 )
             else:
                 lines.extend(_capture(child, child_source, child_target, source, depth))
+            if child.kind == "array" and child.stride:
+                lines.append(
+                    f"{indent}{target}.{child.stride} = sizeof({child.element.native});"
+                )
         return lines
     if plan.kind in {"array", "reference"}:
         length = plan.length if plan.kind == "array" else "1"
@@ -251,13 +257,14 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
             )
             lines.append(f"{indent}}}")
             return lines
-        if plan.element.kind in {"scalar", "enum", "handle"}:
+        if plan.element.kind in {"scalar", "enum", "handle"} and not plan.stride:
             return [f"{indent}{target} = bytes(arena, {source}, {count});"]
         lines = [
             f"{indent}{target} = span(arena, {source}, {count}, [&]([[maybe_unused]] auto& arena, auto {name}) {{",
             f"{indent}  auto copied_{depth} = {name};",
         ]
         lines.extend(_capture(plan.element, name, f"copied_{depth}", parent, depth + 1))
-        lines.extend([f"{indent}  return copied_{depth};", f"{indent}}});"])
+        stride = f", {parent}.{plan.stride}" if plan.stride else ""
+        lines.extend([f"{indent}  return copied_{depth};", f"{indent}}}{stride});"])
         return lines
     raise ModelError([f"{plan.native}: native capture does not support {plan.kind}"])

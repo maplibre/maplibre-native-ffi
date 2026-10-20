@@ -115,6 +115,15 @@ internal object Upcalls {
       value.callback()
     }
 
+  @JvmStatic
+  fun runtimeEventHandlerCallback(userData: Long, events: Long): Unit =
+    upcall<RuntimeEventHandler, Unit>("mln_runtime_event_callback", userData, Unit, null) {
+      value,
+      scope ->
+      val invoke = value.callback ?: return@upcall Unit
+      invoke(readEventBatchView(events))
+    }
+
   private val httpHeaderTransformCallbackAllowed: Set<String> =
     setOf("mln_http_header_transform_response_set_header")
 
@@ -236,6 +245,7 @@ internal expect object UpcallStubs {
   val customMvtVectorSourceOptionsFetchTile: Long
   val customMvtVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
+  val runtimeEventHandlerCallback: Long
   val httpHeaderTransformCallback: Long
   val resourceProviderCallback: Long
   val resourceTransformCallback: Long

@@ -45,14 +45,18 @@ func exitWithLiveHandles(t *testing.T) {
 	if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }}); err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{events: make(chan struct{}, 1)}
+	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
 	options := DefaultRuntimeOptions()
-	options.EventWake = Wake{Callback: func() { notify(f.events) }}
 	runtime, err := RuntimeCreate(options)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.runtime = runtime
+	await(t, submitted(runtime.SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
+		for _, event := range batch.Events {
+			f.pendingEvents <- event
+		}
+	}})))
 	f.m = await(t, submitted(runtime.CreateMap(DefaultMapOptions())))
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {

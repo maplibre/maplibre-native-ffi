@@ -4,6 +4,20 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
+  /// Stops event delivery and retires the previous handler.
+  ///
+  /// See `mln_runtime_clear_event_handler` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func clearEventHandler() async throws {
+    try await nativeUnit("mln_runtime_clear_event_handler") { raw, _, completion, diagnostic in
+      mln_runtime_clear_event_handler(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Clears the runtime-scoped outgoing HTTP header transform.
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
@@ -59,22 +73,6 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Drains this runtime's queued events into a new owned batch.
-  ///
-  /// See `mln_runtime_drain_events` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func drainEvents() throws -> EventBatchHandle? {
-    var value0: mln_event_batch = 0
-    return try nativeInvoke(
-      "mln_runtime_drain_events",
-      absentOn: MLN_STATUS_NOT_READY
-    ) { raw, _, diagnostic in
-      mln_runtime_drain_events(raw, &value0, diagnostic)
-    } result: {
-      try EventBatchHandle(adopting: value0)
-    }
-  }
-
   /// Reports which runtime-scoped event types this runtime queues.
   ///
   /// See `mln_runtime_get_event_mask` in the
@@ -120,6 +118,21 @@ public extension RuntimeHandle {
       mln_runtime_run_ambient_cache_operation(
         raw,
         bindingArg0.nativeValue(),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Selects how runtime and map events reach the host.
+  ///
+  /// See `mln_runtime_set_event_handler` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func setEventHandler(handler bindingArg0: RuntimeEventHandler) async throws {
+    try await nativeUnit("mln_runtime_set_event_handler") { raw, arena, completion, diagnostic in
+      try mln_runtime_set_event_handler(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )

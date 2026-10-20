@@ -25,15 +25,13 @@ _Unreachable _unreachable(RuntimeHandle runtime) {
   return (identity, WeakReference(runtime));
 }
 
-_Unreachable _unreachableRuntimeWithWake() {
-  late final RuntimeHandle runtime;
-  runtime = runtimeCreate(
-    RuntimeOptions(
-      eventWake: Wake(
-        callback: () {
-          runtime.id;
-        },
-      ),
+Future<_Unreachable> _unreachableRuntimeWithEvents() async {
+  final runtime = runtimeCreate(runtimeOptionsDefault());
+  await runtime.setEventHandler(
+    RuntimeEventHandler(
+      callback: (_) {
+        runtime.id;
+      },
     ),
   );
   return _unreachable(runtime);
@@ -85,10 +83,9 @@ _Unreachable _abandonedRuntime() =>
 /// Whether native still knows [runtime], asked through the raw C API, which
 /// is the only way to name a runtime that no owner holds.
 bool _runtimeIsLive(int runtime) => withNativeArena((arena) {
-  final batch = arena<Uint64>();
-  final status = raw.mln_runtime_drain_events(runtime, batch, nullptr);
-  if (status == raw.MLN_STATUS_OK) raw.mln_event_batch_release(batch.value);
-  return status == raw.MLN_STATUS_OK || status == raw.MLN_STATUS_NOT_READY;
+  final mask = arena<Uint64>();
+  return raw.mln_runtime_get_event_mask(runtime, mask, nullptr) ==
+      raw.MLN_STATUS_OK;
 });
 
 /// Collects what the binding writes to standard error.
@@ -163,7 +160,7 @@ void main() {
 
   test('callback registrations do not keep their owners reachable', () async {
     final runtimes = [
-      _unreachableRuntimeWithWake(),
+      await _unreachableRuntimeWithEvents(),
       await _unreachableRuntimeWithProvider(),
     ];
     // Each runtime and the callback that captures it form a cycle through

@@ -530,3 +530,58 @@ struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST> {
   using Record = mln_resource_request_delivery;
   static constexpr auto member = &mln_delivery_payload::resource_request;
 };
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const mln_runtime_event_delivery& source
+) -> mln_runtime_event_delivery {
+  auto result = source;
+  result.events = span(
+    arena, source.events, 1, [&]([[maybe_unused]] auto& arena, auto element_1) {
+      auto copied_1 = element_1;
+      copied_1.events = span(
+        arena, element_1.events, element_1.event_count,
+        [&]([[maybe_unused]] auto& arena, auto element_2) {
+          auto copied_2 = element_2;
+          switch (element_2.payload_type) {
+            case MLN_RUNTIME_EVENT_PAYLOAD_NONE:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
+              break;
+            case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
+              break;
+            default:
+              throw std::invalid_argument{"unknown completion variant"};
+          }
+          return copied_2;
+        },
+        element_1.event_size
+      );
+      copied_1.event_size = sizeof(mln_runtime_event);
+      copied_1.messages =
+        bytes(arena, element_1.messages, element_1.messages_size);
+      return copied_1;
+    }
+  );
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_runtime_event_delivery& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(const mln_runtime_event_delivery*) noexcept
+  -> bool {
+  return false;
+}
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_RUNTIME_EVENTS> {
+  using Record = mln_runtime_event_delivery;
+  static constexpr auto member = &mln_delivery_payload::runtime_events;
+};

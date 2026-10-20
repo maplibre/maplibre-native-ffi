@@ -157,17 +157,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_event_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_event_batch_get(
-      batch.toULong(),
-      outView.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_event_batch_release(batch: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_event_batch_release(batch.toULong())
-  }
-
   actual fun mln_frame_demand_default(returned: Long) {
     org.maplibre.nativeffi.internal.cinterop
       .mln_frame_demand_default()
@@ -2229,6 +2218,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_runtime_clear_event_handler(
+    runtime: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_runtime_clear_event_handler(
+      runtime.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,
@@ -2315,13 +2315,6 @@ internal actual object C {
   actual fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_dispose(
       runtime.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_runtime_drain_events(runtime: Long, outBatch: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_runtime_drain_events(
-      runtime.toULong(),
-      outBatch.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2417,6 +2410,19 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_run_ambient_cache_operation(
       runtime.toULong(),
       operation.toUInt(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_runtime_set_event_handler(
+    runtime: Long,
+    handler: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_runtime_set_event_handler(
+      runtime.toULong(),
+      handler.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

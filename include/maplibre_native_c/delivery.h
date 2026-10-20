@@ -13,12 +13,13 @@
  * Every registration whose callbacks a host need not answer on a native thread
  * accepts a queue: mln_completion, mln_log_handler, mln_resource_provider,
  * mln_resource_request_cancel_handler, mln_camera_transition_handler, and the
- * custom geometry and custom MVT vector source options. Runtime events keep
- * their own queue and wake; see mln_runtime_drain_events().
+ * custom geometry and custom MVT vector source options. Runtime events enter
+ * the queue selected by mln_runtime_set_event_handler().
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
- * raises before pushing its completion. The host chooses when to drain each
- * queue and can drain runtime events when it handles a command completion.
+ * raises before pushing its completion. Events and completions that select
+ * the same queue arrive in that order. Adjacent events share one delivery
+ * and its event and message storage.
  *
  * A queue has no bound. A host that stops draining keeps every pushed item in
  * memory until it drains or releases the queue.
@@ -70,7 +71,14 @@ typedef enum mln_delivery_type : uint32_t {
   MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE = 7,
   /** One tile cancel for a queue-mode custom source. */
   MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8,
+  /** Selected runtime and map events, in publication order. */
+  MLN_DELIVERY_TYPE_RUNTIME_EVENTS = 9,
 } mln_delivery_type;
+
+/** Copied mln_runtime_event_callback arguments. */
+typedef struct mln_runtime_event_delivery {
+  const mln_event_batch_view* events MLN_BINDING("lifetime=owner");
+} mln_runtime_event_delivery;
 
 /** Copied mln_log_callback arguments; fields mirror the callback parameters. */
 typedef struct mln_log_delivery {
@@ -137,6 +145,8 @@ typedef union mln_delivery_payload {
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE");
   mln_custom_source_tile_delivery custom_source_cancel_tile
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE");
+  mln_runtime_event_delivery runtime_events
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_RUNTIME_EVENTS");
 } mln_delivery_payload;
 
 /**

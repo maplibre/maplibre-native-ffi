@@ -66,16 +66,6 @@ struct OfflineRegionData {
   std::vector<uint8_t> metadata;
 };
 
-namespace mln::core {
-
-template <>
-struct HandleTraits<EventBatchObject> {
-  static constexpr auto kind = HandleKind::EventBatch;
-  static constexpr auto leasable = true;
-};
-
-}  // namespace mln::core
-
 namespace {
 // Each mask constant must be the bit of the event type it selects, written
 // against the shift rather than a literal, so an event type added without its
@@ -94,7 +84,6 @@ MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_STARTED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FAILED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_IDLE);
-MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_UPDATE_AVAILABLE);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_ERROR);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FAILED);
@@ -219,38 +208,6 @@ auto lease_resource_provider_state(void* platform_context) noexcept
     return nullptr;
   }
   return runtime->resource_provider_state;
-}
-
-// Each event keeps a uint32_t message length, so clamp oversized diagnostics
-// before they enter the shared queue arena.
-auto truncated_event_message(std::string message) -> std::string {
-  constexpr auto max_size = static_cast<size_t>(UINT32_MAX) - 1;
-  if (message.size() > max_size) {
-    message.resize(max_size);
-  }
-  return message;
-}
-
-auto append_runtime_event(
-  mln::core::RuntimeEventStorage& storage, mln_runtime_event event,
-  std::string message
-) -> void {
-  message = truncated_event_message(std::move(message));
-  event.message_size = static_cast<uint32_t>(message.size());
-  event.message_offset =
-    message.empty() ? 0 : static_cast<uint64_t>(storage.messages.size());
-  storage.events.push_back(event);
-  const auto prior_messages_size = storage.messages.size();
-  try {
-    if (!message.empty()) {
-      storage.messages.append(message);
-      storage.messages.push_back('\0');
-    }
-  } catch (...) {
-    storage.messages.resize(prior_messages_size);
-    storage.events.pop_back();
-    throw;
-  }
 }
 
 auto valid_coordinate(const mln_lat_lng& coordinate) -> bool {
@@ -578,8 +535,7 @@ auto region_event_selected(
   if (!mln::core::event_selected(runtime->event_state->mask, type)) {
     return false;
   }
-  const std::scoped_lock event_lock(runtime->event_queue->mutex);
-  return runtime->event_queue->observed_offline_regions.contains(region_id);
+  return state->observed_regions.contains(region_id);
 }
 
 auto push_offline_region_event(
@@ -607,19 +563,10 @@ auto push_offline_region_event(
     .message_size = 0,
     .payload = payload
   };
-
-  auto should_wake = false;
-  {
-    const std::scoped_lock event_lock(runtime->event_queue->mutex);
-    if (!runtime->event_queue->observed_offline_regions.contains(region_id)) {
-      return;
-    }
-    should_wake = runtime->event_queue->pending.events.empty();
-    append_runtime_event(
-      runtime->event_queue->pending, event, std::move(message)
-    );
+  if (!state->observed_regions.contains(region_id)) return;
+  if (runtime->event_state->registration != nullptr) {
+    runtime->event_state->registration->push(event, message);
   }
-  if (should_wake) runtime->event_queue->wake->notify();
 }
 
 class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
@@ -688,18 +635,6 @@ class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
   std::shared_ptr<mln::core::OfflineRegionEventState> state_;
   mln_offline_region_id region_id_;
 };
-
-auto set_offline_region_observed_flag(
-  mln::core::RuntimeObject* runtime, mln_offline_region_id region_id,
-  bool observed
-) -> void {
-  const std::scoped_lock lock(runtime->event_queue->mutex);
-  if (observed) {
-    runtime->event_queue->observed_offline_regions.insert(region_id);
-  } else {
-    runtime->event_queue->observed_offline_regions.erase(region_id);
-  }
-}
 
 auto to_c_region_data_list(const mln::OfflineRegions& native_regions)
   -> std::optional<std::vector<OfflineRegionData>> {
@@ -781,8 +716,6 @@ auto validate_runtime_options(const mln_runtime_options* options)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto wake_status = mln::core::validate_wake(&options->event_wake);
-  if (wake_status != MLN_STATUS_OK) return wake_status;
 
   return MLN_STATUS_OK;
 }
@@ -952,7 +885,6 @@ auto create_runtime(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   watch_process_exit();
-  const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
   RuntimeCreationGuard result;
   result.runtime = std::make_shared<RuntimeObject>();
@@ -962,12 +894,10 @@ auto create_runtime(
 
   auto runtime = result.runtime;
   runtime->executor.start(
-    [runtime, event_wake, asset_path = std::move(asset_path),
+    [runtime, asset_path = std::move(asset_path),
      cache_path = std::move(cache_path), event_mask]() mutable -> void {
       runtime->event_state = std::make_shared<RuntimeEventState>();
       runtime->event_state->mask.store(event_mask, std::memory_order_relaxed);
-      runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
-      runtime->event_queue->wake = event_wake;
       runtime->asset_path = std::move(asset_path);
       runtime->cache_path = std::move(cache_path);
       runtime->offline_event_state =
@@ -986,7 +916,6 @@ auto create_runtime(
   const auto handle = handle_table<RuntimeObject>().insert(runtime);
   runtime->self = handle;
   bind_platform_context(runtime->platform_context, handle);
-  event_wake->accept();
   result.published = true;
   *out_runtime = handle;
   return MLN_STATUS_OK;
@@ -2139,9 +2068,11 @@ auto offline_region_set_observed_start(
               );
               return;
             }
-            set_offline_region_observed_flag(
-              offline_event_state->runtime, region_id, observed
-            );
+            if (observed) {
+              offline_event_state->observed_regions.insert(region_id);
+            } else {
+              offline_event_state->observed_regions.erase(region_id);
+            }
           }
           auto observer = observed
                             ? std::make_unique<OfflineRegionRuntimeObserver>(
@@ -2289,9 +2220,7 @@ auto offline_region_delete_start(
               offline_event_state->alive &&
               offline_event_state->runtime != nullptr
             ) {
-              set_offline_region_observed_flag(
-                offline_event_state->runtime, region_id, false
-              );
+              offline_event_state->observed_regions.erase(region_id);
             }
           }
           database->setOfflineRegionObserver(region.value(), nullptr);
@@ -2432,17 +2361,8 @@ auto release_runtime_reachable_state(RuntimeObject* runtime) -> void {
     runtime->offline_event_state->alive = false;
     runtime->offline_event_state->runtime = nullptr;
   }
+  runtime->event_state->registration.reset();
 
-  auto event_wake = std::shared_ptr<Wake>{};
-  {
-    const std::scoped_lock event_lock(runtime->event_queue->mutex);
-    runtime->event_queue->pending.events.clear();
-    runtime->event_queue->pending.messages.clear();
-    runtime->event_queue->event_maps.clear();
-    runtime->event_queue->observed_offline_regions.clear();
-    event_wake = std::move(runtime->event_queue->wake);
-  }
-  event_wake.reset();
   runtime->database_source.reset();
 }
 
@@ -2534,83 +2454,99 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   return MLN_STATUS_OK;
 }
 
-auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
-  -> mln_status {
-  if (out_batch == nullptr || *out_batch != MLN_HANDLE_NULL) {
-    set_thread_error("out_batch must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
+auto RuntimeEventRegistration::push(
+  mln_runtime_event event, const std::string& message
+) const -> void {
+  if (process_exiting()) return;
+  if (queue != nullptr) {
+    queue->push_event(event, message, user_data);
+  } else {
+    event.message_size = static_cast<uint32_t>(
+      std::min(message.size(), std::size_t{UINT32_MAX - 1})
+    );
+    event.message_offset = 0;
+    // The callback borrows this span; bindings copy it before returning.
+    const auto truncated = message.size() > event.message_size
+                             ? message.substr(0, event.message_size)
+                             : std::string{};
+    const auto& text = truncated.empty() ? message : truncated;
+    const mln_event_batch_view events = {
+      .size = sizeof(events),
+      .event_size = sizeof(event),
+      .events = &event,
+      .event_count = 1,
+      .messages = text.empty() ? nullptr : text.c_str(),
+      .messages_size = text.empty() ? 0 : text.size() + 1,
+    };
+    callback(context->user_data(), &events);
   }
+}
 
+auto set_runtime_event_handler(
+  mln_runtime runtime, const mln_runtime_event_handler* handler,
+  const mln_completion* completion
+) -> mln_status {
   const auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (!live->control.acquire()) {
-    set_thread_error("runtime is closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto control_lease = ControlLease{&live->control};
-  auto queue = live->event_queue;
-  {
-    const std::scoped_lock lock(queue->mutex);
-    if (queue->pending.events.empty()) return MLN_STATUS_NOT_READY;
-  }
-  // Allocating and registering the batch before the swap means a failure
-  // loses no events: nothing after the swap can throw. The handle stays
-  // private until this call returns it.
-  const auto owned = std::make_shared<EventBatchObject>();
-  owned->queue = queue;
-  const auto handle = handle_table<EventBatchObject>().insert(owned);
-  {
-    const std::scoped_lock lock(queue->mutex);
-    owned->storage.events.swap(queue->pending.events);
-    owned->storage.messages.swap(queue->pending.messages);
-    queue->pending.events.swap(queue->recycled.events);
-    queue->pending.messages.swap(queue->recycled.messages);
-  }
-  // A concurrent drain can empty the queue between the two locks.
-  if (owned->storage.events.empty()) {
-    release_event_batch(handle);
-    return MLN_STATUS_NOT_READY;
-  }
-  *out_batch = handle;
-  return MLN_STATUS_OK;
-}
-
-auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
-  -> mln_status {
-  if (out_view == nullptr || out_view->size < sizeof(mln_event_batch_view)) {
-    set_thread_error("out_view must not be null and must have a valid size");
+  if (handler == nullptr || handler->size < sizeof(*handler)) {
+    set_thread_error("event handler must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto live = handle_table<EventBatchObject>().lease(batch);
+  auto queue = std::shared_ptr<delivery::DeliveryQueueState>{};
+  const auto validated = delivery::resolve_registration_queue(
+    "event handler", handler->queue, handler->callback != nullptr,
+    handler->release_user_data != nullptr, queue
+  );
+  if (validated != MLN_STATUS_OK) return validated;
+  auto queued = queue == nullptr
+                  ? std::unique_ptr<delivery::QueuedRegistration>{}
+                  : std::make_unique<delivery::QueuedRegistration>(
+                      queue, handler->user_data
+                    );
+  auto context = std::make_shared<RuntimeCallbackContext>(
+    queued != nullptr ? queued.get() : handler->user_data,
+    queued != nullptr ? &delivery::QueuedRegistration::retire
+                      : handler->release_user_data
+  );
+  auto registration =
+    std::make_shared<RuntimeEventRegistration>(RuntimeEventRegistration{
+      .callback = handler->callback,
+      .context = context,
+      .queue = queue,
+      .user_data = handler->user_data,
+    });
+  auto transfer = RegistrationTransfer{*context};
+  const auto status =
+    submit_resource_configuration_command<&mln_runtime_set_event_handler>(
+      live, completion, [live, registration]() {
+        auto previous = std::shared_ptr<RuntimeEventRegistration>{};
+        {
+          const auto lock = std::scoped_lock{live->offline_event_state->mutex};
+          previous =
+            std::exchange(live->event_state->registration, registration);
+        }
+      }
+    );
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(queued.release());
+    transfer.accept();
+  }
+  return status;
+}
+
+auto clear_runtime_event_handler(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status {
+  const auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  *out_view = mln_event_batch_view{
-    .size = sizeof(mln_event_batch_view),
-    .event_size = sizeof(mln_runtime_event),
-    .events = live->storage.events.data(),
-    .event_count = live->storage.events.size(),
-    .messages =
-      live->storage.messages.empty() ? nullptr : live->storage.messages.data(),
-    .messages_size = live->storage.messages.size()
-  };
-  return MLN_STATUS_OK;
-}
-
-EventBatchObject::~EventBatchObject() {
-  const auto state = queue.lock();
-  if (state == nullptr) return;
-  storage.events.clear();
-  storage.messages.clear();
-  const auto lock = std::scoped_lock{state->mutex};
-  if (storage.events.capacity() > state->recycled.events.capacity()) {
-    storage.events.swap(state->recycled.events);
-  }
-  if (storage.messages.capacity() > state->recycled.messages.capacity()) {
-    storage.messages.swap(state->recycled.messages);
-  }
-}
-
-auto release_event_batch(mln_event_batch batch) noexcept -> void {
-  static_cast<void>(handle_table<EventBatchObject>().remove(batch));
+  return submit_resource_configuration_command<
+    &mln_runtime_clear_event_handler>(live, completion, [live]() {
+    auto previous = std::shared_ptr<RuntimeEventRegistration>{};
+    {
+      const auto lock = std::scoped_lock{live->offline_event_state->mutex};
+      previous = std::move(live->event_state->registration);
+    }
+  });
 }
 
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
@@ -2793,25 +2729,6 @@ auto invoke_http_header_transform(
 
 namespace {
 
-// A render draws the latest update, so one unread render-update event covers
-// every invalidation queued behind it. Comparing against the tail alone
-// preserves the order of every other event. The tail takes the newer
-// generation, and it stays the tail, so a map's generations stay in order.
-auto coalesce_render_update(
-  RuntimeEventStorage& pending, mln_map map, uint64_t generation, uint32_t type
-) -> bool {
-  if (
-    type != MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE ||
-    pending.events.empty()
-  ) {
-    return false;
-  }
-  auto& tail = pending.events.back();
-  if (tail.type != type || tail.source != map) return false;
-  tail.generation = generation;
-  return true;
-}
-
 auto map_event(
   mln_map map, uint64_t generation, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, int32_t code
@@ -2831,88 +2748,31 @@ auto map_event(
 
 }  // namespace
 
-// Producers test their subscription mask before they call this, so it holds no
-// mask test of its own.
+// Producers test their subscription mask before building an event.
 auto push_runtime_map_event_payload(
-  const std::shared_ptr<RuntimeEventQueueState>& event_queue, mln_map map,
+  const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, int32_t code, std::string message
 ) -> void {
-  auto wake = std::shared_ptr<Wake>{};
-  {
-    const std::scoped_lock lock(event_queue->mutex);
-    auto& queue = *event_queue;
-    if (!queue.event_maps.contains(map)) return;
-    if (coalesce_render_update(queue.pending, map, generation, type)) return;
-    if (queue.pending.events.empty()) {
-      wake = queue.wake;
-    }
-    append_runtime_event(
-      queue.pending,
-      map_event(map, generation, type, payload_type, payload, code),
-      std::move(message)
-    );
-  }
-  if (wake != nullptr) wake->notify();
+  if (state->registration == nullptr) return;
+  state->registration->push(
+    map_event(map, generation, type, payload_type, payload, code), message
+  );
 }
 
 auto push_runtime_map_events(
-  const std::shared_ptr<RuntimeEventQueueState>& event_queue, mln_map map,
+  const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, std::vector<HeldMapEvent>& events
 ) -> void {
-  if (events.empty()) return;
-  auto wake = std::shared_ptr<Wake>{};
-  auto failure = std::exception_ptr{};
-  {
-    const std::scoped_lock lock(event_queue->mutex);
-    auto& queue = *event_queue;
-    if (!queue.event_maps.contains(map)) return;
-    const auto was_empty = queue.pending.events.empty();
-    try {
-      for (auto& held : events) {
-        if (coalesce_render_update(queue.pending, map, generation, held.type)) {
-          continue;
-        }
-        append_runtime_event(
-          queue.pending,
-          map_event(
-            map, generation, held.type, held.payload_type, held.payload,
-            held.code
-          ),
-          std::move(held.message)
-        );
-      }
-    } catch (...) {
-      failure = std::current_exception();
-    }
-    if (was_empty && !queue.pending.events.empty()) {
-      wake = queue.wake;
-    }
+  if (state->registration == nullptr) return;
+  for (auto& held : events) {
+    state->registration->push(
+      map_event(
+        map, generation, held.type, held.payload_type, held.payload, held.code
+      ),
+      held.message
+    );
   }
-  if (wake != nullptr) wake->notify();
-  if (failure) std::rethrow_exception(failure);
-}
-
-auto register_runtime_map_events(
-  mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state
-) -> void {
-  auto live = lease_runtime(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL || event_state == nullptr) {
-    return;
-  }
-
-  const std::scoped_lock lock(live->event_queue->mutex);
-  live->event_queue->event_maps.insert_or_assign(map, std::move(event_state));
-}
-
-auto unregister_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
-  auto live = lease_runtime(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL) {
-    return;
-  }
-
-  const std::scoped_lock lock(live->event_queue->mutex);
-  live->event_queue->event_maps.erase(map);
 }
 
 }  // namespace mln::core

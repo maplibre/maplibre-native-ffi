@@ -2430,6 +2430,40 @@ internal static unsafe class GeneratedValues
             message
         );
 
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void InvokeRuntimeEventHandlerCallback(
+        void* user_data,
+        mln_event_batch_view* events
+    )
+    {
+        try
+        {
+            ((RuntimeEventHandler)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
+                CopyEventBatchView(NativeCallScope.Read(events))
+            );
+        }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_runtime_event_callback", error);
+        }
+    }
+
+    internal static mln_runtime_event_handler NativeRuntimeEventHandler(
+        RuntimeEventHandler value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_runtime_event_handler();
+        native.size = (uint)sizeof(mln_runtime_event_handler);
+        if (value.Callback is not null)
+        {
+            native.user_data = scope.Register(value with { });
+            native.release_user_data = &NativeCallbackRoot.Release;
+            native.callback = value.Callback is null ? null : &InvokeRuntimeEventHandlerCallback;
+        }
+        return native;
+    }
+
     internal static RuntimeEventOfflineRegionResponseError CopyRuntimeEventOfflineRegionResponseError(
         mln_runtime_event_offline_region_response_error value
     ) => new(value.region_id, (ResourceErrorReason)value.reason);
@@ -2529,8 +2563,7 @@ internal static unsafe class GeneratedValues
             value.cache_path.size == 0
                 ? null
                 : RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size),
-            (RuntimeEventMask)value.event_mask,
-            default
+            (RuntimeEventMask)value.event_mask
         );
 
     internal static mln_runtime_options NativeRuntimeOptions(
@@ -2543,7 +2576,6 @@ internal static unsafe class GeneratedValues
         native.asset_path = scope.Utf8(value.AssetPath ?? "");
         native.cache_path = scope.Utf8(value.CachePath ?? "");
         native.event_mask = (ulong)value.EventMask;
-        native.event_wake = NativeWake(value.EventWake, scope);
         return native;
     }
 

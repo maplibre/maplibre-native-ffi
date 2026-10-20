@@ -141,6 +141,33 @@ auto copy(const T& source, Capture capture) -> T {
 }
 
 int main() {
+  struct padded_event { mln_runtime_event event; std::uint64_t padding[2]; };
+  padded_event events[2]{};
+  events[0].event.source = 17;
+  events[0].event.generation = 23;
+  events[0].event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE;
+  events[0].event.message_size = 5;
+  events[1].event.source = 19;
+  events[1].event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
+  events[1].event.payload.render_frame.needs_repaint = true;
+  char event_message[] = "event";
+  mln_event_batch_view event_view{
+    sizeof(mln_event_batch_view), sizeof(padded_event), &events[0].event, 2,
+    event_message, sizeof(event_message),
+  };
+  const auto event_copy = copy(mln_runtime_event_delivery{&event_view}, [](auto& arena, const auto& value) {
+    return mln::delivery::capture_element(arena, value);
+  });
+  std::memset(events, 0, sizeof(events));
+  std::memset(event_message, 0, sizeof(event_message));
+  assert(event_copy.events->event_size == sizeof(mln_runtime_event));
+  assert(event_copy.events->events[0].source == 17);
+  assert(event_copy.events->events[0].generation == 23);
+  assert(event_copy.events->events[0].payload_type == MLN_RUNTIME_EVENT_PAYLOAD_NONE);
+  assert(event_copy.events->events[1].source == 19);
+  assert(event_copy.events->events[1].payload.render_frame.needs_repaint);
+  assert(std::strcmp(event_copy.events->messages, "event") == 0);
+
   char message[] = "borrowed";
   const mln_log_delivery log{1, 2, 3, message};
   const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {

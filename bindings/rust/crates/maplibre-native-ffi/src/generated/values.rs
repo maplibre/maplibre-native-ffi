@@ -1106,7 +1106,7 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     }
 }
 
-/// A borrowed view of one owned runtime-event batch.
+/// A borrowed span of runtime events in one delivery.
 ///
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4970,7 +4970,7 @@ pub enum ResourceUsage: u32 {
 } Unknown
 }
 
-/// One drained runtime event.
+/// One delivered runtime event.
 ///
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5039,6 +5039,64 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
     }
 }
 
+/// Runtime and map event delivery. Set either callback or queue.
+///
+/// See `mln_runtime_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Clone, Default)]
+pub struct RuntimeEventHandler {
+    pub callback: Option<std::sync::Arc<dyn Fn(EventBatchView) -> () + Send + Sync + 'static>>,
+}
+impl std::fmt::Debug for RuntimeEventHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeEventHandler")
+            .finish_non_exhaustive()
+    }
+}
+impl RuntimeEventHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(EventBatchView) -> () + Send + Sync + 'static,
+    {
+        self.callback = Some(std::sync::Arc::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: Fn(EventBatchView) -> () + Send + Sync + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+    unsafe extern "C" fn callback_trampoline(
+        user_data: *mut std::ffi::c_void,
+        events: *const sys::mln_event_batch_view,
+    ) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke("mln_runtime_event_callback", None, (), || {
+            callback::require(&state.callback)?(unsafe { convert::copy_reference(events) }?);
+            Ok(())
+        })
+    }
+}
+impl ToNative<sys::mln_runtime_event_handler> for RuntimeEventHandler {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_event_handler> {
+        let mut raw: sys::mln_runtime_event_handler = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_runtime_event_handler>() as _;
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
+    }
+}
+
 native_flags! {
 /// Bit values for the map and runtime event subscription masks.
 ///
@@ -5055,7 +5113,6 @@ pub struct RuntimeEventMask: u64 {
     const MAP_LOADING_FINISHED = 64;
     const MAP_LOADING_FAILED = 128;
     const MAP_IDLE = 256;
-    const MAP_RENDER_UPDATE_AVAILABLE = 512;
     const MAP_RENDER_ERROR = 1024;
     const MAP_STILL_IMAGE_FINISHED = 2048;
     const MAP_STILL_IMAGE_FAILED = 4096;
@@ -5070,11 +5127,11 @@ pub struct RuntimeEventMask: u64 {
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
     const MAP_SOURCE_CHANGED = 8388608;
     /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 8912894;
+    const ALL_MAP_EVENTS = 8912382;
     /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 3670016;
     /// Selects every event type this version defines.
-    const ALL = 12582910;
+    const ALL = 12582398;
 }
 }
 
@@ -5304,7 +5361,6 @@ pub enum RuntimeEventType: u32 {
     MapLoadingFinished = 6,
     MapLoadingFailed = 7,
     MapIdle = 8,
-    MapRenderUpdateAvailable = 9,
     MapRenderError = 10,
     MapStillImageFinished = 11,
     MapStillImageFailed = 12,
@@ -5325,7 +5381,7 @@ pub enum RuntimeEventType: u32 {
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeOptions {
     /// Directory root for asset:// URLs. Copied during runtime creation. Empty
     /// selects `/android_asset` on Android and `.` elsewhere. Copied text,
@@ -5337,8 +5393,6 @@ pub struct RuntimeOptions {
     /// Runtime-scoped event types this runtime queues, as a bitwise OR of
     /// `mln_runtime_event_mask` values.
     pub event_mask: RuntimeEventMask,
-    /// Wakes the receiver when the runtime event queue becomes nonempty.
-    pub event_wake: Wake,
 }
 impl Default for RuntimeOptions {
     fn default() -> Self {
@@ -5352,7 +5406,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
         raw.asset_path = to_native(&self.asset_path, arena)?;
         raw.cache_path = to_native(&self.cache_path, arena)?;
         raw.event_mask = to_native(&self.event_mask, arena)?;
-        raw.event_wake = to_native(&self.event_wake, arena)?;
         Ok(raw)
     }
 }
@@ -5362,7 +5415,6 @@ impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
             asset_path: unsafe { convert::nonempty(raw.asset_path) }?,
             cache_path: unsafe { convert::nonempty(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
-            event_wake: Default::default(),
         })
     }
 }

@@ -10,8 +10,6 @@ fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: 
     return 1;
 }
 
-fn ignoreWake(_: ?*anyopaque) maplibre.Error!void {}
-
 fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     return .pass_through;
 }
@@ -29,7 +27,6 @@ pub fn main() !void {
 
     var options = try maplibre.runtimeOptionsDefault(allocator);
     defer options.deinit();
-    options.value.event_wake = .{ .callback = ignoreWake };
     const runtime = try maplibre.runtimeCreate(allocator, options.value, null);
     try resolve(try maplibre.runtimeSetResourceProvider(allocator, runtime, .{ .callback = passThrough }, null));
     const map = try resolve(try maplibre.runtimeCreateMap(allocator, runtime, try maplibre.mapOptionsDefault(), null));

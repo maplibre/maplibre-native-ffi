@@ -14,6 +14,17 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
+   * Stops event delivery and retires the previous handler.
+   *
+   * See `mln_runtime_clear_event_handler` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun clearEventHandler(): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_clear_event_handler") {
+      check(C.mln_runtime_clear_event_handler(handle, completion, diagnostic))
+    }
+
+  /**
    * Clears the runtime-scoped outgoing HTTP header transform.
    *
    * See `mln_runtime_clear_http_header_transform` in the
@@ -112,20 +123,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
   public fun dispose(): Unit =
     nativeClose(this, binding, "mln_runtime_dispose") {
       check(C.mln_runtime_dispose(handle, diagnostic))
-    }
-
-  /**
-   * Drains this runtime's queued events into a new owned batch.
-   *
-   * See `mln_runtime_drain_events` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun drainEvents(): EventBatchHandle? =
-    nativeCall(this, binding, "mln_runtime_drain_events") {
-      val out = allocate(8, 8)
-      if (present(C.mln_runtime_drain_events(handle, out, diagnostic), absent = -9))
-        adopt(out, GeneratedOwnerDisposal::eventBatch) { EventBatchHandle(it) }
-      else null
     }
 
   /**
@@ -262,6 +259,24 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
         C.mln_runtime_run_ambient_cache_operation(
           handle,
           operation.rawValue.toInt(),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
+   * Selects how runtime and map events reach the host.
+   *
+   * See `mln_runtime_set_event_handler` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun setEventHandler(handler: RuntimeEventHandler): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_set_event_handler", bindingCallbacks) {
+      check(
+        C.mln_runtime_set_event_handler(
+          handle,
+          writeRuntimeEventHandler(handler),
           completion,
           diagnostic,
         ),

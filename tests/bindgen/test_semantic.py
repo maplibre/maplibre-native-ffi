@@ -547,6 +547,28 @@ mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnos
         api = bind(self.parse(source), require_complete=True)
         value = next(f.value for f in api.values["batch"].fields if f.name == "items")
         self.assertEqual(value.stride, "stride")
+        callback_source = (
+            source
+            + """
+typedef void (*on_batch)(void *user_data, const batch *events);
+typedef void (*release_events)(void *user_data);
+typedef struct handler {
+ on_batch callback;
+ void *user_data BIND("kind=context");
+ release_events release_user_data;
+} handler BIND("kind=callback_registration;release=release_user_data");
+mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
+"""
+        )
+        callbacks = bind(self.parse(callback_source), require_complete=True)
+        callback_events = callbacks.callbacks["on_batch"].parameters[-1].value
+        self.assertEqual(callback_events.unwrapped.native, "batch")
+        self.assertEqual(
+            next(
+                f.value for f in callbacks.values["batch"].fields if f.name == "items"
+            ).item_buffer,
+            value.item_buffer,
+        )
         with self.assertRaisesRegex(ModelError, "input reconstruction contract"):
             bind(
                 self.parse(

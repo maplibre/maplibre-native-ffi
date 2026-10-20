@@ -134,8 +134,6 @@ static inline uint32_t probe_consume_log(
   return 1;
 }
 
-static inline void probe_ignore_wake(void* user_data) { (void)user_data; }
-
 // A style whose GeoJSON source keeps the tile workers busy. Its glyph and
 // sprite requests reach the resource provider, which fails them, and the
 // failures reach the log callback.
@@ -226,7 +224,6 @@ static inline void probe_start(void) {
 // Creates a runtime with an event wake and the probe's resource provider.
 static inline mln_runtime probe_create_runtime(void) {
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake = (mln_wake){.callback = probe_ignore_wake};
   mln_runtime runtime = MLN_HANDLE_NULL;
   probe_require(
     mln_runtime_create(&options, &runtime, NULL), "creating a runtime"

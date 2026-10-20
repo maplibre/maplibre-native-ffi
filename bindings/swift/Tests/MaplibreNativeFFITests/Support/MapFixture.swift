@@ -31,17 +31,36 @@ func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
   }
 }
 
-/// One runtime and one map, the fixture every test that needs native objects
-/// starts from. The runtime's event wake pulses, so event waits wake as soon as
-/// the runtime queues an event, and its resource provider denies every request
-/// it has no route for.
+/// Copies events from native callbacks and signals their arrival.
+final class EventCopies: @unchecked Sendable {
+  private let lock = NSLock()
+  private var events: [RuntimeEvent] = []
+
+  func receive(_ batch: EventBatchView) {
+    lock.withLock { events.append(contentsOf: batch.events) }
+    Pulse.shared.signal()
+  }
+
+  func drain() -> [RuntimeEvent] {
+    lock.withLock {
+      let result = events
+      events.removeAll()
+      return result
+    }
+  }
+}
+
+/// One runtime and map, with a provider that denies requests it has no route
+/// for.
 final class MapFixture: Sendable {
   let runtime: RuntimeHandle
   let map: MapHandle
+  let events: EventCopies
 
-  private init(runtime: RuntimeHandle, map: MapHandle) {
+  private init(runtime: RuntimeHandle, map: MapHandle, events: EventCopies) {
     self.runtime = runtime
     self.map = map
+    self.events = events
   }
 
   static func make(
@@ -53,24 +72,26 @@ final class MapFixture: Sendable {
     routes: [String: Data] = [:]
   ) async throws -> MapFixture {
     let runtime = try makeRuntime()
+    let events = EventCopies()
     do {
+      try await runtime
+        .setEventHandler(handler: RuntimeEventHandler(callback: { batch in
+          events.receive(batch)
+        }))
       try await runtime
         .setResourceProvider(provider: denyingProvider(routes: routes))
       let map = try await runtime
         .createMap(options: MapOptions(initialExtent: extent))
-      return MapFixture(runtime: runtime, map: map)
+      return MapFixture(runtime: runtime, map: map, events: events)
     } catch {
       try? await runtime.close()
       throw error
     }
   }
 
-  /// A runtime whose event wake pulses, for a test that manages its own maps.
+  /// A runtime for a test that manages its own maps.
   static func makeRuntime() throws -> RuntimeHandle {
-    try Maplibre.runtimeCreate(options: RuntimeOptions(
-      cachePath: ":memory:",
-      eventWake: Wake(callback: { Pulse.shared.signal() })
-    ))
+    try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
   }
 
   /// Closes the map, if the test left it open, and then the runtime, waiting
@@ -92,8 +113,8 @@ final class MapFixture: Sendable {
     where isMatch: (RuntimeEvent) -> Bool
   ) async throws -> RuntimeEvent? {
     var found: RuntimeEvent?
-    try await awaitCondition(subject, sourceLocation: sourceLocation) {
-      found = try runtime.drainEventCopies().first(where: isMatch)
+    await awaitCondition(subject, sourceLocation: sourceLocation) {
+      found = events.drain().first(where: isMatch)
       return found != nil
     }
     return found
@@ -115,15 +136,6 @@ func withMapFixture<Result>(
   } catch {
     await fixture.close()
     throw error
-  }
-}
-
-extension RuntimeHandle {
-  /// Drains the queued events into copies that outlive the batch.
-  func drainEventCopies() throws -> [RuntimeEvent] {
-    guard let batch = try drainEvents() else { return [] }
-    defer { try? batch.close() }
-    return try batch.get().events
   }
 }
 

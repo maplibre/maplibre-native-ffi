@@ -43,15 +43,6 @@ pub const AcquiredFrame = owner.Handle("mln_acquired_frame", "AcquiredFrame", st
         try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
     }
 }.dispose);
-/// An owned batch of runtime events from one drain.
-///
-/// See `mln_event_batch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const EventBatch = owner.Handle("mln_event_batch", "EventBatch", struct {
-    fn dispose(raw: u64) status.Error!void {
-        c.mln_event_batch_release(raw);
-    }
-}.dispose);
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
 /// See `mln_geojson_source_data` in the
@@ -927,7 +918,7 @@ pub const EglContextDescriptor = struct {
     }
 };
 
-/// A borrowed view of one owned runtime-event batch.
+/// A borrowed span of runtime events in one delivery.
 ///
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3970,7 +3961,7 @@ pub const ResourceUsage = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// One drained runtime event.
+/// One delivered runtime event.
 ///
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4057,6 +4048,48 @@ pub const RuntimeEvent = struct {
     }
 };
 
+/// Runtime and map event delivery. Set either callback or queue.
+///
+/// See `mln_runtime_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const RuntimeEventHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque, EventBatchView) status.Error!void = null,
+    pub fn toNative(self: RuntimeEventHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_runtime_event_handler);
+        raw.size = @sizeOf(c.mln_runtime_event_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(RuntimeEventHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(RuntimeEventHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_runtime_event_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_runtime_event_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_runtime_event_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_runtime_event_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_runtime_event_callback, 1)) status.Error!marshal.CallbackResult(c.mln_runtime_event_callback) {
+                const state = callback.Registration(RuntimeEventHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return;
+                };
+                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
+                defer arena.deinit();
+                const allocator = arena.allocator();
+                host(state.value.context, try EventBatchView.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*)) catch |err| {
+                    callback.reportError("mln_runtime_event_callback", err);
+                    return;
+                };
+            }
+        }.invoke(native_arg_0, native_arg_1) catch |err| {
+            callback.reportError("mln_runtime_event_callback", err);
+            return;
+        };
+    }
+};
+
 /// Bit values for the map and runtime event subscription masks.
 ///
 /// See `mln_runtime_event_mask` in the
@@ -4070,7 +4103,6 @@ pub const RuntimeEventMask = struct {
     map_loading_finished: bool = false,
     map_loading_failed: bool = false,
     map_idle: bool = false,
-    map_render_update_available: bool = false,
     map_render_error: bool = false,
     map_still_image_finished: bool = false,
     map_still_image_failed: bool = false,
@@ -4085,7 +4117,7 @@ pub const RuntimeEventMask = struct {
     offline_region_tile_count_limit_exceeded: bool = false,
     map_source_changed: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4093,9 +4125,9 @@ pub const RuntimeEventMask = struct {
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
     pub const none = fromNative(0);
-    pub const all_map_events = fromNative(8912894);
+    pub const all_map_events = fromNative(8912382);
     pub const all_runtime_events = fromNative(3670016);
-    pub const all = fromNative(12582910);
+    pub const all = fromNative(12582398);
 };
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -4295,7 +4327,6 @@ pub const RuntimeEventType = enum(u32) {
     map_still_image_failed = 12,
     map_still_image_finished = 11,
     map_render_error = 10,
-    map_render_update_available = 9,
     map_idle = 8,
     map_loading_failed = 7,
     map_loading_finished = 6,
@@ -4324,15 +4355,14 @@ pub const RuntimeOptions = struct {
     /// Runtime-scoped event types this runtime queues, as a bitwise OR of
     /// `mln_runtime_event_mask` values.
     event_mask: RuntimeEventMask = RuntimeEventMask.all,
-    /// Wakes the receiver when the runtime event queue becomes nonempty.
-    event_wake: Wake = .{},
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
+        _ = allocator;
+        _ = roots;
         var raw = c.mln_runtime_options_default();
         raw.size = @sizeOf(c.mln_runtime_options);
         raw.asset_path = if (self.asset_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.cache_path = if (self.cache_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.event_mask = self.event_mask.toNative();
-        raw.event_wake = try self.event_wake.toNative(allocator, roots);
         return raw;
     }
 
@@ -4341,7 +4371,6 @@ pub const RuntimeOptions = struct {
             .asset_path = if (raw.asset_path.size == 0) null else try marshal.copyView(allocator, raw.asset_path),
             .cache_path = if (raw.cache_path.size == 0) null else try marshal.copyView(allocator, raw.cache_path),
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
-            .event_wake = .{},
         };
     }
 };
@@ -6034,22 +6063,6 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
     return call.direct("mln_custom_mvt_vector_source_options_default", .none, {}, OwnedValue(CustomMvtVectorSourceOptions), allocator, .{});
 }
 
-/// Borrows the event and message view stored by an owned event batch.
-///
-/// See `mln_event_batch_get` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(EventBatchView) {
-    return call.invoke("mln_event_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(EventBatchView))});
-}
-
-/// Releases an owned event batch. A null handle is a no-op.
-///
-/// See `mln_event_batch_release` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn eventBatchRelease(batch: EventBatch) status.Error!void {
-    return call.direct("mln_event_batch_release", .close, batch, void, null, .{});
-}
-
 /// Returns a zero-token, render-if-needed, nonpresenting frame demand.
 ///
 /// See `mln_frame_demand_default` in the
@@ -7517,6 +7530,14 @@ pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url:
     return call.invoke("mln_resource_transform_response_set_url", .scoped, response, null, diagnostic, .{url});
 }
 
+/// Stops event delivery and retires the previous handler.
+///
+/// See `mln_runtime_clear_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn runtimeClearEventHandler(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_clear_event_handler", .lease, runtime, call.unit, null, diagnostic, .{});
+}
+
 /// Clears the runtime-scoped outgoing HTTP header transform.
 ///
 /// See `mln_runtime_clear_http_header_transform` in the
@@ -7579,14 +7600,6 @@ pub fn runtimeDeleteOfflineRegion(runtime: Runtime, region_id: i64, diagnostic: 
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn runtimeDispose(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_runtime_dispose", .close, runtime, null, diagnostic, .{});
-}
-
-/// Drains this runtime's queued events into a new owned batch.
-///
-/// See `mln_runtime_drain_events` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!?EventBatch {
-    return call.invokeUnless("mln_runtime_drain_events", .lease, runtime, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(EventBatch, .none)});
 }
 
 /// Reports which runtime-scoped event types this runtime queues.
@@ -7659,6 +7672,14 @@ pub fn runtimeRelease(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) st
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn runtimeRunAmbientCacheOperation(runtime: Runtime, operation: AmbientCacheOperation, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_runtime_run_ambient_cache_operation", .lease, runtime, call.unit, null, diagnostic, .{operation});
+}
+
+/// Selects how runtime and map events reach the host.
+///
+/// See `mln_runtime_set_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn runtimeSetEventHandler(allocator: std.mem.Allocator, runtime: Runtime, handler: RuntimeEventHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_set_event_handler", .lease, runtime, call.unit, allocator, diagnostic, .{handler});
 }
 
 /// Selects which runtime-scoped event types this runtime queues.

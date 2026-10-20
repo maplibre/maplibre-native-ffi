@@ -35,7 +35,7 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let animated: CameraChangeMode = .init(rawValue: 1)
 }
 
-/// A borrowed view of one owned runtime-event batch.
+/// A borrowed span of runtime events in one delivery.
 ///
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1203,7 +1203,7 @@ public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
   public static let offline: ResourceUsage = .init(rawValue: 1)
 }
 
-/// One drained runtime event.
+/// One delivered runtime event.
 ///
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1305,6 +1305,53 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 }
 
+/// Runtime and map event delivery. Set either callback or queue.
+///
+/// See `mln_runtime_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventHandler: Sendable {
+  public var callback: (@Sendable (EventBatchView) throws -> Void)?
+  public init(callback: (@Sendable (EventBatchView) throws -> Void)? = nil) {
+    self.callback = callback
+  }
+
+  public static var `default`: Self {
+    Self()
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_runtime_event_handler
+  {
+    var raw = mln_runtime_event_handler()
+    raw.size = UInt32(MemoryLayout<mln_runtime_event_handler>.size)
+    raw.callback = callback == nil ? nil : invokeRuntimeEventHandlerCallback
+    if callback != nil {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private func invokeRuntimeEventHandlerCallback(
+  user_data: UnsafeMutableRawPointer?,
+  events: UnsafePointer<mln_event_batch_view>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<RuntimeEventHandler>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .callback?(NativeInputArena.copyArray(events, count: 1)
+        .map { try EventBatchView(raw: $0) }[0])
+  } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_runtime_event_callback",
+      error: error
+    ))
+  }
+}
+
 /// Bit values for the map and runtime event subscription masks.
 ///
 /// See `mln_runtime_event_mask` in the
@@ -1327,8 +1374,6 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let mapLoadingFinished: RuntimeEventMask = .init(rawValue: 64)
   public static let mapLoadingFailed: RuntimeEventMask = .init(rawValue: 128)
   public static let mapIdle: RuntimeEventMask = .init(rawValue: 256)
-  public static let mapRenderUpdateAvailable: RuntimeEventMask =
-    .init(rawValue: 512)
   public static let mapRenderError: RuntimeEventMask = .init(rawValue: 1024)
   public static let mapStillImageFinished: RuntimeEventMask =
     .init(rawValue: 2048)
@@ -1354,12 +1399,12 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let mapSourceChanged: RuntimeEventMask =
     .init(rawValue: 8_388_608)
   /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_912_894)
+  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_912_382)
   /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventMask =
     .init(rawValue: 3_670_016)
   /// Selects every event type this version defines.
-  public static let all: RuntimeEventMask = .init(rawValue: 12_582_910)
+  public static let all: RuntimeEventMask = .init(rawValue: 12_582_398)
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -1646,8 +1691,6 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
   public static let mapLoadingFinished: RuntimeEventType = .init(rawValue: 6)
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
-  public static let mapRenderUpdateAvailable: RuntimeEventType =
-    .init(rawValue: 9)
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 10)
   public static let mapStillImageFinished: RuntimeEventType =
     .init(rawValue: 11)
@@ -1673,7 +1716,7 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeOptions: Sendable {
+public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
   /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
   /// by the caller.
@@ -1684,8 +1727,6 @@ public struct RuntimeOptions: Sendable {
   /// Runtime-scoped event types this runtime queues, as a bitwise OR of
   /// `mln_runtime_event_mask` values.
   public var eventMask: RuntimeEventMask
-  /// Wakes the receiver when the runtime event queue becomes nonempty.
-  public var eventWake: Wake
   public static var `default`: Self {
     try! Self(raw: mln_runtime_options_default())
   }
@@ -1693,13 +1734,11 @@ public struct RuntimeOptions: Sendable {
   public init(
     assetPath: String? = RuntimeOptions.default.assetPath,
     cachePath: String? = RuntimeOptions.default.cachePath,
-    eventMask: RuntimeEventMask = RuntimeOptions.default.eventMask,
-    eventWake: Wake = RuntimeOptions.default.eventWake
+    eventMask: RuntimeEventMask = RuntimeOptions.default.eventMask
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.eventMask = eventMask
-    self.eventWake = eventWake
   }
 
   init(
@@ -1715,7 +1754,6 @@ public struct RuntimeOptions: Sendable {
       size: raw.cache_path.size
     )
     eventMask = RuntimeEventMask(rawValue: raw.event_mask)
-    eventWake = Wake()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
@@ -1724,7 +1762,6 @@ public struct RuntimeOptions: Sendable {
     raw.asset_path = assetPath.map { arena.view($0) } ?? mln_buffer_view()
     raw.cache_path = cachePath.map { arena.view($0) } ?? mln_buffer_view()
     raw.event_mask = eventMask.rawValue
-    raw.event_wake = try eventWake.nativeValue(arena: arena)
     return raw
   }
 }

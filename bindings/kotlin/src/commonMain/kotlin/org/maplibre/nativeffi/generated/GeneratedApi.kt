@@ -599,13 +599,7 @@ public object GeneratedApi {
     nativeCall(null, null, "mln_runtime_create") {
       val out = allocate(8, 8)
       check(C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic))
-      adoptRegistered(
-        out,
-        GeneratedOwnerDisposal::runtime,
-        { RuntimeHandle(it) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
+      adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
     }
 
   /**
@@ -616,7 +610,7 @@ public object GeneratedApi {
    */
   public fun runtimeOptionsDefault(): RuntimeOptions =
     nativeCall(null, null, "mln_runtime_options_default") {
-      val out = sized(w(48, 72), 8)
+      val out = sized(w(32, 48), 8)
       C.mln_runtime_options_default(out)
       readRuntimeOptions(out)
     }

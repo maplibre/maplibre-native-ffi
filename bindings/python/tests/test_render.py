@@ -235,7 +235,7 @@ class OwnedTexture:
             return frame.with_vulkan_texture(callback)
         return frame.with_opengl_texture(callback)
 
-    def render(self) -> mln.RenderFrameResult:
+    def render(self, *, wait_for_update: bool = False) -> mln.RenderFrameResult:
         """Render one frame, whether or not the map has a newer update."""
         assert self.session is not None
         session = self.session
@@ -243,7 +243,13 @@ class OwnedTexture:
         self._next_token += 1
         session.request_frame(
             replace(
-                mln.FrameDemand.default(), flags=mln.FrameDemandFlag(0), token=token
+                mln.FrameDemand.default(),
+                flags=(
+                    mln.FrameDemandFlag.IF_NEEDED | mln.FrameDemandFlag.WAIT_FOR_UPDATE
+                )
+                if wait_for_update
+                else mln.FrameDemandFlag(0),
+                token=token,
             )
         )
 
@@ -265,13 +271,15 @@ class OwnedTexture:
         result(self.map.set_style_json(RED_STYLE))
         deadline = time.monotonic() + TIMEOUT
         while True:
-            assert self.render().disposition == mln.RenderResult.RENDERED
+            assert (
+                self.render(wait_for_update=True).disposition
+                == mln.RenderResult.RENDERED
+            )
             image = result(self.session.read_texture())
             if image.data[:4] == RED_PIXEL:
                 return image
             if time.monotonic() > deadline:
                 raise AssertionError("timed out waiting for a red frame")
-            self.harness.wait_event(mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
 
     def _teardown(self, release: bool) -> None:
         """Stop servicing, destroy the session and map, then the graphics.

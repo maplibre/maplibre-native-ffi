@@ -40,41 +40,6 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
   }
 }
 
-struct NativeEventBatchHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_event_batch_release(raw); return true
-  }
-}
-
-/// An owned batch of runtime events from one drain.
-///
-/// See `mln_event_batch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class EventBatchHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeEventBatchHandle>
-  init(adopting raw: mln_event_batch) throws {
-    handle = try NativeHandleBox(
-      typeName: "EventBatchHandle",
-      handle: NativeEventBatchHandle(raw: raw)
-    )
-  }
-
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var id: UInt64 {
-    handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeEventBatchHandle {
-    try handle
-      .requireLive()
-  }
-}
-
 struct NativeGeojsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool

@@ -105,16 +105,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_custom_mvt_vector_source_options mln_custom_mvt_vector_source_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_event_batch_get(
-        MlnEventBatch batch,
-        mln_event_batch_view* out_view,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_event_batch_release(MlnEventBatch batch);
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_frame_demand mln_frame_demand_default();
 
     [LibraryImport(LibraryName)]
@@ -1440,6 +1430,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_clear_event_handler(
+        MlnRuntime runtime,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_clear_http_header_transform(
         MlnRuntime runtime,
         mln_completion* completion,
@@ -1496,13 +1493,6 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_dispose(
         MlnRuntime runtime,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_drain_events(
-        MlnRuntime runtime,
-        MlnEventBatch* out_batch,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1566,6 +1556,14 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_runtime_run_ambient_cache_operation(
         MlnRuntime runtime,
         uint operation,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_set_event_handler(
+        MlnRuntime runtime,
+        mln_runtime_event_handler* handler,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

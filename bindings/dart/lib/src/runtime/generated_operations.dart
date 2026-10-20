@@ -667,168 +667,6 @@ CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
   maxZoom: source.max_zoom,
 );
 
-RenderingStats _readRenderingStats(raw.mln_rendering_stats source) =>
-    RenderingStats(
-      encodingTime: source.encoding_time,
-      renderingTime: source.rendering_time,
-      frameCount: source.frame_count,
-      drawCallCount: source.draw_call_count,
-      totalDrawCallCount: source.total_draw_call_count,
-    );
-
-RuntimeEventRenderFrame _readRuntimeEventRenderFrame(
-  raw.mln_runtime_event_render_frame source,
-) => RuntimeEventRenderFrame(
-  mode: RenderMode.fromRawValue(source.mode),
-  needsRepaint: source.needs_repaint,
-  placementChanged: source.placement_changed,
-  stats: _readRenderingStats(source.stats),
-);
-
-RuntimeEventRenderMap _readRuntimeEventRenderMap(
-  raw.mln_runtime_event_render_map source,
-) => RuntimeEventRenderMap(mode: RenderMode.fromRawValue(source.mode));
-
-TileId _readTileId(raw.mln_tile_id source) => TileId(
-  overscaledZ: source.overscaled_z,
-  wrap: source.wrap,
-  canonicalZ: source.canonical_z,
-  canonicalX: source.canonical_x,
-  canonicalY: source.canonical_y,
-);
-
-RuntimeEventTileAction _readRuntimeEventTileAction(
-  raw.mln_runtime_event_tile_action source,
-) => RuntimeEventTileAction(
-  operation: TileOperation.fromRawValue(source.operation),
-  tileId: _readTileId(source.tile_id),
-);
-
-OfflineRegionStatus _readOfflineRegionStatus(
-  raw.mln_offline_region_status source,
-) => OfflineRegionStatus(
-  downloadState: OfflineRegionDownloadState.fromRawValue(source.download_state),
-  completedResourceCount: uint64FromNative(source.completed_resource_count),
-  completedResourceSize: uint64FromNative(source.completed_resource_size),
-  completedTileCount: uint64FromNative(source.completed_tile_count),
-  requiredTileCount: uint64FromNative(source.required_tile_count),
-  completedTileSize: uint64FromNative(source.completed_tile_size),
-  requiredResourceCount: uint64FromNative(source.required_resource_count),
-  requiredResourceCountIsPrecise: source.required_resource_count_is_precise,
-  complete: source.complete,
-);
-
-RuntimeEventOfflineRegionStatus _readRuntimeEventOfflineRegionStatus(
-  raw.mln_runtime_event_offline_region_status source,
-) => RuntimeEventOfflineRegionStatus(
-  regionId: source.region_id,
-  status: _readOfflineRegionStatus(source.status),
-);
-
-RuntimeEventOfflineRegionResponseError
-_readRuntimeEventOfflineRegionResponseError(
-  raw.mln_runtime_event_offline_region_response_error source,
-) => RuntimeEventOfflineRegionResponseError(
-  regionId: source.region_id,
-  reason: ResourceErrorReason.fromRawValue(source.reason),
-);
-
-RuntimeEventOfflineRegionTileCountLimit
-_readRuntimeEventOfflineRegionTileCountLimit(
-  raw.mln_runtime_event_offline_region_tile_count_limit source,
-) => RuntimeEventOfflineRegionTileCountLimit(
-  regionId: source.region_id,
-  limit: uint64FromNative(source.limit),
-);
-
-RuntimeEvent _readRuntimeEvent(
-  raw.mln_runtime_event source, {
-  Uint8List Function()? rawRecord,
-  String message = '',
-}) => RuntimeEvent(
-  type: RuntimeEventType.fromRawValue(source.type),
-  sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
-  source: uint64FromNative(source.source),
-  generation: uint64FromNative(source.generation),
-  code: source.code,
-  messageOffset: uint64FromNative(source.message_offset),
-  messageSize: source.message_size,
-  message: message,
-  payload: switch (source.payload_type) {
-    1 => RuntimeEventPayloadRenderFrame(
-      _readRuntimeEventRenderFrame(source.payload.render_frame),
-    ),
-    2 => RuntimeEventPayloadRenderMap(
-      _readRuntimeEventRenderMap(source.payload.render_map),
-    ),
-    4 => RuntimeEventPayloadTileAction(
-      _readRuntimeEventTileAction(source.payload.tile_action),
-    ),
-    5 => RuntimeEventPayloadOfflineRegionStatus(
-      _readRuntimeEventOfflineRegionStatus(
-        source.payload.offline_region_status,
-      ),
-    ),
-    6 => RuntimeEventPayloadOfflineRegionResponseError(
-      _readRuntimeEventOfflineRegionResponseError(
-        source.payload.offline_region_response_error,
-      ),
-    ),
-    7 => RuntimeEventPayloadOfflineRegionTileCountLimit(
-      _readRuntimeEventOfflineRegionTileCountLimit(
-        source.payload.offline_region_tile_count_limit,
-      ),
-    ),
-    0 => const RuntimeEventPayloadNone(),
-    final tag => RuntimeEventPayloadUnknown(
-      tag,
-      rawRecord?.call() ??
-          withNativeArena((arena) {
-            final copy = arena<raw.mln_runtime_event>()..ref = source;
-            return Uint8List.fromList(
-              copy.cast<Uint8>().asTypedList(sizeOf<raw.mln_runtime_event>()),
-            );
-          }),
-    ),
-  },
-);
-
-EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
-    EventBatchView(
-      events: (() {
-        if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
-          throwInvalidState('native record stride is too small');
-        }
-        return List<RuntimeEvent>.unmodifiable(
-          List.generate(
-            source.event_count,
-            (index) => _readRuntimeEvent(
-              (source.events.cast<Uint8>() + index * source.event_size)
-                  .cast<raw.mln_runtime_event>()
-                  .ref,
-              rawRecord: () =>
-                  (source.events.cast<Uint8>() + index * source.event_size)
-                      .cast<raw.mln_runtime_event>()
-                      .cast<Uint8>()
-                      .asTypedList(source.event_size),
-              message: _arenaUtf8(
-                source.messages.cast(),
-                source.messages_size,
-                (source.events.cast<Uint8>() + index * source.event_size)
-                    .cast<raw.mln_runtime_event>()
-                    .ref
-                    .message_offset,
-                (source.events.cast<Uint8>() + index * source.event_size)
-                    .cast<raw.mln_runtime_event>()
-                    .ref
-                    .message_size,
-              ),
-            ),
-          ),
-        );
-      })(),
-    );
-
 Pointer<raw.mln_frame_demand> _writeFrameDemand(
   FrameDemand value,
   Arena arena,
@@ -2632,7 +2470,6 @@ _prepareResourceRequestCancelHandler(
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
   Arena arena,
-  _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
@@ -2645,9 +2482,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
     arena,
   ).value;
   result.ref.event_mask = value.eventMask.rawValue;
-  result.ref.event_wake = registrations
-      .add(registrations.roots.wake(value.eventWake.callback))
-      .ref;
   return result;
 }
 
@@ -2660,7 +2494,6 @@ RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
           ? null
           : utf8.decode(_copyBufferView(source.cache_path)),
       eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
-      eventWake: const Wake(),
     );
 
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
@@ -2758,6 +2591,210 @@ OfflineRegionInfo _readOfflineRegionInfo(raw.mln_offline_region_info source) =>
         source.metadata.cast<Uint8>().asTypedList(source.metadata_size),
       ),
     );
+
+OfflineRegionStatus _readOfflineRegionStatus(
+  raw.mln_offline_region_status source,
+) => OfflineRegionStatus(
+  downloadState: OfflineRegionDownloadState.fromRawValue(source.download_state),
+  completedResourceCount: uint64FromNative(source.completed_resource_count),
+  completedResourceSize: uint64FromNative(source.completed_resource_size),
+  completedTileCount: uint64FromNative(source.completed_tile_count),
+  requiredTileCount: uint64FromNative(source.required_tile_count),
+  completedTileSize: uint64FromNative(source.completed_tile_size),
+  requiredResourceCount: uint64FromNative(source.required_resource_count),
+  requiredResourceCountIsPrecise: source.required_resource_count_is_precise,
+  complete: source.complete,
+);
+
+RenderingStats _readRenderingStats(raw.mln_rendering_stats source) =>
+    RenderingStats(
+      encodingTime: source.encoding_time,
+      renderingTime: source.rendering_time,
+      frameCount: source.frame_count,
+      drawCallCount: source.draw_call_count,
+      totalDrawCallCount: source.total_draw_call_count,
+    );
+
+RuntimeEventRenderFrame _readRuntimeEventRenderFrame(
+  raw.mln_runtime_event_render_frame source,
+) => RuntimeEventRenderFrame(
+  mode: RenderMode.fromRawValue(source.mode),
+  needsRepaint: source.needs_repaint,
+  placementChanged: source.placement_changed,
+  stats: _readRenderingStats(source.stats),
+);
+
+RuntimeEventRenderMap _readRuntimeEventRenderMap(
+  raw.mln_runtime_event_render_map source,
+) => RuntimeEventRenderMap(mode: RenderMode.fromRawValue(source.mode));
+
+TileId _readTileId(raw.mln_tile_id source) => TileId(
+  overscaledZ: source.overscaled_z,
+  wrap: source.wrap,
+  canonicalZ: source.canonical_z,
+  canonicalX: source.canonical_x,
+  canonicalY: source.canonical_y,
+);
+
+RuntimeEventTileAction _readRuntimeEventTileAction(
+  raw.mln_runtime_event_tile_action source,
+) => RuntimeEventTileAction(
+  operation: TileOperation.fromRawValue(source.operation),
+  tileId: _readTileId(source.tile_id),
+);
+
+RuntimeEventOfflineRegionStatus _readRuntimeEventOfflineRegionStatus(
+  raw.mln_runtime_event_offline_region_status source,
+) => RuntimeEventOfflineRegionStatus(
+  regionId: source.region_id,
+  status: _readOfflineRegionStatus(source.status),
+);
+
+RuntimeEventOfflineRegionResponseError
+_readRuntimeEventOfflineRegionResponseError(
+  raw.mln_runtime_event_offline_region_response_error source,
+) => RuntimeEventOfflineRegionResponseError(
+  regionId: source.region_id,
+  reason: ResourceErrorReason.fromRawValue(source.reason),
+);
+
+RuntimeEventOfflineRegionTileCountLimit
+_readRuntimeEventOfflineRegionTileCountLimit(
+  raw.mln_runtime_event_offline_region_tile_count_limit source,
+) => RuntimeEventOfflineRegionTileCountLimit(
+  regionId: source.region_id,
+  limit: uint64FromNative(source.limit),
+);
+
+RuntimeEvent _readRuntimeEvent(
+  raw.mln_runtime_event source, {
+  Uint8List Function()? rawRecord,
+  String message = '',
+}) => RuntimeEvent(
+  type: RuntimeEventType.fromRawValue(source.type),
+  sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
+  source: uint64FromNative(source.source),
+  generation: uint64FromNative(source.generation),
+  code: source.code,
+  messageOffset: uint64FromNative(source.message_offset),
+  messageSize: source.message_size,
+  message: message,
+  payload: switch (source.payload_type) {
+    1 => RuntimeEventPayloadRenderFrame(
+      _readRuntimeEventRenderFrame(source.payload.render_frame),
+    ),
+    2 => RuntimeEventPayloadRenderMap(
+      _readRuntimeEventRenderMap(source.payload.render_map),
+    ),
+    4 => RuntimeEventPayloadTileAction(
+      _readRuntimeEventTileAction(source.payload.tile_action),
+    ),
+    5 => RuntimeEventPayloadOfflineRegionStatus(
+      _readRuntimeEventOfflineRegionStatus(
+        source.payload.offline_region_status,
+      ),
+    ),
+    6 => RuntimeEventPayloadOfflineRegionResponseError(
+      _readRuntimeEventOfflineRegionResponseError(
+        source.payload.offline_region_response_error,
+      ),
+    ),
+    7 => RuntimeEventPayloadOfflineRegionTileCountLimit(
+      _readRuntimeEventOfflineRegionTileCountLimit(
+        source.payload.offline_region_tile_count_limit,
+      ),
+    ),
+    0 => const RuntimeEventPayloadNone(),
+    final tag => RuntimeEventPayloadUnknown(
+      tag,
+      rawRecord?.call() ??
+          withNativeArena((arena) {
+            final copy = arena<raw.mln_runtime_event>()..ref = source;
+            return Uint8List.fromList(
+              copy.cast<Uint8>().asTypedList(sizeOf<raw.mln_runtime_event>()),
+            );
+          }),
+    ),
+  },
+);
+
+EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
+    EventBatchView(
+      events: (() {
+        if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
+          throwInvalidState('native record stride is too small');
+        }
+        return List<RuntimeEvent>.unmodifiable(
+          List.generate(
+            source.event_count,
+            (index) => _readRuntimeEvent(
+              (source.events.cast<Uint8>() + index * source.event_size)
+                  .cast<raw.mln_runtime_event>()
+                  .ref,
+              rawRecord: () =>
+                  (source.events.cast<Uint8>() + index * source.event_size)
+                      .cast<raw.mln_runtime_event>()
+                      .cast<Uint8>()
+                      .asTypedList(source.event_size),
+              message: _arenaUtf8(
+                source.messages.cast(),
+                source.messages_size,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_offset,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_size,
+              ),
+            ),
+          ),
+        );
+      })(),
+    );
+
+void _deliverRuntimeEventCallback(
+  RuntimeEventCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.runtime_events;
+  callback(_readEventBatchView(payload.events.ref));
+}
+
+_NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
+  RuntimeEventHandler value,
+  _CallbackRoots roots,
+) {
+  final arena = Arena();
+  DeliveryRegistration? registration;
+  try {
+    final result = arena<raw.mln_runtime_event_handler>();
+    result.ref.size = sizeOf<raw.mln_runtime_event_handler>();
+    if (value.callback == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    final registered = registration = roots.registerQueued({
+      if (value.callback != null)
+        raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
+            _deliverRuntimeEventCallback(
+              value.callback!,
+              batch,
+              index,
+              delivery,
+            ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
+  } catch (_) {
+    registration?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
 
 Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
   final result = arena<raw.mln_http_header>();
@@ -3524,21 +3561,16 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   ensureAbiVersion();
   final outRuntime = arena<Uint64>();
-  final registrations = _NativeRegistrations(_CallbackRoots());
   _check(
-    registrations.run(
-      () => raw.mln_runtime_create(
-        _writeRuntimeOptions(options, arena, registrations),
-        outRuntime,
-        nativeDiagnostic,
-      ),
+    raw.mln_runtime_create(
+      _writeRuntimeOptions(options, arena),
+      outRuntime,
+      nativeDiagnostic,
     ),
   );
   return _adoptOwned(
     outRuntime.value,
-    () =>
-        (RuntimeHandle._(NativeRuntime(outRuntime.value))
-          .._state.retain(registrations)),
+    () => RuntimeHandle._(NativeRuntime(outRuntime.value)),
     (handle) {
       _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
     },
@@ -3829,51 +3861,6 @@ final class AcquiredFrameHandle implements Finalizable {
       ),
     ),
   );
-}
-
-/// Issued `mln_event_batch` handle id.
-extension type const NativeEventBatch(int raw) implements NativeHandle {}
-
-/// Owner of one native `mln_event_batch` handle.
-///
-/// An owned batch of runtime events from one drain.
-///
-/// See `mln_event_batch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class EventBatchHandle implements Finalizable {
-  EventBatchHandle._(NativeEventBatch handle)
-    : _state = NativeHandleState(handle, 'EventBatchHandle');
-  final NativeHandleState<NativeEventBatch> _state;
-  NativeEventBatch get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
-
-  /// Borrows the event and message view stored by an owned event batch.
-  ///
-  /// See `mln_event_batch_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  EventBatchView getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_event_batch_view>();
-    outView.ref.size = sizeOf<raw.mln_event_batch_view>();
-    _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
-    return _readEventBatchView(outView.ref);
-  });
-
-  /// Releases an owned event batch. A null handle is a no-op.
-  ///
-  /// See `mln_event_batch_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void close() => _state.close((handle) {
-    raw.mln_event_batch_release(handle.raw);
-    return nativeStatusOk;
-  });
 }
 
 /// Issued `mln_geojson_source_data` handle id.
@@ -7284,6 +7271,18 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   /// this handle.
   BigInt get id => uint64FromNative(_state.handleId);
 
+  /// Stops event delivery and retires the previous handler.
+  ///
+  /// See `mln_runtime_clear_event_handler` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  Future<void> clearEventHandler() => _run(
+    (arena, completion) => raw.mln_runtime_clear_event_handler(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Clears the runtime-scoped outgoing HTTP header transform.
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
@@ -7379,27 +7378,6 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   void dispose() => _state.close(
     (handle) => raw.mln_runtime_dispose(handle.raw, nativeDiagnostic),
   );
-
-  /// Drains this runtime's queued events into a new owned batch.
-  ///
-  /// See `mln_runtime_drain_events` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  EventBatchHandle? drainEvents() => withNativeArena((arena) {
-    final outBatch = arena<Uint64>();
-    if (!_present(
-      raw.mln_runtime_drain_events(_handle.raw, outBatch, nativeDiagnostic),
-      raw.MLN_STATUS_NOT_READY,
-    )) {
-      return null;
-    }
-    return _adoptOwned(
-      outBatch.value,
-      () => EventBatchHandle._(NativeEventBatch(outBatch.value)),
-      (handle) {
-        raw.mln_event_batch_release(handle);
-      },
-    );
-  });
 
   /// Reports which runtime-scoped event types this runtime queues.
   ///
@@ -7507,6 +7485,25 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Selects how runtime and map events reach the host.
+  ///
+  /// See `mln_runtime_set_event_handler` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  Future<void> setEventHandler(RuntimeEventHandler handler) =>
+      _run((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_event_handler(
+            _handle.raw,
+            registrations.add(
+              _prepareRuntimeEventHandler(handler, registrations.roots),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 
   /// Selects which runtime-scoped event types this runtime queues.
   ///

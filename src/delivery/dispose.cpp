@@ -22,9 +22,6 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
       case core::HandleKind::DeliveryQueue:
         release_delivery_queue(handle);
         return MLN_STATUS_OK;
-      case core::HandleKind::EventBatch:
-        core::release_event_batch(handle);
-        return MLN_STATUS_OK;
       case core::HandleKind::GeoJsonSourceData:
         core::geojson_source_data_release(handle);
         return MLN_STATUS_OK;

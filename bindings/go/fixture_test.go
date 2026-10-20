@@ -16,8 +16,8 @@ import (
 )
 
 // The suite's shared fixture: one runtime and one map per test, a resource
-// provider that denies every request, and waits that block on the runtime's
-// event wake. Native semantics are tested once, in tests/native; these tests
+// provider that denies every request, and waits that receive copied events.
+// Native semantics are tested once, in tests/native; these tests
 // cover what the binding adds on top.
 //
 // Most tests reach no server at all. The resource transform tests, which only
@@ -72,11 +72,9 @@ func awaitCommitted(t *testing.T, future *Future[CommandCompletion]) {
 }
 
 type fixture struct {
-	runtime *RuntimeHandle
-	m       *MapHandle
-	// events receives the runtime's event wake, which fires when the event
-	// queue becomes nonempty.
-	events chan struct{}
+	runtime       *RuntimeHandle
+	m             *MapHandle
+	pendingEvents chan RuntimeEvent
 }
 
 // newFixture creates a runtime with an in-memory cache and a denying resource
@@ -99,16 +97,20 @@ func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 // newRuntimeFixture is newFixture without the map.
 func newRuntimeFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{events: make(chan struct{}, 1)}
+	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
 	options := DefaultRuntimeOptions()
 	cache := ":memory:"
 	options.CachePath = &cache
-	options.EventWake = Wake{Callback: func() { notify(f.events) }}
 	runtime, err := RuntimeCreate(options)
 	if err != nil {
 		t.Fatalf("RuntimeCreate: %v", err)
 	}
 	f.runtime = runtime
+	await(t, submitted(runtime.SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
+		for _, event := range batch.Events {
+			f.pendingEvents <- event
+		}
+	}})))
 	t.Cleanup(func() { await(t, submitted(f.runtime.Close())) })
 	await(t, submitted(runtime.SetResourceProvider(denyingProvider())))
 	return f
@@ -169,33 +171,17 @@ func (f *fixture) serveLoopback(t *testing.T, bodies map[string]string) string {
 	return server.URL
 }
 
-// awaitEvent drains events until one matches, blocking on the event wake while
-// the queue is empty. Events drained before the match are discarded.
+// awaitEvent receives events until one matches, discarding earlier events.
 func (f *fixture) awaitEvent(t *testing.T, what string, match func(RuntimeEvent) bool) RuntimeEvent {
 	t.Helper()
 	deadline := time.NewTimer(testTimeout())
 	defer deadline.Stop()
 	for {
-		batch, err := f.runtime.DrainEvents()
-		if err != nil {
-			t.Fatalf("DrainEvents: %v", err)
-		}
-		if batch != nil {
-			view, err := batch.Get()
-			if err != nil {
-				t.Fatalf("event batch: %v", err)
-			}
-			if err := batch.Close(); err != nil {
-				t.Fatalf("event batch close: %v", err)
-			}
-			for _, event := range view.Events {
-				if match(event) {
-					return event
-				}
-			}
-		}
 		select {
-		case <-f.events:
+		case event := <-f.pendingEvents:
+			if match(event) {
+				return event
+			}
 		case <-deadline.C:
 			t.Fatalf("timed out waiting for %s", what)
 		}

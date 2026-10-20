@@ -9,8 +9,6 @@ internal readonly record struct MlnDeliveryBatch(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnEventBatch(ulong Value) : IMlnHandle;
-
 internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
@@ -844,6 +842,15 @@ internal unsafe struct mln_runtime_event
     public mln_runtime_event_payload payload;
 }
 
+internal unsafe struct mln_runtime_event_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, mln_event_batch_view*, void> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
+}
+
 internal unsafe struct mln_runtime_event_offline_region_response_error
 {
     public long region_id;
@@ -909,7 +916,6 @@ internal unsafe struct mln_runtime_options
     public mln_buffer_view asset_path;
     public mln_buffer_view cache_path;
     public ulong event_mask;
-    public mln_wake event_wake;
 }
 
 internal unsafe struct mln_screen_box
@@ -1681,7 +1687,6 @@ internal enum mln_runtime_event_mask : ulong
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64,
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128,
     MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024,
     MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048,
     MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096,
@@ -1695,9 +1700,9 @@ internal enum mln_runtime_event_mask : ulong
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576,
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152,
     MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 8388608,
-    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912894,
+    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912382,
     MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016,
-    MLN_RUNTIME_EVENT_MASK_ALL = 12582910,
+    MLN_RUNTIME_EVENT_MASK_ALL = 12582398,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -1727,7 +1732,6 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
     MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
     MLN_RUNTIME_EVENT_MAP_IDLE = 8,
-    MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9,
     MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
     MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11,
     MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12,

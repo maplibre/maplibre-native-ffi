@@ -32,16 +32,16 @@ checks the signature that each category requires. A function without a
 completion parameter is `immediate` unless it declares another synchronous
 category.
 
-| Execution       | Operation                                                                         |
-| --------------- | --------------------------------------------------------------------------------- |
-| `command`       | Mutates state; completes with a disposition and a generation                      |
-| `query`         | Reads state; completes with a value                                               |
-| `operation`     | Runs other asynchronous native work; completes with its result                    |
-| `lifecycle`     | Creates, attaches, or retires a handle                                            |
-| `immediate`     | Returns its result synchronously                                                  |
-| `snapshot`      | Copies current state synchronously from a live handle                             |
-| `event_batch`   | Drains queued events or frame results into an owned batch, or reports none queued |
-| `render_driver` | Services graphics work on the thread that the driver requires                     |
+| Execution       | Operation                                                        |
+| --------------- | ---------------------------------------------------------------- |
+| `command`       | Mutates state; completes with a disposition and a generation     |
+| `query`         | Reads state; completes with a value                              |
+| `operation`     | Runs other asynchronous native work; completes with its result   |
+| `lifecycle`     | Creates, attaches, or retires a handle                           |
+| `immediate`     | Returns its result synchronously                                 |
+| `snapshot`      | Copies current state synchronously from a live handle            |
+| `event_batch`   | Drains frame results into an owned batch, or reports none queued |
+| `render_driver` | Services graphics work on the thread that the driver requires    |
 
 ## Name a declaration
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Xunit;
 
@@ -6,7 +7,7 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>A runtime and one map for a test, torn down when the test disposes the fixture.</summary>
 /// <remarks>
 /// The runtime answers every resource request with an error unless the test installs its own
-/// provider, so no test reaches the network. The runtime's event wake releases a semaphore, and
+/// provider, so no test reaches the network. The runtime's event handler releases a semaphore, and
 /// <see cref="WaitForMapEventAsync" /> blocks on it between drains.
 /// </remarks>
 internal sealed class NativeFixture : IAsyncDisposable
@@ -39,12 +40,19 @@ internal sealed class NativeFixture : IAsyncDisposable
         };
 
     private readonly SemaphoreSlim events;
+    private readonly ConcurrentQueue<RuntimeEvent> pendingEvents;
 
-    private NativeFixture(RuntimeHandle runtime, MapHandle map, SemaphoreSlim events)
+    private NativeFixture(
+        RuntimeHandle runtime,
+        MapHandle map,
+        SemaphoreSlim events,
+        ConcurrentQueue<RuntimeEvent> pendingEvents
+    )
     {
         Runtime = runtime;
         Map = map;
         this.events = events;
+        this.pendingEvents = pendingEvents;
     }
 
     internal RuntimeHandle Runtime { get; }
@@ -57,19 +65,24 @@ internal sealed class NativeFixture : IAsyncDisposable
     )
     {
         var events = new SemaphoreSlim(0);
-        var runtime = RuntimeHandle.Create(
-            RuntimeOptions.Default with
-            {
-                EventWake = new Wake(() => events.Release()),
-            }
-        );
+        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var pendingEvents = new ConcurrentQueue<RuntimeEvent>();
         try
         {
+            await runtime.SetEventHandlerAsync(
+                new RuntimeEventHandler(batch =>
+                {
+                    foreach (var item in batch.Events)
+                        pendingEvents.Enqueue(item);
+                    events.Release();
+                }),
+                TestWaits.Token
+            );
             await runtime.SetResourceProviderAsync(provider ?? DenyingProvider, TestWaits.Token);
             var map = await runtime
                 .CreateMapAsync(options ?? SmallMap)
                 .WaitAsync(TestWaits.Deadline, TestWaits.Token);
-            return new NativeFixture(runtime, map, events);
+            return new NativeFixture(runtime, map, events, pendingEvents);
         }
         catch
         {
@@ -95,23 +108,20 @@ internal sealed class NativeFixture : IAsyncDisposable
         }
     }
 
-    /// <summary>Drains the runtime's events until the map reports one of the given type.</summary>
+    /// <summary>Receives events until the map reports one of the given type.</summary>
     internal async Task<RuntimeEvent> WaitForMapEventAsync(RuntimeEventType type)
     {
         var elapsed = Stopwatch.StartNew();
         while (true)
         {
-            using (var batch = Runtime.DrainEvents())
+            while (pendingEvents.TryDequeue(out var runtimeEvent))
             {
-                foreach (var runtimeEvent in batch?.Get().Events ?? [])
-                {
-                    if (
-                        runtimeEvent.Type == type
-                        && runtimeEvent.SourceType == RuntimeEventSourceType.Map
-                        && runtimeEvent.Source == Map.Id
-                    )
-                        return runtimeEvent;
-                }
+                if (
+                    runtimeEvent.Type == type
+                    && runtimeEvent.SourceType == RuntimeEventSourceType.Map
+                    && runtimeEvent.Source == Map.Id
+                )
+                    return runtimeEvent;
             }
             await TestWaits.WaitAsync(events, elapsed, $"map event {type}");
         }
@@ -128,7 +138,7 @@ internal sealed class NativeFixture : IAsyncDisposable
         {
             if (!Runtime.IsClosed)
                 await Runtime.CloseAsync();
-            // Runtime teardown releases the event wake, so nothing signals the semaphore after it.
+            // Runtime teardown retires the event handler before the semaphore is disposed.
             events.Dispose();
         }
     }

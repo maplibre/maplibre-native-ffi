@@ -122,16 +122,15 @@ internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
 internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
   allocate(16, 8).also { putScreenPoint(it, value) }
 
-internal fun NativeCall.putRuntimeOptions(target: Long, value: RuntimeOptions) {
-  writeU32(target, w(48, 72).toUInt())
+internal fun NativeArena.putRuntimeOptions(target: Long, value: RuntimeOptions) {
+  writeU32(target, w(32, 48).toUInt())
   putView(target + w(4, 8), value.assetPath)
   putView(target + w(12, 24), value.cachePath)
   writeU64(target + w(24, 40), value.eventMask.rawValue)
-  putWake(target + w(32, 48), value.eventWake)
 }
 
-internal fun NativeCall.writeRuntimeOptions(value: RuntimeOptions): Long =
-  allocate(w(48, 72), 8).also { putRuntimeOptions(it, value) }
+internal fun NativeArena.writeRuntimeOptions(value: RuntimeOptions): Long =
+  allocate(w(32, 48), 8).also { putRuntimeOptions(it, value) }
 
 internal fun NativeCall.putCustomGeometrySourceOptions(
   target: Long,
@@ -964,6 +963,17 @@ internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: Offline
 internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long =
   allocate(w(72, 80), 8).also { putOfflineRegionDefinition(it, value) }
 
+internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEventHandler) {
+  writeU32(target, w(24, 40).toUInt())
+  if (value.callback == null) return
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
+  allocate(w(24, 40), 8).also { putRuntimeEventHandler(it, value) }
+
 internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
   writeU32(target, w(24, 48).toUInt())
   writeAddress(
@@ -1383,7 +1393,6 @@ internal fun readRuntimeOptions(source: Long): RuntimeOptions =
     assetPath = readViewString(source + w(4, 8)).takeIf { it.isNotEmpty() },
     cachePath = readViewString(source + w(12, 24)).takeIf { it.isNotEmpty() },
     eventMask = RuntimeEventMask(readU64(source + w(24, 40))),
-    eventWake = Wake(),
   )
 
 internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOptions {
@@ -1510,26 +1519,6 @@ internal fun readWebgpuSurfaceDescriptor(source: Long): WebgpuSurfaceDescriptor 
     surface = NativePointer.ofAddress(readAddress(source + w(36, 48))),
     format = readU32(source + w(40, 56)),
   )
-
-internal fun readEventBatchView(source: Long): EventBatchView {
-  val eventsData = readAddress(source + w(16, 24))
-  val eventsSize = readSize(source + w(20, 32))
-  return EventBatchView(
-    events =
-      readStrided(
-        readAddress(source + 8),
-        readSize(source + w(12, 16)),
-        readU32(source + 4).toULong(),
-        120,
-      ) { item ->
-        readRuntimeEvent(
-          item,
-          readItem(eventsData, eventsSize, readU64(item + 32), readU32(item + 40).toULong())
-            .decodeToString(),
-        )
-      },
-  )
-}
 
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source), camera = readCameraOptions(source + 8))
@@ -1688,16 +1677,6 @@ internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
     complete = readBool(source + 57),
   )
 
-internal fun NativeCall.putWake(target: Long, value: Wake) {
-  if (value.callback == null) return
-  writeAddress(target + w(4, 8), registrations.register(value))
-  writeAddress(target, UpcallStubs.wakeCallback)
-  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeWake(value: Wake): Long =
-  allocate(w(12, 24), w(4, 8)).also { putWake(it, value) }
-
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
   var fields = 0u
   value.durationMs?.let {
@@ -1733,6 +1712,16 @@ internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorro
 
 internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
   allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
+
+internal fun NativeCall.putWake(target: Long, value: Wake) {
+  if (value.callback == null) return
+  writeAddress(target + w(4, 8), registrations.register(value))
+  writeAddress(target, UpcallStubs.wakeCallback)
+  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeWake(value: Wake): Long =
+  allocate(w(12, 24), w(4, 8)).also { putWake(it, value) }
 
 internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
   if (value.lock == null && value.unlock == null) return
@@ -1933,6 +1922,26 @@ internal fun NativeArena.writeResourceRewriteRule(value: ResourceRewriteRule): L
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
+internal fun readEventBatchView(source: Long): EventBatchView {
+  val eventsData = readAddress(source + w(16, 24))
+  val eventsSize = readSize(source + w(20, 32))
+  return EventBatchView(
+    events =
+      readStrided(
+        readAddress(source + 8),
+        readSize(source + w(12, 16)),
+        readU32(source + 4).toULong(),
+        120,
+      ) { item ->
+        readRuntimeEvent(
+          item,
+          readItem(eventsData, eventsSize, readU64(item + 32), readU32(item + 40).toULong())
+            .decodeToString(),
+        )
+      },
+  )
+}
+
 internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
   return ResourceRequestInfo(
@@ -2058,38 +2067,6 @@ internal fun readWebgpuBorrowedTexture(source: Long): WebgpuBorrowedTexture =
     textureView = NativePointer.ofAddress(readAddress(source + w(4, 8))),
   )
 
-internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent =
-  RuntimeEvent(
-    type = RuntimeEventType(readU32(source)),
-    sourceType = RuntimeEventSourceType(readU32(source + 4)),
-    source = readU64(source + 8),
-    generation = readU64(source + 16),
-    code = readI32(source + 24),
-    payload =
-      readU32(source + 28).let { tag ->
-        when (tag) {
-          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + 48))
-          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + 48))
-          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 48))
-          5u ->
-            RuntimeEventPayload.OfflineRegionStatus(
-              readRuntimeEventOfflineRegionStatus(source + 48),
-            )
-          6u ->
-            RuntimeEventPayload.OfflineRegionResponseError(
-              readRuntimeEventOfflineRegionResponseError(source + 48),
-            )
-          7u ->
-            RuntimeEventPayload.OfflineRegionTileCountLimit(
-              readRuntimeEventOfflineRegionTileCountLimit(source + 48),
-            )
-          0u -> RuntimeEventPayload.None
-          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
-        }
-      },
-    message = message,
-  )
-
 internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
   StyleSourceTileInfo(
     tileUrls =
@@ -2187,6 +2164,38 @@ internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
 internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
   allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
+internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent =
+  RuntimeEvent(
+    type = RuntimeEventType(readU32(source)),
+    sourceType = RuntimeEventSourceType(readU32(source + 4)),
+    source = readU64(source + 8),
+    generation = readU64(source + 16),
+    code = readI32(source + 24),
+    payload =
+      readU32(source + 28).let { tag ->
+        when (tag) {
+          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + 48))
+          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + 48))
+          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 48))
+          5u ->
+            RuntimeEventPayload.OfflineRegionStatus(
+              readRuntimeEventOfflineRegionStatus(source + 48),
+            )
+          6u ->
+            RuntimeEventPayload.OfflineRegionResponseError(
+              readRuntimeEventOfflineRegionResponseError(source + 48),
+            )
+          7u ->
+            RuntimeEventPayload.OfflineRegionTileCountLimit(
+              readRuntimeEventOfflineRegionTileCountLimit(source + 48),
+            )
+          0u -> RuntimeEventPayload.None
+          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
+        }
+      },
+    message = message,
+  )
+
 internal fun readResourceRange(source: Long): ResourceRange =
   ResourceRange(start = readU64(source), end = readU64(source + 8))
 
@@ -2211,6 +2220,34 @@ internal fun readWebglContextDescriptor(source: Long): WebglContextDescriptor =
     kind = WebglContextKind(readU32(source)),
     context = readI32(source + 4),
     canvasSelector = readViewString(source + 8),
+  )
+
+internal fun readOfflineTilePyramidRegionDefinition(
+  source: Long,
+): OfflineTilePyramidRegionDefinition =
+  OfflineTilePyramidRegionDefinition(
+    styleUrl = readViewString(source),
+    bounds = readLatLngBounds(source + w(8, 16)),
+    minZoom = readF64(source + w(40, 48)),
+    maxZoom = readF64(source + w(48, 56)),
+    pixelRatio = readF32(source + w(56, 64)),
+    includeIdeographs = readBool(source + w(60, 68)),
+  )
+
+internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition =
+  OfflineGeometryRegionDefinition(
+    styleUrl = readViewString(source),
+    geometry = readView(source + w(8, 16)),
+    minZoom = readF64(source + w(16, 32)),
+    maxZoom = readF64(source + w(24, 40)),
+    pixelRatio = readF32(source + w(32, 48)),
+    includeIdeographs = readBool(source + w(36, 52)),
+  )
+
+internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
+  CameraTransitionEnd(
+    outcome = CameraTransitionOutcome(readU32(source + 4)),
+    generation = readU64(source + 8),
   )
 
 internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame =
@@ -2248,34 +2285,6 @@ internal fun readRuntimeEventOfflineRegionTileCountLimit(
   source: Long,
 ): RuntimeEventOfflineRegionTileCountLimit =
   RuntimeEventOfflineRegionTileCountLimit(regionId = readI64(source), limit = readU64(source + 8))
-
-internal fun readOfflineTilePyramidRegionDefinition(
-  source: Long,
-): OfflineTilePyramidRegionDefinition =
-  OfflineTilePyramidRegionDefinition(
-    styleUrl = readViewString(source),
-    bounds = readLatLngBounds(source + w(8, 16)),
-    minZoom = readF64(source + w(40, 48)),
-    maxZoom = readF64(source + w(48, 56)),
-    pixelRatio = readF32(source + w(56, 64)),
-    includeIdeographs = readBool(source + w(60, 68)),
-  )
-
-internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition =
-  OfflineGeometryRegionDefinition(
-    styleUrl = readViewString(source),
-    geometry = readView(source + w(8, 16)),
-    minZoom = readF64(source + w(16, 32)),
-    maxZoom = readF64(source + w(24, 40)),
-    pixelRatio = readF32(source + w(32, 48)),
-    includeIdeographs = readBool(source + w(36, 52)),
-  )
-
-internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
-  CameraTransitionEnd(
-    outcome = CameraTransitionOutcome(readU32(source + 4)),
-    generation = readU64(source + 8),
-  )
 
 internal fun readRenderingStats(source: Long): RenderingStats =
   RenderingStats(

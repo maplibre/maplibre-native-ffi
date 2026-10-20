@@ -15,7 +15,6 @@
 
 #include "base.h"
 #include "completion.h"
-#include "wake.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,9 +81,6 @@ typedef struct mln_offline_region_status {
  *   failure came from a style-loading exception raised inside a C API call.
  *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
- * - MAP_RENDER_UPDATE_AVAILABLE: the map published new render state, which the
- *   next render-if-needed frame demand renders; code is 0; payload NONE. A map
- *   command raises at most one, after its other events.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
  * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
  * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
@@ -107,7 +103,7 @@ typedef struct mln_offline_region_status {
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
  *
- * Value 22 is retired and stays unused.
+ * Values 9 and 22 are retired and stay unused.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -118,7 +114,6 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
-  MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9,
   MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
   MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11,
   MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12,
@@ -165,8 +160,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
   MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
   MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 1ULL << MLN_RUNTIME_EVENT_MAP_IDLE,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 1ULL
-    << MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE,
   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 1ULL
@@ -202,9 +195,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED |
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
-    MLN_RUNTIME_EVENT_MASK_MAP_IDLE |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR |
+    MLN_RUNTIME_EVENT_MASK_MAP_IDLE | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR |
     MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED |
@@ -401,8 +392,6 @@ typedef struct mln_runtime_options {
   uint64_t event_mask MLN_BINDING(
     "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"
   );
-  /** Wakes the receiver when the runtime event queue becomes nonempty. */
-  mln_wake event_wake;
 } mln_runtime_options;
 
 /**
@@ -511,7 +500,7 @@ typedef union mln_runtime_event_payload {
 } mln_runtime_event_payload;
 
 /**
- * One drained runtime event.
+ * One delivered runtime event.
  *
  * Events have a fixed stride and hold no pointers, so a host can copy a whole
  * batch with one memory copy.
@@ -539,7 +528,7 @@ typedef struct mln_runtime_event {
    *
    * A camera, style, loading-finished, loading-failed, or idle event follows
    * the publication of a snapshot that includes the change it reports and
-   * carries that snapshot's generation, so a snapshot read after draining it
+   * carries that snapshot's generation, so a snapshot read after receiving it
    * shows state at least as new as the event. Every other map event carries the
    * generation the map had published last.
    *
@@ -575,10 +564,11 @@ typedef struct mln_runtime_event {
 } mln_runtime_event;
 
 /**
- * A borrowed view of one owned runtime-event batch.
+ * A borrowed span of runtime events in one delivery.
  *
  * Step through events by event_size. The event and message pointers remain
- * valid until the event-batch handle is released.
+ * valid during the callback, or until the delivery batch is released in queue
+ * mode.
  */
 typedef struct mln_event_batch_view {
   uint32_t size;
@@ -604,6 +594,39 @@ typedef struct mln_event_batch_view {
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
 } mln_event_batch_view;
+
+/**
+ * Receives selected events after their snapshots have been published.
+ *
+ * Map events run on the runtime's native scheduler thread. Offline events may
+ * run on a MapLibre worker thread. The callback must be thread-safe and return
+ * promptly. It may call any-thread C APIs, but must not wait for runtime or
+ * graphics-driver work that can only progress on its current thread.
+ */
+MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RUNTIME_EVENTS")
+typedef void (*mln_runtime_event_callback)(
+  void* user_data, const mln_event_batch_view* events
+);
+
+/**
+ * Runtime and map event delivery. Set either callback or queue.
+ *
+ * Callback mode borrows the events for the call and releases user_data after
+ * replacement, clear, or runtime teardown. Queue mode copies events into
+ * MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying user_data, followed by
+ * MLN_DELIVERY_TYPE_RETIRED when the registration retires. Adjacent events
+ * for one registration share record and message storage. Queue mode requires
+ * release_user_data to be null.
+ */
+typedef struct mln_runtime_event_handler {
+  uint32_t size;
+  mln_runtime_event_callback callback MLN_BINDING("nullable=true");
+  void* user_data MLN_BINDING("kind=context");
+  mln_user_data_release release_user_data;
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
+} mln_runtime_event_handler MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
 
 /**
  * The resource kinds that a route or rule matches, one bit per
@@ -1208,8 +1231,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
  * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
  *   small, a path view has null data with a nonzero size or embedded NUL,
- *   options->event_mask holds unknown bits, the wake descriptor is
- *   invalid, or out_runtime is null or does not point to the null handle.
+ *   options->event_mask holds unknown bits, or out_runtime is null or does not
+ *   point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
  */
@@ -1718,57 +1741,41 @@ MLN_API mln_status mln_runtime_dispose(
 ) MLN_NOEXCEPT;
 
 /**
- * Drains this runtime's queued events into a new owned batch.
+ * Selects how runtime and map events reach the host.
  *
- * The drain transfers every event that the queue holds, in queue order. Events
- * that arrive later enter the next batch, and the event wake fires again when
- * the first of them arrives. The returned handle owns the event records and
- * their message arena. Later drains and runtime destruction leave the batch
- * readable. Release each batch with mln_event_batch_release().
- *
- * This queue operation may be called from any thread. Concurrent drains are
- * serialized and each event enters exactly one returned batch.
- *
- * Unselected events reach no batch and raise no wake. A runtime whose release
- * has begun no longer drains; events it already queued are discarded with the
- * runtime.
+ * MLN_STATUS_OK transfers the handler's user_data to the runtime. A rejected
+ * call leaves it with the caller. Events queued before replacement stay on
+ * their original queue. Before a handler is set, events are dropped. Set a
+ * handler before creating maps or observing offline regions to receive their
+ * first events.
  *
  * Returns:
- * - MLN_STATUS_OK when a batch holding at least one event is published in
- *   *out_batch.
- * - MLN_STATUS_NOT_READY when no event is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, the diagnostic
- *   message is empty, and the caller drains again after the next event wake.
- *   Bindings return their language's empty form instead of an error.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_batch
- *   is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime or handler is invalid, or the
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime or the handler's queue is released.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=event_batch")
-MLN_API mln_status mln_runtime_drain_events(
-  mln_runtime runtime, mln_event_batch* out_batch MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
+MLN_BINDING("execution=operation")
+MLN_API mln_status mln_runtime_set_event_handler(
+  mln_runtime runtime, const mln_runtime_event_handler* handler,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Borrows the event and message view stored by an owned event batch.
+ * Stops event delivery and retires the previous handler.
  *
  * Returns:
- * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
- *   null or out_view->size is too small.
- * - MLN_STATUS_INVALID_STATE when batch has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime is released.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status mln_event_batch_get(
-  mln_event_batch batch,
-  mln_event_batch_view* out_view MLN_BINDING("direction=out"),
+MLN_BINDING("execution=operation")
+MLN_API mln_status mln_runtime_clear_event_handler(
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
-
-/** Releases an owned event batch. A null handle is a no-op. */
-MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
 
 /**
  * Selects which runtime-scoped event types this runtime queues.

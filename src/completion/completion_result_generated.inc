@@ -279,6 +279,10 @@ struct CompletionResult<&mln_render_session_set_webgpu_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_runtime_clear_event_handler> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_runtime_clear_http_header_transform> {
   static constexpr bool has_value = false;
 };
@@ -346,6 +350,10 @@ struct CompletionResult<&mln_runtime_release> {
 };
 template <>
 struct CompletionResult<&mln_runtime_run_ambient_cache_operation> {
+  static constexpr bool has_value = false;
+};
+template <>
+struct CompletionResult<&mln_runtime_set_event_handler> {
   static constexpr bool has_value = false;
 };
 template <>

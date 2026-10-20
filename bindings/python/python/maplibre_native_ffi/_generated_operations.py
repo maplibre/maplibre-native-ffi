@@ -25,7 +25,6 @@ from ._generated_values import (
     CustomGeometrySourceOptions,
     CustomMvtVectorSourceOptions,
     EdgeInsets,
-    EventBatchView,
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
@@ -73,6 +72,7 @@ from ._generated_values import (
     ResourceRequestCancelHandler,
     ResourceResponse,
     ResourceTransform,
+    RuntimeEventHandler,
     RuntimeEventMask,
     RuntimeOptions,
     ScreenBox,
@@ -98,7 +98,6 @@ from ._generated_values import (
 if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
-        EventBatchHandle,
         GeojsonSourceDataHandle,
         MapHandle,
         MapProjectionHandle,
@@ -266,26 +265,6 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.close(consumer_completion)
-
-
-class _EventBatchHandleOperations(GeneratedOperations):
-    _native: _native._EventBatchHandle
-
-    def get(self) -> EventBatchView:
-        """Borrows the event and message view stored by an owned event batch.
-
-        See `mln_event_batch_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return EventBatchView._from_native(self._native.get())
-
-    def close(self) -> None:
-        """Releases an owned event batch. A null handle is a no-op.
-
-        See `mln_event_batch_release` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.close()
 
 
 class _GeojsonSourceDataHandleOperations(GeneratedOperations):
@@ -1859,6 +1838,14 @@ class _ResourceTransformResponseScopeOperations(GeneratedOperations):
 class _RuntimeHandleOperations(GeneratedOperations):
     _native: _native._RuntimeHandle
 
+    def clear_event_handler(self) -> Future[None]:
+        """Stops event delivery and retires the previous handler.
+
+        See `mln_runtime_clear_event_handler` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.clear_event_handler()
+
     def clear_http_header_transform(self) -> Future[None]:
         """Clears the runtime-scoped outgoing HTTP header transform.
 
@@ -1911,17 +1898,6 @@ class _RuntimeHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         return self._native.delete_offline_region(region_id)
-
-    def drain_events(self) -> EventBatchHandle | None:
-        """Drains this runtime's queued events into a new owned batch.
-
-        See `mln_runtime_drain_events` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return _maybe(
-            lambda raw: _adopt_value(raw, "EventBatchHandle", None),
-            self._native.drain_events(),
-        )
 
     def get_event_mask(self) -> RuntimeEventMask:
         """Reports which runtime-scoped event types this runtime queues.
@@ -2004,6 +1980,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
         return self._native.run_ambient_cache_operation(operation)
+
+    def set_event_handler(self, handler: RuntimeEventHandler) -> Future[None]:
+        """Selects how runtime and map events reach the host.
+
+        See `mln_runtime_set_event_handler` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.set_event_handler(handler)
 
     def set_event_mask(self, mask: RuntimeEventMask) -> None:
         """Selects which runtime-scoped event types this runtime queues.

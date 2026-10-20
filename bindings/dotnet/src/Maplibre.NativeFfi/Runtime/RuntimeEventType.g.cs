@@ -18,7 +18,6 @@ public enum RuntimeEventType : uint
     MapLoadingFinished = 6,
     MapLoadingFailed = 7,
     MapIdle = 8,
-    MapRenderUpdateAvailable = 9,
     MapRenderError = 10,
     MapStillImageFinished = 11,
     MapStillImageFailed = 12,

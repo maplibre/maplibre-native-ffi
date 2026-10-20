@@ -180,10 +180,12 @@ pub const FixtureOptions = struct {
     map_mode: maplibre.MapMode = .continuous,
 };
 
-/// One runtime and one map. The runtime's event wake drives `waitForEvent`.
+/// One runtime and one map. The runtime's event handler signals `waitForEvent`.
 /// `destroy` closes whatever the test left open, so every path tears down.
 pub const Fixture = struct {
     events: Signal = .{},
+    event_mutex: std.Io.Mutex = .init,
+    pending_events: std.ArrayList(maplibre.OwnedValue(maplibre.RuntimeEvent)) = .empty,
     runtime: maplibre.Runtime,
     map: maplibre.Map,
     map_open: bool = true,
@@ -196,15 +198,32 @@ pub const Fixture = struct {
         var runtime_options = try maplibre.runtimeOptionsDefault(testing.allocator);
         defer runtime_options.deinit();
         runtime_options.value.asset_path = options.asset_path;
-        runtime_options.value.event_wake = self.events.wake();
         self.runtime = try maplibre.runtimeCreate(testing.allocator, runtime_options.value, null);
         errdefer closeRuntimeHandle(self.runtime) catch self.runtime.deinit();
+        try resolve(try maplibre.runtimeSetEventHandler(testing.allocator, self.runtime, .{
+            .callback = receiveEvents,
+            .context = self,
+        }, null));
         try self.setProvider(denying_provider);
         var map_options = try maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
         self.map = try resolve(try maplibre.runtimeCreateMap(testing.allocator, self.runtime, map_options, null));
         return self;
+    }
+
+    fn receiveEvents(context: ?*anyopaque, batch: maplibre.EventBatchView) maplibre.Error!void {
+        const self: *Fixture = @ptrCast(@alignCast(context.?));
+        std.Io.Threaded.mutexLockUncancelable(&self.event_mutex);
+        defer self.event_mutex.unlock(testing.io);
+        for (batch.events) |event| {
+            var arena = std.heap.ArenaAllocator.init(testing.allocator);
+            errdefer arena.deinit();
+            var copy = event;
+            copy.message = try arena.allocator().dupe(u8, event.message);
+            try self.pending_events.append(testing.allocator, .{ .arena = arena, .value = copy });
+        }
+        self.events.notify();
     }
 
     /// Closes the map and runtime if the test left them open, and frees the
@@ -219,6 +238,8 @@ pub const Fixture = struct {
             std.log.err("fixture runtime close failed: {s}", .{@errorName(err)});
             self.runtime.deinit();
         };
+        for (self.pending_events.items) |*event| event.deinit();
+        self.pending_events.deinit(testing.allocator);
         testing.allocator.destroy(self);
     }
 
@@ -267,20 +288,21 @@ pub const Fixture = struct {
     }
 
     /// Drains until an event of `event_type` arrives and returns a copy of it,
-    /// blocking on the runtime's event wake between drains.
+    /// blocking until the event handler receives more events.
     pub fn waitForEvent(self: *Fixture, event_type: maplibre.RuntimeEventType) !maplibre.OwnedValue(maplibre.RuntimeEvent) {
         const deadline = Deadline.start();
         while (true) {
             const seen = self.events.count.load(.acquire);
-            if (try maplibre.runtimeDrainEvents(self.runtime, null)) |drained| {
-                var batch = drained;
-                defer batch.deinit();
-                var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
-                for (copy.value.events) |event| {
-                    if (event.type == event_type) return .{ .arena = copy.arena, .value = event };
+            std.Io.Threaded.mutexLockUncancelable(&self.event_mutex);
+            while (self.pending_events.items.len > 0) {
+                var event = self.pending_events.orderedRemove(0);
+                if (event.value.type == event_type) {
+                    self.event_mutex.unlock(testing.io);
+                    return event;
                 }
-                copy.deinit();
+                event.deinit();
             }
+            self.event_mutex.unlock(testing.io);
             if (deadline.expired()) return error.EventNotObserved;
             try testing.io.futexWaitTimeout(u32, &self.events.count.raw, seen, .{ .deadline = deadline.at });
         }

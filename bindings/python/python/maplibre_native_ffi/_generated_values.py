@@ -38,66 +38,6 @@ def _maybe(convert, raw):
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeEventRenderFrameVariant:
-    value: RuntimeEventRenderFrame
-    _tag = 1
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventRenderFrame._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventRenderMapVariant:
-    value: RuntimeEventRenderMap
-    _tag = 2
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventRenderMap._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventTileActionVariant:
-    value: RuntimeEventTileAction
-    _tag = 4
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventTileAction._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventOfflineRegionStatusVariant:
-    value: RuntimeEventOfflineRegionStatus
-    _tag = 5
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventOfflineRegionStatus._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventOfflineRegionResponseErrorVariant:
-    value: RuntimeEventOfflineRegionResponseError
-    _tag = 6
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventOfflineRegionResponseError._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventOfflineRegionTileCountLimitVariant:
-    value: RuntimeEventOfflineRegionTileCountLimit
-    _tag = 7
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventOfflineRegionTileCountLimit._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
 class OpenglContextDescriptorWglVariant:
     value: WglContextDescriptor
     _tag = 1
@@ -175,6 +115,66 @@ class OfflineRegionDefinitionGeometryVariant:
     @classmethod
     def _from_native(cls, raw):
         return cls(OfflineGeometryRegionDefinition._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventRenderFrameVariant:
+    value: RuntimeEventRenderFrame
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventRenderFrame._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventRenderMapVariant:
+    value: RuntimeEventRenderMap
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventRenderMap._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventTileActionVariant:
+    value: RuntimeEventTileAction
+    _tag = 4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventTileAction._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventOfflineRegionStatusVariant:
+    value: RuntimeEventOfflineRegionStatus
+    _tag = 5
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventOfflineRegionStatus._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventOfflineRegionResponseErrorVariant:
+    value: RuntimeEventOfflineRegionResponseError
+    _tag = 6
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventOfflineRegionResponseError._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventOfflineRegionTileCountLimitVariant:
+    value: RuntimeEventOfflineRegionTileCountLimit
+    _tag = 7
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventOfflineRegionTileCountLimit._from_native(raw))
 
 
 class AmbientCacheOperation(UnknownIntEnum):
@@ -879,7 +879,6 @@ class RuntimeEventMask(IntFlag):
     MAP_LOADING_FINISHED = 64
     MAP_LOADING_FAILED = 128
     MAP_IDLE = 256
-    MAP_RENDER_UPDATE_AVAILABLE = 512
     MAP_RENDER_ERROR = 1024
     MAP_STILL_IMAGE_FINISHED = 2048
     MAP_STILL_IMAGE_FAILED = 4096
@@ -893,9 +892,9 @@ class RuntimeEventMask(IntFlag):
     OFFLINE_REGION_RESPONSE_ERROR = 1048576
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152
     MAP_SOURCE_CHANGED = 8388608
-    ALL_MAP_EVENTS = 8912894
+    ALL_MAP_EVENTS = 8912382
     ALL_RUNTIME_EVENTS = 3670016
-    ALL = 12582910
+    ALL = 12582398
 
 
 class RuntimeEventPayloadType(UnknownIntEnum):
@@ -940,7 +939,6 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_LOADING_FINISHED = 6
     MAP_LOADING_FAILED = 7
     MAP_IDLE = 8
-    MAP_RENDER_UPDATE_AVAILABLE = 9
     MAP_RENDER_ERROR = 10
     MAP_STILL_IMAGE_FINISHED = 11
     MAP_STILL_IMAGE_FAILED = 12
@@ -1693,7 +1691,7 @@ class EglContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class EventBatchView:
-    """A borrowed view of one owned runtime-event batch.
+    """A borrowed span of runtime events in one delivery.
 
     See `mln_event_batch_view` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3647,7 +3645,7 @@ class ResourceTransform:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEvent:
-    """One drained runtime event.
+    """One delivered runtime event.
 
     See `mln_runtime_event` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3710,6 +3708,22 @@ class RuntimeEvent:
             ),
             message=raw["message"],
         )
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventHandler:
+    """Runtime and map event delivery. Set either callback or queue.
+
+    See `mln_runtime_event_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    callback: Callable[[EventBatchView], None] | None = None
+
+    def _invoke_callback(self, events):
+        callback = self.callback
+        assert callback is not None
+        return callback(EventBatchView._from_native(events))
 
 
 @dataclass(frozen=True, slots=True)
@@ -3859,16 +3873,12 @@ class RuntimeOptions:
     `mln_runtime_event_mask` values.
     """
 
-    event_wake: Wake = field(default_factory=lambda: Wake())
-    """Wakes the receiver when the runtime event queue becomes nonempty."""
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
             asset_path=raw["asset_path"],
             cache_path=raw["cache_path"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
-            event_wake=Wake(),
         )
 
     @classmethod

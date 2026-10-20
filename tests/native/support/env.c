@@ -44,7 +44,72 @@ const mln_buffer_view mln_test_red_background_style_json =
 // holds. Tracking is thread local so one thread's teardown leaves another
 // thread's runtime alone.
 static MLN_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
-static MLN_TEST_THREAD_LOCAL mln_event_batch drained_batch;
+static MLN_TEST_THREAD_LOCAL mln_delivery_batch drained_batch;
+static atomic_flag event_queues_lock = ATOMIC_FLAG_INIT;
+static struct {
+  mln_runtime runtime;
+  mln_delivery_queue queue;
+} event_queues[128];
+
+static void lock_event_queues(void) {
+  while (atomic_flag_test_and_set_explicit(
+    &event_queues_lock, memory_order_acquire
+  )) {
+  }
+}
+
+mln_delivery_queue mln_test_event_queue(mln_runtime runtime) {
+  lock_event_queues();
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  for (size_t index = 0; index < 128; ++index) {
+    if (event_queues[index].runtime == runtime) {
+      queue = event_queues[index].queue;
+      break;
+    }
+  }
+  atomic_flag_clear_explicit(&event_queues_lock, memory_order_release);
+  return queue;
+}
+
+void mln_test_configure_events(mln_runtime runtime, mln_wake wake) {
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  const mln_delivery_queue_options options = {
+    .size = sizeof(options), .wake = wake
+  };
+  MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, NULL));
+  lock_event_queues();
+  size_t slot = 0;
+  while (slot < 128 && event_queues[slot].runtime != MLN_HANDLE_NULL) ++slot;
+  if (slot < 128) {
+    event_queues[slot].runtime = runtime;
+    event_queues[slot].queue = queue;
+  }
+  atomic_flag_clear_explicit(&event_queues_lock, memory_order_release);
+  TEST_ASSERT_LESS_THAN_size_t(128, slot);
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_runtime_event_handler handler = {
+    .size = sizeof(handler), .queue = queue
+  };
+  MLN_TEST_OK(mln_runtime_set_event_handler(
+    runtime, &handler, &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_settle(&completion));
+}
+
+static void release_event_queue(mln_runtime runtime) {
+  lock_event_queues();
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  for (size_t index = 0; index < 128; ++index) {
+    if (event_queues[index].runtime == runtime) {
+      queue = event_queues[index].queue;
+      event_queues[index].runtime = MLN_HANDLE_NULL;
+      event_queues[index].queue = MLN_HANDLE_NULL;
+      break;
+    }
+  }
+  atomic_flag_clear_explicit(&event_queues_lock, memory_order_release);
+  mln_delivery_queue_release(queue);
+}
 static MLN_TEST_THREAD_LOCAL mln_map* tracked_maps;
 static MLN_TEST_THREAD_LOCAL size_t tracked_map_count;
 static MLN_TEST_THREAD_LOCAL size_t tracked_map_capacity;
@@ -115,9 +180,9 @@ mln_runtime mln_test_create_runtime(void) {
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options) {
   mln_runtime runtime = MLN_HANDLE_NULL;
   // Event waits block on this wake rather than polling the queue.
-  options.event_wake = mln_test_pulse_wake();
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
+  mln_test_configure_events(runtime, mln_test_pulse_wake());
   tracked_runtime = runtime;
   return runtime;
 }
@@ -256,6 +321,7 @@ mln_map mln_test_create_map(mln_runtime runtime) {
 void mln_test_destroy_runtime(mln_runtime runtime) {
   mln_test_release_drained_batch();
   MLN_TEST_OK(mln_test_runtime_close(runtime));
+  release_event_queue(runtime);
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
@@ -454,6 +520,27 @@ mln_test_event_batch mln_test_event_batch_default(void) {
   return (mln_test_event_batch){.size = sizeof(mln_test_event_batch)};
 }
 
+mln_status mln_test_drain_event_delivery(
+  mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
+  mln_diagnostic* diagnostic
+) {
+  mln_delivery_batch_view deliveries = {.size = sizeof(deliveries)};
+  const mln_status status = mln_delivery_queue_drain(
+    mln_test_event_queue(runtime), batch, &deliveries, diagnostic
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (
+    deliveries.delivery_count != 1 ||
+    deliveries.deliveries[0].type != MLN_DELIVERY_TYPE_RUNTIME_EVENTS
+  ) {
+    mln_delivery_batch_release(*batch);
+    *batch = MLN_HANDLE_NULL;
+    return MLN_STATUS_INVALID_STATE;
+  }
+  *view = *deliveries.deliveries[0].payload.runtime_events.events;
+  return MLN_STATUS_OK;
+}
+
 mln_status mln_test_drain_events(
   mln_runtime runtime, mln_test_event_batch* out_batch
 ) {
@@ -461,23 +548,26 @@ mln_status mln_test_drain_events(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   mln_test_release_drained_batch();
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_runtime_drain_events(runtime, &batch, MLN_TEST_DIAGNOSTIC);
+  mln_delivery_batch batch = MLN_HANDLE_NULL;
+  mln_delivery_batch_view deliveries = {.size = sizeof(deliveries)};
+  const mln_status status = mln_delivery_queue_drain(
+    mln_test_event_queue(runtime), &batch, &deliveries, MLN_TEST_DIAGNOSTIC
+  );
   if (status == MLN_STATUS_NOT_READY) {
     *out_batch = mln_test_event_batch_default();
     return MLN_STATUS_OK;
   }
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
-  status = mln_event_batch_get(batch, &view, MLN_TEST_DIAGNOSTIC);
-  if (status != MLN_STATUS_OK) {
-    mln_event_batch_release(batch);
-    return status;
-  }
+  if (status != MLN_STATUS_OK) return status;
   drained_batch = batch;
+  // Fixture completions use callbacks, so its event queue contains one span.
+  if (
+    deliveries.delivery_count != 1 ||
+    deliveries.deliveries[0].type != MLN_DELIVERY_TYPE_RUNTIME_EVENTS
+  ) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  const mln_event_batch_view view =
+    *deliveries.deliveries[0].payload.runtime_events.events;
   *out_batch = (mln_test_event_batch){
     .size = sizeof(mln_test_event_batch),
     .event_size = view.event_size,
@@ -659,7 +749,7 @@ bool mln_test_wait_until(mln_runtime runtime, const atomic_bool* flag) {
 }
 
 void mln_test_release_drained_batch(void) {
-  mln_event_batch_release(drained_batch);
+  mln_delivery_batch_release(drained_batch);
   drained_batch = MLN_HANDLE_NULL;
 }
 
@@ -689,6 +779,7 @@ bool mln_test_reclaim_thread_resources(void) {
   release_empty_map_slots();
   if (tracked_runtime != MLN_HANDLE_NULL) {
     (void)mln_test_runtime_close(tracked_runtime);
+    release_event_queue(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }

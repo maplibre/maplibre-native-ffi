@@ -8,8 +8,8 @@ static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
   void
 ) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_event_batch_view view = {.size = sizeof(view)};
-  MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, &diagnostic));
+  mln_map_snapshot view = {.size = sizeof(view)};
+  MLN_TEST_INVALID(mln_map_get_snapshot(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
 
   uint32_t network_status = 0;
@@ -21,33 +21,10 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   mln_diagnostic diagnostic;
   memset(&diagnostic, 'x', sizeof(diagnostic));
   diagnostic.size = (uint32_t)(offsetof(mln_diagnostic, message) + 4);
-  mln_event_batch_view view = {.size = sizeof(view)};
-  MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, &diagnostic));
+  mln_map_snapshot view = {.size = sizeof(view)};
+  MLN_TEST_INVALID(mln_map_get_snapshot(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_EQUAL_size_t(3, strlen(diagnostic.message));
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
-}
-
-// Reading a live handle of another kind as an event batch reports why and
-// leaves the output untouched, and releasing it as one is a no-op that leaves
-// the object it names alone.
-static void a_value_that_names_no_batch_is_rejected_without_effect(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_runtime_event sentinel = {0};
-  // A valid size makes the handle the argument that fails.
-  mln_event_batch_view view = {
-    .size = sizeof(view), .events = &sentinel, .event_count = 99
-  };
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  MLN_TEST_INVALID(mln_event_batch_get(runtime, &view, &diagnostic));
-  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "mln_runtime"));
-  TEST_ASSERT_EQUAL_PTR(&sentinel, view.events);
-  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
-  MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, NULL, &diagnostic));
-  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_view"));
-
-  mln_event_batch_release(runtime);
-  MLN_TEST_OK(mln_test_runtime_fence(runtime));
-  mln_test_destroy_runtime(runtime);
 }
 
 // MapLibre throws while parsing malformed style JSON. The command reports that
@@ -130,7 +107,6 @@ static void the_library_reports_its_abi_version_and_built_backend(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it);
   RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
-  RUN_TEST(a_value_that_names_no_batch_is_rejected_without_effect);
   RUN_TEST(a_native_exception_becomes_native_error_with_its_text);
   RUN_TEST(android_initialization_requires_its_environment_and_context);
   RUN_TEST(the_library_reports_its_abi_version_and_built_backend);

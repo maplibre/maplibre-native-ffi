@@ -4,21 +4,11 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static void events_ready(void* user_data) {
-  // Called from any native thread: schedule a drain on the host receiver and
-  // return.
-  (void)user_data;
-}
-
-mln_status open_runtime(
-  const char* cache_path, void* receiver, mln_runtime* out_runtime
-) {
+mln_status open_runtime(const char* cache_path, mln_runtime* out_runtime) {
   // #region runtime
   mln_runtime_options options = mln_runtime_options_default();
   options.cache_path =
     (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
-  options.event_wake.callback = events_ready;
-  options.event_wake.user_data = receiver;
   return mln_runtime_create(&options, out_runtime, NULL);
   // #endregion runtime
 }

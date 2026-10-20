@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <string_view>
 #include <type_traits>
 
 #include "delivery/capture.hpp"
@@ -22,6 +23,8 @@ struct DeliveryItem {
   // Null for a delivery that owns nothing.
   void (*discard)(DeliveryItem& item) noexcept = nullptr;
   bool taken = false;
+  // Event spans own vectors and a message arena instead of an inline copy.
+  void (*destroy)(DeliveryItem*) noexcept = nullptr;
 };
 
 static_assert(std::is_trivially_destructible_v<DeliveryItem>);
@@ -138,6 +141,13 @@ class DeliveryQueueState final {
   // the queue is closed. During process exit the item is dropped without
   // disposal and this reports true.
   [[nodiscard]] auto push(ItemPtr& item) noexcept -> bool;
+
+  // Appends to a tail event span, or starts one after another delivery kind.
+  // Events share contiguous record and message storage, without a capture or
+  // allocation for each event. A failed append leaves the queue unchanged.
+  auto push_event(
+    mln_runtime_event event, std::string_view message, void* user_data
+  ) -> void;
 
   // Moves every queued item, in push order, into a new owned batch, writes
   // its view, and returns its handle; or returns the null handle when nothing

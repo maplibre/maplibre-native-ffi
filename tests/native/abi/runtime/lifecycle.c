@@ -1,9 +1,8 @@
 // Runtime and map lifecycle through the public ABI: creation and its
 // validation, stale and foreign handles, and release.
 
+#include "support/resources.h"
 #include "support/test_support.h"
-
-static void ignore_wake(void* user_data) { (void)user_data; }
 
 static void runtime_options_with_small_size(void* descriptor) {
   ((mln_runtime_options*)descriptor)->size = sizeof(mln_runtime_options) - 1;
@@ -13,21 +12,12 @@ static void runtime_options_with_unknown_event_bit(void* descriptor) {
   ((mln_runtime_options*)descriptor)->event_mask |= UINT64_C(1) << 40U;
 }
 
-static void runtime_options_with_retaining_disabled_wake(void* descriptor) {
-  mln_runtime_options* options = descriptor;
-  options->event_wake.callback = NULL;
-  options->event_wake.release_user_data = ignore_wake;
-}
-
 static const mln_test_validation_case runtime_option_cases[] = {
   {"defaults", NULL, MLN_STATUS_OK, NULL},
   {"undersized", runtime_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
    "size"},
   {"unknown event bit", runtime_options_with_unknown_event_bit,
    MLN_STATUS_INVALID_ARGUMENT, "event_mask"},
-  {"disabled wake that retains user data",
-   runtime_options_with_retaining_disabled_wake, MLN_STATUS_INVALID_ARGUMENT,
-   "disabled wake"},
 };
 
 // A rejected creation leaves the output null; an accepted one is closed at
@@ -72,12 +62,12 @@ static void expect_runtime_calls_reject(
 ) {
   const mln_completion discard = mln_test_discard_completion();
   const mln_map_options map_options = mln_map_options_default();
-  mln_event_batch batch = MLN_HANDLE_NULL;
   uint64_t mask = 0;
   MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
   MLN_TEST_STATUS(expected, mln_runtime_dispose(handle, NULL));
-  MLN_TEST_STATUS(expected, mln_runtime_drain_events(handle, &batch, NULL));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  MLN_TEST_STATUS(
+    expected, mln_runtime_set_event_handler(handle, NULL, &discard, NULL)
+  );
   MLN_TEST_STATUS(expected, mln_runtime_get_event_mask(handle, &mask, NULL));
   MLN_TEST_STATUS(
     expected,
@@ -302,7 +292,15 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
   MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
 }
 
-static void disposal_wake(void* user_data) { (void)user_data; }
+static mln_resource_provider_decision pass_resource(
+  void* context, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)context;
+  (void)request;
+  (void)handle;
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
 
 static void disposal_release(void* user_data) {
   mln_test_flag_set((atomic_bool*)user_data);
@@ -312,11 +310,15 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   atomic_bool released;
   atomic_init(&released, false);
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake.callback = disposal_wake;
-  options.event_wake.user_data = &released;
-  options.event_wake.release_user_data = disposal_release;
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
+  const mln_resource_provider provider = {
+    .size = sizeof(provider),
+    .callback = pass_resource,
+    .user_data = &released,
+    .release_user_data = disposal_release,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
@@ -366,11 +368,15 @@ static void runtime_state_release_can_wait_for_another_runtime(void) {
   retirement_wait wait = {0};
   retirement_result result = {.status = MLN_STATUS_NATIVE_ERROR};
   mln_runtime_options options = mln_runtime_options_default();
-  options.event_wake.callback = ignore_wake;
-  options.event_wake.user_data = &wait;
-  options.event_wake.release_user_data = wait_for_other_retirement;
   mln_runtime waiting = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &waiting, NULL));
+  const mln_resource_provider provider = {
+    .size = sizeof(provider),
+    .callback = pass_resource,
+    .user_data = &wait,
+    .release_user_data = wait_for_other_retirement,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(waiting, &provider));
   const mln_runtime other = create_untracked_runtime();
   const mln_completion waiting_close = {
     .size = sizeof(waiting_close),

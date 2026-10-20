@@ -22,18 +22,14 @@ namespace Maplibre.NativeFfi;
 /// Runtime-scoped event types this runtime queues, as a bitwise OR of
 /// <c>mln_runtime_event_mask</c> values.
 /// </param>
-/// <param name="EventWake">
-/// Wakes the receiver when the runtime event queue becomes nonempty.
-/// </param>
 public readonly partial record struct RuntimeOptions(
     string? AssetPath,
     string? CachePath,
-    RuntimeEventMask EventMask,
-    Wake EventWake
+    RuntimeEventMask EventMask
 )
 {
     public RuntimeOptions()
-        : this(default, default, RuntimeEventMask.All, default!) { }
+        : this(default, default, RuntimeEventMask.All) { }
 
     public static RuntimeOptions Default
     {

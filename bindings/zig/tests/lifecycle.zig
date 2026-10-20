@@ -30,7 +30,7 @@ test "copied handles share one close and close twice safely" {
     try support.closeRuntimeHandle(runtime_copy);
     fixture.runtime_open = false;
     try support.closeRuntimeHandle(fixture.runtime);
-    try testing.expectError(error.InvalidState, maplibre.runtimeDrainEvents(runtime_copy, null));
+    try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime_copy, null));
 }
 
 // A handle's raw value is the source that its events carry, and a close leaves
@@ -60,7 +60,7 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try fixture.closeMap();
 }
 
-fn ignoreWake(_: ?*anyopaque) maplibre.Error!void {}
+fn ignoreEvents(_: ?*anyopaque, _: maplibre.EventBatchView) maplibre.Error!void {}
 
 fn countRelease(context: ?*anyopaque) void {
     const counter: *support.Counter = @ptrCast(@alignCast(context.?));
@@ -71,11 +71,15 @@ fn countRelease(context: ?*anyopaque) void {
 // for its live maps, so the runtime's callback registrations stay rooted until
 // the last map goes.
 test "a child map keeps its disposed runtime's callbacks alive" {
-    var wake_releases = support.Counter{};
+    var handler_releases = support.Counter{};
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
-    options.value.event_wake = .{ .callback = ignoreWake, .context = &wake_releases, .release_context = countRelease };
     var runtime = try maplibre.runtimeCreate(testing.allocator, options.value, null);
+    try support.resolve(try maplibre.runtimeSetEventHandler(testing.allocator, runtime, .{
+        .callback = ignoreEvents,
+        .context = &handler_releases,
+        .release_context = countRelease,
+    }, null));
     var map = try support.resolve(try maplibre.runtimeCreateMap(testing.allocator, runtime, try maplibre.mapOptionsDefault(), null));
 
     runtime.deinit();
@@ -83,12 +87,12 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     _ = try maplibre.mapGetSnapshot(map, null);
     // No fence can follow the disposal: native refuses the map's commands
     // once its runtime is disposed. The count stays zero without one because
-    // native releases the wake only when it retires the runtime, which this
+    // native releases the handler only when it retires the runtime, which this
     // live map holds off, and the binding never releases it on its own.
-    try testing.expectEqual(@as(usize, 0), wake_releases.get());
+    try testing.expectEqual(@as(usize, 0), handler_releases.get());
 
     map.deinit();
-    try wake_releases.waitFor(1);
+    try handler_releases.waitFor(1);
 }
 
 // A creation future owns the object it adopts until a wait hands it out, so

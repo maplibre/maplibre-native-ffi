@@ -1149,7 +1149,6 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     public val MAP_LOADING_FINISHED: RuntimeEventMask = RuntimeEventMask(64uL)
     public val MAP_LOADING_FAILED: RuntimeEventMask = RuntimeEventMask(128uL)
     public val MAP_IDLE: RuntimeEventMask = RuntimeEventMask(256uL)
-    public val MAP_RENDER_UPDATE_AVAILABLE: RuntimeEventMask = RuntimeEventMask(512uL)
     public val MAP_RENDER_ERROR: RuntimeEventMask = RuntimeEventMask(1024uL)
     public val MAP_STILL_IMAGE_FINISHED: RuntimeEventMask = RuntimeEventMask(2048uL)
     public val MAP_STILL_IMAGE_FAILED: RuntimeEventMask = RuntimeEventMask(4096uL)
@@ -1165,11 +1164,11 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
       RuntimeEventMask(2097152uL)
     public val MAP_SOURCE_CHANGED: RuntimeEventMask = RuntimeEventMask(8388608uL)
     /** Selects every map-originated event type this version defines. */
-    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(8912894uL)
+    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(8912382uL)
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask = RuntimeEventMask(3670016uL)
     /** Selects every event type this version defines. */
-    public val ALL: RuntimeEventMask = RuntimeEventMask(12582910uL)
+    public val ALL: RuntimeEventMask = RuntimeEventMask(12582398uL)
   }
 }
 
@@ -1221,7 +1220,6 @@ public data class RuntimeEventType(public val rawValue: UInt) {
     public val MAP_LOADING_FINISHED: RuntimeEventType = RuntimeEventType(6u)
     public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(7u)
     public val MAP_IDLE: RuntimeEventType = RuntimeEventType(8u)
-    public val MAP_RENDER_UPDATE_AVAILABLE: RuntimeEventType = RuntimeEventType(9u)
     public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(10u)
     public val MAP_STILL_IMAGE_FINISHED: RuntimeEventType = RuntimeEventType(11u)
     public val MAP_STILL_IMAGE_FAILED: RuntimeEventType = RuntimeEventType(12u)
@@ -2969,8 +2967,6 @@ public data class RuntimeOptions(
    * values.
    */
   public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
-  /** Wakes the receiver when the runtime event queue becomes nonempty. */
-  public val eventWake: Wake = Wake(),
 )
 
 /**
@@ -3314,209 +3310,6 @@ public data class WebgpuSurfaceDescriptor(
    * navigator.gpu.getPreferredCanvasFormat().
    */
   public val format: UInt = 0u,
-)
-
-/**
- * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
- *
- * See `mln_rendering_stats` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RenderingStats(
-  /** Frame CPU encoding time in seconds. */
-  public val encodingTime: Double = 0.0,
-  /** Frame CPU rendering time in seconds. */
-  public val renderingTime: Double = 0.0,
-  /** Number of frames rendered by the native renderer. */
-  public val frameCount: Long = 0L,
-  /** Draw calls executed during the most recent frame. */
-  public val drawCallCount: Long = 0L,
-  /** Total draw calls executed by the native renderer. */
-  public val totalDrawCallCount: Long = 0L,
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
- *
- * See `mln_runtime_event_render_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventRenderFrame(
-  /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode(0u),
-  /** Whether MapLibre needs another frame after this one. */
-  public val needsRepaint: Boolean = false,
-  /** Whether symbol placement changed during this frame. */
-  public val placementChanged: Boolean = false,
-  public val stats: RenderingStats = RenderingStats(),
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
- *
- * See `mln_runtime_event_render_map` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventRenderMap(
-  /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode(0u),
-)
-
-/**
- * Overscaled tile identity reported in tile observer events.
- *
- * See `mln_tile_id` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class TileId(
-  public val overscaledZ: UInt = 0u,
-  public val wrap: Int = 0,
-  public val canonicalZ: UInt = 0u,
-  public val canonicalX: UInt = 0u,
-  public val canonicalY: UInt = 0u,
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
- *
- * See `mln_runtime_event_tile_action` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventTileAction(
-  /** One of `mln_tile_operation`. */
-  public val operation: TileOperation = TileOperation(0u),
-  public val tileId: TileId = TileId(),
-)
-
-/**
- * Offline region status snapshot. Copied result, owned by the caller.
- *
- * See `mln_offline_region_status` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class OfflineRegionStatus(
-  /** One of `mln_offline_region_download_state`. */
-  public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState(0u),
-  public val completedResourceCount: ULong = 0uL,
-  public val completedResourceSize: ULong = 0uL,
-  public val completedTileCount: ULong = 0uL,
-  public val requiredTileCount: ULong = 0uL,
-  public val completedTileSize: ULong = 0uL,
-  public val requiredResourceCount: ULong = 0uL,
-  public val requiredResourceCountIsPrecise: Boolean = false,
-  public val complete: Boolean = false,
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
- *
- * See `mln_runtime_event_offline_region_status` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventOfflineRegionStatus(
-  public val regionId: Long = 0L,
-  public val status: OfflineRegionStatus = OfflineRegionStatus(),
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
- *
- * See `mln_runtime_event_offline_region_response_error` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventOfflineRegionResponseError(
-  public val regionId: Long = 0L,
-  /** One of `mln_resource_error_reason`. */
-  public val reason: ResourceErrorReason = ResourceErrorReason(0u),
-)
-
-/**
- * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
- *
- * See `mln_runtime_event_offline_region_tile_count_limit` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventOfflineRegionTileCountLimit(
-  public val regionId: Long = 0L,
-  public val limit: ULong = 0uL,
-)
-
-/**
- * Typed event payload carried inline by every event.
- *
- * See `mln_runtime_event_payload` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public sealed interface RuntimeEventPayload {
-  public data class RenderFrame(public val value: RuntimeEventRenderFrame) : RuntimeEventPayload
-
-  public data class RenderMap(public val value: RuntimeEventRenderMap) : RuntimeEventPayload
-
-  public data class TileAction(public val value: RuntimeEventTileAction) : RuntimeEventPayload
-
-  public data class OfflineRegionStatus(public val value: RuntimeEventOfflineRegionStatus) :
-    RuntimeEventPayload
-
-  public data class OfflineRegionResponseError(
-    public val value: RuntimeEventOfflineRegionResponseError,
-  ) : RuntimeEventPayload
-
-  public data class OfflineRegionTileCountLimit(
-    public val value: RuntimeEventOfflineRegionTileCountLimit,
-  ) : RuntimeEventPayload
-
-  public data object None : RuntimeEventPayload
-
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    RuntimeEventPayload {
-    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
-
-    override fun equals(other: Any?): Boolean =
-      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
-
-    override fun hashCode(): Int = contentFields().contentDeepHashCode()
-  }
-}
-
-/**
- * One drained runtime event.
- *
- * See `mln_runtime_event` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEvent(
-  /** One of `mln_runtime_event_type`. */
-  public val type: RuntimeEventType,
-  /** One of `mln_runtime_event_source_type`. */
-  public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType(0u),
-  /** Source handle selected by source_type: an `mln_runtime` or an `mln_map`. */
-  public val source: ULong = 0uL,
-  /**
-   * Map snapshot generation that the event reports, or zero when source_type is
-   * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
-   */
-  public val generation: ULong = 0uL,
-  /**
-   * Secondary event detail whose meaning type selects. Depending on type it carries an
-   * `mln_camera_change_mode`, a MapLibre Native error ordinal, or 0. See `mln_runtime_event_type`
-   * for the per-type meaning.
-   */
-  public val code: Int = 0,
-  /** Typed payload selected by payload_type. */
-  public val payload: RuntimeEventPayload,
-  /** Copied text, owned by the caller. */
-  public val message: String = "",
-)
-
-/**
- * A borrowed view of one owned runtime-event batch.
- *
- * See `mln_event_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class EventBatchView(
-  /** Copied value, owned by the caller. */
-  public val events: List<RuntimeEvent> = emptyList(),
 )
 
 /**
@@ -3990,6 +3783,209 @@ public data class OfflineRegionInfo(
 }
 
 /**
+ * Offline region status snapshot. Copied result, owned by the caller.
+ *
+ * See `mln_offline_region_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class OfflineRegionStatus(
+  /** One of `mln_offline_region_download_state`. */
+  public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState(0u),
+  public val completedResourceCount: ULong = 0uL,
+  public val completedResourceSize: ULong = 0uL,
+  public val completedTileCount: ULong = 0uL,
+  public val requiredTileCount: ULong = 0uL,
+  public val completedTileSize: ULong = 0uL,
+  public val requiredResourceCount: ULong = 0uL,
+  public val requiredResourceCountIsPrecise: Boolean = false,
+  public val complete: Boolean = false,
+)
+
+/**
+ * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+ *
+ * See `mln_rendering_stats` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RenderingStats(
+  /** Frame CPU encoding time in seconds. */
+  public val encodingTime: Double = 0.0,
+  /** Frame CPU rendering time in seconds. */
+  public val renderingTime: Double = 0.0,
+  /** Number of frames rendered by the native renderer. */
+  public val frameCount: Long = 0L,
+  /** Draw calls executed during the most recent frame. */
+  public val drawCallCount: Long = 0L,
+  /** Total draw calls executed by the native renderer. */
+  public val totalDrawCallCount: Long = 0L,
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+ *
+ * See `mln_runtime_event_render_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventRenderFrame(
+  /** One of `mln_render_mode`. */
+  public val mode: RenderMode = RenderMode(0u),
+  /** Whether MapLibre needs another frame after this one. */
+  public val needsRepaint: Boolean = false,
+  /** Whether symbol placement changed during this frame. */
+  public val placementChanged: Boolean = false,
+  public val stats: RenderingStats = RenderingStats(),
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+ *
+ * See `mln_runtime_event_render_map` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventRenderMap(
+  /** One of `mln_render_mode`. */
+  public val mode: RenderMode = RenderMode(0u),
+)
+
+/**
+ * Overscaled tile identity reported in tile observer events.
+ *
+ * See `mln_tile_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class TileId(
+  public val overscaledZ: UInt = 0u,
+  public val wrap: Int = 0,
+  public val canonicalZ: UInt = 0u,
+  public val canonicalX: UInt = 0u,
+  public val canonicalY: UInt = 0u,
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+ *
+ * See `mln_runtime_event_tile_action` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventTileAction(
+  /** One of `mln_tile_operation`. */
+  public val operation: TileOperation = TileOperation(0u),
+  public val tileId: TileId = TileId(),
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+ *
+ * See `mln_runtime_event_offline_region_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventOfflineRegionStatus(
+  public val regionId: Long = 0L,
+  public val status: OfflineRegionStatus = OfflineRegionStatus(),
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+ *
+ * See `mln_runtime_event_offline_region_response_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventOfflineRegionResponseError(
+  public val regionId: Long = 0L,
+  /** One of `mln_resource_error_reason`. */
+  public val reason: ResourceErrorReason = ResourceErrorReason(0u),
+)
+
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+ *
+ * See `mln_runtime_event_offline_region_tile_count_limit` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventOfflineRegionTileCountLimit(
+  public val regionId: Long = 0L,
+  public val limit: ULong = 0uL,
+)
+
+/**
+ * Typed event payload carried inline by every event.
+ *
+ * See `mln_runtime_event_payload` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public sealed interface RuntimeEventPayload {
+  public data class RenderFrame(public val value: RuntimeEventRenderFrame) : RuntimeEventPayload
+
+  public data class RenderMap(public val value: RuntimeEventRenderMap) : RuntimeEventPayload
+
+  public data class TileAction(public val value: RuntimeEventTileAction) : RuntimeEventPayload
+
+  public data class OfflineRegionStatus(public val value: RuntimeEventOfflineRegionStatus) :
+    RuntimeEventPayload
+
+  public data class OfflineRegionResponseError(
+    public val value: RuntimeEventOfflineRegionResponseError,
+  ) : RuntimeEventPayload
+
+  public data class OfflineRegionTileCountLimit(
+    public val value: RuntimeEventOfflineRegionTileCountLimit,
+  ) : RuntimeEventPayload
+
+  public data object None : RuntimeEventPayload
+
+  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
+    RuntimeEventPayload {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
+}
+
+/**
+ * One delivered runtime event.
+ *
+ * See `mln_runtime_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEvent(
+  /** One of `mln_runtime_event_type`. */
+  public val type: RuntimeEventType,
+  /** One of `mln_runtime_event_source_type`. */
+  public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType(0u),
+  /** Source handle selected by source_type: an `mln_runtime` or an `mln_map`. */
+  public val source: ULong = 0uL,
+  /**
+   * Map snapshot generation that the event reports, or zero when source_type is
+   * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+   */
+  public val generation: ULong = 0uL,
+  /**
+   * Secondary event detail whose meaning type selects. Depending on type it carries an
+   * `mln_camera_change_mode`, a MapLibre Native error ordinal, or 0. See `mln_runtime_event_type`
+   * for the per-type meaning.
+   */
+  public val code: Int = 0,
+  /** Typed payload selected by payload_type. */
+  public val payload: RuntimeEventPayload,
+  /** Copied text, owned by the caller. */
+  public val message: String = "",
+)
+
+/**
+ * A borrowed span of runtime events in one delivery.
+ *
+ * See `mln_event_batch_view` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class EventBatchView(
+  /** Copied value, owned by the caller. */
+  public val events: List<RuntimeEvent> = emptyList(),
+)
+
+/**
  * One HTTP header that a header rule supplies.
  *
  * See `mln_http_header` in the
@@ -4283,6 +4279,24 @@ public data class ResourceRequestCancelHandler(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias ResourceRequestCancelCallback = () -> Unit
+
+/**
+ * Runtime and map event delivery. Set either callback or queue.
+ *
+ * See `mln_runtime_event_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventHandler(
+  public val callback: RuntimeEventCallback? = null,
+)
+
+/**
+ * Receives selected events after their snapshots have been published.
+ *
+ * See `mln_runtime_event_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public typealias RuntimeEventCallback = (events: EventBatchView) -> Unit
 
 /**
  * HTTP header transform state: a callback, or native header rules.

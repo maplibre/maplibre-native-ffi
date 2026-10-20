@@ -74,6 +74,11 @@ internal actual object UpcallStubs {
       Upcalls.resourceRequestCancelHandlerCallback(userData.toLong(), handle.toLong())
     }
     .toLong()
+  actual val runtimeEventHandlerCallback: Long =
+    staticCFunction { userData: COpaquePointer?, events: CPointer<mln_event_batch_view>? ->
+      Upcalls.runtimeEventHandlerCallback(userData.toLong(), events.toLong())
+    }
+    .toLong()
   actual val httpHeaderTransformCallback: Long =
     staticCFunction {
       userData: COpaquePointer?,

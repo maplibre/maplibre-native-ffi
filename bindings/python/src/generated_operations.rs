@@ -1863,6 +1863,30 @@ fn generated_copy_mln_runtime_event(
     Ok(dict.into_any().unbind())
 }
 
+unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
+    user_data: *mut std::ffi::c_void,
+    events: *const sys::mln_event_batch_view,
+) {
+    generated_invoke(
+        || (),
+        |py| {
+            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
+                return Ok(());
+            };
+            let _result = callback.bind(py).call1(({
+                if events.is_null() {
+                    return Err(native_error("null record pointer"));
+                }
+                {
+                    let referenced = unsafe { *events };
+                    generated_copy_mln_event_batch_view(py, &referenced)?
+                }
+            },))?;
+            Ok(())
+        },
+    )
+}
+
 fn generated_copy_mln_runtime_event_offline_region_response_error(
     py: Python<'_>,
     value: &sys::mln_runtime_event_offline_region_response_error,
@@ -3953,6 +3977,26 @@ fn generated_input_mln_resource_transform<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_runtime_event_handler<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_runtime_event_handler> {
+    let mut raw: sys::mln_runtime_event_handler = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_runtime_event_handler>() as _;
+    let callback_enabled = !value.getattr("callback")?.is_none();
+    if callback_enabled {
+        raw.user_data =
+            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
+        raw.release_user_data = Some(generated_release_callbacks);
+        raw.callback = if callback_enabled {
+            Some(generated_callback_mln_runtime_event_handler_callback)
+        } else {
+            None
+        };
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_runtime_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3967,7 +4011,6 @@ fn generated_input_mln_runtime_options<'py>(
     raw.event_mask = value
         .getattr("event_mask")?
         .extract::<sys::mln_runtime_event_mask>()?;
-    raw.event_wake = generated_input_mln_wake(&value.getattr("event_wake")?, storage)?;
     Ok(raw)
 }
 
@@ -4660,13 +4703,6 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     unsafe { sys::mln_acquired_frame_dispose(handle, std::ptr::null_mut()) }
 }
 
-unsafe extern "C" fn generated_dispose_mln_event_batch(
-    handle: sys::mln_event_batch,
-) -> sys::mln_status {
-    unsafe { sys::mln_event_batch_release(handle) };
-    sys::MLN_STATUS_OK
-}
-
 unsafe extern "C" fn generated_dispose_mln_geojson_source_data(
     handle: sys::mln_geojson_source_data,
 ) -> sys::mln_status {
@@ -4815,33 +4851,6 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
             })
         }?;
-        reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
-impl EventBatchHandle {
-    #[pyo3(signature = ())]
-    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_event_batch_get", self.admission())?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_view: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
-        out_view.size = std::mem::size_of::<sys::mln_event_batch_view>() as _;
-        unsafe {
-            call.status(|diagnostic| sys::mln_event_batch_get(handle, &mut out_view, diagnostic))
-        }?;
-        generated_copy_mln_event_batch_view(py, &out_view)
-    }
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_event_batch_release", self.admission())?;
-        let Some(mut reservation) = self.reserve()? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_event_batch_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -9730,6 +9739,20 @@ impl ResourceTransformResponseScope {
 #[pymethods]
 impl RuntimeHandle {
     #[pyo3(signature = ())]
+    fn clear_event_handler(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_runtime_clear_event_handler", self.admission())?;
+        let handle = self.live()?;
+        let convert = py_none;
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_runtime_clear_event_handler(handle, completion, diagnostic)
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = ())]
     fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
             py,
@@ -9854,21 +9877,6 @@ impl RuntimeHandle {
                 convert,
             )
         }
-    }
-    #[pyo3(signature = ())]
-    fn drain_events(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_drain_events", self.admission())?;
-        let handle = self.live()?;
-        let mut out_batch: sys::mln_event_batch = unsafe { std::mem::zeroed() };
-        let result = unsafe {
-            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
-                sys::mln_runtime_drain_events(handle, &mut out_batch, diagnostic)
-            })
-        };
-        if !result? {
-            return Ok(py.None());
-        }
-        unsafe { EventBatchHandle::adopt(py, out_batch, Vec::new()) }
     }
     #[pyo3(signature = ())]
     fn get_event_mask(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -10038,6 +10046,30 @@ impl RuntimeHandle {
                 convert,
             )
         }
+    }
+    #[pyo3(signature = (handler))]
+    fn set_event_handler(&self, py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_runtime_set_event_handler", self.admission())?;
+        let storage = &mut call.storage;
+        let handler_value = generated_input_mln_runtime_event_handler(&handler.clone(), storage)?;
+        let handle = self.live()?;
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_runtime_set_event_handler(
+                        handle,
+                        &handler_value,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
     }
     #[pyo3(signature = (mask))]
     fn set_event_mask(
@@ -10265,14 +10297,6 @@ generated_owner!(
         sys::mln_acquired_frame_view_begin,
         sys::mln_acquired_frame_view_end
     )
-);
-generated_owner!(
-    EventBatchHandle,
-    "_EventBatchHandle",
-    mln_event_batch,
-    Some(generated_dispose_mln_event_batch),
-    None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_event_batch, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
     GeojsonSourceDataHandle,
@@ -10658,8 +10682,7 @@ fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult
             sys::mln_runtime_create(&options_value, &mut out_runtime, diagnostic)
         })
     }?;
-    let callback_roots = call.accept_callbacks();
-    unsafe { RuntimeHandle::adopt(py, out_runtime, callback_roots.clone()) }
+    unsafe { RuntimeHandle::adopt(py, out_runtime, Vec::new()) }
 }
 
 #[pyfunction]
@@ -10673,7 +10696,6 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
-    module.add_class::<EventBatchHandle>()?;
     module.add_class::<GeojsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;

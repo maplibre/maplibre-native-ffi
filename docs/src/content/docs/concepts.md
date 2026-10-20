@@ -115,18 +115,17 @@ states synchronization and teardown contracts.
 
 ## Events
 
-The runtime queues events from its maps and resource services. Events report
-style loads, render updates, download progress, and resource failures. A
-subscription selects which event types enter the queue, and a wake tells the
-host when to drain it.
+The runtime delivers events from its maps and resource services. Events report
+style loads, rendered frames, download progress, and resource failures. A
+subscription selects which event types reach the runtime's event handler.
 
-A drain transfers queued events into an owned batch. The host routes events by
-source ID, copies any values that it keeps, and releases the batch. Events
-report changes; completions report individual submissions, and frame results
-report individual frame demands.
+A native callback borrows an event span for its call. Queue delivery includes
+the span in an owned delivery batch. The host routes events by source ID and
+copies any values that it keeps. Events report changes; completions report
+individual submissions, and frame results report individual frame demands.
 
-[Handle events](/maplibre-native-ffi/guides/handle-events/) shows the drain
-path. The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
+[Handle events](/maplibre-native-ffi/guides/handle-events/) shows both delivery
+paths. The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
 describes event payloads and generation ordering.
 
 ## Failures

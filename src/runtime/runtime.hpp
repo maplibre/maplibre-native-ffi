@@ -12,12 +12,12 @@
 #include <shared_mutex>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "completion/completion.hpp"
+#include "delivery/delivery_queue.hpp"
 #include "execution/control_state.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/runtime_executor.hpp"
@@ -38,10 +38,9 @@ namespace mln::core {
 class CameraTransitionEnd;
 struct MapObject;
 struct RuntimeObject;
-class Wake;
+struct RuntimeEventState;
 class OperationObject;
 class Completion;
-struct RuntimeEventQueueState;
 
 // A map event raised inside a map transaction. It waits there for the
 // generation that the transaction publishes.
@@ -79,14 +78,13 @@ struct CameraTransitionCancellation {
   uint64_t transition_id = 0;
 };
 
-// One map's event state. The runtime keeps a share of it while the map is
-// registered, and the camera transitions of the map hold another.
+// One map's event state, shared by its observer and camera transitions.
 struct MapEventState {
   // Any thread reads the mask; map commands write it on the runtime worker.
   std::atomic<uint64_t> mask;
-  // Fixed before the map's producers start. The queue outlives the runtime
-  // handle and serializes event publication with map retirement.
-  std::shared_ptr<RuntimeEventQueueState> event_queue;
+  // Shared runtime event registration. Producers retire on the runtime
+  // worker before map destruction.
+  std::shared_ptr<RuntimeEventState> runtime_events;
 
   // Every field below is runtime-worker only, and only the map that owns this
   // state calls publish() or queues events through it.
@@ -135,8 +133,12 @@ struct MapEventState {
   }
 };
 
+struct RuntimeEventRegistration;
+
 struct RuntimeEventState {
   std::atomic<uint64_t> mask;
+  // Written by runtime commands; offline producers hold their observer lock.
+  std::shared_ptr<RuntimeEventRegistration> registration;
 };
 
 static_assert(
@@ -161,7 +163,7 @@ static_assert(
   "the payload must stay the last member of mln_runtime_event"
 );
 
-// One relaxed load, one shift, one test. No handle-table lock, no event_mutex.
+// One relaxed load, one shift, one test, without a handle-table or queue lock.
 // Relaxed ordering is correct because the mask is policy rather than a
 // synchronisation edge: the documented semantics gate events queued after a
 // setter returns and say nothing about events already in flight.
@@ -218,6 +220,15 @@ class RuntimeCallbackContext {
   void* user_data_ = nullptr;
   mln_user_data_release release_ = nullptr;
   std::atomic_bool owned_{false};
+};
+
+struct RuntimeEventRegistration {
+  mln_runtime_event_callback callback = nullptr;
+  std::shared_ptr<RuntimeCallbackContext> context;
+  std::shared_ptr<delivery::DeliveryQueueState> queue;
+  void* user_data = nullptr;
+
+  auto push(mln_runtime_event event, const std::string& message) const -> void;
 };
 
 struct ResourceProvider {
@@ -302,26 +313,7 @@ struct OfflineRegionEventState {
   std::mutex mutex;
   RuntimeObject* runtime = nullptr;
   bool alive = false;
-};
-
-struct RuntimeEventStorage {
-  std::vector<mln_runtime_event> events;
-  std::string messages;
-};
-
-struct RuntimeEventQueueState {
-  std::mutex mutex;
-  std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
-  RuntimeEventStorage pending;
-  RuntimeEventStorage recycled;
-  std::unordered_set<mln_offline_region_id> observed_offline_regions;
-  std::shared_ptr<mln::core::Wake> wake;
-};
-
-struct EventBatchObject {
-  RuntimeEventStorage storage;
-  std::weak_ptr<RuntimeEventQueueState> queue;
-  ~EventBatchObject();
+  std::unordered_set<mln_offline_region_id> observed_regions;
 };
 
 struct RuntimeObject {
@@ -344,7 +336,6 @@ struct RuntimeObject {
   std::shared_ptr<mln::core::HttpHeaderTransformState>
     http_header_transform_state;
   std::shared_ptr<mln::core::RuntimeEventState> event_state;
-  std::shared_ptr<mln::core::RuntimeEventQueueState> event_queue;
 };
 
 template <>
@@ -359,11 +350,13 @@ auto create_runtime(
 auto dispose_runtime(mln_runtime runtime) -> mln_status;
 auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   -> mln_status;
-auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
-  -> mln_status;
-auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
-  -> mln_status;
-auto release_event_batch(mln_event_batch batch) noexcept -> void;
+auto set_runtime_event_handler(
+  mln_runtime runtime, const mln_runtime_event_handler* handler,
+  const mln_completion* completion
+) -> mln_status;
+auto clear_runtime_event_handler(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status;
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
 auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
   -> mln_status;
@@ -538,18 +531,14 @@ auto has_resource_transform_for_platform_context(
 // holds a transaction's events and stamps every event's generation. Producers
 // test their subscription mask before they build an event.
 auto push_runtime_map_event_payload(
-  const std::shared_ptr<RuntimeEventQueueState>& queue, mln_map map,
+  const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, int32_t code = 0,
   std::string message = {}
 ) -> void;
 auto push_runtime_map_events(
-  const std::shared_ptr<RuntimeEventQueueState>& queue, mln_map map,
+  const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, std::vector<HeldMapEvent>& events
 ) -> void;
-auto register_runtime_map_events(
-  mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state
-) -> void;
-auto unregister_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
 
 }  // namespace mln::core

@@ -10,7 +10,6 @@ import 'native_asset.dart';
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_batch = Uint64;
 typedef mln_delivery_queue = Uint64;
-typedef mln_event_batch = Uint64;
 typedef mln_geojson_source_data = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
@@ -83,6 +82,13 @@ typedef mln_resource_transform_callbackFunction =
       Uint32 kind,
       Pointer<Char> url,
       Pointer<mln_resource_transform_response> out_response,
+    );
+typedef mln_runtime_event_callback =
+    Pointer<NativeFunction<mln_runtime_event_callbackFunction>>;
+typedef mln_runtime_event_callbackFunction =
+    Void Function(
+      Pointer<Void> user_data,
+      Pointer<mln_event_batch_view> events,
     );
 typedef mln_user_data_release =
     Pointer<NativeFunction<mln_user_data_releaseFunction>>;
@@ -332,6 +338,7 @@ final class mln_delivery_payload extends Union {
   external mln_camera_transition_end_delivery camera_transition_end;
   external mln_custom_source_tile_delivery custom_source_fetch_tile;
   external mln_custom_source_tile_delivery custom_source_cancel_tile;
+  external mln_runtime_event_delivery runtime_events;
 }
 
 final class mln_delivery_queue_options extends Struct {
@@ -1162,6 +1169,20 @@ final class mln_runtime_event extends Struct {
   external mln_runtime_event_payload payload;
 }
 
+final class mln_runtime_event_delivery extends Struct {
+  external Pointer<mln_event_batch_view> events;
+}
+
+final class mln_runtime_event_handler extends Struct {
+  @Uint32()
+  external int size;
+  external mln_runtime_event_callback callback;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
+}
+
 final class mln_runtime_event_offline_region_response_error extends Struct {
   @Int64()
   external int region_id;
@@ -1221,7 +1242,6 @@ final class mln_runtime_options extends Struct {
   external mln_buffer_view cache_path;
   @Uint64()
   external int event_mask;
-  external mln_wake event_wake;
 }
 
 final class mln_screen_box extends Struct {
@@ -1686,6 +1706,7 @@ const MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL = 5;
 const MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END = 6;
 const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE = 7;
 const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8;
+const MLN_DELIVERY_TYPE_RUNTIME_EVENTS = 9;
 
 // mln_feature_state_selector_field
 const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
@@ -1964,7 +1985,6 @@ const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32;
 const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64;
 const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128;
 const MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256;
-const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024;
 const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048;
 const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096;
@@ -1978,9 +1998,9 @@ const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
 const MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 8388608;
-const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912894;
+const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912382;
 const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
-const MLN_RUNTIME_EVENT_MASK_ALL = 12582910;
+const MLN_RUNTIME_EVENT_MASK_ALL = 12582398;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
@@ -2004,7 +2024,6 @@ const MLN_RUNTIME_EVENT_MAP_LOADING_STARTED = 5;
 const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6;
 const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7;
 const MLN_RUNTIME_EVENT_MAP_IDLE = 8;
-const MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
 const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10;
 const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11;
 const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12;
@@ -2360,22 +2379,6 @@ external int mln_delivery_queue_drain(
 
 @Native<Void Function(mln_delivery_queue)>()
 external void mln_delivery_queue_release(int queue);
-
-@Native<
-  Int32 Function(
-    mln_event_batch,
-    Pointer<mln_event_batch_view>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_event_batch_get(
-  int batch,
-  Pointer<mln_event_batch_view> out_view,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(mln_event_batch)>()
-external void mln_event_batch_release(int batch);
 
 @Native<mln_frame_demand Function()>()
 external mln_frame_demand mln_frame_demand_default();
@@ -4685,6 +4688,15 @@ external int mln_resource_transform_response_set_url(
 @Native<
   Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
+external int mln_runtime_clear_event_handler(
+  int runtime,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
 external int mln_runtime_clear_http_header_transform(
   int runtime,
   Pointer<mln_completion> completion,
@@ -4774,15 +4786,6 @@ external int mln_runtime_delete_offline_region(
 @Native<Int32 Function(mln_runtime, Pointer<mln_diagnostic>)>()
 external int mln_runtime_dispose(
   int runtime,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_runtime, Pointer<mln_event_batch>, Pointer<mln_diagnostic>)
->()
-external int mln_runtime_drain_events(
-  int runtime,
-  Pointer<mln_event_batch> out_batch,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4885,6 +4888,21 @@ external int mln_runtime_release(
 external int mln_runtime_run_ambient_cache_operation(
   int runtime,
   int operation,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Pointer<mln_runtime_event_handler>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_set_event_handler(
+  int runtime,
+  Pointer<mln_runtime_event_handler> handler,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

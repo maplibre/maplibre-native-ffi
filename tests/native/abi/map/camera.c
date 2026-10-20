@@ -482,20 +482,6 @@ static void release_snapshot_probe(void* user_data) {
   }
 }
 
-typedef struct render_update_match {
-  mln_map map;
-  uint64_t generation;
-} render_update_match;
-
-static bool is_render_update_at(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
-  const render_update_match* match = context;
-  return event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-         event->source == match->map && event->generation == match->generation;
-}
-
 // A two-finger gesture passes its centroid movement as offset and its new
 // centroid as anchor. The pan moves the coordinate at anchor - offset to the
 // anchor, and the zoom and turn keep it there. The command publishes the pan
@@ -557,10 +543,6 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   TEST_ASSERT_EQUAL_UINT64(
     before.latest_render_update_generation + 1,
     snapshot.latest_render_update_generation
-  );
-  render_update_match match = {.map = map, .generation = generation};
-  TEST_ASSERT_EQUAL_size_t(
-    1, mln_test_drain_counting_matching(runtime, is_render_update_at, &match)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
