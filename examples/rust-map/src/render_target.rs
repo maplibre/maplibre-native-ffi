@@ -189,7 +189,6 @@ impl Session {
         self.session.request_frame(&FrameDemand {
             flags,
             token: self.next_token,
-            ..FrameDemand::default()
         })?;
         Ok(())
     }
