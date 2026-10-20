@@ -3,6 +3,9 @@ title: MapLibre Native FFI
 description: A C API for direct host control of the MapLibre Native map and render session.
 ---
 
+import { Image } from "astro:assets";
+
+import ciPoweredByBlacksmith from "../../assets/ci-powered-by-blacksmith.png";
 import SupportMatrix from "../../components/SupportMatrix.astro";
 
 MapLibre Native FFI is a C API for
@@ -32,3 +35,11 @@ shader registry access remain outside the current surface. Hosts that require
 custom draw calls or shaders must extend the native layer.
 
 <SupportMatrix />
+
+## Sponsors
+
+<p>
+  <a href="https://www.blacksmith.sh/">
+    <Image src={ciPoweredByBlacksmith} alt="CI powered by Blacksmith" width={240} />
+  </a>
+</p>
