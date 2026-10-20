@@ -25,11 +25,14 @@ mln_status features_at_screen_point(
   mln_render_session session, mln_screen_point at
 ) {
   // #region geometry
-  const mln_rendered_query_geometry geometry =
-    mln_rendered_query_geometry_box((mln_screen_box){
+  const mln_rendered_query_geometry geometry = {
+    .size = sizeof(mln_rendered_query_geometry),
+    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+    .data.box = {
       .min = {.x = at.x - 6.0, .y = at.y - 6.0},
       .max = {.x = at.x + 6.0, .y = at.y + 6.0},
-    });
+    },
+  };
   // #endregion geometry
 
   // #region layers

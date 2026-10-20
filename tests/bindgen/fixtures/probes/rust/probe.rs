@@ -4,23 +4,6 @@
 use crate::*;
 
 pub fn run() {
-    let points = [
-        ProbeBatchPoint::new(2.0, 5.0),
-        ProbeBatchPoint::new(7.0, 11.0),
-        ProbeBatchPoint::new(-3.0, 17.0),
-    ];
-    assert_eq!(
-        probe_batch_points(&points).unwrap(),
-        vec![
-            ProbeBatchPoint::new(5.0, 3.0),
-            ProbeBatchPoint::new(11.0, 8.0),
-            ProbeBatchPoint::new(17.0, -2.0)
-        ]
-    );
-    assert_eq!(probe_batch_scores(&points).unwrap(), vec![7.0, 18.0, 14.0]);
-    assert!(probe_batch_points(&[]).unwrap().is_empty());
-    assert!(probe_batch_scores(&[]).unwrap().is_empty());
-
     // Fields named after Rust keywords and runtime locals keep their values
     // through both conversions.
     let point = NewPoint::new(1.0, 2.0, 3.0);

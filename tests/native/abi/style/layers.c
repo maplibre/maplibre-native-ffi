@@ -22,14 +22,13 @@ static void add_layer(mln_map map, const char* json, const char* before) {
   ));
 }
 
-static const mln_buffer_view fixture_tiles[] = {
-  MLN_BUFFER_LITERAL("fixture://dem/{z}/{x}/{y}.png"),
-};
-
 static void add_dem_source(mln_map map, const char* id) {
-  MLN_TEST_AWAIT_OK(mln_map_add_raster_dem_source_tiles(
-    map, mln_test_view_of(id), fixture_tiles, 1, NULL, &completion.descriptor,
-    NULL
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id),
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"raster-dem\",\"tiles\":[\"fixture://dem/{z}/{x}/{y}.png\"]}"
+    ),
+    &completion.descriptor, NULL
   ));
 }
 
@@ -366,8 +365,11 @@ static void layers_list_in_style_order_after_moves(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   add_source(map, "points");
-  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
-    map, MLN_BUFFER_LITERAL("tiles"), fixture_tiles, 1, NULL,
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("tiles"),
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"vector\",\"tiles\":[\"fixture://dem/{z}/{x}/{y}.png\"]}"
+    ),
     &completion.descriptor, NULL
   ));
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");

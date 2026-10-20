@@ -76,19 +76,4 @@ public extension ResourceRequestHandle {
       ); arena.decline(if: status == MLN_STATUS_OK && value0); return status
     } result: { value0 }
   }
-
-  /// Blocks until a resource request is released and its cancel callback
-  /// registration has retired: the callback, if it ran, and release_user_data
-  /// have both returned. Completing a request does not release its owner.
-  ///
-  /// See `mln_resource_request_wait_until_retired` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func waitUntilRetired() throws {
-    try nativeInvoke("mln_resource_request_wait_until_retired",
-                     .issued)
-    { raw, _, diagnostic in mln_resource_request_wait_until_retired(
-      raw,
-      diagnostic
-    ) }
-  }
 }

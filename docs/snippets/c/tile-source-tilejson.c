@@ -24,9 +24,11 @@ mln_status add_basemap(
   const mln_completion* layer_completion
 ) {
   // #region source
-  const mln_status status = mln_map_add_vector_source_url(
-    map, view("basemap"), view("https://tiles.example.com/planet/tiles.json"),
-    NULL, source_completion, NULL
+  const char source[] =
+    "{\"type\":\"vector\",\"url\":\"https://tiles.example.com/planet/"
+    "tiles.json\"}";
+  const mln_status status = mln_map_add_style_source_json(
+    map, view("basemap"), view(source), source_completion, NULL
   );
   if (status != MLN_STATUS_OK) {
     return status;

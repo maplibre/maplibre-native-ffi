@@ -148,20 +148,6 @@ mln_rendered_feature_query_options_default(void) MLN_NOEXCEPT;
 MLN_API mln_source_feature_query_options
 mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
 
-/** Returns a rendered point query geometry descriptor. */
-MLN_API mln_rendered_query_geometry
-mln_rendered_query_geometry_point(mln_screen_point point) MLN_NOEXCEPT;
-
-/** Returns a rendered box query geometry descriptor. */
-MLN_API mln_rendered_query_geometry
-mln_rendered_query_geometry_box(mln_screen_box box) MLN_NOEXCEPT;
-
-/** Returns a rendered line-string query geometry descriptor. */
-MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
-  const mln_screen_point* points MLN_BINDING("length=point_count"),
-  size_t point_count
-) MLN_NOEXCEPT;
-
 /**
  * Starts a rendered-feature query against the session's latest driver state.
  *

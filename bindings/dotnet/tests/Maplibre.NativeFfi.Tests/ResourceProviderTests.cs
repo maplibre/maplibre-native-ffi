@@ -23,7 +23,6 @@ public sealed class ResourceProviderTests
         ResourceRequestHandle? retained = null;
         string? requested = null;
         Exception? reentry = null;
-        Exception? waitReentry = null;
         await using var fixture = await NativeFixture.CreateAsync(
             provider: new ResourceProvider
             {
@@ -35,7 +34,6 @@ public sealed class ResourceProviderTests
                     {
                         _ = owner!.Runtime.ClearResourceTransformAsync(TestWaits.Token);
                     });
-                    waitReentry = Record.Exception(handle.WaitUntilRetired);
                     handle.Complete(StyleResponse());
                     return ResourceProviderDecision.PassThrough;
                 },
@@ -48,7 +46,6 @@ public sealed class ResourceProviderTests
 
         Assert.Equal(StyleUrl, requested);
         Assert.IsType<InvalidOperationException>(reentry);
-        Assert.IsType<InvalidOperationException>(waitReentry);
         Assert.NotNull(retained);
         using (retained)
             Assert.False(retained.IsClosed);
@@ -77,7 +74,6 @@ public sealed class ResourceProviderTests
 
         Assert.False(handle.IsClosed);
         handle.Close();
-        handle.WaitUntilRetired();
     }
 
     // A request outside the routes passes through to native loading, which refuses the scheme.
@@ -93,6 +89,12 @@ public sealed class ResourceProviderTests
         var sourceRequested = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
+        ResourceRoute[] routes =
+        [
+            // Another kind: claims no style.
+            new ResourceRoute(ResourceKindMask.Tile, UrlMatchFlags.Glob, "unrouted-test://**"),
+            new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "routed-test://**" },
+        ];
         await using var fixture = await NativeFixture.CreateAsync(
             provider: new ResourceProvider
             {
@@ -117,19 +119,12 @@ public sealed class ResourceProviderTests
                         sourceRequested.TrySetResult();
                     return ResourceProviderDecision.Handle;
                 },
-                Routes =
-                [
-                    // Another kind: claims no style.
-                    new ResourceRoute(
-                        ResourceKindMask.Tile,
-                        UrlMatchFlags.Glob,
-                        "unrouted-test://**",
-                        ResourceRouteUrl.Resolved
-                    ),
-                    new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "routed-test://**" },
-                ],
+                Routes = routes,
             }
         );
+
+        // Changing the host array after registration leaves the native routes intact.
+        Array.Fill(routes, new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "**" });
 
         await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json", TestWaits.Token);
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);

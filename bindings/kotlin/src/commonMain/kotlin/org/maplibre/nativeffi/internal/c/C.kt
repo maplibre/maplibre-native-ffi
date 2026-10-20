@@ -139,44 +139,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_add_raster_dem_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_raster_dem_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_raster_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_raster_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_add_style_layer_json(
     map: Long,
     layerJson: Long,
@@ -189,25 +151,6 @@ internal expect object C {
     map: Long,
     sourceId: Long,
     sourceJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_vector_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_vector_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -493,22 +436,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_projection_lat_lngs_for_pixels(
-    projection: Long,
-    points: Long,
-    pointCount: Long,
-    outCoordinates: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
-    projection: Long,
-    points: Long,
-    pointCount: Long,
-    outCoordinates: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -523,32 +450,9 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_projection_pixels_for_lat_lngs(
-    projection: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    outPoints: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_set_camera(projection: Long, camera: Long, outDiagnostic: Long): Int
-
-  fun mln_map_projection_set_visible_coordinates(
-    projection: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    padding: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_projection_set_visible_geometry(
-    projection: Long,
-    geometry: Long,
-    padding: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_map_release(map: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -939,12 +843,6 @@ internal expect object C {
 
   fun mln_rendered_feature_query_options_default(returned: Long): Unit
 
-  fun mln_rendered_query_geometry_box(box: Long, returned: Long): Unit
-
-  fun mln_rendered_query_geometry_line_string(points: Long, pointCount: Long, returned: Long): Unit
-
-  fun mln_rendered_query_geometry_point(point: Long, returned: Long): Unit
-
   fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int
 
   fun mln_resource_request_is_cancelled(handle: Long, outCancelled: Long, outDiagnostic: Long): Int
@@ -959,8 +857,6 @@ internal expect object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_resource_request_wait_until_retired(handle: Long, outDiagnostic: Long): Int
 
   fun mln_resource_transform_response_set_url(response: Long, url: Long, outDiagnostic: Long): Int
 
@@ -1115,8 +1011,6 @@ internal expect object C {
   fun mln_source_feature_query_options_default(returned: Long): Unit
 
   fun mln_style_image_options_default(returned: Long): Unit
-
-  fun mln_style_tile_source_options_default(returned: Long): Unit
 
   fun mln_style_transition_options_default(returned: Long): Unit
 

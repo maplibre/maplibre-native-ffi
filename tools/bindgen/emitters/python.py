@@ -334,9 +334,7 @@ def operation(
     if decision:
         if not plan.consumes and plan.name not in (decision.complete, decision.resume):
             setup.append(
-                "        let handle = self.state.issued_handle();"
-                if plan.receiver_access == "issued"
-                else "        let handle = self.state.native_for_call().map_err(map_error)?;"
+                "        let handle = self.state.native_for_call().map_err(map_error)?;"
             )
     elif scoped:
         setup.append(
@@ -381,30 +379,6 @@ def operation(
             pass
         else:
             values.supported(value)
-        if output.sized_by:
-            element = value.element
-            native = (
-                scalar_type(element)
-                if element.kind == "scalar"
-                else "sys::" + element.native
-            )
-            count = arguments[value.length]
-            init = (
-                f"unsafe {{ sys::{element.default}() }}"
-                if element.default
-                else "unsafe { std::mem::zeroed() }"
-            )
-            setup.append(
-                f"        let mut {output.name}: Vec<{native}> = (0..{count}).map(|_| {init}).collect();"
-            )
-            for field in element.fields:
-                if field.role == "size":
-                    setup.append(
-                        f"        for value in &mut {output.name} {{ value.size = std::mem::size_of::<{native}>() as _; }}"
-                    )
-            arguments[output.name] = f"{output.name}.as_mut_ptr()"
-            outputs.append((output.name, value))
-            continue
         native = (
             scalar_type(value) if value.kind == "scalar" else "sys::" + value.native
         )
@@ -422,14 +396,6 @@ def operation(
                     )
         arguments[output.name] = f"&mut {output.name}"
         outputs.append((output.name, value))
-
-    def copy_output(output, value):
-        if value.kind == "array" and any(
-            p.name == output and p.sized_by for p in plan.outputs
-        ):
-            copied = values.copy(value.element, "*element")
-            return f"generated_list(py, &{output}, |element| {ok(copied)})?"
-        return values.copy(value, output)
 
     if plan.completion:
         arguments[plan.completion.parameter] = "completion"
@@ -641,14 +607,14 @@ def operation(
                     raise unsupported(
                         function, "absence requires an owned handle output"
                     )
-                body.append(f"        {ok(copy_output(output, value))}")
+                body.append(f"        {ok(values.copy(value, output))}")
                 public_result = values.type(value)
                 expression = values.facade_copy(value, expression)
         else:
             body.append("        let dict = PyDict::new(py);")
             for output, value in outputs:
                 body.append(
-                    f'        dict.set_item("{output_member(output)}", {copy_output(output, value)})?;'
+                    f'        dict.set_item("{output_member(output)}", {values.copy(value, output)})?;'
                 )
             body.append("        Ok(dict.into_any().unbind())")
             product_name = public_name(function.name) + "Result"

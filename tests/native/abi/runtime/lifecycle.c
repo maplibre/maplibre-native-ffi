@@ -8,16 +8,10 @@ static void runtime_options_with_small_size(void* descriptor) {
   ((mln_runtime_options*)descriptor)->size = sizeof(mln_runtime_options) - 1;
 }
 
-static void runtime_options_with_unknown_event_bit(void* descriptor) {
-  ((mln_runtime_options*)descriptor)->event_mask |= UINT64_C(1) << 40U;
-}
-
 static const mln_test_validation_case runtime_option_cases[] = {
   {"defaults", NULL, MLN_STATUS_OK, NULL},
   {"undersized", runtime_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
    "size"},
-  {"unknown event bit", runtime_options_with_unknown_event_bit,
-   MLN_STATUS_INVALID_ARGUMENT, "event_mask"},
 };
 
 // A rejected creation leaves the output null; an accepted one is closed at

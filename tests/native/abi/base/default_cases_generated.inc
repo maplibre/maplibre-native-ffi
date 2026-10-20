@@ -652,10 +652,6 @@ static void mln_runtime_options_default_holds_its_annotated_values(void) {
     (uint64_t)0, (uint64_t)value.cache_path.size,
     "mln_runtime_options.cache_path.size"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)MLN_RUNTIME_EVENT_MASK_ALL, (uint64_t)value.event_mask,
-    "mln_runtime_options.event_mask"
-  );
 }
 
 static void mln_source_feature_query_options_default_holds_its_annotated_values(
@@ -693,20 +689,6 @@ static void mln_style_image_options_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.stretch_y_count,
     "mln_style_image_options.stretch_y_count"
-  );
-}
-
-static void mln_style_tile_source_options_default_holds_its_annotated_values(
-  void
-) {
-  const mln_style_tile_source_options value =
-    mln_style_tile_source_options_default();
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_style_tile_source_options), (uint64_t)value.size,
-    "mln_style_tile_source_options.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.fields, "mln_style_tile_source_options.fields"
   );
 }
 
@@ -1064,7 +1046,6 @@ static void mln_webgpu_surface_descriptor_default_holds_its_annotated_values(
   X(mln_runtime_options_default_holds_its_annotated_values)                    \
   X(mln_source_feature_query_options_default_holds_its_annotated_values)       \
   X(mln_style_image_options_default_holds_its_annotated_values)                \
-  X(mln_style_tile_source_options_default_holds_its_annotated_values)          \
   X(mln_style_transition_options_default_holds_its_annotated_values)           \
   X(mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values) \
   X(mln_vulkan_owned_texture_descriptor_default_holds_its_annotated_values)    \

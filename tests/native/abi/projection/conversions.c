@@ -21,10 +21,9 @@ static mln_lat_lng coordinate_for(
 }
 
 // The camera's center lands on the middle of the map's extent and a point to
-// the north east lands up and to the right of it. A batch converts each
-// coordinate as the single call does, and both forms convert back to the
-// coordinates they came from.
-static void conversions_agree_singly_and_in_batches_and_invert(void) {
+// the north east lands up and to the right of it. Both points convert back
+// to the coordinates they came from.
+static void conversions_invert(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 200;
@@ -53,62 +52,18 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
   TEST_ASSERT_GREATER_THAN_DOUBLE(center.x, north_east.x);
   TEST_ASSERT_LESS_THAN_DOUBLE(center.y, north_east.y);
 
-  mln_screen_point points[2] = {0};
-  MLN_TEST_OK(mln_map_projection_pixels_for_lat_lngs(
-    projection, coordinates, 2, points, NULL
-  ));
   const mln_screen_point singles[2] = {center, north_east};
   for (size_t index = 0; index < 2; index += 1) {
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, singles[index].x, points[index].x);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, singles[index].y, points[index].y);
-    const mln_lat_lng back = coordinate_for(projection, points[index]);
+    const mln_lat_lng back = coordinate_for(projection, singles[index]);
     TEST_ASSERT_DOUBLE_WITHIN(1e-6, coordinates[index].latitude, back.latitude);
     TEST_ASSERT_DOUBLE_WITHIN(
       1e-6, coordinates[index].longitude, back.longitude
     );
   }
 
-  mln_lat_lng round_trip[2] = {0};
-  MLN_TEST_OK(mln_map_projection_lat_lngs_for_pixels(
-    projection, points, 2, round_trip, NULL
-  ));
-  for (size_t index = 0; index < 2; index += 1) {
-    TEST_ASSERT_DOUBLE_WITHIN(
-      1e-6, coordinates[index].latitude, round_trip[index].latitude
-    );
-    TEST_ASSERT_DOUBLE_WITHIN(
-      1e-6, coordinates[index].longitude, round_trip[index].longitude
-    );
-  }
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// An empty batch is valid input in both directions and converts to an empty
-// result.
-static void empty_batches_convert_to_empty_results(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_map_create_projection(map, &projection, NULL));
-  MLN_TEST_OK(
-    mln_map_projection_pixels_for_lat_lngs(projection, NULL, 0, NULL, NULL)
-  );
-  MLN_TEST_OK(
-    mln_map_projection_lat_lngs_for_pixels(projection, NULL, 0, NULL, NULL)
-  );
-  MLN_TEST_OK(mln_map_projection_lat_lngs_for_pixels_unwrapped(
-    projection, NULL, 0, NULL, NULL
-  ));
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-MLN_TEST_GROUP {
-  RUN_TEST(conversions_agree_singly_and_in_batches_and_invert);
-  RUN_TEST(empty_batches_convert_to_empty_results);
-}
+MLN_TEST_GROUP { RUN_TEST(conversions_invert); }

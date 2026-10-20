@@ -83,16 +83,6 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default tile source options.
-  ///
-  /// See `mln_style_tile_source_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func styleTileSourceOptionsDefault() throws -> StyleTileSourceOptions {
-    try nativeDirect("mln_style_tile_source_options_default") { _ in
-      try StyleTileSourceOptions(raw: mln_style_tile_source_options_default())
-    }
-  }
-
   /// Returns default global style transition options.
   ///
   /// See `mln_style_transition_options_default` in the

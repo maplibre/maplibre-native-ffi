@@ -1579,35 +1579,6 @@ fn generated_copy_mln_rendered_feature_query_options(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_rendered_query_geometry(
-    py: Python<'_>,
-    value: &sys::mln_rendered_query_geometry,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "data",
-        match value.type_ {
-            sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT => generated_variant(
-                py,
-                "point",
-                generated_copy_mln_screen_point(py, &(unsafe { value.data.point }))?,
-            )?,
-            sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX => generated_variant(
-                py,
-                "box",
-                generated_copy_mln_screen_box(py, &(unsafe { value.data.box_ }))?,
-            )?,
-            sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING => generated_variant(
-                py,
-                "line_string",
-                generated_copy_mln_screen_line_string(py, &(unsafe { value.data.line_string }))?,
-            )?,
-            tag => generated_unknown_variant(py, tag)?,
-        },
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_rendering_stats(
     py: Python<'_>,
     value: &sys::mln_rendering_stats,
@@ -1950,33 +1921,6 @@ fn generated_copy_mln_runtime_options(
             generated_text(py, value.cache_path)
         })?,
     )?;
-    dict.set_item("event_mask", generated_value(py, value.event_mask)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_screen_box(
-    py: Python<'_>,
-    value: &sys::mln_screen_box,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("min", generated_copy_mln_screen_point(py, &value.min)?)?;
-    dict.set_item("max", generated_copy_mln_screen_point(py, &value.max)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_screen_line_string(
-    py: Python<'_>,
-    value: &sys::mln_screen_line_string,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "points",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.points, value.point_count)? },
-            |element| generated_copy_mln_screen_point(py, element),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2259,78 +2203,6 @@ fn generated_copy_mln_style_source_tile_info(
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
     dict.set_item("scheme", generated_value(py, value.scheme)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_tile_source_options(
-    py: Python<'_>,
-    value: &sys::mln_style_tile_source_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0,
-            || generated_value(py, value.max_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "attribution",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION != 0,
-            || generated_text(py, value.attribution),
-        )?,
-    )?;
-    dict.set_item(
-        "scheme",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME != 0,
-            || generated_value(py, value.scheme),
-        )?,
-    )?;
-    dict.set_item(
-        "bounds",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS != 0,
-            || generated_copy_mln_lat_lng_bounds(py, &value.bounds),
-        )?,
-    )?;
-    dict.set_item(
-        "tile_size",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0,
-            || generated_value(py, value.tile_size),
-        )?,
-    )?;
-    dict.set_item(
-        "vector_encoding",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING != 0,
-            || generated_value(py, value.vector_encoding),
-        )?,
-    )?;
-    dict.set_item(
-        "raster_encoding",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0,
-            || generated_value(py, value.raster_encoding),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3917,9 +3789,6 @@ fn generated_input_mln_resource_route<'py>(
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
     raw.url = storage.buffer(value.getattr("url")?, true)?;
-    raw.url_stage = value
-        .getattr("url_stage")?
-        .extract::<sys::mln_resource_route_url>()?;
     Ok(raw)
 }
 
@@ -3981,9 +3850,6 @@ fn generated_input_mln_runtime_options<'py>(
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
     raw.asset_path = storage.buffer(value.getattr("asset_path")?, true)?;
     raw.cache_path = storage.buffer(value.getattr("cache_path")?, true)?;
-    raw.event_mask = value
-        .getattr("event_mask")?
-        .extract::<sys::mln_runtime_event_mask>()?;
     Ok(raw)
 }
 
@@ -4098,52 +3964,6 @@ fn generated_input_mln_style_image_options<'py>(
     if let Some(field) = generated_present(value, "sdf")? {
         raw.sdf = field.extract::<bool>()?;
         raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
-    }
-    Ok(raw)
-}
-
-fn generated_input_mln_style_tile_source_options<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_style_tile_source_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_style_tile_source_options_default() });
-    }
-    let mut raw: sys::mln_style_tile_source_options =
-        unsafe { sys::mln_style_tile_source_options_default() };
-    raw.size = std::mem::size_of::<sys::mln_style_tile_source_options>() as _;
-    raw.fields = 0;
-    if let Some(field) = generated_present(value, "min_zoom")? {
-        raw.min_zoom = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-    }
-    if let Some(field) = generated_present(value, "max_zoom")? {
-        raw.max_zoom = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-    }
-    if let Some(field) = generated_present(value, "attribution")? {
-        raw.attribution = storage.buffer(field, true)?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-    }
-    if let Some(field) = generated_present(value, "scheme")? {
-        raw.scheme = field.extract::<sys::mln_style_tile_scheme>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-    }
-    if let Some(field) = generated_present(value, "bounds")? {
-        raw.bounds = generated_input_mln_lat_lng_bounds(&field, storage)?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-    }
-    if let Some(field) = generated_present(value, "tile_size")? {
-        raw.tile_size = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-    }
-    if let Some(field) = generated_present(value, "vector_encoding")? {
-        raw.vector_encoding = field.extract::<sys::mln_style_vector_tile_encoding>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-    }
-    if let Some(field) = generated_present(value, "raster_encoding")? {
-        raw.raster_encoding = field.extract::<sys::mln_style_raster_dem_encoding>()?;
-        raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
     }
     Ok(raw)
 }
@@ -4612,13 +4432,6 @@ fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_image_options_default() };
     generated_copy_mln_style_image_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_style_tile_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_style_tile_source_options_default() };
-    generated_copy_mln_style_tile_source_options(py, &value)
 }
 
 #[pyfunction]
@@ -5229,254 +5042,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn add_raster_dem_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_raster_dem_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_raster_dem_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn _discard_add_raster_dem_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_raster_dem_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_raster_dem_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn add_raster_dem_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_raster_dem_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_raster_dem_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn _discard_add_raster_dem_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_raster_dem_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_raster_dem_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn add_raster_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_raster_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_raster_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn _discard_add_raster_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_raster_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_raster_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn add_raster_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_raster_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_raster_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn _discard_add_raster_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_raster_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_raster_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (layer_json, before_layer_id=None))]
     fn add_style_layer_json(
         &self,
@@ -5569,128 +5134,6 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     source_json_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn add_vector_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_vector_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_vector_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, tiles, options=None))]
-    fn _discard_add_vector_source_tiles(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        tiles: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_vector_source_tiles", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_vector_source_tiles(
-                    handle,
-                    source_id_value,
-                    tiles_values.as_ptr(),
-                    tiles_values.len(),
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn add_vector_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_vector_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_vector_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn _discard_add_vector_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_vector_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_style_tile_source_options(&options, storage)
-        })?;
-        let handle = self.live()?;
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_vector_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -8668,76 +8111,6 @@ impl MapProjectionHandle {
         }?;
         generated_copy_mln_lat_lng(py, &out_coordinate)
     }
-    #[pyo3(signature = (points))]
-    fn lat_lngs_for_pixels(
-        &self,
-        py: Python<'_>,
-        points: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_lat_lngs_for_pixels",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let points_values = generated_items(points, |item| {
-            generated_input_mln_screen_point(&item, storage)
-        })?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points_values.len())
-            .map(|_| unsafe { std::mem::zeroed() })
-            .collect();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_lat_lngs_for_pixels(
-                    handle,
-                    points_values.as_ptr(),
-                    points_values.len(),
-                    out_coordinates.as_mut_ptr(),
-                    diagnostic,
-                )
-            })
-        }?;
-        generated_list(py, &out_coordinates, |element| {
-            generated_copy_mln_lat_lng(py, element)
-        })
-    }
-    #[pyo3(signature = (points))]
-    fn lat_lngs_for_pixels_unwrapped(
-        &self,
-        py: Python<'_>,
-        points: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_lat_lngs_for_pixels_unwrapped",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let points_values = generated_items(points, |item| {
-            generated_input_mln_screen_point(&item, storage)
-        })?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points_values.len())
-            .map(|_| unsafe { std::mem::zeroed() })
-            .collect();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_lat_lngs_for_pixels_unwrapped(
-                    handle,
-                    points_values.as_ptr(),
-                    points_values.len(),
-                    out_coordinates.as_mut_ptr(),
-                    diagnostic,
-                )
-            })
-        }?;
-        generated_list(py, &out_coordinates, |element| {
-            generated_copy_mln_lat_lng(py, element)
-        })
-    }
     #[pyo3(signature = (latitude))]
     fn meters_per_pixel_at_latitude(&self, py: Python<'_>, latitude: f64) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
@@ -8783,41 +8156,6 @@ impl MapProjectionHandle {
         }?;
         generated_copy_mln_screen_point(py, &out_point)
     }
-    #[pyo3(signature = (coordinates))]
-    fn pixels_for_lat_lngs(
-        &self,
-        py: Python<'_>,
-        coordinates: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_pixels_for_lat_lngs",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let coordinates_values = generated_items(coordinates, |item| {
-            generated_input_mln_lat_lng(&item, storage)
-        })?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_points: Vec<sys::mln_screen_point> = (0..coordinates_values.len())
-            .map(|_| unsafe { std::mem::zeroed() })
-            .collect();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_pixels_for_lat_lngs(
-                    handle,
-                    coordinates_values.as_ptr(),
-                    coordinates_values.len(),
-                    out_points.as_mut_ptr(),
-                    diagnostic,
-                )
-            })
-        }?;
-        generated_list(py, &out_points, |element| {
-            generated_copy_mln_screen_point(py, element)
-        })
-    }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_projection_release", self.admission())?;
@@ -8839,65 +8177,6 @@ impl MapProjectionHandle {
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_map_projection_set_camera(handle, &camera_value, diagnostic)
-            })
-        }?;
-        Ok(py.None())
-    }
-    #[pyo3(signature = (coordinates, padding))]
-    fn set_visible_coordinates(
-        &self,
-        py: Python<'_>,
-        coordinates: &Bound<'_, PyAny>,
-        padding: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_set_visible_coordinates",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let coordinates_values = generated_items(coordinates, |item| {
-            generated_input_mln_lat_lng(&item, storage)
-        })?;
-        let padding_value = generated_input_mln_edge_insets(&padding.clone(), storage)?;
-        let handle = self.live()?;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_set_visible_coordinates(
-                    handle,
-                    coordinates_values.as_ptr(),
-                    coordinates_values.len(),
-                    padding_value,
-                    diagnostic,
-                )
-            })
-        }?;
-        Ok(py.None())
-    }
-    #[pyo3(signature = (geometry, padding))]
-    fn set_visible_geometry(
-        &self,
-        py: Python<'_>,
-        geometry: &Bound<'_, PyAny>,
-        padding: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_set_visible_geometry",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let geometry_value = storage.buffer(geometry.clone(), false)?;
-        let padding_value = generated_input_mln_edge_insets(&padding.clone(), storage)?;
-        let handle = self.live()?;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_set_visible_geometry(
-                    handle,
-                    geometry_value,
-                    padding_value,
-                    diagnostic,
-                )
             })
         }?;
         Ok(py.None())
@@ -9664,21 +8943,6 @@ impl ResourceRequestHandle {
             *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
         }
         Ok(cancelled)
-    }
-    #[pyo3(signature = ())]
-    fn wait_until_retired(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_request_wait_until_retired",
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
-        )?;
-        let handle = self.state.issued_handle();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_resource_request_wait_until_retired(handle, diagnostic)
-            })
-        }?;
-        Ok(py.None())
     }
 }
 
@@ -10592,51 +9856,6 @@ fn projected_meters_for_lat_lng(
 }
 
 #[pyfunction]
-#[pyo3(signature = (input_box))]
-fn rendered_query_geometry_box(
-    py: Python<'_>,
-    input_box: &Bound<'_, PyAny>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_rendered_query_geometry_box", 0)?;
-    let storage = &mut call.storage;
-    let input_box_value = generated_input_mln_screen_box(&input_box.clone(), storage)?;
-    let result = unsafe { call.run(|| sys::mln_rendered_query_geometry_box(input_box_value)) };
-    generated_copy_mln_rendered_query_geometry(py, &result)
-}
-
-#[pyfunction]
-#[pyo3(signature = (points))]
-fn rendered_query_geometry_line_string(
-    py: Python<'_>,
-    points: &Bound<'_, PyAny>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_rendered_query_geometry_line_string", 0)?;
-    let storage = &mut call.storage;
-    let points_values = generated_items(points, |item| {
-        generated_input_mln_screen_point(&item, storage)
-    })?;
-    let result = unsafe {
-        call.run(|| {
-            sys::mln_rendered_query_geometry_line_string(
-                points_values.as_ptr(),
-                points_values.len(),
-            )
-        })
-    };
-    generated_copy_mln_rendered_query_geometry(py, &result)
-}
-
-#[pyfunction]
-#[pyo3(signature = (point))]
-fn rendered_query_geometry_point(py: Python<'_>, point: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_rendered_query_geometry_point", 0)?;
-    let storage = &mut call.storage;
-    let point_value = generated_input_mln_screen_point(&point.clone(), storage)?;
-    let result = unsafe { call.run(|| sys::mln_rendered_query_geometry_point(point_value)) };
-    generated_copy_mln_rendered_query_geometry(py, &result)
-}
-
-#[pyfunction]
 #[pyo3(signature = (options=None))]
 fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py, "mln_runtime_create", 0)?;
@@ -10733,10 +9952,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_style_tile_source_options,
-        module
-    )?)?;
     module.add_function(wrap_pyfunction!(_default_style_transition_options, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_vulkan_borrowed_texture_descriptor,
@@ -10778,12 +9993,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(plugin_get_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
-    module.add_function(wrap_pyfunction!(rendered_query_geometry_box, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        rendered_query_geometry_line_string,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(rendered_query_geometry_point, module)?)?;
     module.add_function(wrap_pyfunction!(runtime_create, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
     Ok(())

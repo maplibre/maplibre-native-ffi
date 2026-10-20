@@ -144,21 +144,4 @@ public sealed unsafe partial class ResourceRequestHandle
             scope.Accept(CallbackOwner);
         return outCancelled;
     }
-
-    /// <summary>
-    /// Blocks until a resource request is released and its cancel callback
-    /// registration has retired: the callback, if it ran, and release_user_data
-    /// have both returned. Completing a request does not release its owner.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_resource_request_wait_until_retired</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public void WaitUntilRetired()
-    {
-        using var call = Enter(this, "mln_resource_request_wait_until_retired");
-        Check(
-            NativeMethods.mln_resource_request_wait_until_retired(state.IssuedHandle, Diagnostic)
-        );
-    }
 }

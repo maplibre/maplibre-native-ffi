@@ -93,34 +93,63 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
 
   const rendered_row rows[] = {
     {"a point on the east circle hits it in both layers",
-     mln_rendered_query_geometry_point((mln_screen_point){.x = 46, .y = 32}),
-     NULL, NULL, 2, EAST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
+      .data = {.point = {.x = 46, .y = 32}}},
+     NULL,
+     NULL,
+     2,
+     EAST},
     {"a layer ID narrows a hit to that layer",
-     mln_rendered_query_geometry_point((mln_screen_point){.x = 46, .y = 32}),
-     "circles", NULL, 1, EAST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
+      .data = {.point = {.x = 46, .y = 32}}},
+     "circles",
+     NULL,
+     1,
+     EAST},
     {"a filter keeps the matching feature",
-     mln_rendered_query_geometry_box(
-       (mln_screen_box){.min = {.x = 0, .y = 0}, .max = {.x = 64, .y = 64}}
-     ),
-     "circles", "[\"==\",[\"get\",\"kind\"],\"a\"]", 1, WEST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+      .data = {.box = {.min = {.x = 0, .y = 0}, .max = {.x = 64, .y = 64}}}},
+     "circles",
+     "[\"==\",[\"get\",\"kind\"],\"a\"]",
+     1,
+     WEST},
     {"a box past every edge is clipped to the viewport",
-     mln_rendered_query_geometry_box((mln_screen_box){
-       .min = {.x = -4096, .y = -4096}, .max = {.x = 4096, .y = 4096}
-     }),
-     "circles", NULL, 2, WEST | EAST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+      .data =
+        {.box =
+           {.min = {.x = -4096, .y = -4096}, .max = {.x = 4096, .y = 4096}}}},
+     "circles",
+     NULL,
+     2,
+     WEST | EAST},
     {"a box with swapped corners is normalized",
-     mln_rendered_query_geometry_box(
-       (mln_screen_box){.min = {.x = 64, .y = 40}, .max = {.x = 36, .y = 24}}
-     ),
-     "circles", NULL, 1, EAST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+      .data = {.box = {.min = {.x = 64, .y = 40}, .max = {.x = 36, .y = 24}}}},
+     "circles",
+     NULL,
+     1,
+     EAST},
     {"a box beyond the viewport finds nothing",
-     mln_rendered_query_geometry_box(
-       (mln_screen_box){.min = {.x = 100, .y = 0}, .max = {.x = 200, .y = 64}}
-     ),
-     NULL, NULL, 0, 0},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+      .data = {.box = {.min = {.x = 100, .y = 0}, .max = {.x = 200, .y = 64}}}},
+     NULL,
+     NULL,
+     0,
+     0},
     {"a line string through both circles hits both",
-     mln_rendered_query_geometry_line_string(crossing_line, 2), "circles", NULL,
-     2, WEST | EAST},
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
+      .data = {.line_string = {.points = crossing_line, .point_count = 2}}},
+     "circles",
+     NULL,
+     2,
+     WEST | EAST},
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const rendered_row* row = &rows[index];
@@ -185,12 +214,18 @@ static void non_finite_point(void* call) {
   ((query_call*)call)->geometry.data.point.x = (double)INFINITY;
 }
 static void empty_line_string(void* call) {
-  ((query_call*)call)->geometry =
-    mln_rendered_query_geometry_line_string(crossing_line, 0);
+  ((query_call*)call)->geometry = (mln_rendered_query_geometry){
+    .size = sizeof(mln_rendered_query_geometry),
+    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
+    .data = {.line_string = {.points = crossing_line, .point_count = 0}}
+  };
 }
 static void null_line_string_points(void* call) {
-  ((query_call*)call)->geometry =
-    mln_rendered_query_geometry_line_string(NULL, 2);
+  ((query_call*)call)->geometry = (mln_rendered_query_geometry){
+    .size = sizeof(mln_rendered_query_geometry),
+    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
+    .data = {.line_string = {.points = NULL, .point_count = 2}}
+  };
 }
 static void undersized_rendered_options(void* call) {
   ((query_call*)call)->rendered.size =
@@ -630,7 +665,11 @@ static void malformed_queries_are_rejected_at_submission(void) {
   };
   const query_call defaults = {
     .geometry =
-      mln_rendered_query_geometry_point((mln_screen_point){.x = 32, .y = 32}),
+      (mln_rendered_query_geometry){
+        .size = sizeof(mln_rendered_query_geometry),
+        .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
+        .data = {.point = (mln_screen_point){.x = 32, .y = 32}}
+      },
     .rendered = mln_rendered_feature_query_options_default(),
     .source = mln_source_feature_query_options_default(),
     .source_id = MLN_BUFFER_LITERAL("points"),

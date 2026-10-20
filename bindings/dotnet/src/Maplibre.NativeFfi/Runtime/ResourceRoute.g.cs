@@ -18,16 +18,12 @@ namespace Maplibre.NativeFfi;
 /// <param name="Url">
 /// The URL or glob pattern to compare.
 /// </param>
-/// <param name="UrlStage">
-/// The URL stage to compare.
-/// </param>
 public readonly partial record struct ResourceRoute(
     ResourceKindMask Kinds,
     UrlMatchFlags Flags,
-    string Url,
-    ResourceRouteUrl UrlStage
+    string Url
 )
 {
     public ResourceRoute()
-        : this(ResourceKindMask.All, default, default!, default) { }
+        : this(ResourceKindMask.All, default, default!) { }
 }

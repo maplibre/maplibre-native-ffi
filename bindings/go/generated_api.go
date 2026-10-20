@@ -883,18 +883,6 @@ const (
 	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
 )
 
-// ResourceRouteUrl corresponds to mln_resource_route_url. The URL stage that a
-// provider route compares.
-//
-// See mln_resource_route_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceRouteUrl uint32
-
-const (
-	ResourceRouteUrlResolved  ResourceRouteUrl = ResourceRouteUrl(C.MLN_RESOURCE_ROUTE_URL_RESOLVED)
-	ResourceRouteUrlRequested ResourceRouteUrl = ResourceRouteUrl(C.MLN_RESOURCE_ROUTE_URL_REQUESTED)
-)
-
 type ResourceStoragePolicy uint32
 
 const (
@@ -928,8 +916,6 @@ const (
 	RuntimeEventMaskMapLoadingFailed                    RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED)
 	RuntimeEventMaskMapIdle                             RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_IDLE)
 	RuntimeEventMaskMapRenderError                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR)
-	RuntimeEventMaskMapStillImageFinished               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED)
-	RuntimeEventMaskMapStillImageFailed                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED)
 	RuntimeEventMaskMapRenderFrameStarted               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED)
 	RuntimeEventMaskMapRenderFrameFinished              RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED)
 	RuntimeEventMaskMapRenderMapStarted                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED)
@@ -996,8 +982,6 @@ const (
 	RuntimeEventTypeMapLoadingFailed                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
 	RuntimeEventTypeMapIdle                             RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
 	RuntimeEventTypeMapRenderError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
-	RuntimeEventTypeMapStillImageFinished               RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED)
-	RuntimeEventTypeMapStillImageFailed                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED)
 	RuntimeEventTypeMapRenderFrameStarted               RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
 	RuntimeEventTypeMapRenderFrameFinished              RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
 	RuntimeEventTypeMapRenderMapStarted                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)
@@ -1121,7 +1105,7 @@ const (
 )
 
 // StyleRasterDemEncoding corresponds to mln_style_raster_dem_encoding. DEM
-// raster encoding values used by mln_style_tile_source_options.
+// raster encoding values.
 //
 // See mln_style_raster_dem_encoding in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -1179,7 +1163,7 @@ const (
 )
 
 // StyleTileScheme corresponds to mln_style_tile_scheme. Tile URL coordinate
-// scheme values used by mln_style_tile_source_options.
+// scheme values.
 //
 // See mln_style_tile_scheme in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -1189,28 +1173,6 @@ const (
 	StyleTileSchemeXyz StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_XYZ)
 	StyleTileSchemeTms StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_TMS)
 )
-
-// StyleTileSourceOptionField corresponds to mln_style_tile_source_option_field.
-// Field mask values for mln_style_tile_source_options.
-//
-// See mln_style_tile_source_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleTileSourceOptionField uint32
-
-const (
-	StyleTileSourceOptionFieldMinZoom        StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)
-	StyleTileSourceOptionFieldMaxZoom        StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)
-	StyleTileSourceOptionFieldAttribution    StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)
-	StyleTileSourceOptionFieldScheme         StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)
-	StyleTileSourceOptionFieldBounds         StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)
-	StyleTileSourceOptionFieldTileSize       StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
-	StyleTileSourceOptionFieldVectorEncoding StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
-	StyleTileSourceOptionFieldRasterEncoding StyleTileSourceOptionField = StyleTileSourceOptionField(C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING)
-)
-
-func (value StyleTileSourceOptionField) Has(flags StyleTileSourceOptionField) bool {
-	return value&flags == flags
-}
 
 // StyleTransitionOptionField corresponds to mln_style_transition_option_field.
 // Field mask values for mln_style_transition_options.
@@ -1230,7 +1192,7 @@ func (value StyleTransitionOptionField) Has(flags StyleTransitionOptionField) bo
 }
 
 // StyleVectorTileEncoding corresponds to mln_style_vector_tile_encoding. Vector
-// tile encoding values used by mln_style_tile_source_options.
+// tile encoding values.
 //
 // See mln_style_vector_tile_encoding in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -3705,22 +3667,6 @@ func DefaultRenderedFeatureQueryOptions() RenderedFeatureQueryOptions {
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type RenderedQueryGeometry struct{ Data RenderedQueryGeometryData }
 
-func copyRenderedQueryGeometry(raw C.mln_rendered_query_geometry) RenderedQueryGeometry {
-	var result RenderedQueryGeometry
-	result.Data = func() RenderedQueryGeometryData {
-		switch raw._type {
-		case C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
-			return RenderedQueryGeometryDataPointVariant{Value: copyScreenPoint((*(*C.mln_screen_point)(unsafe.Pointer(&raw.data))))}
-		case C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
-			return RenderedQueryGeometryDataBoxVariant{Value: copyScreenBox((*(*C.mln_screen_box)(unsafe.Pointer(&raw.data))))}
-		case C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING:
-			return RenderedQueryGeometryDataLineStringVariant{Value: copyScreenLineString((*(*C.mln_screen_line_string)(unsafe.Pointer(&raw.data))))}
-		}
-		return UnknownVariant{Tag: uint32(raw._type)}
-	}()
-	return result
-}
-
 func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingArena) C.mln_rendered_query_geometry {
 	raw := C.mln_rendered_query_geometry{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
@@ -3983,8 +3929,6 @@ type ResourceRoute struct {
 	Flags UrlMatchFlags
 	// The URL or glob pattern to compare.
 	Url string
-	// The URL stage to compare.
-	UrlStage ResourceRouteUrl
 }
 
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
@@ -3992,7 +3936,6 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 	raw.kinds = C.uint32_t(input.Kinds)
 	raw.flags = C.uint32_t(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
-	raw.url_stage = C.uint32_t(input.UrlStage)
 	return raw
 }
 
@@ -4242,9 +4185,6 @@ type RuntimeOptions struct {
 	// Cache database path. Copied during runtime creation. Copied text, owned by
 	// the caller.
 	CachePath *string
-	// Runtime-scoped event types this runtime queues, as a bitwise OR of
-	// mln_runtime_event_mask values.
-	EventMask RuntimeEventMask
 }
 
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
@@ -4263,7 +4203,6 @@ func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 		value := bindingString(raw.cache_path.data, uint64(raw.cache_path.size))
 		return &value
 	}()
-	result.EventMask = RuntimeEventMask(raw.event_mask)
 	return result
 }
 
@@ -4276,7 +4215,6 @@ func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runti
 	if input.CachePath != nil {
 		raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.CachePath))), size: C.size_t(len((*input.CachePath)))}
 	}
-	raw.event_mask = C.uint64_t(input.EventMask)
 	return raw
 }
 
@@ -4294,13 +4232,6 @@ type ScreenBox struct {
 	Max ScreenPoint
 }
 
-func copyScreenBox(raw C.mln_screen_box) ScreenBox {
-	var result ScreenBox
-	result.Min = copyScreenPoint(raw.min)
-	result.Max = copyScreenPoint(raw.max)
-	return result
-}
-
 func nativeScreenBox(input ScreenBox, arena *bindingArena) C.mln_screen_box {
 	raw := C.mln_screen_box{}
 	raw.min = nativeScreenPoint(input.Min, arena)
@@ -4314,22 +4245,8 @@ func nativeScreenBox(input ScreenBox, arena *bindingArena) C.mln_screen_box {
 // See mln_screen_line_string in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type ScreenLineString struct {
-	// Points. Null only when point_count is 0. Copied value, owned by the caller.
+	// Points. Null only when point_count is 0.
 	Points []ScreenPoint
-}
-
-func copyScreenLineString(raw C.mln_screen_line_string) ScreenLineString {
-	var result ScreenLineString
-	result.Points = func() []ScreenPoint {
-		length := bindingLength(uint64(raw.point_count))
-		result := make([]ScreenPoint, length)
-		for i := range result {
-			item := *(*C.mln_screen_point)(bindingElement(unsafe.Pointer(raw.points), i, uint64(unsafe.Sizeof(C.mln_screen_point{})), unsafe.Sizeof(*raw.points), unsafe.Alignof(*raw.points)))
-			result[i] = copyScreenPoint(item)
-		}
-		return result
-	}()
-	return result
 }
 
 func nativeScreenLineString(input ScreenLineString, arena *bindingArena) C.mln_screen_line_string {
@@ -4704,62 +4621,6 @@ func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileIn
 	result.MaxZoom = float64(raw.max_zoom)
 	result.Scheme = StyleTileScheme(raw.scheme)
 	return result
-}
-
-// StyleTileSourceOptions corresponds to mln_style_tile_source_options. Options
-// for vector and raster tile sources.
-//
-// See mln_style_tile_source_options in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleTileSourceOptions struct {
-	MinZoom *float64
-	MaxZoom *float64
-	// Copied text, owned by the caller.
-	Attribution *string
-	// One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ.
-	Scheme *StyleTileScheme
-	Bounds *LatLngBounds
-	// Raster tile size in pixels. Defaults to 512.
-	TileSize *uint32
-	// One of mln_style_vector_tile_encoding. Defaults to MVT.
-	VectorEncoding *StyleVectorTileEncoding
-	// One of mln_style_raster_dem_encoding. Defaults to Mapbox.
-	RasterEncoding *StyleRasterDemEncoding
-}
-
-func copyStyleTileSourceOptions(raw C.mln_style_tile_source_options) StyleTileSourceOptions {
-	var result StyleTileSourceOptions
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.MaxZoom = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
-	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
-	result.Scheme = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME != 0, func() StyleTileScheme { return StyleTileScheme(raw.scheme) })
-	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
-	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
-	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
-	result.RasterEncoding = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0, func() StyleRasterDemEncoding { return StyleRasterDemEncoding(raw.raster_encoding) })
-	return result
-}
-
-func nativeStyleTileSourceOptions(input StyleTileSourceOptions, arena *bindingArena) C.mln_style_tile_source_options {
-	raw := C.mln_style_tile_source_options_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
-	if input.Attribution != nil {
-		raw.attribution = C.mln_buffer_view{data: arena.bytes([]byte((*input.Attribution))), size: C.size_t(len((*input.Attribution)))}
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
-	}
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME, &raw.scheme, input.Scheme, arena, bindingNumber[StyleTileScheme, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS, &raw.bounds, input.Bounds, arena, nativeLatLngBounds)
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, input.TileSize, arena, bindingNumber[uint32, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING, &raw.vector_encoding, input.VectorEncoding, arena, bindingNumber[StyleVectorTileEncoding, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING, &raw.raster_encoding, input.RasterEncoding, arena, bindingNumber[StyleRasterDemEncoding, C.uint32_t])
-	return raw
-}
-
-func DefaultStyleTileSourceOptions() StyleTileSourceOptions {
-	return copyStyleTileSourceOptions(C.mln_style_tile_source_options_default())
 }
 
 // StyleTransitionOptions corresponds to mln_style_transition_options. Global
@@ -6392,46 +6253,6 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 	}, completionCommand)
 }
 
-// AddRasterDemSourceTiles adds a raster DEM source with inline tile URLs.
-//
-// See mln_map_add_raster_dem_source_tiles in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddRasterDemSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddRasterDemSourceUrl adds a raster DEM source with a TileJSON URL.
-//
-// See mln_map_add_raster_dem_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddRasterDemSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddRasterSourceTiles adds a raster source with inline tile URLs.
-//
-// See mln_map_add_raster_source_tiles in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddRasterSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddRasterSourceUrl adds a raster source with a TileJSON URL.
-//
-// See mln_map_add_raster_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddRasterSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
 // AddStyleLayerJson adds one style layer from a full style-spec layer JSON
 // object.
 //
@@ -6451,26 +6272,6 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *st
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_source_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddVectorSourceTiles adds a vector source with inline tile URLs.
-//
-// See mln_map_add_vector_source_tiles in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddVectorSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddVectorSourceUrl adds a vector source with a TileJSON URL.
-//
-// See mln_map_add_vector_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddVectorSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_vector_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7110,45 +6911,6 @@ func (receiver *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) 
 	})
 }
 
-// LatLngsForPixels converts screen points to geographic coordinates.
-//
-// See mln_map_projection_lat_lngs_for_pixels in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
-	outCoordinates := make([]C.mln_lat_lng, len(points))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lngs_for_pixels), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_lat_lngs_for_pixels(C.mln_map_projection(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), unsafe.SliceData(outCoordinates), diagnostic))
-	}, func(arena *bindingArena) []LatLng {
-		return func() []LatLng {
-			result := make([]LatLng, len(outCoordinates))
-			for index, item := range outCoordinates {
-				result[index] = copyLatLng(item)
-			}
-			return result
-		}()
-	})
-}
-
-// LatLngsForPixelsUnwrapped converts screen points to unwrapped geographic
-// coordinates.
-//
-// See mln_map_projection_lat_lngs_for_pixels_unwrapped in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) ([]LatLng, error) {
-	outCoordinates := make([]C.mln_lat_lng, len(points))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lngs_for_pixels_unwrapped), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_lat_lngs_for_pixels_unwrapped(C.mln_map_projection(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), unsafe.SliceData(outCoordinates), diagnostic))
-	}, func(arena *bindingArena) []LatLng {
-		return func() []LatLng {
-			result := make([]LatLng, len(outCoordinates))
-			for index, item := range outCoordinates {
-				result[index] = copyLatLng(item)
-			}
-			return result
-		}()
-	})
-}
-
 // MetersPerPixelAtLatitude reads the ground distance covered by one logical map
 // pixel at a latitude for the helper camera zoom.
 //
@@ -7176,25 +6938,6 @@ func (receiver *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPo
 	})
 }
 
-// PixelsForLatLngs converts geographic coordinates to screen points.
-//
-// See mln_map_projection_pixels_for_lat_lngs in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error) {
-	outPoints := make([]C.mln_screen_point, len(coordinates))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_pixels_for_lat_lngs), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_pixels_for_lat_lngs(C.mln_map_projection(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), unsafe.SliceData(outPoints), diagnostic))
-	}, func(arena *bindingArena) []ScreenPoint {
-		return func() []ScreenPoint {
-			result := make([]ScreenPoint, len(outPoints))
-			for index, item := range outPoints {
-				result[index] = copyScreenPoint(item)
-			}
-			return result
-		}()
-	})
-}
-
 // Close releases a standalone projection.
 //
 // See mln_map_projection_release in the C API reference:
@@ -7212,26 +6955,6 @@ func (receiver *MapProjectionHandle) Close() error {
 func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_camera), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(raw), bindingStore(nativeCameraOptions(camera, arena), arena), diagnostic))
-	})
-}
-
-// SetVisibleCoordinates applies a camera fit for geographic coordinates.
-//
-// See mln_map_projection_set_visible_coordinates in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_visible_coordinates), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_set_visible_coordinates(C.mln_map_projection(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), nativeEdgeInsets(padding, arena), diagnostic))
-	})
-}
-
-// SetVisibleGeometry applies a camera fit for GeoJSON Geometry bytes.
-//
-// See mln_map_projection_set_visible_geometry in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_visible_geometry), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_set_visible_geometry(C.mln_map_projection(raw), bindingView(geometry, arena), nativeEdgeInsets(padding, arena), diagnostic))
 	})
 }
 
@@ -8017,38 +7740,6 @@ func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSur
 	}, completionUnit)
 }
 
-// RenderedQueryGeometryBox returns a rendered box query geometry descriptor.
-//
-// See mln_rendered_query_geometry_box in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func RenderedQueryGeometryBox(box ScreenBox) (RenderedQueryGeometry, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_box), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
-		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_box(nativeScreenBox(box, arena)))
-	})
-}
-
-// RenderedQueryGeometryLineString returns a rendered line-string query geometry
-// descriptor.
-//
-// See mln_rendered_query_geometry_line_string in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func RenderedQueryGeometryLineString(points []ScreenPoint) (RenderedQueryGeometry, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_line_string), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
-		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_line_string(bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points))))
-	})
-}
-
-// RenderedQueryGeometryPoint returns a rendered point query geometry
-// descriptor.
-//
-// See mln_rendered_query_geometry_point in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func RenderedQueryGeometryPoint(point ScreenPoint) (RenderedQueryGeometry, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_point), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
-		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_point(nativeScreenPoint(point, arena)))
-	})
-}
-
 // Complete completes a C API resource provider request.
 //
 // See mln_resource_request_complete in the C API reference:
@@ -8106,19 +7797,6 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 			arena.decline()
 		}
 		return bool(outCancelled)
-	})
-}
-
-// WaitUntilRetired blocks until a resource request is released and its cancel
-// callback registration has retired: the callback, if it ran, and
-// release_user_data have both returned. Completing a request does not release
-// its owner.
-//
-// See mln_resource_request_wait_until_retired in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceRequestHandle) WaitUntilRetired() error {
-	return bindingDo(bindingIssued(receiver.owner(), C.binding_operation_mln_resource_request_wait_until_retired), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_wait_until_retired(C.mln_resource_request(raw), diagnostic))
 	})
 }
 
@@ -8455,34 +8133,6 @@ func (view MapHandleDiscarding) AddImageSourceUrl(sourceId string, coordinates [
 	})
 }
 
-func (view MapHandleDiscarding) AddRasterDemSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddRasterDemSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddRasterSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddRasterSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_raster_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	})
-}
-
 func (view MapHandleDiscarding) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) error {
 	receiver := view.owner
 	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -8494,20 +8144,6 @@ func (view MapHandleDiscarding) AddStyleSourceJson(sourceId string, sourceJson [
 	receiver := view.owner
 	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_source_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddVectorSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddVectorSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_vector_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
 	})
 }
 

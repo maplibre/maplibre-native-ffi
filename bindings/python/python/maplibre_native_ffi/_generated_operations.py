@@ -24,7 +24,6 @@ from ._generated_values import (
     CanonicalTileId,
     CustomGeometrySourceOptions,
     CustomMvtVectorSourceOptions,
-    EdgeInsets,
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
@@ -75,14 +74,12 @@ from ._generated_values import (
     RuntimeEventHandler,
     RuntimeEventMask,
     RuntimeOptions,
-    ScreenBox,
     ScreenPoint,
     SourceFeatureQueryOptions,
     StyleImageInfo,
     StyleImageOptions,
     StyleLayerInfo,
     StyleSourceInfo,
-    StyleTileSourceOptions,
     StyleTransitionOptions,
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
@@ -358,52 +355,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_image_source_url(source_id, coordinates, url)
 
-    def add_raster_dem_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> Future[CommandCompletion]:
-        """Adds a raster DEM source with inline tile URLs.
-
-        See `mln_map_add_raster_dem_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_raster_dem_source_tiles(source_id, tiles, options)
-
-    def add_raster_dem_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a raster DEM source with a TileJSON URL.
-
-        See `mln_map_add_raster_dem_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_raster_dem_source_url(source_id, url, options)
-
-    def add_raster_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> Future[CommandCompletion]:
-        """Adds a raster source with inline tile URLs.
-
-        See `mln_map_add_raster_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_raster_source_tiles(source_id, tiles, options)
-
-    def add_raster_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a raster source with a TileJSON URL.
-
-        See `mln_map_add_raster_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_raster_source_url(source_id, url, options)
-
     def add_style_layer_json(
         self, layer_json: bytes, before_layer_id: str | None = None
     ) -> Future[CommandCompletion]:
@@ -423,29 +374,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native.add_style_source_json(source_id, source_json)
-
-    def add_vector_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> Future[CommandCompletion]:
-        """Adds a vector source with inline tile URLs.
-
-        See `mln_map_add_vector_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_vector_source_tiles(source_id, tiles, options)
-
-    def add_vector_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a vector source with a TileJSON URL.
-
-        See `mln_map_add_vector_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.add_vector_source_url(source_id, url, options)
 
     def apply_camera_delta(
         self, delta: CameraDelta | None = None
@@ -1350,32 +1278,6 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return LatLng._from_native(self._native.lat_lng_for_pixel_unwrapped(point))
 
-    def lat_lngs_for_pixels(
-        self, points: tuple[ScreenPoint, ...]
-    ) -> tuple[LatLng, ...]:
-        """Converts screen points to geographic coordinates.
-
-        See `mln_map_projection_lat_lngs_for_pixels` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return tuple(
-            LatLng._from_native(item)
-            for item in self._native.lat_lngs_for_pixels(points)
-        )
-
-    def lat_lngs_for_pixels_unwrapped(
-        self, points: tuple[ScreenPoint, ...]
-    ) -> tuple[LatLng, ...]:
-        """Converts screen points to unwrapped geographic coordinates.
-
-        See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return tuple(
-            LatLng._from_native(item)
-            for item in self._native.lat_lngs_for_pixels_unwrapped(points)
-        )
-
     def meters_per_pixel_at_latitude(self, latitude: float) -> float:
         """Reads the ground distance covered by one logical map pixel at a
         latitude for the helper camera zoom.
@@ -1393,19 +1295,6 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return ScreenPoint._from_native(self._native.pixel_for_lat_lng(coordinate))
 
-    def pixels_for_lat_lngs(
-        self, coordinates: tuple[LatLng, ...]
-    ) -> tuple[ScreenPoint, ...]:
-        """Converts geographic coordinates to screen points.
-
-        See `mln_map_projection_pixels_for_lat_lngs` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return tuple(
-            ScreenPoint._from_native(item)
-            for item in self._native.pixels_for_lat_lngs(coordinates)
-        )
-
     def close(self) -> None:
         """Releases a standalone projection.
 
@@ -1421,24 +1310,6 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return self._native.set_camera(camera)
-
-    def set_visible_coordinates(
-        self, coordinates: tuple[LatLng, ...], padding: EdgeInsets
-    ) -> None:
-        """Applies a camera fit for geographic coordinates.
-
-        See `mln_map_projection_set_visible_coordinates` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return self._native.set_visible_coordinates(coordinates, padding)
-
-    def set_visible_geometry(self, geometry: bytes, padding: EdgeInsets) -> None:
-        """Applies a camera fit for GeoJSON Geometry bytes.
-
-        See `mln_map_projection_set_visible_geometry` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return self._native.set_visible_geometry(geometry, padding)
 
 
 class _RenderFrameBatchHandleOperations(GeneratedOperations):
@@ -1809,17 +1680,6 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
         return self._native.set_cancel_callback(handler)
-
-    def wait_until_retired(self) -> None:
-        """Blocks until a resource request is released and its cancel callback
-        registration has retired: the callback, if it ran, and
-        release_user_data have both returned. Completing a request does not
-        release its owner.
-
-        See `mln_resource_request_wait_until_retired` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.wait_until_retired()
 
 
 class _ResourceTransformResponseScopeOperations(GeneratedOperations):
@@ -2198,41 +2058,6 @@ def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     )
 
 
-def rendered_query_geometry_box(input_box: ScreenBox) -> RenderedQueryGeometry:
-    """Returns a rendered box query geometry descriptor.
-
-    See `mln_rendered_query_geometry_box` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-    return RenderedQueryGeometry._from_native(
-        _native.rendered_query_geometry_box(input_box)
-    )
-
-
-def rendered_query_geometry_line_string(
-    points: tuple[ScreenPoint, ...],
-) -> RenderedQueryGeometry:
-    """Returns a rendered line-string query geometry descriptor.
-
-    See `mln_rendered_query_geometry_line_string` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-    return RenderedQueryGeometry._from_native(
-        _native.rendered_query_geometry_line_string(points)
-    )
-
-
-def rendered_query_geometry_point(point: ScreenPoint) -> RenderedQueryGeometry:
-    """Returns a rendered point query geometry descriptor.
-
-    See `mln_rendered_query_geometry_point` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-    return RenderedQueryGeometry._from_native(
-        _native.rendered_query_geometry_point(point)
-    )
-
-
 def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
     """Creates a runtime.
 
@@ -2323,54 +2148,6 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_image_source_url(source_id, coordinates, url)
 
-    def add_raster_dem_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> None:
-        """Adds a raster DEM source with inline tile URLs.
-
-        See `mln_map_add_raster_dem_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_raster_dem_source_tiles(
-            source_id, tiles, options
-        )
-
-    def add_raster_dem_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> None:
-        """Adds a raster DEM source with a TileJSON URL.
-
-        See `mln_map_add_raster_dem_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_raster_dem_source_url(source_id, url, options)
-
-    def add_raster_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> None:
-        """Adds a raster source with inline tile URLs.
-
-        See `mln_map_add_raster_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_raster_source_tiles(source_id, tiles, options)
-
-    def add_raster_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> None:
-        """Adds a raster source with a TileJSON URL.
-
-        See `mln_map_add_raster_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_raster_source_url(source_id, url, options)
-
     def add_style_layer_json(
         self, layer_json: bytes, before_layer_id: str | None = None
     ) -> None:
@@ -2388,29 +2165,6 @@ class MapHandleDiscarding:
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native._discard_add_style_source_json(source_id, source_json)
-
-    def add_vector_source_tiles(
-        self,
-        source_id: str,
-        tiles: tuple[str, ...],
-        options: StyleTileSourceOptions | None = None,
-    ) -> None:
-        """Adds a vector source with inline tile URLs.
-
-        See `mln_map_add_vector_source_tiles` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_vector_source_tiles(source_id, tiles, options)
-
-    def add_vector_source_url(
-        self, source_id: str, url: str, options: StyleTileSourceOptions | None = None
-    ) -> None:
-        """Adds a vector source with a TileJSON URL.
-
-        See `mln_map_add_vector_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_vector_source_url(source_id, url, options)
 
     def apply_camera_delta(self, delta: CameraDelta | None = None) -> None:
         """Submits one atomic relative camera update.

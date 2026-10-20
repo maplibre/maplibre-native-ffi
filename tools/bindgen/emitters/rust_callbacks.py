@@ -597,12 +597,6 @@ impl {name} {{
         maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
         self.state.register_cancel({identifier(cancel.parameter)}.{identifier(cancel.callbacks[0])})
     }}
-{documented(decision.wait_retired)}
-    pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{
-        let native = self.state.issued_handle();
-        maplibre_core::callback::check("{decision.wait_retired}", native.0)?;
-        {checked(decision.wait_retired, "native")}
-    }}
     pub fn close(&self) -> Result<()> {{
         maplibre_core::callback::check("{decision.handle.release}", self.state.issued_handle().0)?;
         self.state.close();

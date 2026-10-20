@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// DEM raster encoding values used by <c>mln_style_tile_source_options</c>.
+/// DEM raster encoding values.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_raster_dem_encoding</c> in the <see

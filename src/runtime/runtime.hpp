@@ -54,16 +54,6 @@ struct HeldMapEvent {
   std::string message;
 };
 
-// An operation completion raised inside a map transaction. It waits until
-// the transaction queues the events it held, so an operation's event precedes
-// its completion.
-struct DeferredOperationCompletion {
-  std::shared_ptr<OperationObject> operation;
-  mln_status status = MLN_STATUS_OK;
-  std::string message;
-  std::any result;
-};
-
 // A camera command whose transitions ended with `outcome`, waiting for the
 // generation of the snapshot that shows where they left the camera.
 struct EndedCameraTransition {
@@ -102,9 +92,6 @@ struct MapEventState {
   // until it publishes, and transactions never nest.
   uint32_t transaction_depth = 0;
   std::vector<HeldMapEvent> held;
-  // Operations that finished inside the open transaction, such as a pending
-  // still image that a style error inside a command fails.
-  std::vector<DeferredOperationCompletion> deferred_completions;
   // Camera commands with an end handler whose transitions are still running,
   // so that a map close can report them closed.
   std::vector<std::shared_ptr<CameraTransitionEnd>> running_transition_ends;
@@ -297,11 +284,10 @@ class ResourceProviderLease {
   // Whether the provider's routes claim a request. A request they do not
   // claim passes through to native loading.
   [[nodiscard]] auto matches(
-    std::uint32_t kind, std::string_view requested_url,
-    std::string_view resolved_url
+    std::uint32_t kind, std::string_view resolved_url
   ) const noexcept -> bool {
     return provider_.routes == nullptr ||
-           provider_.routes->matches(kind, requested_url, resolved_url);
+           provider_.routes->matches(kind, resolved_url);
   }
 
  private:

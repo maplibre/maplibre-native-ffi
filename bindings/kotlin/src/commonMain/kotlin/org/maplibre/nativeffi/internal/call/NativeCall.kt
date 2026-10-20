@@ -151,7 +151,6 @@ internal enum class Access {
 
   /** Holds off a concurrent release while the call copies borrowed outputs. */
   READ,
-  ISSUED,
 }
 
 private fun <T> receive(
@@ -173,7 +172,7 @@ private fun <T> receive(
         block(handle)
       }
     }
-    val handle = if (access == Access.ISSUED) state.issued() else state.handle()
+    val handle = state.handle()
     CallbackAdmission.check(handle, name)
     return block(handle)
   } finally {

@@ -4133,26 +4133,6 @@ impl ToNative<sys::mln_rendered_query_geometry> for RenderedQueryGeometry {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_rendered_query_geometry> for RenderedQueryGeometry {
-    unsafe fn from_native(raw: sys::mln_rendered_query_geometry) -> Result<Self> {
-        Ok(Self {
-            data: match raw.type_ {
-                sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT => {
-                    RenderedQueryGeometryData::Point(unsafe { from_native(raw.data.point) }?)
-                }
-                sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX => {
-                    RenderedQueryGeometryData::Box(unsafe { from_native(raw.data.box_) }?)
-                }
-                sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING => {
-                    RenderedQueryGeometryData::LineString(unsafe {
-                        from_native(raw.data.line_string)
-                    }?)
-                }
-                tag => RenderedQueryGeometryData::Unknown(tag as u32),
-            },
-        })
-    }
-}
 
 /// Screen-space query geometry data.
 ///
@@ -4489,19 +4469,6 @@ impl ResourceRequest {
         maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
         self.state.register_cancel(handler.callback)
     }
-    /// Blocks until a resource request is released and its cancel callback
-    /// registration has retired: the callback, if it ran, and release_user_data
-    /// have both returned. Completing a request does not release its owner.
-    ///
-    /// See `mln_resource_request_wait_until_retired` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn wait_until_retired(&self) -> Result<()> {
-        let native = self.state.issued_handle();
-        maplibre_core::callback::check("mln_resource_request_wait_until_retired", native.0)?;
-        maplibre_core::check(|out_diagnostic| unsafe {
-            sys::mln_resource_request_wait_until_retired(native, out_diagnostic)
-        })
-    }
     pub fn close(&self) -> Result<()> {
         maplibre_core::callback::check(
             "mln_resource_request_release",
@@ -4723,8 +4690,6 @@ pub struct ResourceRoute {
     pub flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
     pub url: String,
-    /// The URL stage to compare.
-    pub url_stage: ResourceRouteUrl,
 }
 impl Default for ResourceRoute {
     fn default() -> Self {
@@ -4732,7 +4697,6 @@ impl Default for ResourceRoute {
             kinds: ResourceKindMask::ALL,
             flags: Default::default(),
             url: Default::default(),
-            url_stage: Default::default(),
         }
     }
 }
@@ -4742,20 +4706,8 @@ impl ToNative<sys::mln_resource_route> for ResourceRoute {
         raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
-        raw.url_stage = to_native(&self.url_stage, arena)?;
         Ok(raw)
     }
-}
-
-native_enum! {
-/// The URL stage that a provider route compares.
-///
-/// See `mln_resource_route_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub enum ResourceRouteUrl: u32 {
-    Resolved = 0,
-    Requested = 1,
-} Unknown
 }
 
 native_enum! {
@@ -5041,8 +4993,6 @@ pub struct RuntimeEventMask: u64 {
     const MAP_LOADING_FAILED = 128;
     const MAP_IDLE = 256;
     const MAP_RENDER_ERROR = 1024;
-    const MAP_STILL_IMAGE_FINISHED = 2048;
-    const MAP_STILL_IMAGE_FAILED = 4096;
     const MAP_RENDER_FRAME_STARTED = 8192;
     const MAP_RENDER_FRAME_FINISHED = 16384;
     const MAP_RENDER_MAP_STARTED = 32768;
@@ -5054,11 +5004,11 @@ pub struct RuntimeEventMask: u64 {
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
     const MAP_SOURCE_CHANGED = 8388608;
     /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 8912382;
+    const ALL_MAP_EVENTS = 8906238;
     /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 3670016;
     /// Selects every event type this version defines.
-    const ALL = 12582398;
+    const ALL = 12576254;
 }
 }
 
@@ -5289,8 +5239,6 @@ pub enum RuntimeEventType: u32 {
     MapLoadingFailed = 7,
     MapIdle = 8,
     MapRenderError = 10,
-    MapStillImageFinished = 11,
-    MapStillImageFailed = 12,
     MapRenderFrameStarted = 13,
     MapRenderFrameFinished = 14,
     MapRenderMapStarted = 15,
@@ -5317,9 +5265,6 @@ pub struct RuntimeOptions {
     /// Cache database path. Copied during runtime creation. Copied text, owned
     /// by the caller.
     pub cache_path: Option<String>,
-    /// Runtime-scoped event types this runtime queues, as a bitwise OR of
-    /// `mln_runtime_event_mask` values.
-    pub event_mask: RuntimeEventMask,
 }
 impl Default for RuntimeOptions {
     fn default() -> Self {
@@ -5332,7 +5277,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
         raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
         raw.asset_path = to_native(&self.asset_path, arena)?;
         raw.cache_path = to_native(&self.cache_path, arena)?;
-        raw.event_mask = to_native(&self.event_mask, arena)?;
         Ok(raw)
     }
 }
@@ -5341,7 +5285,6 @@ impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
         Ok(Self {
             asset_path: unsafe { convert::nonempty(raw.asset_path) }?,
             cache_path: unsafe { convert::nonempty(raw.cache_path) }?,
-            event_mask: unsafe { from_native(raw.event_mask) }?,
         })
     }
 }
@@ -5368,14 +5311,6 @@ impl ToNative<sys::mln_screen_box> for ScreenBox {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_screen_box> for ScreenBox {
-    unsafe fn from_native(raw: sys::mln_screen_box) -> Result<Self> {
-        Ok(Self {
-            min: unsafe { from_native(raw.min) }?,
-            max: unsafe { from_native(raw.max) }?,
-        })
-    }
-}
 
 /// Screen-space line string in logical map pixels.
 ///
@@ -5383,8 +5318,7 @@ impl FromNative<sys::mln_screen_box> for ScreenBox {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ScreenLineString {
-    /// Points. Null only when point_count is 0. Copied value, owned by the
-    /// caller.
+    /// Points. Null only when point_count is 0.
     pub points: Vec<ScreenPoint>,
 }
 impl ToNative<sys::mln_screen_line_string> for ScreenLineString {
@@ -5393,13 +5327,6 @@ impl ToNative<sys::mln_screen_line_string> for ScreenLineString {
         raw.points = convert::array(&self.points, arena)?;
         raw.point_count = convert::count(self.points.len())?;
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_screen_line_string> for ScreenLineString {
-    unsafe fn from_native(raw: sys::mln_screen_line_string) -> Result<Self> {
-        Ok(Self {
-            points: unsafe { convert::copy_array(raw.points, raw.point_count) }?,
-        })
     }
 }
 
@@ -5792,7 +5719,7 @@ pub enum StyleLayerVisibility: u32 {
 }
 
 native_enum! {
-/// DEM raster encoding values used by `mln_style_tile_source_options`.
+/// DEM raster encoding values.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -5944,7 +5871,7 @@ pub enum StyleSourceType: u32 {
 }
 
 native_enum! {
-/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+/// Tile URL coordinate scheme values.
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -5952,137 +5879,6 @@ pub enum StyleTileScheme: u32 {
     Xyz = 0,
     Tms = 1,
 } Unknown
-}
-
-native_flags! {
-/// Field mask values for `mln_style_tile_source_options`.
-///
-/// See `mln_style_tile_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct StyleTileSourceOptionField: u32 {
-    const MIN_ZOOM = 1;
-    const MAX_ZOOM = 2;
-    const ATTRIBUTION = 4;
-    const SCHEME = 8;
-    const BOUNDS = 16;
-    const TILE_SIZE = 32;
-    const VECTOR_ENCODING = 64;
-    const RASTER_ENCODING = 128;
-}
-}
-
-/// Options for vector and raster tile sources.
-///
-/// See `mln_style_tile_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq)]
-pub struct StyleTileSourceOptions {
-    pub min_zoom: Option<f64>,
-    pub max_zoom: Option<f64>,
-    /// Copied text, owned by the caller.
-    pub attribution: Option<String>,
-    /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
-    pub scheme: Option<StyleTileScheme>,
-    pub bounds: Option<LatLngBounds>,
-    /// Raster tile size in pixels. Defaults to 512.
-    pub tile_size: Option<u32>,
-    /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
-    pub vector_encoding: Option<StyleVectorTileEncoding>,
-    /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
-    pub raster_encoding: Option<StyleRasterDemEncoding>,
-}
-impl Default for StyleTileSourceOptions {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_style_tile_source_options_default() })
-    }
-}
-impl ToNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_tile_source_options> {
-        let mut raw: sys::mln_style_tile_source_options =
-            unsafe { sys::mln_style_tile_source_options_default() };
-        raw.size = std::mem::size_of::<sys::mln_style_tile_source_options>() as _;
-        raw.fields = 0;
-        if let Some(item) = &self.min_zoom {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = *item;
-        }
-        if let Some(item) = &self.max_zoom {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = *item;
-        }
-        if let Some(item) = &self.attribution {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-            raw.attribution = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.scheme {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-            raw.scheme = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.bounds {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-            raw.bounds = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.tile_size {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = *item;
-        }
-        if let Some(item) = &self.vector_encoding {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-            raw.vector_encoding = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.raster_encoding {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-            raw.raster_encoding = to_native(&*item, arena)?;
-        }
-        Ok(raw)
-    }
-}
-impl FromNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
-    unsafe fn from_native(raw: sys::mln_style_tile_source_options) -> Result<Self> {
-        Ok(Self {
-            min_zoom: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0)
-                .then_some(raw.min_zoom),
-            max_zoom: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0)
-                .then_some(raw.max_zoom),
-            attribution: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION,
-                    raw.attribution,
-                )
-            }?,
-            scheme: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME,
-                    raw.scheme,
-                )
-            }?,
-            bounds: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS,
-                    raw.bounds,
-                )
-            }?,
-            tile_size: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0)
-                .then_some(raw.tile_size),
-            vector_encoding: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING,
-                    raw.vector_encoding,
-                )
-            }?,
-            raster_encoding: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING,
-                    raw.raster_encoding,
-                )
-            }?,
-        })
-    }
 }
 
 native_flags! {
@@ -6156,7 +5952,7 @@ impl FromNative<sys::mln_style_transition_options> for StyleTransitionOptions {
 }
 
 native_enum! {
-/// Vector tile encoding values used by `mln_style_tile_source_options`.
+/// Vector tile encoding values.
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

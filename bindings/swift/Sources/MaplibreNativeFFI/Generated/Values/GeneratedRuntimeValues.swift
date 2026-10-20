@@ -1040,8 +1040,6 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   public var flags: UrlMatchFlags
   /// The URL or glob pattern to compare.
   public var url: String
-  /// The URL stage to compare.
-  public var urlStage: ResourceRouteUrl
   public static var `default`: Self {
     Self()
   }
@@ -1049,13 +1047,11 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   public init(
     kinds: ResourceKindMask = ResourceKindMask.all,
     flags: UrlMatchFlags = .init(rawValue: 0),
-    url: String = "",
-    urlStage: ResourceRouteUrl = .init(rawValue: 0)
+    url: String = ""
   ) {
     self.kinds = kinds
     self.flags = flags
     self.url = url
-    self.urlStage = urlStage
   }
 
   init(
@@ -1065,7 +1061,6 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     kinds = ResourceKindMask(rawValue: raw.kinds)
     flags = UrlMatchFlags(rawValue: raw.flags)
     url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
-    urlStage = ResourceRouteUrl(rawValue: raw.url_stage)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
@@ -1073,25 +1068,8 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = arena.view(url)
-    raw.url_stage = urlStage.rawValue
     return raw
   }
-}
-
-/// The URL stage that a provider route compares.
-///
-/// See `mln_resource_route_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceRouteUrl: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let resolved: ResourceRouteUrl = .init(rawValue: 0)
-  public static let requested: ResourceRouteUrl = .init(rawValue: 1)
 }
 
 public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
@@ -1375,10 +1353,6 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let mapLoadingFailed: RuntimeEventMask = .init(rawValue: 128)
   public static let mapIdle: RuntimeEventMask = .init(rawValue: 256)
   public static let mapRenderError: RuntimeEventMask = .init(rawValue: 1024)
-  public static let mapStillImageFinished: RuntimeEventMask =
-    .init(rawValue: 2048)
-  public static let mapStillImageFailed: RuntimeEventMask =
-    .init(rawValue: 4096)
   public static let mapRenderFrameStarted: RuntimeEventMask =
     .init(rawValue: 8192)
   public static let mapRenderFrameFinished: RuntimeEventMask =
@@ -1399,12 +1373,12 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let mapSourceChanged: RuntimeEventMask =
     .init(rawValue: 8_388_608)
   /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_912_382)
+  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_906_238)
   /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventMask =
     .init(rawValue: 3_670_016)
   /// Selects every event type this version defines.
-  public static let all: RuntimeEventMask = .init(rawValue: 12_582_398)
+  public static let all: RuntimeEventMask = .init(rawValue: 12_576_254)
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -1692,9 +1666,6 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 10)
-  public static let mapStillImageFinished: RuntimeEventType =
-    .init(rawValue: 11)
-  public static let mapStillImageFailed: RuntimeEventType = .init(rawValue: 12)
   public static let mapRenderFrameStarted: RuntimeEventType =
     .init(rawValue: 13)
   public static let mapRenderFrameFinished: RuntimeEventType =
@@ -1724,21 +1695,16 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// Cache database path. Copied during runtime creation. Copied text, owned by
   /// the caller.
   public var cachePath: String?
-  /// Runtime-scoped event types this runtime queues, as a bitwise OR of
-  /// `mln_runtime_event_mask` values.
-  public var eventMask: RuntimeEventMask
   public static var `default`: Self {
     try! Self(raw: mln_runtime_options_default())
   }
 
   public init(
     assetPath: String? = RuntimeOptions.default.assetPath,
-    cachePath: String? = RuntimeOptions.default.cachePath,
-    eventMask: RuntimeEventMask = RuntimeOptions.default.eventMask
+    cachePath: String? = RuntimeOptions.default.cachePath
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
-    self.eventMask = eventMask
   }
 
   init(
@@ -1753,7 +1719,6 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
       data: raw.cache_path.data,
       size: raw.cache_path.size
     )
-    eventMask = RuntimeEventMask(rawValue: raw.event_mask)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
@@ -1761,7 +1726,6 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
     raw.size = UInt32(MemoryLayout<mln_runtime_options>.size)
     raw.asset_path = assetPath.map { arena.view($0) } ?? mln_buffer_view()
     raw.cache_path = cachePath.map { arena.view($0) } ?? mln_buffer_view()
-    raw.event_mask = eventMask.rawValue
     return raw
   }
 }

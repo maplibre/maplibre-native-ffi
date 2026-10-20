@@ -75,17 +75,4 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
       if (!outCancelled) accept(bindingCallbacks)
       outCancelled
     }
-
-  /**
-   * Blocks until a resource request is released and its cancel callback registration has retired:
-   * the callback, if it ran, and release_user_data have both returned. Completing a request does
-   * not release its owner.
-   *
-   * See `mln_resource_request_wait_until_retired` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun waitUntilRetired(): Unit =
-    nativeCall(this, binding, "mln_resource_request_wait_until_retired", Access.ISSUED) {
-      check(C.mln_resource_request_wait_until_retired(handle, diagnostic))
-    }
 }

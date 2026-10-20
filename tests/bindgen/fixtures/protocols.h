@@ -11,8 +11,7 @@
 #define MLN_BINDGEN_PROTOCOLS_H
 
 // Groups that declare fixed-width types include the standard headers.
-#if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES) || \
-  defined(MLN_PROTOCOL_CALLER_SIZED_OUTPUT)
+#if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
@@ -235,25 +234,6 @@ typedef struct mln_keyword_entry {
 mln_status mln_keyword_combine(
   double defer, double self, double raw, double bindingArg0,
   mln_keyword_entry* out_entry BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-#endif
-
-#ifdef MLN_PROTOCOL_CALLER_SIZED_OUTPUT
-typedef struct mln_probe_batch_point {
-  double x;
-  double y;
-} mln_probe_batch_point;
-mln_status mln_probe_batch_points(
-  const mln_probe_batch_point* points BIND("length=point_count"),
-  uint32_t point_count,
-  mln_probe_batch_point* out_points BIND("direction=out;length=point_count"),
-  mln_diagnostic* out_diagnostic
-);
-mln_status mln_probe_batch_scores(
-  const mln_probe_batch_point* points BIND("length=point_count"),
-  uint32_t point_count,
-  double* out_scores BIND("direction=out;length=point_count"),
   mln_diagnostic* out_diagnostic
 );
 #endif
@@ -569,8 +549,7 @@ typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticke
   "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM;"
   "decision_pass=MLN_DECISION_DELEGATE;"
   "complete=mln_ticket_answer;cancelled=mln_ticket_cancelled;"
-  "cancel_registration=mln_ticket_on_cancel;"
-  "wait_retired=mln_ticket_await"
+  "cancel_registration=mln_ticket_on_cancel"
 );
 typedef struct mln_ticket_provider {
   mln_ticket_provider_callback callback;
@@ -593,9 +572,6 @@ mln_status mln_ticket_answer(
 mln_status mln_ticket_cancelled(
   mln_ticket ticket, bool* result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
-);
-mln_status mln_ticket_await(
-  mln_ticket ticket BIND("handle_access=issued"), mln_diagnostic* out_diagnostic
 );
 #endif
 

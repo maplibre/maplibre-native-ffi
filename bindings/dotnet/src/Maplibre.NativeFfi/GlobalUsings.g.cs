@@ -22,7 +22,6 @@ global using static Maplibre.NativeFfi.Internal.C.mln_source_feature_query_optio
 global using static Maplibre.NativeFfi.Internal.C.mln_style_image_info_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_image_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_source_info_field;
-global using static Maplibre.NativeFfi.Internal.C.mln_style_tile_source_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_transition_option_field;
 global using Maplibre.NativeFfi.Internal.Callback;
 global using Maplibre.NativeFfi.Internal.Memory;

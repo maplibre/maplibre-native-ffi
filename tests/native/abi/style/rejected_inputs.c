@@ -1,5 +1,5 @@
-// Style commands that refuse their input or their target: empty views and tile
-// lists, images without pixels, invalid style JSON, and sources whose ID is
+// Style commands that refuse their input or their target: empty views,
+// images without pixels, invalid style JSON, and sources whose ID is
 // taken or whose kind does not take the command.
 
 #include "support/style.h"
@@ -13,19 +13,16 @@
 
 static const mln_lat_lng corners[4] = {{1, 1}, {1, 2}, {0, 2}, {0, 1}};
 
-// Every ID, URL, JSON, and tile URL input that must name at least one byte is
+// Every ID, URL, and JSON input that must name at least one byte is
 // refused at submission when empty, so no empty view reaches the map worker.
 // One shared check guards every such input, so one ID and one other view stand
-// for them, beside the rules that belong to tile lists alone.
+// for them.
 static void empty_views_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_buffer_view empty = MLN_BUFFER_LITERAL("");
   const mln_buffer_view id = MLN_BUFFER_LITERAL("id");
   const mln_buffer_view json = MLN_BUFFER_LITERAL("{}");
-  const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://data");
-  const mln_buffer_view tiles[] = {url};
-  const mln_buffer_view empty_tiles[] = {url, empty};
 
   EXPECT_EMPTY_REJECTED(
     "source_id", mln_map_add_style_source_json(
@@ -38,25 +35,6 @@ static void empty_views_are_rejected_at_submission(void) {
       map, id, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-  EXPECT_EMPTY_REJECTED(
-    "tile URL",
-    mln_map_add_vector_source_tiles(
-      map, id, empty_tiles, 2, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "tile_count must be greater than 0",
-    mln_map_add_vector_source_tiles(
-      map, id, tiles, 0, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "tiles must not be null",
-    mln_map_add_vector_source_tiles(
-      map, id, NULL, 1, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -170,12 +148,13 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
       map, image, geojson_url, &completion.descriptor, NULL
     )
   );
-  const mln_buffer_view tiles[] = {
-    MLN_BUFFER_LITERAL("fixture://tiles/{z}/{x}/{y}.mvt"),
-  };
   const mln_buffer_view vector = MLN_BUFFER_LITERAL("vector");
-  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
-    map, vector, tiles, 1, NULL, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, vector,
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"vector\",\"tiles\":[\"fixture://tiles/{z}/{x}/{y}.mvt\"]}"
+    ),
+    &completion.descriptor, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",

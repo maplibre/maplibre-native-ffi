@@ -22,7 +22,6 @@ const (
 	// The call leases the receiver and holds off its close, because the
 	// results borrow from it until they are copied.
 	bindingReadAccess
-	bindingIssuedAccess
 	// Native consumes the receiver when the call succeeds.
 	bindingCloseAccess
 	// Native always consumes the receiver.
@@ -53,10 +52,6 @@ func bindingLive(owner *bindingOwner, operation uint32) bindingTarget {
 
 func bindingRead(owner *bindingOwner, operation uint32) bindingTarget {
 	return bindingTarget{owner: owner, access: bindingReadAccess, operation: operation}
-}
-
-func bindingIssued(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingIssuedAccess, operation: operation}
 }
 
 func bindingClosing(owner *bindingOwner, operation uint32) bindingTarget {
@@ -124,8 +119,6 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	defer runtime.KeepAlive(owner)
 	var value T
 	switch target.access {
-	case bindingIssuedAccess:
-		value = call(arena, owner.state.issued)
 	case bindingCloseAccess, bindingConsumeAccess:
 		raw, transaction := owner.state.reserveClose()
 		defer transaction.finish()

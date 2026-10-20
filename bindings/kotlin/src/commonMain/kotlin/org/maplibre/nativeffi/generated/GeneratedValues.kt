@@ -1081,19 +1081,6 @@ public data class ResourceResponseStatus(public val rawValue: UInt) {
   }
 }
 
-/**
- * The URL stage that a provider route compares.
- *
- * See `mln_resource_route_url` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceRouteUrl(public val rawValue: UInt) {
-  public companion object {
-    public val RESOLVED: ResourceRouteUrl = ResourceRouteUrl(0u)
-    public val REQUESTED: ResourceRouteUrl = ResourceRouteUrl(1u)
-  }
-}
-
 public data class ResourceStoragePolicy(public val rawValue: UInt) {
   public companion object {
     public val PERMANENT: ResourceStoragePolicy = ResourceStoragePolicy(0u)
@@ -1136,8 +1123,6 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     public val MAP_LOADING_FAILED: RuntimeEventMask = RuntimeEventMask(128uL)
     public val MAP_IDLE: RuntimeEventMask = RuntimeEventMask(256uL)
     public val MAP_RENDER_ERROR: RuntimeEventMask = RuntimeEventMask(1024uL)
-    public val MAP_STILL_IMAGE_FINISHED: RuntimeEventMask = RuntimeEventMask(2048uL)
-    public val MAP_STILL_IMAGE_FAILED: RuntimeEventMask = RuntimeEventMask(4096uL)
     public val MAP_RENDER_FRAME_STARTED: RuntimeEventMask = RuntimeEventMask(8192uL)
     public val MAP_RENDER_FRAME_FINISHED: RuntimeEventMask = RuntimeEventMask(16384uL)
     public val MAP_RENDER_MAP_STARTED: RuntimeEventMask = RuntimeEventMask(32768uL)
@@ -1150,11 +1135,11 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
       RuntimeEventMask(2097152uL)
     public val MAP_SOURCE_CHANGED: RuntimeEventMask = RuntimeEventMask(8388608uL)
     /** Selects every map-originated event type this version defines. */
-    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(8912382uL)
+    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(8906238uL)
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask = RuntimeEventMask(3670016uL)
     /** Selects every event type this version defines. */
-    public val ALL: RuntimeEventMask = RuntimeEventMask(12582398uL)
+    public val ALL: RuntimeEventMask = RuntimeEventMask(12576254uL)
   }
 }
 
@@ -1207,8 +1192,6 @@ public data class RuntimeEventType(public val rawValue: UInt) {
     public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(7u)
     public val MAP_IDLE: RuntimeEventType = RuntimeEventType(8u)
     public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(10u)
-    public val MAP_STILL_IMAGE_FINISHED: RuntimeEventType = RuntimeEventType(11u)
-    public val MAP_STILL_IMAGE_FAILED: RuntimeEventType = RuntimeEventType(12u)
     public val MAP_RENDER_FRAME_STARTED: RuntimeEventType = RuntimeEventType(13u)
     public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType = RuntimeEventType(14u)
     public val MAP_RENDER_MAP_STARTED: RuntimeEventType = RuntimeEventType(15u)
@@ -1357,7 +1340,7 @@ public data class StyleLayerVisibility(public val rawValue: UInt) {
 }
 
 /**
- * DEM raster encoding values used by `mln_style_tile_source_options`.
+ * DEM raster encoding values.
  *
  * See `mln_style_raster_dem_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1425,7 +1408,7 @@ public data class StyleSourceType(public val rawValue: UInt) {
 }
 
 /**
- * Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+ * Tile URL coordinate scheme values.
  *
  * See `mln_style_tile_scheme` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1434,34 +1417,6 @@ public data class StyleTileScheme(public val rawValue: UInt) {
   public companion object {
     public val XYZ: StyleTileScheme = StyleTileScheme(0u)
     public val TMS: StyleTileScheme = StyleTileScheme(1u)
-  }
-}
-
-/**
- * Field mask values for `mln_style_tile_source_options`.
- *
- * See `mln_style_tile_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleTileSourceOptionField(public val rawValue: UInt) {
-  public infix fun or(other: StyleTileSourceOptionField): StyleTileSourceOptionField =
-    StyleTileSourceOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleTileSourceOptionField): StyleTileSourceOptionField =
-    StyleTileSourceOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleTileSourceOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val MIN_ZOOM: StyleTileSourceOptionField = StyleTileSourceOptionField(1u)
-    public val MAX_ZOOM: StyleTileSourceOptionField = StyleTileSourceOptionField(2u)
-    public val ATTRIBUTION: StyleTileSourceOptionField = StyleTileSourceOptionField(4u)
-    public val SCHEME: StyleTileSourceOptionField = StyleTileSourceOptionField(8u)
-    public val BOUNDS: StyleTileSourceOptionField = StyleTileSourceOptionField(16u)
-    public val TILE_SIZE: StyleTileSourceOptionField = StyleTileSourceOptionField(32u)
-    public val VECTOR_ENCODING: StyleTileSourceOptionField = StyleTileSourceOptionField(64u)
-    public val RASTER_ENCODING: StyleTileSourceOptionField = StyleTileSourceOptionField(128u)
   }
 }
 
@@ -1490,7 +1445,7 @@ public data class StyleTransitionOptionField(public val rawValue: UInt) {
 }
 
 /**
- * Vector tile encoding values used by `mln_style_tile_source_options`.
+ * Vector tile encoding values.
  *
  * See `mln_style_vector_tile_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2860,62 +2815,6 @@ public data class RenderedFeatureQueryOptions(
 }
 
 /**
- * Screen-space box in logical map pixels.
- *
- * See `mln_screen_box` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class ScreenBox(
-  public val min: ScreenPoint = ScreenPoint(),
-  public val max: ScreenPoint = ScreenPoint(),
-)
-
-/**
- * Screen-space line string in logical map pixels.
- *
- * See `mln_screen_line_string` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class ScreenLineString(
-  /** Points. Null only when point_count is 0. Copied value, owned by the caller. */
-  public val points: List<ScreenPoint> = emptyList(),
-)
-
-/**
- * Screen-space query geometry data.
- *
- * See `mln_rendered_query_geometry_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public sealed interface RenderedQueryGeometryData {
-  public data class Point(public val value: ScreenPoint) : RenderedQueryGeometryData
-
-  public data class Box(public val value: ScreenBox) : RenderedQueryGeometryData
-
-  public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometryData
-
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    RenderedQueryGeometryData {
-    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
-
-    override fun equals(other: Any?): Boolean =
-      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
-
-    override fun hashCode(): Int = contentFields().contentDeepHashCode()
-  }
-}
-
-/**
- * Rendered feature query geometry descriptor.
- *
- * See `mln_rendered_query_geometry` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class RenderedQueryGeometry(
-  public val data: RenderedQueryGeometryData,
-)
-
-/**
  * Options used when creating a runtime.
  *
  * See `mln_runtime_options` in the
@@ -2929,11 +2828,6 @@ public data class RuntimeOptions(
   public val assetPath: String? = null,
   /** Cache database path. Copied during runtime creation. Copied text, owned by the caller. */
   public val cachePath: String? = null,
-  /**
-   * Runtime-scoped event types this runtime queues, as a bitwise OR of `mln_runtime_event_mask`
-   * values.
-   */
-  public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
 )
 
 /**
@@ -3014,28 +2908,6 @@ public data class StyleImageOptions(
   public val pixelRatio: Float? = null,
   /** Whether the image is a signed distance field icon. Defaults to false. */
   public val sdf: Boolean? = null,
-)
-
-/**
- * Options for vector and raster tile sources.
- *
- * See `mln_style_tile_source_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleTileSourceOptions(
-  public val minZoom: Double? = null,
-  public val maxZoom: Double? = null,
-  /** Copied text, owned by the caller. */
-  public val attribution: String? = null,
-  /** One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`. */
-  public val scheme: StyleTileScheme? = null,
-  public val bounds: LatLngBounds? = null,
-  /** Raster tile size in pixels. Defaults to 512. */
-  public val tileSize: UInt? = null,
-  /** One of `mln_style_vector_tile_encoding`. Defaults to MVT. */
-  public val vectorEncoding: StyleVectorTileEncoding? = null,
-  /** One of `mln_style_raster_dem_encoding`. Defaults to Mapbox. */
-  public val rasterEncoding: StyleRasterDemEncoding? = null,
 )
 
 /**
@@ -3527,6 +3399,62 @@ public data class RenderSessionSnapshot(
   public val acquiredFrameCount: UInt = 0u,
   /** True when a map update or an accepted resize arrived after the latest rendered frame. */
   public val pendingChanges: Boolean = false,
+)
+
+/**
+ * Screen-space box in logical map pixels.
+ *
+ * See `mln_screen_box` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class ScreenBox(
+  public val min: ScreenPoint = ScreenPoint(),
+  public val max: ScreenPoint = ScreenPoint(),
+)
+
+/**
+ * Screen-space line string in logical map pixels.
+ *
+ * See `mln_screen_line_string` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class ScreenLineString(
+  /** Points. Null only when point_count is 0. */
+  public val points: List<ScreenPoint> = emptyList(),
+)
+
+/**
+ * Screen-space query geometry data.
+ *
+ * See `mln_rendered_query_geometry_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public sealed interface RenderedQueryGeometryData {
+  public data class Point(public val value: ScreenPoint) : RenderedQueryGeometryData
+
+  public data class Box(public val value: ScreenBox) : RenderedQueryGeometryData
+
+  public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometryData
+
+  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
+    RenderedQueryGeometryData {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  }
+}
+
+/**
+ * Rendered feature query geometry descriptor.
+ *
+ * See `mln_rendered_query_geometry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class RenderedQueryGeometry(
+  public val data: RenderedQueryGeometryData,
 )
 
 /**
@@ -4044,8 +3972,6 @@ public data class ResourceRoute(
   public val flags: UrlMatchFlags = UrlMatchFlags(0u),
   /** The URL or glob pattern to compare. */
   public val url: String = "",
-  /** The URL stage to compare. */
-  public val urlStage: ResourceRouteUrl = ResourceRouteUrl(0u),
 )
 
 /**

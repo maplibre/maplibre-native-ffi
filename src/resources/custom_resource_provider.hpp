@@ -36,7 +36,4 @@ auto set_resource_request_cancel_callback(
   const mln_resource_request_cancel_handler* handler, bool* out_cancelled
 ) -> mln_status;
 void release_resource_request(mln_resource_request handle) noexcept;
-auto wait_for_resource_request_retired(mln_resource_request handle)
-  -> mln_status;
-
 }  // namespace mln::core

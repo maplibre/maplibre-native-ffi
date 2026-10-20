@@ -20,7 +20,6 @@ pub const Access = enum {
     /// The call leases the receiver and holds off its close, because its
     /// outputs borrow from it until they are copied.
     borrow,
-    issued,
     /// The receiver is a response that is valid only inside its callback.
     scoped,
     /// The call closes the receiver. A receiver that is already closed makes
@@ -50,15 +49,6 @@ fn Output(comptime T: type, comptime sized: bool, comptime parent: Parent) type 
 
 pub fn out(comptime T: type) Output(T, false, .none) {
     return .{};
-}
-
-pub fn outArray(comptime T: type, count: usize) struct {
-    pub const Value = marshal.OwnedValue([]const T);
-    pub const array_element = T;
-    pub const retains: Parent = .none;
-    count: usize,
-} {
-    return .{ .count = count };
 }
 
 /// Receives an output record whose `size` field native reads first.
@@ -113,10 +103,7 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
         types[index] = if (isHandle(Field))
             Field.Lease
         else if (isOutput(Field))
-            if (@hasDecl(Field, "array_element"))
-                []@typeInfo(Param(function, offset + index)).pointer.child
-            else
-                @typeInfo(Param(function, offset + index)).pointer.child
+            @typeInfo(Param(function, offset + index)).pointer.child
         else
             void;
     }
@@ -135,7 +122,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
         const State = switch (access) {
             .none => void,
             .lease, .borrow, .complete => T.Lease,
-            .issued => u64,
             .scoped => T,
             .close => T.Close,
         };
@@ -157,7 +143,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
                 .lease => try receiver.lease(diagnostic),
                 .borrow => try receiver.borrow(diagnostic),
                 .complete => try receiver.beginComplete(diagnostic),
-                .issued => receiver.raw,
                 .scoped => receiver,
                 .close => try receiver.beginClose(diagnostic) orelse return null,
             } };
@@ -170,7 +155,6 @@ fn Receiver(comptime access: Access, comptime T: type) type {
         } {
             return switch (access) {
                 .none => {},
-                .issued => self.state,
                 .scoped => self.state.native,
                 else => self.state.native,
             };
@@ -280,19 +264,9 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                     self.leased = index + 1;
                     native[offset + index] = self.held[index].native;
                 } else if (comptime isOutput(Field)) {
-                    if (comptime @hasDecl(Field, "array_element")) {
-                        const Element = @typeInfo(Parameter).pointer.child;
-                        self.held[index] = try self.inputAllocator().alloc(Element, input.count);
-                        for (self.held[index]) |*item| {
-                            item.* = std.mem.zeroes(Element);
-                            if (comptime @typeInfo(Element) == .@"struct" and @hasField(Element, "size")) item.size = @sizeOf(Element);
-                        }
-                        native[offset + index] = self.held[index].ptr;
-                    } else {
-                        self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
-                        if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
-                        native[offset + index] = &self.held[index];
-                    }
+                    self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
+                    if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
+                    native[offset + index] = &self.held[index];
                 } else {
                     native[offset + index] = try self.encode(Parameter, input);
                 }
@@ -371,15 +345,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].Value {
             const Step = fields[index];
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
-            if (comptime @hasDecl(Step, "array_element")) {
-                var arena = std.heap.ArenaAllocator.init(allocator);
-                errdefer arena.deinit();
-                const values = try arena.allocator().alloc(Step.array_element, self.held[index].len);
-                for (values, self.held[index]) |*decoded, native_value| {
-                    decoded.* = try marshal.decode(Step.array_element, native_value, .{ .allocator = arena.allocator() });
-                }
-                return .{ .arena = arena, .value = values };
-            }
             return marshal.decode(Step.Value, self.held[index], .{
                 .allocator = if (Allocator == std.mem.Allocator) allocator else null,
                 .parent = self.parent(Step.retains),

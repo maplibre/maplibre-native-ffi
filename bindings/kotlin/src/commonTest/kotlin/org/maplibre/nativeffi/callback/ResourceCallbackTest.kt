@@ -63,13 +63,10 @@ class ResourceCallbackTest {
       }
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
 
-      // Releasing the unanswered request fails it and releases the callback, which can no longer
-      // run. A close that lands while the provider is still deciding releases the request once
-      // the decision returns, so the case drains the request before it counts. The failure still
-      // on its way to the map is not a child of the runtime, so the fixture's releases do not
-      // wait for it.
+      // Provider removal waits for the callback to return. Closing the unanswered request then
+      // releases its cancel registration before the root count is read.
+      runtime.clearResourceProvider().awaitWithin("provider removal")
       request.close()
-      request.waitUntilRetired()
       assertEquals(0, request.bindingCallbacks.rootCountForTesting())
       assertEquals(0, cancels.load())
     }

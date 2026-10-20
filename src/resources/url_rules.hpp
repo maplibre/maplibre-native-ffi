@@ -55,17 +55,12 @@ struct UrlPattern {
 
 // The routes of a resource provider, which owns their strings.
 struct RouteTable {
-  struct Route {
-    UrlPattern pattern;
-    std::uint32_t url_stage;
-  };
-  std::vector<Route> routes;
+  std::vector<UrlPattern> routes;
 
   // Whether a request reaches the provider. A table without routes claims
   // every request.
   [[nodiscard]] auto matches(
-    std::uint32_t kind, std::string_view requested_url,
-    std::string_view resolved_url
+    std::uint32_t kind, std::string_view resolved_url
   ) const noexcept -> bool;
 };
 

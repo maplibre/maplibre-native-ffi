@@ -20,7 +20,6 @@ extension NativeReceiver {
 enum NativeAccess {
   /// The call borrows the receiver, which holds off its close.
   case live
-  case issued
   /// The call borrows the receiver and claims its pending decision, which the
   /// call accepts when it succeeds.
   case claim
@@ -51,9 +50,6 @@ extension NativeReceiver {
     defer { withExtendedLifetime(self) {} }
     let arena = NativeInputArena(receiver: self)
     defer { withExtendedLifetime(arena) {} }
-    if access == .issued {
-      return try body(handle.issued.raw, arena)
-    }
     let read = try handle.borrow()
     defer { read.end() }
     guard access == .claim else { return try body(read.handle.raw, arena) }

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vector tile encoding values used by <c>mln_style_tile_source_options</c>.
+/// Vector tile encoding values.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_vector_tile_encoding</c> in the <see

@@ -269,12 +269,8 @@ callback as able to run on any native thread, and each callback's header comment
 states the threads that it runs on.
 
 An annotation that names another declaration, such as `reentry_calls`,
-`complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
-the schema reports the name that does not resolve.
-
-A caller-sized output array uses `direction=out;length=<count>`. The count must
-also size an input array of the same call. Bindings allocate one output element
-per input element and return the copied outputs as a list.
+`complete` or `cancel_registration`, must name one that exists; the schema
+reports the name that does not resolve.
 
 ## Document a declaration
 

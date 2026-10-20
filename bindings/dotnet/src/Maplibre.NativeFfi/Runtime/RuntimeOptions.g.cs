@@ -18,19 +18,8 @@ namespace Maplibre.NativeFfi;
 /// Cache database path. Copied during runtime creation. Copied text, owned by
 /// the caller.
 /// </param>
-/// <param name="EventMask">
-/// Runtime-scoped event types this runtime queues, as a bitwise OR of
-/// <c>mln_runtime_event_mask</c> values.
-/// </param>
-public readonly partial record struct RuntimeOptions(
-    string? AssetPath,
-    string? CachePath,
-    RuntimeEventMask EventMask
-)
+public readonly partial record struct RuntimeOptions(string? AssetPath, string? CachePath)
 {
-    public RuntimeOptions()
-        : this(default, default, RuntimeEventMask.All) { }
-
     public static RuntimeOptions Default
     {
         get

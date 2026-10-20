@@ -1,5 +1,5 @@
 // Standalone projections: a projection copies the transform the map published
-// with its latest snapshot, outlives the map, converts and fits synchronously
+// with its latest snapshot, outlives the map, converts synchronously
 // on any thread, and reads its scale at its own camera. The spherical Mercator
 // helpers need no map at all.
 
@@ -210,30 +210,6 @@ static void setters_apply_before_return(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, committed.zoom);
 
-  const mln_lat_lng origin = {.latitude = 0.0, .longitude = 0.0};
-  mln_screen_point origin_before_fit = {0};
-  MLN_TEST_OK(mln_map_projection_pixel_for_lat_lng(
-    projection, origin, &origin_before_fit, NULL
-  ));
-
-  const mln_lat_lng coordinates[] = {
-    {.latitude = 0.0, .longitude = -10.0},
-    {.latitude = 0.0, .longitude = 10.0},
-  };
-  MLN_TEST_OK(mln_map_projection_set_visible_coordinates(
-    projection, coordinates, 2, (mln_edge_insets){0}, NULL
-  ));
-  const mln_camera_options fitted = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.center.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.center.longitude);
-  mln_screen_point origin_after_fit = {0};
-  MLN_TEST_OK(mln_map_projection_pixel_for_lat_lng(
-    projection, origin, &origin_after_fit, NULL
-  ));
-  // The committed fit moved the camera, so the same coordinate lands on a
-  // different pixel than it did before the fit.
-  TEST_ASSERT_TRUE(origin_after_fit.x != origin_before_fit.x);
-
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -256,16 +232,11 @@ static mln_lat_lng coordinate_for_pixel(
 
 static void coordinates_for_pixels(
   mln_map_projection projection, const mln_screen_point* points, size_t count,
-  bool unwrapped, mln_lat_lng* out_coordinates
+  bool unwrapped, mln_lat_lng* out
 ) {
-  MLN_TEST_OK(
-    unwrapped ? mln_map_projection_lat_lngs_for_pixels_unwrapped(
-                  projection, points, count, out_coordinates, NULL
-                )
-              : mln_map_projection_lat_lngs_for_pixels(
-                  projection, points, count, out_coordinates, NULL
-                )
-  );
+  for (size_t index = 0; index < count; ++index) {
+    out[index] = coordinate_for_pixel(projection, points[index], unwrapped);
+  }
 }
 
 static void jump_to(mln_map map, double longitude, double zoom) {
@@ -281,7 +252,7 @@ static void jump_to(mln_map map, double longitude, double zoom) {
 
 // A viewport wider than one world copy, or one across the antimeridian, shows
 // longitudes that the wrapped conversions fold into -180 to 180 and that the
-// unwrapped ones keep in the visible copy. Single and batch conversions agree.
+// unwrapped ones keep in the visible copy.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
@@ -347,82 +318,6 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   TEST_ASSERT_TRUE(edges_wrapped[1].longitude < 0.0);
 
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// A geometry fit frames the coordinates the geometry carries, the same way a
-// coordinate fit does. A geometry with nothing to frame leaves the camera
-// where it was.
-static void visible_geometry_fits_like_its_coordinates(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_map_projection projection = create_projection(map);
-  const mln_edge_insets padding = {
-    .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0
-  };
-
-  const mln_lat_lng corners[] = {
-    {.latitude = -10.0, .longitude = -10.0},
-    {.latitude = 10.0, .longitude = 20.0},
-  };
-  MLN_TEST_OK(mln_map_projection_set_visible_coordinates(
-    projection, corners, 2, padding, NULL
-  ));
-  const mln_camera_options coordinate_fit = read_camera(projection);
-
-  // Reset first, so the geometry fit has to move the camera to agree.
-  mln_camera_options reset = mln_camera_options_default();
-  reset.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  reset.zoom = 1.0;
-  MLN_TEST_OK(mln_map_projection_set_camera(projection, &reset, NULL));
-  MLN_TEST_OK(mln_map_projection_set_visible_geometry(
-    projection,
-    MLN_BUFFER_LITERAL(
-      "{\"type\":\"MultiPoint\",\"coordinates\":[[-10,-10],[20,10]]}"
-    ),
-    padding, NULL
-  ));
-  const mln_camera_options geometry_fit = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-9, coordinate_fit.center.latitude, geometry_fit.center.latitude
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-9, coordinate_fit.center.longitude, geometry_fit.center.longitude
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, coordinate_fit.zoom, geometry_fit.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 5.0, geometry_fit.center.longitude);
-
-  // Not JSON, not a Geometry, and a Geometry with no coordinate.
-  static const char* const unframeable[] = {
-    "not json",
-    "{\"type\":\"Feature\",\"geometry\":null,\"properties\":{}}",
-    "{\"type\":\"MultiPoint\",\"coordinates\":[]}",
-  };
-  for (size_t index = 0; index < sizeof(unframeable) / sizeof(*unframeable);
-       index += 1) {
-    const char* geometry = unframeable[index];
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT,
-      mln_map_projection_set_visible_geometry(
-        projection, mln_test_buffer_view(geometry, strlen(geometry)), padding,
-        NULL
-      ),
-      geometry
-    );
-  }
-  const mln_camera_options unchanged = read_camera(projection);
-  TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.zoom, unchanged.zoom);
-  TEST_ASSERT_EQUAL_DOUBLE(
-    geometry_fit.center.longitude, unchanged.center.longitude
-  );
-
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-  MLN_TEST_INVALID_STATE(mln_map_projection_set_visible_geometry(
-    projection,
-    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"), padding,
-    NULL
-  ));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -616,9 +511,7 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A standalone projection validates what its setters take: a finite camera,
-// coordinates in range, nonnegative padding, and at least one coordinate to
-// fit. A rejected call leaves the projection's camera as it was.
+// A rejected camera update leaves the projection's camera as it was.
 static void projection_setters_reject_invalid_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -631,25 +524,6 @@ static void projection_setters_reject_invalid_values(void) {
   MLN_TEST_INVALID(
     mln_map_projection_set_camera(projection, &camera, MLN_TEST_DIAGNOSTIC)
   );
-  const mln_lat_lng past_the_pole[2] = {{91.0, 0.0}, {0.0, 10.0}};
-  const mln_edge_insets no_padding = {0};
-  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
-    projection, past_the_pole, 2, no_padding, MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "latitude"));
-  const mln_lat_lng corners[2] = {{-10.0, -10.0}, {10.0, 10.0}};
-  const mln_edge_insets negative_padding = {.top = -1.0};
-  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
-    projection, corners, 2, negative_padding, MLN_TEST_DIAGNOSTIC
-  ));
-  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
-    projection, corners, 0, no_padding, MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(mln_test_last_error(), "coordinate_count must be greater than 0"),
-    mln_test_last_error()
-  );
-
   const mln_camera_options after = read_camera(projection);
   TEST_ASSERT_EQUAL_DOUBLE(before.center.latitude, after.center.latitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.center.longitude, after.center.longitude);
@@ -659,66 +533,36 @@ static void projection_setters_reject_invalid_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A batch validates its whole input before it writes any output, so an
-// invalid last element leaves every output as it was.
+// Invalid coordinates leave the output untouched.
 static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_map_projection projection = create_projection(map);
-  const mln_lat_lng coordinates[] = {{0.0, 0.0}, {10.0, 20.0}, {91.0, 0.0}};
-  mln_screen_point output[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
-  const mln_screen_point before[3] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
-  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
-    projection, coordinates, 3, output, NULL
-  ));
-  MLN_TEST_INVALID(
-    mln_map_projection_pixels_for_lat_lngs(projection, NULL, 1, output, NULL)
-  );
-  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
-    projection, coordinates, 1, NULL, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
-    MLN_HANDLE_NULL, coordinates, 1, output, NULL
-  ));
-  MLN_TEST_INVALID(
-    mln_map_projection_pixel_for_lat_lng(projection, coordinates[0], NULL, NULL)
-  );
+  const mln_screen_point before = {.x = -1.0, .y = -2.0};
+  mln_screen_point output = before;
   MLN_TEST_INVALID(mln_map_projection_pixel_for_lat_lng(
-    projection, coordinates[2], output, NULL
+    projection, (mln_lat_lng){91.0, 0.0}, &output, NULL
   ));
-  TEST_ASSERT_EQUAL_MEMORY(before, output, sizeof(output));
+  MLN_TEST_INVALID(mln_map_projection_pixel_for_lat_lng(
+    projection, (mln_lat_lng){0.0, 0.0}, NULL, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(&before, &output, sizeof(output));
 
-  typedef mln_status (*convert_points)(
-    mln_map_projection, const mln_screen_point*, size_t, mln_lat_lng*,
-    mln_diagnostic*
-  );
-  const convert_points conversions[] = {
-    mln_map_projection_lat_lngs_for_pixels,
-    mln_map_projection_lat_lngs_for_pixels_unwrapped,
-  };
-  const mln_screen_point invalid[] = {{0.0, 0.0}, {20.0, 10.0}, {0.0, NAN}};
-  mln_lat_lng converted[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
-  const mln_lat_lng original[3] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
-  for (size_t index = 0; index < 2; ++index) {
-    MLN_TEST_INVALID(
-      conversions[index](projection, invalid, 3, converted, NULL)
-    );
-    MLN_TEST_INVALID(conversions[index](projection, NULL, 1, converted, NULL));
-    MLN_TEST_INVALID(conversions[index](projection, invalid, 1, NULL, NULL));
-    MLN_TEST_INVALID(
-      conversions[index](MLN_HANDLE_NULL, invalid, 1, converted, NULL)
-    );
-  }
-  MLN_TEST_INVALID(
-    mln_map_projection_lat_lng_for_pixel(projection, invalid[0], NULL, NULL)
-  );
+  const mln_lat_lng original = {-1.0, -2.0};
+  mln_lat_lng converted = original;
+  MLN_TEST_INVALID(mln_map_projection_lat_lng_for_pixel(
+    projection, (mln_screen_point){0.0, NAN}, &converted, NULL
+  ));
   MLN_TEST_INVALID(mln_map_projection_lat_lng_for_pixel_unwrapped(
-    projection, invalid[0], NULL, NULL
+    projection, (mln_screen_point){0.0, NAN}, &converted, NULL
   ));
   MLN_TEST_INVALID(mln_map_projection_lat_lng_for_pixel(
-    projection, invalid[2], converted, NULL
+    projection, (mln_screen_point){0.0, 0.0}, NULL, NULL
   ));
-  TEST_ASSERT_EQUAL_MEMORY(original, converted, sizeof(converted));
+  MLN_TEST_INVALID(mln_map_projection_lat_lng_for_pixel_unwrapped(
+    projection, (mln_screen_point){0.0, 0.0}, NULL, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(&original, &converted, sizeof(converted));
 
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);
@@ -734,7 +578,6 @@ MLN_TEST_GROUP {
   RUN_TEST(setters_apply_before_return);
   RUN_TEST(projection_setters_reject_invalid_values);
   RUN_TEST(unwrapped_conversion_preserves_world_copies);
-  RUN_TEST(visible_geometry_fits_like_its_coordinates);
   RUN_TEST(meters_per_pixel_follows_the_projection_camera);
   RUN_TEST(projection_handles_are_callable_from_foreign_threads);
   RUN_TEST(projected_meters_round_trip);

@@ -133,23 +133,6 @@ def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip
     assert [end.outcome for end in ends] == [mln.CameraTransitionOutcome.CANCELLED]
 
 
-def test_an_array_input_is_copied_when_it_is_submitted(
-    map_handle: mln.MapHandle,
-) -> None:
-    result(map_handle.set_style_json(EMPTY_STYLE))
-    tiles = ["custom://tiles/{z}/{x}/{y}.pbf"]
-
-    added = map_handle.add_vector_source_tiles("vector", typing.cast(typing.Any, tiles))
-    tiles[0] = "custom://replaced/{z}/{x}/{y}.pbf"
-    tiles.append("custom://appended/{z}/{x}/{y}.pbf")
-
-    assert result(added).disposition == mln.CommandDisposition.COMMITTED
-    source = result(map_handle.get_style_source("vector"))
-    assert source is not None
-    assert source.tilejson is not None
-    assert source.tilejson.tile_urls == ("custom://tiles/{z}/{x}/{y}.pbf",)
-
-
 def test_public_type_hints_resolve() -> None:
     for name in api.__all__:
         target = getattr(api, name)
@@ -160,18 +143,3 @@ def test_public_type_hints_resolve() -> None:
                     typing.get_type_hints(member)
         elif callable(target):
             typing.get_type_hints(target)
-
-
-def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
-    map_handle: mln.MapHandle,
-) -> None:
-    projection = map_handle.create_projection()
-    try:
-        coordinates = (mln.LatLng(0, 0), mln.LatLng(10, 20), mln.LatLng(-12, -30))
-        points = projection.pixels_for_lat_lngs(coordinates)
-        assert points == tuple(
-            projection.pixel_for_lat_lng(value) for value in coordinates
-        )
-        assert projection.pixels_for_lat_lngs(()) == ()
-    finally:
-        projection.close()

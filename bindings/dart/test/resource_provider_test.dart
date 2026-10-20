@@ -95,7 +95,6 @@ void main() {
       throwsA(isA<InvalidStateException>()),
     );
     handle.close();
-    handle.waitUntilRetired();
     handle.close();
     expect(handle.isCancelled, throwsA(isA<InvalidStateException>()));
     expect(
@@ -167,7 +166,6 @@ void main() {
     expect(zoneErrors, [isA<StateError>()]);
     expect(singleRegistrationProbeForTesting(handle), isNull);
     handle.close();
-    handle.waitUntilRetired();
   });
 
   test(

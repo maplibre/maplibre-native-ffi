@@ -932,79 +932,6 @@ PremultipliedRgba8Image _readPremultipliedRgba8Image(
   ),
 );
 
-Pointer<raw.mln_style_tile_source_options> _writeStyleTileSourceOptions(
-  StyleTileSourceOptions value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_style_tile_source_options>();
-  result.ref = raw.mln_style_tile_source_options_default();
-  if (value.minZoom != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-    result.ref.min_zoom = value.minZoom!;
-  }
-  if (value.maxZoom != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-    result.ref.max_zoom = value.maxZoom!;
-  }
-  if (value.attribution != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-    result.ref.attribution = nativeStringView(value.attribution!, arena).value;
-  }
-  if (value.scheme != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-    result.ref.scheme = value.scheme!.rawValue;
-  }
-  if (value.bounds != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-    result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
-  }
-  if (value.tileSize != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-    result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
-  }
-  if (value.vectorEncoding != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-    result.ref.vector_encoding = value.vectorEncoding!.rawValue;
-  }
-  if (value.rasterEncoding != null) {
-    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-    result.ref.raster_encoding = value.rasterEncoding!.rawValue;
-  }
-  return result;
-}
-
-StyleTileSourceOptions _readStyleTileSourceOptions(
-  raw.mln_style_tile_source_options source,
-) => StyleTileSourceOptions(
-  minZoom: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) != 0
-      ? source.min_zoom
-      : null,
-  maxZoom: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) != 0
-      ? source.max_zoom
-      : null,
-  attribution:
-      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION) != 0
-      ? utf8.decode(_copyBufferView(source.attribution))
-      : null,
-  scheme: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME) != 0
-      ? StyleTileScheme.fromRawValue(source.scheme)
-      : null,
-  bounds: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS) != 0
-      ? _readLatLngBounds(source.bounds)
-      : null,
-  tileSize: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE) != 0
-      ? source.tile_size
-      : null,
-  vectorEncoding:
-      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING) != 0
-      ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
-      : null,
-  rasterEncoding:
-      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING) != 0
-      ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
-      : null,
-);
-
 Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
   MetalBorrowedTexture value,
   Arena arena,
@@ -2192,11 +2119,6 @@ Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Arena arena) {
   return result;
 }
 
-ScreenBox _readScreenBox(raw.mln_screen_box source) => ScreenBox(
-  min: _readScreenPoint(source.min),
-  max: _readScreenPoint(source.max),
-);
-
 Pointer<raw.mln_screen_line_string> _writeScreenLineString(
   ScreenLineString value,
   Arena arena,
@@ -2214,16 +2136,6 @@ Pointer<raw.mln_screen_line_string> _writeScreenLineString(
   }
   return result;
 }
-
-ScreenLineString _readScreenLineString(raw.mln_screen_line_string source) =>
-    ScreenLineString(
-      points: List<ScreenPoint>.unmodifiable(
-        List.generate(
-          source.point_count,
-          (index) => _readScreenPoint(source.points[index]),
-        ),
-      ),
-    );
 
 Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
   RenderedQueryGeometry value,
@@ -2247,17 +2159,6 @@ Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
   }
   return result;
 }
-
-RenderedQueryGeometry _readRenderedQueryGeometry(
-  raw.mln_rendered_query_geometry source,
-) => switch (source.type) {
-  1 => RenderedQueryGeometry.point(_readScreenPoint(source.data.point)),
-  2 => RenderedQueryGeometry.box(_readScreenBox(source.data.box)),
-  3 => RenderedQueryGeometry.lineString(
-    _readScreenLineString(source.data.line_string),
-  ),
-  _ => throwInvalidState('native union contains an unsupported variant'),
-};
 
 Pointer<raw.mln_rendered_feature_query_options>
 _writeRenderedFeatureQueryOptions(
@@ -2466,7 +2367,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
     (value.cachePath ?? ''),
     arena,
   ).value;
-  result.ref.event_mask = value.eventMask.rawValue;
   return result;
 }
 
@@ -2478,7 +2378,6 @@ RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
       cachePath: source.cache_path.size == 0
           ? null
           : utf8.decode(_copyBufferView(source.cache_path)),
-      eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
     );
 
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
@@ -2897,7 +2796,6 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
   result.ref.url = nativeStringView(value.url, arena).value;
-  result.ref.url_stage = value.urlStage.rawValue;
   return result;
 }
 
@@ -3492,53 +3390,6 @@ RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
   return _readRenderedFeatureQueryOptions(nativeResult);
 }
 
-/// Returns a rendered box query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_box` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-      final nativeResult = raw.mln_rendered_query_geometry_box(
-        _writeScreenBox(box, arena).ref,
-      );
-      return _readRenderedQueryGeometry(nativeResult);
-    });
-
-/// Returns a rendered line-string query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_line_string` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-RenderedQueryGeometry renderedQueryGeometryLineString(
-  List<ScreenPoint> points,
-) => withNativeArena((arena) {
-  ensureAbiVersion();
-  final nativepoints = arena<raw.mln_screen_point>(
-    points.isEmpty ? 1 : points.length,
-  );
-  for (var index = 0; index < points.length; index++) {
-    nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
-  }
-  final nativeResult = raw.mln_rendered_query_geometry_line_string(
-    nativepoints,
-    points.length,
-  );
-  return _readRenderedQueryGeometry(nativeResult);
-});
-
-/// Returns a rendered point query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-      final nativeResult = raw.mln_rendered_query_geometry_point(
-        _writeScreenPoint(point, arena).ref,
-      );
-      return _readRenderedQueryGeometry(nativeResult);
-    });
-
 /// Creates a runtime.
 ///
 /// See `mln_runtime_create` in the
@@ -3590,16 +3441,6 @@ StyleImageOptions styleImageOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_style_image_options_default();
   return _readStyleImageOptions(nativeResult);
-}
-
-/// Returns default tile source options.
-///
-/// See `mln_style_tile_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleTileSourceOptions styleTileSourceOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_tile_source_options_default();
-  return _readStyleTileSourceOptions(nativeResult);
 }
 
 /// Returns default global style transition options.
@@ -3985,76 +3826,6 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     );
   });
-  void addRasterDemSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _discard((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_raster_dem_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-  void addRasterDemSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _discard(
-    (arena, completion) => raw.mln_map_add_raster_dem_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-  void addRasterSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _discard((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_raster_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-  void addRasterSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _discard(
-    (arena, completion) => raw.mln_map_add_raster_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
   void addStyleLayerJson(Uint8List layerJson, {String? beforeLayerId}) =>
       _discard(
         (arena, completion) => raw.mln_map_add_style_layer_json(
@@ -4070,41 +3841,6 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       nativeBufferView(sourceJson, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-  void addVectorSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _discard((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_vector_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-  void addVectorSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _discard(
-    (arena, completion) => raw.mln_map_add_vector_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4690,96 +4426,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   });
 
-  /// Adds a raster DEM source with inline tile URLs.
-  ///
-  /// See `mln_map_add_raster_dem_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addRasterDemSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _command((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_raster_dem_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-
-  /// Adds a raster DEM source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_raster_dem_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addRasterDemSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_raster_dem_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Adds a raster source with inline tile URLs.
-  ///
-  /// See `mln_map_add_raster_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addRasterSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _command((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_raster_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-
-  /// Adds a raster source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_raster_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addRasterSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_raster_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Adds one style layer from a full style-spec layer JSON object.
   ///
   /// See `mln_map_add_style_layer_json` in the
@@ -4809,51 +4455,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       nativeBufferView(sourceJson, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Adds a vector source with inline tile URLs.
-  ///
-  /// See `mln_map_add_vector_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addVectorSourceTiles(
-    String sourceId,
-    List<String> tiles, {
-    StyleTileSourceOptions? options,
-  }) => _command((arena, completion) {
-    final nativetiles = arena<raw.mln_buffer_view>(
-      tiles.isEmpty ? 1 : tiles.length,
-    );
-    for (var index = 0; index < tiles.length; index++) {
-      nativetiles[index] = nativeStringView(tiles[index], arena).value;
-    }
-    return raw.mln_map_add_vector_source_tiles(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativetiles,
-      tiles.length,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-
-  /// Adds a vector source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_vector_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> addVectorSourceUrl(
-    String sourceId,
-    String url, {
-    StyleTileSourceOptions? options,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_vector_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -6355,66 +5956,6 @@ final class MapProjectionHandle implements Finalizable {
     return _readLatLng(outCoordinate.ref);
   });
 
-  /// Converts screen points to geographic coordinates.
-  ///
-  /// See `mln_map_projection_lat_lngs_for_pixels` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  List<LatLng> latLngsForPixels(List<ScreenPoint> points) =>
-      withNativeArena((arena) {
-        final nativepoints = arena<raw.mln_screen_point>(
-          points.isEmpty ? 1 : points.length,
-        );
-        for (var index = 0; index < points.length; index++) {
-          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
-        }
-        final outCoordinates = arena<raw.mln_lat_lng>(points.length);
-        _check(
-          raw.mln_map_projection_lat_lngs_for_pixels(
-            _handle.raw,
-            nativepoints,
-            points.length,
-            outCoordinates,
-            nativeDiagnostic,
-          ),
-        );
-        return List<LatLng>.unmodifiable(
-          List.generate(
-            points.length,
-            (index) => _readLatLng(outCoordinates[index]),
-          ),
-        );
-      });
-
-  /// Converts screen points to unwrapped geographic coordinates.
-  ///
-  /// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  List<LatLng> latLngsForPixelsUnwrapped(List<ScreenPoint> points) =>
-      withNativeArena((arena) {
-        final nativepoints = arena<raw.mln_screen_point>(
-          points.isEmpty ? 1 : points.length,
-        );
-        for (var index = 0; index < points.length; index++) {
-          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
-        }
-        final outCoordinates = arena<raw.mln_lat_lng>(points.length);
-        _check(
-          raw.mln_map_projection_lat_lngs_for_pixels_unwrapped(
-            _handle.raw,
-            nativepoints,
-            points.length,
-            outCoordinates,
-            nativeDiagnostic,
-          ),
-        );
-        return List<LatLng>.unmodifiable(
-          List.generate(
-            points.length,
-            (index) => _readLatLng(outCoordinates[index]),
-          ),
-        );
-      });
-
   /// Reads the ground distance covered by one logical map pixel at a latitude
   /// for the helper camera zoom.
   ///
@@ -6450,39 +5991,6 @@ final class MapProjectionHandle implements Finalizable {
     return _readScreenPoint(outPoint.ref);
   });
 
-  /// Converts geographic coordinates to screen points.
-  ///
-  /// See `mln_map_projection_pixels_for_lat_lngs` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) =>
-      withNativeArena((arena) {
-        final nativecoordinates = arena<raw.mln_lat_lng>(
-          coordinates.isEmpty ? 1 : coordinates.length,
-        );
-        for (var index = 0; index < coordinates.length; index++) {
-          nativecoordinates[index] = _writeLatLng(
-            coordinates[index],
-            arena,
-          ).ref;
-        }
-        final outPoints = arena<raw.mln_screen_point>(coordinates.length);
-        _check(
-          raw.mln_map_projection_pixels_for_lat_lngs(
-            _handle.raw,
-            nativecoordinates,
-            coordinates.length,
-            outPoints,
-            nativeDiagnostic,
-          ),
-        );
-        return List<ScreenPoint>.unmodifiable(
-          List.generate(
-            coordinates.length,
-            (index) => _readScreenPoint(outPoints[index]),
-          ),
-        );
-      });
-
   /// Releases a standalone projection.
   ///
   /// See `mln_map_projection_release` in the
@@ -6504,48 +6012,6 @@ final class MapProjectionHandle implements Finalizable {
       ),
     );
   });
-
-  /// Applies a camera fit for geographic coordinates.
-  ///
-  /// See `mln_map_projection_set_visible_coordinates` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) =>
-      withNativeArena((arena) {
-        final nativecoordinates = arena<raw.mln_lat_lng>(
-          coordinates.isEmpty ? 1 : coordinates.length,
-        );
-        for (var index = 0; index < coordinates.length; index++) {
-          nativecoordinates[index] = _writeLatLng(
-            coordinates[index],
-            arena,
-          ).ref;
-        }
-        _check(
-          raw.mln_map_projection_set_visible_coordinates(
-            _handle.raw,
-            nativecoordinates,
-            coordinates.length,
-            _writeEdgeInsets(padding, arena).ref,
-            nativeDiagnostic,
-          ),
-        );
-      });
-
-  /// Applies a camera fit for GeoJSON Geometry bytes.
-  ///
-  /// See `mln_map_projection_set_visible_geometry` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  void setVisibleGeometry(Uint8List geometry, EdgeInsets padding) =>
-      withNativeArena((arena) {
-        _check(
-          raw.mln_map_projection_set_visible_geometry(
-            _handle.raw,
-            nativeBufferView(geometry, arena),
-            _writeEdgeInsets(padding, arena).ref,
-            nativeDiagnostic,
-          ),
-        );
-      });
 }
 
 /// Issued `mln_render_frame_batch` handle id.
@@ -7203,19 +6669,6 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
         );
         return outCancelled.value;
       });
-
-  /// Blocks until a resource request is released and its cancel callback
-  /// registration has retired: the callback, if it ran, and release_user_data
-  /// have both returned. Completing a request does not release its owner.
-  ///
-  /// See `mln_resource_request_wait_until_retired` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void waitUntilRetired() => _check(
-    raw.mln_resource_request_wait_until_retired(
-      _state.handleId,
-      nativeDiagnostic,
-    ),
-  );
 }
 
 /// Issued `mln_runtime` handle id.

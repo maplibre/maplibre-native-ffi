@@ -1109,8 +1109,6 @@ final class mln_resource_route extends Struct {
   @Uint32()
   external int flags;
   external mln_buffer_view url;
-  @Uint32()
-  external int url_stage;
 }
 
 final class mln_resource_transform extends Struct {
@@ -1222,8 +1220,6 @@ final class mln_runtime_options extends Struct {
   external int size;
   external mln_buffer_view asset_path;
   external mln_buffer_view cache_path;
-  @Uint64()
-  external int event_mask;
 }
 
 final class mln_screen_box extends Struct {
@@ -1345,27 +1341,6 @@ final class mln_style_source_tile_info extends Struct {
   external double max_zoom;
   @Uint32()
   external int scheme;
-}
-
-final class mln_style_tile_source_options extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int fields;
-  @Double()
-  external double min_zoom;
-  @Double()
-  external double max_zoom;
-  external mln_buffer_view attribution;
-  @Uint32()
-  external int scheme;
-  external mln_lat_lng_bounds bounds;
-  @Uint32()
-  external int tile_size;
-  @Uint32()
-  external int vector_encoding;
-  @Uint32()
-  external int raster_encoding;
 }
 
 final class mln_style_transition_options extends Struct {
@@ -1940,10 +1915,6 @@ const MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1;
 const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2;
 const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
 
-// mln_resource_route_url
-const MLN_RESOURCE_ROUTE_URL_RESOLVED = 0;
-const MLN_RESOURCE_ROUTE_URL_REQUESTED = 1;
-
 // mln_resource_storage_policy
 const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
 const MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1;
@@ -1963,8 +1934,6 @@ const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64;
 const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128;
 const MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024;
-const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048;
-const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768;
@@ -1975,9 +1944,9 @@ const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
 const MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 8388608;
-const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912382;
+const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8906238;
 const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
-const MLN_RUNTIME_EVENT_MASK_ALL = 12582398;
+const MLN_RUNTIME_EVENT_MASK_ALL = 12576254;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
@@ -2002,8 +1971,6 @@ const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6;
 const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7;
 const MLN_RUNTIME_EVENT_MAP_IDLE = 8;
 const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10;
-const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11;
-const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12;
 const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13;
 const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14;
 const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15;
@@ -2083,16 +2050,6 @@ const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9;
 // mln_style_tile_scheme
 const MLN_STYLE_TILE_SCHEME_XYZ = 0;
 const MLN_STYLE_TILE_SCHEME_TMS = 1;
-
-// mln_style_tile_source_option_field
-const MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1;
-const MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 2;
-const MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 4;
-const MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 8;
-const MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 16;
-const MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 32;
-const MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 64;
-const MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 128;
 
 // mln_style_transition_option_field
 const MLN_STYLE_TRANSITION_OPTION_DURATION = 1;
@@ -2561,86 +2518,6 @@ external int mln_map_add_image_source_url(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    Pointer<mln_buffer_view>,
-    Size,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_raster_dem_source_tiles(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_buffer_view> tiles,
-  int tile_count,
-  Pointer<mln_style_tile_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_raster_dem_source_url(
-  int map,
-  mln_buffer_view source_id,
-  mln_buffer_view url,
-  Pointer<mln_style_tile_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_buffer_view>,
-    Size,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_raster_source_tiles(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_buffer_view> tiles,
-  int tile_count,
-  Pointer<mln_style_tile_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_raster_source_url(
-  int map,
-  mln_buffer_view source_id,
-  mln_buffer_view url,
-  Pointer<mln_style_tile_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -2667,46 +2544,6 @@ external int mln_map_add_style_source_json(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view source_json,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_buffer_view>,
-    Size,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_vector_source_tiles(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_buffer_view> tiles,
-  int tile_count,
-  Pointer<mln_style_tile_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_style_tile_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_vector_source_url(
-  int map,
-  mln_buffer_view source_id,
-  mln_buffer_view url,
-  Pointer<mln_style_tile_source_options> options,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3411,40 +3248,6 @@ external int mln_map_projection_lat_lng_for_pixel_unwrapped(
 @Native<
   Int32 Function(
     mln_map_projection,
-    Pointer<mln_screen_point>,
-    Size,
-    Pointer<mln_lat_lng>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_projection_lat_lngs_for_pixels(
-  int projection,
-  Pointer<mln_screen_point> points,
-  int point_count,
-  Pointer<mln_lat_lng> out_coordinates,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map_projection,
-    Pointer<mln_screen_point>,
-    Size,
-    Pointer<mln_lat_lng>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_projection_lat_lngs_for_pixels_unwrapped(
-  int projection,
-  Pointer<mln_screen_point> points,
-  int point_count,
-  Pointer<mln_lat_lng> out_coordinates,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map_projection,
     Double,
     Pointer<Double>,
     Pointer<mln_diagnostic>,
@@ -3472,23 +3275,6 @@ external int mln_map_projection_pixel_for_lat_lng(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    mln_map_projection,
-    Pointer<mln_lat_lng>,
-    Size,
-    Pointer<mln_screen_point>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_projection_pixels_for_lat_lngs(
-  int projection,
-  Pointer<mln_lat_lng> coordinates,
-  int coordinate_count,
-  Pointer<mln_screen_point> out_points,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Int32 Function(mln_map_projection, Pointer<mln_diagnostic>)>()
 external int mln_map_projection_release(
   int projection,
@@ -3505,38 +3291,6 @@ external int mln_map_projection_release(
 external int mln_map_projection_set_camera(
   int projection,
   Pointer<mln_camera_options> camera,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map_projection,
-    Pointer<mln_lat_lng>,
-    Size,
-    mln_edge_insets,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_projection_set_visible_coordinates(
-  int projection,
-  Pointer<mln_lat_lng> coordinates,
-  int coordinate_count,
-  mln_edge_insets padding,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map_projection,
-    mln_buffer_view,
-    mln_edge_insets,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_projection_set_visible_geometry(
-  int projection,
-  mln_buffer_view geometry,
-  mln_edge_insets padding,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4572,22 +4326,6 @@ external int mln_render_session_set_webgpu_surface_target(
 external mln_rendered_feature_query_options
 mln_rendered_feature_query_options_default();
 
-@Native<mln_rendered_query_geometry Function(mln_screen_box)>()
-external mln_rendered_query_geometry mln_rendered_query_geometry_box(
-  mln_screen_box box,
-);
-
-@Native<mln_rendered_query_geometry Function(Pointer<mln_screen_point>, Size)>()
-external mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
-  Pointer<mln_screen_point> points,
-  int point_count,
-);
-
-@Native<mln_rendered_query_geometry Function(mln_screen_point)>()
-external mln_rendered_query_geometry mln_rendered_query_geometry_point(
-  mln_screen_point point,
-);
-
 @Native<
   Int32 Function(
     mln_resource_request,
@@ -4631,12 +4369,6 @@ external int mln_resource_request_set_cancel_callback(
   int handle,
   Pointer<mln_resource_request_cancel_handler> handler,
   Pointer<Bool> out_cancelled,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Int32 Function(mln_resource_request, Pointer<mln_diagnostic>)>()
-external int mln_resource_request_wait_until_retired(
-  int handle,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -5001,9 +4733,6 @@ mln_source_feature_query_options_default();
 
 @Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
-
-@Native<mln_style_tile_source_options Function()>()
-external mln_style_tile_source_options mln_style_tile_source_options_default();
 
 @Native<mln_style_transition_options Function()>()
 external mln_style_transition_options mln_style_transition_options_default();

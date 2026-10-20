@@ -42,7 +42,7 @@ ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
 # ownership=value, encoding=utf8, and reentry=allow, so a header never writes
-# them; an absent nullable or handle_access means false or live. The semantic
+# them; an absent nullable means false. The semantic
 # layer in semantic.py supplies the remaining values: lifetime=completion for an
 # array completion result, consumes=always for a release that returns void, and
 # discardable completions for commands.
@@ -58,7 +58,6 @@ ANNOTATION_VALUES = {
     "consumes": frozenset({"success"}),
     "reentry": frozenset({"forbid", "protocol"}),
     "release_reentry": frozenset({"forbid"}),
-    "handle_access": frozenset({"issued"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
 }
@@ -81,7 +80,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset(
-    {"direction", "length", "consumes", "enum", "kind", "handle_access"}
+    {"direction", "length", "consumes", "enum", "kind"}
 )
 FIELD_KEYS = COMMON_KEYS | frozenset(
     {
@@ -141,7 +140,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "resume",
         "cancelled",
         "cancel_registration",
-        "wait_retired",
         "delivery",
         "synchronous",
         "fields",
@@ -738,18 +736,6 @@ def validate(api: Api) -> None:
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
-            if "handle_access" in parameter.metadata:
-                owner = api.typedefs_by_name.get(parameter.type.declaration or "")
-                if (
-                    owner is None
-                    or owner.metadata.get("kind") != "handle"
-                    or parameter.metadata.get("direction", "in") != "in"
-                    or parameter.metadata.get("consumes")
-                    or metadata.get("consumes")
-                ):
-                    errors.append(
-                        f"{pcontext}: handle_access requires a nonconsuming input handle"
-                    )
             if "enum" in parameter.metadata and parameter.metadata["enum"] not in {
                 enum.name for enum in api.enums
             }:
@@ -757,6 +743,14 @@ def validate(api: Api) -> None:
             if parameter.metadata.get("direction") == "out":
                 if parameter.type.kind != "pointer":
                     errors.append(f"{pcontext}: output direction requires a pointer")
+                elif (
+                    parameter.type.pointee
+                    and parameter.type.pointee.kind != "pointer"
+                    and parameter.metadata.get("length") not in {None, "1"}
+                ):
+                    errors.append(
+                        f"{pcontext}: output arrays require an owned pointer output"
+                    )
                 elif parameter.type.pointee and parameter.type.pointee.const:
                     errors.append(
                         f"{pcontext}: output direction contradicts const pointee"
@@ -768,31 +762,6 @@ def validate(api: Api) -> None:
                 and parameter.metadata["length"] != "1"
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
-            if (
-                parameter.metadata.get("direction") == "out"
-                and parameter.metadata.get("length") not in {None, "1"}
-                and (
-                    parameter.type.pointee is None
-                    or parameter.type.pointee.kind == "pointer"
-                    or not any(
-                        input_.metadata.get("direction", "in") == "in"
-                        and input_.type.kind == "pointer"
-                        and input_.type.pointee is not None
-                        and input_.metadata.get("encoding") is None
-                        and input_.metadata.get("length")
-                        == parameter.metadata["length"]
-                        and parameter.metadata["length"] in parameters
-                        and parameters[parameter.metadata["length"]].metadata.get(
-                            "direction", "in"
-                        )
-                        == "in"
-                        for input_ in function.parameters
-                    )
-                )
-            ):
-                errors.append(
-                    f"{pcontext}: output array length must name an input array's count"
-                )
     for record in api.records:
         context = f"{record.location}: {record.name}"
         errors.extend(
@@ -1183,7 +1152,6 @@ def validate(api: Api) -> None:
             "complete",
             "cancelled",
             "cancel_registration",
-            "wait_retired",
         }
         if (decision_keys | {"resume"}) & typedef.metadata.keys():
             if not decision_keys <= typedef.metadata.keys():
@@ -1235,28 +1203,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{context}: {key} requires an immediate status operation on the decision handle"
                     )
-            wait = api.functions_by_name.get(typedef.metadata["wait_retired"])
-            if (
-                wait is None
-                or len(wait.parameters) != 1
-                or wait.parameters[0].type.declaration != handle.name
-                or wait.parameters[0].metadata.get("handle_access") != "issued"
-                or wait.parameters[0].metadata.get("direction", "in") != "in"
-                or wait.parameters[0].metadata.get("consumes") is not None
-                or wait.metadata.get("consumes") is not None
-                or wait.metadata.get("execution") != "immediate"
-                or not is_status(wait.return_type)
-                or has_completion(wait)
-            ):
-                errors.append(
-                    f"{context}: wait_retired requires a nonconsuming immediate status operation on one issued decision handle"
-                )
-            if typedef.metadata["wait_retired"] in typedef.metadata.get(
-                "reentry_calls", ""
-            ).split(","):
-                errors.append(
-                    f"{context}: retirement waits cannot be callback reentry operations"
-                )
     for typedef in api.typedefs:
         if typedef.metadata.get("kind") != "handle":
             continue
@@ -1554,7 +1500,6 @@ FUNCTION_REFERENCES = {
         "resume",
         "cancelled",
         "cancel_registration",
-        "wait_retired",
         "reentry_calls",
     ),
 }

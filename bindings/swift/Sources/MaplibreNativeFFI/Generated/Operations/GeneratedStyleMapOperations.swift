@@ -132,96 +132,6 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a raster DEM source with inline tile URLs.
-  ///
-  /// See `mln_map_add_raster_dem_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addRasterDemSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_raster_dem_source_tiles") { raw, arena, completion, diagnostic in
-      try mln_map_add_raster_dem_source_tiles(
-        raw,
-        arena.view(bindingArg0),
-        arena.array(bindingArg1.map { arena.view($0) }),
-        NativeInputArena.count(bindingArg1.count),
-        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a raster DEM source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_raster_dem_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addRasterDemSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_raster_dem_source_url") { raw, arena, completion, diagnostic in
-      try mln_map_add_raster_dem_source_url(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a raster source with inline tile URLs.
-  ///
-  /// See `mln_map_add_raster_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addRasterSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_raster_source_tiles") { raw, arena, completion, diagnostic in
-      try mln_map_add_raster_source_tiles(
-        raw,
-        arena.view(bindingArg0),
-        arena.array(bindingArg1.map { arena.view($0) }),
-        NativeInputArena.count(bindingArg1.count),
-        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a raster source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_raster_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addRasterSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_raster_source_url") { raw, arena, completion, diagnostic in
-      try mln_map_add_raster_source_url(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Adds one style layer from a full style-spec layer JSON object.
   ///
   /// See `mln_map_add_style_layer_json` in the
@@ -256,51 +166,6 @@ public extension MapHandle {
         raw,
         arena.view(bindingArg0),
         arena.view(bindingArg1),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a vector source with inline tile URLs.
-  ///
-  /// See `mln_map_add_vector_source_tiles` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addVectorSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_vector_source_tiles") { raw, arena, completion, diagnostic in
-      try mln_map_add_vector_source_tiles(
-        raw,
-        arena.view(bindingArg0),
-        arena.array(bindingArg1.map { arena.view($0) }),
-        NativeInputArena.count(bindingArg1.count),
-        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds a vector source with a TileJSON URL.
-  ///
-  /// See `mln_map_add_vector_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func addVectorSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_vector_source_url") { raw, arena, completion, diagnostic in
-      try mln_map_add_vector_source_url(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
         completion,
         diagnostic
       )
@@ -1126,80 +991,6 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func addRasterDemSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_raster_dem_source_tiles") { raw, arena, diagnostic in
-        try mln_map_add_raster_dem_source_tiles(
-          raw,
-          arena.view(bindingArg0),
-          arena.array(bindingArg1.map { arena.view($0) }),
-          NativeInputArena.count(bindingArg1.count),
-          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addRasterDemSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_raster_dem_source_url") { raw, arena, diagnostic in
-        try mln_map_add_raster_dem_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addRasterSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_raster_source_tiles") { raw, arena, diagnostic in
-        try mln_map_add_raster_source_tiles(
-          raw,
-          arena.view(bindingArg0),
-          arena.array(bindingArg1.map { arena.view($0) }),
-          NativeInputArena.count(bindingArg1.count),
-          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addRasterSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_raster_source_url") { raw, arena, diagnostic in
-        try mln_map_add_raster_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
   func addStyleLayerJson(
     layerJson bindingArg0: Data,
     beforeLayerId bindingArg1: String? = nil
@@ -1226,43 +1017,6 @@ public extension MapHandleDiscarding {
           raw,
           arena.view(bindingArg0),
           arena.view(bindingArg1),
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addVectorSourceTiles(
-    sourceId bindingArg0: String,
-    tiles bindingArg1: [String],
-    options bindingArg3: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_vector_source_tiles") { raw, arena, diagnostic in
-        try mln_map_add_vector_source_tiles(
-          raw,
-          arena.view(bindingArg0),
-          arena.array(bindingArg1.map { arena.view($0) }),
-          NativeInputArena.count(bindingArg1.count),
-          bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addVectorSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: StyleTileSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeDiscard("mln_map_add_vector_source_url") { raw, arena, diagnostic in
-        try mln_map_add_vector_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
           nil,
           diagnostic
         )

@@ -104,30 +104,6 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                     },
                 )
 
-    def test_public_enums_and_retired_handle_access(self):
-        source = """
-typedef enum event_code : unsigned { CAMERA_CHANGED = 3 } event_code;
-typedef unsigned long owner BIND("kind=handle;release=release_owner");
-void release_owner(owner value);
-mln_status await_owner(owner value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        self.assertEqual(
-            model.values["event_code"].enum_values, (("CAMERA_CHANGED", 3),)
-        )
-        self.assertEqual(
-            model.operations_by_name["await_owner"].receiver_access, "issued"
-        )
-        with self.assertRaisesRegex(ModelError, "nonconsuming input handle"):
-            bind(
-                self.parse(
-                    source.replace(
-                        "await_owner(owner value", "await_owner(unsigned value"
-                    )
-                ),
-                require_complete=True,
-            )
-
     def test_view_scope_and_empty_union_have_verified_relationships(self):
         source = """
 typedef unsigned long owner BIND("kind=handle;release=release_owner;view_begin=begin_view;view_end=end_view");
@@ -736,19 +712,6 @@ mln_status read_flags(
         self.assertEqual(output.kind, "reference")
         self.assertEqual(output.element.kind, "enum")
 
-    def test_counted_output_preserves_array_storage(self):
-        model = bind(
-            self.parse("""
-mln_status copy_values(
-  const double *values BIND("length=count"),
-  double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
-"""),
-            require_complete=True,
-        )
-        output = model.operations[0].outputs[0].value
-        self.assertEqual((output.kind, output.length), ("array", "count"))
-        self.assertEqual(model.operations[0].outputs[0].sized_by, "values")
-
     def test_callback_signature_and_retirement_form_one_registration(self):
         source = """
 typedef void (*notify)(void *context);
@@ -884,13 +847,12 @@ typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
 typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
-typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
+typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("accepted_unless=cancelled") mln_status on_cancel(
   request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
-mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         decision = model.callbacks["provider"].decision
@@ -910,7 +872,6 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             .decision
         )
         self.assertEqual(resumed_decision.resume, "resume_request")
-        self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
         (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
@@ -918,12 +879,6 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             ("release", "cancelled"),
         )
         for before, after, error in (
-            (
-                "wait_retired=await_retirement",
-                "wait_retired=answer",
-                "issued decision handle",
-            ),
-            (' BIND("handle_access=issued")', "", "issued decision handle"),
             ("decision_accept=CLAIM", "decision_accept=DELEGATE", "distinct values"),
             ("complete=answer", "complete=is_missing", "immediate status operation"),
             (

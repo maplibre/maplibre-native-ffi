@@ -9,10 +9,8 @@
  * which is the null handle, a handle of another type, or a value this library
  * never issued, reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no
  * effect, and its diagnostic names the case.
- * mln_resource_request_wait_until_retired() is the one exception: it reports
- * MLN_STATUS_OK for any nonnull handle that names no live request. Handle
- * values are safe to copy, compare, hash, and move between threads, and carry
- * no ownership on their own.
+ * Handle values are safe to copy, compare, hash, and move between threads, and
+ * carry no ownership on their own.
  *
  * Hosts must pass handles back as issued, without decoding or synthesizing
  * them.

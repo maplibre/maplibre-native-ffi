@@ -82,9 +82,6 @@ typedef struct mln_offline_region_status {
  *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
- * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
- * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
- *   NONE.
  * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
  * - MAP_RENDER_FRAME_FINISHED: code is 0; payload RENDER_FRAME.
  * - MAP_RENDER_MAP_STARTED: code is 0; payload NONE.
@@ -103,7 +100,7 @@ typedef struct mln_offline_region_status {
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
  *
- * Values 9 and 22 are retired and stay unused.
+ * Values 9, 11, 12, and 22 are retired and stay unused.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -115,8 +112,6 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
   MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
-  MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11,
-  MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12,
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13,
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15,
@@ -162,10 +157,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
   MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 1ULL << MLN_RUNTIME_EVENT_MAP_IDLE,
   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
-  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 1ULL
-    << MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED,
-  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 1ULL
-    << MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED,
   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 1ULL
@@ -196,8 +187,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
     MLN_RUNTIME_EVENT_MASK_MAP_IDLE | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR |
-    MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED |
-    MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED |
@@ -381,17 +370,6 @@ typedef struct mln_runtime_options {
   mln_buffer_view asset_path MLN_BINDING("optional=empty");
   /** Cache database path. Copied during runtime creation. */
   mln_buffer_view cache_path MLN_BINDING("optional=empty");
-  /**
-   * Runtime-scoped event types this runtime queues, as a bitwise OR of
-   * mln_runtime_event_mask values.
-   *
-   * This field is always read. MLN_RUNTIME_EVENT_MASK_ALL selects every event
-   * type this library reports, and MLN_RUNTIME_EVENT_MASK_NONE queues none.
-   * Defaults to MLN_RUNTIME_EVENT_MASK_ALL. See mln_runtime_set_event_mask().
-   */
-  uint64_t event_mask MLN_BINDING(
-    "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"
-  );
 } mln_runtime_options;
 
 /**
@@ -684,19 +662,10 @@ typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
   MLN_URL_MATCH_GLOB = 1U << 0U,
 } mln_url_match_flags;
 
-/** The URL stage that a provider route compares. */
-typedef enum mln_resource_route_url : uint32_t {
-  MLN_RESOURCE_ROUTE_URL_RESOLVED = 0U,
-  MLN_RESOURCE_ROUTE_URL_REQUESTED = 1U,
-} mln_resource_route_url;
-
 /**
  * One request pattern that a resource provider claims.
  *
- * Routes compare the normalized resolved URL by default, rewrite rules compare
- * the normalized URL before rewriting, and header rules compare the transformed
- * URL immediately before an HTTP attempt. A route can select the original
- * requested URL through url_stage.
+ * Routes compare the normalized resolved URL that native loading fetches.
  */
 typedef struct mln_resource_route {
   /** The resource kinds to match. */
@@ -707,8 +676,6 @@ typedef struct mln_resource_route {
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
   mln_buffer_view url;
-  /** The URL stage to compare. */
-  uint32_t url_stage MLN_BINDING("enum=mln_resource_route_url");
 } mln_resource_route;
 
 /**
@@ -1084,7 +1051,6 @@ MLN_BINDING(
   "resume=mln_resource_request_pass_through;"
   "cancelled=mln_resource_request_is_cancelled;"
   "cancel_registration=mln_resource_request_set_cancel_callback;"
-  "wait_retired=mln_resource_request_wait_until_retired;"
   "reentry=protocol;"
   "reentry_owner=handle;"
   "reentry_calls="
@@ -1231,8 +1197,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
  * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
  *   small, a path view has null data with a nonzero size or embedded NUL,
- *   options->event_mask holds unknown bits, or out_runtime is null or does not
- *   point to the null handle.
+ *   or out_runtime is null or does not point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
  */
@@ -1281,7 +1246,7 @@ MLN_API mln_status mln_runtime_create(
  *   are set, release_user_data is set in queue mode, queue is an invalid
  *   handle, a route is invalid, or completion is invalid. A route is invalid
  *   when routes is null with a nonzero route_count, or the route's url is null
- *   or its kinds are zero or hold unknown bits, its url_stage is invalid,
+ *   or its kinds are zero or hold unknown bits,
  *   or its flags hold an unknown bit; the diagnostic names the route's index.
  * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
  *   runtime is closing.
@@ -1442,30 +1407,10 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
  * Passing MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
  * released. A released handle reports MLN_STATUS_INVALID_STATE from every
- * other request entry point except mln_resource_request_wait_until_retired(),
- * including from a copy another thread holds.
+ * other request entry point, including from a copy another thread holds.
  */
 MLN_API void mln_resource_request_release(
   mln_resource_request handle
-) MLN_NOEXCEPT;
-
-/**
- * Blocks until a resource request is released and its cancel callback
- * registration has retired: the callback, if it ran, and release_user_data
- * have both returned. Completing a request does not release its owner.
- *
- * Hosts that hand a request to another execution context use this to drain
- * outstanding requests during teardown. Call it from a context that is not
- * responsible for retiring the request.
- *
- * Returns:
- * - MLN_STATUS_OK once the request is retired. A handle that names no live
- *   request, including a value this library never issued, counts as retired.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is MLN_HANDLE_NULL.
- */
-MLN_API mln_status mln_resource_request_wait_until_retired(
-  mln_resource_request handle MLN_BINDING("handle_access=issued"),
-  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

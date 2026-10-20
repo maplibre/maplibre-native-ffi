@@ -295,7 +295,6 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
                 kinds: ResourceKindMask::TILE,
                 flags: UrlMatchFlags::GLOB,
                 url: "**".to_owned(),
-                ..Default::default()
             },
             // Only a URL pattern: every kind under it reaches the provider.
             ResourceRoute {

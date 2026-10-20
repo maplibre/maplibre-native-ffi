@@ -174,18 +174,6 @@ def operation(plan, values, *, discard=False):
         value = element(p.value)
         values.require(value)
         local = labels[p.name]
-        if p.sized_by:
-            count = f"len({labels[p.sized_by]})"
-            raw_type = values.c_type(value.element)
-            setup.append(f"{local} := make([]{raw_type}, {count})")
-            for member in value.element.fields:
-                if member.role == "size":
-                    setup.append(
-                        f"for index := range {local} {{ {local}[index].{member.name} = {values.c_type(member.value)}(unsafe.Sizeof({local}[index])) }}"
-                    )
-            arguments[p.name] = f"unsafe.SliceData({local})"
-            outputs.append((p, value, local))
-            continue
         setup.append(
             f"{local} := C.{value.default}()"
             if value.default
@@ -210,12 +198,7 @@ def operation(plan, values, *, discard=False):
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
         output_types.append(values.type(value))
-        if p.sized_by:
-            copied = values.copy(value.element, "item")
-            conversions.append(
-                f"func() {values.type(value)} {{ result := make({values.type(value)}, len({local})); for index, item := range {local} {{ result[index] = {copied} }}; return result }}()"
-            )
-        elif value.kind == "handle":
+        if value.kind == "handle":
             adopted = f"adopted{len(adoptions)}" if len(outputs) > 1 else "adopted"
             adoptions.append(
                 f"{adopted} := adopt{values.owner(value.native)}(uint64({local}), {parent_of(owned.get(p.name))})"
@@ -242,8 +225,6 @@ def operation(plan, values, *, discard=False):
         access = "Closing"
     elif decision and plan.name in (decision.complete, decision.resume):
         access = "Completing"
-    elif plan.receiver_access == "issued":
-        access = "Issued"
     elif plan.view or any(
         o.value.lifetime == "owner" or element(o.value).lifetime == "owner"
         for o in plan.outputs

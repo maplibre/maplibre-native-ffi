@@ -112,33 +112,19 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
 } mln_style_source_info_field;
 
-/** Field mask values for mln_style_tile_source_options. */
-typedef enum MLN_BINDING(
-  "kind=bitmask"
-) mln_style_tile_source_option_field : uint32_t {
-  MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
-  MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
-  MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 1U << 2U,
-  MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 1U << 3U,
-  MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 1U << 4U,
-  MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 1U << 5U,
-  MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 1U << 6U,
-  MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 1U << 7U,
-} mln_style_tile_source_option_field;
-
-/** Tile URL coordinate scheme values used by mln_style_tile_source_options. */
+/** Tile URL coordinate scheme values. */
 typedef enum mln_style_tile_scheme : uint32_t {
   MLN_STYLE_TILE_SCHEME_XYZ = 0,
   MLN_STYLE_TILE_SCHEME_TMS = 1,
 } mln_style_tile_scheme;
 
-/** Vector tile encoding values used by mln_style_tile_source_options. */
+/** Vector tile encoding values. */
 typedef enum mln_style_vector_tile_encoding : uint32_t {
   MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0,
   MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1,
 } mln_style_vector_tile_encoding;
 
-/** DEM raster encoding values used by mln_style_tile_source_options. */
+/** DEM raster encoding values. */
 typedef enum mln_style_raster_dem_encoding : uint32_t {
   MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0,
   MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
@@ -332,38 +318,6 @@ typedef struct mln_style_layer_info {
   /** One of mln_style_layer_visibility. */
   uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
 } mln_style_layer_info;
-
-/** Options for vector and raster tile sources. */
-typedef struct mln_style_tile_source_options {
-  uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_style_tile_source_option_field");
-  double min_zoom
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM");
-  double max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM");
-  mln_buffer_view attribution
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION");
-  /** One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ. */
-  uint32_t scheme MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;"
-    "enum=mln_style_tile_scheme"
-  );
-  mln_lat_lng_bounds bounds
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS");
-  /** Raster tile size in pixels. Defaults to 512. */
-  uint32_t tile_size
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE");
-  /** One of mln_style_vector_tile_encoding. Defaults to MVT. */
-  uint32_t vector_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;"
-    "enum=mln_style_vector_tile_encoding"
-  );
-  /** One of mln_style_raster_dem_encoding. Defaults to Mapbox. */
-  uint32_t raster_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;"
-    "enum=mln_style_raster_dem_encoding"
-  );
-} mln_style_tile_source_options;
 
 /**
  * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -721,10 +675,6 @@ typedef struct mln_style_transition_options {
   );
 } mln_style_transition_options;
 
-/** Returns default tile source options. */
-MLN_API mln_style_tile_source_options
-mln_style_tile_source_options_default(void) MLN_NOEXCEPT;
-
 /** Returns default GeoJSON source options. */
 MLN_API mln_geojson_source_options
 mln_geojson_source_options_default(void) MLN_NOEXCEPT;
@@ -751,6 +701,12 @@ mln_style_transition_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Adds one style source from a style-spec source JSON object.
+ *
+ * Vector sources with a TileJSON URL accept minzoom, maxzoom, and encoding
+ * ("mvt" or "mlt") in the source JSON. These fields override the loaded
+ * TileJSON. For example:
+ * {"type":"vector","url":"https://tiles.example/source.json",
+ *  "minzoom":2,"maxzoom":14,"encoding":"mlt"}.
  *
  * source_id and source_json are borrowed for the call and copied before
  * return. source_json is the object that appears under sources[source_id] in a
@@ -1035,158 +991,6 @@ MLN_API mln_status mln_map_set_geojson_source_data(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
   mln_map map, mln_buffer_view source_id, bool enabled,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a vector source with a TileJSON URL.
- *
- * source_id and url are borrowed for the call. options may be null for
- * defaults. For URL sources, min_zoom, max_zoom, and vector_encoding override
- * values from the loaded TileJSON when their field bits are set.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_vector_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a vector source with inline tile URLs.
- *
- * source_id and tile URL views are borrowed for the call and copied before
- * return. options may be null for defaults.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
- *   or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
- *   tileset cannot be built.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_vector_source_tiles(
-  mln_map map, mln_buffer_view source_id,
-  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
-  size_t tile_count,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a raster source with a TileJSON URL.
- *
- * source_id and url are borrowed for the call. options may be null for
- * defaults. For URL sources, only tile_size is used when its field bit is set.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_raster_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a raster source with inline tile URLs.
- *
- * source_id and tile URL views are borrowed for the call and copied before
- * return. options may be null for defaults.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
- *   or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
- *   tileset cannot be built.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_raster_source_tiles(
-  mln_map map, mln_buffer_view source_id,
-  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
-  size_t tile_count,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a raster DEM source with a TileJSON URL.
- *
- * source_id and url are borrowed for the call. options may be null for
- * defaults. For URL sources, tile_size and raster_encoding are used when their
- * field bits are set.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_raster_dem_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds a raster DEM source with inline tile URLs.
- *
- * source_id and tile URL views are borrowed for the call and copied before
- * return. options may be null for defaults.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
- *   or empty, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
- *   tileset cannot be built.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_raster_dem_source_tiles(
-  mln_map map, mln_buffer_view source_id,
-  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
-  size_t tile_count,
-  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

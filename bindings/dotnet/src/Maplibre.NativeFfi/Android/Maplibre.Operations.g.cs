@@ -206,51 +206,6 @@ public static unsafe partial class Maplibre
     }
 
     /// <summary>
-    /// Returns a rendered box query geometry descriptor.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_rendered_query_geometry_box</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
-    /// </remarks>
-    public static RenderedQueryGeometry RenderedQueryGeometryBox(ScreenBox box)
-    {
-        using var call = Enter(null, "mln_rendered_query_geometry_box");
-        var returned = NativeMethods.mln_rendered_query_geometry_box(NativeScreenBox(box));
-        return CopyRenderedQueryGeometry(returned);
-    }
-
-    /// <summary>
-    /// Returns a rendered line-string query geometry descriptor.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_rendered_query_geometry_line_string</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
-    /// </remarks>
-    public static RenderedQueryGeometry RenderedQueryGeometryLineString(ScreenPoint[] points)
-    {
-        using var scope = new NativeCallScope(null, "mln_rendered_query_geometry_line_string");
-        var returned = NativeMethods.mln_rendered_query_geometry_line_string(
-            scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
-            checked((nuint)points.Length)
-        );
-        return CopyRenderedQueryGeometry(returned);
-    }
-
-    /// <summary>
-    /// Returns a rendered point query geometry descriptor.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_rendered_query_geometry_point</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
-    /// </remarks>
-    public static RenderedQueryGeometry RenderedQueryGeometryPoint(ScreenPoint point)
-    {
-        using var call = Enter(null, "mln_rendered_query_geometry_point");
-        var returned = NativeMethods.mln_rendered_query_geometry_point(NativeScreenPoint(point));
-        return CopyRenderedQueryGeometry(returned);
-    }
-
-    /// <summary>
     /// Reports the render backends available in this native library build.
     /// </summary>
     /// <remarks>

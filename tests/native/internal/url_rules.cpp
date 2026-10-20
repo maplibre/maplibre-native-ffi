@@ -84,48 +84,22 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
   return table;
 }
 
-// A route compares the resolved URL unless it asks for the requested one. A
-// route matches only the kinds that its mask names.
-void routes_compare_the_url_stage_they_select() {
-  constexpr auto alias = std::string_view{"maplibre://maps/style"};
+// Routes compare the resolved URL and match the kinds that their masks name.
+void routes_match_resolved_urls_and_selected_kinds() {
   const auto resolved = table_of({
     .kinds = MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE,
     .flags = MLN_URL_MATCH_EXACT,
     .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
-    .url_stage = MLN_RESOURCE_ROUTE_URL_RESOLVED,
   });
-  TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url));
-  TEST_ASSERT_TRUE(
-    resolved.matches(MLN_RESOURCE_KIND_SOURCE, alias, style_url)
-  );
-  TEST_ASSERT_FALSE(resolved.matches(MLN_RESOURCE_KIND_TILE, alias, style_url));
+  TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, style_url));
+  TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_SOURCE, style_url));
+  TEST_ASSERT_FALSE(resolved.matches(MLN_RESOURCE_KIND_TILE, style_url));
   // A kind past the mask's width never matches a route that names kinds.
-  TEST_ASSERT_FALSE(resolved.matches(UINT32_MAX, alias, style_url));
-
-  const auto requested = table_of({
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .flags = MLN_URL_MATCH_EXACT,
-    .url = MLN_BUFFER_LITERAL("maplibre://maps/style"),
-    .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
-  });
-  TEST_ASSERT_TRUE(requested.matches(MLN_RESOURCE_KIND_TILE, alias, style_url));
-  TEST_ASSERT_FALSE(
-    requested.matches(MLN_RESOURCE_KIND_STYLE, style_url, style_url)
-  );
-
-  const auto requested_glob = table_of({
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .flags = MLN_URL_MATCH_GLOB,
-    .url = MLN_BUFFER_LITERAL("maplibre://**"),
-    .url_stage = MLN_RESOURCE_ROUTE_URL_REQUESTED,
-  });
-  TEST_ASSERT_TRUE(
-    requested_glob.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url)
-  );
+  TEST_ASSERT_FALSE(resolved.matches(UINT32_MAX, style_url));
 
   // A table without routes claims every request.
   TEST_ASSERT_TRUE(
-    mln::core::RouteTable{}.matches(MLN_RESOURCE_KIND_STYLE, alias, style_url)
+    mln::core::RouteTable{}.matches(MLN_RESOURCE_KIND_STYLE, style_url)
   );
 }
 
@@ -133,5 +107,5 @@ void routes_compare_the_url_stage_they_select() {
 
 MLN_TEST_GROUP {
   RUN_TEST(globs_match_the_documented_pattern_language);
-  RUN_TEST(routes_compare_the_url_stage_they_select);
+  RUN_TEST(routes_match_resolved_urls_and_selected_kinds);
 }

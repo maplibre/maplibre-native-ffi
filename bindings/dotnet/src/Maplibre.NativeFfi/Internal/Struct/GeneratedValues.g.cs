@@ -1945,23 +1945,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static RenderedQueryGeometry CopyRenderedQueryGeometry(
-        mln_rendered_query_geometry value
-    ) =>
-        value.type switch
-        {
-            (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT =>
-                new RenderedQueryGeometry.Point(CopyScreenPoint(value.data.point)),
-            (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX =>
-                new RenderedQueryGeometry.Box(CopyScreenBox(value.data.box)),
-            (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING =>
-                new RenderedQueryGeometry.LineString(CopyScreenLineString(value.data.line_string)),
-            _ => new RenderedQueryGeometry.Unknown(
-                (uint)value.type,
-                NativeCallScope.CopyValueBytes(value.data)
-            ),
-        };
-
     internal static mln_rendered_query_geometry NativeRenderedQueryGeometry(
         RenderedQueryGeometry value,
         NativeCallScope scope
@@ -2281,7 +2264,6 @@ internal static unsafe class GeneratedValues
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.Utf8(value.Url);
-        native.url_stage = (uint)value.UrlStage;
         return native;
     }
 
@@ -2547,8 +2529,7 @@ internal static unsafe class GeneratedValues
                 : RuntimeStructs.CopyUtf8((sbyte*)value.asset_path.data, value.asset_path.size),
             value.cache_path.size == 0
                 ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size),
-            (RuntimeEventMask)value.event_mask
+                : RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size)
         );
 
     internal static mln_runtime_options NativeRuntimeOptions(
@@ -2560,12 +2541,8 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_runtime_options);
         native.asset_path = scope.Utf8(value.AssetPath ?? "");
         native.cache_path = scope.Utf8(value.CachePath ?? "");
-        native.event_mask = (ulong)value.EventMask;
         return native;
     }
-
-    internal static ScreenBox CopyScreenBox(mln_screen_box value) =>
-        new(CopyScreenPoint(value.min), CopyScreenPoint(value.max));
 
     internal static mln_screen_box NativeScreenBox(ScreenBox value)
     {
@@ -2574,18 +2551,6 @@ internal static unsafe class GeneratedValues
         native.max = NativeScreenPoint(value.Max);
         return native;
     }
-
-    internal static ScreenLineString CopyScreenLineString(mln_screen_line_string value) =>
-        new()
-        {
-            PointsStorage = new(
-                NativeCallScope.CopyArray<mln_screen_point, ScreenPoint>(
-                    value.points,
-                    (nuint)(value.point_count),
-                    static item => CopyScreenPoint(item)
-                )
-            ),
-        };
 
     internal static mln_screen_line_string NativeScreenLineString(
         ScreenLineString value,
@@ -2970,93 +2935,6 @@ internal static unsafe class GeneratedValues
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
         native.scheme = (uint)value.Scheme;
-        return native;
-    }
-
-    internal static StyleTileSourceOptions CopyStyleTileSourceOptions(
-        mln_style_tile_source_options value
-    ) =>
-        new()
-        {
-            MinZoom = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)
-                ? value.min_zoom
-                : null,
-            MaxZoom = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)
-                ? value.max_zoom
-                : null,
-            Attribution = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.attribution.data, value.attribution.size)
-                : null,
-            Scheme = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)
-                ? (StyleTileScheme)value.scheme
-                : null,
-            Bounds = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)
-                ? CopyLatLngBounds(value.bounds)
-                : null,
-            TileSize = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
-                ? value.tile_size
-                : null,
-            VectorEncoding = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
-                ? (StyleVectorTileEncoding)value.vector_encoding
-                : null,
-            RasterEncoding = value.fields.HasFlag(MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING)
-                ? (StyleRasterDemEncoding)value.raster_encoding
-                : null,
-        };
-
-    internal static mln_style_tile_source_options NativeStyleTileSourceOptions(
-        StyleTileSourceOptions value,
-        NativeCallScope scope
-    )
-    {
-        var native = NativeMethods.mln_style_tile_source_options_default();
-        native.fields = 0;
-        native.size = (uint)sizeof(mln_style_tile_source_options);
-        native.fields |= Put(
-            value.MinZoom,
-            ref native.min_zoom,
-            MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
-        );
-        native.fields |= Put(
-            value.MaxZoom,
-            ref native.max_zoom,
-            MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
-        );
-        native.fields |= Put(
-            value.Attribution,
-            ref native.attribution,
-            MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION,
-            present => scope.Utf8(present)
-        );
-        native.fields |= Put(
-            value.Scheme,
-            ref native.scheme,
-            MLN_STYLE_TILE_SOURCE_OPTION_SCHEME,
-            static present => (uint)present
-        );
-        native.fields |= Put(
-            value.Bounds,
-            ref native.bounds,
-            MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS,
-            NativeLatLngBounds
-        );
-        native.fields |= Put(
-            value.TileSize,
-            ref native.tile_size,
-            MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
-        );
-        native.fields |= Put(
-            value.VectorEncoding,
-            ref native.vector_encoding,
-            MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING,
-            static present => (uint)present
-        );
-        native.fields |= Put(
-            value.RasterEncoding,
-            ref native.raster_encoding,
-            MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING,
-            static present => (uint)present
-        );
         return native;
     }
 

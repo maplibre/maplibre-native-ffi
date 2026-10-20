@@ -128,11 +128,6 @@ struct ResourceRequestObject {
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
-  // A release took a registration whose callback never ran and is invoking
-  // its release_user_data. The request is not retired to a waiter, and no
-  // other release removes the table entry, until it returns.
-  bool releasing_cancel_user_data = false;
-  std::thread::id releasing_cancel_user_data_thread;
   // Set when the callback released its own request: the callback wrapper
   // removes the table entry once the callback returns.
   bool remove_after_cancel_callback = false;
@@ -428,13 +423,8 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
 }
 
 // Retires the id so no later call can reach this request. Idempotent, and
-// safe to run on several threads at once.
-//
-// The table entry stays until a running cancel callback returns, and until
-// the release_user_data of a registration whose callback never ran returns. A
-// release on any other thread finds the object and waits, whether or not an
-// earlier release already retired it. A release from inside either callback
-// returns without waiting and leaves the removal to the call running it.
+// safe to run on several threads at once. A release on another thread waits
+// for a running cancel callback; a self-release leaves removal to the callback.
 void retire_request(mln_resource_request handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().try_lease(handle);
   if (object == nullptr) {
@@ -449,48 +439,23 @@ void retire_request(mln_resource_request handle) noexcept {
     object->cancel_callback = nullptr;
     release = std::exchange(object->cancel_release, nullptr);
     user_data = std::exchange(object->cancel_user_data, nullptr);
-    if (release != nullptr) {
-      object->releasing_cancel_user_data = true;
-      object->releasing_cancel_user_data_thread = std::this_thread::get_id();
-    }
     if (object->cancel_callback_running) {
       if (object->cancel_callback_thread == std::this_thread::get_id()) {
         object->remove_after_cancel_callback = true;
-        lock.unlock();
-        object->state_changed.notify_all();
         return;
       }
       mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
       object->state_changed.wait(lock, [&object] {
         return !object->cancel_callback_running;
       });
-    } else if (release == nullptr && object->releasing_cancel_user_data) {
-      // Another release took the registration and is releasing its user
-      // data. Removing the entry now would retire the request to a waiter
-      // before that release returns.
-      if (
-        object->releasing_cancel_user_data_thread == std::this_thread::get_id()
-      ) {
-        return;
-      }
-      mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
-      object->state_changed.wait(lock, [&object] {
-        return !object->releasing_cancel_user_data;
-      });
     }
   }
-  object->state_changed.notify_all();
   if (release != nullptr) {
     try {
       if (!process_exiting()) release(user_data);
     } catch (...) {
       // Host callbacks must not unwind through the release path.
     }
-    {
-      const std::scoped_lock lock(object->mutex);
-      object->releasing_cancel_user_data = false;
-    }
-    object->state_changed.notify_all();
   }
   handle_table<ResourceRequestObject>().remove(handle);
 }
@@ -803,36 +768,6 @@ auto set_resource_request_cancel_callback(
     live->cancel_release = handler->release_user_data;
     live->cancel_user_data = handler->user_data;
   }
-  return MLN_STATUS_OK;
-}
-
-auto wait_for_resource_request_retired(mln_resource_request handle)
-  -> mln_status {
-  if (handle == MLN_HANDLE_NULL) {
-    set_thread_error("resource request handle must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  // A handle that no longer resolves is already retired, which is a success
-  // here, so try_lease keeps it out of the thread-local diagnostic.
-  const auto live = handle_table<ResourceRequestObject>().try_lease(handle);
-  if (live == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  // A callback that released its own request leaves the entry in place until
-  // it returns, so a drained request is one whose callback has also returned,
-  // and whose registration's user data has been released.
-  auto lock = std::unique_lock{live->mutex};
-  const auto drained = [&live] {
-    return live->retired && !live->cancel_callback_running &&
-           !live->releasing_cancel_user_data;
-  };
-  if (
-    !drained() &&
-    (live->cancel_callback_running || live->releasing_cancel_user_data)
-  ) {
-    mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
-  }
-  live->state_changed.wait(lock, drained);
   return MLN_STATUS_OK;
 }
 

@@ -85,7 +85,6 @@ class DecisionPlan:
     complete: str
     cancelled: str
     cancel_registration: str
-    wait_retired: str
     resume: str | None = None
 
 
@@ -230,8 +229,6 @@ class ParameterPlan:
     value: ValuePlan
     direction: str
     consumes: str | None = None
-    # The input array whose length sizes this caller-allocated output array.
-    sized_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -392,7 +389,6 @@ class OperationPlan:
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
-    receiver_access: str = "live"
     status: bool = False
     member: str = ""
     absence: AbsencePlan | None = None
@@ -817,14 +813,6 @@ class Binder:
             }
             child_name = type_name(pointee)
             if metadata.get("direction") == "out":
-                if pointee.kind != "pointer" and metadata.get("length") not in {
-                    None,
-                    "1",
-                }:
-                    element = self.value(
-                        pointee, child_metadata, context + " output element"
-                    )
-                    return ValuePlan(kind="array", element=element, **common)
                 if pointee.kind == "pointer" and "length" in metadata:
                     child_metadata["length"] = metadata["length"]
                 element = self.value(pointee, child_metadata, context + " output")
@@ -1073,18 +1061,6 @@ class Binder:
                 value,
                 direction,
                 metadata.get("consumes"),
-                next(
-                    (
-                        input_.name
-                        for input_ in reversed(function.parameters)
-                        if input_.metadata.get("direction", "in") == "in"
-                        and input_.metadata.get("length") == value.length
-                        and input_.type.kind == "pointer"
-                    ),
-                    None,
-                )
-                if direction == "out" and value.kind == "array"
-                else None,
             )
 
             def validate_input_lifetime(item, parameter_name=parameter.name):
@@ -1425,14 +1401,6 @@ class Binder:
             tuple(owners),
             view,
             scoped_receiver,
-            next(
-                (
-                    parameter.metadata.get("handle_access", "live")
-                    for parameter in function.parameters
-                    if parameter.name == receiver
-                ),
-                "live",
-            ),
             is_status(function.return_type),
             member,
             absence,
@@ -1637,7 +1605,6 @@ class Binder:
             metadata["complete"],
             metadata["cancelled"],
             metadata["cancel_registration"],
-            metadata["wait_retired"],
             metadata.get("resume"),
         )
 

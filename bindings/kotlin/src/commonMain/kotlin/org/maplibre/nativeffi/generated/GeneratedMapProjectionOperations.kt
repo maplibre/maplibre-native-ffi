@@ -58,48 +58,6 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
     }
 
   /**
-   * Converts screen points to geographic coordinates.
-   *
-   * See `mln_map_projection_lat_lngs_for_pixels` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> =
-    nativeCall(this, binding, "mln_map_projection_lat_lngs_for_pixels", Access.READ) {
-      val out = allocate(points.size.toLong() * 16, 8)
-      check(
-        C.mln_map_projection_lat_lngs_for_pixels(
-          handle,
-          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
-          points.size.toLong(),
-          out,
-          diagnostic,
-        ),
-      )
-      List(points.size) { index -> readLatLng(out + index.toLong() * 16) }
-    }
-
-  /**
-   * Converts screen points to unwrapped geographic coordinates.
-   *
-   * See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> =
-    nativeCall(this, binding, "mln_map_projection_lat_lngs_for_pixels_unwrapped", Access.READ) {
-      val out = allocate(points.size.toLong() * 16, 8)
-      check(
-        C.mln_map_projection_lat_lngs_for_pixels_unwrapped(
-          handle,
-          array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
-          points.size.toLong(),
-          out,
-          diagnostic,
-        ),
-      )
-      List(points.size) { index -> readLatLng(out + index.toLong() * 16) }
-    }
-
-  /**
    * Reads the ground distance covered by one logical map pixel at a latitude for the helper camera
    * zoom.
    *
@@ -129,27 +87,6 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
     }
 
   /**
-   * Converts geographic coordinates to screen points.
-   *
-   * See `mln_map_projection_pixels_for_lat_lngs` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> =
-    nativeCall(this, binding, "mln_map_projection_pixels_for_lat_lngs", Access.READ) {
-      val out = allocate(coordinates.size.toLong() * 16, 8)
-      check(
-        C.mln_map_projection_pixels_for_lat_lngs(
-          handle,
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          out,
-          diagnostic,
-        ),
-      )
-      List(coordinates.size) { index -> readScreenPoint(out + index.toLong() * 16) }
-    }
-
-  /**
    * Releases a standalone projection.
    *
    * See `mln_map_projection_release` in the
@@ -169,42 +106,5 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
   public fun setCamera(camera: CameraOptions): Unit =
     nativeCall(this, binding, "mln_map_projection_set_camera") {
       check(C.mln_map_projection_set_camera(handle, writeCameraOptions(camera), diagnostic))
-    }
-
-  /**
-   * Applies a camera fit for geographic coordinates.
-   *
-   * See `mln_map_projection_set_visible_coordinates` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets): Unit =
-    nativeCall(this, binding, "mln_map_projection_set_visible_coordinates") {
-      check(
-        C.mln_map_projection_set_visible_coordinates(
-          handle,
-          array(coordinates, 16, 8) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          writeEdgeInsets(padding),
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Applies a camera fit for GeoJSON Geometry bytes.
-   *
-   * See `mln_map_projection_set_visible_geometry` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets): Unit =
-    nativeCall(this, binding, "mln_map_projection_set_visible_geometry") {
-      check(
-        C.mln_map_projection_set_visible_geometry(
-          handle,
-          view(geometry),
-          writeEdgeInsets(padding),
-          diagnostic,
-        ),
-      )
     }
 }

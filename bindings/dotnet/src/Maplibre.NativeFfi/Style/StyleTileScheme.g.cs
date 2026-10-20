@@ -2,8 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Tile URL coordinate scheme values used by
-/// <c>mln_style_tile_source_options</c>.
+/// Tile URL coordinate scheme values.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_tile_scheme</c> in the <see

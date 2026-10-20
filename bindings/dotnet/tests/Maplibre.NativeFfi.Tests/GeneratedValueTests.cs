@@ -9,17 +9,6 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>One representative of each generated value shape, crossing to native and back.</summary>
 public sealed class GeneratedValueTests
 {
-    [Fact]
-    public async Task SynchronousCallsFillCallerSizedOutputsInInputOrder()
-    {
-        await using var fixture = await NativeFixture.CreateAsync();
-        using var projection = fixture.Map.CreateProjection();
-        LatLng[] coordinates = [new(0, 0), new(10, 20), new(-12, -30)];
-        var points = projection.PixelsForLatLngs(coordinates);
-        Assert.Equal(coordinates.Select(projection.PixelForLatLng), points);
-        Assert.Empty(projection.PixelsForLatLngs([]));
-    }
-
     private static byte[] EmptyGeoJsonSource =>
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
 
@@ -83,21 +72,6 @@ public sealed class GeneratedValueTests
         Assert.Equal(3, camera.Zoom.Value, 6);
         Assert.NotNull(camera.Bearing);
         Assert.Equal(30, camera.Bearing.Value, 6);
-    }
-
-    [Fact]
-    public async Task AnArrayIsCopiedWhenTheCallIsSubmitted()
-    {
-        await using var fixture = await NativeFixture.WithEmptyStyleAsync();
-        string[] tiles = ["provider-test://tiles/{z}/{x}/{y}.pbf"];
-
-        var added = fixture.Map.AddVectorSourceTilesAsync("tiles", tiles, null, TestWaits.Token);
-        tiles[0] = "provider-test://changed/{z}/{x}/{y}.pbf";
-        Assert.Equal(CommandDisposition.Committed, (await added).Disposition);
-
-        var source = await fixture.Map.GetStyleSourceAsync("tiles", TestWaits.Token);
-        Assert.NotNull(source?.Tilejson);
-        Assert.Equal(["provider-test://tiles/{z}/{x}/{y}.pbf"], source.Tilejson.Value.TileUrls);
     }
 
     // A parameterless constructor starts each member at the header's annotated default, so the

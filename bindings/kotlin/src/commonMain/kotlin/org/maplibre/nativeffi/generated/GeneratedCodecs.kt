@@ -105,31 +105,14 @@ internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
 internal fun NativeArena.writeLatLng(value: LatLng): Long =
   allocate(16, 8).also { putLatLng(it, value) }
 
-internal fun NativeArena.putScreenBox(target: Long, value: ScreenBox) {
-  putScreenPoint(target, value.min)
-  putScreenPoint(target + 16, value.max)
-}
-
-internal fun NativeArena.writeScreenBox(value: ScreenBox): Long =
-  allocate(32, 8).also { putScreenBox(it, value) }
-
-internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
-  writeF64(target, value.x)
-  writeF64(target + 8, value.y)
-}
-
-internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
-  allocate(16, 8).also { putScreenPoint(it, value) }
-
 internal fun NativeArena.putRuntimeOptions(target: Long, value: RuntimeOptions) {
-  writeU32(target, w(32, 48).toUInt())
+  writeU32(target, w(20, 40).toUInt())
   putView(target + w(4, 8), value.assetPath)
   putView(target + w(12, 24), value.cachePath)
-  writeU64(target + w(24, 40), value.eventMask.rawValue)
 }
 
 internal fun NativeArena.writeRuntimeOptions(value: RuntimeOptions): Long =
-  allocate(w(32, 48), 8).also { putRuntimeOptions(it, value) }
+  allocate(w(20, 40), w(4, 8)).also { putRuntimeOptions(it, value) }
 
 internal fun NativeCall.putCustomGeometrySourceOptions(
   target: Long,
@@ -225,47 +208,6 @@ internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: Premult
 
 internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8Image): Long =
   allocate(w(24, 32), w(4, 8)).also { putPremultipliedRgba8Image(it, value) }
-
-internal fun NativeArena.putStyleTileSourceOptions(target: Long, value: StyleTileSourceOptions) {
-  writeU32(target, w(88, 96).toUInt())
-  var fields = 0u
-  value.minZoom?.let {
-    fields = fields or 1u
-    writeF64(target + 8, it)
-  }
-  value.maxZoom?.let {
-    fields = fields or 2u
-    writeF64(target + 16, it)
-  }
-  value.attribution?.let {
-    fields = fields or 4u
-    putView(target + 24, it)
-  }
-  value.scheme?.let {
-    fields = fields or 8u
-    writeU32(target + w(32, 40), it.rawValue)
-  }
-  value.bounds?.let {
-    fields = fields or 16u
-    putLatLngBounds(target + w(40, 48), it)
-  }
-  value.tileSize?.let {
-    fields = fields or 32u
-    writeU32(target + w(72, 80), it)
-  }
-  value.vectorEncoding?.let {
-    fields = fields or 64u
-    writeU32(target + w(76, 84), it.rawValue)
-  }
-  value.rasterEncoding?.let {
-    fields = fields or 128u
-    writeU32(target + w(80, 88), it.rawValue)
-  }
-  writeU32(target + 4, fields)
-}
-
-internal fun NativeArena.writeStyleTileSourceOptions(value: StyleTileSourceOptions): Long =
-  allocate(w(88, 96), 8).also { putStyleTileSourceOptions(it, value) }
 
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
   writeU32(target, w(168, 176).toUInt())
@@ -793,15 +735,13 @@ internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
 internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
   allocate(w(232, 240), 8).also { putCameraUpdate(it, value) }
 
-internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
-  writeF64(target, value.top)
-  writeF64(target + 8, value.left)
-  writeF64(target + 16, value.bottom)
-  writeF64(target + 24, value.right)
+internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
+  writeF64(target, value.x)
+  writeF64(target + 8, value.y)
 }
 
-internal fun NativeArena.writeEdgeInsets(value: EdgeInsets): Long =
-  allocate(32, 8).also { putEdgeInsets(it, value) }
+internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
+  allocate(16, 8).also { putScreenPoint(it, value) }
 
 internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQueryGeometry) {
   writeU32(target, 40.toUInt())
@@ -991,7 +931,7 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   writeU32(target, w(32, 56).toUInt())
   writeAddress(
     target + w(24, 40),
-    array(value.routes, w(20, 32), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -1364,24 +1304,10 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
   )
 }
 
-internal fun readRenderedQueryGeometry(source: Long): RenderedQueryGeometry =
-  RenderedQueryGeometry(
-    data =
-      readU32(source + 4).let { tag ->
-        when (tag) {
-          1u -> RenderedQueryGeometryData.Point(readScreenPoint(source + 8))
-          2u -> RenderedQueryGeometryData.Box(readScreenBox(source + 8))
-          3u -> RenderedQueryGeometryData.LineString(readScreenLineString(source + 8))
-          else -> RenderedQueryGeometryData.Unknown(tag, NativeMemory.getBytes(source + 8, 32))
-        }
-      },
-  )
-
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
   RuntimeOptions(
     assetPath = readViewString(source + w(4, 8)).takeIf { it.isNotEmpty() },
     cachePath = readViewString(source + w(12, 24)).takeIf { it.isNotEmpty() },
-    eventMask = RuntimeEventMask(readU64(source + w(24, 40))),
   )
 
 internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOptions {
@@ -1424,22 +1350,6 @@ internal fun readStyleImageOptions(source: Long): StyleImageOptions {
       if ((fields and 64u) != 0u) StyleImageTextFit(readU32(source + w(44, 60))) else null,
     pixelRatio = if ((fields and 1u) != 0u) readF32(source + w(48, 64)) else null,
     sdf = if ((fields and 2u) != 0u) readBool(source + w(52, 68)) else null,
-  )
-}
-
-internal fun readStyleTileSourceOptions(source: Long): StyleTileSourceOptions {
-  val fields = readU32(source + 4)
-  return StyleTileSourceOptions(
-    minZoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
-    maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    attribution = if ((fields and 4u) != 0u) readViewString(source + 24) else null,
-    scheme = if ((fields and 8u) != 0u) StyleTileScheme(readU32(source + w(32, 40))) else null,
-    bounds = if ((fields and 16u) != 0u) readLatLngBounds(source + w(40, 48)) else null,
-    tileSize = if ((fields and 32u) != 0u) readU32(source + w(72, 80)) else null,
-    vectorEncoding =
-      if ((fields and 64u) != 0u) StyleVectorTileEncoding(readU32(source + w(76, 84))) else null,
-    rasterEncoding =
-      if ((fields and 128u) != 0u) StyleRasterDemEncoding(readU32(source + w(80, 88))) else null,
   )
 }
 
@@ -1792,6 +1702,16 @@ internal fun NativeArena.putWebgpuBorrowedTexture(target: Long, value: WebgpuBor
 internal fun NativeArena.writeWebgpuBorrowedTexture(value: WebgpuBorrowedTexture): Long =
   allocate(w(8, 16), w(4, 8)).also { putWebgpuBorrowedTexture(it, value) }
 
+internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
+  writeF64(target, value.top)
+  writeF64(target + 8, value.left)
+  writeF64(target + 16, value.bottom)
+  writeF64(target + 24, value.right)
+}
+
+internal fun NativeArena.writeEdgeInsets(value: EdgeInsets): Long =
+  allocate(32, 8).also { putEdgeInsets(it, value) }
+
 internal fun NativeArena.putVec3(target: Long, value: Vec3) {
   writeF64(target, value.x)
   writeF64(target + 8, value.y)
@@ -1827,6 +1747,14 @@ internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
 
 internal fun NativeArena.writeImageContent(value: ImageContent): Long =
   allocate(16, 4).also { putImageContent(it, value) }
+
+internal fun NativeArena.putScreenBox(target: Long, value: ScreenBox) {
+  putScreenPoint(target, value.min)
+  putScreenPoint(target + 16, value.max)
+}
+
+internal fun NativeArena.writeScreenBox(value: ScreenBox): Long =
+  allocate(32, 8).also { putScreenBox(it, value) }
 
 internal fun NativeArena.putScreenLineString(target: Long, value: ScreenLineString) {
   writeAddress(target, array(value.points, 16, 8) { at, item -> putScreenPoint(at, item) })
@@ -1886,11 +1814,10 @@ internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
   putView(target + 8, value.url)
-  writeU32(target + w(16, 24), value.urlStage.rawValue)
 }
 
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
+  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
   writeU32(target, value.kinds.rawValue)
@@ -2000,17 +1927,6 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
 
 internal fun readOpenglBorrowedTexture(source: Long): OpenglBorrowedTexture =
   OpenglBorrowedTexture(texture = readU32(source))
-
-internal fun readScreenBox(source: Long): ScreenBox =
-  ScreenBox(min = readScreenPoint(source), max = readScreenPoint(source + 16))
-
-internal fun readScreenLineString(source: Long): ScreenLineString =
-  ScreenLineString(
-    points =
-      readArray(readAddress(source), readSize(source + w(4, 8)), 16.toLong()) { item ->
-        readScreenPoint(item)
-      },
-  )
 
 internal fun readImageStretch(source: Long): ImageStretch =
   ImageStretch(from = readF32(source), to = readF32(source + 4))

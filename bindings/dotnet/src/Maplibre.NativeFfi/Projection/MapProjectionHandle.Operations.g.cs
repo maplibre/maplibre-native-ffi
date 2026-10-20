@@ -110,64 +110,6 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts screen points to geographic coordinates.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_lat_lngs_for_pixels</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public LatLng[] LatLngsForPixels(ScreenPoint[] points)
-    {
-        using var read = state.Read(this, "mln_map_projection_lat_lngs_for_pixels");
-        using var scope = new NativeCallScope();
-        var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
-        Check(
-            NativeMethods.mln_map_projection_lat_lngs_for_pixels(
-                read.Handle,
-                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
-                checked((nuint)points.Length),
-                outCoordinates,
-                Diagnostic
-            )
-        );
-        scope.Accept();
-        return NativeCallScope.CopyArray<mln_lat_lng, LatLng>(
-            outCoordinates,
-            (nuint)(points.Length),
-            static item => CopyLatLng(item)
-        );
-    }
-
-    /// <summary>
-    /// Converts screen points to unwrapped geographic coordinates.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_lat_lngs_for_pixels_unwrapped</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public LatLng[] LatLngsForPixelsUnwrapped(ScreenPoint[] points)
-    {
-        using var read = state.Read(this, "mln_map_projection_lat_lngs_for_pixels_unwrapped");
-        using var scope = new NativeCallScope();
-        var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
-        Check(
-            NativeMethods.mln_map_projection_lat_lngs_for_pixels_unwrapped(
-                read.Handle,
-                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
-                checked((nuint)points.Length),
-                outCoordinates,
-                Diagnostic
-            )
-        );
-        scope.Accept();
-        return NativeCallScope.CopyArray<mln_lat_lng, LatLng>(
-            outCoordinates,
-            (nuint)(points.Length),
-            static item => CopyLatLng(item)
-        );
-    }
-
-    /// <summary>
     /// Reads the ground distance covered by one logical map pixel at a latitude
     /// for the helper camera zoom.
     /// </summary>
@@ -213,35 +155,6 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Converts geographic coordinates to screen points.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_pixels_for_lat_lngs</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public ScreenPoint[] PixelsForLatLngs(LatLng[] coordinates)
-    {
-        using var read = state.Read(this, "mln_map_projection_pixels_for_lat_lngs");
-        using var scope = new NativeCallScope();
-        var outPoints = scope.OutputArray<mln_screen_point>(coordinates.Length);
-        Check(
-            NativeMethods.mln_map_projection_pixels_for_lat_lngs(
-                read.Handle,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                checked((nuint)coordinates.Length),
-                outPoints,
-                Diagnostic
-            )
-        );
-        scope.Accept();
-        return NativeCallScope.CopyArray<mln_screen_point, ScreenPoint>(
-            outPoints,
-            (nuint)(coordinates.Length),
-            static item => CopyScreenPoint(item)
-        );
-    }
-
-    /// <summary>
     /// Releases a standalone projection.
     /// </summary>
     /// <remarks>
@@ -266,48 +179,5 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         using var call = Enter(this, "mln_map_projection_set_camera");
         var nativeCamera = NativeCameraOptions(camera);
         Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, Diagnostic));
-    }
-
-    /// <summary>
-    /// Applies a camera fit for geographic coordinates.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_set_visible_coordinates</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public void SetVisibleCoordinates(LatLng[] coordinates, EdgeInsets padding)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_coordinates");
-        Check(
-            NativeMethods.mln_map_projection_set_visible_coordinates(
-                Handle,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                checked((nuint)coordinates.Length),
-                NativeEdgeInsets(padding),
-                Diagnostic
-            )
-        );
-        scope.Accept();
-    }
-
-    /// <summary>
-    /// Applies a camera fit for GeoJSON Geometry bytes.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_set_visible_geometry</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_geometry");
-        Check(
-            NativeMethods.mln_map_projection_set_visible_geometry(
-                Handle,
-                scope.Buffer(geometry),
-                NativeEdgeInsets(padding),
-                Diagnostic
-            )
-        );
-        scope.Accept();
     }
 }

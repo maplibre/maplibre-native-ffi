@@ -161,52 +161,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_raster_dem_source_tiles =
-    Ffm.downcall(
-      "mln_map_add_raster_dem_source_tiles",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_raster_dem_source_url =
-    Ffm.downcall(
-      "mln_map_add_raster_dem_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_raster_source_tiles =
-    Ffm.downcall(
-      "mln_map_add_raster_source_tiles",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_raster_source_url =
-    Ffm.downcall(
-      "mln_map_add_raster_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_add_style_layer_json =
     Ffm.downcall(
       "mln_map_add_style_layer_json",
@@ -224,29 +178,6 @@ internal actual object C {
       JAVA_LONG,
       mln_buffer_view,
       mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_vector_source_tiles =
-    Ffm.downcall(
-      "mln_map_add_vector_source_tiles",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_vector_source_url =
-    Ffm.downcall(
-      "mln_map_add_vector_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -596,26 +527,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_projection_lat_lngs_for_pixels =
-    Ffm.downcall(
-      "mln_map_projection_lat_lngs_for_pixels",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_projection_lat_lngs_for_pixels_unwrapped =
-    Ffm.downcall(
-      "mln_map_projection_lat_lngs_for_pixels_unwrapped",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_projection_meters_per_pixel_at_latitude =
     Ffm.downcall(
       "mln_map_projection_meters_per_pixel_at_latitude",
@@ -634,39 +545,10 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_projection_pixels_for_lat_lngs =
-    Ffm.downcall(
-      "mln_map_projection_pixels_for_lat_lngs",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_projection_release =
     Ffm.downcall("mln_map_projection_release", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_set_camera =
     Ffm.downcall("mln_map_projection_set_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_projection_set_visible_coordinates =
-    Ffm.downcall(
-      "mln_map_projection_set_visible_coordinates",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      mln_edge_insets,
-      JAVA_LONG,
-    )
-  private val mln_map_projection_set_visible_geometry =
-    Ffm.downcall(
-      "mln_map_projection_set_visible_geometry",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_edge_insets,
-      JAVA_LONG,
-    )
   private val mln_map_release =
     Ffm.downcall("mln_map_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_remove_feature_state =
@@ -1145,17 +1027,6 @@ internal actual object C {
     )
   private val mln_rendered_feature_query_options_default =
     Ffm.downcall("mln_rendered_feature_query_options_default", mln_rendered_feature_query_options)
-  private val mln_rendered_query_geometry_box =
-    Ffm.downcall("mln_rendered_query_geometry_box", mln_rendered_query_geometry, mln_screen_box)
-  private val mln_rendered_query_geometry_line_string =
-    Ffm.downcall(
-      "mln_rendered_query_geometry_line_string",
-      mln_rendered_query_geometry,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_rendered_query_geometry_point =
-    Ffm.downcall("mln_rendered_query_geometry_point", mln_rendered_query_geometry, mln_screen_point)
   private val mln_resource_request_complete =
     Ffm.downcall("mln_resource_request_complete", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_resource_request_is_cancelled =
@@ -1173,8 +1044,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_resource_request_wait_until_retired =
-    Ffm.downcall("mln_resource_request_wait_until_retired", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_resource_transform_response_set_url =
     Ffm.downcall(
       "mln_resource_transform_response_set_url",
@@ -1358,8 +1227,6 @@ internal actual object C {
     Ffm.downcall("mln_source_feature_query_options_default", mln_source_feature_query_options)
   private val mln_style_image_options_default =
     Ffm.downcall("mln_style_image_options_default", mln_style_image_options)
-  private val mln_style_tile_source_options_default =
-    Ffm.downcall("mln_style_tile_source_options_default", mln_style_tile_source_options)
   private val mln_style_transition_options_default =
     Ffm.downcall("mln_style_transition_options_default", mln_style_transition_options)
   private val mln_supported_render_backend_mask =
@@ -1656,78 +1523,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_raster_dem_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_raster_dem_source_tiles.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      tiles,
-      tileCount,
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_raster_dem_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_raster_dem_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(url, mln_buffer_view),
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_raster_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_raster_source_tiles.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      tiles,
-      tileCount,
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_raster_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_raster_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(url, mln_buffer_view),
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_add_style_layer_json(
     map: Long,
     layerJson: Long,
@@ -1754,42 +1549,6 @@ internal actual object C {
       map,
       Ffm.value(sourceId, mln_buffer_view),
       Ffm.value(sourceJson, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_vector_source_tiles(
-    map: Long,
-    sourceId: Long,
-    tiles: Long,
-    tileCount: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_vector_source_tiles.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      tiles,
-      tileCount,
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_vector_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_vector_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(url, mln_buffer_view),
-      options,
       completion,
       outDiagnostic,
     ) as Int
@@ -2319,36 +2078,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_projection_lat_lngs_for_pixels(
-    projection: Long,
-    points: Long,
-    pointCount: Long,
-    outCoordinates: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_projection_lat_lngs_for_pixels.invokeExact(
-      projection,
-      points,
-      pointCount,
-      outCoordinates,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
-    projection: Long,
-    points: Long,
-    pointCount: Long,
-    outCoordinates: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_projection_lat_lngs_for_pixels_unwrapped.invokeExact(
-      projection,
-      points,
-      pointCount,
-      outCoordinates,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -2375,21 +2104,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_projection_pixels_for_lat_lngs(
-    projection: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    outPoints: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_projection_pixels_for_lat_lngs.invokeExact(
-      projection,
-      coordinates,
-      coordinateCount,
-      outPoints,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int =
     mln_map_projection_release.invokeExact(projection, outDiagnostic) as Int
 
@@ -2398,34 +2112,6 @@ internal actual object C {
     camera: Long,
     outDiagnostic: Long,
   ): Int = mln_map_projection_set_camera.invokeExact(projection, camera, outDiagnostic) as Int
-
-  actual fun mln_map_projection_set_visible_coordinates(
-    projection: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    padding: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_projection_set_visible_coordinates.invokeExact(
-      projection,
-      coordinates,
-      coordinateCount,
-      Ffm.value(padding, mln_edge_insets),
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_projection_set_visible_geometry(
-    projection: Long,
-    geometry: Long,
-    padding: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_projection_set_visible_geometry.invokeExact(
-      projection,
-      Ffm.value(geometry, mln_buffer_view),
-      Ffm.value(padding, mln_edge_insets),
-      outDiagnostic,
-    ) as Int
 
   actual fun mln_map_release(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_release.invokeExact(map, completion, outDiagnostic) as Int
@@ -3189,32 +2875,6 @@ internal actual object C {
     ) as MemorySegment
   }
 
-  actual fun mln_rendered_query_geometry_box(box: Long, returned: Long) {
-    mln_rendered_query_geometry_box.invokeExact(
-      Ffm.into(returned, mln_rendered_query_geometry),
-      Ffm.value(box, mln_screen_box),
-    ) as MemorySegment
-  }
-
-  actual fun mln_rendered_query_geometry_line_string(
-    points: Long,
-    pointCount: Long,
-    returned: Long,
-  ) {
-    mln_rendered_query_geometry_line_string.invokeExact(
-      Ffm.into(returned, mln_rendered_query_geometry),
-      points,
-      pointCount,
-    ) as MemorySegment
-  }
-
-  actual fun mln_rendered_query_geometry_point(point: Long, returned: Long) {
-    mln_rendered_query_geometry_point.invokeExact(
-      Ffm.into(returned, mln_rendered_query_geometry),
-      Ffm.value(point, mln_screen_point),
-    ) as MemorySegment
-  }
-
   actual fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int =
     mln_resource_request_complete.invokeExact(handle, response, outDiagnostic) as Int
 
@@ -3243,9 +2903,6 @@ internal actual object C {
       outCancelled,
       outDiagnostic,
     ) as Int
-
-  actual fun mln_resource_request_wait_until_retired(handle: Long, outDiagnostic: Long): Int =
-    mln_resource_request_wait_until_retired.invokeExact(handle, outDiagnostic) as Int
 
   actual fun mln_resource_transform_response_set_url(
     response: Long,
@@ -3496,12 +3153,6 @@ internal actual object C {
   actual fun mln_style_image_options_default(returned: Long) {
     mln_style_image_options_default.invokeExact(Ffm.into(returned, mln_style_image_options))
       as MemorySegment
-  }
-
-  actual fun mln_style_tile_source_options_default(returned: Long) {
-    mln_style_tile_source_options_default.invokeExact(
-      Ffm.into(returned, mln_style_tile_source_options),
-    ) as MemorySegment
   }
 
   actual fun mln_style_transition_options_default(returned: Long) {
@@ -3891,29 +3542,12 @@ internal val mln_rendered_feature_query_options: GroupLayout =
     JAVA_LONG.withName("layer_id_count"),
     mln_buffer_view.withName("filter"),
   )
-internal val mln_screen_box: GroupLayout =
-  Ffm.struct(mln_screen_point.withName("min"), mln_screen_point.withName("max"))
-internal val mln_screen_line_string: GroupLayout =
-  Ffm.struct(ADDRESS.withName("points"), JAVA_LONG.withName("point_count"))
-internal val mln_rendered_query_geometry_data: GroupLayout =
-  Ffm.union(
-    mln_screen_point.withName("point"),
-    mln_screen_box.withName("box"),
-    mln_screen_line_string.withName("line_string"),
-  )
-internal val mln_rendered_query_geometry: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("type"),
-    mln_rendered_query_geometry_data.withName("data"),
-  )
 internal val mln_runtime_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
     mln_buffer_view.withName("asset_path"),
     mln_buffer_view.withName("cache_path"),
-    JAVA_LONG.withName("event_mask"),
   )
 internal val mln_source_feature_query_options: GroupLayout =
   Ffm.struct(
@@ -3944,21 +3578,6 @@ internal val mln_style_image_options: GroupLayout =
     JAVA_FLOAT.withName("pixel_ratio"),
     JAVA_BOOLEAN.withName("sdf"),
     Ffm.pad(3),
-  )
-internal val mln_style_tile_source_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    JAVA_DOUBLE.withName("max_zoom"),
-    mln_buffer_view.withName("attribution"),
-    JAVA_INT.withName("scheme"),
-    Ffm.pad(4),
-    mln_lat_lng_bounds.withName("bounds"),
-    JAVA_INT.withName("tile_size"),
-    JAVA_INT.withName("vector_encoding"),
-    JAVA_INT.withName("raster_encoding"),
-    Ffm.pad(4),
   )
 internal val mln_style_transition_options: GroupLayout =
   Ffm.struct(

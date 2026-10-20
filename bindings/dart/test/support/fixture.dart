@@ -120,7 +120,6 @@ Future<RuntimeFixture> openRuntime({
     RuntimeOptions(
       assetPath: defaults.assetPath,
       cachePath: defaults.cachePath,
-      eventMask: defaults.eventMask,
     ),
   );
   addTearDown(runtime.close);

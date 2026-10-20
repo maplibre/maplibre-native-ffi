@@ -53,14 +53,6 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
             root.Retain(owner ?? NativeCallbackOwner.Global);
     }
 
-    internal T* OutputArray<T>(int count)
-        where T : unmanaged
-    {
-        var pointer = Allocate<T>(count);
-        new Span<T>(pointer, count).Clear();
-        return pointer;
-    }
-
     private T* Allocate<T>(int count)
         where T : unmanaged
     {

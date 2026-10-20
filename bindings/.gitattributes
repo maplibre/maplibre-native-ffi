@@ -138,7 +138,6 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseStatus.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRewriteRule.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRoute.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRouteUrl.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.Operations.g.cs linguist-generated=true
@@ -185,8 +184,6 @@
 /dotnet/src/Maplibre.NativeFfi/Style/StyleSourceTileInfo.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleSourceType.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleTileScheme.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Style/StyleTileSourceOptionField.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Style/StyleTileSourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleTransitionOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleTransitionOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleVectorTileEncoding.g.cs linguist-generated=true

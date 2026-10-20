@@ -3802,8 +3802,6 @@ pub const ResourceRoute = struct {
     flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
-    /// The URL stage to compare.
-    url_stage: ResourceRouteUrl = std.mem.zeroes(ResourceRouteUrl),
     pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
         _ = allocator;
         _ = roots;
@@ -3811,7 +3809,6 @@ pub const ResourceRoute = struct {
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = marshal.view(self.url);
-        raw.url_stage = self.url_stage.toNative();
         return raw;
     }
 
@@ -3820,21 +3817,8 @@ pub const ResourceRoute = struct {
             .kinds = ResourceKindMask.fromNative(raw.kinds),
             .flags = UrlMatchFlags.fromNative(raw.flags),
             .url = try marshal.copyView(allocator, raw.url),
-            .url_stage = ResourceRouteUrl.fromNative(raw.url_stage),
         };
     }
-};
-
-/// The URL stage that a provider route compares.
-///
-/// See `mln_resource_route_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const ResourceRouteUrl = enum(u32) {
-    requested = 1,
-    resolved = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 pub const ResourceStoragePolicy = enum(u32) {
@@ -4051,8 +4035,6 @@ pub const RuntimeEventMask = struct {
     map_loading_failed: bool = false,
     map_idle: bool = false,
     map_render_error: bool = false,
-    map_still_image_finished: bool = false,
-    map_still_image_failed: bool = false,
     map_render_frame_started: bool = false,
     map_render_frame_finished: bool = false,
     map_render_map_started: bool = false,
@@ -4064,7 +4046,7 @@ pub const RuntimeEventMask = struct {
     offline_region_tile_count_limit_exceeded: bool = false,
     map_source_changed: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 1024, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4072,9 +4054,9 @@ pub const RuntimeEventMask = struct {
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
     pub const none = fromNative(0);
-    pub const all_map_events = fromNative(8912382);
+    pub const all_map_events = fromNative(8906238);
     pub const all_runtime_events = fromNative(3670016);
-    pub const all = fromNative(12582398);
+    pub const all = fromNative(12576254);
 };
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -4271,8 +4253,6 @@ pub const RuntimeEventType = enum(u32) {
     map_render_map_started = 15,
     map_render_frame_finished = 14,
     map_render_frame_started = 13,
-    map_still_image_failed = 12,
-    map_still_image_finished = 11,
     map_render_error = 10,
     map_idle = 8,
     map_loading_failed = 7,
@@ -4299,9 +4279,6 @@ pub const RuntimeOptions = struct {
     /// Cache database path. Copied during runtime creation. Copied text, owned
     /// by the caller.
     cache_path: ?[]const u8 = null,
-    /// Runtime-scoped event types this runtime queues, as a bitwise OR of
-    /// `mln_runtime_event_mask` values.
-    event_mask: RuntimeEventMask = RuntimeEventMask.all,
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
         _ = allocator;
         _ = roots;
@@ -4309,7 +4286,6 @@ pub const RuntimeOptions = struct {
         raw.size = @sizeOf(c.mln_runtime_options);
         raw.asset_path = if (self.asset_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.cache_path = if (self.cache_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        raw.event_mask = self.event_mask.toNative();
         return raw;
     }
 
@@ -4317,7 +4293,6 @@ pub const RuntimeOptions = struct {
         return .{
             .asset_path = if (raw.asset_path.size == 0) null else try marshal.copyView(allocator, raw.asset_path),
             .cache_path = if (raw.cache_path.size == 0) null else try marshal.copyView(allocator, raw.cache_path),
-            .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
         };
     }
 };
@@ -4348,8 +4323,7 @@ pub const ScreenBox = struct {
 /// See `mln_screen_line_string` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const ScreenLineString = struct {
-    /// Points. Null only when point_count is 0. Copied value, owned by the
-    /// caller.
+    /// Points. Null only when point_count is 0.
     points: []const ScreenPoint = &.{},
     pub fn toNative(self: ScreenLineString, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_screen_line_string {
         _ = roots;
@@ -4753,7 +4727,7 @@ pub const StyleLayerVisibility = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// DEM raster encoding values used by `mln_style_tile_source_options`.
+/// DEM raster encoding values.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4924,7 +4898,7 @@ pub const StyleSourceType = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+/// Tile URL coordinate scheme values.
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4934,81 +4908,6 @@ pub const StyleTileScheme = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
-/// Field mask values for `mln_style_tile_source_options`.
-///
-/// See `mln_style_tile_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleTileSourceOptionField = struct {
-    min_zoom: bool = false,
-    max_zoom: bool = false,
-    attribution: bool = false,
-    scheme: bool = false,
-    bounds: bool = false,
-    tile_size: bool = false,
-    vector_encoding: bool = false,
-    raster_encoding: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-    pub const contains = methods.contains;
-    pub const isEmpty = methods.isEmpty;
-    pub const unionWith = methods.unionWith;
-};
-
-/// Options for vector and raster tile sources.
-///
-/// See `mln_style_tile_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleTileSourceOptions = struct {
-    min_zoom: ?f64 = null,
-    max_zoom: ?f64 = null,
-    /// Copied text, owned by the caller.
-    attribution: ?[]const u8 = null,
-    /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
-    scheme: ?StyleTileScheme = null,
-    bounds: ?LatLngBounds = null,
-    /// Raster tile size in pixels. Defaults to 512.
-    tile_size: ?u32 = null,
-    /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
-    vector_encoding: ?StyleVectorTileEncoding = null,
-    /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
-    raster_encoding: ?StyleRasterDemEncoding = null,
-    pub fn toNative(self: StyleTileSourceOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_tile_source_options {
-        _ = allocator;
-        _ = roots;
-        var raw = c.mln_style_tile_source_options_default();
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_style_tile_source_options);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
-        if (self.attribution) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-            raw.attribution = marshal.view(item);
-        }
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME, &raw.scheme, self.scheme);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS, &raw.bounds, self.bounds);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, self.tile_size);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
-        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING, &raw.raster_encoding, self.raster_encoding);
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_tile_source_options) status.Error!StyleTileSourceOptions {
-        return .{
-            .min_zoom = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
-            .max_zoom = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
-            .attribution = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
-            .scheme = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME != 0) StyleTileScheme.fromNative(raw.scheme) else null,
-            .bounds = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
-            .tile_size = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0) raw.tile_size else null,
-            .vector_encoding = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
-            .raster_encoding = if (raw.fields & c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0) StyleRasterDemEncoding.fromNative(raw.raster_encoding) else null,
-        };
-    }
 };
 
 /// Field mask values for `mln_style_transition_options`.
@@ -5061,7 +4960,7 @@ pub const StyleTransitionOptions = struct {
     }
 };
 
-/// Vector tile encoding values used by `mln_style_tile_source_options`.
+/// Vector tile encoding values.
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -6155,38 +6054,6 @@ pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: [
     return call.submit("mln_map_add_image_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
 }
 
-/// Adds a raster DEM source with inline tile URLs.
-///
-/// See `mln_map_add_raster_dem_source_tiles` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddRasterDemSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_raster_dem_source_tiles", .lease, map, call.command, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-}
-
-/// Adds a raster DEM source with a TileJSON URL.
-///
-/// See `mln_map_add_raster_dem_source_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddRasterDemSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_raster_dem_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
-}
-
-/// Adds a raster source with inline tile URLs.
-///
-/// See `mln_map_add_raster_source_tiles` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddRasterSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_raster_source_tiles", .lease, map, call.command, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-}
-
-/// Adds a raster source with a TileJSON URL.
-///
-/// See `mln_map_add_raster_source_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddRasterSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_raster_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
-}
-
 /// Adds one style layer from a full style-spec layer JSON object.
 ///
 /// See `mln_map_add_style_layer_json` in the
@@ -6201,22 +6068,6 @@ pub fn mapAddStyleLayerJson(map: Map, layer_json: []const u8, before_layer_id: ?
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapAddStyleSourceJson(map: Map, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     return call.submit("mln_map_add_style_source_json", .lease, map, call.command, null, diagnostic, .{ source_id, source_json });
-}
-
-/// Adds a vector source with inline tile URLs.
-///
-/// See `mln_map_add_vector_source_tiles` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddVectorSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_vector_source_tiles", .lease, map, call.command, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-}
-
-/// Adds a vector source with a TileJSON URL.
-///
-/// See `mln_map_add_vector_source_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_add_vector_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
 }
 
 /// Submits one atomic relative camera update.
@@ -6626,22 +6477,6 @@ pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: Sc
     return call.invoke("mln_map_projection_lat_lng_for_pixel_unwrapped", .lease, projection, null, diagnostic, .{ point, call.out(LatLng) });
 }
 
-/// Converts screen points to geographic coordinates.
-///
-/// See `mln_map_projection_lat_lngs_for_pixels` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionLatLngsForPixels(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
-    return call.invoke("mln_map_projection_lat_lngs_for_pixels", .borrow, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
-}
-
-/// Converts screen points to unwrapped geographic coordinates.
-///
-/// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
-    return call.invoke("mln_map_projection_lat_lngs_for_pixels_unwrapped", .borrow, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
-}
-
 /// Reads the ground distance covered by one logical map pixel at a latitude for
 /// the helper camera zoom.
 ///
@@ -6659,14 +6494,6 @@ pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng
     return call.invoke("mln_map_projection_pixel_for_lat_lng", .lease, projection, null, diagnostic, .{ coordinate, call.out(ScreenPoint) });
 }
 
-/// Converts geographic coordinates to screen points.
-///
-/// See `mln_map_projection_pixels_for_lat_lngs` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const ScreenPoint) {
-    return call.invoke("mln_map_projection_pixels_for_lat_lngs", .borrow, projection, allocator, diagnostic, .{ coordinates, coordinates.len, call.outArray(ScreenPoint, call.len(coordinates)) });
-}
-
 /// Releases a standalone projection.
 ///
 /// See `mln_map_projection_release` in the
@@ -6681,22 +6508,6 @@ pub fn mapProjectionRelease(projection: MapProjection, diagnostic: ?*diagnostics
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProjection, camera: CameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_map_projection_set_camera", .lease, projection, allocator, diagnostic, .{camera});
-}
-
-/// Applies a camera fit for geographic coordinates.
-///
-/// See `mln_map_projection_set_visible_coordinates` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionSetVisibleCoordinates(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, padding: EdgeInsets, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_map_projection_set_visible_coordinates", .lease, projection, allocator, diagnostic, .{ coordinates, coordinates.len, padding });
-}
-
-/// Applies a camera fit for GeoJSON Geometry bytes.
-///
-/// See `mln_map_projection_set_visible_geometry` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionSetVisibleGeometry(projection: MapProjection, geometry: []const u8, padding: EdgeInsets, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_map_projection_set_visible_geometry", .lease, projection, null, diagnostic, .{ geometry, padding });
 }
 
 /// Releases a map after synchronous state preflight.
@@ -7395,30 +7206,6 @@ pub fn renderedFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.E
     return call.direct("mln_rendered_feature_query_options_default", .none, {}, OwnedValue(RenderedFeatureQueryOptions), allocator, .{});
 }
 
-/// Returns a rendered box query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_box` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderedQueryGeometryBox(allocator: std.mem.Allocator, box: ScreenBox) status.Error!OwnedValue(RenderedQueryGeometry) {
-    return call.direct("mln_rendered_query_geometry_box", .none, {}, OwnedValue(RenderedQueryGeometry), allocator, .{box});
-}
-
-/// Returns a rendered line-string query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_line_string` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderedQueryGeometryLineString(allocator: std.mem.Allocator, points: []const ScreenPoint) status.Error!OwnedValue(RenderedQueryGeometry) {
-    return call.direct("mln_rendered_query_geometry_line_string", .none, {}, OwnedValue(RenderedQueryGeometry), allocator, .{ points, points.len });
-}
-
-/// Returns a rendered point query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderedQueryGeometryPoint(allocator: std.mem.Allocator, point: ScreenPoint) status.Error!OwnedValue(RenderedQueryGeometry) {
-    return call.direct("mln_rendered_query_geometry_point", .none, {}, OwnedValue(RenderedQueryGeometry), allocator, .{point});
-}
-
 /// Completes a C API resource provider request.
 ///
 /// See `mln_resource_request_complete` in the
@@ -7458,16 +7245,6 @@ pub fn resourceRequestRelease(handle: ResourceRequest) status.Error!void {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequest, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
-}
-
-/// Blocks until a resource request is released and its cancel callback
-/// registration has retired: the callback, if it ran, and release_user_data
-/// have both returned. Completing a request does not release its owner.
-///
-/// See `mln_resource_request_wait_until_retired` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestWaitUntilRetired(handle: ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_resource_request_wait_until_retired", .issued, handle, null, diagnostic, .{});
 }
 
 /// Copies a replacement URL into C API-managed storage for the current
@@ -7711,14 +7488,6 @@ pub fn styleImageOptionsDefault(allocator: std.mem.Allocator) status.Error!Owned
     return call.direct("mln_style_image_options_default", .none, {}, OwnedValue(StyleImageOptions), allocator, .{});
 }
 
-/// Returns default tile source options.
-///
-/// See `mln_style_tile_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleTileSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(StyleTileSourceOptions) {
-    return call.direct("mln_style_tile_source_options_default", .none, {}, OwnedValue(StyleTileSourceOptions), allocator, .{});
-}
-
 /// Returns default global style transition options.
 ///
 /// See `mln_style_transition_options_default` in the
@@ -7815,26 +7584,6 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_image_source_url", .lease, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
     }
 
-    pub fn addRasterDemSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_raster_dem_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-    }
-
-    pub fn addRasterDemSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_raster_dem_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
-    }
-
-    pub fn addRasterSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_raster_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-    }
-
-    pub fn addRasterSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_raster_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
-    }
-
     pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_style_layer_json", .lease, map, null, diagnostic, .{ layer_json, before_layer_id });
@@ -7843,16 +7592,6 @@ pub const MapDiscarding = struct {
     pub fn addStyleSourceJson(self: MapDiscarding, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_style_source_json", .lease, map, null, diagnostic, .{ source_id, source_json });
-    }
-
-    pub fn addVectorSourceTiles(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_vector_source_tiles", .lease, map, allocator, diagnostic, .{ source_id, tiles, tiles.len, options });
-    }
-
-    pub fn addVectorSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_vector_source_url", .lease, map, allocator, diagnostic, .{ source_id, url, options });
     }
 
     pub fn applyCameraDelta(self: MapDiscarding, allocator: std.mem.Allocator, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

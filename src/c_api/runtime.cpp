@@ -14,7 +14,6 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
     .size = sizeof(mln_runtime_options),
     .asset_path = {},
     .cache_path = {},
-    .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
   };
 }
 
@@ -80,14 +79,6 @@ auto mln_resource_request_set_cancel_callback(
     return mln::core::set_resource_request_cancel_callback(
       handle, handler, out_cancelled
     );
-  });
-}
-
-auto mln_resource_request_wait_until_retired(
-  mln_resource_request handle, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::wait_for_resource_request_retired(handle);
   });
 }
 

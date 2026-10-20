@@ -494,33 +494,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif parameter.name in output_plans:
             output = output_plans[parameter.name]
             value = output.value
-            if output.sized_by:
-                element = value.element
-                value_types.add(element, "out")
-                raw_type = SCALARS.get(ctype(pointee), "sys::" + ctype(pointee))
-                initial = (
-                    f"unsafe {{ sys::{element.default}() }}"
-                    if element.default
-                    else "unsafe { std::mem::zeroed() }"
-                )
-                prelude.append(
-                    f"let mut {local}: Vec<{raw_type}> = (0..{lengths[value.length]}).map(|_| {initial}).collect();"
-                )
-                if element.kind == "record" and any(
-                    field.role == "size" for field in element.fields
-                ):
-                    prelude.append(
-                        f"for value in &mut {local} {{ value.size = std::mem::size_of::<{raw_type}>() as _; }}"
-                    )
-                args.append(f"{local}.as_mut_ptr()")
-                copied = decode(value_types, element, "item")
-                outputs.append(
-                    (
-                        f"Vec<{value_types.public(element)}>",
-                        f"{local}.into_iter().map(|item| Ok({copied})).collect::<Result<Vec<_>>>()?",
-                    )
-                )
-                continue
             if value.kind == "reference":
                 value = value.element
             if value.kind == "handle":

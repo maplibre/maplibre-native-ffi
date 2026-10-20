@@ -59,24 +59,6 @@ struct OwnedGeoJSONOptions {
   }
 };
 
-struct OwnedTileOptions {
-  mln_style_tile_source_options value{};
-  OwnedView attribution;
-
-  explicit OwnedTileOptions(const mln_style_tile_source_options* source)
-      : value(
-          source == nullptr ? mln::core::style_tile_source_options_default()
-                            : *source
-        ),
-        attribution(value.attribution) {}
-
-  [[nodiscard]] auto options() const -> mln_style_tile_source_options {
-    auto copied = value;
-    copied.attribution = attribution.view();
-    return copied;
-  }
-};
-
 auto queue_tile_fetch(
   void* registration, mln_canonical_tile_id tile_id
 ) noexcept -> void {
@@ -171,26 +153,6 @@ auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
   return valid_view(view, name);
 }
 
-auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
-  if (tile_count == 0) {
-    mln::core::set_thread_error("tile_count must be greater than 0");
-    return false;
-  }
-  if (tiles == nullptr) {
-    mln::core::set_thread_error("tiles must not be null");
-    return false;
-  }
-  for (size_t index = 0; index < tile_count; ++index) {
-    if (
-      !valid_non_empty_view(tiles[index], "tile URL") ||
-      !mln::core::validate_c_string_view(tiles[index], "tile URL")
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // A rejected submission leaves user_data with the caller. An accepted command
 // releases it with the last shared reference unless the style adopts it.
 template <typename Options>
@@ -243,11 +205,6 @@ auto add_callback_source(
 }
 
 }  // namespace
-
-auto mln_style_tile_source_options_default(void) noexcept
-  -> mln_style_tile_source_options {
-  return mln::core::style_tile_source_options_default();
-}
 
 auto mln_geojson_source_options_default(void) noexcept
   -> mln_geojson_source_options {
@@ -414,82 +371,6 @@ auto mln_map_list_style_sources(
     );
   });
 }
-
-#define MLN_TILE_URL_COMMAND(NAME, CORE, KIND)                               \
-  auto NAME(                                                                 \
-    mln_map map, mln_buffer_view source_id, mln_buffer_view url,             \
-    const mln_style_tile_source_options* options,                            \
-    const mln_completion* completion, mln_diagnostic* out_diagnostic         \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
-      if (                                                                   \
-        !valid_non_empty_view(source_id, "source_id") ||                     \
-        !valid_non_empty_view(url, "url") ||                                 \
-        !mln::core::validate_c_string_view(url, "url") ||                    \
-        mln::core::validate_tile_source_options(options, KIND) !=            \
-          MLN_STATUS_OK                                                      \
-      ) {                                                                    \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      auto id = OwnedView{source_id};                                        \
-      auto owned_url = OwnedView{url};                                       \
-      auto owned_options = OwnedTileOptions{options};                        \
-      return mln::core::submit_map_command(                                  \
-        map,                                                                 \
-        [id = std::move(id), url = std::move(owned_url),                     \
-         options = std::move(owned_options)](mln::core::MapObject& live)     \
-          -> mln_status {                                                    \
-          const auto source_options = options.options();                     \
-          return mln::core::CORE(                                            \
-            live, id.view(), url.view(), &source_options                     \
-          );                                                                 \
-        },                                                                   \
-        completion                                                           \
-      );                                                                     \
-    });                                                                      \
-  }
-
-#define MLN_TILE_LIST_COMMAND(NAME, CORE, KIND)                              \
-  auto NAME(                                                                 \
-    mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,    \
-    size_t tile_count, const mln_style_tile_source_options* options,         \
-    const mln_completion* completion, mln_diagnostic* out_diagnostic         \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
-      if (                                                                   \
-        !valid_non_empty_view(source_id, "source_id") ||                     \
-        !valid_tile_urls(tiles, tile_count) ||                               \
-        mln::core::validate_tile_source_options(options, KIND) !=            \
-          MLN_STATUS_OK                                                      \
-      ) {                                                                    \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      auto id = OwnedView{source_id};                                        \
-      auto owned_tiles = std::vector<OwnedView>{};                           \
-      owned_tiles.reserve(tile_count);                                       \
-      for (size_t index = 0; index < tile_count; ++index) {                  \
-        owned_tiles.emplace_back(tiles[index]);                              \
-      }                                                                      \
-      auto owned_options = OwnedTileOptions{options};                        \
-      return mln::core::submit_map_command(                                  \
-        map,                                                                 \
-        [id = std::move(id), tiles = std::move(owned_tiles),                 \
-         options = std::move(owned_options)](mln::core::MapObject& live)     \
-          -> mln_status {                                                    \
-          auto views = std::vector<mln_buffer_view>{};                       \
-          views.reserve(tiles.size());                                       \
-          for (const auto& tile : tiles) {                                   \
-            views.push_back(tile.view());                                    \
-          }                                                                  \
-          const auto source_options = options.options();                     \
-          return mln::core::CORE(                                            \
-            live, id.view(), views.data(), views.size(), &source_options     \
-          );                                                                 \
-        },                                                                   \
-        completion                                                           \
-      );                                                                     \
-    });                                                                      \
-  }
 
 auto mln_map_add_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -665,31 +546,6 @@ auto mln_map_set_style_source_volatile(
   });
 }
 
-MLN_TILE_URL_COMMAND(
-  mln_map_add_vector_source_url, map_add_vector_source_url,
-  mln::core::TileSourceOptionKind::Vector
-)
-MLN_TILE_LIST_COMMAND(
-  mln_map_add_vector_source_tiles, map_add_vector_source_tiles,
-  mln::core::TileSourceOptionKind::Vector
-)
-MLN_TILE_URL_COMMAND(
-  mln_map_add_raster_source_url, map_add_raster_source_url,
-  mln::core::TileSourceOptionKind::Raster
-)
-MLN_TILE_LIST_COMMAND(
-  mln_map_add_raster_source_tiles, map_add_raster_source_tiles,
-  mln::core::TileSourceOptionKind::Raster
-)
-MLN_TILE_URL_COMMAND(
-  mln_map_add_raster_dem_source_url, map_add_raster_dem_source_url,
-  mln::core::TileSourceOptionKind::RasterDEM
-)
-MLN_TILE_LIST_COMMAND(
-  mln_map_add_raster_dem_source_tiles, map_add_raster_dem_source_tiles,
-  mln::core::TileSourceOptionKind::RasterDEM
-)
-
 auto mln_map_add_custom_geometry_source(
   mln_map map, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options,
@@ -860,9 +716,6 @@ auto mln_map_invalidate_custom_mvt_vector_source_tile(
     );
   });
 }
-
-#undef MLN_TILE_LIST_COMMAND
-#undef MLN_TILE_URL_COMMAND
 
 auto mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,

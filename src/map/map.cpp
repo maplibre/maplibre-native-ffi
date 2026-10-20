@@ -100,8 +100,6 @@
 
 namespace {
 
-enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
-
 constexpr auto default_map_width = uint32_t{256};
 constexpr auto default_map_height = uint32_t{256};
 constexpr double default_scale_factor = 1.0;
@@ -1854,29 +1852,6 @@ auto validate_screen_point(mln_screen_point point) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto validate_screen_point_array(
-  const mln_screen_point* points, size_t point_count
-) -> mln_status {
-  if (point_count == 0) {
-    return MLN_STATUS_OK;
-  }
-
-  if (points == nullptr) {
-    mln::core::set_thread_error("points must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto point_span =
-    std::span<const mln_screen_point>{points, point_count};
-  for (const auto point : point_span) {
-    const auto status = validate_screen_point(point);
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  return MLN_STATUS_OK;
-}
-
 auto validate_edge_insets(mln_edge_insets padding) -> mln_status {
   if (
     !std::isfinite(padding.top) || !std::isfinite(padding.left) ||
@@ -2556,29 +2531,6 @@ class RuntimeMapRetainGuard final {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
 };
 
-// Completes an operation that the map finished on the runtime worker. Inside a
-// map transaction the completion waits until the transaction queues the events
-// it held, so the operation's own event comes first. If the completion cannot
-// be deferred it runs now, because a completion must still run exactly once.
-auto complete_after_held_events(
-  MapEventState& events, std::shared_ptr<OperationObject> operation,
-  mln_status status, std::string message, std::any result
-) noexcept -> void {
-  if (events.in_transaction()) {
-    try {
-      auto& held = events.deferred_completions.emplace_back();
-      held.operation = std::move(operation);
-      held.status = status;
-      held.message = std::move(message);
-      held.result = std::move(result);
-      return;
-    } catch (...) {
-      // Allocation failure still owes exactly one completion.
-    }
-  }
-  operation->complete(status, std::move(message), std::move(result));
-}
-
 // Runs on the runtime worker from MapLibre's still-image continuation and
 // resolves the handle that identifies the pending request.
 auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
@@ -2592,27 +2544,10 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   if (auto release = std::exchange(live->still_image_release_submission, {})) {
     release();
   }
-  // The event is queued before the completion runs, so a host that sees the
-  // completion and then drains events finds the event.
-  // MapLibre usually finishes a request from renderStill() or from a renderer
-  // callback, but a style error inside a map command finishes it too. That
-  // command's transaction holds the event, so the completion waits until the
-  // transaction queues it.
-  auto& events = *live->event_state;
-  const auto status = error ? MLN_STATUS_NATIVE_ERROR : MLN_STATUS_OK;
-  auto message = error ? exception_message(error) : std::string{};
-  const auto type = error ? MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
-                          : MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED;
-  if (event_selected(events.mask, type)) {
-    queue_map_event(
-      events, events.published_generation, type, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-      zeroed_event_payload(), 0, message
-    );
-  }
   if (!operation) return;
-  complete_after_held_events(
-    events, std::move(operation), status, std::move(message),
-    std::any{std::monostate{}}
+  operation->complete(
+    error ? MLN_STATUS_NATIVE_ERROR : MLN_STATUS_OK,
+    error ? exception_message(error) : std::string{}, std::any{std::monostate{}}
   );
 }
 
@@ -2770,9 +2705,8 @@ auto open_map_transaction(MapEventState& events) -> void {
 }
 
 // Queues the held events with `generation` and announces the held update to
-// the attached session from a later task. Operations that finished inside the
-// transaction complete after their events, and ended camera transitions run
-// their handlers last, with the transaction's generation. Every delivery is
+// the attached session from a later task. Ended camera transitions run their
+// handlers with the transaction's generation. Every delivery is
 // attempted, and the first failure is rethrown afterwards.
 auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   auto& events = *live.event_state;
@@ -2792,14 +2726,6 @@ auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
     live.frontend->release_held_update();
   } catch (...) {
     record();
-  }
-  // A completion runs host code, which may submit work but never runs a task
-  // inline, so nothing appends to the slot while it drains.
-  auto deferred = std::exchange(events.deferred_completions, {});
-  for (auto& held : deferred) {
-    held.operation->complete(
-      held.status, std::move(held.message), std::move(held.result)
-    );
   }
   deliver_ended_transitions(
     events, generation != 0 ? generation : events.published_generation
@@ -4605,55 +4531,6 @@ auto map_projection_set_camera(
   );
 }
 
-auto map_projection_set_visible_coordinates(
-  mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding
-) -> mln_status {
-  const auto coordinates_status =
-    validate_lat_lng_array(coordinates, coordinate_count, false);
-  if (coordinates_status != MLN_STATUS_OK) {
-    return coordinates_status;
-  }
-  const auto padding_status = validate_edge_insets(padding);
-  if (padding_status != MLN_STATUS_OK) {
-    return padding_status;
-  }
-  const auto native_coordinates =
-    to_native_lat_lngs(coordinates, coordinate_count);
-  const auto native_padding = to_native_edge_insets(padding);
-  return with_projection(
-    projection,
-    [&native_coordinates, &native_padding](mln::MapProjection& value) {
-      value.setVisibleCoordinates(native_coordinates, native_padding);
-    }
-  );
-}
-
-auto map_projection_set_visible_geometry(
-  mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding
-) -> mln_status {
-  const auto padding_status = validate_edge_insets(padding);
-  if (padding_status != MLN_STATUS_OK) {
-    return padding_status;
-  }
-  const auto native_geometry = to_native_geometry(geometry);
-  if (!native_geometry) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinates = geometry_lat_lngs(*native_geometry);
-  if (coordinates.empty()) {
-    set_thread_error("geometry must contain at least one coordinate");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto native_padding = to_native_edge_insets(padding);
-  return with_projection(
-    projection, [&coordinates, &native_padding](mln::MapProjection& value) {
-      value.setVisibleCoordinates(coordinates, native_padding);
-    }
-  );
-}
-
 auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point
@@ -4716,80 +4593,6 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return projection_lat_lng_for_pixel(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
-  );
-}
-
-auto map_projection_pixels_for_lat_lngs(
-  mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_screen_point* out_points
-) -> mln_status {
-  if (coordinate_count != 0 && out_points == nullptr) {
-    set_thread_error(
-      "out_points must not be null when coordinate_count is nonzero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto status =
-    validate_lat_lng_array(coordinates, coordinate_count, true);
-  if (status != MLN_STATUS_OK) return status;
-  auto converted = std::vector<mln_screen_point>(coordinate_count);
-  return with_projection(projection, [&](mln::MapProjection& value) {
-    for (size_t index = 0; index < coordinate_count; ++index) {
-      converted[index] = from_native_screen_point(
-        value.pixelForLatLng(to_native_lat_lng(coordinates[index]))
-      );
-    }
-    if (coordinate_count != 0) {
-      std::copy(converted.begin(), converted.end(), out_points);
-    }
-  });
-}
-
-namespace {
-
-auto projection_lat_lngs_for_pixels(
-  mln_map_projection projection, const mln_screen_point* points,
-  size_t point_count, mln_lat_lng* out_coordinates,
-  mln::LatLng::WrapMode wrap_mode
-) -> mln_status {
-  if (point_count != 0 && out_coordinates == nullptr) {
-    set_thread_error(
-      "out_coordinates must not be null when point_count is nonzero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto status = validate_screen_point_array(points, point_count);
-  if (status != MLN_STATUS_OK) return status;
-  auto converted = std::vector<mln_lat_lng>(point_count);
-  return with_projection(projection, [&](mln::MapProjection& value) {
-    for (size_t index = 0; index < point_count; ++index) {
-      converted[index] = from_native_lat_lng(
-        value.latLngForPixel(to_native_screen_point(points[index]), wrap_mode)
-      );
-    }
-    if (point_count != 0) {
-      std::copy(converted.begin(), converted.end(), out_coordinates);
-    }
-  });
-}
-
-}  // namespace
-
-auto map_projection_lat_lngs_for_pixels(
-  mln_map_projection projection, const mln_screen_point* points,
-  size_t point_count, mln_lat_lng* out_coordinates
-) -> mln_status {
-  return projection_lat_lngs_for_pixels(
-    projection, points, point_count, out_coordinates, mln::LatLng::Wrapped
-  );
-}
-
-auto map_projection_lat_lngs_for_pixels_unwrapped(
-  mln_map_projection projection, const mln_screen_point* points,
-  size_t point_count, mln_lat_lng* out_coordinates
-) -> mln_status {
-  return projection_lat_lngs_for_pixels(
-    projection, points, point_count, out_coordinates, mln::LatLng::Unwrapped
   );
 }
 

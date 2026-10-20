@@ -68,18 +68,3 @@ test "generated absence returns null and other failures still report" {
     try std.testing.expect(try api.probeReadLevel(null) == null);
     try std.testing.expectEqual(@as(?f64, 0.5), try api.probeReadLevel(null));
 }
-
-test "generated caller-sized output arrays" {
-    const allocator = std.testing.allocator;
-    const points = [_]api.ProbeBatchPoint{ .{ .x = 2, .y = 5 }, .{ .x = 7, .y = 11 }, .{ .x = -3, .y = 17 } };
-    var result = try api.probeBatchPoints(allocator, &points, null);
-    defer result.deinit();
-    const expected = [_]api.ProbeBatchPoint{ .{ .x = 5, .y = 3 }, .{ .x = 11, .y = 8 }, .{ .x = 17, .y = -2 } };
-    try std.testing.expectEqualSlices(api.ProbeBatchPoint, &expected, result.value);
-    var scores = try api.probeBatchScores(allocator, &points, null);
-    defer scores.deinit();
-    try std.testing.expectEqualSlices(f64, &.{ 7, 18, 14 }, scores.value);
-    var empty = try api.probeBatchPoints(allocator, &.{}, null);
-    defer empty.deinit();
-    try std.testing.expectEqual(@as(usize, 0), empty.value.len);
-}

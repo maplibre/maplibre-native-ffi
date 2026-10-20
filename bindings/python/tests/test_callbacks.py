@@ -405,14 +405,12 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     routes = [
         # Another kind: claims no style or sprite, whatever its URL.
         mln.ResourceRoute(
-            url_stage=mln.ResourceRouteUrl.RESOLVED,
             kinds=mln.ResourceKindMask.TILE,
             flags=mln.UrlMatchFlags.GLOB,
             url="**",
         ),
         # A URL pattern alone claims every kind under it.
         mln.ResourceRoute(
-            url_stage=mln.ResourceRouteUrl.RESOLVED,
             flags=mln.UrlMatchFlags.GLOB,
             url="custom://routed/**",
         ),
@@ -423,7 +421,6 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     # Native holds its own copy, so a route that would claim everything,
     # added after the call, claims nothing.
     routes[0] = mln.ResourceRoute(
-        url_stage=mln.ResourceRouteUrl.RESOLVED,
         kinds=mln.ResourceKindMask.ALL,
         flags=mln.UrlMatchFlags.GLOB,
         url="**",

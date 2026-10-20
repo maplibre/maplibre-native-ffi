@@ -139,9 +139,6 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
     MLN_HANDLE_NULL, &handler, &cancelled, NULL
   ));
-  MLN_TEST_INVALID(
-    mln_resource_request_wait_until_retired(MLN_HANDLE_NULL, NULL)
-  );
 }
 
 typedef struct provider_request_probe {
@@ -384,7 +381,6 @@ static void a_held_request_does_not_hold_its_runtime_open(void) {
 
   const mln_resource_request handle = atomic_load(&probe.handle);
   mln_resource_request_release(handle);
-  MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
 }
 
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
@@ -695,9 +691,8 @@ static void cancel_callback_may_release_the_request(void) {
   mln_map map = start_cancel_probe_request(runtime, &probe);
 
   mln_test_destroy_map(map);
-  TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.cancel_count, 1));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.release_count, 1));
   const mln_resource_request handle = atomic_load(&probe.handle);
-  MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
   const mln_resource_request_cancel_handler unreleased =
     cancel_handler(count_cancel, &probe, NULL);

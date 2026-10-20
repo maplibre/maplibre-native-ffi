@@ -529,49 +529,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns a rendered box query geometry descriptor.
-   *
-   * See `mln_rendered_query_geometry_box` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  public fun renderedQueryGeometryBox(box: ScreenBox): RenderedQueryGeometry =
-    nativeCall(null, null, "mln_rendered_query_geometry_box") {
-      val out = sized(40, 8)
-      C.mln_rendered_query_geometry_box(writeScreenBox(box), out)
-      readRenderedQueryGeometry(out)
-    }
-
-  /**
-   * Returns a rendered line-string query geometry descriptor.
-   *
-   * See `mln_rendered_query_geometry_line_string` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  public fun renderedQueryGeometryLineString(points: List<ScreenPoint>): RenderedQueryGeometry =
-    nativeCall(null, null, "mln_rendered_query_geometry_line_string") {
-      val out = sized(40, 8)
-      C.mln_rendered_query_geometry_line_string(
-        array(points, 16, 8) { at, item -> putScreenPoint(at, item) },
-        points.size.toLong(),
-        out,
-      )
-      readRenderedQueryGeometry(out)
-    }
-
-  /**
-   * Returns a rendered point query geometry descriptor.
-   *
-   * See `mln_rendered_query_geometry_point` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  public fun renderedQueryGeometryPoint(point: ScreenPoint): RenderedQueryGeometry =
-    nativeCall(null, null, "mln_rendered_query_geometry_point") {
-      val out = sized(40, 8)
-      C.mln_rendered_query_geometry_point(writeScreenPoint(point), out)
-      readRenderedQueryGeometry(out)
-    }
-
-  /**
    * Copies a replacement URL into C API-managed storage for the current callback.
    *
    * See `mln_resource_transform_response_set_url` in the
@@ -610,7 +567,7 @@ public object GeneratedApi {
    */
   public fun runtimeOptionsDefault(): RuntimeOptions =
     nativeCall(null, null, "mln_runtime_options_default") {
-      val out = sized(w(32, 48), 8)
+      val out = sized(w(20, 40), w(4, 8))
       C.mln_runtime_options_default(out)
       readRuntimeOptions(out)
     }
@@ -639,19 +596,6 @@ public object GeneratedApi {
       val out = sized(w(56, 72), w(4, 8))
       C.mln_style_image_options_default(out)
       readStyleImageOptions(out)
-    }
-
-  /**
-   * Returns default tile source options.
-   *
-   * See `mln_style_tile_source_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun styleTileSourceOptionsDefault(): StyleTileSourceOptions =
-    nativeCall(null, null, "mln_style_tile_source_options_default") {
-      val out = sized(w(88, 96), 8)
-      C.mln_style_tile_source_options_default(out)
-      readStyleTileSourceOptions(out)
     }
 
   /**

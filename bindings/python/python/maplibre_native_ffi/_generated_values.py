@@ -837,17 +837,6 @@ class ResourceResponseStatus(UnknownIntEnum):
     NOT_MODIFIED = 3
 
 
-class ResourceRouteUrl(UnknownIntEnum):
-    """The URL stage that a provider route compares.
-
-    See `mln_resource_route_url` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    RESOLVED = 0
-    REQUESTED = 1
-
-
 class ResourceStoragePolicy(UnknownIntEnum):
     PERMANENT = 0
     VOLATILE = 1
@@ -875,8 +864,6 @@ class RuntimeEventMask(IntFlag):
     MAP_LOADING_FAILED = 128
     MAP_IDLE = 256
     MAP_RENDER_ERROR = 1024
-    MAP_STILL_IMAGE_FINISHED = 2048
-    MAP_STILL_IMAGE_FAILED = 4096
     MAP_RENDER_FRAME_STARTED = 8192
     MAP_RENDER_FRAME_FINISHED = 16384
     MAP_RENDER_MAP_STARTED = 32768
@@ -887,9 +874,9 @@ class RuntimeEventMask(IntFlag):
     OFFLINE_REGION_RESPONSE_ERROR = 1048576
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152
     MAP_SOURCE_CHANGED = 8388608
-    ALL_MAP_EVENTS = 8912382
+    ALL_MAP_EVENTS = 8906238
     ALL_RUNTIME_EVENTS = 3670016
-    ALL = 12582398
+    ALL = 12576254
 
 
 class RuntimeEventPayloadType(UnknownIntEnum):
@@ -935,8 +922,6 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_LOADING_FAILED = 7
     MAP_IDLE = 8
     MAP_RENDER_ERROR = 10
-    MAP_STILL_IMAGE_FINISHED = 11
-    MAP_STILL_IMAGE_FAILED = 12
     MAP_RENDER_FRAME_STARTED = 13
     MAP_RENDER_FRAME_FINISHED = 14
     MAP_RENDER_MAP_STARTED = 15
@@ -1032,7 +1017,7 @@ class StyleLayerVisibility(UnknownIntEnum):
 
 
 class StyleRasterDemEncoding(UnknownIntEnum):
-    """DEM raster encoding values used by `mln_style_tile_source_options`.
+    """DEM raster encoding values.
 
     See `mln_style_raster_dem_encoding` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1078,8 +1063,7 @@ class StyleSourceType(UnknownIntEnum):
 
 
 class StyleTileScheme(UnknownIntEnum):
-    """Tile URL coordinate scheme values used by
-    `mln_style_tile_source_options`.
+    """Tile URL coordinate scheme values.
 
     See `mln_style_tile_scheme` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1087,23 +1071,6 @@ class StyleTileScheme(UnknownIntEnum):
 
     XYZ = 0
     TMS = 1
-
-
-class StyleTileSourceOptionField(IntFlag):
-    """Field mask values for `mln_style_tile_source_options`.
-
-    See `mln_style_tile_source_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    MIN_ZOOM = 1
-    MAX_ZOOM = 2
-    ATTRIBUTION = 4
-    SCHEME = 8
-    BOUNDS = 16
-    TILE_SIZE = 32
-    VECTOR_ENCODING = 64
-    RASTER_ENCODING = 128
 
 
 class StyleTransitionOptionField(IntFlag):
@@ -1119,7 +1086,7 @@ class StyleTransitionOptionField(IntFlag):
 
 
 class StyleVectorTileEncoding(UnknownIntEnum):
-    """Vector tile encoding values used by `mln_style_tile_source_options`.
+    """Vector tile encoding values.
 
     See `mln_style_vector_tile_encoding` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3552,9 +3519,6 @@ class ResourceRoute:
     url: str
     """The URL or glob pattern to compare."""
 
-    url_stage: ResourceRouteUrl
-    """The URL stage to compare."""
-
     kinds: ResourceKindMask = ResourceKindMask.ALL
     """The resource kinds to match."""
 
@@ -3564,7 +3528,6 @@ class ResourceRoute:
             kinds=ResourceKindMask(raw["kinds"]),
             flags=UrlMatchFlags(raw["flags"]),
             url=raw["url"],
-            url_stage=ResourceRouteUrl(raw["url_stage"]),
         )
 
 
@@ -3817,18 +3780,9 @@ class RuntimeOptions:
     by the caller.
     """
 
-    event_mask: RuntimeEventMask = RuntimeEventMask.ALL
-    """Runtime-scoped event types this runtime queues, as a bitwise OR of
-    `mln_runtime_event_mask` values.
-    """
-
     @classmethod
     def _from_native(cls, raw):
-        return cls(
-            asset_path=raw["asset_path"],
-            cache_path=raw["cache_path"],
-            event_mask=RuntimeEventMask(raw["event_mask"]),
-        )
+        return cls(asset_path=raw["asset_path"], cache_path=raw["cache_path"])
 
     @classmethod
     def default(cls):
@@ -3866,9 +3820,7 @@ class ScreenLineString:
     """
 
     points: tuple[ScreenPoint, ...]
-    """Points. Null only when point_count is 0. Copied value, owned by the
-    caller.
-    """
+    """Points. Null only when point_count is 0."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -4176,55 +4128,6 @@ class StyleSourceTileInfo:
             max_zoom=raw["max_zoom"],
             scheme=StyleTileScheme(raw["scheme"]),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleTileSourceOptions:
-    """Options for vector and raster tile sources.
-
-    See `mln_style_tile_source_options` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    min_zoom: float | None = None
-
-    max_zoom: float | None = None
-
-    attribution: str | None = None
-    """Copied text, owned by the caller."""
-
-    scheme: StyleTileScheme | None = None
-    """One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`."""
-
-    bounds: LatLngBounds | None = None
-
-    tile_size: int | None = None
-    """Raster tile size in pixels. Defaults to 512."""
-
-    vector_encoding: StyleVectorTileEncoding | None = None
-    """One of `mln_style_vector_tile_encoding`. Defaults to MVT."""
-
-    raster_encoding: StyleRasterDemEncoding | None = None
-    """One of `mln_style_raster_dem_encoding`. Defaults to Mapbox."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            min_zoom=raw["min_zoom"],
-            max_zoom=raw["max_zoom"],
-            attribution=raw["attribution"],
-            scheme=_maybe(StyleTileScheme, raw["scheme"]),
-            bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
-            tile_size=raw["tile_size"],
-            vector_encoding=_maybe(StyleVectorTileEncoding, raw["vector_encoding"]),
-            raster_encoding=_maybe(StyleRasterDemEncoding, raw["raster_encoding"]),
-        )
-
-    @classmethod
-    def default(cls):
-        from . import _native
-
-        return cls._from_native(_native._default_style_tile_source_options())
 
 
 @dataclass(frozen=True, slots=True)

@@ -367,12 +367,6 @@ static void invalid_routes_are_rejected(void) {
   MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
   const mln_resource_route zero_kinds = {.url = MLN_BUFFER_LITERAL("**")};
   MLN_TEST_INVALID(submit_routes(runtime, &zero_kinds, 1, NULL));
-  const mln_resource_route invalid_stage = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = MLN_BUFFER_LITERAL("**"),
-    .url_stage = UINT32_MAX
-  };
-  MLN_TEST_INVALID(submit_routes(runtime, &invalid_stage, 1, NULL));
   const mln_resource_route null_url = {
     .kinds = MLN_RESOURCE_KIND_MASK_ALL,
     .url = (mln_buffer_view){.data = NULL, .size = 1}

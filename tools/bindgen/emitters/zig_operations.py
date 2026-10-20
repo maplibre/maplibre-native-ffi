@@ -60,8 +60,6 @@ def access(plan, values, decision):
         return "scoped"
     if not plan.receiver:
         return "none"
-    if plan.receiver_access == "issued":
-        return "issued"
     if plan.consumes:
         return "close"
     if decision:
@@ -192,13 +190,6 @@ def operation(plan, values, *, discard=False):
             public = owned(values, value)
             needs_allocator |= dynamic(value)
             results.append((label, public))
-            output = next(p for p in plan.outputs if p.name == name)
-            if output.sized_by:
-                source = names[output.sized_by]
-                arguments.append(
-                    f"call.outArray({values.public(value.element)}, call.len({source}))"
-                )
-                continue
             sized = value.kind == "record" and any(
                 field.role == "size" for field in value.fields
             )

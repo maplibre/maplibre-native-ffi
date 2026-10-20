@@ -225,48 +225,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_raster_dem_source_tiles(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view* tiles,
-        nuint tile_count,
-        mln_style_tile_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_raster_dem_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view url,
-        mln_style_tile_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_raster_source_tiles(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view* tiles,
-        nuint tile_count,
-        mln_style_tile_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_raster_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view url,
-        mln_style_tile_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_add_style_layer_json(
         MlnMap map,
         mln_buffer_view layer_json,
@@ -280,27 +238,6 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_buffer_view source_id,
         mln_buffer_view source_json,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_vector_source_tiles(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view* tiles,
-        nuint tile_count,
-        mln_style_tile_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_vector_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view url,
-        mln_style_tile_source_options* options,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -707,24 +644,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_lat_lngs_for_pixels(
-        MlnMapProjection projection,
-        mln_screen_point* points,
-        nuint point_count,
-        mln_lat_lng* out_coordinates,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
-        MlnMapProjection projection,
-        mln_screen_point* points,
-        nuint point_count,
-        mln_lat_lng* out_coordinates,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_meters_per_pixel_at_latitude(
         MlnMapProjection projection,
         double latitude,
@@ -741,15 +660,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_pixels_for_lat_lngs(
-        MlnMapProjection projection,
-        mln_lat_lng* coordinates,
-        nuint coordinate_count,
-        mln_screen_point* out_points,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_release(
         MlnMapProjection projection,
         mln_diagnostic* out_diagnostic
@@ -759,23 +669,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_projection_set_camera(
         MlnMapProjection projection,
         mln_camera_options* camera,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_set_visible_coordinates(
-        MlnMapProjection projection,
-        mln_lat_lng* coordinates,
-        nuint coordinate_count,
-        mln_edge_insets padding,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_set_visible_geometry(
-        MlnMapProjection projection,
-        mln_buffer_view geometry,
-        mln_edge_insets padding,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1368,22 +1261,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_rendered_feature_query_options mln_rendered_feature_query_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_rendered_query_geometry mln_rendered_query_geometry_box(
-        mln_screen_box box
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
-        mln_screen_point* points,
-        nuint point_count
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_rendered_query_geometry mln_rendered_query_geometry_point(
-        mln_screen_point point
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_request_complete(
         MlnResourceRequest handle,
         mln_resource_response* response,
@@ -1411,12 +1288,6 @@ internal static unsafe partial class NativeMethods
         MlnResourceRequest handle,
         mln_resource_request_cancel_handler* handler,
         bool* out_cancelled,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_resource_request_wait_until_retired(
-        MlnResourceRequest handle,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1638,9 +1509,6 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_style_image_options mln_style_image_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_style_tile_source_options mln_style_tile_source_options_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_style_transition_options mln_style_transition_options_default();

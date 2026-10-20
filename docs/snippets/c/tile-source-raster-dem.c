@@ -11,21 +11,14 @@ mln_status add_hillshading(
   mln_map map, const mln_completion* source_completion,
   const mln_completion* layer_completion
 ) {
-  // #region options
-  mln_style_tile_source_options options =
-    mln_style_tile_source_options_default();
-  options.fields = MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING |
-                   MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-  options.raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM;
-  options.max_zoom = 12;
-  // #endregion options
+  // #region json
+  const char source[] =
+    "{\"type\":\"raster-dem\",\"encoding\":\"terrarium\",\"maxzoom\":12,"
+    "\"tiles\":[\"https://tiles.example.com/terrain/{z}/{x}/{y}.png\"]}";
+  // #endregion json
   // #region source
-  const mln_buffer_view tiles[] = {
-    view("https://tiles.example.com/terrain/{z}/{x}/{y}.png"),
-  };
-  const mln_status status = mln_map_add_raster_dem_source_tiles(
-    map, view("terrain"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options,
-    source_completion, NULL
+  const mln_status status = mln_map_add_style_source_json(
+    map, view("terrain"), view(source), source_completion, NULL
   );
   // #endregion source
   if (status != MLN_STATUS_OK) {

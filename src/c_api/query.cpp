@@ -28,34 +28,6 @@ auto mln_source_feature_query_options_default(void) noexcept
   };
 }
 
-auto mln_rendered_query_geometry_point(mln_screen_point point) noexcept
-  -> mln_rendered_query_geometry {
-  return mln_rendered_query_geometry{
-    .size = sizeof(mln_rendered_query_geometry),
-    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
-    .data = {.point = point}
-  };
-}
-
-auto mln_rendered_query_geometry_box(mln_screen_box box) noexcept
-  -> mln_rendered_query_geometry {
-  return mln_rendered_query_geometry{
-    .size = sizeof(mln_rendered_query_geometry),
-    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
-    .data = {.box = box}
-  };
-}
-
-auto mln_rendered_query_geometry_line_string(
-  const mln_screen_point* points, size_t point_count
-) noexcept -> mln_rendered_query_geometry {
-  return mln_rendered_query_geometry{
-    .size = sizeof(mln_rendered_query_geometry),
-    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
-    .data = {.line_string = {.points = points, .point_count = point_count}}
-  };
-}
-
 auto mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,

@@ -210,7 +210,6 @@ func installProvider(
       $0.type == .mapStyleLoaded
     } != nil)
     try request.close()
-    try request.waitUntilRetired()
     #expect(request.isClosed)
   }
 }

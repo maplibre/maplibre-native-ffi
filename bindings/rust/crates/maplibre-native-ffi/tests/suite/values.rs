@@ -220,22 +220,3 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 fn a_record_built_from_its_default_equals_the_native_default() {
     assert_eq!(MapOptions::default(), map_options_default().unwrap());
 }
-
-#[test]
-fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
-    let fixture = Fixture::new();
-    let projection = fixture.map().create_projection().unwrap();
-    let coordinates = [
-        LatLng::new(0.0, 0.0),
-        LatLng::new(10.0, 20.0),
-        LatLng::new(-12.0, -30.0),
-    ];
-    let points = projection.pixels_for_lat_lngs(&coordinates).unwrap();
-    let singles: Vec<_> = coordinates
-        .iter()
-        .map(|&value| projection.pixel_for_lat_lng(value).unwrap())
-        .collect();
-    assert_eq!(points, singles);
-    assert!(projection.pixels_for_lat_lngs(&[]).unwrap().is_empty());
-    projection.release().unwrap();
-}

@@ -317,8 +317,7 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
 /// See `mln_screen_line_string` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct ScreenLineString: Equatable, Hashable, Sendable {
-  /// Points. Null only when point_count is 0. Copied value, owned by the
-  /// caller.
+  /// Points. Null only when point_count is 0.
   public var points: [ScreenPoint]
   public static var `default`: Self {
     Self()

@@ -987,7 +987,7 @@ public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
   public static let none: StyleLayerVisibility = .init(rawValue: 1)
 }
 
-/// DEM raster encoding values used by `mln_style_tile_source_options`.
+/// DEM raster encoding values.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1234,7 +1234,7 @@ public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
   public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
 }
 
-/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+/// Tile URL coordinate scheme values.
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1248,143 +1248,6 @@ public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let xyz: StyleTileScheme = .init(rawValue: 0)
   public static let tms: StyleTileScheme = .init(rawValue: 1)
-}
-
-/// Field mask values for `mln_style_tile_source_options`.
-///
-/// See `mln_style_tile_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleTileSourceOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let minZoom: StyleTileSourceOptionField = .init(rawValue: 1)
-  public static let maxZoom: StyleTileSourceOptionField = .init(rawValue: 2)
-  public static let attribution: StyleTileSourceOptionField = .init(rawValue: 4)
-  public static let scheme: StyleTileSourceOptionField = .init(rawValue: 8)
-  public static let bounds: StyleTileSourceOptionField = .init(rawValue: 16)
-  public static let tileSize: StyleTileSourceOptionField = .init(rawValue: 32)
-  public static let vectorEncoding: StyleTileSourceOptionField =
-    .init(rawValue: 64)
-  public static let rasterEncoding: StyleTileSourceOptionField =
-    .init(rawValue: 128)
-}
-
-/// Options for vector and raster tile sources.
-///
-/// See `mln_style_tile_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleTileSourceOptions: Equatable, Hashable, Sendable {
-  public var minZoom: Double?
-  public var maxZoom: Double?
-  /// Copied text, owned by the caller.
-  public var attribution: String?
-  /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
-  public var scheme: StyleTileScheme?
-  public var bounds: LatLngBounds?
-  /// Raster tile size in pixels. Defaults to 512.
-  public var tileSize: UInt32?
-  /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
-  public var vectorEncoding: StyleVectorTileEncoding?
-  /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
-  public var rasterEncoding: StyleRasterDemEncoding?
-  public static var `default`: Self {
-    try! Self(raw: mln_style_tile_source_options_default())
-  }
-
-  public init(
-    minZoom: Double? = StyleTileSourceOptions.default.minZoom,
-    maxZoom: Double? = StyleTileSourceOptions.default.maxZoom,
-    attribution: String? = StyleTileSourceOptions.default.attribution,
-    scheme: StyleTileScheme? = StyleTileSourceOptions.default.scheme,
-    bounds: LatLngBounds? = StyleTileSourceOptions.default.bounds,
-    tileSize: UInt32? = StyleTileSourceOptions.default.tileSize,
-    vectorEncoding: StyleVectorTileEncoding? = StyleTileSourceOptions.default
-      .vectorEncoding,
-    rasterEncoding: StyleRasterDemEncoding? = StyleTileSourceOptions.default
-      .rasterEncoding
-  ) {
-    self.minZoom = minZoom
-    self.maxZoom = maxZoom
-    self.attribution = attribution
-    self.scheme = scheme
-    self.bounds = bounds
-    self.tileSize = tileSize
-    self.vectorEncoding = vectorEncoding
-    self.rasterEncoding = rasterEncoding
-  }
-
-  init(
-    raw: mln_style_tile_source_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    minZoom = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
-      .rawValue != 0 ? raw.min_zoom : nil
-    maxZoom = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
-      .rawValue != 0 ? raw.max_zoom : nil
-    attribution = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.attribution.data,
-        size: raw.attribution.size
-      ) : nil
-    scheme = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
-      .rawValue != 0 ? StyleTileScheme(rawValue: raw.scheme) : nil
-    bounds = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
-      .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
-    tileSize = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
-      .rawValue != 0 ? raw.tile_size : nil
-    vectorEncoding = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-      .rawValue != 0 ? StyleVectorTileEncoding(rawValue: raw.vector_encoding) :
-      nil
-    rasterEncoding = raw.fields & MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-      .rawValue != 0 ? StyleRasterDemEncoding(rawValue: raw.raster_encoding) :
-      nil
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_style_tile_source_options
-  {
-    var raw = mln_style_tile_source_options_default()
-    raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_style_tile_source_options>.size)
-    if let item = minZoom {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
-        .min_zoom = item
-    }
-    if let item = maxZoom {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
-        .max_zoom = item
-    }
-    if let item = attribution {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION.rawValue; raw
-        .attribution = arena.view(item)
-    }
-    if let item = scheme {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_SCHEME.rawValue; raw
-        .scheme = item.rawValue
-    }
-    if let item = bounds {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS.rawValue; raw
-        .bounds = item.nativeValue()
-    }
-    if let item = tileSize {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE.rawValue; raw
-        .tile_size = item
-    }
-    if let item = vectorEncoding {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING.rawValue; raw
-        .vector_encoding = item.rawValue
-    }
-    if let item = rasterEncoding {
-      raw.fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING.rawValue; raw
-        .raster_encoding = item.rawValue
-    }
-    return raw
-  }
 }
 
 /// Field mask values for `mln_style_transition_options`.
@@ -1463,7 +1326,7 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vector tile encoding values used by `mln_style_tile_source_options`.
+/// Vector tile encoding values.
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

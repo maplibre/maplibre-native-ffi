@@ -121,8 +121,6 @@ def receiver_arguments(plan):
 
 
 def access(plan):
-    if plan.receiver and plan.receiver_access == "issued":
-        return ", Access.ISSUED"
     if needs_read(plan):
         return ", Access.READ"
     return ""
@@ -263,23 +261,8 @@ def call_arguments(plan, values):
     return result
 
 
-def output_storage(value, values, count=None):
+def output_storage(value, values):
     """Allocate one output and decode it after the call: (allocation, decoded)."""
-    if value.kind == "array" and count is not None:
-        element = value.element
-        size = values.element_size(element)
-        align = values.element_align(element)
-        allocation = f"allocate({count}.toLong() * {size}, {align})"
-        size_field = next((f for f in element.fields if f.role == "size"), None)
-        if size_field:
-            write = values.write_scalar(
-                size_field.value,
-                values.at("item", element, size_field.name),
-                f"{size}.toUInt()",
-            )
-            allocation += f".also {{ base -> repeat({count}) {{ index -> val item = base + index.toLong() * {size}; {write} }} }}"
-        decoded = values.decode(element, f"{{out}} + index.toLong() * {size}")
-        return allocation, f"List({count}) {{ index -> {decoded} }}"
     if value.kind == "record" or (
         value.kind == "buffer" and value.buffer_form == "view"
     ):
@@ -408,9 +391,7 @@ def immediate(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, decoded = [], None
     if plan.outputs:
-        output = plan.outputs[0]
-        count = f"{parameter_name(output.sized_by)}.size" if output.sized_by else None
-        allocation, decoded = output_storage(result, values, count)
+        allocation, decoded = output_storage(result, values)
         setup.append(f"val out = {allocation}")
         arguments.append("out")
         decoded = decoded.replace("{out}", "out")
@@ -439,9 +420,7 @@ def multiple_outputs(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, copied = [], []
     for index, (field, value) in enumerate(values.multiple[result_type]):
-        output = plan.outputs[index]
-        count = f"{parameter_name(output.sized_by)}.size" if output.sized_by else None
-        allocation, decoded = output_storage(value, values, count)
+        allocation, decoded = output_storage(value, values)
         setup.append(f"val out{index} = {allocation}")
         arguments.append(f"out{index}")
         copied.append(f"{field} = " + decoded.replace("{out}", f"out{index}"))

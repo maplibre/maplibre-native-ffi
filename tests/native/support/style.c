@@ -177,11 +177,16 @@ static mln_test_feature_list finish_feature_probe(
 mln_test_feature_list mln_test_style_query_rendered(
   const mln_test_render_fixture* fixture
 ) {
-  const mln_rendered_query_geometry geometry =
-    mln_rendered_query_geometry_box((mln_screen_box){
-      .min = {.x = -4096.0, .y = -4096.0},
-      .max = {.x = 4096.0, .y = 4096.0},
-    });
+  const mln_rendered_query_geometry geometry = (mln_rendered_query_geometry){
+    .size = sizeof(mln_rendered_query_geometry),
+    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+    .data = {
+      .box = (mln_screen_box){
+        .min = {.x = -4096.0, .y = -4096.0},
+        .max = {.x = 4096.0, .y = 4096.0},
+      }
+    }
+  };
   return mln_test_style_query_rendered_with(fixture, &geometry, NULL);
 }
 

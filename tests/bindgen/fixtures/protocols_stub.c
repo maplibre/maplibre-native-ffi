@@ -4,7 +4,6 @@
  * Each probe compiles this file with the same MLN_PROTOCOL_* defines as the
  * header it generated bindings from, and links it into the probe program.
  */
-#define MLN_PROTOCOL_CALLER_SIZED_OUTPUT
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
@@ -178,32 +177,5 @@ mln_status mln_probe_ledger_get(
     .readings = &readings[0].reading,
     .reading_count = 2,
   };
-  return MLN_STATUS_OK;
-}
-
-mln_status mln_probe_batch_points(
-  const mln_probe_batch_point* points, uint32_t point_count,
-  mln_probe_batch_point* out_points, mln_diagnostic* out_diagnostic
-) {
-  if (point_count != 0 && (points == NULL || out_points == NULL)) {
-    return fail(out_diagnostic, "missing batch array");
-  }
-  for (size_t index = 0; index < point_count; ++index) {
-    out_points[index] =
-      (mln_probe_batch_point){points[index].y, points[index].x + 1};
-  }
-  return MLN_STATUS_OK;
-}
-
-mln_status mln_probe_batch_scores(
-  const mln_probe_batch_point* points, uint32_t point_count, double* out_scores,
-  mln_diagnostic* out_diagnostic
-) {
-  if (point_count != 0 && (points == NULL || out_scores == NULL)) {
-    return fail(out_diagnostic, "missing batch array");
-  }
-  for (size_t index = 0; index < point_count; ++index) {
-    out_scores[index] = points[index].x + points[index].y;
-  }
   return MLN_STATUS_OK;
 }

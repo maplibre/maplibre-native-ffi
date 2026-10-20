@@ -795,7 +795,6 @@ internal unsafe struct mln_resource_route
     public uint kinds;
     public uint flags;
     public mln_buffer_view url;
-    public uint url_stage;
 }
 
 internal unsafe struct mln_resource_transform
@@ -906,7 +905,6 @@ internal unsafe struct mln_runtime_options
     public uint size;
     public mln_buffer_view asset_path;
     public mln_buffer_view cache_path;
-    public ulong event_mask;
 }
 
 internal unsafe struct mln_screen_box
@@ -1001,20 +999,6 @@ internal unsafe struct mln_style_source_tile_info
     public double min_zoom;
     public double max_zoom;
     public uint scheme;
-}
-
-internal unsafe struct mln_style_tile_source_options
-{
-    public uint size;
-    public mln_style_tile_source_option_field fields;
-    public double min_zoom;
-    public double max_zoom;
-    public mln_buffer_view attribution;
-    public uint scheme;
-    public mln_lat_lng_bounds bounds;
-    public uint tile_size;
-    public uint vector_encoding;
-    public uint raster_encoding;
 }
 
 internal unsafe struct mln_style_transition_options
@@ -1644,12 +1628,6 @@ internal enum mln_resource_response_status : uint
     MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3,
 }
 
-internal enum mln_resource_route_url : uint
-{
-    MLN_RESOURCE_ROUTE_URL_RESOLVED = 0,
-    MLN_RESOURCE_ROUTE_URL_REQUESTED = 1,
-}
-
 internal enum mln_resource_storage_policy : uint
 {
     MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0,
@@ -1674,8 +1652,6 @@ internal enum mln_runtime_event_mask : ulong
     MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128,
     MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024,
-    MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048,
-    MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768,
@@ -1686,9 +1662,9 @@ internal enum mln_runtime_event_mask : ulong
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576,
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152,
     MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 8388608,
-    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912382,
+    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8906238,
     MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016,
-    MLN_RUNTIME_EVENT_MASK_ALL = 12582398,
+    MLN_RUNTIME_EVENT_MASK_ALL = 12576254,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -1719,8 +1695,6 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
     MLN_RUNTIME_EVENT_MAP_IDLE = 8,
     MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
-    MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11,
-    MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12,
     MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13,
     MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14,
     MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15,
@@ -1820,18 +1794,6 @@ internal enum mln_style_tile_scheme : uint
 {
     MLN_STYLE_TILE_SCHEME_XYZ = 0,
     MLN_STYLE_TILE_SCHEME_TMS = 1,
-}
-
-internal enum mln_style_tile_source_option_field : uint
-{
-    MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1,
-    MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 2,
-    MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 4,
-    MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 8,
-    MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 16,
-    MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 32,
-    MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 64,
-    MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 128,
 }
 
 internal enum mln_style_transition_option_field : uint

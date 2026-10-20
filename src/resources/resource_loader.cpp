@@ -240,9 +240,7 @@ class AbiNetworkFileSource final : public mln::FileSource {
         // A request outside the provider's routes passes through, as one the
         // provider declined does.
         if (
-          provider->matches(
-            resource_kind_to_abi(resource.kind), resource.url, resolved_url
-          )
+          provider->matches(resource_kind_to_abi(resource.kind), resolved_url)
         ) {
           auto request = request_custom_resource(
             resource, std::move(resolved_url), provider->callback(),

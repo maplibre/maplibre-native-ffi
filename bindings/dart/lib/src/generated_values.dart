@@ -819,16 +819,6 @@ final class ResourceResponseStatus extends _Enum {
   static const notModified = ResourceResponseStatus.fromRawValue(3);
 }
 
-/// The URL stage that a provider route compares.
-///
-/// See `mln_resource_route_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRouteUrl extends _Enum {
-  const ResourceRouteUrl.fromRawValue(super.rawValue);
-  static const resolved = ResourceRouteUrl.fromRawValue(0);
-  static const requested = ResourceRouteUrl.fromRawValue(1);
-}
-
 final class ResourceStoragePolicy extends _Enum {
   const ResourceStoragePolicy.fromRawValue(super.rawValue);
   static const permanent = ResourceStoragePolicy.fromRawValue(0);
@@ -859,8 +849,6 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const mapLoadingFailed = RuntimeEventMask.fromRawValue(128);
   static const mapIdle = RuntimeEventMask.fromRawValue(256);
   static const mapRenderError = RuntimeEventMask.fromRawValue(1024);
-  static const mapStillImageFinished = RuntimeEventMask.fromRawValue(2048);
-  static const mapStillImageFailed = RuntimeEventMask.fromRawValue(4096);
   static const mapRenderFrameStarted = RuntimeEventMask.fromRawValue(8192);
   static const mapRenderFrameFinished = RuntimeEventMask.fromRawValue(16384);
   static const mapRenderMapStarted = RuntimeEventMask.fromRawValue(32768);
@@ -878,13 +866,13 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const mapSourceChanged = RuntimeEventMask.fromRawValue(8388608);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventMask.fromRawValue(8912382);
+  static const allMapEvents = RuntimeEventMask.fromRawValue(8906238);
 
   /// Selects every runtime-originated event type this version defines.
   static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventMask.fromRawValue(12582398);
+  static const all = RuntimeEventMask.fromRawValue(12576254);
   @override
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
@@ -931,8 +919,6 @@ final class RuntimeEventType extends _Enum {
   static const mapLoadingFailed = RuntimeEventType.fromRawValue(7);
   static const mapIdle = RuntimeEventType.fromRawValue(8);
   static const mapRenderError = RuntimeEventType.fromRawValue(10);
-  static const mapStillImageFinished = RuntimeEventType.fromRawValue(11);
-  static const mapStillImageFailed = RuntimeEventType.fromRawValue(12);
   static const mapRenderFrameStarted = RuntimeEventType.fromRawValue(13);
   static const mapRenderFrameFinished = RuntimeEventType.fromRawValue(14);
   static const mapRenderMapStarted = RuntimeEventType.fromRawValue(15);
@@ -1058,7 +1044,7 @@ final class StyleLayerVisibility extends _Enum {
   static const none = StyleLayerVisibility.fromRawValue(1);
 }
 
-/// DEM raster encoding values used by `mln_style_tile_source_options`.
+/// DEM raster encoding values.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1118,7 +1104,7 @@ final class StyleSourceType extends _Enum {
   static const customMvtVector = StyleSourceType.fromRawValue(9);
 }
 
-/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+/// Tile URL coordinate scheme values.
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1126,26 +1112,6 @@ final class StyleTileScheme extends _Enum {
   const StyleTileScheme.fromRawValue(super.rawValue);
   static const xyz = StyleTileScheme.fromRawValue(0);
   static const tms = StyleTileScheme.fromRawValue(1);
-}
-
-/// Field mask values for `mln_style_tile_source_options`.
-///
-/// See `mln_style_tile_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleTileSourceOptionField
-    extends _Flags<StyleTileSourceOptionField> {
-  const StyleTileSourceOptionField.fromRawValue(super.rawValue);
-  static const minZoom = StyleTileSourceOptionField.fromRawValue(1);
-  static const maxZoom = StyleTileSourceOptionField.fromRawValue(2);
-  static const attribution = StyleTileSourceOptionField.fromRawValue(4);
-  static const scheme = StyleTileSourceOptionField.fromRawValue(8);
-  static const bounds = StyleTileSourceOptionField.fromRawValue(16);
-  static const tileSize = StyleTileSourceOptionField.fromRawValue(32);
-  static const vectorEncoding = StyleTileSourceOptionField.fromRawValue(64);
-  static const rasterEncoding = StyleTileSourceOptionField.fromRawValue(128);
-  @override
-  StyleTileSourceOptionField _of(int rawValue) =>
-      StyleTileSourceOptionField.fromRawValue(rawValue);
 }
 
 /// Field mask values for `mln_style_transition_options`.
@@ -1164,7 +1130,7 @@ final class StyleTransitionOptionField
       StyleTransitionOptionField.fromRawValue(rawValue);
 }
 
-/// Vector tile encoding values used by `mln_style_tile_source_options`.
+/// Vector tile encoding values.
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2209,53 +2175,6 @@ final class PremultipliedRgba8Image extends _Value {
 
   @override
   List<Object?> get _members => [width, height, stride, pixels];
-}
-
-/// Options for vector and raster tile sources.
-///
-/// See `mln_style_tile_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleTileSourceOptions extends _Value {
-  const StyleTileSourceOptions({
-    this.minZoom,
-    this.maxZoom,
-    this.attribution,
-    this.scheme,
-    this.bounds,
-    this.tileSize,
-    this.vectorEncoding,
-    this.rasterEncoding,
-  });
-  final double? minZoom;
-  final double? maxZoom;
-
-  /// Copied text, owned by the caller.
-  final String? attribution;
-
-  /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
-  final StyleTileScheme? scheme;
-  final LatLngBounds? bounds;
-
-  /// Raster tile size in pixels. Defaults to 512.
-  final int? tileSize;
-
-  /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
-  final StyleVectorTileEncoding? vectorEncoding;
-
-  /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
-  final StyleRasterDemEncoding? rasterEncoding;
-
-  @override
-  List<Object?> get _members => [
-    minZoom,
-    maxZoom,
-    attribution,
-    scheme,
-    bounds,
-    tileSize,
-    vectorEncoding,
-    rasterEncoding,
-  ];
 }
 
 /// One caller-owned Metal texture of a borrowed texture ring.
@@ -3709,8 +3628,7 @@ final class ScreenLineString extends _Value {
   ScreenLineString({required List<ScreenPoint> points})
     : points = List.unmodifiable(points);
 
-  /// Points. Null only when point_count is 0. Copied value, owned by the
-  /// caller.
+  /// Points. Null only when point_count is 0.
   final List<ScreenPoint> points;
 
   @override
@@ -3950,11 +3868,7 @@ final class ResourceRequestCancelHandler {
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
-  const RuntimeOptions({
-    this.assetPath,
-    this.cachePath,
-    this.eventMask = RuntimeEventMask.all,
-  });
+  const RuntimeOptions({this.assetPath, this.cachePath});
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
   /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
@@ -3965,12 +3879,8 @@ final class RuntimeOptions extends _Value {
   /// the caller.
   final String? cachePath;
 
-  /// Runtime-scoped event types this runtime queues, as a bitwise OR of
-  /// `mln_runtime_event_mask` values.
-  final RuntimeEventMask eventMask;
-
   @override
-  List<Object?> get _members => [assetPath, cachePath, eventMask];
+  List<Object?> get _members => [assetPath, cachePath];
 }
 
 /// Tile-pyramid offline region definition.
@@ -4596,7 +4506,6 @@ final class ResourceRoute extends _Value {
     this.kinds = ResourceKindMask.all,
     this.flags = const UrlMatchFlags.fromRawValue(0),
     required this.url,
-    this.urlStage = const ResourceRouteUrl.fromRawValue(0),
   });
 
   /// The resource kinds to match.
@@ -4608,11 +4517,8 @@ final class ResourceRoute extends _Value {
   /// The URL or glob pattern to compare.
   final String url;
 
-  /// The URL stage to compare.
-  final ResourceRouteUrl urlStage;
-
   @override
-  List<Object?> get _members => [kinds, flags, url, urlStage];
+  List<Object?> get _members => [kinds, flags, url];
 }
 
 /// Resource provider state.

@@ -282,9 +282,6 @@ pub const MLN_RESOURCE_RESPONSE_STATUS_OK: mln_resource_response_status = 0;
 pub const MLN_RESOURCE_RESPONSE_STATUS_ERROR: mln_resource_response_status = 1;
 pub const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT: mln_resource_response_status = 2;
 pub const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED: mln_resource_response_status = 3;
-pub type mln_resource_route_url = u32;
-pub const MLN_RESOURCE_ROUTE_URL_RESOLVED: mln_resource_route_url = 0;
-pub const MLN_RESOURCE_ROUTE_URL_REQUESTED: mln_resource_route_url = 1;
 pub type mln_resource_storage_policy = u32;
 pub const MLN_RESOURCE_STORAGE_POLICY_PERMANENT: mln_resource_storage_policy = 0;
 pub const MLN_RESOURCE_STORAGE_POLICY_VOLATILE: mln_resource_storage_policy = 1;
@@ -302,8 +299,6 @@ pub const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED: mln_runtime_event_mask = 
 pub const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED: mln_runtime_event_mask = 128;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_IDLE: mln_runtime_event_mask = 256;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR: mln_runtime_event_mask = 1024;
-pub const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED: mln_runtime_event_mask = 2048;
-pub const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED: mln_runtime_event_mask = 4096;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED: mln_runtime_event_mask = 8192;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED: mln_runtime_event_mask = 16384;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED: mln_runtime_event_mask = 32768;
@@ -315,9 +310,9 @@ pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_even
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_mask =
     2097152;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED: mln_runtime_event_mask = 8388608;
-pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 8912382;
+pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 8906238;
 pub const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS: mln_runtime_event_mask = 3670016;
-pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 12582398;
+pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 12576254;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
@@ -341,8 +336,6 @@ pub const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED: mln_runtime_event_type = 6;
 pub const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED: mln_runtime_event_type = 7;
 pub const MLN_RUNTIME_EVENT_MAP_IDLE: mln_runtime_event_type = 8;
 pub const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR: mln_runtime_event_type = 10;
-pub const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED: mln_runtime_event_type = 11;
-pub const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED: mln_runtime_event_type = 12;
 pub const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED: mln_runtime_event_type = 13;
 pub const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED: mln_runtime_event_type = 14;
 pub const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED: mln_runtime_event_type = 15;
@@ -413,15 +406,6 @@ pub const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR: mln_style_source_type = 9;
 pub type mln_style_tile_scheme = u32;
 pub const MLN_STYLE_TILE_SCHEME_XYZ: mln_style_tile_scheme = 0;
 pub const MLN_STYLE_TILE_SCHEME_TMS: mln_style_tile_scheme = 1;
-pub type mln_style_tile_source_option_field = u32;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM: mln_style_tile_source_option_field = 1;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM: mln_style_tile_source_option_field = 2;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION: mln_style_tile_source_option_field = 4;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_SCHEME: mln_style_tile_source_option_field = 8;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS: mln_style_tile_source_option_field = 16;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE: mln_style_tile_source_option_field = 32;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING: mln_style_tile_source_option_field = 64;
-pub const MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING: mln_style_tile_source_option_field = 128;
 pub type mln_style_transition_option_field = u32;
 pub const MLN_STYLE_TRANSITION_OPTION_DURATION: mln_style_transition_option_field = 1;
 pub const MLN_STYLE_TRANSITION_OPTION_DELAY: mln_style_transition_option_field = 2;
@@ -1194,7 +1178,6 @@ pub struct mln_resource_route {
     pub kinds: u32,
     pub flags: u32,
     pub url: mln_buffer_view,
-    pub url_stage: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1288,7 +1271,6 @@ pub struct mln_runtime_options {
     pub size: u32,
     pub asset_path: mln_buffer_view,
     pub cache_path: mln_buffer_view,
-    pub event_mask: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1383,20 +1365,6 @@ pub struct mln_style_source_tile_info {
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub scheme: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_tile_source_options {
-    pub size: u32,
-    pub fields: u32,
-    pub min_zoom: f64,
-    pub max_zoom: f64,
-    pub attribution: mln_buffer_view,
-    pub scheme: u32,
-    pub bounds: mln_lat_lng_bounds,
-    pub tile_size: u32,
-    pub vector_encoding: u32,
-    pub raster_encoding: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1819,40 +1787,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_raster_dem_source_tiles(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        tiles: *const mln_buffer_view,
-        tile_count: usize,
-        options: *const mln_style_tile_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_raster_dem_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        url: mln_buffer_view,
-        options: *const mln_style_tile_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_raster_source_tiles(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        tiles: *const mln_buffer_view,
-        tile_count: usize,
-        options: *const mln_style_tile_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_raster_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        url: mln_buffer_view,
-        options: *const mln_style_tile_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_add_style_layer_json(
         map: mln_map,
         layer_json: mln_buffer_view,
@@ -1864,23 +1798,6 @@ unsafe extern "C" {
         map: mln_map,
         source_id: mln_buffer_view,
         source_json: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_vector_source_tiles(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        tiles: *const mln_buffer_view,
-        tile_count: usize,
-        options: *const mln_style_tile_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_vector_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        url: mln_buffer_view,
-        options: *const mln_style_tile_source_options,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2187,20 +2104,6 @@ unsafe extern "C" {
         out_coordinate: *mut mln_lat_lng,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_projection_lat_lngs_for_pixels(
-        projection: mln_map_projection,
-        points: *const mln_screen_point,
-        point_count: usize,
-        out_coordinates: *mut mln_lat_lng,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_projection_lat_lngs_for_pixels_unwrapped(
-        projection: mln_map_projection,
-        points: *const mln_screen_point,
-        point_count: usize,
-        out_coordinates: *mut mln_lat_lng,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_projection_meters_per_pixel_at_latitude(
         projection: mln_map_projection,
         latitude: f64,
@@ -2213,13 +2116,6 @@ unsafe extern "C" {
         out_point: *mut mln_screen_point,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_projection_pixels_for_lat_lngs(
-        projection: mln_map_projection,
-        coordinates: *const mln_lat_lng,
-        coordinate_count: usize,
-        out_points: *mut mln_screen_point,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_projection_release(
         projection: mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
@@ -2227,19 +2123,6 @@ unsafe extern "C" {
     pub fn mln_map_projection_set_camera(
         projection: mln_map_projection,
         camera: *const mln_camera_options,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_projection_set_visible_coordinates(
-        projection: mln_map_projection,
-        coordinates: *const mln_lat_lng,
-        coordinate_count: usize,
-        padding: mln_edge_insets,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_projection_set_visible_geometry(
-        projection: mln_map_projection,
-        geometry: mln_buffer_view,
-        padding: mln_edge_insets,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_release(
@@ -2661,14 +2544,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_rendered_feature_query_options_default() -> mln_rendered_feature_query_options;
-    pub fn mln_rendered_query_geometry_box(box_: mln_screen_box) -> mln_rendered_query_geometry;
-    pub fn mln_rendered_query_geometry_line_string(
-        points: *const mln_screen_point,
-        point_count: usize,
-    ) -> mln_rendered_query_geometry;
-    pub fn mln_rendered_query_geometry_point(
-        point: mln_screen_point,
-    ) -> mln_rendered_query_geometry;
     pub fn mln_resource_request_complete(
         handle: mln_resource_request,
         response: *const mln_resource_response,
@@ -2688,10 +2563,6 @@ unsafe extern "C" {
         handle: mln_resource_request,
         handler: *const mln_resource_request_cancel_handler,
         out_cancelled: *mut bool,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_resource_request_wait_until_retired(
-        handle: mln_resource_request,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_transform_response_set_url(
@@ -2853,7 +2724,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
     pub fn mln_style_image_options_default() -> mln_style_image_options;
-    pub fn mln_style_tile_source_options_default() -> mln_style_tile_source_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;
     pub fn mln_supported_render_backend_mask() -> u32;
     pub fn mln_vulkan_borrowed_texture_descriptor_default() -> mln_vulkan_borrowed_texture_descriptor;

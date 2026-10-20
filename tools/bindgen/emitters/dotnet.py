@@ -93,7 +93,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
             value.length not in (None, "1")
             and not (value.length == "nul" and value.encoding == "utf8")
             and planned.direction != "in"
-            and not planned.sized_by
         ):
             return f"parameter {parameter.name} requires counted-buffer conversion"
     return None
@@ -384,8 +383,6 @@ def emit_operation(
     asynchronous = plan.completion is not None
     records: set[str] = {receiver} if plan.scoped_receiver else set()
     args = ["Pointer" if plan.scoped_receiver else "Handle"] if receiver else []
-    if plan.receiver_access == "issued":
-        args[0] = "state.IssuedHandle"
     parameters = []
     prologue: list[str] = []
     outputs = []
@@ -421,24 +418,7 @@ def emit_operation(
         output = outputs_by_name.get(parameter.name)
         output_plan = output.value.element if output else None
         is_output = output is not None
-        if output and output.sized_by:
-            value = output.value
-            element = value.element
-            values.supported(value)
-            scoped = True
-            count = f"{camel(output.sized_by)}.Length"
-            raw = values.raw_type(element)
-            prologue.append(f"var {name} = scope.OutputArray<{raw}>({count});")
-            if element.kind == "record" and any(
-                f.role == "size" for f in element.fields
-            ):
-                prologue.append(
-                    f"for (var index = 0; index < {count}; index++) {name}[index].{member('size')} = (uint)sizeof({raw});"
-                )
-            args.append(name)
-            outputs.append((values.public_type(value), values.copy(value, name, count)))
-            continue
-        elif (
+        if (
             asynchronous
             and is_output
             and parameter.name not in {owner.parameter for owner in plan.owned_outputs}

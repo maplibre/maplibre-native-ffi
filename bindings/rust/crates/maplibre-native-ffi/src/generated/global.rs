@@ -432,43 +432,6 @@ pub fn rendered_feature_query_options_default() -> Result<RenderedFeatureQueryOp
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns a rendered box query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_box` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn rendered_query_geometry_box(r#box: ScreenBox) -> Result<RenderedQueryGeometry> {
-    let mut call = Call::global("mln_rendered_query_geometry_box")?;
-    let r#box = call.input(&r#box)?;
-    let value = call.run(|_| unsafe { sys::mln_rendered_query_geometry_box(r#box) });
-    Ok(unsafe { from_native(value) }?)
-}
-
-/// Returns a rendered line-string query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_line_string` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn rendered_query_geometry_line_string(
-    points: &[ScreenPoint],
-) -> Result<RenderedQueryGeometry> {
-    let mut call = Call::global("mln_rendered_query_geometry_line_string")?;
-    let point_count = convert::count(points.len())?;
-    let points = call.array(points)?;
-    let value =
-        call.run(|_| unsafe { sys::mln_rendered_query_geometry_line_string(points, point_count) });
-    Ok(unsafe { from_native(value) }?)
-}
-
-/// Returns a rendered point query geometry descriptor.
-///
-/// See `mln_rendered_query_geometry_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn rendered_query_geometry_point(point: ScreenPoint) -> Result<RenderedQueryGeometry> {
-    let mut call = Call::global("mln_rendered_query_geometry_point")?;
-    let point = call.input(&point)?;
-    let value = call.run(|_| unsafe { sys::mln_rendered_query_geometry_point(point) });
-    Ok(unsafe { from_native(value) }?)
-}
-
 /// Creates a runtime.
 ///
 /// See `mln_runtime_create` in the
@@ -511,16 +474,6 @@ pub fn source_feature_query_options_default() -> Result<SourceFeatureQueryOption
 pub fn style_image_options_default() -> Result<StyleImageOptions> {
     let mut call = Call::global("mln_style_image_options_default")?;
     let value = call.run(|_| unsafe { sys::mln_style_image_options_default() });
-    Ok(unsafe { from_native(value) }?)
-}
-
-/// Returns default tile source options.
-///
-/// See `mln_style_tile_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn style_tile_source_options_default() -> Result<StyleTileSourceOptions> {
-    let mut call = Call::global("mln_style_tile_source_options_default")?;
-    let value = call.run(|_| unsafe { sys::mln_style_tile_source_options_default() });
     Ok(unsafe { from_native(value) }?)
 }
 

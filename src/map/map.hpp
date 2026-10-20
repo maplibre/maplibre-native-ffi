@@ -42,8 +42,6 @@ auto free_camera_options_default() noexcept -> mln_free_camera_options;
 auto projection_mode_default() noexcept -> mln_projection_mode;
 auto map_viewport_options_default() noexcept -> mln_map_viewport_options;
 auto map_tile_options_default() noexcept -> mln_map_tile_options;
-auto style_tile_source_options_default() noexcept
-  -> mln_style_tile_source_options;
 auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
@@ -259,10 +257,6 @@ auto start_style_operation(
     map, &deliver_style_result<Function>, std::move(work), completion
   );
 }
-enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
-auto validate_tile_source_options(
-  const mln_style_tile_source_options* options, TileSourceOptionKind kind
-) -> mln_status;
 auto validate_custom_geometry_source_options(
   const mln_custom_geometry_source_options* options
 ) -> mln_status;
@@ -355,30 +349,6 @@ auto map_set_geojson_source_data(
 ) -> mln_status;
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
-) -> mln_status;
-auto map_add_vector_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status;
-auto map_add_vector_source_tiles(
-  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
-) -> mln_status;
-auto map_add_raster_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status;
-auto map_add_raster_source_tiles(
-  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
-) -> mln_status;
-auto map_add_raster_dem_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status;
-auto map_add_raster_dem_source_tiles(
-  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_custom_geometry_source(
   MapObject& live, mln_buffer_view source_id,
@@ -533,14 +503,6 @@ auto map_projection_get_camera(
 auto map_projection_set_camera(
   mln_map_projection projection, const mln_camera_options* camera
 ) -> mln_status;
-auto map_projection_set_visible_coordinates(
-  mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding
-) -> mln_status;
-auto map_projection_set_visible_geometry(
-  mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding
-) -> mln_status;
 auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point
@@ -557,18 +519,6 @@ auto map_list_style_layers(
   MapObject& live, std::vector<StyleLayerRecord>& layers
 ) -> mln_status;
 
-auto map_projection_pixels_for_lat_lngs(
-  mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_screen_point* out_points
-) -> mln_status;
-auto map_projection_lat_lngs_for_pixels(
-  mln_map_projection projection, const mln_screen_point* points,
-  size_t point_count, mln_lat_lng* out_coordinates
-) -> mln_status;
-auto map_projection_lat_lngs_for_pixels_unwrapped(
-  mln_map_projection projection, const mln_screen_point* points,
-  size_t point_count, mln_lat_lng* out_coordinates
-) -> mln_status;
 auto map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;

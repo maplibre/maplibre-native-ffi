@@ -134,13 +134,11 @@ auto UrlPattern::matches(
 }
 
 auto RouteTable::matches(
-  std::uint32_t kind, std::string_view requested_url,
-  std::string_view resolved_url
+  std::uint32_t kind, std::string_view resolved_url
 ) const noexcept -> bool {
   if (routes.empty()) return true;
   for (const auto& route : routes) {
-    const auto requested = route.url_stage == MLN_RESOURCE_ROUTE_URL_REQUESTED;
-    if (route.pattern.matches(kind, requested ? requested_url : resolved_url)) {
+    if (route.matches(kind, resolved_url)) {
       return true;
     }
   }
@@ -161,15 +159,8 @@ auto copy_routes(
     const auto status =
       check_pattern("route", index, route.kinds, route.flags, route.url);
     if (status != MLN_STATUS_OK) return status;
-    if (
-      route.url_stage != MLN_RESOURCE_ROUTE_URL_RESOLVED &&
-      route.url_stage != MLN_RESOURCE_ROUTE_URL_REQUESTED
-    ) {
-      return reject("route", index, "has an unknown url_stage");
-    }
-    out.routes.push_back(
-      {{route.kinds, route.flags, string_view_from_view(route.url)},
-       route.url_stage}
+    out.routes.emplace_back(
+      route.kinds, route.flags, string_view_from_view(route.url)
     );
   }
   return MLN_STATUS_OK;

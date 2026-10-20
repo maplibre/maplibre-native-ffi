@@ -85,8 +85,6 @@ MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FAILED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_IDLE);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_ERROR);
-MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FINISHED);
-MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FAILED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_FRAME_STARTED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_FRAME_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_MAP_STARTED);
@@ -713,15 +711,6 @@ auto validate_runtime_options(const mln_runtime_options* options)
     mln::core::set_thread_error("mln_runtime_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  constexpr auto known_mask_bits =
-    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
-  if ((options->event_mask & ~known_mask_bits) != 0U) {
-    mln::core::set_thread_error(
-      "mln_runtime_options.event_mask contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   return MLN_STATUS_OK;
 }
 
@@ -895,14 +884,15 @@ auto create_runtime(
   result.runtime = std::make_shared<RuntimeObject>();
   auto asset_path = string_from_view(options->asset_path);
   auto cache_path = string_from_view(options->cache_path);
-  const auto event_mask = options->event_mask;
 
   auto runtime = result.runtime;
   runtime->executor.start(
     [runtime, asset_path = std::move(asset_path),
-     cache_path = std::move(cache_path), event_mask]() mutable -> void {
+     cache_path = std::move(cache_path)]() mutable -> void {
       runtime->event_state = std::make_shared<RuntimeEventState>();
-      runtime->event_state->mask.store(event_mask, std::memory_order_relaxed);
+      runtime->event_state->mask.store(
+        MLN_RUNTIME_EVENT_MASK_ALL, std::memory_order_relaxed
+      );
       runtime->asset_path = std::move(asset_path);
       runtime->cache_path = std::move(cache_path);
       runtime->offline_event_state =
