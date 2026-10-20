@@ -297,59 +297,47 @@ def select(
     model: str = DEFAULT_MODEL,
     api_key: str | None = None,
     deadline: float | None = None,
+    cache: pathlib.Path | None = None,
 ) -> dict:
-    """Return each unit's probability, the maximum across patch chunks."""
+    """Return each unit's probability, the maximum across patch chunks.
+
+    With a cache directory, an identical question reuses its earlier answer.
+    """
     config = config or load_config()
-    api_key = api_key or os.environ["TYPESAFE_API_KEY"]
+    if cache:
+        material = json.dumps([model, fingerprint(config), base, head, message])
+        path = cache / f"{hashlib.sha256(material.encode()).hexdigest()[:24]}.json"
+        if path.exists():
+            return json.loads(path.read_text()) | {"input_tokens": 0}
+
     described = describe_change(base, head, message)
     question_map = questions(config)
     fixed = {"ci": " ".join(config["overview"].split()), "change": described["change"]}
-    budget = max(STATE_BUDGET - len(json.dumps(fixed)), 8_000)
-
-    while True:
-        parts = chunk(described["patches"], budget)
-        if len(parts) > MAX_CHUNKS:
-            return {
-                "model": model,
-                "units": dict.fromkeys(question_map, 1.0),
-                "oversized": True,
-                "chunks": [],
-                "input_tokens": 0,
-            }
-        try:
-            responses = []
-            for index, text in enumerate(parts):
-                change = dict(described["change"], patch=text)
-                if len(parts) > 1:
-                    change["patch_part"] = (
-                        f"Part {index + 1} of {len(parts)} of the patch. The "
-                        "file list covers the whole change."
-                    )
-                responses.append(
-                    ask(
-                        dict(fixed, change=change),
-                        question_map,
-                        model,
-                        api_key,
-                        deadline,
-                    )
+    parts = chunk(described["patches"], STATE_BUDGET - len(json.dumps(fixed)))
+    if len(parts) > MAX_CHUNKS:
+        result = {"model": model, "units": dict.fromkeys(question_map, 1.0)}
+        result |= {"oversized": True, "input_tokens": 0}
+    else:
+        api_key = api_key or os.environ["TYPESAFE_API_KEY"]
+        responses = []
+        for index, text in enumerate(parts):
+            change = dict(described["change"], patch=text)
+            if len(parts) > 1:
+                change["patch_part"] = (
+                    f"Part {index + 1} of {len(parts)} of the patch. The file "
+                    "list covers the whole change."
                 )
-            break
-        except RuntimeError as error:
-            if "max_tokens_exceeded" not in str(error) or budget <= 8_000:
-                raise
-            budget //= 2
-
-    units = {
-        unit: max(response["answers"][unit]["noul"] for response in responses)
-        for unit in question_map
-    }
-    return {
-        "model": responses[0]["model"],
-        "units": units,
-        "chunks": [
-            {unit: r["answers"][unit]["noul"] for unit in question_map}
-            for r in responses
-        ],
-        "input_tokens": sum(r["usage"]["input_tokens"] for r in responses),
-    }
+            state = dict(fixed, change=change)
+            responses.append(ask(state, question_map, model, api_key, deadline))
+        result = {
+            "model": responses[0]["model"],
+            "units": {
+                unit: max(response["answers"][unit]["noul"] for response in responses)
+                for unit in question_map
+            },
+            "input_tokens": sum(r["usage"]["input_tokens"] for r in responses),
+        }
+    if cache:
+        cache.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result))
+    return result

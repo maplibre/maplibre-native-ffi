@@ -3,10 +3,7 @@
 # and the other workflow jobs in `jobs`; every job except hygiene belongs to
 # exactly one unit. A standalone unit is judged on its own rather than relative
 # to Linux x64. A changed file matching one of a unit's `paths` selects it
-# regardless of Jev's answer; in these patterns `*` also matches `/`. `minutes`
-# records each unit's runner time in a warm full run, for replay estimates.
-
-hygiene_minutes = 11
+# regardless of Jev's answer; in these patterns `*` also matches `/`.
 
 overview = """
 This repository is a C API for MapLibre Native, the C++ map renderer vendored as
@@ -67,7 +64,6 @@ Node toolchain put it at risk.
 """
 paths = ["docs/*"]
 jobs = ["docs"]
-minutes = 10
 
 [[units]]
 id = "linux-x64"
@@ -80,7 +76,6 @@ check for native code, bindings, examples, and build logic shared by all
 platforms.
 """
 targets = ["linux-gnu-x64-*"]
-minutes = 38
 
 [[units]]
 id = "linux-arm64"
@@ -90,7 +85,6 @@ suites as Linux x64. Catches architecture-specific problems and ARM runner
 toolchain differences. Architecture-neutral changes do not need it.
 """
 targets = ["linux-gnu-arm64-*"]
-minutes = 32
 
 [[units]]
 id = "linux-musl"
@@ -100,7 +94,6 @@ musl ABI, and runs the Rust and .NET tests against it in Alpine. Catches libc
 assumptions and musl packaging problems.
 """
 targets = ["linux-musl-*"]
-minutes = 32
 
 [[units]]
 id = "macos"
@@ -119,7 +112,6 @@ paths = [
   "examples/swift-map/*",
 ]
 targets = ["macos-*"]
-minutes = 60
 
 [[units]]
 id = "apple-mobile"
@@ -142,7 +134,6 @@ paths = [
 ]
 targets = ["ios-*", "tvos-*"]
 jobs = ["apple-xcframework"]
-minutes = 52
 
 [[units]]
 id = "windows"
@@ -160,7 +151,6 @@ paths = [
   ".github/actions/setup-windows-*",
 ]
 targets = ["windows-*"]
-minutes = 96
 
 [[units]]
 id = "android"
@@ -181,7 +171,6 @@ paths = [
 ]
 targets = ["android-*"]
 jobs = ["android-multi"]
-minutes = 96
 
 [[units]]
 id = "ohos"
@@ -192,7 +181,6 @@ emulator; the ARM64 jobs only build. Catches OpenHarmony SDK and platform proble
 """
 paths = ["cmake/platform/ohos.cmake", "mise.ohos.*"]
 targets = ["ohos-*"]
-minutes = 23
 
 [[units]]
 id = "web"
@@ -210,7 +198,6 @@ paths = [
   "mise.emscripten.*",
 ]
 targets = ["emscripten-*"]
-minutes = 16
 
 [[units]]
 id = "maven"
@@ -225,4 +212,3 @@ packaging for one platform, are covered by the target units.
 """
 paths = ["ci/kotlin_maven_modules.json"]
 jobs = ["kotlin-maven"]
-minutes = 21

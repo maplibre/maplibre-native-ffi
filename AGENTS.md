@@ -20,74 +20,30 @@ interop or the popular MapLibre Android/iOS SDKs.
 ## Workflow
 
 ```bash
-# Install/refresh system packages, shared tools, and repository hooks.
-# On Linux this uses sudo; --yes accepts package-manager prompts. Use this on
-# Linux and macOS:
+# Install system packages, shared tools, and Git hooks. On Windows, add
+# --skip files.
 mise bootstrap --yes
-# On Windows, skip mise's unused Unix-only managed-files phase.
-mise bootstrap --yes --skip files
 
-# Project-specific tools install automatically with namespaced tasks.
-
-# List available tasks across the workspace
-mise tasks --all
-
-# Configure, build, and install the host native library
-mise run build
-
-# Build and run C API tests (also runs build)
-mise run test
-
-# Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:test
-
-# Headless smoke test — no display needed
-mise run //examples/zig-readback:run
-
-# GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
-
-# Build a different native target/backend
-mise run build linux-gnu-x64-egl
-
-# Package a native artifact with CPack
-mise run package-native linux-gnu-x64-egl
-
-# Build the Android binding for one ABI/backend
-mise run //bindings/kotlin:android-build opengl x86_64
-
-# Run formatters and linters on _all_ files
-mise run fix
-
-# Run formatters and linters on targeted files; add --stage to stage the fixes
-hk fix [FILES...]
+mise tasks --all                          # List every task
+mise run build                            # Build the host native library
+mise run build linux-gnu-x64-egl          # Build another target or backend
+mise run test                             # Build and run the C API tests
+mise run //bindings/rust:test             # Run one binding's tests
+mise run //examples/zig-readback:run      # Headless smoke test
+mise run //examples/zig-map:run           # GUI app; use a timeout or background
+mise run fix                              # Format and lint every file
+hk fix [FILES...]                         # Format and lint some files
 ```
 
-Native targets and render backends are defined in `CMakePresets.json`. Gradle
-selects the Android presets when building platform packages; OpenHarmony and
-host workflows use the presets directly.
+Project-specific tools install automatically when their tasks run. To run a
+command that is not a task, use `mise exec -- ...` so that repository tools are
+on the path. Formatters and linters also run on pre-commit.
 
-Clangd uses the compilation database selected by the last
-`mise run build <preset>` invocation; select the matching preset before trusting
-target-specific diagnostics.
+Clangd uses the compilation database of the last `mise run build <preset>`, so
+build the matching preset before trusting target-specific diagnostics.
 
-The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
-configuration environment named after its presets. A build for one of those
-targets reads `ANDROID_HOME`, `EMSDK`, or `OHOS_SDK_NATIVE` from the
-environment. To use a pinned SDK instead, pass `-E` to the install and to every
-later command that builds for the target:
-
-```bash
-mise -E android install
-mise -E android run build android-arm64-vulkan
-```
-
-Formatters and linters run automatically on pre-commit; you usually don't need
-to run them manually.
-
-The environment is managed by mise. If you need to run a command that's not
-already a mise task, use `mise exec -- ...` so repository tools and dependency
-paths are available.
+Android, Emscripten, and OpenHarmony builds need an SDK; see
+[Targets that need an SDK](docs/src/content/docs/development/overview.md#targets-that-need-an-sdk).
 
 ## Pull requests
 
@@ -96,14 +52,10 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-CI selects coverage for each pull request push from the diff. Jev judges which
-coverage units the change puts at risk, and each unit judges only what changed
-since it last passed. Hygiene always runs, and main runs every unit after merge.
-See [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage).
-
-To force a unit, add its label with
-`gh pr edit <number> --add-label 'ci:<unit>'`, using a unit ID from
-`ci/select.toml`, such as `ci:windows`. `ci:full` selects every unit.
+CI runs the coverage that each push puts at risk; see
+[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage). To
+force a unit, run `gh pr edit <number> --add-label 'ci:<unit>'` with a unit ID
+from `ci/select.toml`, or `ci:full` for every unit.
 
 ## Project Invariants
 
@@ -154,8 +106,8 @@ Read these docs before changing related code:
   for binding requirements and language binding changes.
 - [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
   for example requirements.
-- [Overview](docs/src/content/docs/development/overview.md) for project layout,
-  workflow, and tooling.
+- [Overview](docs/src/content/docs/development/overview.md) for setup, common
+  tasks, tool ownership, and CI.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before

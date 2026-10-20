@@ -89,10 +89,24 @@ def decision(run: bool, reason: str, **details) -> dict:
     return {"run": run, "reason": reason, **details}
 
 
-def jev_choice(config: dict, api_key: str, deadline: float):
+def jev_choice(
+    config: dict,
+    api_key: str,
+    deadline: float | None = None,
+    *,
+    model: str = select.DEFAULT_MODEL,
+    cache: pathlib.Path | None = None,
+):
     def choose(base: str, head: str, message: str) -> dict[str, dict]:
         result = select.select(
-            base, head, message, config=config, api_key=api_key, deadline=deadline
+            base,
+            head,
+            message,
+            config=config,
+            model=model,
+            api_key=api_key,
+            deadline=deadline,
+            cache=cache,
         )
         if result.get("oversized"):
             return dict.fromkeys(
