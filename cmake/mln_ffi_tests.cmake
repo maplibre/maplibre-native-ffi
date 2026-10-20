@@ -529,6 +529,12 @@ function(mln_native_add_internal_suite out_sources)
     PRIVATE
       $<TARGET_PROPERTY:maplibre_native_c_objects,SYSTEM_INCLUDE_DIRECTORIES>)
   target_link_libraries(mln_native_internal_tests PRIVATE ${library})
+  if(WIN32)
+    target_link_libraries(mln_native_internal_tests PRIVATE dbghelp)
+    target_compile_options(mln_native_internal_tests PRIVATE /Z7)
+    target_compile_options(maplibre_native_c_objects PRIVATE /Z7)
+    target_link_options(mln_native_internal_tests PRIVATE /DEBUG:FULL)
+  endif()
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 

@@ -8,6 +8,7 @@
 #include "completion/completion.hpp"
 #include "internal/support/allocation_faults.hpp"
 #include "internal/support/sync_points.hpp"
+#include "internal/support/windows_crash.hpp"
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
@@ -219,6 +220,10 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
 void barrier_admission_failure_retires_its_sequence() {
   auto failures_with_pending = unsigned{0};
   for (auto index = std::size_t{0}; index != 12; ++index) {
+#if defined(_WIN32)
+    std::fprintf(stderr, "barrier fault index=%zu begin\n", index);
+    std::fflush(stderr);
+#endif
     const auto runtime = create_runtime();
     auto live = mln::core::lease_runtime(runtime);
     auto completion = mln_test_completion_default(0);
@@ -227,6 +232,13 @@ void barrier_admission_failure_retires_its_sequence() {
       const auto fault = AllocationFaults{index};
       status = mln_runtime_barrier(runtime, &completion.descriptor, nullptr);
     }
+#if defined(_WIN32)
+    std::fprintf(
+      stderr, "barrier fault index=%zu returned status=%d\n", index,
+      static_cast<int>(status)
+    );
+    std::fflush(stderr);
+#endif
     auto pending = std::vector<uint64_t>{};
     {
       const auto lock = std::scoped_lock{live->terminal_mutex};
@@ -516,6 +528,9 @@ void runtime_release_waits_for_worker_thread_destruction() {
 }  // namespace
 
 MLN_TEST_GROUP {
+#if defined(_WIN32)
+  mln::native_tests::install_access_violation_reporter();
+#endif
   RUN_TEST(a_blocked_worker_exit_does_not_hold_other_retirements);
   RUN_TEST(abandoned_completion_keeps_its_submission_pending_until_delivery);
   RUN_TEST(accepted_completions_keep_runtime_submissions_pending);
