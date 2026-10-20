@@ -330,7 +330,7 @@ struct RuntimeObject {
   ControlState control;
   RetirementTask disposal_task;
   std::shared_ptr<RuntimeObject> disposal_owner;
-  // Reported by the reserved finalizer after joining the worker; null for
+  // Reported by the shared finalizer after joining the worker; null for
   // dispose.
   std::shared_ptr<Completion> release_completion;
   std::atomic_bool disposal_requested = false;

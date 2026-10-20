@@ -14,7 +14,6 @@
 
 #include "c_api/autorelease_pool.hpp"
 #include "execution/retirement.hpp"
-#include "execution/retirement_wake.hpp"
 #include "execution/worker_thread.hpp"
 
 namespace mln::core {
@@ -61,15 +60,10 @@ class RuntimeExecutor {
   auto start(std::function<void()> initialize = std::function<void()>{})
     -> void;
   auto stop() noexcept -> void;
-  // Called on the worker after every lease and operation has retired. Runs
-  // completion on the reserved finalizer after joining the worker;
-  // completion may destroy this executor.
+  // Called on the worker after every lease and operation has retired. The
+  // shared finalizer runs completion, which must join the worker through
+  // stop() before destroying this executor or reporting runtime release.
   auto retire(RetirementTask& completion) noexcept -> void;
-  // Queues task without allocating. The caller must guarantee the executor has
-  // not stopped: a map holds MapObject::runtime_cleanup_lease until it is
-  // destroyed, which keeps runtime disposal from draining and stopping this
-  // executor, and runtime disposal itself queues before it calls retire().
-  auto invoke_retirement(RetirementTask& task) noexcept -> void;
 
   [[nodiscard]] auto run_loop() const noexcept -> mln::util::RunLoop* {
     return run_loop_.load();
@@ -113,21 +107,17 @@ class RuntimeExecutor {
   }
   std::mutex mutex_;
   std::condition_variable started_;
-  struct Finalization;
-  std::shared_ptr<Finalization> finalization_;
+  WorkerThread worker_;
   std::atomic<mln::util::RunLoop*> run_loop_ = nullptr;
   std::exception_ptr startup_error_;
   bool starting_ = false;
   bool stopping_ = false;
-  RetirementQueue retirement_queue_;
-  RetirementWake* retirement_wake_ = nullptr;
   ExecutorQueue work_queue_;
   ExecutorQueue notices_;
   bool work_scheduled_ = false;
   bool draining_ = false;
   auto drain_work() noexcept -> void;
   auto flush_notices() noexcept -> void;
-  auto drain_retirement() noexcept -> void;
 };
 
 }  // namespace mln::core

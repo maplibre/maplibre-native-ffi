@@ -913,7 +913,6 @@ auto destroy_render_session(
 
 auto register_render_session(std::shared_ptr<mln_render_session_object> session)
   -> mln_render_session {
-  static_cast<void>(session_teardown_lane());
   return handle_table<mln_render_session_object>().insert(std::move(session));
 }
 
@@ -4527,7 +4526,7 @@ auto detach_disposed_session(
 // every session, which makes no graphics call.
 enum class DisposalTeardown : std::uint8_t { DetachOnWorker, Quarantine };
 
-// Admission owns an embedded node and a self-reference and allocates nothing.
+// Disposal owns an embedded node and a self-reference.
 // Unless the caller asks for quarantine, an attached core-worker session with
 // no acquired frame detaches on its worker, which then hands it to the
 // teardown lane. Any other session goes to the lane directly. A driver call or
@@ -4537,7 +4536,7 @@ enum class DisposalTeardown : std::uint8_t { DetachOnWorker, Quarantine };
 auto dispose_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
   DisposalTeardown teardown
-) -> void {
+) noexcept -> void {
   auto detach_on_worker = false;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -4563,21 +4562,13 @@ auto dispose_render_session(
       auto owned = session.disposal_owner;
       auto result =
         mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
-      try {
-        static_cast<void>(abandon_render_session(
-          owned, &result,
-          session.disposal_keeps_graphics ? AbandonedGraphics::Keep
-                                          : AbandonedGraphics::DestroyWhenSafe
-        ));
-        static_cast<void>(
-          destroy_render_session(owned, DestroyCaller::Disposal)
-        );
-        session.disposal_owner.reset();
-      } catch (...) {
-        // Native destruction can allocate after admission. Preserve ownership
-        // and retry on the reserved lane when that work cannot finish.
-        session_teardown_lane().submit(session.disposal_task);
-      }
+      static_cast<void>(abandon_render_session(
+        owned, &result,
+        session.disposal_keeps_graphics ? AbandonedGraphics::Keep
+                                        : AbandonedGraphics::DestroyWhenSafe
+      ));
+      static_cast<void>(destroy_render_session(owned, DestroyCaller::Disposal));
+      session.disposal_owner.reset();
     };
     live->worker_condition.notify_all();
   }

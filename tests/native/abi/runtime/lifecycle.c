@@ -344,7 +344,6 @@ static void wait_for_other_retirement(void* user_data) {
 typedef struct retirement_result {
   atomic_int status;
   atomic_bool released;
-  retirement_wait* wait;
 } retirement_result;
 
 static void record_retirement(
@@ -352,7 +351,6 @@ static void record_retirement(
 ) {
   retirement_result* probe = user_data;
   atomic_store(&probe->status, result->status);
-  if (probe->wait != NULL) wait_for_other_retirement(probe->wait);
 }
 
 static void release_retirement(void* user_data) {
@@ -364,17 +362,13 @@ static void complete_other_retirement(void* user_data) {
   mln_test_flag_set(&((retirement_wait*)user_data)->other_released);
 }
 
-static void retirement_callbacks_can_wait(bool during_state_release) {
+static void runtime_state_release_can_wait_for_another_runtime(void) {
   retirement_wait wait = {0};
   retirement_result result = {.status = MLN_STATUS_NATIVE_ERROR};
   mln_runtime_options options = mln_runtime_options_default();
-  if (during_state_release) {
-    options.event_wake.callback = ignore_wake;
-    options.event_wake.user_data = &wait;
-    options.event_wake.release_user_data = wait_for_other_retirement;
-  } else {
-    result.wait = &wait;
-  }
+  options.event_wake.callback = ignore_wake;
+  options.event_wake.user_data = &wait;
+  options.event_wake.release_user_data = wait_for_other_retirement;
   mln_runtime waiting = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &waiting, NULL));
   const mln_runtime other = create_untracked_runtime();
@@ -399,14 +393,6 @@ static void retirement_callbacks_can_wait(bool during_state_release) {
   TEST_ASSERT_TRUE(waiting_released);
   MLN_TEST_OK(atomic_load(&result.status));
   TEST_ASSERT_TRUE(atomic_load(&wait.observed_other));
-}
-
-static void runtime_state_release_can_wait_for_another_runtime(void) {
-  retirement_callbacks_can_wait(true);
-}
-
-static void runtime_release_completion_can_wait_for_another_runtime(void) {
-  retirement_callbacks_can_wait(false);
 }
 
 typedef struct release_parent {
@@ -460,6 +446,5 @@ MLN_TEST_GROUP {
   RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);
   RUN_TEST(runtime_and_map_outlive_the_creating_host_thread);
   RUN_TEST(runtime_state_release_can_wait_for_another_runtime);
-  RUN_TEST(runtime_release_completion_can_wait_for_another_runtime);
   RUN_TEST(a_map_release_completion_can_release_its_runtime);
 }

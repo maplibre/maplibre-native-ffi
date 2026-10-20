@@ -765,9 +765,9 @@ MLN_API mln_status mln_render_session_release(
 /**
  * Consumes a session and schedules its retirement and destruction.
  *
- * Disposal admission allocates no memory and starts no thread. Queued driver
- * work completes with MLN_STATUS_TARGET_LOST. An attached core-worker session
- * with no acquired frame detaches after in-flight driver work ends. Every
+ * Queued driver work completes with MLN_STATUS_TARGET_LOST. An attached
+ * core-worker session with no acquired frame detaches after in-flight driver
+ * work ends. Every
  * other session is abandoned after in-flight driver work and scopes from
  * mln_acquired_frame_view_begin() end, following mln_render_session_abandon().
  * A session waiting for those does not delay other sessions' retirement.
@@ -778,6 +778,8 @@ MLN_API mln_status mln_render_session_release(
  * is a session whose target an earlier detach or abandon already released:
  * the rules of that call apply. Acquired frame accessors report target loss
  * after acceptance; their owners still release or dispose those frames.
+ * Teardown may allocate; allocation failure after acceptance terminates the
+ * process.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been

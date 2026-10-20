@@ -275,7 +275,6 @@ void reserved_decisions_are_cancelled_with_the_native_request() {
         return mln_resource_request_pass_through(handle, nullptr);
       });
     } else {
-      const auto faults = mln::native_tests::AllocationFaults{};
       mln_resource_request_release(handle);
     }
     request.reset();

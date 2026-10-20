@@ -18,9 +18,10 @@
 namespace mln::core {
 
 // The library's run loop allocates a list entry on each AsyncTask send.
-// Retirement reserves its registration so sending only signals existing state.
+// Provider decisions reserve their registration so sending only signals
+// existing state, including after a response copy fails to allocate.
 #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-class RetirementWake {
+class ResourceRequestWake {
   struct State : mln::platform::RunLoopWake::Runnable {
     explicit State(std::function<void()> callback)
         : callback(std::move(callback)) {}
@@ -38,7 +39,7 @@ class RetirementWake {
   };
 
  public:
-  explicit RetirementWake(std::function<void()> callback)
+  explicit ResourceRequestWake(std::function<void()> callback)
       : wake_(
           static_cast<mln::platform::RunLoopWake*>(
             mln::util::RunLoop::getLoopHandle()
@@ -47,7 +48,7 @@ class RetirementWake {
         state_(std::make_shared<State>(std::move(callback))) {
     wake_->addRunnable(state_);
   }
-  ~RetirementWake() { wake_->removeRunnable(state_); }
+  ~ResourceRequestWake() { wake_->removeRunnable(state_); }
   auto send() noexcept -> void {
     state_->queued = true;
     wake_->notify();
@@ -58,7 +59,7 @@ class RetirementWake {
   std::shared_ptr<State> state_;
 };
 #else
-using RetirementWake = mln::util::AsyncTask;
+using ResourceRequestWake = mln::util::AsyncTask;
 #endif
 
 }  // namespace mln::core

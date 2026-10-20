@@ -25,9 +25,9 @@
 #include "diagnostics/diagnostics.hpp"
 #include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
-#include "execution/retirement_wake.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "resources/resource_request_wake.hpp"
 #include "testing/sync_point.hpp"
 
 namespace mln::core {
@@ -103,7 +103,7 @@ class ProviderRequest final : public mln::AsyncRequest {
   std::shared_ptr<ResourceRequestObject> object_;
   Decision pending_ = Decision::None;
   std::unique_ptr<mln::AsyncRequest> native_;
-  std::unique_ptr<RetirementWake> wake_;
+  std::unique_ptr<ResourceRequestWake> wake_;
 };
 
 struct ResourceRequestObject {
@@ -158,7 +158,7 @@ void ProviderRequest::prepare(
   const std::shared_ptr<ResourceRequestObject>& object
 ) {
   object_ = object;
-  wake_ = std::make_unique<RetirementWake>([this] { drain(); });
+  wake_ = std::make_unique<ResourceRequestWake>([this] { drain(); });
 }
 
 void ProviderRequest::deliver_failure(Failure failure) {

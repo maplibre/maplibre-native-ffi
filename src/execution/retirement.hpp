@@ -54,14 +54,13 @@ inline auto run_retirement_task(RetirementTask* task) noexcept -> void {
   static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
 }
 
-// Reserve this lane before publishing any object that needs it. Queueing an
-// embedded node requires neither allocation nor a new thread.
+// A shared lane for cleanup that must run outside an object's worker.
 class RetirementLane {
  public:
   // The lane runs MapLibre destructors, so it takes a worker-sized stack.
   // Throws std::system_error when the thread cannot be created.
-  RetirementLane() {
-    WorkerThread([this]() noexcept {
+  explicit RetirementLane(bool autorelease_pool = true) {
+    WorkerThread([this, autorelease_pool]() noexcept {
       for (;;) {
         RetirementTask* task;
         {
@@ -69,7 +68,10 @@ class RetirementLane {
           condition_.wait(lock, [this] { return !queue_.empty(); });
           task = queue_.pop();
         }
-        run_retirement_task(task);
+        if (autorelease_pool)
+          run_retirement_task(task);
+        else
+          task->run(task);
       }
     }).detach();
   }

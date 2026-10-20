@@ -1614,11 +1614,15 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * released maps' teardown and each submission's completion and release
  * callback, has finished. The runtime's worker has exited, including its
  * thread-local cleanup, and runtime-owned callback and resource state has
- * retired. A reserved finalizer delivers the completion after joining that
+ * retired. A shared finalizer delivers the completion after joining that
  * worker. The completion must not block. Shared native services and the
  * finalizer's own return remain outside this guarantee; release completion does
  * not permit unloading the library. A host that outlives its runtimes may pass
  * a discarding completion.
+ *
+ * Teardown may allocate. Allocation failure after acceptance terminates the
+ * process. A worker that exits slowly delays other runtimes' release
+ * completions on the shared finalizer.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
@@ -1673,12 +1677,12 @@ MLN_API mln_status mln_runtime_release(
 /**
  * Consumes a runtime handle without observing its asynchronous retirement.
  *
- * Disposal of an eligible live handle allocates no memory and starts no thread.
  * Retirement releases callback state and resources on their required threads.
  * A successful call consumes the handle before returning. A failed call
  * retains caller ownership. Retirement waits for live and pending children and
  * accepted work. Existing children retain their own cleanup obligations;
- * dispose or release them to let the runtime finish retiring.
+ * dispose or release them to let the runtime finish retiring. Teardown may
+ * allocate; allocation failure after acceptance terminates the process.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

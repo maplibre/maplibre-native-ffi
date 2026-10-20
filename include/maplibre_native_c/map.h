@@ -1301,7 +1301,8 @@ MLN_API mln_status mln_map_request_still_image(
  * completion runs after previously accepted work is terminal, the native map
  * can no longer call the host, and map-owned callback state has been released.
  * Backend worker and graphics-resource cleanup may continue after completion.
- * The completion state follows the one-shot ownership contract.
+ * The completion state follows the one-shot ownership contract. Teardown may
+ * allocate; allocation failure after acceptance terminates the process.
  *
  * Returns:
  * - MLN_STATUS_OK when release was accepted and the handle was consumed.
@@ -1309,7 +1310,7 @@ MLN_API mln_status mln_map_request_still_image(
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is already closing
  *   or still has an attached render session.
- * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
+ * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_map_release(
@@ -1319,11 +1320,11 @@ MLN_API mln_status mln_map_release(
 /**
  * Consumes a map handle without observing its asynchronous retirement.
  *
- * Disposal of an eligible live handle allocates no memory and starts no thread.
  * Retirement releases callback state and resources on their required threads.
  * Attached sessions retain the map until they detach or retire. A successful
  * call consumes the handle before returning. A failed call retains caller
- * ownership.
+ * ownership. Teardown may allocate; allocation failure after acceptance
+ * terminates the process.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

@@ -259,44 +259,6 @@ struct ThreadExitSentinel {
   }
 };
 
-void a_blocked_worker_exit_does_not_hold_other_retirements() {
-  const auto runtime = create_runtime();
-  auto live = mln::core::lease_runtime(runtime);
-  const auto weak = std::weak_ptr{live};
-  struct ExitGate {
-    std::atomic_bool claimed = false;
-    mln_test_gate gate;
-  };
-  auto exit_gate = std::make_shared<ExitGate>();
-  mln_test_gate_init(&exit_gate->gate);
-  // Park before TLS cleanup: Windows serializes thread startup and TLS
-  // destruction under the loader lock.
-  mln::testing::set_sync_point_handler(
-    [](SyncPoint point, void* context) noexcept {
-      if (point != SyncPoint::RuntimeWorkerExiting) return;
-      const auto owned = *static_cast<std::shared_ptr<ExitGate>*>(context);
-      if (!owned->claimed.exchange(true)) mln_test_gate_park(&owned->gate);
-    },
-    &exit_gate
-  );
-  auto closed = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_runtime_release(runtime, &closed.descriptor, nullptr));
-  live.reset();
-  const auto exiting = mln_test_gate_wait_entered(&exit_gate->gate);
-  const auto retained = !weak.expired();
-  const auto completed_early = mln_test_completion_poll(&closed);
-  const auto other = create_runtime();
-  const auto other_status = mln_test_runtime_close(other);
-  mln_test_gate_release(&exit_gate->gate);
-  const auto status = mln_test_completion_settle(&closed);
-  mln::testing::set_sync_point_handler(nullptr, nullptr);
-  MLN_TEST_OK(status);
-  TEST_ASSERT_TRUE(exiting);
-  TEST_ASSERT_TRUE(retained);
-  TEST_ASSERT_FALSE(completed_early);
-  MLN_TEST_OK(other_status);
-}
-
 // A completion that native work abandons without resolving it still holds
 // runtime release until it delivers its cancellation, whether the command's
 // task dropped it or an operation's result delivery threw.
@@ -379,7 +341,6 @@ void runtime_release_waits_for_worker_thread_destruction() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_blocked_worker_exit_does_not_hold_other_retirements);
   RUN_TEST(an_abandoned_completion_holds_runtime_release_until_it_cancels);
   RUN_TEST(accepted_completions_hold_runtime_release);
   RUN_TEST(runtime_release_waits_for_worker_thread_destruction);

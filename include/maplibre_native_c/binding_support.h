@@ -36,8 +36,9 @@ extern "C" {
  * Creates a finalizer token for one owned native handle.
  *
  * Ownership transfers to the token on entry. Explicit release destroys the
- * token; finalization disposes the native owner. Allocation failure disposes
- * the owner and returns null.
+ * token; finalization disposes the native owner. If token allocation fails,
+ * the function disposes the owner and returns null. Allocation failure during
+ * disposal terminates the process.
  */
 MLN_BINDING("ownership=owned")
 MLN_API void* mln_binding_owner_token_create(uint64_t handle) MLN_NOEXCEPT;

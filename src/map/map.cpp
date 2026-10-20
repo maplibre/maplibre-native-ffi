@@ -3235,8 +3235,6 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_teardown_lane() -> RetirementLane&;
-
 }  // namespace
 
 // Runs on the runtime worker, after create_map_start() validated the options
@@ -3247,7 +3245,6 @@ auto create_map(
   auto runtime_state = lease_runtime(runtime);
   if (runtime_state == nullptr) return recorded_handle_fault_status();
   auto* live_runtime = runtime_state.get();
-  static_cast<void>(map_teardown_lane());
 
   const auto retain_status = retain_runtime_map(runtime);
   if (retain_status != MLN_STATUS_OK) {
@@ -3511,7 +3508,7 @@ auto map_resize(
 }
 
 namespace {
-// Pool shutdown can block, so maps reserve a separate lane before creation.
+// Pool shutdown can block, so maps shut down on a separate lane.
 auto map_teardown_lane() -> RetirementLane& {
   static auto* lane = new RetirementLane{};
   return *lane;
@@ -3554,7 +3551,9 @@ auto begin_map_retirement(RetirementTask* task) noexcept -> void {
   map.control.notify_when_drained(
     [](void* context) noexcept {
       auto& live = *static_cast<MapObject*>(context);
-      live.runtime_state->executor.invoke_retirement(live.disposal_task);
+      live.runtime_state->executor.invoke([task = &live.disposal_task] {
+        task->run(task);
+      });
     },
     &map
   );
@@ -3569,11 +3568,11 @@ auto retire_map(
   owned->disposal_task.run = begin_map_retirement;
   release_runtime_map(owned->runtime);
   auto& executor = owned->runtime_state->executor;
-  auto& task = owned->disposal_task;
+  auto* task = &owned->disposal_task;
   // Drop the caller's reference before the worker can hand ownership to the
   // pool shutdown lane.
   owned.reset();
-  executor.invoke_retirement(task);
+  executor.invoke([task] { task->run(task); });
 }
 }  // namespace
 

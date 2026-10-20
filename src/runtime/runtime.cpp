@@ -2500,7 +2500,7 @@ auto release_runtime_reachable_state(RuntimeObject* runtime) -> void {
 namespace {
 
 // Submission leases, children, and pending operations drain before this node
-// reaches the worker. The reserved finalizer joins that worker before the
+// reaches the worker. The shared finalizer joins that worker before the
 // same node finishes retirement and reports the completion.
 auto retire_runtime(
   std::shared_ptr<RuntimeObject> live, std::shared_ptr<Completion> completion
@@ -2515,6 +2515,7 @@ auto retire_runtime(
     release_runtime_reachable_state(retiring);
     task->run = [](RetirementTask* node) noexcept {
       auto* state = static_cast<RuntimeObject*>(node->context);
+      state->executor.stop();
       auto owned = std::move(state->disposal_owner);
       auto release_completion = std::move(owned->release_completion);
       auto destroy = [&owned]() -> mln_status {
@@ -2535,7 +2536,7 @@ auto retire_runtime(
   const auto drained = retiring->control.notify_when_drained(
     [](void* context) noexcept {
       auto& state = *static_cast<RuntimeObject*>(context);
-      state.executor.invoke_retirement(state.disposal_task);
+      state.executor.invoke([task = &state.disposal_task] { task->run(task); });
     },
     retiring
   );
@@ -2574,8 +2575,8 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   }
   live->disposal_requested = true;
   static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
-  // Nothing after close can fail. Accepting first keeps the completion on the
-  // finalizer even when the runtime has already drained. Close rejects
+  // Accepting first keeps the completion on the finalizer even when the
+  // runtime has already drained. Close rejects
   // every later submission, so retirement, which waits for the pending ones,
   // reports after every earlier accepted submission has finished.
   release_completion->accept();
