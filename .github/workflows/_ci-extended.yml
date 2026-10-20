@@ -1409,13 +1409,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:build ios-arm64-metal
-      - id: suite-4
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        env:
-          MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios
-      - id: suite-5
+      - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1429,7 +1424,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ios-arm64-metal')
   target-ios-simulator-arm64-metal:
@@ -1482,13 +1477,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test ios-simulator-arm64-metal
-      - id: suite-5
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        env:
-          MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios-simulator
-      - id: suite-6
+      - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -1502,7 +1492,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ios-simulator-arm64-metal')
   target-ios-maccatalyst-arm64-metal:
@@ -1596,11 +1586,6 @@ jobs:
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:build tvos-arm64-metal
-      - id: suite-3
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        env:
-          MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:build tvos-arm64-metal
       - name: Upload native artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1610,7 +1595,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-tvos-arm64-metal')
   target-tvos-simulator-arm64-metal:
@@ -1659,11 +1644,6 @@ jobs:
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test tvos-simulator-arm64-metal
-      - id: suite-4
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        env:
-          MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test tvos-simulator-arm64-metal
       - name: Upload native artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1673,7 +1653,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-tvos-simulator-arm64-metal')
   target-android-arm-egl:

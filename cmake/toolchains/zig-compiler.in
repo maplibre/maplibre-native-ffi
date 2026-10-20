@@ -8,12 +8,22 @@
 # cc-rs, through ring's build script, passes the four-component LLVM triple
 # x86_64-unknown-linux-gnu, which zig reads as os="unknown". The target below is
 # the intended one, so incoming target flags are dropped.
+#
+# Rust adds the Cortex-A53 erratum 843419 executable-link workaround even to
+# build scripts. Zig rejects it; our ARM64 CI hosts use newer cores. The Rust
+# platform archive leaves executable-link workarounds to the consumer's linker.
 args=""
 quote() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --target=*) shift; continue ;;
     --target | -target) shift 2; continue ;;
+    -Wl,--fix-cortex-a53-843419) shift; continue ;;
+    -Xlinker)
+      if [ "${2-}" = --fix-cortex-a53-843419 ]; then
+        shift 2; continue
+      fi
+      ;;
   esac
   args="$args '$(quote "$1")'"
   shift
