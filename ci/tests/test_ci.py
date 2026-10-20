@@ -114,6 +114,17 @@ class PlanTest(unittest.TestCase):
         selected = {unit for unit, run in decisions.items() if run}
         self.assertEqual(selected, {HYGIENE, "windows", "android"})
 
+    def test_pull_request_labels_do_not_select_coverage(self):
+        event = pr()
+        event["pull_request"]["labels"] = [
+            {"name": "ci:full"},
+            {"name": "ci:android"},
+        ]
+        decisions, bases = self.run_plan(event)
+        self.assertEqual(bases, [FORK])
+        selected = {unit for unit, run in decisions.items() if run}
+        self.assertEqual(selected, {HYGIENE, "windows"})
+
     def test_each_unit_judges_changes_since_it_last_passed(self):
         failed, failed_jobs = self.passing_run(["windows"], run_id=94, head=NEWER)
         failed_jobs[0]["conclusion"] = "failure"
