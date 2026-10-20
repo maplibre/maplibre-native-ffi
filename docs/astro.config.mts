@@ -32,6 +32,9 @@ export default defineConfig({
           "https://github.com/maplibre/maplibre-native-ffi/edit/main/docs/",
       },
       customCss: ["./src/styles/custom.css"],
+      components: {
+        Footer: "./src/components/Footer.astro",
+      },
       plugins: [
         starlightCopyButton(),
         starlightLlmsTxt({ exclude: ["reference/**"] }),

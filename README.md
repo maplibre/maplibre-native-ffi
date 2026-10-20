@@ -55,6 +55,16 @@ Platform support is still filling in -- see the
 [Overview](https://maplibre.org/maplibre-native-ffi/#status) page for full
 platform status.
 
+## Sponsors
+
+<a href="https://www.blacksmith.sh/">
+  <img
+    alt="CI powered by Blacksmith"
+    src="docs/src/assets/ci-powered-by-blacksmith.png"
+    width="240"
+  >
+</a>
+
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).

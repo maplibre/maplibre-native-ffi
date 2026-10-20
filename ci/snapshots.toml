@@ -85,6 +85,7 @@ shared = [
   "!.clangd",
   "!.gitignore",
   "!.github/ISSUE_TEMPLATE/**",
+  "!.github/actionlint.yaml",
   "!.github/dependabot.yml",
   "!.github/FUNDING.yml",
   "!.coderabbit.yaml",

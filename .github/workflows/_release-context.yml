@@ -30,7 +30,7 @@ permissions:
 jobs:
   resolve:
     name: Resolve release context
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 240
     permissions:
       actions: read
@@ -45,7 +45,7 @@ jobs:
       sha: ${{ steps.context.outputs.sha }}
       version: ${{ steps.context.outputs.version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0

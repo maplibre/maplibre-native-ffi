@@ -59,18 +59,18 @@ jobs:
       matrix:
         include:
           - partition: linux
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
             target: linux-gnu-x64-vulkan
             native_pattern: native-package-android-*
           - partition: apple
-            runner: macos-26
+            runner: blacksmith-6vcpu-macos-26
             target: macos-arm64-metal
             native_pattern: native-package-*
     env:
       KOTLIN_VERSION: ${{ inputs.version }}
       PACKAGE_SHA: ${{ inputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.PACKAGE_SHA }}
           persist-credentials: false
@@ -108,7 +108,7 @@ jobs:
     if: ${{ inputs.verified_run_id == '' }}
     needs:
       - stage
-    runs-on: macos-26
+    runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 60
     permissions:
       actions: read
@@ -117,7 +117,7 @@ jobs:
       KOTLIN_VERSION: ${{ inputs.version }}
       PACKAGE_SHA: ${{ inputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.PACKAGE_SHA }}
           persist-credentials: false
@@ -153,7 +153,7 @@ jobs:
       needs.verify.result == 'success')
     needs:
       - verify
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     environment:
       name: maven-central
@@ -170,7 +170,7 @@ jobs:
       KOTLIN_VERSION: ${{ inputs.version }}
       PUBLISH_SHA: ${{ inputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.PUBLISH_SHA }}
           fetch-depth: 0
