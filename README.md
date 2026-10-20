@@ -60,7 +60,7 @@ platform status.
 <a href="https://www.blacksmith.sh/">
   <img
     alt="CI powered by Blacksmith"
-    src="docs/src/assets/ci-powered-by-blacksmith.png"
+    src="https://github.com/user-attachments/assets/7d8455df-0b86-4676-9df8-fefe1f69ae4b"
     width="240"
   >
 </a>
