@@ -51,7 +51,5 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh workflow run publish-snapshots.yml
-          --repo "$GITHUB_REPOSITORY"
-          --ref main
-          -f components=docs
+          gh workflow run publish-snapshots.yml --repo "$GITHUB_REPOSITORY"
+          --ref main -f components=docs

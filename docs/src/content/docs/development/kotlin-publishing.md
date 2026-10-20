@@ -1,6 +1,8 @@
 ---
 title: Kotlin publishing
-description: Maven publication design for the Kotlin Multiplatform binding and its native runtimes.
+description:
+  Maven publication design for the Kotlin Multiplatform binding and its native
+  runtimes.
 sidebar:
   order: 6
 ---
@@ -202,11 +204,11 @@ published from, so a change confined to another binding leaves the Kotlin
 modules alone. That commit is recorded as a floating
 `snapshot-state/<component>` tag, whose annotated message carries the timestamp
 and run URL of the publish, and only components that published successfully have
-their tag moved, so a failure is retried the next day. `git ls-remote --tags
-origin 'refs/tags/snapshot-state/*'` reports where every snapshot stands.
-Dispatch the workflow manually to publish sooner: `all` applies the same gate
-immediately, and naming one component republishes it whether or not its inputs
-changed.
+their tag moved, so a failure is retried the next day.
+`git ls-remote --tags origin 'refs/tags/snapshot-state/*'` reports where every
+snapshot stands. Dispatch the workflow manually to publish sooner: `all` applies
+the same gate immediately, and naming one component republishes it whether or
+not its inputs changed.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

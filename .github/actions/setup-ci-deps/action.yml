@@ -11,15 +11,19 @@ inputs:
     required: false
     default: ""
   sccache-secret-access-key:
-    description: R2 S3 secret access key with Object Read & Write (push jobs only)
+    description:
+      R2 S3 secret access key with Object Read & Write (push jobs only)
     required: false
     default: ""
   zig:
-    description: Restore the Zig package cache and expose its key for a later save
+    description:
+      Restore the Zig package cache and expose its key for a later save
     required: false
     default: "false"
   gradle:
-    description: Set up Gradle and its user-home cache; jobs that run no Gradle build leave this off
+    description:
+      Set up Gradle and its user-home cache; jobs that run no Gradle build leave
+      this off
     required: false
     default: "true"
   save-toolchains:
@@ -32,10 +36,12 @@ inputs:
 
 outputs:
   zig-cache-key:
-    description: Key the job saves the Zig package cache under once its checks pass
+    description:
+      Key the job saves the Zig package cache under once its checks pass
     value: ${{ steps.zig-cache-key.outputs.key }}
   zig-cache-hit:
-    description: Whether the Zig package cache was restored from an exact key match
+    description:
+      Whether the Zig package cache was restored from an exact key match
     value: ${{ steps.zig-packages.outputs.cache-hit }}
 
 runs:
@@ -88,8 +94,8 @@ runs:
       id: mln-pin
       shell: bash
       run: >-
-        echo "sha=$(git ls-tree HEAD third_party/maplibre-native | awk '{print $3}')"
-        >> "$GITHUB_OUTPUT"
+        echo "sha=$(git ls-tree HEAD third_party/maplibre-native | awk '{print
+        $3}')" >> "$GITHUB_OUTPUT"
 
     - name: Cache MapLibre Native source
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -97,7 +103,9 @@ runs:
         path: |
           third_party/maplibre-native
           .git/modules/third_party/maplibre-native
-        key: mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules') }}-${{ steps.mln-pin.outputs.sha }}
+        key:
+          mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules')
+          }}-${{ steps.mln-pin.outputs.sha }}
         # Restore only caches created with the current selective-sync logic.
         # A stale submodule worktree can otherwise report the recorded commit
         # while retaining files from the previous checkout.
@@ -152,7 +160,9 @@ runs:
     # process access to hardware acceleration. Without it both emulators fall
     # back to software emulation, which no job here has the time budget for.
     - name: Enable KVM for the emulator
-      if: ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' || startsWith(inputs.target, 'android-x64-')) }}
+      if:
+        ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' ||
+        startsWith(inputs.target, 'android-x64-')) }}
       shell: bash
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -181,7 +191,9 @@ runs:
         # The workspace lock file alone: a `**` glob also matches the
         # submodule's, which an earlier step restores from another cache, so the
         # key would depend on that cache's contents.
-        key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-${{ hashFiles('Cargo.lock') }}
+        key:
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-${{
+          hashFiles('Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-
 
@@ -212,7 +224,10 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.ci-package-cache
-        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', 'bindings/dotnet/.config/dotnet-tools.json') }}
+        key:
+          ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{
+          hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props',
+          'bindings/dotnet/.config/dotnet-tools.json') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-pkg-v2-
 
@@ -228,8 +243,8 @@ runs:
       id: zig-cache-key
       shell: bash
       run: >-
-        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-${{ hashFiles('**/build.zig.zon') }}"
-        >> "$GITHUB_OUTPUT"
+        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-${{
+        hashFiles('**/build.zig.zon') }}" >> "$GITHUB_OUTPUT"
 
     # Only `p`, the downloaded package tarballs. The rest of the global cache
     # holds compilation artifacts keyed by this key's `build.zig.zon` hash, so
@@ -299,7 +314,9 @@ runs:
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
     - name: Install Windows Vulkan SDK
-      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      if:
+        ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target,
+        '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
@@ -319,7 +336,9 @@ runs:
     # directory to both ordinary processes and runtimes with isolated DLL
     # search paths, such as Python 3.8+.
     - name: Expose the Vulkan loader
-      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      if:
+        ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target,
+        '-vulkan') }}
       shell: pwsh
       run: |
         # Where the loader sits differs by runner: the x64 SDK groups it under
@@ -458,7 +477,9 @@ runs:
     # every job archive the toolchain tree for one of them to win the key, and
     # the losers pay the archive before the conflict is reported.
     - name: Save toolchains
-      if: ${{ inputs.save-toolchains == 'true' && steps.toolchains.outputs.cache-hit != 'true' }}
+      if:
+        ${{ inputs.save-toolchains == 'true' &&
+        steps.toolchains.outputs.cache-hit != 'true' }}
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         # Matches the restore above, exclusions included.

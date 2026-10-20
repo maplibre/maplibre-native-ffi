@@ -28,9 +28,9 @@ on:
         type: number
       verified_run_id:
         description: >-
-          Run that already staged and verified this commit at this version.
-          When set, staging and verification are skipped and the publish job
-          reuses that run's verified repository.
+          Run that already staged and verified this commit at this version. When
+          set, staging and verification are skipped and the publish job reuses
+          that run's verified repository.
         default: ""
         required: false
         type: string
@@ -93,11 +93,12 @@ jobs:
           pattern: native-package-linux-gnu-*-*-${{ env.PACKAGE_SHA }}
           path: build/packages/native/maven-input
       - run: >-
-          mise run //:kotlin:publish stage
-          ${{ matrix.partition }} "$KOTLIN_VERSION"
+          mise run //:kotlin:publish stage ${{ matrix.partition }}
+          "$KOTLIN_VERSION"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: kotlin-maven-staging-${{ matrix.partition }}-${{ env.PACKAGE_SHA }}
+          name:
+            kotlin-maven-staging-${{ matrix.partition }}-${{ env.PACKAGE_SHA }}
           path: build/packages/kotlin/maven-staging-${{ matrix.partition }}
           if-no-files-found: error
           retention-days: 1
@@ -133,8 +134,8 @@ jobs:
           build/packages/kotlin/maven-staging
           build/packages/kotlin/maven-staging-parts/*
       - run: >-
-          mise run //:kotlin:publish verify
-          build/packages/kotlin/maven-staging "$KOTLIN_VERSION"
+          mise run //:kotlin:publish verify build/packages/kotlin/maven-staging
+          "$KOTLIN_VERSION"
       # Main CI retains this repository for delayed or retried publishing;
       # pull requests retain it for one day.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -148,15 +149,20 @@ jobs:
     name: Kotlin Maven publish
     # A publish that reuses a verified repository runs with `verify` skipped.
     if: >-
-      !cancelled() && inputs.publish
-      && (inputs.verified_run_id != '' || needs.verify.result == 'success')
+      !cancelled() && inputs.publish && (inputs.verified_run_id != '' ||
+      needs.verify.result == 'success')
     needs:
       - verify
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment:
       name: maven-central
-      url: ${{ inputs.release && format('https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi/{0}', inputs.version) || 'https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/' }}
+      url:
+        ${{ inputs.release &&
+        format('https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi/{0}',
+        inputs.version) ||
+        'https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/'
+        }}
     permissions:
       actions: read
       contents: read
@@ -246,7 +252,9 @@ jobs:
         if: ${{ inputs.release }}
         with:
           name: kotlin-maven-central-${{ env.KOTLIN_VERSION }}
-          path: build/packages/kotlin/maplibre-native-ffi-${{ env.KOTLIN_VERSION }}.zip
+          path:
+            build/packages/kotlin/maplibre-native-ffi-${{ env.KOTLIN_VERSION
+            }}.zip
           if-no-files-found: error
           retention-days: 7
       - name: Upload and publish the Central deployment

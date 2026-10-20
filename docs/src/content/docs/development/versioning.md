@@ -1,6 +1,8 @@
 ---
 title: Versioning and release tags
-description: Calendar-based package versions, compatibility epochs, and monorepo release tags.
+description:
+  Calendar-based package versions, compatibility epochs, and monorepo release
+  tags.
 sidebar:
   order: 5
 ---

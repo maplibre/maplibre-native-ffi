@@ -217,8 +217,12 @@ description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
   'case "$usage_preset" in android-*) mise run //:android-sdk-packages --ndk-only ;; esac',
-  { task = "//:build-preset", args = ["{{usage.preset}}"] },
-  { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
+  { task = "//:build-preset", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = "//:select-clangd-preset", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.build-preset]
@@ -249,7 +253,9 @@ outputs = { auto = true }
 # lets the fixtures and examples drive the API the way a host does; presets
 # whose loader comes from the platform or an SDK install nothing.
 run = [
-  { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
+  { task = "//:check-cross-sdk", args = [
+    "{{usage.preset}}",
+  ] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
 ]
@@ -315,7 +321,9 @@ description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
 run = [
   'cpack --preset "$usage_preset"',
-  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+  { task = "//:verify-native-package", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.test]

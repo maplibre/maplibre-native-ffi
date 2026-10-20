@@ -1,6 +1,7 @@
 ---
 title: Overview
-description: Contributor setup, project scope, workflow commands, tests, and examples.
+description:
+  Contributor setup, project scope, workflow commands, tests, and examples.
 sidebar:
   order: 1
 ---
@@ -219,8 +220,8 @@ workflow objects and serializes them as YAML. `mise run ci:generate-workflow`
 updates the generated callers and reusable workflows under `.github/workflows/`;
 `--check` verifies that the checked-in files match. `ci/snapshots.toml` declares
 the input scope of each component the daily snapshot workflow publishes, so a
-component republishes only when the paths it consumes changed; `mise run
-ci:check-snapshot-scopes` keeps every tracked path classified.
+component republishes only when the paths it consumes changed;
+`mise run ci:check-snapshot-scopes` keeps every tracked path classified.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
@@ -267,10 +268,10 @@ primary failure once, including its dependent verification and required checks.
 
 ## Tests And Examples
 
-Every feature needs automated CI coverage when practical. The root `mise run
-test` command builds the native library and runs the direct C API suite through
-CTest and Unity. Language binding suites run through their binding-specific CI
-tasks.
+Every feature needs automated CI coverage when practical. The root
+`mise run test` command builds the native library and runs the direct C API
+suite through CTest and Unity. Language binding suites run through their
+binding-specific CI tasks.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.
