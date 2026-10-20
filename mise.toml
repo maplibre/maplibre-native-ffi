@@ -75,12 +75,10 @@ emsdk_version = "6.0.12"
 go_version = "1.27.2"
 doc2go_version = "0.12.2"
 gofumpt_version = "0.12.0"
-google_java_format_version = "1.37.0"
 flutter_version = "3.47.7"
 hk_version = "2.7.0"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
-ktfmt_version = "0.65"
 libxml2_version = "2.13.9"
 node_version = "26.12.0"
 ninja_version = "1.13.2"
@@ -422,7 +420,7 @@ description = "Stop the OpenHarmony emulator started by mise."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",
@@ -435,7 +433,7 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",

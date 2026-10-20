@@ -1,7 +1,5 @@
 [tools]
 "core:java" = "{{vars.java_version}}"
-"aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}"
-"aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
 [tasks.generate]
 description = "Regenerate the committed JVM FFM declarations with jextract."

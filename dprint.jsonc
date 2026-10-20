@@ -44,6 +44,12 @@
     "toml.enabled": false,
   },
   "ruff": { "indentWidth": 4, "lineLength": 88 },
+  // Google style matches `ktfmt --google-style`. lineWidth stays at ktfmt's own
+  // 100; the plugin would otherwise inherit the global 80.
+  "ktfmt": { "style": "google", "lineWidth": 100 },
+  // lineWidth stays at google-java-format's own 100; the plugin would otherwise
+  // inherit the global 80.
+  "googleJavaFormat": { "lineWidth": 100 },
   "clangFormat": {
     "BasedOnStyle": "Google",
     "ColumnLimit": 80,
@@ -62,14 +68,6 @@
   },
   "exec": {
     "commands": [
-      {
-        "command": "bash .mise/bin/dprint-ktfmt --google-style - --stdin-name={{file_path}}",
-        "exts": ["kt", "kts"],
-      },
-      {
-        "command": "bash .mise/bin/dprint-java - --assume-filename {{file_path}}",
-        "exts": ["java"],
-      },
       {
         "command": "bash .mise/bin/dprint-csharpier {{file_path}}",
         "cwd": "${configDir}",
@@ -106,5 +104,7 @@
     "https://plugins.dprint.dev/g-plane/pretty_yaml-v0.6.0.wasm",
     "https://plugins.dprint.dev/g-plane/markup_fmt-v0.27.6.wasm",
     "https://plugins.dprint.dev/g-plane/malva-v0.16.0.wasm",
+    "https://plugins.dprint.dev/sargunv/ktfmt-0.65.0.json@d355d4440dda00c0e315b5c39669f417bcfa76b64b68591fa1818f7a1f6b1005",
+    "https://plugins.dprint.dev/sargunv/google-java-format-0.1.0.json@168697c8e19478c6492a5f9117d163f6241b26010d04946f8441a9236616486e",
   ],
 }
