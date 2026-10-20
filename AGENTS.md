@@ -45,6 +45,17 @@ build the matching preset before trusting target-specific diagnostics.
 Android, Emscripten, and OpenHarmony builds need an SDK; see
 [Targets that need an SDK](docs/src/content/docs/development/overview.md#targets-that-need-an-sdk).
 
+## Issue and PR organization
+
+Label an issue or a pull request with exactly one kind (`bug`, `feature`,
+`perf`, `chore`, or `research`) and at least one `area:*` label. Add `binding:`,
+`platform:`, and `renderer:` labels when the work is specific to one, and add
+`upstream` when the cause is in MapLibre Native. A patch we carry early still
+gets `area:upstream`. Leave GitHub's native issue type unset.
+
+`ci:*` labels are CI instructions, separate from that scheme. `needs-info` and
+`do-not-merge` are workflow state, and they do not replace a kind or an area.
+
 ## Pull requests
 
 When you open a pull request, follow the repository PR template and write

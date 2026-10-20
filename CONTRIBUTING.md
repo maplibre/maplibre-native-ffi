@@ -3,6 +3,15 @@
 Discuss changes in `#maplibre` on the
 [OSM-US Slack](https://slack.openstreetmap.us/).
 
+## Issues
+
+File a
+[bug](https://github.com/maplibre/maplibre-native-ffi/issues/new?template=bug.yml)
+or a
+[feature request](https://github.com/maplibre/maplibre-native-ffi/issues/new?template=feature.yml).
+Ask a question in
+[Discussions](https://github.com/maplibre/maplibre-native-ffi/discussions/new?category=q-a).
+
 ## Before Making Changes
 
 See the

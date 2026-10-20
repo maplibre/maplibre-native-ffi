@@ -17,3 +17,20 @@ body:
       description: Why is this useful? What problem does it solve?
     validations:
       required: false
+  - type: checkboxes
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the API does this affect?
+      options:
+        - label: Runtime
+        - label: Map, camera, or style
+        - label: Render session or render target
+        - label: Query
+        - label: Layer plugins
+        - label: Language binding
+        - label: Example app
+        - label: Documentation
+        - label: Build, CI, packaging, or release
+    validations:
+      required: false
