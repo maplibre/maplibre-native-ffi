@@ -39,8 +39,8 @@ fn assert_background(pixels: &[u8]) {
         pixels.len(),
         EXTENT.width as usize * EXTENT.height as usize * 4
     );
-    for pixel in pixels.chunks_exact(4) {
-        assert_eq!(pixel, BACKGROUND_RGBA);
+    for pixel in pixels.as_chunks::<4>().0 {
+        assert_eq!(*pixel, BACKGROUND_RGBA);
     }
 }
 
