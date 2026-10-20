@@ -6,8 +6,9 @@
 #endif
 #include <cstdio>
 
-#include <dbghelp.h>
 #include <windows.h>
+// dbghelp.h needs the types that windows.h declares.
+#include <dbghelp.h>
 
 namespace mln::native_tests {
 
