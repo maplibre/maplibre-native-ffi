@@ -610,7 +610,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static FrameDemand CopyFrameDemand(mln_frame_demand value) =>
-        new((FrameDemandFlag)value.flags, value.token, value.coalescing_boundary, value.timeout_ns);
+        new((FrameDemandFlag)value.flags, value.token);
 
     internal static mln_frame_demand NativeFrameDemand(FrameDemand value)
     {
@@ -618,8 +618,6 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_frame_demand);
         native.flags = (uint)value.Flags;
         native.token = value.Token;
-        native.coalescing_boundary = value.CoalescingBoundary;
-        native.timeout_ns = value.TimeoutNs;
         return native;
     }
 
@@ -761,7 +759,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static GpuSync CopyGpuSync(mln_gpu_sync value) =>
-        new((GpuSyncKind)value.kind, value.@object, value.value);
+        new((GpuSyncKind)value.kind, value.@object);
 
     internal static mln_gpu_sync NativeGpuSync(GpuSync value)
     {
@@ -769,7 +767,6 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_gpu_sync);
         native.kind = (uint)value.Kind;
         native.@object = value.Object;
-        native.value = value.Value;
         return native;
     }
 
@@ -1803,7 +1800,7 @@ internal static unsafe class GeneratedValues
             (RenderResult)value.disposition,
             value.token,
             value.map_update_generation,
-            value.extent_generation,
+            value.generation,
             value.frame_generation,
             value.needs_repaint != 0
         );
@@ -1815,7 +1812,7 @@ internal static unsafe class GeneratedValues
         native.disposition = (uint)value.Disposition;
         native.token = value.Token;
         native.map_update_generation = value.MapUpdateGeneration;
-        native.extent_generation = value.ExtentGeneration;
+        native.generation = value.Generation;
         native.frame_generation = value.FrameGeneration;
         native.needs_repaint = (byte)(value.NeedsRepaint ? 1 : 0);
         return native;
@@ -1875,18 +1872,12 @@ internal static unsafe class GeneratedValues
     ) =>
         new(
             (RenderSessionState)value.state,
-            (RenderDriverKind)value.driver,
-            (RenderResult)value.latest_result,
             CopyLogicalExtent(value.extent),
             value.generation,
             value.map_update_generation,
             value.rendered_update_generation,
-            value.extent_generation,
             value.frame_generation,
-            value.latest_demand_token,
-            value.pending_demand_count,
             value.acquired_frame_count,
-            value.target_ready != 0,
             value.pending_changes != 0
         );
 
@@ -1897,18 +1888,12 @@ internal static unsafe class GeneratedValues
         var native = new mln_render_session_snapshot();
         native.size = (uint)sizeof(mln_render_session_snapshot);
         native.state = (uint)value.State;
-        native.driver = (uint)value.Driver;
-        native.latest_result = (uint)value.LatestResult;
         native.extent = NativeLogicalExtent(value.Extent);
         native.generation = value.Generation;
         native.map_update_generation = value.MapUpdateGeneration;
         native.rendered_update_generation = value.RenderedUpdateGeneration;
-        native.extent_generation = value.ExtentGeneration;
         native.frame_generation = value.FrameGeneration;
-        native.latest_demand_token = value.LatestDemandToken;
-        native.pending_demand_count = value.PendingDemandCount;
         native.acquired_frame_count = value.AcquiredFrameCount;
-        native.target_ready = (byte)(value.TargetReady ? 1 : 0);
         native.pending_changes = (byte)(value.PendingChanges ? 1 : 0);
         return native;
     }

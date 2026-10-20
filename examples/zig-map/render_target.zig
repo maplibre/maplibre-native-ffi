@@ -93,7 +93,7 @@ pub const Session = struct {
     /// Services every queued caller-driver item on the graphics thread.
     pub fn service(self: *Session) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        _ = maplibre.renderSessionServiceDriverWork(self.handle.?, 0, &diagnostic) catch |err| {
+        _ = maplibre.renderSessionServiceDriverWork(self.handle.?, &diagnostic) catch |err| {
             diagnostics.logError("render driver service failed", err, &diagnostic);
             return types.AppError.BackendDrawFailed;
         };
@@ -185,7 +185,7 @@ pub const Session = struct {
             while (true) {
                 // A wake that arrives after the clear ends the next wait at once.
                 events.clearDriverWait();
-                _ = maplibre.renderSessionServiceDriverWork(self.handle.?, 0, &diagnostic) catch |err| {
+                _ = maplibre.renderSessionServiceDriverWork(self.handle.?, &diagnostic) catch |err| {
                     diagnostics.logError("render driver service failed", err, &diagnostic);
                     return err;
                 };

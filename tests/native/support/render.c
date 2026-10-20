@@ -74,9 +74,9 @@ mln_status mln_test_render_fixture_service(
   if (fixture->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     return MLN_STATUS_OK;
   }
-  size_t serviced = 0;
+
   return mln_render_session_service_driver_work(
-    fixture->session, SIZE_MAX, &serviced, MLN_TEST_DIAGNOSTIC
+    fixture->session, MLN_TEST_DIAGNOSTIC
   );
 }
 

@@ -30,9 +30,9 @@ typedef void (*mln_wake_callback)(void* user_data);
  * as one that drains its queue. On the graphics thread, a callback may also
  * service its own caller-driver session inline. A service of that session that
  * already runs further up the stack returns MLN_STATUS_BUSY, and the running
- * service takes the new work. Inline service nests when max_work limits service
- * or when several sessions share a graphics thread, so a host that does either
- * schedules service to run after the callback returns.
+ * service takes the new work. When several sessions share a graphics thread,
+ * the host schedules service after the callback returns to keep calls from
+ * nesting across sessions.
  *
  * The callback may release a delivery queue that owns its wake. For every
  * other owner, the callback must not destroy the object that owns the wake.

@@ -227,13 +227,6 @@ static void mln_frame_demand_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.token, "mln_frame_demand.token"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.coalescing_boundary,
-    "mln_frame_demand.coalescing_boundary"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.timeout_ns, "mln_frame_demand.timeout_ns"
-  );
 }
 
 static void mln_free_camera_options_default_holds_its_annotated_values(void) {
@@ -270,9 +263,6 @@ static void mln_gpu_sync_default_holds_its_annotated_values(void) {
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.object, "mln_gpu_sync.object"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.value, "mln_gpu_sync.value"
   );
 }
 

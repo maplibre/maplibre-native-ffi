@@ -137,7 +137,7 @@ fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
             session.get_snapshot().unwrap().state,
             RenderSessionState::Attached
         );
-        let error = session.service_driver_work(64).unwrap_err();
+        let error = session.service_driver_work().unwrap_err();
         assert_eq!(error.kind(), ErrorKind::WrongThread);
         drop(session);
         finish.send(()).unwrap();

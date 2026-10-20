@@ -212,7 +212,8 @@ class OwnedTexture:
                 if self._stopping:
                     break
                 if self.session is not None:
-                    self.serviced += self.session.service_driver_work(0)
+                    self.session.service_driver_work()
+                    self.serviced += 1
         except BaseException as error:  # noqa: BLE001 - reported by close()
             self.service_errors.append(error)
         finally:

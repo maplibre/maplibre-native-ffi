@@ -36,11 +36,9 @@ mln_render_session_attach_options render_session_attach_options(
 }
 
 app_error render_session_service(render_session* session) {
-  size_t serviced = 0;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_render_session_service_driver_work(
-    session->handle, 0, &serviced, &diagnostic
-  );
+  const mln_status status =
+    mln_render_session_service_driver_work(session->handle, &diagnostic);
   if (status != MLN_STATUS_OK) {
     return log_failure(
       APP_ERROR_BACKEND_DRAW_FAILED, "driver service failed", status,

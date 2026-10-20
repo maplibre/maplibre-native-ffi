@@ -127,7 +127,7 @@ internal class OwnedTextureFixture(
       try {
         withTimeout(WAIT_TIMEOUT) {
           while (true) {
-            session.serviceDriverWork(0uL)
+            session.serviceDriverWork()
             if (ready()) break
             select {
               wakes.onReceive {}

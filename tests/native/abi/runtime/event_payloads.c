@@ -6,6 +6,7 @@
 
 #include <assert.h>
 
+#include "support/frames.h"
 #include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
@@ -471,8 +472,8 @@ static void camera_events_carry_their_change_mode(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Renders one frame demand and fences it with a render barrier, then drains
-// the frame results and, when `log` is set, the runtime's events.
+// Renders one frame demand, drains its result, and, when `log` is set,
+// drains the runtime's events.
 static void render_one_frame(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log
 ) {
@@ -480,14 +481,8 @@ static void render_one_frame(
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, fixture,
-    mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
-  );
-  mln_render_frame_batch frames = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture->session, &frames, NULL)
-  );
+  const mln_render_frame_batch frames =
+    mln_test_render_wait_for_results(fixture, 1);
   mln_render_frame_batch_release(frames);
   if (log != NULL) {
     log_drain(runtime, log);

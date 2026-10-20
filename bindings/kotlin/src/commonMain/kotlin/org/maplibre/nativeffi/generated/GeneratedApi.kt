@@ -145,7 +145,7 @@ public object GeneratedApi {
    */
   public fun frameDemandDefault(): FrameDemand =
     nativeCall(null, null, "mln_frame_demand_default") {
-      val out = sized(32, 8)
+      val out = sized(16, 8)
       C.mln_frame_demand_default(out)
       readFrameDemand(out)
     }
@@ -207,7 +207,7 @@ public object GeneratedApi {
    */
   public fun gpuSyncDefault(): GpuSync =
     nativeCall(null, null, "mln_gpu_sync_default") {
-      val out = sized(24, 8)
+      val out = sized(16, 8)
       C.mln_gpu_sync_default(out)
       readGpuSync(out)
     }

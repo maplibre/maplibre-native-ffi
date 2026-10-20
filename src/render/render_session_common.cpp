@@ -1,11 +1,9 @@
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <exception>
-#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -51,7 +49,6 @@
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
-#include "testing/render_clock.hpp"
 #include "testing/sync_point.hpp"
 
 namespace mln::core {
@@ -421,15 +418,6 @@ auto opengl_context_matches(
 }
 
 }  // namespace mln::core
-
-mln_render_frame_batch_object::~mln_render_frame_batch_object() {
-  results.clear();
-  const auto live = session.lock();
-  if (live == nullptr) return;
-  const auto lock = std::scoped_lock{live->control_mutex};
-  if (results.capacity() > live->recycled_frame_results.capacity())
-    results.swap(live->recycled_frame_results);
-}
 
 namespace {
 
@@ -1106,35 +1094,26 @@ auto publish_driver_work_locked(
   }
 }
 
-// Queues one work item behind whatever the driver is already waiting on. While
-// an ordered resize waits for the map, everything after it parks with it so the
-// driver keeps its accepted order.
+// Queues work in driver order.
 auto push_driver_work_locked(
   mln_render_session_object& session, RenderDriverWork work,
   DeferredWakes& wakes
 ) noexcept -> void {
-  auto& queue = session.waiting_update_work.empty()
-                  ? session.driver_work
-                  : session.waiting_update_work;
+  auto& queue = session.driver_work;
   queue.push_back(std::move(work));
-  if (session.waiting_update_work.empty())
-    publish_driver_work_locked(session, wakes);
+  publish_driver_work_locked(session, wakes);
 }
 
 auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void;
 
-// Queues a work item that runs the session's front demand, on the queue that
-// push_driver_work_locked() would choose. Queueing allocates; when it fails,
-// this queues nothing and returns false, and the demand stays in `demands`
-// until a later work item or detach gives it a result.
+// Queues work for the session's front demand. If allocation fails, the demand
+// stays queued until later driver work or detach gives it a result.
 auto queue_frame_demand_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> bool {
-  auto& queue = session.waiting_update_work.empty()
-                  ? session.driver_work
-                  : session.waiting_update_work;
+  auto& queue = session.driver_work;
   try {
     queue.push_back(
       RenderDriverWork{
@@ -1144,8 +1123,7 @@ auto queue_frame_demand_work_locked(
   } catch (...) {
     return false;
   }
-  if (session.waiting_update_work.empty())
-    publish_driver_work_locked(session, wakes);
+  publish_driver_work_locked(session, wakes);
   return true;
 }
 
@@ -1181,15 +1159,6 @@ auto finish_update_waiting_demands_locked(
   mln_render_session_object& session, mln_render_result disposition,
   DeferredWakes& wakes
 ) noexcept -> void;
-
-auto splice_work(
-  std::deque<RenderDriverWork>& from, std::deque<RenderDriverWork>& into
-) noexcept -> void {
-  while (!from.empty()) {
-    into.push_back(std::move(from.front()));
-    from.pop_front();
-  }
-}
 
 // Releases the core worker after stop_worker is set. A session destroyed from
 // one of its detach completions runs on the core worker and would join itself.
@@ -1462,7 +1431,10 @@ auto validate_render_session_attach_request(
     set_thread_error("render driver kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (options->producer_sync_kind > MLN_GPU_SYNC_WEBGPU_TOKEN) {
+  if (
+    options->producer_sync_kind != MLN_GPU_SYNC_CPU_COMPLETE &&
+    options->producer_sync_kind != MLN_GPU_SYNC_OPENGL_FENCE
+  ) {
     set_thread_error("producer synchronization kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1613,7 +1585,6 @@ auto start_attach_render_session(
             {
               const auto lock = std::scoped_lock{session->control_mutex};
               session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
-              session->target_ready = false;
               ++session->generation;
             }
             attach_operation->complete(
@@ -1664,7 +1635,6 @@ auto start_attach_render_session(
         {
           const auto lock = std::scoped_lock{session->control_mutex};
           session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
-          session->target_ready = false;
           ++session->generation;
         }
         attach_operation->complete(
@@ -1719,10 +1689,6 @@ auto notify_render_session_map_update(
     session->pending_changes = true;
   // Queueing work publishes it to the driver. A demand parked by a full ring
   // keeps no work item, and an update frees no slot, so it needs no wake here.
-  if (!session->waiting_update_work.empty()) {
-    splice_work(session->waiting_update_work, session->driver_work);
-    publish_driver_work_locked(*session, wakes);
-  }
   resume_update_waiting_demands_locked(*session, wakes);
 }
 
@@ -1907,8 +1873,8 @@ namespace {
 // Submissions from one thread size the map in the order they were made, along
 // with session resizes, which size it the same way; submissions that race from
 // two threads can post their map resizes in the other order. The map heads for
-// the extent from here, so a resize accepted earlier is superseded, and the
-// snapshot reports the applied extent until the replacement runs.
+// the extent from the last accepted command. The snapshot reports the applied
+// extent until the replacement runs.
 auto submit_retarget(
   mln_render_session session, const mln_logical_extent& extent,
   RenderDriverCallable work, std::shared_ptr<Completion> completion,
@@ -1919,8 +1885,6 @@ auto submit_retarget(
   admit.commit =
     [&map, commit = std::move(admit.commit)](mln_render_session_object& live) {
       if (commit) commit(live);
-      ++live.resize_submission;
-      live.pending_extent.reset();
       map = live.map;
     };
   const auto status = submit_driver_work(
@@ -2057,7 +2021,7 @@ auto render_session_render_update_on_driver(
   if (
     update->transformState.getSize() != mln::Size{live->width, live->height}
   ) {
-    *out_result = MLN_RENDER_RESULT_SIZE_PENDING;
+    *out_result = MLN_RENDER_RESULT_NO_UPDATE;
     return MLN_STATUS_OK;
   }
 
@@ -2589,11 +2553,11 @@ auto publish_frame_result_locked(
   mln_render_session_object& session, mln_render_frame_result result,
   DeferredWakes& wakes
 ) noexcept -> void {
-  session.latest_result = static_cast<mln_render_result>(result.disposition);
-  session.latest_demand_token = result.token;
   // A batch view's stride is the record size, so every queued record carries
   // it whichever path built it.
   result.size = sizeof(mln_render_frame_result);
+  if (result.disposition != MLN_RENDER_RESULT_RENDERED)
+    result.generation = session.generation;
   session.frame_results.push_back(result);
   if (session.frame_wake && !session.frame_wake_pending) {
     session.frame_wake_pending = true;
@@ -2605,14 +2569,14 @@ auto finish_update_waiting_demands_locked(
   mln_render_session_object& session, mln_render_result disposition,
   DeferredWakes& wakes
 ) noexcept -> void {
-  auto waiting = std::deque<PendingFrameDemand>{};
+  auto waiting = std::deque<mln_frame_demand>{};
   waiting.swap(session.update_waiting_demands);
   for (const auto& pending : waiting) {
     publish_frame_result_locked(
       session,
       mln_render_frame_result{
-        sizeof(mln_render_frame_result), disposition, pending.demand.token,
-        session.map_update_generation, session.extent_generation, 0, false
+        sizeof(mln_render_frame_result), disposition, pending.token,
+        session.map_update_generation, session.generation, 0, false
       },
       wakes
     );
@@ -2629,56 +2593,6 @@ auto publish_frame_result(
     publish_frame_result_locked(*session, result, wakes);
   }
   mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
-}
-
-// The barriers whose earlier demands have all reached a terminal result.
-// Demands run and are queued in acceptance order, so the lowest outstanding
-// epoch is the oldest one either running or at the front of a queue. A demand
-// that waits for a map update can return ahead of older ones, but every such
-// demand carries the current barrier epoch, because a barrier ends each
-// earlier wait, so the order it returns in never settles a barrier early.
-auto take_settled_barriers_locked(mln_render_session_object& session)
-  -> std::vector<std::shared_ptr<OperationObject>> {
-  auto oldest = std::numeric_limits<std::uint64_t>::max();
-  for (const auto epoch : session.active_demand_epochs) {
-    oldest = std::min(oldest, epoch);
-  }
-  if (!session.update_waiting_demands.empty()) {
-    oldest =
-      std::min(oldest, session.update_waiting_demands.front().barrier_epoch);
-  }
-  if (!session.demands.empty()) {
-    oldest = std::min(oldest, session.demands.front().barrier_epoch);
-  }
-  auto settled = std::vector<std::shared_ptr<OperationObject>>{};
-  while (!session.barriers.empty() && session.barriers.front().arrived &&
-         session.barriers.front().epoch <= oldest) {
-    settled.push_back(std::move(session.barriers.front().operation));
-    session.barriers.pop_front();
-  }
-  return settled;
-}
-
-auto settle_barriers(
-  mln_render_session_object& session,
-  std::optional<std::uint64_t> arrived_epoch = std::nullopt
-) noexcept -> void {
-  auto settled = std::vector<std::shared_ptr<OperationObject>>{};
-  {
-    const auto lock = std::scoped_lock{session.control_mutex};
-    if (arrived_epoch) {
-      for (auto& barrier : session.barriers) {
-        if (barrier.epoch == *arrived_epoch) {
-          barrier.arrived = true;
-          break;
-        }
-      }
-    }
-    settled = take_settled_barriers_locked(session);
-  }
-  for (const auto& operation : settled) {
-    operation->complete(MLN_STATUS_OK, {}, {});
-  }
 }
 
 auto fail_frame_target(
@@ -2749,7 +2663,7 @@ auto service_scheduler_work(
 // terminal disposition when the demand finishes.
 auto wait_for_map_update(
   const std::shared_ptr<mln_render_session_object>& session,
-  const PendingFrameDemand& pending, std::uint64_t evaluated,
+  const mln_frame_demand& pending, std::uint64_t evaluated,
   mln_render_frame_result& result
 ) noexcept -> bool {
   mln::testing::hit(mln::testing::SyncPoint::RenderDemandWaits);
@@ -2759,10 +2673,7 @@ auto wait_for_map_update(
     result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
     return true;
   }
-  if (
-    !session->barriers.empty() &&
-    session->barriers.back().epoch > pending.barrier_epoch
-  ) {
+  if (session->pending_frame_barriers != 0) {
     result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
     return true;
   }
@@ -2794,13 +2705,10 @@ auto fail_frame_target(
   const std::shared_ptr<mln_render_session_object>& session, mln_status status
 ) -> void {
   auto discarded = std::deque<RenderDriverWork>{};
-  auto waiting = std::deque<RenderDriverWork>{};
-  auto barriers = std::deque<PendingBarrier>{};
   {
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{session->control_mutex};
     session->pending_changes = true;
-    session->target_ready = false;
     session->rendered_update_generation = 0;
     session->rendered_target_generation = 0;
     session->rendered_transform.reset();
@@ -2816,95 +2724,59 @@ auto fail_frame_target(
         *session,
         mln_render_frame_result{
           sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-          pending.demand.token, session->map_update_generation,
-          session->extent_generation, 0, false
+          pending.token, session->map_update_generation, session->generation, 0,
+          false
         },
         wakes
       );
     }
     session->demands.clear();
     discarded.swap(session->driver_work);
-    waiting.swap(session->waiting_update_work);
-    barriers.swap(session->barriers);
     session->stop_worker = true;
     session->worker_condition.notify_all();
   }
-  for (auto* queue : {&discarded, &waiting}) {
-    for (auto& work : *queue) {
-      if (work.abandon) work.abandon();
-    }
-  }
-  for (const auto& barrier : barriers) {
-    barrier.operation->complete(
-      MLN_STATUS_TARGET_LOST, "render target lost", {}
-    );
+  for (auto& work : discarded) {
+    if (work.abandon) work.abandon();
   }
 }
 
 auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
-  auto pending = PendingFrameDemand{};
+  auto pending = mln_frame_demand{};
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     if (
-      session->demands.empty() ||
+      session->pending_frame_barriers != 0 || session->demands.empty() ||
       (session->state != MLN_RENDER_SESSION_STATE_ATTACHED &&
        session->state != MLN_RENDER_SESSION_STATE_DETACHING)
     )
       return;
     pending = session->demands.front();
     session->demands.pop_front();
-    session->active_demand_epochs.push_back(pending.barrier_epoch);
   }
   auto selected_slot = std::optional<std::size_t>{};
-  // Releases the slot and every barrier that was waiting only on this demand.
-  struct ActiveDemandGuard {
+  struct RenderingSlotGuard {
     std::shared_ptr<mln_render_session_object> session;
-    std::uint64_t epoch;
     std::optional<std::size_t>& slot;
-    ~ActiveDemandGuard() {
-      auto settled = std::vector<std::shared_ptr<OperationObject>>{};
-      {
-        const auto lock = std::scoped_lock{session->control_mutex};
-        if (slot) session->texture.slots[*slot].rendering = false;
-        auto& epochs = session->active_demand_epochs;
-        const auto found = std::find(epochs.begin(), epochs.end(), epoch);
-        if (found != epochs.end()) epochs.erase(found);
-        settled = take_settled_barriers_locked(*session);
-      }
-      for (const auto& operation : settled) {
-        operation->complete(MLN_STATUS_OK, {}, {});
-      }
+    ~RenderingSlotGuard() {
+      const auto lock = std::scoped_lock{session->control_mutex};
+      if (slot) session->texture.slots[*slot].rendering = false;
     }
-  } active_demand{session, pending.barrier_epoch, selected_slot};
+  } rendering_slot{session, selected_slot};
   // A rendering demand delivers queued worker results inside its render. Every
   // path that does not render delivers them first, so they still reach the
   // renderer and the map.
-  const auto demand = pending.demand;
+  const auto demand = pending;
   auto result = mln_render_frame_result{
     .size = sizeof(mln_render_frame_result),
     .disposition = MLN_RENDER_RESULT_NO_UPDATE,
     .token = demand.token,
     .map_update_generation = map_latest_update_generation(*session->map_object),
-    .extent_generation = session->extent_generation,
+    .generation = 0,
     .frame_generation = 0,
     .needs_repaint = false,
   };
-  const auto elapsed_ns =
-    std::chrono::duration_cast<std::chrono::nanoseconds>(
-      mln::testing::render_clock_now() - pending.accepted_at
-    )
-      .count();
-  if (
-    demand.timeout_ns > 0 && elapsed_ns >= 0 &&
-    static_cast<std::uint64_t>(elapsed_ns) >= demand.timeout_ns
-  ) {
-    result.disposition = MLN_RENDER_RESULT_DEADLINE_MISSED;
-    deliver_pending_session_work(session);
-    publish_frame_result(session, result);
-    return;
-  }
   const auto waits_for_update =
     (demand.flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
   if ((demand.flags & MLN_FRAME_DEMAND_IF_NEEDED) != 0) {
@@ -2954,13 +2826,13 @@ auto run_frame_demand(
       finish_update_waiting_demands_locked(
         *session, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes
       );
-      auto stranded = std::deque<PendingFrameDemand>{};
+      auto stranded = std::deque<mln_frame_demand>{};
       stranded.swap(session->demands);
       result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
       publish_frame_result_locked(*session, result, wakes);
       for (const auto& other : stranded) {
         auto other_result = result;
-        other_result.token = other.demand.token;
+        other_result.token = other.token;
         publish_frame_result_locked(*session, other_result, wakes);
       }
     } else if (!slots.empty()) {
@@ -2987,7 +2859,12 @@ auto run_frame_demand(
         // Parking in the section that found the ring full keeps the demand
         // visible to a release or disposal on another thread, which queues
         // the work that resumes it.
-        session->demands.push_front(pending);
+        if (session->pending_frame_barriers != 0) {
+          result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
+          publish_frame_result_locked(*session, result, wakes);
+        } else {
+          session->demands.push_front(pending);
+        }
       } else {
         selected_slot = static_cast<std::size_t>(slot - slots.begin());
         slot->available = false;
@@ -3021,7 +2898,7 @@ auto run_frame_demand(
     auto needs_repaint = false;
     auto metadata = std::any{};
     auto producer_sync =
-      mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
+      mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
     // One backend scope spans the render and the frame's metadata, so the
     // scopes they open themselves nest in it and activate the backend once.
     auto scope = std::optional<mln::gfx::BackendScope>{};
@@ -3054,6 +2931,7 @@ auto run_frame_demand(
       auto metadata_request = RenderFrameMetadata{};
       {
         const auto lock = std::scoped_lock{session->control_mutex};
+        result.generation = session->generation;
         result.frame_generation = ++session->frame_generation;
         metadata_request = RenderFrameMetadata{
           .generation = session->generation,
@@ -3088,7 +2966,6 @@ auto run_frame_demand(
       }
       scope.reset();
       const auto lock = std::scoped_lock{session->control_mutex};
-      session->target_ready = true;
       if (selected_slot) {
         auto& slot = session->texture.slots[*selected_slot];
         slot.result = result;
@@ -3119,9 +2996,7 @@ auto run_frame_demand(
     result.needs_repaint = false;
   }
   if (
-    waits_for_update &&
-    (result.disposition == MLN_RENDER_RESULT_NO_UPDATE ||
-     result.disposition == MLN_RENDER_RESULT_SIZE_PENDING) &&
+    waits_for_update && result.disposition == MLN_RENDER_RESULT_NO_UPDATE &&
     !wait_for_map_update(session, pending, rendered_map_generation, result)
   )
     return;
@@ -3163,23 +3038,12 @@ auto render_session_get_snapshot(
   *out_snapshot = mln_render_session_snapshot{
     .size = sizeof(*out_snapshot),
     .state = live->state,
-    .driver = live->capabilities.driver,
-    .latest_result = live->latest_result,
-    .extent = live->pending_extent.value_or(
-      mln_logical_extent{live->width, live->height, live->scale_factor}
-    ),
+    .extent = {live->width, live->height, live->scale_factor},
     .generation = live->generation,
     .map_update_generation = live->map_update_generation,
     .rendered_update_generation = live->rendered_update_generation,
-    .extent_generation = live->extent_generation,
     .frame_generation = live->frame_generation,
-    .latest_demand_token = live->latest_demand_token,
-    .pending_demand_count = static_cast<uint32_t>(
-      live->demands.size() + live->update_waiting_demands.size() +
-      live->active_demand_epochs.size()
-    ),
     .acquired_frame_count = live->acquired_frame_count,
-    .target_ready = live->target_ready,
     .pending_changes = live->pending_changes,
   };
   return MLN_STATUS_OK;
@@ -3222,26 +3086,21 @@ auto render_session_request_frame(
     set_thread_error("every texture slot of the render session is quarantined");
     return MLN_STATUS_INVALID_STATE;
   }
-  const auto supersedes = [&](const PendingFrameDemand& pending) {
-    return pending.barrier_epoch == live->barrier_epoch &&
-           pending.demand.flags == demand->flags &&
-           pending.demand.coalescing_boundary == demand->coalescing_boundary;
+  const auto supersedes = [&](const mln_frame_demand& pending) {
+    return (demand->flags & MLN_FRAME_DEMAND_IF_NEEDED) != 0 &&
+           pending.flags == demand->flags;
   };
-  const auto supersede = [&](const PendingFrameDemand& pending) {
+  const auto supersede = [&](const mln_frame_demand& pending) {
     publish_frame_result_locked(
       *live,
       mln_render_frame_result{
         sizeof(mln_render_frame_result), MLN_RENDER_RESULT_SUPERSEDED,
-        pending.demand.token, live->map_update_generation,
-        live->extent_generation, 0, false
+        pending.token, live->map_update_generation, live->generation, 0, false
       },
       wakes
     );
   };
-  // Every waiting demand carries the current barrier epoch, because a barrier
-  // ends each earlier wait, so any of them can be superseded. Their results
-  // can reach the host out of acceptance order, as the flag's documentation
-  // allows.
+  // Waiting demands can finish out of acceptance order.
   auto& waiting = live->update_waiting_demands;
   for (auto entry = waiting.begin(); entry != waiting.end();) {
     if (supersedes(*entry)) {
@@ -3251,33 +3110,25 @@ auto render_session_request_frame(
       ++entry;
     }
   }
-  if (!live->demands.empty() && supersedes(live->demands.back())) {
-    supersede(live->demands.back());
-    live->demands.pop_back();
-  }
-  live->demands.push_back(
-    PendingFrameDemand{
-      .demand = *demand,
-      .accepted_at = mln::testing::render_clock_now(),
-      .barrier_epoch = live->barrier_epoch,
+  for (auto entry = live->demands.begin(); entry != live->demands.end();) {
+    if (supersedes(*entry)) {
+      supersede(*entry);
+      entry = live->demands.erase(entry);
+    } else {
+      ++entry;
     }
-  );
-  // The demand and the work item that runs it are queued together, so no
-  // accepted demand can outlive the item that gives it a terminal result.
+  }
+  live->demands.push_back(*demand);
+  // The driver work evaluates the next queued demand. A superseded demand
+  // may leave an extra work item, which finds an empty queue.
   push_driver_work_locked(
     *live, RenderDriverWork{[live]() { run_frame_demand(live); }, {}}, wakes
   );
   return MLN_STATUS_OK;
 }
 
-auto render_session_service_driver_work(
-  mln_render_session session, std::size_t max_work, std::size_t* out_serviced
-) -> mln_status {
-  if (out_serviced == nullptr) {
-    set_thread_error("out_serviced must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_serviced = 0;
+auto render_session_service_driver_work(mln_render_session session)
+  -> mln_status {
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
   {
@@ -3334,7 +3185,7 @@ auto render_session_service_driver_work(
       resubmit_parked_retirements(parked);
     }
   } guard{live};
-  while (max_work == 0 || *out_serviced < max_work) {
+  while (true) {
     auto item = RenderDriverWork{};
     {
       const auto lock = std::scoped_lock{live->control_mutex};
@@ -3353,7 +3204,6 @@ auto render_session_service_driver_work(
     } catch (...) {
       if (item.abandon) item.abandon();
     }
-    ++*out_serviced;
   }
   return MLN_STATUS_OK;
 }
@@ -3378,12 +3228,10 @@ auto render_session_drain_frame_results(
   // loses no results: nothing after the swap can throw. The handle stays
   // private until this call returns it.
   const auto batch = std::make_shared<mln_render_frame_batch_object>();
-  batch->session = live;
   const auto handle =
     handle_table<mln_render_frame_batch_object>().insert(batch);
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    batch->results.swap(live->recycled_frame_results);
     batch->results.swap(live->frame_results);
     live->frame_wake_pending = false;
   }
@@ -3603,16 +3451,13 @@ auto acquired_frame_release(
   const auto copied =
     consumer_completion != nullptr
       ? *consumer_completion
-      : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
+      : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
   if (copied.size < sizeof(mln_gpu_sync)) {
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    copied.kind == MLN_GPU_SYNC_OPENGL_FENCE &&
-    (copied.object == 0 || copied.value != 0)
-  ) {
-    set_thread_error("OpenGL fence must have a nonzero object and zero value");
+  if (copied.kind == MLN_GPU_SYNC_OPENGL_FENCE && copied.object == 0) {
+    set_thread_error("OpenGL fence must have a nonzero object");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(frame);
@@ -3738,117 +3583,80 @@ auto acquired_frame_release(
 }
 
 namespace {
+struct DriverMapCompletion {
+  std::mutex mutex;
+  std::shared_ptr<OperationObject> operation;
+  unsigned remaining = 2;
+  mln_status status = MLN_STATUS_OK;
+  std::string diagnostic;
+
+  auto complete(mln_status next_status, std::string next_diagnostic) -> void {
+    {
+      const auto lock = std::scoped_lock{mutex};
+      if (next_status != MLN_STATUS_OK || status == MLN_STATUS_OK) {
+        status = next_status;
+        diagnostic = std::move(next_diagnostic);
+      }
+      if (--remaining != 0) return;
+    }
+    operation->complete(status, std::move(diagnostic), {});
+  }
+};
+
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
-  const std::shared_ptr<OperationObject>& operation, mln_logical_extent extent,
-  uint64_t ticket
+  const std::shared_ptr<DriverMapCompletion>& completion,
+  mln_logical_extent extent
 ) -> RenderDriverWork {
   return RenderDriverWork{
-    [session, operation, extent, ticket]() {
-      // A resize the host replaced before the driver reached it is done: the
-      // map is heading for the newer extent, so waiting for this one would
-      // park the whole queue behind an update that never arrives. A resize
-      // that runs once detach has started fails. Otherwise the resize waits
-      // for the map's update at the new extent. A static or tile map
-      // publishes an update only for a still image, so there the resize
-      // applies at once, and the next still image renders at the new extent.
-      // One lock covers all three decisions, so a detach or a newer
-      // submission cannot slip in between a check and the wait.
-      enum class Next { Superseded, Detaching, Wait, Apply };
-      const auto continuous = map_is_continuous(session->map);
-      auto next = Next::Apply;
+    [session, completion, extent]() {
+      auto attached = false;
       {
         const auto lock = std::scoped_lock{session->control_mutex};
-        if (ticket != session->resize_submission) {
-          next = Next::Superseded;
-        } else if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-          session->pending_extent.reset();
-          next = Next::Detaching;
-        } else if (continuous) {
-          const auto update = map_latest_update(*session->map_object);
-          // The map transaction stores its render update before publishing
-          // its snapshot. Wait for both before completing the resize; the
-          // update notice follows snapshot publication and resumes this work.
-          const auto published_extent = [&] {
-            const auto lock =
-              std::scoped_lock{session->map_object->snapshot_mutex};
-            return session->map_object->snapshot.logical_extent;
-          }();
-          if (
-            !update ||
-            update->transformState.getSize() !=
-              mln::Size{extent.width, extent.height} ||
-            published_extent.width != extent.width ||
-            published_extent.height != extent.height
-          ) {
-            session->waiting_update_work.push_back(
-              make_ordered_resize_work(session, operation, extent, ticket)
-            );
-            splice_work(session->driver_work, session->waiting_update_work);
-            next = Next::Wait;
-          }
-        }
+        attached = session->state == MLN_RENDER_SESSION_STATE_ATTACHED;
+        if (attached) invalidate_unacquired_texture_frames_locked(*session);
       }
-      if (next == Next::Wait) return;
-      if (next == Next::Superseded) {
-        operation->complete(
-          MLN_STATUS_OK, {},
-          std::any{
-            static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_SUPERSEDED)
-          }
-        );
-        return;
-      }
-      if (next == Next::Detaching) {
-        operation->complete(
+      if (!attached) {
+        completion->complete(
           MLN_STATUS_INVALID_STATE,
-          "render session detached before the resize applied", {}
+          "render session detached before the resize applied"
         );
         return;
       }
-      const auto physical_width =
-        physical_dimension(extent.width, extent.scale_factor);
-      const auto physical_height =
-        physical_dimension(extent.height, extent.scale_factor);
-      {
-        // A render that was already executing when resize was accepted may
-        // have published an old-size frame afterward. Retire it before the
-        // backend changes its ring resources. Acquired slots remain leased
-        // until their consumer releases them.
-        const auto lock = std::scoped_lock{session->control_mutex};
-        invalidate_unacquired_texture_frames_locked(*session);
+      try {
+        const auto width =
+          physical_dimension(extent.width, extent.scale_factor);
+        const auto height =
+          physical_dimension(extent.height, extent.scale_factor);
+        if (session->kind == RenderSessionKind::Surface)
+          session->surface.backend->resize(width, height);
+        else
+          session->texture.backend->resize({width, height});
+        {
+          auto wakes = DeferredWakes{};
+          const auto lock = std::scoped_lock{session->control_mutex};
+          session->width = extent.width;
+          session->height = extent.height;
+          session->physical_width = width;
+          session->physical_height = height;
+          ++session->generation;
+          session->pending_changes = true;
+          session->rendered_update_generation = 0;
+          session->rendered_target_generation = 0;
+          session->rendered_transform.reset();
+          resume_update_waiting_demands_locked(*session, wakes);
+        }
+        completion->complete(MLN_STATUS_OK, {});
+      } catch (const std::exception& exception) {
+        completion->complete(MLN_STATUS_NATIVE_ERROR, exception.what());
+      } catch (...) {
+        completion->complete(
+          MLN_STATUS_NATIVE_ERROR, "render target resize failed"
+        );
       }
-      if (session->kind == RenderSessionKind::Surface)
-        session->surface.backend->resize(physical_width, physical_height);
-      else
-        session->texture.backend->resize({physical_width, physical_height});
-      // The renderer carries its tile pyramid, atlases, and symbol placement
-      // across the resize. Its pixel ratio is baked into compiled shaders,
-      // which is why an accepted resize cannot change the scale factor.
-      {
-        auto wakes = DeferredWakes{};
-        const auto lock = std::scoped_lock{session->control_mutex};
-        session->width = extent.width;
-        session->height = extent.height;
-        session->physical_width = physical_width;
-        session->physical_height = physical_height;
-        session->scale_factor = extent.scale_factor;
-        session->pending_extent.reset();
-        ++session->extent_generation;
-        ++session->generation;
-        session->pending_changes = true;
-        session->rendered_update_generation = 0;
-        session->rendered_target_generation = 0;
-        session->rendered_transform.reset();
-        // The resize retired every unacquired frame. A resize to the extent
-        // the map already has publishes no update, so a demand that waits for
-        // one renders at the applied extent now.
-        resume_update_waiting_demands_locked(*session, wakes);
-      }
-      operation->complete(MLN_STATUS_OK, {}, {});
     },
-    [operation]() {
-      operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
+    [completion]() {
+      completion->complete(MLN_STATUS_TARGET_LOST, "target abandoned");
     }
   };
 }
@@ -3902,15 +3710,12 @@ auto render_session_resize_start(
     completion,
     [](
       const std::shared_ptr<Completion>& state, mln_status status,
-      std::string diagnostic, std::any result
+      std::string diagnostic, std::any
     ) {
-      const auto* disposition = std::any_cast<std::uint32_t>(&result);
       complete_command(
         state,
         status != MLN_STATUS_OK
           ? static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_FAILED)
-        : disposition != nullptr
-          ? *disposition
           : static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_COMMITTED),
         status, 0, std::move(diagnostic)
       );
@@ -3928,27 +3733,40 @@ auto render_session_resize_start(
       async.completion
     );
   };
-  auto ticket = uint64_t{0};
+  auto joined = std::make_shared<DriverMapCompletion>();
+  joined->operation = async.operation;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    live->pending_extent = extent;
     live->pending_changes = true;
-    ticket = ++live->resize_submission;
     // An owned-texture ring may contain several completed frames. None of its
     // old-size, unacquired entries may survive an accepted resize and outrank
     // the first new-size frame when the host next acquires the oldest result.
     invalidate_unacquired_texture_frames_locked(*live);
   }
-  const auto post = map_post_resize(live->map, extent.width, extent.height);
-  if (post != MLN_STATUS_OK) {
-    {
-      // No driver work will clear the extent the snapshot is already
-      // advertising, so the failed submission clears it here.
-      const auto lock = std::scoped_lock{live->control_mutex};
-      live->pending_extent.reset();
-    }
+  auto context = std::make_unique<std::shared_ptr<DriverMapCompletion>>(joined);
+  const auto map_completion = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback =
+      [](void* data, const mln_completion_result* result) {
+        const auto& joined =
+          *static_cast<std::shared_ptr<DriverMapCompletion>*>(data);
+        joined->complete(
+          static_cast<mln_status>(result->status),
+          string_from_view(result->diagnostic)
+        );
+      },
+    .user_data = context.get(),
+    .release_user_data =
+      [](void* data) {
+        delete static_cast<std::shared_ptr<DriverMapCompletion>*>(data);
+      },
+    .queue = MLN_HANDLE_NULL,
+  };
+  const auto post =
+    map_post_resize(live->map, extent.width, extent.height, &map_completion);
+  if (post != MLN_STATUS_OK)
     return fail_on_worker(post, thread_last_error_message());
-  }
+  static_cast<void>(context.release());
   // A detach that starts after the checks above must not find this resize
   // queued behind its own work, where it would run against released backends.
   {
@@ -3957,13 +3775,11 @@ auto render_session_resize_start(
     if (live->state == MLN_RENDER_SESSION_STATE_ATTACHED) {
       // Accepted before the driver can take the work, so the driver, rather
       // than this thread, delivers a completion that finishes early.
-      auto work =
-        make_ordered_resize_work(live, async.operation, extent, ticket);
+      auto work = make_ordered_resize_work(live, joined, extent);
       if (async.completion) async.completion->accept();
       push_driver_work_locked(*live, std::move(work), wakes);
       return MLN_STATUS_OK;
     }
-    live->pending_extent.reset();
   }
   return fail_on_worker(
     MLN_STATUS_INVALID_STATE,
@@ -3995,21 +3811,34 @@ auto render_session_barrier_start(
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
-    // Every demand that waits for a map update was accepted before the
-    // barrier, which would otherwise wait for an update that may never come.
+    ++live->pending_frame_barriers;
     finish_update_waiting_demands_locked(
       *live, MLN_RENDER_RESULT_NO_UPDATE, wakes
     );
-    const auto epoch = ++live->barrier_epoch;
-    // The barrier waits for the demands accepted before it, not merely for the
-    // queue position it takes: a demand parked by a full texture ring gives up
-    // its work item and finishes later.
-    auto work =
-      RenderDriverWork{[live, epoch]() { settle_barriers(*live, epoch); }, {}};
-    live->barriers.push_back(PendingBarrier{async.operation, epoch});
+    for (const auto& pending : live->demands) {
+      publish_frame_result_locked(
+        *live,
+        mln_render_frame_result{
+          sizeof(mln_render_frame_result), MLN_RENDER_RESULT_NO_UPDATE,
+          pending.token, live->map_update_generation, live->generation, 0, false
+        },
+        wakes
+      );
+    }
+    live->demands.clear();
+    auto work = RenderDriverWork{
+      [live, operation = async.operation]() {
+        {
+          const auto lock = std::scoped_lock{live->control_mutex};
+          --live->pending_frame_barriers;
+        }
+        operation->complete(MLN_STATUS_OK, {}, {});
+      },
+      [operation = async.operation]() {
+        operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
+      }
+    };
     async.completion->accept();
-    // The barrier itself lives in `barriers` until it settles, so abandonment
-    // completes it from there rather than through this work item.
     push_driver_work_locked(*live, std::move(work), wakes);
   }
   return MLN_STATUS_OK;
@@ -4063,17 +3892,14 @@ auto render_session_maintenance_start(
 }
 
 namespace {
-// Runs on the driver. Detaches the session and gives every demand and barrier
-// that waited on the attached target its terminal result. After disposal no
-// host drains frame results, so stranded demands are dropped unpublished and
-// barriers report the target lost, as abandon reports them.
+// Runs on the driver. Detaches the target and ends outstanding demands.
+// Disposal drops their results because the host no longer drains them.
 auto finish_detach(const std::shared_ptr<mln_render_session_object>& live)
   -> mln_status {
   static_cast<void>(map_set_render_session_publish_callback(live->map, {}));
   const auto detach_status = render_session_detach(*live);
   const auto disposed = live->disposal_requested.load();
-  auto stranded = std::deque<PendingFrameDemand>{};
-  auto lost_barriers = std::deque<PendingBarrier>{};
+  auto stranded = std::deque<mln_frame_demand>{};
   {
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -4086,26 +3912,20 @@ auto finish_detach(const std::shared_ptr<mln_render_session_object>& live)
     // terminal result.
     requeue_update_waiting_demands_locked(*live);
     stranded.swap(live->demands);
-    if (disposed) {
-      lost_barriers.swap(live->barriers);
-    } else {
+    if (!disposed) {
       for (const auto& pending : stranded) {
         publish_frame_result_locked(
           *live,
           mln_render_frame_result{
             sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-            pending.demand.token, live->map_update_generation,
-            live->extent_generation, 0, false
+            pending.token, live->map_update_generation, live->generation, 0,
+            false
           },
           wakes
         );
       }
     }
   }
-  for (const auto& barrier : lost_barriers) {
-    barrier.operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
-  }
-  settle_barriers(*live);
   return detach_status;
 }
 }  // namespace
@@ -4152,12 +3972,7 @@ auto render_session_detach_start(
       return MLN_STATUS_INVALID_STATE;
     }
     live->state = MLN_RENDER_SESSION_STATE_DETACHING;
-    ++live->barrier_epoch;
     ++live->generation;
-    // A resize that waits for the map holds back the work behind it. Detach
-    // ends that wait: the resize finds the session detaching and fails, and
-    // the work behind it runs ahead of the detach.
-    splice_work(live->waiting_update_work, live->driver_work);
     // The work is queued under the lock that marks the session detaching. An
     // abandon that takes the lock later finds the work in the queue and
     // completes it as abandoned; one queued after the abandon emptied the
@@ -4274,9 +4089,7 @@ auto abandon_render_session(
   mln_render_abandon_result* out_result, AbandonedGraphics graphics
 ) -> mln_status {
   auto discarded = std::deque<RenderDriverWork>{};
-  auto waiting = std::deque<RenderDriverWork>{};
-  auto pending_demands = std::deque<PendingFrameDemand>{};
-  auto pending_barriers = std::deque<PendingBarrier>{};
+  auto pending_demands = std::deque<mln_frame_demand>{};
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
@@ -4339,21 +4152,18 @@ auto abandon_render_session(
     live->abandonment_thread = current_owner_thread();
     live->state = MLN_RENDER_SESSION_STATE_ABANDONED;
     live->attached = false;
-    live->target_ready = false;
     live->stop_worker = true;
     discarded.swap(live->driver_work);
-    waiting.swap(live->waiting_update_work);
     requeue_update_waiting_demands_locked(*live);
     pending_demands.swap(live->demands);
-    pending_barriers.swap(live->barriers);
     if (!live->disposal_requested.load())
       for (const auto& pending : pending_demands) {
         publish_frame_result_locked(
           *live,
           mln_render_frame_result{
             sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-            pending.demand.token, live->map_update_generation,
-            live->extent_generation, 0, false
+            pending.token, live->map_update_generation, live->generation, 0,
+            false
           },
           wakes
         );
@@ -4383,10 +4193,8 @@ auto abandon_render_session(
   }
   close_wakes(frame_wake, driver_wake);
   static_cast<void>(map_set_render_session_publish_callback(live->map, {}));
-  for (auto* queue : {&discarded, &waiting}) {
-    for (auto& item : *queue) {
-      if (item.abandon) item.abandon();
-    }
+  for (auto& item : discarded) {
+    if (item.abandon) item.abandon();
   }
   // The host's GPU may still read the texture of a session-owned slot that a
   // frame holds or that a disposed frame quarantined, and nothing tells native
@@ -4402,9 +4210,6 @@ auto abandon_render_session(
                 std::ranges::any_of(live->texture.slots, [](const auto& slot) {
                   return slot.acquired || slot.quarantined;
                 });
-  }
-  for (const auto& barrier : pending_barriers) {
-    barrier.operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
   }
   live->scheduler.set_work_available_callback({});
   live->scheduler.discard();
@@ -4457,7 +4262,6 @@ auto detach_disposed_session(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
   auto discarded = std::deque<RenderDriverWork>{};
-  auto waiting = std::deque<RenderDriverWork>{};
   auto detaching = false;
   {
     const auto lock = std::scoped_lock{session->control_mutex};
@@ -4470,12 +4274,10 @@ auto detach_disposed_session(
                 session->active_views == 0;
     if (detaching) {
       session->state = MLN_RENDER_SESSION_STATE_DETACHING;
-      ++session->barrier_epoch;
       ++session->generation;
       session->driver_call_in_flight = true;
       session->driver_call_thread = current_owner_thread();
       discarded.swap(session->driver_work);
-      waiting.swap(session->waiting_update_work);
     }
   }
   auto status = MLN_STATUS_NATIVE_ERROR;
@@ -4483,7 +4285,6 @@ auto detach_disposed_session(
     // Queued work completes as abandoned before the detach, so a frame release
     // among it still reaches the backend that holds its slot.
     abandon_driver_work(discarded);
-    abandon_driver_work(waiting);
     try {
       auto detach = [&]() -> mln_status { return finish_detach(session); };
       status = mln::c_api::with_autorelease_pool(detach);
@@ -4499,14 +4300,12 @@ auto detach_disposed_session(
       // Work the detach itself queued, such as a demand resumed by a frame
       // release, targets nothing now.
       discarded.swap(session->driver_work);
-      waiting.swap(session->waiting_update_work);
     }
     session->views_invalidated = true;
     session->stop_worker = true;
     session->worker_condition.notify_all();
   }
   abandon_driver_work(discarded);
-  abandon_driver_work(waiting);
   if (status == MLN_STATUS_OK)
     mln::testing::hit(mln::testing::SyncPoint::RenderDisposalDetached);
   session_teardown_lane().submit(session->disposal_task);

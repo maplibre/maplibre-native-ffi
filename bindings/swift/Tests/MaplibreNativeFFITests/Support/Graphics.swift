@@ -158,12 +158,13 @@ extension RenderSessionHandle {
   ) async throws -> RenderFrameResult? {
     var pending: UInt64?
     var rendered: RenderFrameResult?
+    var token: UInt64 = 0
     try await awaitCondition(
       "a rendered frame",
       sourceLocation: sourceLocation
     ) {
       if pending == nil {
-        let token = try getSnapshot().latestDemandToken + 1
+        token += 1
         try requestFrame(demand: FrameDemand(flags: [], token: token))
         pending = token
       }
@@ -266,7 +267,7 @@ final class RenderThread: @unchecked Sendable {
         task()
       }
       if let target {
-        _ = try? target.serviceDriverWork(maxWork: 0)
+        _ = try? target.serviceDriverWork()
         Pulse.shared.signal()
       }
     }

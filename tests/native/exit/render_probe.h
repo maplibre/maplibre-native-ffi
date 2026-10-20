@@ -167,11 +167,9 @@ static inline void* probe_drive(void* user_data) {
   while (true) {
     seen = probe_signal_wait(&probe->driver_work, seen);
     if (probe->stopping) break;
-    size_t serviced = 0;
+
     probe_require(
-      mln_render_session_service_driver_work(
-        probe->session, 0, &serviced, NULL
-      ),
+      mln_render_session_service_driver_work(probe->session, NULL),
       "servicing driver work"
     );
   }

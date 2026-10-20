@@ -552,11 +552,6 @@ fn generated_copy_mln_frame_demand(
     let dict = PyDict::new(py);
     dict.set_item("flags", generated_value(py, value.flags)?)?;
     dict.set_item("token", generated_value(py, value.token)?)?;
-    dict.set_item(
-        "coalescing_boundary",
-        generated_value(py, value.coalescing_boundary)?,
-    )?;
-    dict.set_item("timeout_ns", generated_value(py, value.timeout_ns)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -684,7 +679,6 @@ fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyR
     let dict = PyDict::new(py);
     dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item("object", generated_value(py, value.object)?)?;
-    dict.set_item("value", generated_value(py, value.value)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1481,10 +1475,7 @@ fn generated_copy_mln_render_frame_result(
         "map_update_generation",
         generated_value(py, value.map_update_generation)?,
     )?;
-    dict.set_item(
-        "extent_generation",
-        generated_value(py, value.extent_generation)?,
-    )?;
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item(
         "frame_generation",
         generated_value(py, value.frame_generation)?,
@@ -1530,8 +1521,6 @@ fn generated_copy_mln_render_session_snapshot(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("state", generated_value(py, value.state)?)?;
-    dict.set_item("driver", generated_value(py, value.driver)?)?;
-    dict.set_item("latest_result", generated_value(py, value.latest_result)?)?;
     dict.set_item(
         "extent",
         generated_copy_mln_logical_extent(py, &value.extent)?,
@@ -1546,26 +1535,13 @@ fn generated_copy_mln_render_session_snapshot(
         generated_value(py, value.rendered_update_generation)?,
     )?;
     dict.set_item(
-        "extent_generation",
-        generated_value(py, value.extent_generation)?,
-    )?;
-    dict.set_item(
         "frame_generation",
         generated_value(py, value.frame_generation)?,
-    )?;
-    dict.set_item(
-        "latest_demand_token",
-        generated_value(py, value.latest_demand_token)?,
-    )?;
-    dict.set_item(
-        "pending_demand_count",
-        generated_value(py, value.pending_demand_count)?,
     )?;
     dict.set_item(
         "acquired_frame_count",
         generated_value(py, value.acquired_frame_count)?,
     )?;
-    dict.set_item("target_ready", generated_value(py, value.target_ready)?)?;
     dict.set_item(
         "pending_changes",
         generated_value(py, value.pending_changes)?,
@@ -3128,8 +3104,6 @@ fn generated_input_mln_frame_demand<'py>(
         .getattr("flags")?
         .extract::<sys::mln_frame_demand_flag>()?;
     raw.token = value.getattr("token")?.extract::<u64>()?;
-    raw.coalescing_boundary = value.getattr("coalescing_boundary")?.extract::<u64>()?;
-    raw.timeout_ns = value.getattr("timeout_ns")?.extract::<u64>()?;
     Ok(raw)
 }
 
@@ -3224,7 +3198,6 @@ fn generated_input_mln_gpu_sync<'py>(
     raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
     raw.kind = value.getattr("kind")?.extract::<sys::mln_gpu_sync_kind>()?;
     raw.object = value.getattr("object")?.extract::<u64>()?;
-    raw.value = value.getattr("value")?.extract::<u64>()?;
     Ok(raw)
 }
 
@@ -9327,26 +9300,20 @@ impl RenderSessionHandle {
             })
         }
     }
-    #[pyo3(signature = (max_work))]
-    fn service_driver_work(&self, py: Python<'_>, max_work: usize) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = ())]
+    fn service_driver_work(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
             py,
             "mln_render_session_service_driver_work",
             self.admission(),
         )?;
         let handle = self.live()?;
-        let mut out_serviced: usize = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_render_session_service_driver_work(
-                    handle,
-                    max_work,
-                    &mut out_serviced,
-                    diagnostic,
-                )
+                sys::mln_render_session_service_driver_work(handle, diagnostic)
             })
         }?;
-        generated_value(py, out_serviced)
+        Ok(py.None())
     }
     #[pyo3(signature = (descriptor=None))]
     fn set_metal_borrowed_texture_target(

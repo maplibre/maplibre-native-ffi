@@ -264,19 +264,18 @@ const (
 	// whatever it presented last. Ignored by targets without presentation.
 	FrameDemandFlagPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
 	// With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
-	// MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits instead,
-	// and runs again after the map's next update, a target replacement, or an
-	// applied resize. A waiting demand holds no ring slot. A later demand with the
-	// same flags and coalescing boundary supersedes it, a barrier ends its wait
-	// with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon, or the quarantine of
-	// the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY. A
-	// waiting demand's result can follow the results of demands accepted after it.
-	// The flag does not pace: a host that re-arms a waiting demand as each result
-	// arrives renders every update the map publishes. The map publishes one update
-	// for the commands that its runtime worker runs back to back, but a command
-	// that reaches the worker while a frame renders appears in a later frame. To
-	// show several commands in one frame, submit them in a command group, or arm
-	// demands once per display frame.
+	// MLN_RENDER_RESULT_NO_UPDATE waits instead, and runs again after the map's
+	// next update, a target replacement, or an applied resize. A waiting demand
+	// holds no ring slot. A later demand with the same flags supersedes it, a
+	// barrier ends its wait with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon,
+	// or the quarantine of the ring's last usable slot end it with
+	// MLN_RENDER_RESULT_TARGET_NOT_READY. A waiting demand's result can follow the
+	// results of demands accepted after it. The flag does not pace: a host that
+	// re-arms a waiting demand as each result arrives renders every update the map
+	// publishes. The map publishes one update for the commands that its runtime
+	// worker runs back to back, but a command that reaches the worker while a frame
+	// renders appears in a later frame. To show several commands in one frame,
+	// submit them in a command group, or arm demands once per display frame.
 	FrameDemandFlagWaitForUpdate FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_WAIT_FOR_UPDATE)
 )
 
@@ -355,15 +354,9 @@ const (
 	// was submitted to the device's queue, before the frame became acquirable or
 	// before the release call.
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
-	// id<MTLSharedEvent> plus a monotonically increasing signal value.
-	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
-	// VkSemaphore plus a timeline value.
-	GpuSyncKindVulkanTimelineSemaphore GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
 	// GLsync in the shared EGL or WGL context's share group, used only by a
-	// caller-graphics-thread driver. value is zero and object is nonzero.
+	// caller-graphics-thread driver. object is nonzero.
 	GpuSyncKindOpenglFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
-	// A backend-defined WebGPU completion token.
-	GpuSyncKindWebgpuToken GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
 )
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
@@ -692,24 +685,19 @@ type RenderResult uint32
 const (
 	// A frame was rendered for acquisition, presentation, or ordered readback.
 	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
-	// No newer map update was available, or the map had no complete frame to draw
-	// yet. The map publishes another update when it has one. A demand with
-	// MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and finishes
-	// with this result only when a barrier ends its wait.
+	// No newer map update was available, the map had no complete frame to draw, or
+	// the update extent differed from the target. The map publishes another update
+	// when it has one. A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for
+	// that update instead, and finishes with this result only when a barrier ends
+	// its wait.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
-	// An ordered extent change had not reached the map. The map publishes an update
-	// at the new extent, which a demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits
-	// for instead of finishing with this result.
-	RenderResultSizePending RenderResult = RenderResult(C.MLN_RENDER_RESULT_SIZE_PENDING)
 	// The target could not produce a frame. The attempt consumes nothing, so a
 	// later demand with the same flags renders what this one would have. This
 	// result does not cause a map update, so the host demands again when the target
 	// can be ready, such as after a paced delay.
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
-	// A newer demand in the same coalescing boundary replaced this demand.
+	// A newer IF_NEEDED demand with the same flags replaced this demand.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
-	// The demand's timeout elapsed before driver work began.
-	RenderResultDeadlineMissed RenderResult = RenderResult(C.MLN_RENDER_RESULT_DEADLINE_MISSED)
 )
 
 // RenderSessionCapabilityFlag corresponds to
@@ -2050,21 +2038,12 @@ type FrameDemand struct {
 	Flags FrameDemandFlag
 	// Host identity returned with the terminal frame result.
 	Token uint64
-	// Demands coalesce only when this value and their flags match.
-	CoalescingBoundary uint64
-	// Positive time allowed before driver work begins, in nanoseconds; zero has no
-	// limit. A demand that waits, for a free texture slot or for a map update, is
-	// checked against its timeout when it runs again; a wait has no timer of its
-	// own.
-	TimeoutNs uint64
 }
 
 func copyFrameDemand(raw C.mln_frame_demand) FrameDemand {
 	var result FrameDemand
 	result.Flags = FrameDemandFlag(raw.flags)
 	result.Token = uint64(raw.token)
-	result.CoalescingBoundary = uint64(raw.coalescing_boundary)
-	result.TimeoutNs = uint64(raw.timeout_ns)
 	return result
 }
 
@@ -2073,8 +2052,6 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.flags = C.uint32_t(input.Flags)
 	raw.token = C.uint64_t(input.Token)
-	raw.coalescing_boundary = C.uint64_t(input.CoalescingBoundary)
-	raw.timeout_ns = C.uint64_t(input.TimeoutNs)
 	return raw
 }
 
@@ -2191,17 +2168,14 @@ func DefaultGeojsonSourceOptions() GeojsonSourceOptions {
 type GpuSync struct {
 	// One mln_gpu_sync_kind value.
 	Kind GpuSyncKind
-	// Bit pattern of the backend object that kind names: the id<MTLSharedEvent>
-	// pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
+	// Bit pattern of the GLsync pointer.
 	Object uint64
-	Value  uint64
 }
 
 func copyGpuSync(raw C.mln_gpu_sync) GpuSync {
 	var result GpuSync
 	result.Kind = GpuSyncKind(raw.kind)
 	result.Object = uint64(raw.object)
-	result.Value = uint64(raw.value)
 	return result
 }
 
@@ -2210,7 +2184,6 @@ func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.uint32_t(input.Kind)
 	raw.object = C.uint64_t(input.Object)
-	raw.value = C.uint64_t(input.Value)
 	return raw
 }
 
@@ -3521,9 +3494,9 @@ type RenderFrameResult struct {
 	// mln_map_snapshot.latest_render_update_generation to find the first frame that
 	// includes a command.
 	MapUpdateGeneration uint64
-	// The session's extent generation when the demand reached its result. See
-	// mln_render_session_snapshot.extent_generation.
-	ExtentGeneration uint64
+	// The session's target generation when the demand reached its result. See
+	// mln_render_session_snapshot.generation.
+	Generation uint64
 	// Position of the frame among the frames that the session rendered, counting
 	// from one. Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
 	FrameGeneration uint64
@@ -3546,7 +3519,7 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 	result.Disposition = RenderResult(raw.disposition)
 	result.Token = uint64(raw.token)
 	result.MapUpdateGeneration = uint64(raw.map_update_generation)
-	result.ExtentGeneration = uint64(raw.extent_generation)
+	result.Generation = uint64(raw.generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.NeedsRepaint = bool(raw.needs_repaint)
 	return result
@@ -3636,11 +3609,7 @@ func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) Render
 type RenderSessionSnapshot struct {
 	// One mln_render_session_state value.
 	State RenderSessionState
-	// One mln_render_driver_kind value.
-	Driver RenderDriverKind
-	// Most recent terminal mln_render_result value.
-	LatestResult RenderResult
-	// Logical extent, including a resize the driver has not applied yet.
+	// Logical extent applied by the driver.
 	Extent LogicalExtent
 	// Increases when the session's lifecycle state, target, or applied extent
 	// changes. An acquired texture frame reports the value it rendered under.
@@ -3650,18 +3619,10 @@ type RenderSessionSnapshot struct {
 	// Map render update generation that the latest rendered frame drew. Zero before
 	// the first frame after attachment or a target replacement.
 	RenderedUpdateGeneration uint64
-	// Starts at one and increases each time the driver applies a resize.
-	ExtentGeneration uint64
 	// Frame generation of the latest rendered frame, zero before the first.
 	FrameGeneration uint64
-	// Token of the demand whose terminal result the session queued last.
-	LatestDemandToken uint64
-	// Accepted demands that have no terminal result yet.
-	PendingDemandCount uint32
 	// Acquired frames that the host has not released or disposed.
 	AcquiredFrameCount uint32
-	// False once attachment fails or the session is abandoned.
-	TargetReady bool
 	// True when a map update or an accepted resize arrived after the latest
 	// rendered frame.
 	PendingChanges bool
@@ -3670,18 +3631,12 @@ type RenderSessionSnapshot struct {
 func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionSnapshot {
 	var result RenderSessionSnapshot
 	result.State = RenderSessionState(raw.state)
-	result.Driver = RenderDriverKind(raw.driver)
-	result.LatestResult = RenderResult(raw.latest_result)
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.Generation = uint64(raw.generation)
 	result.MapUpdateGeneration = uint64(raw.map_update_generation)
 	result.RenderedUpdateGeneration = uint64(raw.rendered_update_generation)
-	result.ExtentGeneration = uint64(raw.extent_generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
-	result.LatestDemandToken = uint64(raw.latest_demand_token)
-	result.PendingDemandCount = uint32(raw.pending_demand_count)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
-	result.TargetReady = bool(raw.target_ready)
 	result.PendingChanges = bool(raw.pending_changes)
 	return result
 }
@@ -5781,15 +5736,6 @@ func (view GpuSyncView) Object() (uint64, error) {
 	})
 }
 
-func (view GpuSyncView) Value() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Value
-	})
-}
-
 type VulkanTextureFrameView struct {
 	value VulkanTextureFrame
 	scope *bindingScope
@@ -7772,9 +7718,11 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 	})
 }
 
-// Barrier starts a barrier that completes after all render work accepted before
-// it has a terminal result. A barrier does not request a frame. Accepting a
-// barrier ends the wait of every earlier demand that waits for a map update.
+// Barrier ends every frame demand that has not started with
+// MLN_RENDER_RESULT_NO_UPDATE and completes after earlier driver work has
+// finished. A running demand finishes its attempt and ends any wait for a map
+// update or a free slot. After completion, a new frame demand is required to
+// render again.
 //
 // See mln_render_session_barrier in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7956,12 +7904,11 @@ func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 	})
 }
 
-// Resize starts an ordered logical resize, which also resizes the map. On a
-// continuous map, the completion runs after the map's viewport takes the new
-// extent and the selected driver applies it. A static or tile map publishes a
-// render update only for a still image, so on those maps the driver applies the
-// extent without waiting for the map's viewport, and the next still image
-// renders at the new extent.
+// Resize starts an ordered logical resize of the driver and the map. The driver
+// applies the extent as soon as its work reaches the queue. The completion runs
+// after both have applied it and the map has published its snapshot. Frames
+// render once a map update matches the applied extent; static and tile maps
+// publish that update for their next still image.
 //
 // See mln_render_session_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7971,20 +7918,17 @@ func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[Comma
 	}, completionCommand)
 }
 
-// ServiceDriverWork services up to max_work items for a caller-graphics-thread
-// driver; zero services every item currently queued. The first successful
-// service call fixes the session's graphics-thread identity; later calls from
-// another native thread return MLN_STATUS_WRONG_THREAD. The target context must
-// be current. Core-worker sessions return MLN_STATUS_INVALID_STATE.
+// ServiceDriverWork services every queued item for a caller-graphics-thread
+// driver. The first successful service call fixes the session's graphics-thread
+// identity; later calls from another native thread return
+// MLN_STATUS_WRONG_THREAD. The target context must be current. Core-worker
+// sessions return MLN_STATUS_INVALID_STATE.
 //
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) ServiceDriverWork(maxWork uint) (uint, error) {
-	var outServiced C.size_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_service_driver_work), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), C.size_t(maxWork), &outServiced, diagnostic))
-	}, func(arena *bindingArena) uint {
-		return uint(outServiced)
+func (receiver *RenderSessionHandle) ServiceDriverWork() error {
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_service_driver_work), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), diagnostic))
 	})
 }
 

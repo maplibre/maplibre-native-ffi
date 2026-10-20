@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <any>
 #include <atomic>
-#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
@@ -292,7 +291,7 @@ class TextureSessionBackend {
                                                   : MLN_STATUS_UNSUPPORTED;
   }
   virtual auto producer_sync() const -> mln_gpu_sync {
-    return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
+    return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
   }
   // Records the backend metadata a host reads back from an acquired frame.
   // Runs on the driver thread, right after the render, for the slot the
@@ -415,7 +414,6 @@ struct RenderTextureSlot {
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
     .object = 0,
-    .value = 0
   };
   // Recorded by the driver thread when the slot's frame is published. Empty
   // until then, which makes the slot unacquirable.
@@ -668,19 +666,6 @@ struct RenderDriverWork {
   std::function<void()> abandon;
 };
 
-struct PendingFrameDemand {
-  mln_frame_demand demand;
-  std::chrono::steady_clock::time_point accepted_at;
-  std::uint64_t barrier_epoch;
-};
-
-// A barrier waits for its driver work item and every earlier demand. Demands
-// carry the barrier epoch current when they were accepted.
-struct PendingBarrier {
-  std::shared_ptr<OperationObject> operation;
-  std::uint64_t epoch;
-  bool arrived = false;
-};
 }  // namespace mln::core
 
 struct mln_render_session_object
@@ -699,7 +684,6 @@ struct mln_render_session_object
   uint32_t height = 0;
   uint32_t physical_width = 0;
   uint32_t physical_height = 0;
-  uint64_t barrier_epoch = 0;
   double scale_factor = 1.0;
 
   mutable std::mutex control_mutex;
@@ -715,13 +699,11 @@ struct mln_render_session_object
   uint64_t rendered_update_generation = 0;
   uint64_t rendered_target_generation = 0;
   std::optional<mln::TransformState> rendered_transform;
-  uint64_t extent_generation = 1;
   uint64_t frame_generation = 0;
-  uint64_t latest_demand_token = 0;
-  mln_render_result latest_result = MLN_RENDER_RESULT_NO_UPDATE;
-  bool target_ready = true;
   bool pending_changes = true;
-  std::optional<mln_logical_extent> pending_extent;
+  // Keeps stale demand work from starting a later demand ahead of a barrier.
+  // A running demand also ends its wait while a barrier is queued.
+  std::size_t pending_frame_barriers = 0;
   std::optional<mln::core::OwnerThreadToken> graphics_thread;
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
@@ -744,24 +726,10 @@ struct mln_render_session_object
   bool disposal_keeps_graphics = false;
   bool destruction_started = false;
   bool attached = false;
-  // Ticket of the newest accepted resize. An older ticket reaching the driver
-  // was replaced and completes as superseded instead of waiting for an extent
-  // the map will never publish.
-  uint64_t resize_submission = 0;
-
   std::vector<mln_render_frame_result> frame_results;
-  std::vector<mln_render_frame_result> recycled_frame_results;
-  std::deque<mln::core::PendingFrameDemand> demands;
-  // Demands with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE that found nothing to render,
-  // in the order they began waiting. Each carries the current barrier epoch,
-  // because a barrier ends every earlier wait, so their order relative to each
-  // other and to `demands` never affects which barriers settle. They keep no
-  // work item: whatever can make them renderable moves them back to the front
-  // of `demands` and queues one.
-  std::deque<mln::core::PendingFrameDemand> update_waiting_demands;
-  std::vector<uint64_t> active_demand_epochs;
-  std::deque<mln::core::PendingBarrier> barriers;
-  std::deque<mln::core::RenderDriverWork> waiting_update_work;
+  std::deque<mln_frame_demand> demands;
+  // Waiting demands hold no work item until an update or target change.
+  std::deque<mln_frame_demand> update_waiting_demands;
   std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
   mln::core::WorkerThread worker;
@@ -803,8 +771,6 @@ struct mln_render_session_object
 };
 
 struct mln_render_frame_batch_object {
-  ~mln_render_frame_batch_object();
-  std::weak_ptr<mln_render_session_object> session;
   std::vector<mln_render_frame_result> results;
 };
 
@@ -1133,9 +1099,8 @@ auto render_session_get_snapshot(
 auto render_session_request_frame(
   mln_render_session session, const mln_frame_demand* demand
 ) -> mln_status;
-auto render_session_service_driver_work(
-  mln_render_session session, std::size_t max_work, std::size_t* out_serviced
-) -> mln_status;
+auto render_session_service_driver_work(mln_render_session session)
+  -> mln_status;
 auto render_session_drain_frame_results(
   mln_render_session session, mln_render_frame_batch* out_batch
 ) -> mln_status;

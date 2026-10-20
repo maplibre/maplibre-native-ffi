@@ -1976,12 +1976,10 @@ static jint mln_render_session_resize_jni(
 }
 
 static jint mln_render_session_service_driver_work_jni(
-  JNIEnv* env, jclass type, jlong session, jlong max_work, jlong out_serviced,
-  jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong session, jlong out_diagnostic
 ) {
   return (jint)mln_render_session_service_driver_work(
-    (mln_render_session)session, (size_t)max_work,
-    MLN_JNI_POINTER(size_t*, out_serviced),
+    (mln_render_session)session,
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2915,7 +2913,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
    (void*)mln_render_session_resize_jni},
-  {"mln_render_session_service_driver_work", "(JJJJ)I",
+  {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
   {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
    (void*)mln_render_session_set_metal_borrowed_texture_target_jni},
@@ -3354,7 +3352,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
    (void*)mln_render_session_resize_jni},
-  {"mln_render_session_service_driver_work", "(JJJJ)I",
+  {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
   {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
    (void*)mln_render_session_set_metal_borrowed_texture_target_jni},

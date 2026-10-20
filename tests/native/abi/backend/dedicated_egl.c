@@ -4,13 +4,6 @@
 #include "support/frames.h"
 #include "support/test_support.h"
 
-static void finish_render_barrier(const mln_test_render_fixture* fixture) {
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, fixture,
-    mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
-  );
-}
-
 // The contract a dedicated session offers a host: it creates its own context
 // from a descriptor that names no share context, renders through it, and leaves
 // it current so the next render costs no EGL call.
@@ -28,11 +21,8 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = MLN_FRAME_DEMAND_PRESENT;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
-  finish_render_barrier(&fixture);
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-  );
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture, 1);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);
@@ -64,10 +54,10 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_CAPABILITY_READBACK, capabilities.flags
   );
-  size_t serviced = 0;
+
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_service_driver_work(fixture.session, 0, &serviced, NULL)
+    mln_render_session_service_driver_work(fixture.session, NULL)
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
@@ -84,12 +74,8 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   demand.flags = 0;
   demand.token = 41;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
-  finish_render_barrier(&fixture);
-
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-  );
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture, 1);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);

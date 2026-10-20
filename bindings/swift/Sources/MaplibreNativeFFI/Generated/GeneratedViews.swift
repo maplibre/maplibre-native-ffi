@@ -113,10 +113,6 @@ public final class GpuSyncView {
   public var object: UInt64 {
     get throws { try scope.check(); return snapshot.object }
   }
-
-  public var value: UInt64 {
-    get throws { try scope.check(); return snapshot.value }
-  }
 }
 
 public final class VulkanTextureFrameView {

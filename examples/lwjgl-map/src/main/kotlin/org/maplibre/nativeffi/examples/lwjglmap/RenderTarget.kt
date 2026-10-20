@@ -49,7 +49,7 @@ internal class SessionDriver(
 
   /** Runs every queued item after the driver-work wake. */
   fun service(session: RenderSessionHandle) {
-    if (work?.consume() == true) session.serviceDriverWork(0uL)
+    if (work?.consume() == true) session.serviceDriverWork()
   }
 
   /**
@@ -61,7 +61,7 @@ internal class SessionDriver(
     if (caller) {
       completion.invokeOnCompletion { glfwPostEmptyEvent() }
       while (true) {
-        session.serviceDriverWork(0uL)
+        session.serviceDriverWork()
         if (completion.isCompleted) break
         glfwWaitEvents()
       }

@@ -351,13 +351,6 @@ final class MetalTextureCompositor {
     switch try producerSynchronization?.kind ?? .cpuComplete {
     case .cpuComplete:
       break
-    case .metalSharedEvent:
-      let event =
-        try metalSharedEvent(address: UInt(producerSynchronization!.object))
-      try commandBuffer.encodeWaitForEvent(
-        event,
-        value: producerSynchronization!.value
-      )
     default:
       throw metalError("Metal frame returned incompatible GPU synchronization")
     }
@@ -458,19 +451,6 @@ private func metalTexture(address: UInt) throws -> any MTLTexture {
     )
   }
   return texture
-}
-
-private func metalSharedEvent(address: UInt) throws -> any MTLSharedEvent {
-  guard let pointer = UnsafeRawPointer(bitPattern: address) else {
-    throw metalError("Metal frame has a null shared event")
-  }
-  let object = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
-  guard let event = object as? any MTLSharedEvent else {
-    throw metalError(
-      "Metal frame pointer did not contain an MTLSharedEvent"
-    )
-  }
-  return event
 }
 
 private func nativePointer(_ object: AnyObject) -> NativePointer {

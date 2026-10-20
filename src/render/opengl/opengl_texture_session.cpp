@@ -593,6 +593,7 @@ class OpenGLTextureSessionBackend final
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       mln::platform::glWaitSync(fence, 0, GL_TIMEOUT_IGNORED);
+      mln::platform::glDeleteSync(fence);
       if (mln::platform::glGetError() != GL_NO_ERROR) {
         mln::core::set_thread_error(
           "waiting for the consumer OpenGL fence failed"
@@ -660,7 +661,7 @@ class OpenGLTextureSessionBackend final
       mln::platform::glFlush();
       producer_sync_ = mln_gpu_sync{
         sizeof(mln_gpu_sync), MLN_GPU_SYNC_OPENGL_FENCE,
-        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence)), 0
+        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(fence))
       };
     } else {
       backend_.finish_rendering();
@@ -689,7 +690,7 @@ class OpenGLTextureSessionBackend final
   OpenGLTextureBackend backend_;
   uint32_t producer_sync_kind_;
   mln_gpu_sync producer_sync_{
-    sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0
+    sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0
   };
   std::array<mln::platform::GLsync, mln::core::max_texture_ring_depth>
     producer_fences_{};

@@ -18,8 +18,6 @@ auto mln_frame_demand_default() noexcept -> mln_frame_demand {
     .size = sizeof(mln_frame_demand),
     .flags = MLN_FRAME_DEMAND_IF_NEEDED,
     .token = 0,
-    .coalescing_boundary = 0,
-    .timeout_ns = 0,
   };
 }
 auto mln_render_session_attach_options_default() noexcept
@@ -40,7 +38,6 @@ auto mln_gpu_sync_default() noexcept -> mln_gpu_sync {
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
     .object = 0,
-    .value = 0,
   };
 }
 
@@ -183,13 +180,10 @@ auto mln_render_session_dump_debug_logs(
 }
 
 auto mln_render_session_service_driver_work(
-  mln_render_session session, size_t max_work, size_t* out_serviced,
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_service_driver_work(
-      session, max_work, out_serviced
-    );
+    return mln::core::render_session_service_driver_work(session);
   });
 }
 

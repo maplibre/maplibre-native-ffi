@@ -47,10 +47,11 @@ impl RenderSessionHandle {
         Ok(Some(AcquiredFrameHandle::adopt(out_frame, parent)?))
     }
 
-    /// Starts a barrier that completes after all render work accepted before it
-    /// has a terminal result. A barrier does not request a frame. Accepting a
-    /// barrier ends the wait of every earlier demand that waits for a map
-    /// update.
+    /// Ends every frame demand that has not started with
+    /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work
+    /// has finished. A running demand finishes its attempt and ends any wait
+    /// for a map update or a free slot. After completion, a new frame demand is
+    /// required to render again.
     ///
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -341,12 +342,11 @@ impl RenderSessionHandle {
         Ok(())
     }
 
-    /// Starts an ordered logical resize, which also resizes the map. On a
-    /// continuous map, the completion runs after the map's viewport takes the
-    /// new extent and the selected driver applies it. A static or tile map
-    /// publishes a render update only for a still image, so on those maps the
-    /// driver applies the extent without waiting for the map's viewport, and
-    /// the next still image renders at the new extent.
+    /// Starts an ordered logical resize of the driver and the map. The driver
+    /// applies the extent as soon as its work reaches the queue. The completion
+    /// runs after both have applied it and the map has published its snapshot.
+    /// Frames render once a map update matches the applied extent; static and
+    /// tile maps publish that update for their next still image.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -358,26 +358,20 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Services up to max_work items for a caller-graphics-thread driver; zero
-    /// services every item currently queued. The first successful service call
-    /// fixes the session's graphics-thread identity; later calls from another
-    /// native thread return `MLN_STATUS_WRONG_THREAD`. The target context must
-    /// be current. Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+    /// Services every queued item for a caller-graphics-thread driver. The
+    /// first successful service call fixes the session's graphics-thread
+    /// identity; later calls from another native thread return
+    /// `MLN_STATUS_WRONG_THREAD`. The target context must be current.
+    /// Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn service_driver_work(&self, max_work: usize) -> Result<usize> {
+    pub fn service_driver_work(&self) -> Result<()> {
         let mut call = self.inner.call("mln_render_session_service_driver_work")?;
-        let mut out_serviced: usize = Default::default();
         call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_service_driver_work(
-                session,
-                max_work,
-                &mut out_serviced,
-                out_diagnostic,
-            )
+            sys::mln_render_session_service_driver_work(session, out_diagnostic)
         })?;
-        Ok(out_serviced)
+        Ok(())
     }
 
     /// Starts an ordered replacement of every texture of a caller-owned Metal
@@ -616,12 +610,11 @@ impl RenderSessionHandle {
     }
 }
 impl RenderSessionHandleDiscarding<'_> {
-    /// Starts an ordered logical resize, which also resizes the map. On a
-    /// continuous map, the completion runs after the map's viewport takes the
-    /// new extent and the selected driver applies it. A static or tile map
-    /// publishes a render update only for a still image, so on those maps the
-    /// driver applies the extent without waiting for the map's viewport, and
-    /// the next still image renders at the new extent.
+    /// Starts an ordered logical resize of the driver and the map. The driver
+    /// applies the extent as soon as its work reaches the queue. The completion
+    /// runs after both have applied it and the map has published its snapshot.
+    /// Frames render once a map update matches the applied extent; static and
+    /// tile maps publish that update for their next still image.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

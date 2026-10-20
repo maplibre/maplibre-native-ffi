@@ -30,9 +30,8 @@ typedef struct foreign_driver_probe {
 
 static void service_from_foreign_thread(void* argument) {
   foreign_driver_probe* probe = argument;
-  size_t serviced = 0;
-  probe->status =
-    mln_render_session_service_driver_work(probe->session, 1, &serviced, NULL);
+
+  probe->status = mln_render_session_service_driver_work(probe->session, NULL);
   mln_test_flag_set(&probe->done);
 }
 
@@ -71,7 +70,6 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   }
   mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
-  TEST_ASSERT_EQUAL_UINT32(capabilities.driver, snapshot.driver);
 
   foreign_driver_probe probe = {.session = fixture.session};
   atomic_init(&probe.done, false);
@@ -574,8 +572,8 @@ static bool attach_abandon_settled(void* context) {
   return atomic_load(&probe->completed);
 }
 
-// The driver delivers an attach completion inside its driver call, like every
-// other command's, so abandon from it is busy and the session stays attached.
+// The driver delivers an attach completion inside its driver call, so abandon
+// from it is busy and the session stays attached.
 static void abandon_from_an_attach_completion_is_busy(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -845,10 +843,8 @@ static void drain_inside_frame_wake(void* context) {
 }
 
 static mln_status service_on_graphics_thread(reentrant_host* host) {
-  size_t serviced = 0;
-  const mln_status status = mln_render_session_service_driver_work(
-    host->session, SIZE_MAX, &serviced, NULL
-  );
+  const mln_status status =
+    mln_render_session_service_driver_work(host->session, NULL);
   if (status != MLN_STATUS_OK && status != MLN_STATUS_BUSY)
     atomic_fetch_add(&host->failures, 1U);
   return status;

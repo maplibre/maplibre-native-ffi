@@ -26,15 +26,14 @@ extern "C" {
 // has an update to render.
 void mln_test_render_prepare_map(mln_map map);
 
-// Requests a forced frame, which renders the latest update whether or not it
-// is new, with `token` as both its token and its coalescing boundary so it
-// never supersedes an earlier demand.
+// Requests a forced frame of the latest update with the supplied token.
+// Every forced demand remains independent.
 void mln_test_render_request_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 );
 
-// Services the fixture until no demand is pending and one drain yields at
-// least `minimum` results, and returns that batch. The caller releases it.
+// Services the fixture until one drain yields at least `minimum` results
+// and returns that batch. The caller releases it.
 mln_render_frame_batch mln_test_render_wait_for_results(
   const mln_test_render_fixture* fixture, size_t minimum
 );

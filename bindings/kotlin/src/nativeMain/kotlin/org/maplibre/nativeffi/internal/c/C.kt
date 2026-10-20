@@ -2015,16 +2015,9 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_service_driver_work(
-    session: Long,
-    maxWork: Long,
-    outServiced: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_service_driver_work(
       session.toULong(),
-      maxWork.convert(),
-      outServiced.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

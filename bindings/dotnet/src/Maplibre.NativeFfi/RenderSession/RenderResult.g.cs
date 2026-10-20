@@ -16,21 +16,13 @@ public enum RenderResult : uint
     Rendered = 0,
 
     /// <summary>
-    /// No newer map update was available, or the map had no complete frame to
-    /// draw yet. The map publishes another update when it has one. A demand
-    /// with <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for that update
-    /// instead, and finishes with this result only when a barrier ends its
-    /// wait.
+    /// No newer map update was available, the map had no complete frame to
+    /// draw, or the update extent differed from the target. The map publishes
+    /// another update when it has one. A demand with
+    /// <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for that update instead,
+    /// and finishes with this result only when a barrier ends its wait.
     /// </summary>
     NoUpdate = 1,
-
-    /// <summary>
-    /// An ordered extent change had not reached the map. The map publishes an
-    /// update at the new extent, which a demand with
-    /// <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for instead of finishing
-    /// with this result.
-    /// </summary>
-    SizePending = 2,
 
     /// <summary>
     /// The target could not produce a frame. The attempt consumes nothing, so a
@@ -41,12 +33,7 @@ public enum RenderResult : uint
     TargetNotReady = 3,
 
     /// <summary>
-    /// A newer demand in the same coalescing boundary replaced this demand.
+    /// A newer IF_NEEDED demand with the same flags replaced this demand.
     /// </summary>
     Superseded = 4,
-
-    /// <summary>
-    /// The demand's timeout elapsed before driver work began.
-    /// </summary>
-    DeadlineMissed = 5,
 }

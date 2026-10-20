@@ -79,7 +79,7 @@ fn waitForSessionFuture(
         const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
         while (true) {
             signal.reset();
-            _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
+            _ = try maplibre.renderSessionServiceDriverWork(session, null);
             if (try future.poll()) break;
             try signal.wait(deadline);
         }
@@ -210,7 +210,7 @@ fn renderStillImage(
     try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
     while (true) {
         signal.reset();
-        if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
+        if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, null);
         if (try still_image.poll()) return still_image.wait(null);
         var demand = false;
         var results = try maplibre.renderSessionDrainFrameResults(session, null);

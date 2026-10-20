@@ -17,7 +17,6 @@ static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, snapshot.driver);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
 
   mln_test_render_request_forced(&fixture, 901);

@@ -182,7 +182,6 @@ static void render_through_update(
     demand.flags =
       MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
     demand.token = token;
-    demand.coalescing_boundary = token;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );

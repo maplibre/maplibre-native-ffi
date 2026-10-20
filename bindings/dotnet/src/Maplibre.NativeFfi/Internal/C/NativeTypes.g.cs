@@ -233,8 +233,6 @@ internal unsafe struct mln_frame_demand
     public uint size;
     public uint flags;
     public ulong token;
-    public ulong coalescing_boundary;
-    public ulong timeout_ns;
 }
 
 internal unsafe struct mln_free_camera_options
@@ -267,7 +265,6 @@ internal unsafe struct mln_gpu_sync
     public uint size;
     public uint kind;
     public ulong @object;
-    public ulong value;
 }
 
 internal unsafe struct mln_http_header
@@ -645,7 +642,7 @@ internal unsafe struct mln_render_frame_result
     public uint disposition;
     public ulong token;
     public ulong map_update_generation;
-    public ulong extent_generation;
+    public ulong generation;
     public ulong frame_generation;
     public byte needs_repaint;
 }
@@ -673,18 +670,12 @@ internal unsafe struct mln_render_session_snapshot
 {
     public uint size;
     public uint state;
-    public uint driver;
-    public uint latest_result;
     public mln_logical_extent extent;
     public ulong generation;
     public ulong map_update_generation;
     public ulong rendered_update_generation;
-    public ulong extent_generation;
     public ulong frame_generation;
-    public ulong latest_demand_token;
-    public uint pending_demand_count;
     public uint acquired_frame_count;
-    public byte target_ready;
     public byte pending_changes;
 }
 
@@ -1368,10 +1359,7 @@ internal enum mln_gesture_phase : uint
 internal enum mln_gpu_sync_kind : uint
 {
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
-    MLN_GPU_SYNC_METAL_SHARED_EVENT = 1,
-    MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2,
     MLN_GPU_SYNC_OPENGL_FENCE = 3,
-    MLN_GPU_SYNC_WEBGPU_TOKEN = 4,
 }
 
 internal enum mln_log_event : uint
@@ -1545,10 +1533,8 @@ internal enum mln_render_result : uint
 {
     MLN_RENDER_RESULT_RENDERED = 0,
     MLN_RENDER_RESULT_NO_UPDATE = 1,
-    MLN_RENDER_RESULT_SIZE_PENDING = 2,
     MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
     MLN_RENDER_RESULT_SUPERSEDED = 4,
-    MLN_RENDER_RESULT_DEADLINE_MISSED = 5,
 }
 
 internal enum mln_render_session_capability_flag : uint

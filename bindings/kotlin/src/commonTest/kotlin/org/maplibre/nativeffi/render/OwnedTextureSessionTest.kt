@@ -126,7 +126,7 @@ class OwnedTextureSessionTest {
       // session's driver-work and frame wakes, while this test runs on another thread.
       renderStill()
 
-      val failure = assertFailsWith<WrongThreadException> { session.serviceDriverWork(0uL) }
+      val failure = assertFailsWith<WrongThreadException> { session.serviceDriverWork() }
       assertEquals(MaplibreStatus.WRONG_THREAD, failure.status)
     }
   }

@@ -53,19 +53,13 @@ typedef enum mln_render_result : uint32_t {
    */
   MLN_RENDER_RESULT_RENDERED = 0,
   /**
-   * No newer map update was available, or the map had no complete frame to
-   * draw yet. The map publishes another update when it has one. A demand
-   * with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and
-   * finishes with this result only when a barrier ends its wait.
+   * No newer map update was available, the map had no complete frame to draw,
+   * or the update extent differed from the target. The map publishes another
+   * update when it has one. A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE
+   * waits for that update instead, and finishes with this result only when a
+   * barrier ends its wait.
    */
   MLN_RENDER_RESULT_NO_UPDATE = 1,
-  /**
-   * An ordered extent change had not reached the map. The map publishes an
-   * update at the new extent, which a demand with
-   * MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for instead of finishing with this
-   * result.
-   */
-  MLN_RENDER_RESULT_SIZE_PENDING = 2,
   /**
    * The target could not produce a frame. The attempt consumes nothing, so a
    * later demand with the same flags renders what this one would have. This
@@ -73,10 +67,8 @@ typedef enum mln_render_result : uint32_t {
    * target can be ready, such as after a paced delay.
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
-  /** A newer demand in the same coalescing boundary replaced this demand. */
+  /** A newer IF_NEEDED demand with the same flags replaced this demand. */
   MLN_RENDER_RESULT_SUPERSEDED = 4,
-  /** The demand's timeout elapsed before driver work began. */
-  MLN_RENDER_RESULT_DEADLINE_MISSED = 5,
 } mln_render_result;
 
 /** Render-session lifecycle visible in snapshots. */
@@ -101,20 +93,19 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
   MLN_FRAME_DEMAND_PRESENT = 1U << 1U,
   /**
    * With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
-   * MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits
-   * instead, and runs again after the map's next update, a target
-   * replacement, or an applied resize. A waiting demand holds no ring slot. A
-   * later demand with the same flags and coalescing boundary supersedes it, a
-   * barrier ends its wait with MLN_RENDER_RESULT_NO_UPDATE, and detach,
-   * abandon, or the quarantine of the ring's last usable slot end it with
-   * MLN_RENDER_RESULT_TARGET_NOT_READY. A waiting demand's result can follow
-   * the results of demands accepted after it. The flag does not pace: a host
-   * that re-arms a waiting demand as each result arrives renders every update
-   * the map publishes. The map publishes one update for the commands that its
-   * runtime worker runs back to back, but a command that reaches the worker
-   * while a frame renders appears in a later frame. To show several commands
-   * in one frame, submit them in a command group, or arm demands once per
-   * display frame.
+   * MLN_RENDER_RESULT_NO_UPDATE waits instead, and runs again after the map's
+   * next update, a target replacement, or an applied resize. A waiting demand
+   * holds no ring slot. A later demand with the same flags supersedes it, a
+   * barrier ends its wait
+   * with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon, or the quarantine of
+   * the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY.
+   * A waiting demand's result can follow the results of demands accepted after
+   * it. The flag does not pace: a host that re-arms a waiting demand as each
+   * result arrives renders every update the map publishes. The map publishes
+   * one update for the commands that its runtime worker runs back to back, but
+   * a command that reaches the worker while a frame renders appears in a later
+   * frame. To show several commands in one frame, submit them in a command
+   * group, or arm demands once per display frame.
    */
   MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 1U << 2U,
 } mln_frame_demand_flag;
@@ -131,15 +122,6 @@ typedef struct mln_frame_demand {
   );
   /** Host identity returned with the terminal frame result. */
   uint64_t token;
-  /** Demands coalesce only when this value and their flags match. */
-  uint64_t coalescing_boundary;
-  /**
-   * Positive time allowed before driver work begins, in nanoseconds; zero has
-   * no limit. A demand that waits, for a free texture slot or for a map
-   * update, is checked against its timeout when it runs again; a wait has no
-   * timer of its own.
-   */
-  uint64_t timeout_ns;
 } mln_frame_demand;
 
 /**
@@ -163,10 +145,10 @@ typedef struct mln_render_frame_result {
    */
   uint64_t map_update_generation;
   /**
-   * The session's extent generation when the demand reached its result. See
-   * mln_render_session_snapshot.extent_generation.
+   * The session's target generation when the demand reached its result. See
+   * mln_render_session_snapshot.generation.
    */
-  uint64_t extent_generation;
+  uint64_t generation;
   /**
    * Position of the frame among the frames that the session rendered, counting
    * from one. Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
@@ -215,11 +197,7 @@ typedef struct mln_render_session_snapshot {
   uint32_t size;
   /** One mln_render_session_state value. */
   uint32_t state MLN_BINDING("enum=mln_render_session_state");
-  /** One mln_render_driver_kind value. */
-  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
-  /** Most recent terminal mln_render_result value. */
-  uint32_t latest_result MLN_BINDING("enum=mln_render_result");
-  /** Logical extent, including a resize the driver has not applied yet. */
+  /** Logical extent applied by the driver. */
   mln_logical_extent extent;
   /**
    * Increases when the session's lifecycle state, target, or applied extent
@@ -233,18 +211,10 @@ typedef struct mln_render_session_snapshot {
    * before the first frame after attachment or a target replacement.
    */
   uint64_t rendered_update_generation;
-  /** Starts at one and increases each time the driver applies a resize. */
-  uint64_t extent_generation;
   /** Frame generation of the latest rendered frame, zero before the first. */
   uint64_t frame_generation;
-  /** Token of the demand whose terminal result the session queued last. */
-  uint64_t latest_demand_token;
-  /** Accepted demands that have no terminal result yet. */
-  uint32_t pending_demand_count;
   /** Acquired frames that the host has not released or disposed. */
   uint32_t acquired_frame_count;
-  /** False once attachment fails or the session is abandoned. */
-  bool target_ready;
   /**
    * True when a map update or an accepted resize arrived after the latest
    * rendered frame.
@@ -455,8 +425,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or
- *   consumer_completion is undersized, or an OpenGL fence has a zero object
- *   or a nonzero value.
+ *   consumer_completion is undersized, or an OpenGL fence has a zero object.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
  *   active.
@@ -501,12 +470,11 @@ MLN_API void mln_acquired_frame_view_end(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered logical resize, which also resizes the map. On a
- * continuous map, the completion runs after the map's viewport takes the new
- * extent and the selected driver applies it. A static or tile map publishes a
- * render update only for a still image, so on those maps the driver applies
- * the extent without waiting for the map's viewport, and the next still image
- * renders at the new extent.
+ * Starts an ordered logical resize of the driver and the map. The driver
+ * applies the extent as soon as its work reaches the queue. The completion
+ * runs after both have applied it and the map has published its snapshot.
+ * Frames render once a map update matches the applied extent; static and
+ * tile maps publish that update for their next still image.
  *
  * scale_factor must equal the session's current value, set at attachment or by
  * the latest target replacement. To change it, replace a surface or borrowed
@@ -527,10 +495,8 @@ MLN_API void mln_acquired_frame_view_end(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_COMMITTED once the driver applies
- *   the new extent.
- * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_SUPERSEDED when a later resize
- *   or target replacement replaced this one.
+ * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_COMMITTED once the map and driver
+ *   apply the new extent and the map publishes its snapshot.
  * - MLN_STATUS_INVALID_STATE when the session starts detaching before the
  *   driver applies the extent.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
@@ -542,9 +508,10 @@ MLN_API mln_status mln_render_session_resize(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a barrier that completes after all render work accepted before it has
- * a terminal result. A barrier does not request a frame. Accepting a barrier
- * ends the wait of every earlier demand that waits for a map update.
+ * Ends every frame demand that has not started with MLN_RENDER_RESULT_NO_UPDATE
+ * and completes after earlier driver work has finished. A running demand
+ * finishes its attempt and ends any wait for a map update or a free slot.
+ * After completion, a new frame demand is required to render again.
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.
@@ -554,8 +521,7 @@ MLN_API mln_status mln_render_session_resize(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK once every earlier demand and ordered operation has a
- *   terminal result.
+ * - MLN_STATUS_OK once earlier driver work has finished.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
@@ -628,17 +594,15 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
 ) MLN_NOEXCEPT;
 
 /**
- * Services up to max_work items for a caller-graphics-thread driver; zero
- * services every item currently queued. The first successful service call
- * fixes the session's graphics-thread identity; later calls from another native
- * thread return MLN_STATUS_WRONG_THREAD. The target context must be current.
- * Core-worker sessions return MLN_STATUS_INVALID_STATE.
+ * Services every queued item for a caller-graphics-thread driver. The first
+ * successful service call fixes the session's graphics-thread identity; later
+ * calls from another native thread return MLN_STATUS_WRONG_THREAD. The target
+ * context must be current. Core-worker sessions return
+ * MLN_STATUS_INVALID_STATE.
  *
  * Returns:
- * - MLN_STATUS_OK when the serviced items are counted in *out_serviced, which
- *   may be zero.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
- *   out_serviced is null.
+ * - MLN_STATUS_OK once queued driver work has been serviced.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when session has been released or is driven by its
  *   own core worker.
  * - MLN_STATUS_TARGET_LOST after abandonment or dispose of the session.
@@ -649,9 +613,7 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  */
 MLN_BINDING("execution=render_driver")
 MLN_API mln_status mln_render_session_service_driver_work(
-  mln_render_session session, size_t max_work,
-  size_t* out_serviced MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

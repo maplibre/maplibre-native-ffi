@@ -104,7 +104,7 @@ func (r *renderFixture) service(t *testing.T, done <-chan struct{}, what string)
 	deadline := time.NewTimer(testTimeout())
 	defer deadline.Stop()
 	for {
-		if _, err := r.session.ServiceDriverWork(0); err != nil {
+		if err := r.session.ServiceDriverWork(); err != nil {
 			t.Fatalf("ServiceDriverWork: %v", err)
 		}
 		select {
@@ -129,7 +129,7 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 			t.Fatalf("RequestFrame: %v", err)
 		}
 		for {
-			if _, err := r.session.ServiceDriverWork(0); err != nil {
+			if err := r.session.ServiceDriverWork(); err != nil {
 				t.Fatalf("ServiceDriverWork: %v", err)
 			}
 			if disposition, done := r.result(t, r.token); done {

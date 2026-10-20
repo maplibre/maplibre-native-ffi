@@ -132,14 +132,9 @@ pub fn wait_for<T>(submitted: Result<NativeFuture<T>>) -> T {
     future.take().expect("the operation failed")
 }
 
-/// Awaits a future, running `service` each time it is still pending and
-/// blocking on `signal` when `service` finds nothing to do. The future wakes
-/// `signal` itself, so a completion from any thread ends the wait.
-pub fn drive<F: Future>(
-    signal: &Arc<Signal>,
-    future: F,
-    mut service: impl FnMut() -> usize,
-) -> F::Output {
+/// Awaits a future, servicing queued driver work before blocking on `signal`.
+/// The future wakes `signal` itself, so a completion from any thread ends the wait.
+pub fn drive<F: Future>(signal: &Arc<Signal>, future: F, mut service: impl FnMut()) -> F::Output {
     let waker = Waker::from(Arc::clone(signal));
     let mut context = Context::from_waker(&waker);
     let mut future = pin!(future);
@@ -149,9 +144,8 @@ pub fn drive<F: Future>(
         if let Poll::Ready(output) = future.as_mut().poll(&mut context) {
             return output;
         }
-        if service() == 0 {
-            signal.wait_past(seen, deadline, "an operation to complete");
-        }
+        service();
+        signal.wait_past(seen, deadline, "an operation to complete");
     }
 }
 
@@ -509,9 +503,9 @@ impl Session {
         drive(&self.wakes.signal, operation, || self.service())
     }
 
-    fn service(&self) -> usize {
+    fn service(&self) {
         // A core worker drives itself and rejects service calls.
-        self.handle.service_driver_work(64).unwrap_or(0)
+        let _ = self.handle.service_driver_work();
     }
 
     /// Demands one frame and returns its result.

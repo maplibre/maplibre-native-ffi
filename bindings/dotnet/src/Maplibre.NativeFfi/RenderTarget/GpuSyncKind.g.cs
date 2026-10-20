@@ -18,24 +18,8 @@ public enum GpuSyncKind : uint
     CpuComplete = 0,
 
     /// <summary>
-    /// <c>id&lt;MTLSharedEvent&gt;</c> plus a monotonically increasing signal
-    /// value.
-    /// </summary>
-    MetalSharedEvent = 1,
-
-    /// <summary>
-    /// VkSemaphore plus a timeline value.
-    /// </summary>
-    VulkanTimelineSemaphore = 2,
-
-    /// <summary>
     /// GLsync in the shared EGL or WGL context's share group, used only by a
-    /// caller-graphics-thread driver. value is zero and object is nonzero.
+    /// caller-graphics-thread driver. object is nonzero.
     /// </summary>
     OpenglFence = 3,
-
-    /// <summary>
-    /// A backend-defined WebGPU completion token.
-    /// </summary>
-    WebgpuToken = 4,
 }

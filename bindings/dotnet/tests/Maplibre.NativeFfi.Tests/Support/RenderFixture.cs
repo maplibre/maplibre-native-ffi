@@ -129,7 +129,7 @@ internal sealed class RenderFixture : IDisposable
         var elapsed = Stopwatch.StartNew();
         while (!operation.IsCompleted)
         {
-            Session.ServiceDriverWork(0);
+            Session.ServiceDriverWork();
             if (!operation.IsCompleted)
                 TestWaits.Wait(wake, elapsed, what);
         }
@@ -153,7 +153,7 @@ internal sealed class RenderFixture : IDisposable
             RenderFrameResult? result = null;
             while (result is null)
             {
-                Session.ServiceDriverWork(0);
+                Session.ServiceDriverWork();
                 result = DrainFrames().LastOrDefault(frame => frame.Token == demand);
                 if (result is null)
                     TestWaits.Wait(wake, elapsed, "a rendered frame");

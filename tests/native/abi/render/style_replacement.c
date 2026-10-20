@@ -39,13 +39,12 @@ static mln_render_session_snapshot session_snapshot(
 static bool frame_finished_while_retained(void* context) {
   replacement_wait* wait = context;
   const mln_render_session_snapshot snapshot = session_snapshot(wait);
-  return snapshot.frame_generation > wait->retained_frame &&
-         snapshot.pending_demand_count == 0;
+  return snapshot.frame_generation > wait->retained_frame;
 }
 
 static bool repaint_waits_for_a_demand(void* context) {
   const mln_render_session_snapshot snapshot = session_snapshot(context);
-  return snapshot.pending_changes && snapshot.pending_demand_count == 0;
+  return snapshot.pending_changes;
 }
 
 static void request_next(replacement_wait* wait) {

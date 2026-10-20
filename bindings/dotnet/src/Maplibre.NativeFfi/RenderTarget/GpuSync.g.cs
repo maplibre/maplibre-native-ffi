@@ -13,11 +13,9 @@ namespace Maplibre.NativeFfi;
 /// One <c>mln_gpu_sync_kind</c> value.
 /// </param>
 /// <param name="Object">
-/// Bit pattern of the backend object that kind names: the
-/// <c>id&lt;MTLSharedEvent&gt;</c> pointer, the VkSemaphore handle, the GLsync
-/// pointer, or the WebGPU token.
+/// Bit pattern of the GLsync pointer.
 /// </param>
-public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Object, ulong Value)
+public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Object)
 {
     public static GpuSync Default
     {

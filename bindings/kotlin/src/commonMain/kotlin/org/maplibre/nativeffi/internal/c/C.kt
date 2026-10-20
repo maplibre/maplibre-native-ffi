@@ -879,12 +879,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_render_session_service_driver_work(
-    session: Long,
-    maxWork: Long,
-    outServiced: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,

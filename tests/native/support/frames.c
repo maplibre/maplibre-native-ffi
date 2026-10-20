@@ -22,7 +22,6 @@ void mln_test_render_request_forced(
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   demand.token = token;
-  demand.coalescing_boundary = token;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
@@ -35,20 +34,9 @@ typedef struct results_wait {
   bool failed;
 } results_wait;
 
-// Holds once every pending demand has settled and one drain yields at least
-// `minimum` results. A drain with fewer is released and the wait goes on.
+// Holds once one drain yields at least `minimum` results.
 static bool results_ready(void* context) {
   results_wait* wait = context;
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  if (
-    mln_render_session_get_snapshot(wait->fixture->session, &snapshot, NULL) !=
-      MLN_STATUS_OK ||
-    snapshot.pending_demand_count != 0
-  ) {
-    return false;
-  }
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status status = mln_render_session_drain_frame_results(
     wait->fixture->session, &batch, NULL
@@ -75,6 +63,23 @@ static bool results_ready(void* context) {
 mln_render_frame_batch mln_test_render_wait_for_results(
   const mln_test_render_fixture* fixture, size_t minimum
 ) {
+  if (minimum > 1) {
+    mln_test_completion fence = mln_test_completion_default(0);
+    const mln_status status = mln_render_session_dump_debug_logs(
+      fixture->session, &fence.descriptor, NULL
+    );
+    if (status == MLN_STATUS_OK) {
+      const mln_status settled =
+        mln_test_render_fixture_finish_operation(fixture, &fence);
+      TEST_ASSERT_TRUE(
+        settled == MLN_STATUS_OK || settled == MLN_STATUS_TARGET_LOST
+      );
+    } else {
+      MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, status);
+      mln_test_completion_reject(&fence);
+    }
+    mln_test_completion_destroy(&fence);
+  }
   results_wait wait = {
     .fixture = fixture, .minimum = minimum, .batch = MLN_HANDLE_NULL
   };

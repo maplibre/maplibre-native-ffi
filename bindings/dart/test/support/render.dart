@@ -99,12 +99,7 @@ void _release(RenderSessionHandle session) {
 BigInt _requestFrame(RenderSessionHandle session, int value) {
   final token = BigInt.from(value);
   session.requestFrame(
-    FrameDemand(
-      flags: const FrameDemandFlag.fromRawValue(0),
-      token: token,
-      coalescingBoundary: BigInt.zero,
-      timeoutNs: BigInt.zero,
-    ),
+    FrameDemand(flags: const FrameDemandFlag.fromRawValue(0), token: token),
   );
   return token;
 }

@@ -330,17 +330,17 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
     public val PRESENT: FrameDemandFlag = FrameDemandFlag(2u)
     /**
      * With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
-     * `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits instead, and runs
-     * again after the map's next update, a target replacement, or an applied resize. A waiting
-     * demand holds no ring slot. A later demand with the same flags and coalescing boundary
-     * supersedes it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach,
-     * abandon, or the quarantine of the ring's last usable slot end it with
-     * `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow the results of
-     * demands accepted after it. The flag does not pace: a host that re-arms a waiting demand as
-     * each result arrives renders every update the map publishes. The map publishes one update for
-     * the commands that its runtime worker runs back to back, but a command that reaches the worker
-     * while a frame renders appears in a later frame. To show several commands in one frame, submit
-     * them in a command group, or arm demands once per display frame.
+     * `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the map's next update, a
+     * target replacement, or an applied resize. A waiting demand holds no ring slot. A later demand
+     * with the same flags supersedes it, a barrier ends its wait with
+     * `MLN_RENDER_RESULT_NO_UPDATE`, and detach, abandon, or the quarantine of the ring's last
+     * usable slot end it with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
+     * follow the results of demands accepted after it. The flag does not pace: a host that re-arms
+     * a waiting demand as each result arrives renders every update the map publishes. The map
+     * publishes one update for the commands that its runtime worker runs back to back, but a
+     * command that reaches the worker while a frame renders appears in a later frame. To show
+     * several commands in one frame, submit them in a command group, or arm demands once per
+     * display frame.
      */
     public val WAIT_FOR_UPDATE: FrameDemandFlag = FrameDemandFlag(4u)
   }
@@ -436,17 +436,11 @@ public data class GpuSyncKind(public val rawValue: UInt) {
      * the device's queue, before the frame became acquirable or before the release call.
      */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
-    /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
-    public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)
-    /** VkSemaphore plus a timeline value. */
-    public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(2u)
     /**
      * GLsync in the shared EGL or WGL context's share group, used only by a caller-graphics-thread
-     * driver. value is zero and object is nonzero.
+     * driver. object is nonzero.
      */
     public val OPENGL_FENCE: GpuSyncKind = GpuSyncKind(3u)
-    /** A backend-defined WebGPU completion token. */
-    public val WEBGPU_TOKEN: GpuSyncKind = GpuSyncKind(4u)
   }
 }
 
@@ -849,28 +843,20 @@ public data class RenderResult(public val rawValue: UInt) {
     /** A frame was rendered for acquisition, presentation, or ordered readback. */
     public val RENDERED: RenderResult = RenderResult(0u)
     /**
-     * No newer map update was available, or the map had no complete frame to draw yet. The map
-     * publishes another update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
-     * waits for that update instead, and finishes with this result only when a barrier ends its
-     * wait.
+     * No newer map update was available, the map had no complete frame to draw, or the update
+     * extent differed from the target. The map publishes another update when it has one. A demand
+     * with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and finishes with this
+     * result only when a barrier ends its wait.
      */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
-    /**
-     * An ordered extent change had not reached the map. The map publishes an update at the new
-     * extent, which a demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing
-     * with this result.
-     */
-    public val SIZE_PENDING: RenderResult = RenderResult(2u)
     /**
      * The target could not produce a frame. The attempt consumes nothing, so a later demand with
      * the same flags renders what this one would have. This result does not cause a map update, so
      * the host demands again when the target can be ready, such as after a paced delay.
      */
     public val TARGET_NOT_READY: RenderResult = RenderResult(3u)
-    /** A newer demand in the same coalescing boundary replaced this demand. */
+    /** A newer IF_NEEDED demand with the same flags replaced this demand. */
     public val SUPERSEDED: RenderResult = RenderResult(4u)
-    /** The demand's timeout elapsed before driver work began. */
-    public val DEADLINE_MISSED: RenderResult = RenderResult(5u)
   }
 }
 
@@ -1821,12 +1807,8 @@ public class OpenglTextureFrame(
 public class GpuSync(
   /** One `mln_gpu_sync_kind` value. */
   kind: GpuSyncKind = GpuSyncKind(0u),
-  /**
-   * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>` pointer, the
-   * VkSemaphore handle, the GLsync pointer, or the WebGPU token.
-   */
+  /** Bit pattern of the GLsync pointer. */
   `object`: ULong = 0uL,
-  value: ULong = 0uL,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedKind: GpuSyncKind = kind
@@ -1841,13 +1823,6 @@ public class GpuSync(
     get() {
       bindingScope?.ensureActive()
       return storedObject
-    }
-
-  private val storedValue: ULong = value
-  public val value: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedValue
     }
 }
 
@@ -1870,10 +1845,10 @@ public data class RenderFrameResult(
    */
   public val mapUpdateGeneration: ULong = 0uL,
   /**
-   * The session's extent generation when the demand reached its result. See
-   * `mln_render_session_snapshot.extent_generation`.
+   * The session's target generation when the demand reached its result. See
+   * `mln_render_session_snapshot.generation`.
    */
-  public val extentGeneration: ULong = 0uL,
+  public val generation: ULong = 0uL,
   /**
    * Position of the frame among the frames that the session rendered, counting from one. Zero
    * unless disposition is `MLN_RENDER_RESULT_RENDERED`.
@@ -2333,14 +2308,6 @@ public data class FrameDemand(
   public val flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED,
   /** Host identity returned with the terminal frame result. */
   public val token: ULong = 0uL,
-  /** Demands coalesce only when this value and their flags match. */
-  public val coalescingBoundary: ULong = 0uL,
-  /**
-   * Positive time allowed before driver work begins, in nanoseconds; zero has no limit. A demand
-   * that waits, for a free texture slot or for a map update, is checked against its timeout when it
-   * runs again; a wait has no timer of its own.
-   */
-  public val timeoutNs: ULong = 0uL,
 )
 
 /**
@@ -3540,11 +3507,7 @@ public data class RenderSessionCapabilities(
 public data class RenderSessionSnapshot(
   /** One `mln_render_session_state` value. */
   public val state: RenderSessionState,
-  /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
-  /** Most recent terminal `mln_render_result` value. */
-  public val latestResult: RenderResult = RenderResult(0u),
-  /** Logical extent, including a resize the driver has not applied yet. */
+  /** Logical extent applied by the driver. */
   public val extent: LogicalExtent = LogicalExtent(),
   /**
    * Increases when the session's lifecycle state, target, or applied extent changes. An acquired
@@ -3558,18 +3521,10 @@ public data class RenderSessionSnapshot(
    * after attachment or a target replacement.
    */
   public val renderedUpdateGeneration: ULong = 0uL,
-  /** Starts at one and increases each time the driver applies a resize. */
-  public val extentGeneration: ULong = 0uL,
   /** Frame generation of the latest rendered frame, zero before the first. */
   public val frameGeneration: ULong = 0uL,
-  /** Token of the demand whose terminal result the session queued last. */
-  public val latestDemandToken: ULong = 0uL,
-  /** Accepted demands that have no terminal result yet. */
-  public val pendingDemandCount: UInt = 0u,
   /** Acquired frames that the host has not released or disposed. */
   public val acquiredFrameCount: UInt = 0u,
-  /** False once attachment fails or the session is abandoned. */
-  public val targetReady: Boolean = false,
   /** True when a map update or an accepted resize arrived after the latest rendered frame. */
   public val pendingChanges: Boolean = false,
 )

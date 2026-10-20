@@ -720,29 +720,31 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   auto busy_weak = std::weak_ptr{busy};
   busy.reset();
   // Driver work belongs to the thread that first services it, so one helper
-  // thread services both the attachment and the blocking operation. The first
-  // call services only the attachment, because the operation can be queued
-  // before that call returns.
+  // thread services both the attachment and the blocking operation.
   auto checks = BackgroundChecks{};
   auto serve = std::atomic_bool{false};
+  auto attachment_serviced = std::atomic_bool{false};
   auto graphics = std::thread{[&] {
-    auto serviced = std::size_t{0};
     checks.check(
-      mln_render_session_service_driver_work(busy_id, 1, &serviced, nullptr) ==
-        MLN_STATUS_OK,
+      mln_render_session_service_driver_work(busy_id, nullptr) == MLN_STATUS_OK,
       "servicing the attachment failed"
     );
+    attachment_serviced = true;
+    mln_test_pulse();
     checks.check(
       await([&] { return serve.load(); }, "the operation to service"),
       "the operation was never enqueued"
     );
     checks.check(
-      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
-        MLN_STATUS_OK,
+      mln_render_session_service_driver_work(busy_id, nullptr) == MLN_STATUS_OK,
       "servicing the operation failed"
     );
   }};
-  const auto attached = released(attach);
+  const auto attached = await(
+                          [&] { return attachment_serviced.load(); },
+                          "the attachment service to return"
+                        ) &&
+                        released(attach);
   auto driver = WorkerGate{};
   auto blocked = Result{};
   const auto blocked_completion = descriptor(blocked);

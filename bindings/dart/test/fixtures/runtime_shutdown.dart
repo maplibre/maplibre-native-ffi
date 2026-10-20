@@ -72,13 +72,7 @@ Future<void> abandonSession() async {
   // A frame wake leaves the isolate free to finish, so a port keeps it alive
   // until a frame result arrives.
   final waiting = ReceivePort();
-  session.requestFrame(
-    FrameDemand(
-      token: BigInt.one,
-      coalescingBoundary: BigInt.zero,
-      timeoutNs: BigInt.zero,
-    ),
-  );
+  session.requestFrame(FrameDemand(token: BigInt.one));
   var drained = 0;
   while (drained == 0) {
     await frames.future;

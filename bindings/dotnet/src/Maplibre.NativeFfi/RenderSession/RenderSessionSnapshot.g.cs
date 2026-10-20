@@ -12,14 +12,8 @@ namespace Maplibre.NativeFfi;
 /// <param name="State">
 /// One <c>mln_render_session_state</c> value.
 /// </param>
-/// <param name="Driver">
-/// One <c>mln_render_driver_kind</c> value.
-/// </param>
-/// <param name="LatestResult">
-/// Most recent terminal <c>mln_render_result</c> value.
-/// </param>
 /// <param name="Extent">
-/// Logical extent, including a resize the driver has not applied yet.
+/// Logical extent applied by the driver.
 /// </param>
 /// <param name="Generation">
 /// Increases when the session's lifecycle state, target, or applied extent
@@ -32,23 +26,11 @@ namespace Maplibre.NativeFfi;
 /// Map render update generation that the latest rendered frame drew. Zero
 /// before the first frame after attachment or a target replacement.
 /// </param>
-/// <param name="ExtentGeneration">
-/// Starts at one and increases each time the driver applies a resize.
-/// </param>
 /// <param name="FrameGeneration">
 /// Frame generation of the latest rendered frame, zero before the first.
 /// </param>
-/// <param name="LatestDemandToken">
-/// Token of the demand whose terminal result the session queued last.
-/// </param>
-/// <param name="PendingDemandCount">
-/// Accepted demands that have no terminal result yet.
-/// </param>
 /// <param name="AcquiredFrameCount">
 /// Acquired frames that the host has not released or disposed.
-/// </param>
-/// <param name="TargetReady">
-/// False once attachment fails or the session is abandoned.
 /// </param>
 /// <param name="PendingChanges">
 /// True when a map update or an accepted resize arrived after the latest
@@ -56,36 +38,16 @@ namespace Maplibre.NativeFfi;
 /// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
-    RenderDriverKind Driver,
-    RenderResult LatestResult,
     LogicalExtent Extent,
     ulong Generation,
     ulong MapUpdateGeneration,
     ulong RenderedUpdateGeneration,
-    ulong ExtentGeneration,
     ulong FrameGeneration,
-    ulong LatestDemandToken,
-    uint PendingDemandCount,
     uint AcquiredFrameCount,
-    bool TargetReady,
     bool PendingChanges
 )
 {
     public RenderSessionSnapshot()
-        : this(
-            default,
-            default,
-            default,
-            new LogicalExtent(),
-            default,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default,
-            default
-        ) { }
+        : this(default, new LogicalExtent(), default, default, default, default, default, default)
+    { }
 }

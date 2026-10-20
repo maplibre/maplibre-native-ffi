@@ -138,8 +138,7 @@ class Host {
     check(mln_render_session_request_frame(session_, &demand, nullptr));
   }
   void service() {
-    size_t count = 0;
-    check(mln_render_session_service_driver_work(session_, 0, &count, nullptr));
+    check(mln_render_session_service_driver_work(session_, nullptr));
     for (;;) {
       auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
       const auto status =
@@ -196,10 +195,8 @@ class Host {
         const auto lock = std::scoped_lock{attached.mutex};
         if (attached.ready) break;
       }
-      size_t count = 0;
-      check(
-        mln_render_session_service_driver_work(session_, 0, &count, nullptr)
-      );
+
+      check(mln_render_session_service_driver_work(session_, nullptr));
     }
     arm();
     {
@@ -227,10 +224,8 @@ class Host {
         const auto lock = std::scoped_lock{detached.mutex};
         if (detached.ready) break;
       }
-      size_t count = 0;
-      check(
-        mln_render_session_service_driver_work(session_, 0, &count, nullptr)
-      );
+
+      check(mln_render_session_service_driver_work(session_, nullptr));
     }
     check(mln_render_session_release(session_, nullptr));
     mln_test_graphics_destroy(graphics);

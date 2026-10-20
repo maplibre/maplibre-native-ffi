@@ -16,24 +16,10 @@ namespace Maplibre.NativeFfi;
 /// <param name="Token">
 /// Host identity returned with the terminal frame result.
 /// </param>
-/// <param name="CoalescingBoundary">
-/// Demands coalesce only when this value and their flags match.
-/// </param>
-/// <param name="TimeoutNs">
-/// Positive time allowed before driver work begins, in nanoseconds; zero has no
-/// limit. A demand that waits, for a free texture slot or for a map update, is
-/// checked against its timeout when it runs again; a wait has no timer of its
-/// own.
-/// </param>
-public readonly partial record struct FrameDemand(
-    FrameDemandFlag Flags,
-    ulong Token,
-    ulong CoalescingBoundary,
-    ulong TimeoutNs
-)
+public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token)
 {
     public FrameDemand()
-        : this(FrameDemandFlag.IfNeeded, default, default, default) { }
+        : this(FrameDemandFlag.IfNeeded, default) { }
 
     public static FrameDemand Default
     {

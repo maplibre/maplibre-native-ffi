@@ -250,9 +250,7 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
       TEST_ASSERT_EQUAL_UINT32(
         MLN_RENDER_RESULT_RENDERED, record.result.disposition
       );
-      TEST_ASSERT_EQUAL_UINT64(
-        snapshot.extent_generation, record.result.extent_generation
-      );
+      TEST_ASSERT_EQUAL_UINT64(snapshot.generation, record.result.generation);
       TEST_ASSERT_EQUAL_UINT64(
         snapshot.frame_generation, record.result.frame_generation
       );
@@ -487,22 +485,20 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   detach(runtime, map, &fixture);
 }
 
-// Waits until the driver has run every work item that it already holds, then
-// counts the demands that it parked behind a full texture ring.
-static uint32_t parked_demand_count(const mln_test_render_fixture* fixture) {
+// Waits for earlier driver work and verifies that parked demands have no
+// result.
+static void expect_parked_demand(const mln_test_render_fixture* fixture) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
     mln_render_session_reduce_memory_use(
       fixture->session, &completion.descriptor, NULL
     )
   );
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  MLN_TEST_OK(
-    mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_NOT_READY,
+    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
   );
-  return snapshot.pending_demand_count;
 }
 
 // Disposing a frame, which a binding's finalizer uses in place of a
@@ -548,7 +544,7 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   // to render, even though the quarantined slot holds no frame.
   mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 3);
   mln_test_render_request_forced(&fixture, 4);
-  TEST_ASSERT_EQUAL_UINT32(1, parked_demand_count(&fixture));
+  expect_parked_demand(&fixture);
   mln_test_render_release_frame(&held);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(&fixture, 1);
@@ -569,11 +565,10 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   attach(&runtime, &map, &fixture, mln_test_empty_style_json);
   const mln_acquired_frame first = mln_test_render_and_acquire(&fixture, 1);
   const mln_acquired_frame second = mln_test_render_and_acquire(&fixture, 2);
-  // Each demand has its own coalescing boundary, so neither supersedes the
-  // other and both park.
+  // Forced demands remain independent, so both park.
   mln_test_render_request_forced(&fixture, 3);
   mln_test_render_request_forced(&fixture, 4);
-  TEST_ASSERT_EQUAL_UINT32(2, parked_demand_count(&fixture));
+  expect_parked_demand(&fixture);
 
   MLN_TEST_OK(mln_acquired_frame_dispose(first, NULL));
   MLN_TEST_OK(mln_acquired_frame_dispose(second, NULL));

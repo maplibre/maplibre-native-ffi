@@ -103,7 +103,7 @@ func (driver *callerDriver) attach(session *maplibre.RenderSessionHandle, comple
 // sleeping until the driver-work wake or the completion arrives.
 func (driver *callerDriver) await(future *maplibre.Future[struct{}]) error {
 	for {
-		if _, err := driver.session.ServiceDriverWork(0); err != nil {
+		if err := driver.session.ServiceDriverWork(); err != nil {
 			return err
 		}
 		select {
@@ -132,7 +132,7 @@ func (driver *callerDriver) RequestFrame(force bool) error {
 
 func (driver *callerDriver) HandleWakes() (bool, error) {
 	if driver.wakes.driverWork.consume() {
-		if _, err := driver.session.ServiceDriverWork(0); err != nil {
+		if err := driver.session.ServiceDriverWork(); err != nil {
 			return false, err
 		}
 	}

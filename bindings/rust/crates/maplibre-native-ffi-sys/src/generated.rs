@@ -104,10 +104,7 @@ pub const MLN_GESTURE_PHASE_END: mln_gesture_phase = 3;
 pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
 pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
-pub const MLN_GPU_SYNC_METAL_SHARED_EVENT: mln_gpu_sync_kind = 1;
-pub const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE: mln_gpu_sync_kind = 2;
 pub const MLN_GPU_SYNC_OPENGL_FENCE: mln_gpu_sync_kind = 3;
-pub const MLN_GPU_SYNC_WEBGPU_TOKEN: mln_gpu_sync_kind = 4;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;
@@ -215,10 +212,8 @@ pub const MLN_RENDER_MODE_FULL: mln_render_mode = 1;
 pub type mln_render_result = u32;
 pub const MLN_RENDER_RESULT_RENDERED: mln_render_result = 0;
 pub const MLN_RENDER_RESULT_NO_UPDATE: mln_render_result = 1;
-pub const MLN_RENDER_RESULT_SIZE_PENDING: mln_render_result = 2;
 pub const MLN_RENDER_RESULT_TARGET_NOT_READY: mln_render_result = 3;
 pub const MLN_RENDER_RESULT_SUPERSEDED: mln_render_result = 4;
-pub const MLN_RENDER_RESULT_DEADLINE_MISSED: mln_render_result = 5;
 pub type mln_render_session_capability_flag = u32;
 pub const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION: mln_render_session_capability_flag = 1;
 pub const MLN_RENDER_SESSION_CAPABILITY_READBACK: mln_render_session_capability_flag = 2;
@@ -662,8 +657,6 @@ pub struct mln_frame_demand {
     pub size: u32,
     pub flags: u32,
     pub token: u64,
-    pub coalescing_boundary: u64,
-    pub timeout_ns: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -696,7 +689,6 @@ pub struct mln_gpu_sync {
     pub size: u32,
     pub kind: u32,
     pub object: u64,
-    pub value: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1059,7 +1051,7 @@ pub struct mln_render_frame_result {
     pub disposition: u32,
     pub token: u64,
     pub map_update_generation: u64,
-    pub extent_generation: u64,
+    pub generation: u64,
     pub frame_generation: u64,
     pub needs_repaint: bool,
 }
@@ -1087,18 +1079,12 @@ pub struct mln_render_session_capabilities {
 pub struct mln_render_session_snapshot {
     pub size: u32,
     pub state: u32,
-    pub driver: u32,
-    pub latest_result: u32,
     pub extent: mln_logical_extent,
     pub generation: u64,
     pub map_update_generation: u64,
     pub rendered_update_generation: u64,
-    pub extent_generation: u64,
     pub frame_generation: u64,
-    pub latest_demand_token: u64,
-    pub pending_demand_count: u32,
     pub acquired_frame_count: u32,
-    pub target_ready: bool,
     pub pending_changes: bool,
 }
 #[repr(C)]
@@ -2624,8 +2610,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_service_driver_work(
         session: mln_render_session,
-        max_work: usize,
-        out_serviced: *mut usize,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_metal_borrowed_texture_target(

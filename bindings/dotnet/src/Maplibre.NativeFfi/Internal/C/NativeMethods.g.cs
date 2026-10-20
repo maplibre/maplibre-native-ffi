@@ -1297,8 +1297,6 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_service_driver_work(
         MlnRenderSession session,
-        nuint max_work,
-        nuint* out_serviced,
         mln_diagnostic* out_diagnostic
     );
 

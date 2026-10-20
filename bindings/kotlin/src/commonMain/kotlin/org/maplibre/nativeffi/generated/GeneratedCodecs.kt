@@ -9,14 +9,13 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.NativePointer
 
 internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
-  writeU32(target, 24.toUInt())
+  writeU32(target, 16.toUInt())
   writeU32(target + 4, value.kind.rawValue)
   writeU64(target + 8, value.`object`)
-  writeU64(target + 16, value.value)
 }
 
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
-  allocate(24, 8).also { putGpuSync(it, value) }
+  allocate(16, 8).also { putGpuSync(it, value) }
 
 internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSourceOptions) {
   writeU32(target, w(64, 72).toUInt())
@@ -881,15 +880,13 @@ internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQuer
   allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
 
 internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
-  writeU32(target, 32.toUInt())
+  writeU32(target, 16.toUInt())
   writeU32(target + 4, value.flags.rawValue)
   writeU64(target + 8, value.token)
-  writeU64(target + 16, value.coalescingBoundary)
-  writeU64(target + 24, value.timeoutNs)
 }
 
 internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
-  allocate(32, 8).also { putFrameDemand(it, value) }
+  allocate(16, 8).also { putFrameDemand(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
   writeU32(target, w(72, 96).toUInt())
@@ -1058,19 +1055,16 @@ internal fun readOpenglTextureFrame(source: Long, scope: ViewScope? = null): Ope
     .also { it.bindingScope = scope }
 
 internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
-  GpuSync(
-      kind = GpuSyncKind(readU32(source + 4)),
-      `object` = readU64(source + 8),
-      value = readU64(source + 16),
-    )
-    .also { it.bindingScope = scope }
+  GpuSync(kind = GpuSyncKind(readU32(source + 4)), `object` = readU64(source + 8)).also {
+    it.bindingScope = scope
+  }
 
 internal fun readRenderFrameResult(source: Long): RenderFrameResult =
   RenderFrameResult(
     disposition = RenderResult(readU32(source + 4)),
     token = readU64(source + 8),
     mapUpdateGeneration = readU64(source + 16),
-    extentGeneration = readU64(source + 24),
+    generation = readU64(source + 24),
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
   )
@@ -1213,12 +1207,7 @@ internal fun readCustomMvtVectorSourceOptions(source: Long): CustomMvtVectorSour
 }
 
 internal fun readFrameDemand(source: Long): FrameDemand =
-  FrameDemand(
-    flags = FrameDemandFlag(readU32(source + 4)),
-    token = readU64(source + 8),
-    coalescingBoundary = readU64(source + 16),
-    timeoutNs = readU64(source + 24),
-  )
+  FrameDemand(flags = FrameDemandFlag(readU32(source + 4)), token = readU64(source + 8))
 
 internal fun readFreeCameraOptions(source: Long): FreeCameraOptions {
   val fields = readU32(source + 4)
@@ -1629,19 +1618,13 @@ internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilit
 internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
   RenderSessionSnapshot(
     state = RenderSessionState(readU32(source + 4)),
-    driver = RenderDriverKind(readU32(source + 8)),
-    latestResult = RenderResult(readU32(source + 12)),
-    extent = readLogicalExtent(source + 16),
-    generation = readU64(source + 32),
-    mapUpdateGeneration = readU64(source + 40),
-    renderedUpdateGeneration = readU64(source + 48),
-    extentGeneration = readU64(source + 56),
-    frameGeneration = readU64(source + 64),
-    latestDemandToken = readU64(source + 72),
-    pendingDemandCount = readU32(source + 80),
-    acquiredFrameCount = readU32(source + 84),
-    targetReady = readBool(source + 88),
-    pendingChanges = readBool(source + 89),
+    extent = readLogicalExtent(source + 8),
+    generation = readU64(source + 24),
+    mapUpdateGeneration = readU64(source + 32),
+    renderedUpdateGeneration = readU64(source + 40),
+    frameGeneration = readU64(source + 48),
+    acquiredFrameCount = readU32(source + 56),
+    pendingChanges = readBool(source + 60),
   )
 
 internal fun readQueriedFeature(source: Long): QueriedFeature {

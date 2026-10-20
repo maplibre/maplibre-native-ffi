@@ -1070,14 +1070,7 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_render_session_service_driver_work =
-    Ffm.downcall(
-      "mln_render_session_service_driver_work",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
+    Ffm.downcall("mln_render_session_service_driver_work", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_set_metal_borrowed_texture_target =
     Ffm.downcall(
       "mln_render_session_set_metal_borrowed_texture_target",
@@ -3083,14 +3076,8 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_render_session_service_driver_work(
-    session: Long,
-    maxWork: Long,
-    outServiced: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_service_driver_work.invokeExact(session, maxWork, outServiced, outDiagnostic)
-      as Int
+  actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
+    mln_render_session_service_driver_work.invokeExact(session, outDiagnostic) as Int
 
   actual fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,
@@ -3687,13 +3674,7 @@ internal val mln_custom_mvt_vector_source_options: GroupLayout =
     JAVA_LONG.withName("queue"),
   )
 internal val mln_frame_demand: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("flags"),
-    JAVA_LONG.withName("token"),
-    JAVA_LONG.withName("coalescing_boundary"),
-    JAVA_LONG.withName("timeout_ns"),
-  )
+  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("flags"), JAVA_LONG.withName("token"))
 internal val mln_vec3: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"), JAVA_DOUBLE.withName("z"))
 internal val mln_quaternion: GroupLayout =
@@ -3730,12 +3711,7 @@ internal val mln_geojson_source_options: GroupLayout =
     Ffm.pad(1),
   )
 internal val mln_gpu_sync: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("kind"),
-    JAVA_LONG.withName("object"),
-    JAVA_LONG.withName("value"),
-  )
+  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("object"))
 internal val mln_projected_meters: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("northing"), JAVA_DOUBLE.withName("easting"))
 internal val mln_logical_extent: GroupLayout =

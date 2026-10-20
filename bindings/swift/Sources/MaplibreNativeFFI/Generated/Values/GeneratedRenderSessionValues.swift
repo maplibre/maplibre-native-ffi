@@ -13,42 +13,27 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   public var flags: FrameDemandFlag
   /// Host identity returned with the terminal frame result.
   public var token: UInt64
-  /// Demands coalesce only when this value and their flags match.
-  public var coalescingBoundary: UInt64
-  /// Positive time allowed before driver work begins, in nanoseconds; zero has
-  /// no limit. A demand that waits, for a free texture slot or for a map
-  /// update, is checked against its timeout when it runs again; a wait has no
-  /// timer of its own.
-  public var timeoutNs: UInt64
   public static var `default`: Self {
     Self(raw: mln_frame_demand_default())
   }
 
   public init(
     flags: FrameDemandFlag = FrameDemand.default.flags,
-    token: UInt64 = FrameDemand.default.token,
-    coalescingBoundary: UInt64 = FrameDemand.default.coalescingBoundary,
-    timeoutNs: UInt64 = FrameDemand.default.timeoutNs
+    token: UInt64 = FrameDemand.default.token
   ) {
     self.flags = flags
     self.token = token
-    self.coalescingBoundary = coalescingBoundary
-    self.timeoutNs = timeoutNs
   }
 
   init(raw: mln_frame_demand) {
     flags = FrameDemandFlag(rawValue: raw.flags)
     token = raw.token
-    coalescingBoundary = raw.coalescing_boundary
-    timeoutNs = raw.timeout_ns
   }
 
   func nativeValue() -> mln_frame_demand {
     var raw = mln_frame_demand_default()
     raw.flags = flags.rawValue
     raw.token = token
-    raw.coalescing_boundary = coalescingBoundary
-    raw.timeout_ns = timeoutNs
     return raw
   }
 }
@@ -72,20 +57,19 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// whatever it presented last. Ignored by targets without presentation.
   public static let present: FrameDemandFlag = .init(rawValue: 2)
   /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
-  /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
-  /// instead, and runs again after the map's next update, a target replacement,
-  /// or an applied resize. A waiting demand holds no ring slot. A later demand
-  /// with the same flags and coalescing boundary supersedes it, a barrier ends
-  /// its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach, abandon, or the
-  /// quarantine of the ring's last usable slot end it with
-  /// `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
-  /// the results of demands accepted after it. The flag does not pace: a host
-  /// that re-arms a waiting demand as each result arrives renders every update
-  /// the map publishes. The map publishes one update for the commands that its
-  /// runtime worker runs back to back, but a command that reaches the worker
-  /// while a frame renders appears in a later frame. To show several commands
-  /// in one frame, submit them in a command group, or arm demands once per
-  /// display frame.
+  /// `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the
+  /// map's next update, a target replacement, or an applied resize. A waiting
+  /// demand holds no ring slot. A later demand with the same flags supersedes
+  /// it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and
+  /// detach, abandon, or the quarantine of the ring's last usable slot end it
+  /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
+  /// follow the results of demands accepted after it. The flag does not pace: a
+  /// host that re-arms a waiting demand as each result arrives renders every
+  /// update the map publishes. The map publishes one update for the commands
+  /// that its runtime worker runs back to back, but a command that reaches the
+  /// worker while a frame renders appears in a later frame. To show several
+  /// commands in one frame, submit them in a command group, or arm demands once
+  /// per display frame.
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
@@ -191,9 +175,9 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// with `mln_map_snapshot.latest_render_update_generation` to find the first
   /// frame that includes a command.
   public var mapUpdateGeneration: UInt64
-  /// The session's extent generation when the demand reached its result. See
-  /// `mln_render_session_snapshot.extent_generation`.
-  public var extentGeneration: UInt64
+  /// The session's target generation when the demand reached its result. See
+  /// `mln_render_session_snapshot.generation`.
+  public var generation: UInt64
   /// Position of the frame among the frames that the session rendered, counting
   /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
   public var frameGeneration: UInt64
@@ -217,14 +201,14 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     disposition: RenderResult = RenderFrameResult.default.disposition,
     token: UInt64 = RenderFrameResult.default.token,
     mapUpdateGeneration: UInt64 = RenderFrameResult.default.mapUpdateGeneration,
-    extentGeneration: UInt64 = RenderFrameResult.default.extentGeneration,
+    generation: UInt64 = RenderFrameResult.default.generation,
     frameGeneration: UInt64 = RenderFrameResult.default.frameGeneration,
     needsRepaint: Bool = RenderFrameResult.default.needsRepaint
   ) {
     self.disposition = disposition
     self.token = token
     self.mapUpdateGeneration = mapUpdateGeneration
-    self.extentGeneration = extentGeneration
+    self.generation = generation
     self.frameGeneration = frameGeneration
     self.needsRepaint = needsRepaint
   }
@@ -233,7 +217,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     disposition = RenderResult(rawValue: raw.disposition)
     token = raw.token
     mapUpdateGeneration = raw.map_update_generation
-    extentGeneration = raw.extent_generation
+    generation = raw.generation
     frameGeneration = raw.frame_generation
     needsRepaint = raw.needs_repaint
   }
@@ -244,7 +228,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     raw.disposition = disposition.rawValue
     raw.token = token
     raw.map_update_generation = mapUpdateGeneration
-    raw.extent_generation = extentGeneration
+    raw.generation = generation
     raw.frame_generation = frameGeneration
     raw.needs_repaint = needsRepaint
     return raw
@@ -265,25 +249,19 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
 
   /// A frame was rendered for acquisition, presentation, or ordered readback.
   public static let rendered: RenderResult = .init(rawValue: 0)
-  /// No newer map update was available, or the map had no complete frame to
-  /// draw yet. The map publishes another update when it has one. A demand with
-  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and
-  /// finishes with this result only when a barrier ends its wait.
+  /// No newer map update was available, the map had no complete frame to draw,
+  /// or the update extent differed from the target. The map publishes another
+  /// update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
+  /// waits for that update instead, and finishes with this result only when a
+  /// barrier ends its wait.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
-  /// An ordered extent change had not reached the map. The map publishes an
-  /// update at the new extent, which a demand with
-  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
-  /// this result.
-  public static let sizePending: RenderResult = .init(rawValue: 2)
   /// The target could not produce a frame. The attempt consumes nothing, so a
   /// later demand with the same flags renders what this one would have. This
   /// result does not cause a map update, so the host demands again when the
   /// target can be ready, such as after a paced delay.
   public static let targetNotReady: RenderResult = .init(rawValue: 3)
-  /// A newer demand in the same coalescing boundary replaced this demand.
+  /// A newer IF_NEEDED demand with the same flags replaced this demand.
   public static let superseded: RenderResult = .init(rawValue: 4)
-  /// The demand's timeout elapsed before driver work began.
-  public static let deadlineMissed: RenderResult = .init(rawValue: 5)
 }
 
 /// Any-thread render-session snapshot.
@@ -293,11 +271,7 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
 public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   /// One `mln_render_session_state` value.
   public var state: RenderSessionState
-  /// One `mln_render_driver_kind` value.
-  public var driver: RenderDriverKind
-  /// Most recent terminal `mln_render_result` value.
-  public var latestResult: RenderResult
-  /// Logical extent, including a resize the driver has not applied yet.
+  /// Logical extent applied by the driver.
   public var extent: LogicalExtent
   /// Increases when the session's lifecycle state, target, or applied extent
   /// changes. An acquired texture frame reports the value it rendered under.
@@ -307,18 +281,10 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   /// Map render update generation that the latest rendered frame drew. Zero
   /// before the first frame after attachment or a target replacement.
   public var renderedUpdateGeneration: UInt64
-  /// Starts at one and increases each time the driver applies a resize.
-  public var extentGeneration: UInt64
   /// Frame generation of the latest rendered frame, zero before the first.
   public var frameGeneration: UInt64
-  /// Token of the demand whose terminal result the session queued last.
-  public var latestDemandToken: UInt64
-  /// Accepted demands that have no terminal result yet.
-  public var pendingDemandCount: UInt32
   /// Acquired frames that the host has not released or disposed.
   public var acquiredFrameCount: UInt32
-  /// False once attachment fails or the session is abandoned.
-  public var targetReady: Bool
   /// True when a map update or an accepted resize arrived after the latest
   /// rendered frame.
   public var pendingChanges: Bool
@@ -328,54 +294,35 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
 
   public init(
     state: RenderSessionState = RenderSessionSnapshot.default.state,
-    driver: RenderDriverKind = RenderSessionSnapshot.default.driver,
-    latestResult: RenderResult = RenderSessionSnapshot.default.latestResult,
     extent: LogicalExtent = RenderSessionSnapshot.default.extent,
     generation: UInt64 = RenderSessionSnapshot.default.generation,
     mapUpdateGeneration: UInt64 = RenderSessionSnapshot.default
       .mapUpdateGeneration,
     renderedUpdateGeneration: UInt64 = RenderSessionSnapshot.default
       .renderedUpdateGeneration,
-    extentGeneration: UInt64 = RenderSessionSnapshot.default.extentGeneration,
     frameGeneration: UInt64 = RenderSessionSnapshot.default.frameGeneration,
-    latestDemandToken: UInt64 = RenderSessionSnapshot.default.latestDemandToken,
-    pendingDemandCount: UInt32 = RenderSessionSnapshot.default
-      .pendingDemandCount,
     acquiredFrameCount: UInt32 = RenderSessionSnapshot.default
       .acquiredFrameCount,
-    targetReady: Bool = RenderSessionSnapshot.default.targetReady,
     pendingChanges: Bool = RenderSessionSnapshot.default.pendingChanges
   ) {
     self.state = state
-    self.driver = driver
-    self.latestResult = latestResult
     self.extent = extent
     self.generation = generation
     self.mapUpdateGeneration = mapUpdateGeneration
     self.renderedUpdateGeneration = renderedUpdateGeneration
-    self.extentGeneration = extentGeneration
     self.frameGeneration = frameGeneration
-    self.latestDemandToken = latestDemandToken
-    self.pendingDemandCount = pendingDemandCount
     self.acquiredFrameCount = acquiredFrameCount
-    self.targetReady = targetReady
     self.pendingChanges = pendingChanges
   }
 
   init(raw: mln_render_session_snapshot) {
     state = RenderSessionState(rawValue: raw.state)
-    driver = RenderDriverKind(rawValue: raw.driver)
-    latestResult = RenderResult(rawValue: raw.latest_result)
     extent = LogicalExtent(raw: raw.extent)
     generation = raw.generation
     mapUpdateGeneration = raw.map_update_generation
     renderedUpdateGeneration = raw.rendered_update_generation
-    extentGeneration = raw.extent_generation
     frameGeneration = raw.frame_generation
-    latestDemandToken = raw.latest_demand_token
-    pendingDemandCount = raw.pending_demand_count
     acquiredFrameCount = raw.acquired_frame_count
-    targetReady = raw.target_ready
     pendingChanges = raw.pending_changes
   }
 
@@ -383,18 +330,12 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     var raw = mln_render_session_snapshot()
     raw.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
     raw.state = state.rawValue
-    raw.driver = driver.rawValue
-    raw.latest_result = latestResult.rawValue
     raw.extent = extent.nativeValue()
     raw.generation = generation
     raw.map_update_generation = mapUpdateGeneration
     raw.rendered_update_generation = renderedUpdateGeneration
-    raw.extent_generation = extentGeneration
     raw.frame_generation = frameGeneration
-    raw.latest_demand_token = latestDemandToken
-    raw.pending_demand_count = pendingDemandCount
     raw.acquired_frame_count = acquiredFrameCount
-    raw.target_ready = targetReady
     raw.pending_changes = pendingChanges
     return raw
   }

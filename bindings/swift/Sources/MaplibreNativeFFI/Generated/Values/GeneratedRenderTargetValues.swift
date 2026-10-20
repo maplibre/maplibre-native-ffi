@@ -81,36 +81,29 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 public struct GpuSync: Equatable, Hashable, Sendable {
   /// One `mln_gpu_sync_kind` value.
   public var kind: GpuSyncKind
-  /// Bit pattern of the backend object that kind names: the
-  /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
-  /// or the WebGPU token.
+  /// Bit pattern of the GLsync pointer.
   public var object: UInt64
-  public var value: UInt64
   public static var `default`: Self {
     Self(raw: mln_gpu_sync_default())
   }
 
   public init(
     kind: GpuSyncKind = GpuSync.default.kind,
-    object: UInt64 = GpuSync.default.object,
-    value: UInt64 = GpuSync.default.value
+    object: UInt64 = GpuSync.default.object
   ) {
     self.kind = kind
     self.object = object
-    self.value = value
   }
 
   init(raw: mln_gpu_sync) {
     kind = GpuSyncKind(rawValue: raw.kind)
     object = raw.object
-    value = raw.value
   }
 
   func nativeValue() -> mln_gpu_sync {
     var raw = mln_gpu_sync_default()
     raw.kind = kind.rawValue
     raw.object = object
-    raw.value = value
     return raw
   }
 }
@@ -131,15 +124,9 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
   /// was submitted to the device's queue, before the frame became acquirable or
   /// before the release call.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
-  /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
-  public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 1)
-  /// VkSemaphore plus a timeline value.
-  public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 2)
   /// GLsync in the shared EGL or WGL context's share group, used only by a
-  /// caller-graphics-thread driver. value is zero and object is nonzero.
+  /// caller-graphics-thread driver. object is nonzero.
   public static let openglFence: GpuSyncKind = .init(rawValue: 3)
-  /// A backend-defined WebGPU completion token.
-  public static let webgpuToken: GpuSyncKind = .init(rawValue: 4)
 }
 
 /// Metal backend context fields shared by Metal render targets.

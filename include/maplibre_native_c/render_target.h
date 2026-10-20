@@ -176,13 +176,9 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * release call, or on WebGPU were submitted to the device's queue before it.
    */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
-  /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
-  MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
-  /** VkSemaphore plus a timeline value. */
-  MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
   /**
    * GLsync in the shared EGL or WGL context's share group, used only by a
-   * caller-graphics-thread driver. value is zero and object is nonzero.
+   * caller-graphics-thread driver. object is nonzero.
    *
    * The producer inserts glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) and
    * calls glFlush before publishing the frame. Before reading the texture,
@@ -195,41 +191,33 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * extends that borrowing. The session deletes fences on slot reuse or
    * normal detach while its context is current.
    *
-   * The host owns consumer fences. It inserts a fence after its reads and
-   * calls glFlush in the context that inserted it before releasing the frame.
-   * The driver queues glWaitSync before reusing the slot. The host keeps the
-   * fence alive until a later session barrier or detach completes, then
-   * deletes it in a context of the share group.
+   * The host inserts a consumer fence after its reads and calls glFlush in
+   * that context before releasing the frame. A successful release transfers
+   * the fence to the session. The driver queues glWaitSync before reusing the
+   * slot and deletes the fence after queueing the wait.
    *
    * Target loss invalidates frame access. Abandon performs no graphics
-   * cleanup and may retain producer fences until process exit. After abandon,
-   * the host may delete its consumer fences in a surviving share-group
-   * context, but must finish its GPU reads before destroying borrowed textures.
+   * cleanup and may retain producer and consumer fences until process exit.
+   * The host finishes its GPU reads before destroying borrowed textures.
    */
   MLN_GPU_SYNC_OPENGL_FENCE = 3U,
-  /** A backend-defined WebGPU completion token. */
-  MLN_GPU_SYNC_WEBGPU_TOKEN = 4U,
 } mln_gpu_sync_kind;
 
 /**
  * Backend synchronization copied by frame access and release calls.
  *
- * object is retained only for Metal. Vulkan and WebGPU objects remain borrowed
- * until a later session barrier or detach completes. OpenGL ownership and
- * lifetimes follow MLN_GPU_SYNC_OPENGL_FENCE.
+ * OpenGL ownership and lifetimes follow MLN_GPU_SYNC_OPENGL_FENCE.
  */
 typedef struct mln_gpu_sync {
   uint32_t size;
   /** One mln_gpu_sync_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /**
-   * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>`
-   * pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
+   * Bit pattern of the GLsync pointer.
    *
    * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE.
    */
   uint64_t object;
-  uint64_t value;
 } mln_gpu_sync;
 
 /** Returns CPU-complete synchronization for this C API version. */

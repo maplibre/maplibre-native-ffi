@@ -189,14 +189,7 @@ const MetalTextureCompositor = struct {
 
         const command_buffer = self.queue.msgSend(objc.Object, "commandBuffer", .{});
         if (command_buffer.value == null) return types.AppError.BackendDrawFailed;
-        switch (producer_sync.kind) {
-            .cpu_complete => {},
-            .metal_shared_event => command_buffer.msgSend(void, "encodeWaitForEvent:value:", .{
-                objc.Object.fromId(@as(*anyopaque, @ptrFromInt(producer_sync.object))),
-                producer_sync.value,
-            }),
-            else => return types.AppError.BackendDrawFailed,
-        }
+        if (producer_sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
         const encoder = command_buffer.msgSend(
             objc.Object,
             "renderCommandEncoderWithDescriptor:",

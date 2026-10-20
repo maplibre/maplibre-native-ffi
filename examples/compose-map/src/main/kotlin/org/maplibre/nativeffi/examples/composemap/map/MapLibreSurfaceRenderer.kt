@@ -122,13 +122,13 @@ internal class MapLibreSurfaceRenderer(
       }
     drawing.set(false)
     // Driver work that arrived before the flag cleared asked for no draw, so it runs now.
-    if (callerDriver) renderSession?.session?.serviceDriverWork(0uL)
+    if (callerDriver) renderSession?.session?.serviceDriverWork()
     return result
   }
 
   private fun renderAttached(map: MapHandle, frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
     val session = ensureAttachedRenderSession(map, frame).session
-    if (callerDriver) session.serviceDriverWork(0uL)
+    if (callerDriver) session.serviceDriverWork()
     val forced = frameForced.getAndSet(false)
     val wanted = frameWanted.getAndSet(false)
     val ready =
@@ -225,7 +225,7 @@ internal class MapLibreSurfaceRenderer(
    */
   private fun awaitResult(session: RenderSessionHandle, token: ULong): RenderFrameResult {
     while (true) {
-      if (callerDriver) session.serviceDriverWork(0uL)
+      if (callerDriver) session.serviceDriverWork()
       val result =
         session.drainFrameResults()?.use { results ->
           results.get().results.lastOrNull { it.token == token }
@@ -448,7 +448,7 @@ internal class MapLibreSurfaceRenderer(
   private fun <T> await(session: RenderSessionHandle, completion: Deferred<T>): T {
     completion.invokeOnCompletion { sessionWork.release() }
     while (true) {
-      if (callerDriver) session.serviceDriverWork(0uL)
+      if (callerDriver) session.serviceDriverWork()
       if (completion.isCompleted) break
       sessionWork.acquire()
     }

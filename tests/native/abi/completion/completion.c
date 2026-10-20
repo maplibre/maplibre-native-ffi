@@ -202,9 +202,7 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(80, snapshot.extent.height);
-  TEST_ASSERT_EQUAL_UINT64(
-    before.extent_generation + 1, snapshot.extent_generation
-  );
+  TEST_ASSERT_EQUAL_UINT64(before.generation + 1, snapshot.generation);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

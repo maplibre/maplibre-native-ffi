@@ -62,14 +62,8 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture.session, &demand, NULL)
     );
-    MLN_TEST_RENDER_AWAIT(
-      MLN_STATUS_OK, &fixture,
-      mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
-    );
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    MLN_TEST_OK(
-      mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-    );
+    const mln_render_frame_batch batch =
+      mln_test_render_wait_for_results(&fixture, 1);
     const mln_render_frame_result result =
       mln_test_render_batch_result(batch, 0);
     mln_render_frame_batch_release(batch);

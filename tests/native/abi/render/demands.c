@@ -130,9 +130,7 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
 
 // With every ring slot acquired, a demand waits for a CPU release instead of
 // rendering over an acquired frame, and detach refuses while frames are out.
-// The parked demand gives up its driver work item, so a barrier accepted
-// after it waits for its terminal result, and detach, the last place that can
-// give it one, does.
+// A barrier ends the parked demand while the host still owns both frames.
 static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   mln_runtime runtime;
   mln_map map;
@@ -149,13 +147,9 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   MLN_TEST_OK(
     mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
   );
-  // The fence runs after the driver parked the demand and checked the
-  // barrier, so the barrier stays pending until a frame is released.
-  fence_driver(&fixture);
-  TEST_ASSERT_FALSE(mln_test_completion_poll(&barrier));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
   mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(2, snapshot.acquired_frame_count);
-  TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
   mln_completion rejected_detach = mln_test_discard_completion();
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
@@ -163,14 +157,15 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   );
 
   mln_test_render_release_frame(&first);
-  TEST_ASSERT_EQUAL_UINT64(203, take_one_result(&fixture).token);
+  const mln_render_frame_result cancelled = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(203, cancelled.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, cancelled.disposition);
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
   mln_test_completion_destroy(&barrier);
 
   // Park another demand behind a full ring, then release both frames, which
   // leaves the demand with no work item, and detach.
-  first = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
+  first = mln_test_render_and_acquire(&fixture, 204);
   mln_test_render_request_forced(&fixture, 503);
   fence_driver(&fixture);
   mln_test_render_release_frame(&first);
@@ -192,7 +187,6 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   TEST_ASSERT_TRUE(reported);
   snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_DETACHED, snapshot.state);
-  TEST_ASSERT_EQUAL_UINT32(0, snapshot.pending_demand_count);
   detach(runtime, map, &fixture);
 }
 
@@ -243,21 +237,14 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   detach(runtime, map, &fixture);
 }
 
-// A resize changes the extent generation from the next frame on, and keeps
-// the scale factor. Two resizes accepted before the driver reaches either
-// both commit: the first is superseded rather than parked forever waiting for
-// an extent the map has already moved past, so the queue behind it keeps
-// draining.
-static void resizes_order_extent_generations_and_supersede_each_other(void) {
+// Resizes apply in order, preserve the scale factor, and publish target
+// generations.
+static void resizes_apply_in_order_and_publish_generations(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
   mln_test_render_request_forced(&fixture, 301);
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, &fixture,
-    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
-  );
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
   mln_logical_extent extent = {
@@ -283,13 +270,11 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     )
   );
   TEST_ASSERT_EQUAL_UINT64(
-    old_frame.extent_generation, take_one_result(&fixture).extent_generation
+    old_frame.generation, take_one_result(&fixture).generation
   );
   mln_test_render_request_forced(&fixture, 303);
   const mln_render_frame_result new_frame = take_one_result(&fixture);
-  TEST_ASSERT_GREATER_THAN_UINT64(
-    old_frame.extent_generation, new_frame.extent_generation
-  );
+  TEST_ASSERT_GREATER_THAN_UINT64(old_frame.generation, new_frame.generation);
   TEST_ASSERT_GREATER_THAN_UINT64(
     old_frame.frame_generation, new_frame.frame_generation
   );
@@ -297,9 +282,7 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
   TEST_ASSERT_DOUBLE_WITHIN(0.0, 1.0, snapshot.extent.scale_factor);
-  TEST_ASSERT_EQUAL_UINT64(
-    new_frame.extent_generation, snapshot.extent_generation
-  );
+  TEST_ASSERT_EQUAL_UINT64(new_frame.generation, snapshot.generation);
 
   mln_logical_extent second = extent;
   second.width = 128;
@@ -312,8 +295,6 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   MLN_TEST_OK(mln_render_session_resize(
     fixture.session, second, &second_resize.descriptor, NULL
   ));
-  snapshot = read_snapshot(fixture.session);
-  TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)
   );
@@ -326,10 +307,6 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   );
   mln_test_completion_destroy(&first_resize);
   mln_test_completion_destroy(&second_resize);
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, &fixture,
-    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
-  );
   snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(72, snapshot.extent.height);
@@ -349,8 +326,7 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  const uint64_t old_generation =
-    read_snapshot(fixture.session).extent_generation;
+  const uint64_t old_generation = read_snapshot(fixture.session).generation;
 
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
@@ -364,7 +340,7 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
   TEST_ASSERT_DOUBLE_WITHIN(0.0, 1.0, snapshot.extent.scale_factor);
-  TEST_ASSERT_GREATER_THAN_UINT64(old_generation, snapshot.extent_generation);
+  TEST_ASSERT_GREATER_THAN_UINT64(old_generation, snapshot.generation);
   mln_map_snapshot map_snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &map_snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT32(96, map_snapshot.logical_extent.width);
@@ -401,12 +377,10 @@ static void attaching_sizes_the_map_to_the_target(void) {
   detach(runtime, map, &fixture);
 }
 
-// A resize waits for the map's update at the new extent, which an open command
-// group holds. Detach ends that wait rather than waiting for the group: the
-// resize fails, since the session detaches before it applies. A caller driver
-// starts the resize waiting before the detach; a core worker may instead reach
-// the resize after the detach starts, which ends the same way.
-static void detach_ends_a_resize_that_waits_for_the_map(void) {
+// A command group holds the new render update while resize still applies on
+// both the map and the driver. Later driver work and detach can run before
+// the group ends.
+static void a_resize_applies_while_a_command_group_holds_the_update(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
@@ -414,22 +388,22 @@ static void detach_ends_a_resize_that_waits_for_the_map(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_begin_command_group(map, &completion.descriptor, NULL)
   );
-  mln_test_completion resize = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_render_session_resize(
-    fixture.session,
-    (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
-    &resize.descriptor, NULL
-  ));
-  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_resize(
+      fixture.session,
+      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+      &completion.descriptor, NULL
+    )
+  );
+  expect_map_size(map, 96, 48);
+  const mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
+  TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&resize, -1));
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_test_completion_status(&resize)
-  );
-  mln_test_completion_destroy(&resize);
   MLN_TEST_AWAIT_OK(
     mln_map_end_command_group(map, &completion.descriptor, NULL)
   );
@@ -533,9 +507,6 @@ static void expect_waiting(const mln_test_render_fixture* fixture) {
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY,
     mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    1, read_snapshot(fixture->session).pending_demand_count
   );
 }
 
@@ -690,10 +661,10 @@ MLN_TEST_GROUP {
   RUN_TEST(frame_results_wake_the_host_and_drain_into_an_owned_batch);
   RUN_TEST(a_full_ring_parks_demands_until_a_release_or_detach);
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
-  RUN_TEST(resizes_order_extent_generations_and_supersede_each_other);
+  RUN_TEST(resizes_apply_in_order_and_publish_generations);
   RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
   RUN_TEST(attaching_sizes_the_map_to_the_target);
-  RUN_TEST(detach_ends_a_resize_that_waits_for_the_map);
+  RUN_TEST(a_resize_applies_while_a_command_group_holds_the_update);
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
   RUN_TEST(a_waiting_demand_renders_the_next_map_update);
   RUN_TEST(a_waiting_demand_ends_by_supersession_barrier_or_detach);

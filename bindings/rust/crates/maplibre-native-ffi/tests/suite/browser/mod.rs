@@ -131,7 +131,7 @@ fn a_completion_resolves_while_the_browser_runs_its_loop() {
     // delivers, both through a wait and through a future's waker.
     fixture.fence();
     let woken = Arc::new(Signal::default());
-    drive(&woken, fixture.map().get_style_url().unwrap(), || 0).unwrap();
+    drive(&woken, fixture.map().get_style_url().unwrap(), || {}).unwrap();
 }
 
 #[test]

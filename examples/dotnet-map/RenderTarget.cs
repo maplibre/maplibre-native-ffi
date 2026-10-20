@@ -39,7 +39,7 @@ internal sealed class SessionDriver(
     {
         if (work?.Consume() == true)
         {
-            session.ServiceDriverWork(0);
+            session.ServiceDriverWork();
         }
     }
 
@@ -58,7 +58,7 @@ internal sealed class SessionDriver(
             );
             while (true)
             {
-                session.ServiceDriverWork(0);
+                session.ServiceDriverWork();
                 if (operation.IsCompleted)
                 {
                     break;

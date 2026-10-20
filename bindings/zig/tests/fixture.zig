@@ -478,7 +478,7 @@ pub const OwnedTexture = struct {
     }
 
     fn service(self: *OwnedTexture) !void {
-        if (self.caller_driven) _ = try maplibre.renderSessionServiceDriverWork(self.session, 0, null);
+        if (self.caller_driven) _ = try maplibre.renderSessionServiceDriverWork(self.session, null);
     }
 
     /// Requests one forced frame, which renders whether or not the map
@@ -513,7 +513,7 @@ pub const OwnedTexture = struct {
             const result = try self.renderFrame();
             switch (result.disposition) {
                 .rendered => return result,
-                .no_update, .size_pending, .target_not_ready => {},
+                .no_update, .target_not_ready => {},
                 else => return error.UnexpectedFrameDisposition,
             }
         }

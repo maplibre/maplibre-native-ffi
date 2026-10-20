@@ -55,7 +55,7 @@ private constructor(
 
   /** Runs every queued item of a caller driver after its wake. */
   fun serviceDriverWork() {
-    if (callerDriver) session.serviceDriverWork(0uL)
+    if (callerDriver) session.serviceDriverWork()
   }
 
   /**
@@ -171,7 +171,7 @@ private constructor(
       driverWork.drainPermits()
       completion.invokeOnCompletion { driverWork.release() }
       while (true) {
-        session.serviceDriverWork(0uL)
+        session.serviceDriverWork()
         if (completion.isCompleted) break
         driverWork.acquire()
       }

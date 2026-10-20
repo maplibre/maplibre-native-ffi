@@ -117,7 +117,7 @@ static void paint_background_blue(mln_map map) {
   ));
 }
 
-// Renders one frame and, once the session is idle, returns its disposition.
+// Renders one frame and returns its disposition.
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint32_t flags
 ) {
@@ -128,15 +128,8 @@ static uint32_t render_frame(
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
-  mln_test_completion barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
-  );
-  finish(fixture, &barrier, MLN_STATUS_OK, "the render barrier");
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
-  );
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(fixture, 1);
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   uint32_t disposition = UINT32_MAX;
   for (size_t index = 0; index < view.result_count; index += 1) {
@@ -266,44 +259,6 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
   close_map(&map);
 }
 
-typedef struct demand_wait {
-  const mln_test_render_fixture* fixture;
-  uint64_t token;
-  bool published;
-} demand_wait;
-
-// Services one driver work item at a time until the demand's result is
-// published, so the driver stops right after the item that published it.
-static bool service_until_published(void* context) {
-  demand_wait* wait = context;
-  size_t serviced = 0;
-  MLN_TEST_OK(mln_render_session_service_driver_work(
-    wait->fixture->session, 1, &serviced, NULL
-  ));
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  if (
-    mln_render_session_drain_frame_results(
-      wait->fixture->session, &batch, NULL
-    ) == MLN_STATUS_OK
-  ) {
-    mln_render_frame_batch_view view = {.size = sizeof(view)};
-    MLN_TEST_OK(mln_render_frame_batch_get(batch, &view, NULL));
-    for (size_t index = 0; index < view.result_count; index += 1) {
-      const mln_render_frame_result* result =
-        (const mln_render_frame_result*)((const char*)view.results +
-                                         index * view.result_size);
-      if (result->token == wait->token) {
-        TEST_ASSERT_EQUAL_UINT32(
-          MLN_RENDER_RESULT_RENDERED, result->disposition
-        );
-        wait->published = true;
-      }
-    }
-    mln_render_frame_batch_release(batch);
-  }
-  return wait->published;
-}
-
 static void open_borrowed_ring(retarget_map* out, uint32_t driver) {
   out->runtime = mln_test_create_runtime();
   out->map = mln_test_create_map(out->runtime);
@@ -431,8 +386,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
 
 // No frame published before a replacement can be acquired, not even one that
 // a demand queued ahead of the replacement renders into a texture it
-// replaces. A caller driver lets the case stop the driver between that demand
-// and the replacement.
+// replaces. Driver service runs the demand and replacement in queue order.
 static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   retarget_map map = {0};
   open_borrowed_ring(&map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
@@ -467,13 +421,12 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
 
-  demand_wait wait = {.fixture = fixture, .token = demand.token};
-  TEST_ASSERT_TRUE(mln_test_await(
-    service_until_published, &wait, mln_test_deadline_default(),
-    "the demand queued ahead of the replacement"
-  ));
-  TEST_ASSERT_FALSE(mln_test_completion_poll(&completion));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(fixture, 1);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
 

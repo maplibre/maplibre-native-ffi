@@ -422,10 +422,7 @@ class GpuSyncKind(UnknownIntEnum):
     """
 
     CPU_COMPLETE = 0
-    METAL_SHARED_EVENT = 1
-    VULKAN_TIMELINE_SEMAPHORE = 2
     OPENGL_FENCE = 3
-    WEBGPU_TOKEN = 4
 
 
 class LogEvent(UnknownIntEnum):
@@ -692,10 +689,8 @@ class RenderResult(UnknownIntEnum):
 
     RENDERED = 0
     NO_UPDATE = 1
-    SIZE_PENDING = 2
     TARGET_NOT_READY = 3
     SUPERSEDED = 4
-    DEADLINE_MISSED = 5
 
 
 class RenderSessionCapabilityFlag(IntFlag):
@@ -1748,16 +1743,6 @@ class FrameDemand:
     token: int
     """Host identity returned with the terminal frame result."""
 
-    coalescing_boundary: int
-    """Demands coalesce only when this value and their flags match."""
-
-    timeout_ns: int
-    """Positive time allowed before driver work begins, in nanoseconds; zero has
-    no limit. A demand that waits, for a free texture slot or for a map
-    update, is checked against its timeout when it runs again; a wait has no
-    timer of its own.
-    """
-
     flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
     """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
     `MLN_FRAME_DEMAND_IF_NEEDED`.
@@ -1765,12 +1750,7 @@ class FrameDemand:
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(
-            flags=FrameDemandFlag(raw["flags"]),
-            token=raw["token"],
-            coalescing_boundary=raw["coalescing_boundary"],
-            timeout_ns=raw["timeout_ns"],
-        )
+        return cls(flags=FrameDemandFlag(raw["flags"]), token=raw["token"])
 
     @classmethod
     def default(cls):
@@ -1885,18 +1865,11 @@ class GpuSync:
     """One `mln_gpu_sync_kind` value."""
 
     object: int
-    """Bit pattern of the backend object that kind names: the
-    `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
-    or the WebGPU token.
-    """
-
-    value: int
+    """Bit pattern of the GLsync pointer."""
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(
-            kind=GpuSyncKind(raw["kind"]), object=raw["object"], value=raw["value"]
-        )
+        return cls(kind=GpuSyncKind(raw["kind"]), object=raw["object"])
 
     @classmethod
     def default(cls):
@@ -3112,9 +3085,9 @@ class RenderFrameResult:
     find the first frame that includes a command.
     """
 
-    extent_generation: int
-    """The session's extent generation when the demand reached its result. See
-    `mln_render_session_snapshot.extent_generation`.
+    generation: int
+    """The session's target generation when the demand reached its result. See
+    `mln_render_session_snapshot.generation`.
     """
 
     frame_generation: int
@@ -3144,7 +3117,7 @@ class RenderFrameResult:
             disposition=RenderResult(raw["disposition"]),
             token=raw["token"],
             map_update_generation=raw["map_update_generation"],
-            extent_generation=raw["extent_generation"],
+            generation=raw["generation"],
             frame_generation=raw["frame_generation"],
             needs_repaint=raw["needs_repaint"],
         )
@@ -3247,14 +3220,8 @@ class RenderSessionSnapshot:
     state: RenderSessionState
     """One `mln_render_session_state` value."""
 
-    driver: RenderDriverKind
-    """One `mln_render_driver_kind` value."""
-
-    latest_result: RenderResult
-    """Most recent terminal `mln_render_result` value."""
-
     extent: LogicalExtent
-    """Logical extent, including a resize the driver has not applied yet."""
+    """Logical extent applied by the driver."""
 
     generation: int
     """Increases when the session's lifecycle state, target, or applied extent
@@ -3269,23 +3236,11 @@ class RenderSessionSnapshot:
     before the first frame after attachment or a target replacement.
     """
 
-    extent_generation: int
-    """Starts at one and increases each time the driver applies a resize."""
-
     frame_generation: int
     """Frame generation of the latest rendered frame, zero before the first."""
 
-    latest_demand_token: int
-    """Token of the demand whose terminal result the session queued last."""
-
-    pending_demand_count: int
-    """Accepted demands that have no terminal result yet."""
-
     acquired_frame_count: int
     """Acquired frames that the host has not released or disposed."""
-
-    target_ready: bool
-    """False once attachment fails or the session is abandoned."""
 
     pending_changes: bool
     """True when a map update or an accepted resize arrived after the latest
@@ -3296,18 +3251,12 @@ class RenderSessionSnapshot:
     def _from_native(cls, raw):
         return cls(
             state=RenderSessionState(raw["state"]),
-            driver=RenderDriverKind(raw["driver"]),
-            latest_result=RenderResult(raw["latest_result"]),
             extent=LogicalExtent._from_native(raw["extent"]),
             generation=raw["generation"],
             map_update_generation=raw["map_update_generation"],
             rendered_update_generation=raw["rendered_update_generation"],
-            extent_generation=raw["extent_generation"],
             frame_generation=raw["frame_generation"],
-            latest_demand_token=raw["latest_demand_token"],
-            pending_demand_count=raw["pending_demand_count"],
             acquired_frame_count=raw["acquired_frame_count"],
-            target_ready=raw["target_ready"],
             pending_changes=raw["pending_changes"],
         )
 

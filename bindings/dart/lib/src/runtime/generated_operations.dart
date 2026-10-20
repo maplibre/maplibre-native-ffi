@@ -35,14 +35,12 @@ Pointer<raw.mln_gpu_sync> _writeGpuSync(GpuSync value, Arena arena) {
   result.ref = raw.mln_gpu_sync_default();
   result.ref.kind = value.kind.rawValue;
   result.ref.object = uint64ToNative(value.object, 'uint64_t');
-  result.ref.value = uint64ToNative(value.value, 'uint64_t');
   return result;
 }
 
 GpuSync _readGpuSync(raw.mln_gpu_sync source) => GpuSync(
   kind: GpuSyncKind.fromRawValue(source.kind),
   object: uint64FromNative(source.object),
-  value: uint64FromNative(source.value),
 );
 
 RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
@@ -50,7 +48,7 @@ RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
       disposition: RenderResult.fromRawValue(source.disposition),
       token: uint64FromNative(source.token),
       mapUpdateGeneration: uint64FromNative(source.map_update_generation),
-      extentGeneration: uint64FromNative(source.extent_generation),
+      generation: uint64FromNative(source.generation),
       frameGeneration: uint64FromNative(source.frame_generation),
       needsRepaint: source.needs_repaint,
     );
@@ -675,19 +673,12 @@ Pointer<raw.mln_frame_demand> _writeFrameDemand(
   result.ref = raw.mln_frame_demand_default();
   result.ref.flags = value.flags.rawValue;
   result.ref.token = uint64ToNative(value.token, 'uint64_t');
-  result.ref.coalescing_boundary = uint64ToNative(
-    value.coalescingBoundary,
-    'uint64_t',
-  );
-  result.ref.timeout_ns = uint64ToNative(value.timeoutNs, 'uint64_t');
   return result;
 }
 
 FrameDemand _readFrameDemand(raw.mln_frame_demand source) => FrameDemand(
   flags: FrameDemandFlag.fromRawValue(source.flags),
   token: uint64FromNative(source.token),
-  coalescingBoundary: uint64FromNative(source.coalescing_boundary),
-  timeoutNs: uint64FromNative(source.timeout_ns),
 );
 
 Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Arena arena) {
@@ -2185,18 +2176,12 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   raw.mln_render_session_snapshot source,
 ) => RenderSessionSnapshot(
   state: RenderSessionState.fromRawValue(source.state),
-  driver: RenderDriverKind.fromRawValue(source.driver),
-  latestResult: RenderResult.fromRawValue(source.latest_result),
   extent: _readLogicalExtent(source.extent),
   generation: uint64FromNative(source.generation),
   mapUpdateGeneration: uint64FromNative(source.map_update_generation),
   renderedUpdateGeneration: uint64FromNative(source.rendered_update_generation),
-  extentGeneration: uint64FromNative(source.extent_generation),
   frameGeneration: uint64FromNative(source.frame_generation),
-  latestDemandToken: uint64FromNative(source.latest_demand_token),
-  pendingDemandCount: source.pending_demand_count,
   acquiredFrameCount: source.acquired_frame_count,
-  targetReady: source.target_ready,
   pendingChanges: source.pending_changes,
 );
 
@@ -6691,9 +6676,11 @@ final class RenderSessionHandle implements Finalizable {
     );
   });
 
-  /// Starts a barrier that completes after all render work accepted before it
-  /// has a terminal result. A barrier does not request a frame. Accepting a
-  /// barrier ends the wait of every earlier demand that waits for a map update.
+  /// Ends every frame demand that has not started with
+  /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
+  /// finished. A running demand finishes its attempt and ends any wait for a
+  /// map update or a free slot. After completion, a new frame demand is
+  /// required to render again.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6960,12 +6947,11 @@ final class RenderSessionHandle implements Finalizable {
     );
   });
 
-  /// Starts an ordered logical resize, which also resizes the map. On a
-  /// continuous map, the completion runs after the map's viewport takes the new
-  /// extent and the selected driver applies it. A static or tile map publishes
-  /// a render update only for a still image, so on those maps the driver
-  /// applies the extent without waiting for the map's viewport, and the next
-  /// still image renders at the new extent.
+  /// Starts an ordered logical resize of the driver and the map. The driver
+  /// applies the extent as soon as its work reaches the queue. The completion
+  /// runs after both have applied it and the map has published its snapshot.
+  /// Frames render once a map update matches the applied extent; static and
+  /// tile maps publish that update for their next still image.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6978,30 +6964,17 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Services up to max_work items for a caller-graphics-thread driver; zero
-  /// services every item currently queued. The first successful service call
-  /// fixes the session's graphics-thread identity; later calls from another
-  /// native thread return `MLN_STATUS_WRONG_THREAD`. The target context must be
-  /// current. Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+  /// Services every queued item for a caller-graphics-thread driver. The first
+  /// successful service call fixes the session's graphics-thread identity;
+  /// later calls from another native thread return `MLN_STATUS_WRONG_THREAD`.
+  /// The target context must be current. Core-worker sessions return
+  /// `MLN_STATUS_INVALID_STATE`.
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  int serviceDriverWork(int maxWork) => withNativeArena((arena) {
-    final outServiced = arena<Size>();
-    _check(
-      raw.mln_render_session_service_driver_work(
-        _handle.raw,
-        _nativeInteger(
-          maxWork,
-          0,
-          sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
-        ),
-        outServiced,
-        nativeDiagnostic,
-      ),
-    );
-    return outServiced.value;
-  });
+  void serviceDriverWork() => _check(
+    raw.mln_render_session_service_driver_work(_handle.raw, nativeDiagnostic),
+  );
 
   /// Starts an ordered replacement of every texture of a caller-owned Metal
   /// ring.
@@ -7711,7 +7684,6 @@ final class ScopedGpuSync {
   T withView<T>(T Function(ScopedGpuSync) use) => _scope.use(() => use(this));
   GpuSyncKind get kind => _scope.active(_value).kind;
   BigInt get object => _scope.active(_value).object;
-  BigInt get value => _scope.active(_value).value;
 }
 
 final class ScopedVulkanTextureFrame {

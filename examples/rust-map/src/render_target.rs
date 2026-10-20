@@ -172,7 +172,7 @@ impl Session {
 
     /// Services every queued caller-driver item on the graphics thread.
     pub fn service(&self) -> maplibre_native_ffi::Result<()> {
-        self.session.service_driver_work(0)?;
+        self.session.service_driver_work()?;
         Ok(())
     }
 
@@ -294,7 +294,7 @@ impl Session {
         loop {
             // A wake that arrives after the clear ends the next wait at once.
             self.driver_wait.clear();
-            self.session.service_driver_work(0)?;
+            self.session.service_driver_work()?;
             if operation.is_ready() {
                 return operation.take();
             }

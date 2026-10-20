@@ -60,9 +60,7 @@ void run_one_frame(
       &receiver->driver_ready, false, memory_order_acq_rel
     )
   ) {
-    // Zero services every item the mailbox holds.
-    size_t serviced = 0;
-    (void)mln_render_session_service_driver_work(session, 0, &serviced, NULL);
+    (void)mln_render_session_service_driver_work(session, NULL);
   }
   // #endregion service
   if (

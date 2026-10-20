@@ -170,7 +170,6 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/url_rules.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp
-      ${PROJECT_SOURCE_DIR}/src/testing/render_clock.cpp
       ${PROJECT_SOURCE_DIR}/src/testing/sync_point.cpp)
   list(APPEND MLN_FFI_C_API_SOURCES ${PROJECT_SOURCE_DIR}/src/wake/wake.cpp)
 

@@ -220,7 +220,7 @@ private func withOwnedTextureSession<Result>(
     #expect(try session.getSnapshot().state == .attaching)
     thread.service(session)
     try await attachment.completion.value
-    #expect(try session.getSnapshot().driver == .callerGraphicsThread)
+    #expect(try session.getCapabilities().driver == .callerGraphicsThread)
 
     // A demand that waits for the style's first update wakes the thread when
     // the update arrives.

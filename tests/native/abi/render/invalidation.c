@@ -516,16 +516,8 @@ static bool frame_matches(void* context) {
   MLN_TEST_OK(
     mln_render_session_request_frame(seek->fixture->session, &demand, NULL)
   );
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, seek->fixture,
-    mln_render_session_barrier(
-      seek->fixture->session, &completion.descriptor, NULL
-    )
-  );
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_render_session_drain_frame_results(seek->fixture->session, &batch, NULL)
-  );
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(seek->fixture, 1);
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool matched = false;
   for (size_t index = 0; index < view.result_count; index += 1) {

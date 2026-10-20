@@ -405,10 +405,6 @@ final class mln_frame_demand extends Struct {
   external int flags;
   @Uint64()
   external int token;
-  @Uint64()
-  external int coalescing_boundary;
-  @Uint64()
-  external int timeout_ns;
 }
 
 final class mln_free_camera_options extends Struct {
@@ -455,8 +451,6 @@ final class mln_gpu_sync extends Struct {
   external int kind;
   @Uint64()
   external int object;
-  @Uint64()
-  external int value;
 }
 
 final class mln_http_header extends Struct {
@@ -917,7 +911,7 @@ final class mln_render_frame_result extends Struct {
   @Uint64()
   external int map_update_generation;
   @Uint64()
-  external int extent_generation;
+  external int generation;
   @Uint64()
   external int frame_generation;
   @Bool()
@@ -954,10 +948,6 @@ final class mln_render_session_snapshot extends Struct {
   external int size;
   @Uint32()
   external int state;
-  @Uint32()
-  external int driver;
-  @Uint32()
-  external int latest_result;
   external mln_logical_extent extent;
   @Uint64()
   external int generation;
@@ -966,17 +956,9 @@ final class mln_render_session_snapshot extends Struct {
   @Uint64()
   external int rendered_update_generation;
   @Uint64()
-  external int extent_generation;
-  @Uint64()
   external int frame_generation;
-  @Uint64()
-  external int latest_demand_token;
-  @Uint32()
-  external int pending_demand_count;
   @Uint32()
   external int acquired_frame_count;
-  @Bool()
-  external bool target_ready;
   @Bool()
   external bool pending_changes;
 }
@@ -1744,10 +1726,7 @@ const MLN_GESTURE_PHASE_CANCEL = 4;
 
 // mln_gpu_sync_kind
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
-const MLN_GPU_SYNC_METAL_SHARED_EVENT = 1;
-const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2;
 const MLN_GPU_SYNC_OPENGL_FENCE = 3;
-const MLN_GPU_SYNC_WEBGPU_TOKEN = 4;
 
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;
@@ -1877,10 +1856,8 @@ const MLN_RENDER_MODE_FULL = 1;
 // mln_render_result
 const MLN_RENDER_RESULT_RENDERED = 0;
 const MLN_RENDER_RESULT_NO_UPDATE = 1;
-const MLN_RENDER_RESULT_SIZE_PENDING = 2;
 const MLN_RENDER_RESULT_TARGET_NOT_READY = 3;
 const MLN_RENDER_RESULT_SUPERSEDED = 4;
-const MLN_RENDER_RESULT_DEADLINE_MISSED = 5;
 
 // mln_render_session_capability_flag
 const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
@@ -4465,18 +4442,9 @@ external int mln_render_session_resize(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Size,
-    Pointer<Size>,
-    Pointer<mln_diagnostic>,
-  )
->()
+@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_service_driver_work(
   int session,
-  int max_work,
-  Pointer<Size> out_serviced,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

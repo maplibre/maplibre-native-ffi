@@ -233,20 +233,19 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   static const present = FrameDemandFlag.fromRawValue(2);
 
   /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
-  /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
-  /// instead, and runs again after the map's next update, a target replacement,
-  /// or an applied resize. A waiting demand holds no ring slot. A later demand
-  /// with the same flags and coalescing boundary supersedes it, a barrier ends
-  /// its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach, abandon, or the
-  /// quarantine of the ring's last usable slot end it with
-  /// `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
-  /// the results of demands accepted after it. The flag does not pace: a host
-  /// that re-arms a waiting demand as each result arrives renders every update
-  /// the map publishes. The map publishes one update for the commands that its
-  /// runtime worker runs back to back, but a command that reaches the worker
-  /// while a frame renders appears in a later frame. To show several commands
-  /// in one frame, submit them in a command group, or arm demands once per
-  /// display frame.
+  /// `MLN_RENDER_RESULT_NO_UPDATE` waits instead, and runs again after the
+  /// map's next update, a target replacement, or an applied resize. A waiting
+  /// demand holds no ring slot. A later demand with the same flags supersedes
+  /// it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and
+  /// detach, abandon, or the quarantine of the ring's last usable slot end it
+  /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
+  /// follow the results of demands accepted after it. The flag does not pace: a
+  /// host that re-arms a waiting demand as each result arrives renders every
+  /// update the map publishes. The map publishes one update for the commands
+  /// that its runtime worker runs back to back, but a command that reaches the
+  /// worker while a frame renders appears in a later frame. To show several
+  /// commands in one frame, submit them in a command group, or arm demands once
+  /// per display frame.
   static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
@@ -324,18 +323,9 @@ final class GpuSyncKind extends _Enum {
   /// before the release call.
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
-  /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
-  static const metalSharedEvent = GpuSyncKind.fromRawValue(1);
-
-  /// VkSemaphore plus a timeline value.
-  static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(2);
-
   /// GLsync in the shared EGL or WGL context's share group, used only by a
-  /// caller-graphics-thread driver. value is zero and object is nonzero.
+  /// caller-graphics-thread driver. object is nonzero.
   static const openglFence = GpuSyncKind.fromRawValue(3);
-
-  /// A backend-defined WebGPU completion token.
-  static const webgpuToken = GpuSyncKind.fromRawValue(4);
 }
 
 /// Log event categories emitted by MapLibre Native.
@@ -643,17 +633,12 @@ final class RenderResult extends _Enum {
   /// A frame was rendered for acquisition, presentation, or ordered readback.
   static const rendered = RenderResult.fromRawValue(0);
 
-  /// No newer map update was available, or the map had no complete frame to
-  /// draw yet. The map publishes another update when it has one. A demand with
-  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and
-  /// finishes with this result only when a barrier ends its wait.
+  /// No newer map update was available, the map had no complete frame to draw,
+  /// or the update extent differed from the target. The map publishes another
+  /// update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
+  /// waits for that update instead, and finishes with this result only when a
+  /// barrier ends its wait.
   static const noUpdate = RenderResult.fromRawValue(1);
-
-  /// An ordered extent change had not reached the map. The map publishes an
-  /// update at the new extent, which a demand with
-  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
-  /// this result.
-  static const sizePending = RenderResult.fromRawValue(2);
 
   /// The target could not produce a frame. The attempt consumes nothing, so a
   /// later demand with the same flags renders what this one would have. This
@@ -661,11 +646,8 @@ final class RenderResult extends _Enum {
   /// target can be ready, such as after a paced delay.
   static const targetNotReady = RenderResult.fromRawValue(3);
 
-  /// A newer demand in the same coalescing boundary replaced this demand.
+  /// A newer IF_NEEDED demand with the same flags replaced this demand.
   static const superseded = RenderResult.fromRawValue(4);
-
-  /// The demand's timeout elapsed before driver work began.
-  static const deadlineMissed = RenderResult.fromRawValue(5);
 }
 
 /// Optional render-session capabilities.
@@ -1395,20 +1377,16 @@ final class GpuSync extends _Value {
   const GpuSync({
     this.kind = const GpuSyncKind.fromRawValue(0),
     required this.object,
-    required this.value,
   });
 
   /// One `mln_gpu_sync_kind` value.
   final GpuSyncKind kind;
 
-  /// Bit pattern of the backend object that kind names: the
-  /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
-  /// or the WebGPU token.
+  /// Bit pattern of the GLsync pointer.
   final BigInt object;
-  final BigInt value;
 
   @override
-  List<Object?> get _members => [kind, object, value];
+  List<Object?> get _members => [kind, object];
 }
 
 /// Terminal result of one frame demand, held by an owned frame-result batch and
@@ -1421,7 +1399,7 @@ final class RenderFrameResult extends _Value {
     this.disposition = const RenderResult.fromRawValue(0),
     required this.token,
     required this.mapUpdateGeneration,
-    required this.extentGeneration,
+    required this.generation,
     required this.frameGeneration,
     this.needsRepaint = false,
   });
@@ -1436,9 +1414,9 @@ final class RenderFrameResult extends _Value {
   /// frame that includes a command.
   final BigInt mapUpdateGeneration;
 
-  /// The session's extent generation when the demand reached its result. See
-  /// `mln_render_session_snapshot.extent_generation`.
-  final BigInt extentGeneration;
+  /// The session's target generation when the demand reached its result. See
+  /// `mln_render_session_snapshot.generation`.
+  final BigInt generation;
 
   /// Position of the frame among the frames that the session rendered, counting
   /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
@@ -1462,7 +1440,7 @@ final class RenderFrameResult extends _Value {
     disposition,
     token,
     mapUpdateGeneration,
-    extentGeneration,
+    generation,
     frameGeneration,
     needsRepaint,
   ];
@@ -2020,8 +1998,6 @@ final class FrameDemand extends _Value {
   const FrameDemand({
     this.flags = FrameDemandFlag.ifNeeded,
     required this.token,
-    required this.coalescingBoundary,
-    required this.timeoutNs,
   });
 
   /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
@@ -2031,17 +2007,8 @@ final class FrameDemand extends _Value {
   /// Host identity returned with the terminal frame result.
   final BigInt token;
 
-  /// Demands coalesce only when this value and their flags match.
-  final BigInt coalescingBoundary;
-
-  /// Positive time allowed before driver work begins, in nanoseconds; zero has
-  /// no limit. A demand that waits, for a free texture slot or for a map
-  /// update, is checked against its timeout when it runs again; a wait has no
-  /// timer of its own.
-  final BigInt timeoutNs;
-
   @override
-  List<Object?> get _members => [flags, token, coalescingBoundary, timeoutNs];
+  List<Object?> get _members => [flags, token];
 }
 
 /// Three-component vector used by free camera options.
@@ -3669,31 +3636,19 @@ final class RenderSessionCapabilities extends _Value {
 final class RenderSessionSnapshot extends _Value {
   const RenderSessionSnapshot({
     required this.state,
-    required this.driver,
-    this.latestResult = const RenderResult.fromRawValue(0),
     this.extent = const LogicalExtent(),
     required this.generation,
     required this.mapUpdateGeneration,
     required this.renderedUpdateGeneration,
-    required this.extentGeneration,
     required this.frameGeneration,
-    required this.latestDemandToken,
-    this.pendingDemandCount = 0,
     this.acquiredFrameCount = 0,
-    this.targetReady = false,
     this.pendingChanges = false,
   });
 
   /// One `mln_render_session_state` value.
   final RenderSessionState state;
 
-  /// One `mln_render_driver_kind` value.
-  final RenderDriverKind driver;
-
-  /// Most recent terminal `mln_render_result` value.
-  final RenderResult latestResult;
-
-  /// Logical extent, including a resize the driver has not applied yet.
+  /// Logical extent applied by the driver.
   final LogicalExtent extent;
 
   /// Increases when the session's lifecycle state, target, or applied extent
@@ -3707,23 +3662,11 @@ final class RenderSessionSnapshot extends _Value {
   /// before the first frame after attachment or a target replacement.
   final BigInt renderedUpdateGeneration;
 
-  /// Starts at one and increases each time the driver applies a resize.
-  final BigInt extentGeneration;
-
   /// Frame generation of the latest rendered frame, zero before the first.
   final BigInt frameGeneration;
 
-  /// Token of the demand whose terminal result the session queued last.
-  final BigInt latestDemandToken;
-
-  /// Accepted demands that have no terminal result yet.
-  final int pendingDemandCount;
-
   /// Acquired frames that the host has not released or disposed.
   final int acquiredFrameCount;
-
-  /// False once attachment fails or the session is abandoned.
-  final bool targetReady;
 
   /// True when a map update or an accepted resize arrived after the latest
   /// rendered frame.
@@ -3732,18 +3675,12 @@ final class RenderSessionSnapshot extends _Value {
   @override
   List<Object?> get _members => [
     state,
-    driver,
-    latestResult,
     extent,
     generation,
     mapUpdateGeneration,
     renderedUpdateGeneration,
-    extentGeneration,
     frameGeneration,
-    latestDemandToken,
-    pendingDemandCount,
     acquiredFrameCount,
-    targetReady,
     pendingChanges,
   ];
 }

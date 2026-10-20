@@ -94,9 +94,7 @@ object RenderSessionExitProbe {
       check(rendered == RenderResult.RENDERED) { "the frame to acquire resolved as $rendered" }
       checkNotNull(session.acquireFrame()) { "the one-slot ring has no frame to acquire" }
       session.requestFrame(FrameDemand(flags = FrameDemandFlag(0u), token = PARKED_TOKEN))
-      withContext(TestGraphics.thread) { session.serviceDriverWork(0uL) }
-      val parked = session.getSnapshot().pendingDemandCount
-      check(parked == 1u) { "expected one parked demand, found $parked" }
+      withContext(TestGraphics.thread) { session.serviceDriverWork() }
       exiting = true
       exitProcess(0)
     }
