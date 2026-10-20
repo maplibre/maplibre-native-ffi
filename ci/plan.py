@@ -96,20 +96,6 @@ def decision(run: bool, *, score: float | None = None, rule: str = "", **since) 
     return {"run": run, "score": score, "rule": rule, **since}
 
 
-def log_request(request: dict, response: dict) -> None:
-    """Print one Jev request and its answers as a collapsed log group."""
-    change = request["state"]["change"]
-    part = change.get("patch_part", "").split(" of the patch")[0].lower()
-    print(f"::group::Jev request{f' ({part})' if part else ''}")
-    print(json.dumps(request, indent=2))
-    print(
-        json.dumps(
-            {"model": response["model"], "answers": response["answers"]}, indent=2
-        )
-    )
-    print("::endgroup::")
-
-
 def jev_choice(
     config: dict,
     api_key: str,
@@ -172,10 +158,6 @@ def plan(
     if event_name != "pull_request":
         raise ValueError(f"Unsupported CI event: {event_name}")
     pr = event["pull_request"]
-    # A label edit emits pull_request. Closed pull requests stay labeled for
-    # search, and relabeling one must not start a run.
-    if pr.get("state") != "open":
-        return {unit: decision(False, rule="pull request is closed") for unit in owned}
     labels = {label["name"] for label in pr["labels"]}
     if "ci:full" in labels:
         return everything(config, "full: label ci:full")
@@ -185,7 +167,7 @@ def plan(
         config,
         env["TYPESAFE_API_KEY"],
         time.monotonic() + SELECTION_SECONDS,
-        on_request=log_request,
+        on_request=select.log_request,
     )
 
     try:

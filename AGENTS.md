@@ -58,7 +58,9 @@ Label an issue or a pull request with exactly one kind (`bug`, `feature`,
 `perf`, `chore`, or `research`) and at least one `area:*` label. Add `binding:`,
 `platform:`, and `renderer:` labels when the work is specific to one, and add
 `upstream` when the cause is in MapLibre Native. A patch we carry early still
-gets `area:upstream`. Leave GitHub's native issue type unset.
+gets `area:upstream`. Leave GitHub's native issue type unset. When an item
+opens, the Label workflow fills each of these groups that has no label yet; see
+[Labels](docs/src/content/docs/development/overview.md#labels).
 
 `ci:*` labels are CI instructions, separate from that scheme. `needs-info` and
 `do-not-merge` are workflow state, and they do not replace a kind or an area.
@@ -125,6 +127,6 @@ gets `area:upstream`. Leave GitHub's native issue type unset.
   sentence each, and follow [AI_POLICY.md](AI_POLICY.md).
 - CI selects the coverage that each push puts at risk. Force a unit with its
   `ci:<unit>` label from `ci/select.toml`, or use `ci:full` for every unit.
-  Label changes on closed pull requests do not start a run. Add `ci:full` for
-  CI, shared toolchain, dependency, or publishing changes. See
+  Label changes on closed pull requests run no jobs. Add `ci:full` for CI,
+  shared toolchain, dependency, or publishing changes. See
   [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage).
