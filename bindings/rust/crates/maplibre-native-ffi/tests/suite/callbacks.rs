@@ -231,36 +231,47 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     wait_for(fixture.runtime().clear_resource_transform());
 
-    // A header transform's error drops its headers, and the reporter receives
-    // it, since native keeps only a status.
-    let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
-    wait_for(fixture.runtime().clear_resource_provider());
-    wait_for(
-        fixture.runtime().set_http_header_transform(
-            HttpHeaderTransform::default()
-                .with_callback(|_, _, _| Err(Error::invalid_argument("the transform refused"))),
-        ),
-    );
-    fixture
-        .map()
-        .set_style_url(&server.url("/style.json"))
-        .unwrap();
-    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    set_reporter(None);
-    // Other tests may run callbacks concurrently, so only this test's error
-    // counts.
-    let refused = Error::invalid_argument("the transform refused");
-    let callbacks: Vec<_> = reports
-        .try_iter()
-        .filter_map(|report| match report {
-            Report::CallbackError { callback, error } if error == refused => Some(callback),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(callbacks, ["mln_http_header_transform_callback"]);
+    // OpenHarmony has no HTTP header transforms, the one callback that
+    // returns an error for the reporter.
+    #[cfg(not(target_env = "ohos"))]
+    {
+        // A header transform's error drops its headers, and the reporter receives
+        // it, since native keeps only a status.
+        let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
+        wait_for(fixture.runtime().clear_resource_provider());
+        wait_for(
+            fixture
+                .runtime()
+                .set_http_header_transform(HttpHeaderTransform::default().with_callback(
+                    |_, _, _| Err(Error::invalid_argument("the transform refused")),
+                )),
+        );
+        fixture
+            .map()
+            .set_style_url(&server.url("/style.json"))
+            .unwrap();
+        fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+        set_reporter(None);
+        // Other tests may run callbacks concurrently, so only this test's error
+        // counts.
+        let refused = Error::invalid_argument("the transform refused");
+        let callbacks: Vec<_> = reports
+            .try_iter()
+            .filter_map(|report| match report {
+                Report::CallbackError { callback, error } if error == refused => Some(callback),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(callbacks, ["mln_http_header_transform_callback"]);
 
-    // The runtime keeps working.
-    wait_for(fixture.runtime().clear_http_header_transform());
+        // The runtime keeps working.
+        wait_for(fixture.runtime().clear_http_header_transform());
+    }
+    #[cfg(target_env = "ohos")]
+    {
+        drop(reports);
+        set_reporter(None);
+    }
     wait_for(fixture.runtime().set_resource_provider(denying_provider()));
     fixture.fence();
 }
