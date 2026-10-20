@@ -515,11 +515,6 @@ void mln_test_thread_join(mln_test_thread* thread) {
   free(thread);
 }
 
-mln_test_event_batch mln_test_event_batch_default(void) {
-  mln_test_release_drained_batch();
-  return (mln_test_event_batch){.size = sizeof(mln_test_event_batch)};
-}
-
 mln_status mln_test_drain_event_delivery(
   mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
   mln_diagnostic* diagnostic
@@ -542,40 +537,22 @@ mln_status mln_test_drain_event_delivery(
 }
 
 mln_status mln_test_drain_events(
-  mln_runtime runtime, mln_test_event_batch* out_batch
+  mln_runtime runtime, mln_event_batch_view* out_batch
 ) {
-  if (out_batch == NULL || out_batch->size < sizeof(mln_test_event_batch)) {
+  if (out_batch == NULL || out_batch->size < sizeof(mln_event_batch_view)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   mln_test_release_drained_batch();
   mln_delivery_batch batch = MLN_HANDLE_NULL;
-  mln_delivery_batch_view deliveries = {.size = sizeof(deliveries)};
-  const mln_status status = mln_delivery_queue_drain(
-    mln_test_event_queue(runtime), &batch, &deliveries, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_test_drain_event_delivery(
+    runtime, &batch, out_batch, MLN_TEST_DIAGNOSTIC
   );
   if (status == MLN_STATUS_NOT_READY) {
-    *out_batch = mln_test_event_batch_default();
+    *out_batch = (mln_event_batch_view){.size = sizeof(mln_event_batch_view)};
     return MLN_STATUS_OK;
   }
   if (status != MLN_STATUS_OK) return status;
   drained_batch = batch;
-  // Fixture completions use callbacks, so its event queue contains one span.
-  if (
-    deliveries.delivery_count != 1 ||
-    deliveries.deliveries[0].type != MLN_DELIVERY_TYPE_RUNTIME_EVENTS
-  ) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  const mln_event_batch_view view =
-    *deliveries.deliveries[0].payload.runtime_events.events;
-  *out_batch = (mln_test_event_batch){
-    .size = sizeof(mln_test_event_batch),
-    .event_size = view.event_size,
-    .events = view.events,
-    .event_count = view.event_count,
-    .messages = view.messages,
-    .messages_size = view.messages_size,
-  };
   return MLN_STATUS_OK;
 }
 
@@ -586,7 +563,7 @@ size_t mln_test_drain_all(mln_runtime runtime) {
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   size_t total = 0;
   for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
+    mln_event_batch_view batch = {.size = sizeof(batch)};
     if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return total;
     }
@@ -617,7 +594,7 @@ static bool drain_until_match(void* context) {
   event_search* search = context;
   bool matched = false;
   for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
+    mln_event_batch_view batch = {.size = sizeof(batch)};
     if (mln_test_drain_events(search->runtime, &batch) != MLN_STATUS_OK) {
       search->drain_failed = true;
       return true;
@@ -652,7 +629,7 @@ size_t mln_test_drain_counting_matching(
 ) {
   size_t total = 0;
   for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
+    mln_event_batch_view batch = {.size = sizeof(batch)};
     if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return total;
     }

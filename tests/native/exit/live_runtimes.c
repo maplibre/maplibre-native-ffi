@@ -1,6 +1,6 @@
 // A process that exits with two runtimes live, each with a map loading a
 // style, and with every callback it installed still installed: the log
-// callback, each runtime's event wake, and each runtime's resource provider.
+// callback and each runtime's resource provider.
 // See probe.h.
 
 #include "probe.h"

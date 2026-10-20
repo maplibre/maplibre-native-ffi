@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 
@@ -13,6 +14,14 @@
 #include "wake/wake.hpp"
 
 namespace mln::delivery {
+
+// A message span includes its source string's terminator in the batch view.
+inline auto event_message(std::string_view message) -> std::string_view {
+  if (message.size() > UINT32_MAX - 1) {
+    throw std::length_error{"runtime event message is too large"};
+  }
+  return message;
+}
 
 // One queued delivery and the copy it owns, in a single allocation: this
 // header, then the arena storage that the view's pointers reach.

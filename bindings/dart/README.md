@@ -2,8 +2,8 @@
 
 `maplibre_native_ffi` is the low-level Dart binding for the public MapLibre
 Native C API. The package exposes explicit native handle lifetimes, copied value
-types, owned runtime event batches, ordinary futures, resource callbacks, and
-the render backend descriptors used by host integrations.
+types, copied runtime event spans, ordinary futures, resource callbacks, and the
+render backend descriptors used by host integrations.
 
 ## Build and test
 

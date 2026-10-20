@@ -57,24 +57,13 @@ struct Arena {
 
 template <bool Writing, class T, class Convert>
 auto span(
-  Arena<Writing>& arena, const T* source, std::size_t count, Convert convert,
-  std::size_t stride = sizeof(T)
+  Arena<Writing>& arena, const T* source, std::size_t count, Convert convert
 ) -> T* {
   if (count == 0) return source == nullptr ? nullptr : empty_pointer<T>();
   if (source == nullptr) throw std::invalid_argument{"null span"};
-  if (stride < sizeof(T)) {
-    throw std::invalid_argument{"invalid span stride"};
-  }
-  if (count > std::numeric_limits<std::size_t>::max() / stride)
-    throw std::bad_alloc{};
   auto* destination = arena.template allocate<T>(count);
   for (std::size_t index = 0; index < count; ++index) {
-    auto element = T{};
-    std::memcpy(
-      &element, reinterpret_cast<const std::byte*>(source) + index * stride,
-      sizeof(T)
-    );
-    const auto copied = convert(arena, element);
+    const auto copied = convert(arena, source[index]);
     if constexpr (Writing) destination[index] = copied;
   }
   return destination;

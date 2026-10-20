@@ -130,13 +130,15 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     woke = threading.Event()
     receiver: dict[str, object] = {}
 
-    def wake(_: mln.EventBatchView, receiver: dict[str, object] = receiver) -> None:
+    def receive_events(
+        _: mln.EventBatchView, receiver: dict[str, object] = receiver
+    ) -> None:
         if receiver.get("runtime") is not None:
             woke.set()
 
-    callback = weakref.ref(wake)
+    callback = weakref.ref(receive_events)
     runtime = mln.runtime_create(mln.RuntimeOptions.default())
-    result(runtime.set_event_handler(mln.RuntimeEventHandler(wake)))
+    result(runtime.set_event_handler(mln.RuntimeEventHandler(receive_events)))
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)
     map_handle = result(runtime.create_map())
@@ -147,7 +149,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     # The runtime roots the callback, and the callback reaches it, so only
     # the cycle collector can reclaim them, which it can see through the root.
     with leak_reports() as reports:
-        del map_handle, runtime, wake, receiver
+        del map_handle, runtime, receive_events, receiver
         gc.collect()
     assert owner() is None
     assert callback() is None
@@ -200,21 +202,21 @@ def test_an_exception_in_a_callback_is_reported_and_contained(
     assert str(report.exc_value) == "provider failed"
 
 
-class _WakeFailure(Exception):
+class _EventCallbackFailure(Exception):
     pass
 
 
 def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The wake callback may make any native call, but the hook that receives
+    # The event callback may make any native call, but the hook that receives
     # its exception runs on the callback's stack, where the binding refuses
     # every native call.
     refusals: list[bool] = []
     reported = threading.Event()
 
     def hook(report: sys.UnraisableHookArgs) -> None:
-        if not isinstance(report.exc_value, _WakeFailure):
+        if not isinstance(report.exc_value, _EventCallbackFailure):
             return
         try:
             mln.network_get_status()
@@ -224,12 +226,12 @@ def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
             refusals.append(False)
         reported.set()
 
-    def wake(_: mln.EventBatchView) -> None:
-        raise _WakeFailure
+    def receive_events(_: mln.EventBatchView) -> None:
+        raise _EventCallbackFailure
 
     monkeypatch.setattr(sys, "unraisablehook", hook)
     runtime = mln.runtime_create(mln.RuntimeOptions.default())
-    result(runtime.set_event_handler(mln.RuntimeEventHandler(wake)))
+    result(runtime.set_event_handler(mln.RuntimeEventHandler(receive_events)))
     try:
         map_handle = result(runtime.create_map())
         result(map_handle.set_style_json(EMPTY_STYLE))

@@ -251,6 +251,9 @@ Eight keys state what a C shape cannot:
   for its reentry scope and leaves it out of the host's callback. Such a
   callback may call back only into the receiver of the call that registers it.
 
+`capture=manual` on a delivery record leaves its native capture to the core.
+Runtime events use this to share record and message storage across a batch.
+
 Every callback registration is a struct with `kind=callback_registration`, which
 a function takes by pointer. A registration may hold one `mln_delivery_queue`
 member marked `kind=delivery_queue`, which a binding runtime sets in place of

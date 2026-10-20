@@ -45,8 +45,7 @@ struct EventDeliveryItem final : DeliveryItem {
   }
 
   auto append(mln_runtime_event event, std::string_view message) -> void {
-    message =
-      message.substr(0, std::min(message.size(), std::size_t{UINT32_MAX - 1}));
+    message = event_message(message);
     event.message_size = static_cast<uint32_t>(message.size());
     event.message_offset = message.empty() ? 0 : messages.size();
     // Reserve both before changing their sizes. A failed reserve can move

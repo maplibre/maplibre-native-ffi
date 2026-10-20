@@ -56,6 +56,12 @@ class QueuedRegistration final {
     return false;
   }
 
+  // Events share the queue tail's record and message storage.
+  auto push_event(mln_runtime_event event, std::string_view message) const
+    -> void {
+    queue_->push_event(event, message, user_data_);
+  }
+
   // Reserves a one-shot delivery without owned handles before accepting its
   // registration. The delivered record must fit this initial record's storage.
   template <mln_delivery_type Type>

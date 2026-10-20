@@ -221,7 +221,7 @@ static inline void probe_start(void) {
   );
 }
 
-// Creates a runtime with an event wake and the probe's resource provider.
+// Creates a runtime with the probe's resource provider.
 static inline mln_runtime probe_create_runtime(void) {
   mln_runtime_options options = mln_runtime_options_default();
   mln_runtime runtime = MLN_HANDLE_NULL;

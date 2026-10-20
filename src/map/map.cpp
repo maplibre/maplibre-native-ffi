@@ -544,35 +544,8 @@ struct EndedTransitionDelivery {
   }
 };
 
-auto announce_pending_render_update(MapObject& map) noexcept -> void;
-
-// Runs the handlers of the ended commands from a later task on the runtime
-// worker, outside the MapLibre call that ended them. The task first announces
-// the render update of that call, so its event is queued before the handlers
-// run. The map keeps its runtime executor running, so the task runs unless
-// allocation fails, in which case the handlers run here rather than never.
 auto post_ended_transitions(MapEventState& events, uint64_t generation) noexcept
-  -> void {
-  if (events.ended_transitions.empty()) return;
-  auto delivery = EndedTransitionDelivery{
-    std::exchange(events.ended_transitions, {}), generation
-  };
-  try {
-    const auto owner = events.owner.lock();
-    if (owner != nullptr) {
-      owner->runtime_state->executor.invoke(
-        [delivery = std::move(delivery),
-         weak = events.owner]() mutable -> void {
-          if (const auto live = weak.lock(); live && live->map)
-            announce_pending_render_update(*live);
-          delivery.deliver();
-        }
-      );
-      return;
-    }
-  } catch (...) {
-  }
-}
+  -> void;
 
 // Reports the camera commands that a closing map still runs as closed, after
 // the commands that ended before the close.
@@ -1073,7 +1046,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   // Runs on the runtime worker. An open map transaction or command group holds
   // the update. Each update is a complete snapshot of the map, so only the
   // newest held one is kept. Otherwise the update is stored at once, and its
-  // event and session notice wait for the announcement task.
+  // session notice waits for the announcement task.
   void update(std::shared_ptr<mln::UpdateParameters> update) override {
     auto feature_state = feature_state_.snapshot();
     {
@@ -1123,6 +1096,9 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       generation = latest_update_generation_;
       notify_session = session_publish_;
     }
+    // Publish asynchronous camera and loading changes before the session sees
+    // their update, including when the host selects no events.
+    event_state_->fresh_generation();
     if (notify_session) notify_session(generation);
   }
 
@@ -2756,12 +2732,32 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
   return generation;
 }
 
-auto announce_pending_render_update(MapObject& map) noexcept -> void {
-  map.frontend->announce();
-}
-
-auto publish_map_render_state(MapObject& live) -> uint64_t {
-  return publish_map_snapshot(live);
+// Runs the handlers of the ended commands from a later task on the runtime
+// worker, outside the MapLibre call that ended them. The task first notifies
+// the attached session of the update before the handlers run. The map keeps its
+// runtime executor running, so the task runs unless allocation fails, in
+// which case the handlers run here.
+auto post_ended_transitions(MapEventState& events, uint64_t generation) noexcept
+  -> void {
+  if (events.ended_transitions.empty()) return;
+  auto delivery = EndedTransitionDelivery{
+    std::exchange(events.ended_transitions, {}), generation
+  };
+  try {
+    const auto owner = events.owner.lock();
+    if (owner != nullptr) {
+      owner->runtime_state->executor.invoke(
+        [delivery = std::move(delivery),
+         weak = events.owner]() mutable -> void {
+          if (const auto live = weak.lock(); live && live->map)
+            live->frontend->announce();
+          delivery.deliver();
+        }
+      );
+      return;
+    }
+  } catch (...) {
+  }
 }
 
 // Opens a transaction, which holds the events that the map raises until
@@ -2773,14 +2769,11 @@ auto open_map_transaction(MapEventState& events) -> void {
   events.transaction_depth += 1;
 }
 
-// Queues the held events with `generation`, then the event of the render update
-// that the transaction held, so a command raises at most one; the attached
-// session hears of the update from a later task. Operations that
-// finished inside the transaction complete after their events, and the camera
-// commands whose transitions ended inside it run their end handlers last, with
-// the transaction's generation. The update, the completions, and the handlers
-// go out even when queueing fails, and the first failure is rethrown
-// afterwards.
+// Queues the held events with `generation` and announces the held update to
+// the attached session from a later task. Operations that finished inside the
+// transaction complete after their events, and ended camera transitions run
+// their handlers last, with the transaction's generation. Every delivery is
+// attempted, and the first failure is rethrown afterwards.
 auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   auto& events = *live.event_state;
   auto error = std::exception_ptr{};
@@ -2883,7 +2876,7 @@ auto complete_map_command(Completion* completion, MapCommandOutcome outcome)
 auto MapEventState::publish() -> uint64_t {
   const auto locked = owner.lock();
   if (locked == nullptr || locked->map == nullptr) return 0;
-  return publish_map_render_state(*locked);
+  return publish_map_snapshot(*locked);
 }
 
 auto map_options_default() noexcept -> mln_map_options {

@@ -11,10 +11,10 @@
  * thread, takes the handles it keeps, and releases each batch.
  *
  * Every registration whose callbacks a host need not answer on a native thread
- * accepts a queue: mln_completion, mln_log_handler, mln_resource_provider,
+ * accepts a queue: mln_completion, mln_runtime_event_handler, mln_log_handler,
+ * mln_resource_provider,
  * mln_resource_request_cancel_handler, mln_camera_transition_handler, and the
- * custom geometry and custom MVT vector source options. Runtime events enter
- * the queue selected by mln_runtime_set_event_handler().
+ * custom geometry and custom MVT vector source options.
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. Events and completions that select
@@ -76,7 +76,7 @@ typedef enum mln_delivery_type : uint32_t {
 } mln_delivery_type;
 
 /** Copied mln_runtime_event_callback arguments. */
-typedef struct mln_runtime_event_delivery {
+typedef struct MLN_BINDING("capture=manual") mln_runtime_event_delivery {
   const mln_event_batch_view* events MLN_BINDING("lifetime=owner");
 } mln_runtime_event_delivery;
 

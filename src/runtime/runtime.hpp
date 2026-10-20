@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "completion/completion.hpp"
-#include "delivery/delivery_queue.hpp"
 #include "execution/control_state.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/runtime_executor.hpp"
@@ -28,6 +27,9 @@
 namespace mln {
 class DatabaseFileSource;
 class ResourceOptions;
+namespace delivery {
+class QueuedRegistration;
+}  // namespace delivery
 namespace util {
 class RunLoop;
 }  // namespace util
@@ -225,8 +227,7 @@ class RuntimeCallbackContext {
 struct RuntimeEventRegistration {
   mln_runtime_event_callback callback = nullptr;
   std::shared_ptr<RuntimeCallbackContext> context;
-  std::shared_ptr<delivery::DeliveryQueueState> queue;
-  void* user_data = nullptr;
+  delivery::QueuedRegistration* queued = nullptr;
 
   auto push(mln_runtime_event event, const std::string& message) const -> void;
 };

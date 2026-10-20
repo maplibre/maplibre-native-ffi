@@ -543,19 +543,27 @@ auto push_offline_region_event(
   mln_offline_region_id region_id, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, std::string message = {}
 ) -> void {
-  const std::scoped_lock state_lock(state->mutex);
-  auto* runtime = state->runtime;
-  if (!state->alive || runtime == nullptr) {
-    return;
+  auto registration = std::shared_ptr<mln::core::RuntimeEventRegistration>{};
+  auto source = mln_runtime{MLN_HANDLE_NULL};
+  {
+    const std::scoped_lock state_lock(state->mutex);
+    auto* runtime = state->runtime;
+    if (
+      !state->alive || runtime == nullptr ||
+      !state->observed_regions.contains(region_id) ||
+      !mln::core::event_selected(runtime->event_state->mask, type)
+    ) {
+      return;
+    }
+    registration = runtime->event_state->registration;
+    source = runtime->self;
   }
-  if (!mln::core::event_selected(runtime->event_state->mask, type)) {
-    return;
-  }
+  if (registration == nullptr) return;
 
   auto event = mln_runtime_event{
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = runtime->self,
+    .source = source,
     .generation = 0,
     .code = 0,
     .payload_type = payload_type,
@@ -563,10 +571,7 @@ auto push_offline_region_event(
     .message_size = 0,
     .payload = payload
   };
-  if (!state->observed_regions.contains(region_id)) return;
-  if (runtime->event_state->registration != nullptr) {
-    runtime->event_state->registration->push(event, message);
-  }
+  registration->push(event, message);
 }
 
 class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
@@ -2457,25 +2462,20 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
 auto RuntimeEventRegistration::push(
   mln_runtime_event event, const std::string& message
 ) const -> void {
-  if (process_exiting()) return;
-  if (queue != nullptr) {
-    queue->push_event(event, message, user_data);
+  if (queued != nullptr) {
+    queued->push_event(event, message);
   } else {
-    event.message_size = static_cast<uint32_t>(
-      std::min(message.size(), std::size_t{UINT32_MAX - 1})
-    );
+    if (process_exiting()) return;
+    const auto text = delivery::event_message(message);
+    event.message_size = static_cast<uint32_t>(text.size());
     event.message_offset = 0;
     // The callback borrows this span; bindings copy it before returning.
-    const auto truncated = message.size() > event.message_size
-                             ? message.substr(0, event.message_size)
-                             : std::string{};
-    const auto& text = truncated.empty() ? message : truncated;
     const mln_event_batch_view events = {
       .size = sizeof(events),
       .event_size = sizeof(event),
       .events = &event,
       .event_count = 1,
-      .messages = text.empty() ? nullptr : text.c_str(),
+      .messages = text.empty() ? nullptr : text.data(),
       .messages_size = text.empty() ? 0 : text.size() + 1,
     };
     callback(context->user_data(), &events);
@@ -2512,8 +2512,7 @@ auto set_runtime_event_handler(
     std::make_shared<RuntimeEventRegistration>(RuntimeEventRegistration{
       .callback = handler->callback,
       .context = context,
-      .queue = queue,
-      .user_data = handler->user_data,
+      .queued = queued.get(),
     });
   auto transfer = RegistrationTransfer{*context};
   const auto status =

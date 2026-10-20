@@ -83,7 +83,7 @@ static void log_reset(event_log* log) {
 // failure for the next assertion to report.
 static void log_drain_quietly(mln_runtime runtime, event_log* log) {
   while (true) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
+    mln_event_batch_view batch = {.size = sizeof(batch)};
     if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       log->drain_failed = true;
       return;

@@ -11,9 +11,9 @@ session.
 
 ## Runtime
 
-A runtime owns a native scheduler thread, an event queue, and shared resource
-services such as networking and the cache database. One runtime can serve
-multiple maps. Host threads submit work, and the scheduler applies it in order.
+A runtime owns a native scheduler thread and shared resource services such as
+networking and the cache database. One runtime can serve multiple maps. Host
+threads submit work, and the scheduler applies it in order.
 
 Callbacks may run on native threads or on the submitting thread. Host code
 schedules UI work on its own event loop. A wake callback announces work that is
@@ -23,14 +23,15 @@ Each callback's API reference states its threading and reentry rules.
 Some hosts, such as Dart isolates and JavaScript engines, run host code on their
 own event loop. Such a host sets a
 [delivery queue](/maplibre-native-ffi/reference/c/delivery_8h.html) in place of
-the callback of a completion, the log handler, or a resource provider. Native
-code then answers any decision itself, copies the payload into the queue, and
-wakes the host, which drains the copies on its own event loop. Transforms must
-answer inside the call, so they take native rules instead of a callback, and a
-resource provider takes routes that choose which requests reach it. Queue
-delivery finishes when native code inserts the result or discards it after queue
-release. Runtime shutdown can finish before the host drains those deliveries.
-The host retains its delivery tokens until it handles or abandons them.
+the callback of a completion, the event handler, the log handler, or a resource
+provider. Native code then answers any decision itself, copies the payload into
+the queue, and wakes the host, which drains the copies on its own event loop.
+Transforms must answer inside the call, so they take native rules instead of a
+callback, and a resource provider takes routes that choose which requests reach
+it. Queue delivery finishes when native code inserts the result or discards it
+after queue release. Runtime shutdown can finish before the host drains those
+deliveries. The host retains its delivery tokens until it handles or abandons
+them.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
 runtime options and shutdown. The

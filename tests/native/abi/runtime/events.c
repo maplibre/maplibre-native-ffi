@@ -5,7 +5,7 @@
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 
 static const mln_runtime_event* batch_event(
-  const mln_test_event_batch* batch, size_t index
+  const mln_event_batch_view* batch, size_t index
 ) {
   return (const mln_runtime_event*)((const char*)batch->events +
                                     (index * batch->event_size));
@@ -35,7 +35,6 @@ static void call_event_api_from_a_foreign_thread(void* argument) {
 
 // Map creation rejects a mask the setter rejects, so one value is not accepted
 // at creation and then refused on the way back through a read-modify-write.
-// The runtime options have the same check in lifecycle.c.
 static void options_reject_unknown_event_mask_bits(void) {
   const uint64_t unknown = UINT64_C(1) << 40U;
 
@@ -131,7 +130,7 @@ static void the_message_arena_carries_one_range_per_event(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(second));
 
-  mln_test_event_batch batch = mln_test_event_batch_default();
+  mln_event_batch_view batch = {.size = sizeof(batch)};
   MLN_TEST_OK(mln_test_drain_events(runtime, &batch));
 
   size_t failures = 0;

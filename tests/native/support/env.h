@@ -3,8 +3,8 @@
 
 // Runtime and map fixtures, event draining, fixture files, and host threads.
 //
-// The runtime fixture installs an event wake that pulses, so the event waits
-// below block until the runtime publishes rather than polling its queue.
+// The runtime fixture installs an event handler's delivery queue with a wake
+// that pulses, so event waits block until the runtime publishes.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -137,18 +137,6 @@ typedef struct mln_test_thread mln_test_thread;
 mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument);
 void mln_test_thread_join(mln_test_thread* thread);
 
-// One drained batch, viewed in place. The batch stays alive until the next
-// drain or destroy helper on this thread releases it.
-typedef struct mln_test_event_batch {
-  uint32_t size;
-  uint32_t event_size;
-  const mln_runtime_event* events;
-  size_t event_count;
-  const char* messages;
-  size_t messages_size;
-} mln_test_event_batch;
-
-mln_test_event_batch mln_test_event_batch_default(void);
 // Installs a queue before event producers start; the test teardown owns it.
 void mln_test_configure_events(mln_runtime runtime, mln_wake wake);
 mln_delivery_queue mln_test_event_queue(mln_runtime runtime);
@@ -156,10 +144,11 @@ mln_status mln_test_drain_event_delivery(
   mln_runtime runtime, mln_delivery_batch* batch, mln_event_batch_view* view,
   mln_diagnostic* diagnostic
 );
-// Drains runtime event deliveries; an empty queue returns
-// MLN_STATUS_OK with a batch of no events.
+// Drains runtime event deliveries; an empty queue returns MLN_STATUS_OK with
+// no events. The view stays alive until the next drain or destroy helper on
+// this thread releases its batch.
 mln_status mln_test_drain_events(
-  mln_runtime runtime, mln_test_event_batch* out_batch
+  mln_runtime runtime, mln_event_batch_view* out_batch
 );
 // Releases the batch the latest drain on this thread kept alive.
 void mln_test_release_drained_batch(void);
@@ -174,8 +163,8 @@ typedef bool (*mln_test_event_match)(
   const mln_runtime_event* event, const char* messages, void* context
 );
 
-// Drains the queue until `match` accepts an event, blocking on the runtime's
-// event wake in between, and discards the rest of the queue. Returns false at
+// Drains until `match` accepts an event, blocking on the event handler's
+// delivery queue wake between drains, and discards the rest. Returns false at
 // the deadline or when a drain fails.
 bool mln_test_await_event_matching(
   mln_runtime runtime, mln_test_event_match match, void* context,

@@ -60,6 +60,7 @@ ANNOTATION_VALUES = {
     "release_reentry": frozenset({"forbid"}),
     "handle_access": frozenset({"issued"}),
     "synchronous": frozenset({"true"}),
+    "capture": frozenset({"manual"}),
 }
 
 # The same semantic vocabulary applies to all target languages. A field's
@@ -105,6 +106,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
 )
 RECORD_KEYS = COMMON_KEYS | frozenset(
     {
+        "capture",
         "kind",
         "default",
         "mask",

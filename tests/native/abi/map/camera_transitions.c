@@ -4,6 +4,7 @@
 // around a camera write.
 
 #include "support/camera.h"
+#include "support/frames.h"
 #include "support/test_support.h"
 
 static mln_camera_options test_camera(void) {
@@ -254,6 +255,51 @@ static void a_rendered_ease_completes_at_its_target(void) {
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void an_unobserved_animation_publishes_its_final_snapshot(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.event_mask = MLN_RUNTIME_EVENT_MASK_NONE;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_background_style_json));
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  const mln_camera_update ease = ease_to_zoom(5.0, 20.0, NULL);
+  const uint64_t started = update_camera_generation(map, &ease);
+  mln_map_snapshot initial = {.size = sizeof(initial)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &initial, NULL));
+
+  mln_render_frame_result result;
+  do {
+    mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags |= MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+    MLN_TEST_OK(
+      mln_render_session_request_frame(fixture.session, &demand, NULL)
+    );
+    mln_render_frame_batch batch =
+      mln_test_render_wait_for_results(&fixture, 1);
+    result = mln_test_render_batch_result(batch, 0);
+    mln_render_frame_batch_release(batch);
+    TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  } while (result.needs_repaint);
+
+  mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, snapshot.camera.zoom);
+  TEST_ASSERT_GREATER_THAN_UINT64(started, snapshot.generation);
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    initial.latest_render_update_generation,
+    snapshot.latest_render_update_generation
+  );
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+    result.map_update_generation, snapshot.latest_render_update_generation
+  );
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -821,6 +867,7 @@ static void a_rejected_command_runs_no_handler(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_rendered_ease_completes_at_its_target);
+  RUN_TEST(an_unobserved_animation_publishes_its_final_snapshot);
   RUN_TEST(an_immediate_command_completes_before_its_completion);
   RUN_TEST(the_handler_runs_whatever_the_event_mask_selects);
   RUN_TEST(cancel_transitions_commits_and_leaves_the_camera);
