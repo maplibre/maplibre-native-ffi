@@ -180,10 +180,12 @@ to every backend alike does not qualify.
 """
 
 [groups.renderer.labels]
-"renderer:opengl" = "The OpenGL, OpenGL ES, EGL, or WGL render backend."
+"renderer:opengl" = """
+The OpenGL or OpenGL ES render backend, with its EGL, WGL, or WebGL context.
+"""
 "renderer:vulkan" = "The Vulkan render backend."
 "renderer:metal" = "The Metal render backend."
-"renderer:webgpu" = "The WebGPU or WebGL render backend."
+"renderer:webgpu" = "The WebGPU render backend."
 
 [groups.upstream]
 threshold = 0.8

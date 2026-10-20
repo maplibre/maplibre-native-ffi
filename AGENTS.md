@@ -69,7 +69,7 @@ CI runs the coverage that each push puts at risk; see
 [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage). To
 force a unit, run `gh pr edit <number> --add-label 'ci:<unit>'` with a unit ID
 from `ci/select.toml`, or `ci:full` for every unit. A label change on a closed
-pull request does not start a run.
+pull request runs no jobs.
 
 ## Project Invariants
 

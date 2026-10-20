@@ -22,6 +22,7 @@ jobs:
   plan:
     runs-on: ubuntu-slim
     timeout-minutes: 10
+    if: github.event.pull_request.state != 'closed'
     outputs:
       jobs: ${{ steps.plan.outputs.jobs }}
     steps:
@@ -1897,7 +1898,7 @@ jobs:
     name: ci-required
     runs-on: ubuntu-slim
     timeout-minutes: 5
-    if: always()
+    if: always() && github.event.pull_request.state != 'closed'
     needs:
       - plan
       - hygiene

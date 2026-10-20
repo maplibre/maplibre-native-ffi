@@ -205,7 +205,6 @@ def replay(pr: dict, config: dict, owned: dict, needs: dict, choose) -> list[dic
             "pull_request": {
                 "number": pr["number"],
                 "title": pr["title"],
-                "state": "open",
                 "labels": [],
                 "head": {"sha": head, "ref": pr["headRefName"]},
                 "base": {"sha": pr["baseRefOid"]},
