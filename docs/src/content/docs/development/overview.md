@@ -134,8 +134,8 @@ selects every unit. Main pushes, manual runs, and pull requests from forks or
 Dependabot also run every unit, and so does any planning failure. Because main
 runs every unit after merge, a missed selection surfaces there.
 
-`ci/select.toml` defines the units and the description of CI that Jev reads.
-Each run uploads a `ci-plan` artifact with every decision and Jev's probability.
+`ci/select.toml` defines the units and the description of CI that Jev reads. The
+plan job's log shows each unit's decision and the full prompt sent to Jev.
 Before changing `ci/select.toml`, evaluate the change against history with
 `uv run python -m ci.select_eval commits`, which compares answers with the
 labeled commits in `ci/select_cases.toml`. `ci.select_eval prs` replays merged

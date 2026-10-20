@@ -176,13 +176,13 @@ class PlanTest(unittest.TestCase):
                     "GITHUB_EVENT_PATH": str(root / "event"),
                     "GITHUB_OUTPUT": str(root / "output"),
                     "GITHUB_STEP_SUMMARY": str(root / "summary"),
-                    "CI_PLAN_RECORD": str(root / "record.json"),
                 },
             )
             jobs = json.loads((root / "output").read_text().removeprefix("jobs="))
             self.assertEqual(len(jobs), sum(map(len, self.owned.values())))
-            record = json.loads((root / "record.json").read_text())
-            self.assertTrue(all(entry["run"] for entry in record["units"].values()))
+            summary = (root / "summary").read_text()
+            for unit in self.owned:
+                self.assertIn(f"| ✅ | {unit} | full: no Jev API key |", summary)
 
 
 class GateTest(unittest.TestCase):

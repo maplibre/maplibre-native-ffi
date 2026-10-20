@@ -35,13 +35,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
         run: bash .mise/tasks/ci/plan
-      - name: Upload plan record
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ci-plan
-          path: build/ci-plan.json
-          if-no-files-found: error
-          retention-days: 90
   hygiene:
     name: hygiene
     runs-on: ubuntu-latest

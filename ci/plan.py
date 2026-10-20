@@ -85,8 +85,23 @@ def last_passed(
     return {unit: sha for unit, sha in passed.items() if present(sha)}
 
 
-def decision(run: bool, reason: str, **details) -> dict:
-    return {"run": run, "reason": reason, **details}
+def decision(run: bool, *, score: float | None = None, rule: str = "", **since) -> dict:
+    """Describe one unit's decision: Jev's score, a rule, or both."""
+    return {"run": run, "score": score, "rule": rule, **since}
+
+
+def log_request(request: dict, response: dict) -> None:
+    """Print one Jev request and its answers as a collapsed log group."""
+    change = request["state"]["change"]
+    part = change.get("patch_part", "").split(" of the patch")[0].lower()
+    print(f"::group::Jev request{f' ({part})' if part else ''}")
+    print(json.dumps(request, indent=2))
+    print(
+        json.dumps(
+            {"model": response["model"], "answers": response["answers"]}, indent=2
+        )
+    )
+    print("::endgroup::")
 
 
 def jev_choice(
@@ -96,6 +111,7 @@ def jev_choice(
     *,
     model: str = select.DEFAULT_MODEL,
     cache: pathlib.Path | None = None,
+    on_request=None,
 ):
     def choose(base: str, head: str, message: str) -> dict[str, dict]:
         result = select.select(
@@ -107,18 +123,18 @@ def jev_choice(
             api_key=api_key,
             deadline=deadline,
             cache=cache,
+            on_request=on_request,
         )
         if result.get("oversized"):
             return dict.fromkeys(
-                result["units"], decision(True, "change too large to judge")
+                result["units"], decision(True, rule="too large to judge")
             )
         forced = select.forced_units(config, select.changed_paths(base, head))
         return {
             unit: decision(
                 unit in forced or p >= select.THRESHOLD,
-                "changed path" if unit in forced else f"Jev {p:.2f}",
-                probability=p,
-                model=result["model"],
+                score=p,
+                rule=f"matches {forced[unit]}" if unit in forced else "",
             )
             for unit, p in result["units"].items()
         }
@@ -126,9 +142,9 @@ def jev_choice(
     return choose
 
 
-def everything(config: dict, reason: str) -> dict[str, dict]:
+def everything(config: dict, rule: str) -> dict[str, dict]:
     units = [HYGIENE, *(unit["id"] for unit in config["units"])]
-    return {unit: decision(True, reason) for unit in units}
+    return {unit: decision(True, rule=rule) for unit in units}
 
 
 def plan(
@@ -140,22 +156,26 @@ def plan(
     *,
     api=github,
     choose=None,
+    log=lambda line: None,
 ) -> dict[str, dict]:
-    """Return whether each unit runs, why, and what Jev answered."""
-    if event_name in {"push", "workflow_dispatch"}:
-        return everything(config, "full coverage outside pull requests")
+    """Return whether each unit runs, and the score or rule that decided it."""
+    if event_name == "push":
+        return everything(config, "full: main")
+    if event_name == "workflow_dispatch":
+        return everything(config, "full: manual run")
     if event_name != "pull_request":
         raise ValueError(f"Unsupported CI event: {event_name}")
     pr = event["pull_request"]
     labels = {label["name"] for label in pr["labels"]}
     if "ci:full" in labels:
-        return everything(config, "label ci:full")
+        return everything(config, "full: label ci:full")
     if not env.get("TYPESAFE_API_KEY") and choose is None:
-        return everything(
-            config, "no Jev API key, as in fork and Dependabot pull requests"
-        )
+        return everything(config, "full: no Jev API key")
     choose = choose or jev_choice(
-        config, env["TYPESAFE_API_KEY"], time.monotonic() + SELECTION_SECONDS
+        config,
+        env["TYPESAFE_API_KEY"],
+        time.monotonic() + SELECTION_SECONDS,
+        on_request=log_request,
     )
 
     try:
@@ -167,37 +187,48 @@ def plan(
             bases.setdefault(passed.get(unit, fork), []).append(unit)
         decisions = {}
         for base, units in bases.items():
-            since = "since the merge base" if base == fork else f"since {base[:9]}"
+            since = {"since": base, "merge_base": base == fork}
             if base == head:
-                decisions |= {
-                    unit: decision(False, f"passed at {head[:9]}", since=base)
-                    for unit in units
-                }
+                for unit in units:
+                    decisions[unit] = decision(
+                        False, rule="passed at this head", **since
+                    )
                 continue
             # Judge only the pull request's own changes, not main's merged ones.
             judged = base if base == fork else select.own_changes_base(base, fork)
             changed = bool(select.changed_paths(judged, head))
             if changed and units != [HYGIENE]:
-                log = select.git("log", "--format=%B", f"{base}..{head}")[:4000]
-                answers = choose(judged, head, f"{pr['title']}\n\n{log}")
+                origin = "the merge base" if base == fork else "its last pass"
+                log(
+                    f"Judging the changes since {base[:9]}, {origin}, for {', '.join(units)}"
+                )
+                messages = select.git("log", "--format=%B", f"{base}..{head}")[:4000]
+                answers = choose(judged, head, f"{pr['title']}\n\n{messages}")
             for unit in units:
                 if unit == HYGIENE:
-                    decisions[unit] = decision(True, f"changed {since}", since=base)
+                    decisions[unit] = decision(True, rule="head changed", **since)
                 elif not changed:
-                    reason = f"no changes of its own {since}"
-                    decisions[unit] = decision(False, reason, since=base)
+                    decisions[unit] = decision(False, rule="no new changes", **since)
                 else:
-                    answer = answers[unit]
-                    answer["reason"] += f" {since}"
-                    decisions[unit] = answer | {"since": base, "judged": judged}
+                    decisions[unit] = answers[unit] | since
     # Selection is an optimization, so any failure runs every unit.
     except Exception as error:  # noqa: BLE001
-        return everything(config, f"selection failed: {error}")
+        return everything(config, f"full: selection failed: {error}")
 
     for unit in owned:
         if f"ci:{unit}" in labels:
-            decisions[unit] = decisions[unit] | decision(True, f"label ci:{unit}")
+            decisions[unit] = decisions[unit] | {
+                "run": True,
+                "rule": f"label ci:{unit}",
+            }
     return decisions
+
+
+def describe(entry: dict) -> str:
+    score = f"{entry['score']:.2f}" if entry["score"] is not None else ""
+    if entry["rule"] and score:
+        return f"{entry['rule']} ({score})"
+    return entry["rule"] or score
 
 
 def main() -> None:
@@ -206,36 +237,33 @@ def main() -> None:
     config = select.load_config()
     source, presets = load_configuration(ROOT)
     owned = unit_jobs(config, source, presets)
-    decisions = plan(config, owned, env["GITHUB_EVENT_NAME"], event, env)
+    decisions = plan(config, owned, env["GITHUB_EVENT_NAME"], event, env, log=print)
     units = [unit for unit, entry in decisions.items() if entry["run"]]
     jobs = selected_jobs(owned, dependencies(source, presets), units)
     with pathlib.Path(env["GITHUB_OUTPUT"]).open("a") as output:
         print(f"jobs={json.dumps(jobs)}", file=output)
 
-    table = ["| Unit | Runs | Reason |", "| --- | --- | --- |"]
+    heading = (
+        f"{len(units)} of {len(decisions)} units run. Jev's score selects a unit "
+        f"at {select.THRESHOLD:.2f} or above."
+    )
+    commits = f"{env.get('GITHUB_SERVER_URL', 'https://github.com')}/{env.get('GITHUB_REPOSITORY')}/commit"
+    print(heading)
+    rows = ["| | Unit | Score or rule | Judged since |", "| --- | --- | --- | --- |"]
     for unit, entry in decisions.items():
-        table.append(
-            f"| {unit} | {'yes' if entry['run'] else 'no'} | {entry['reason']} |"
+        mark = "✅" if entry["run"] else "➖"
+        sha = entry.get("since", "")
+        since = (
+            f"{sha[:9]}{' (merge base)' if entry.get('merge_base') else ''}"
+            if sha
+            else ""
         )
-    print("\n".join(table))
+        print(f"{mark} {unit:<13} {describe(entry):<28} {since}")
+        link = f"[`{sha[:9]}`]({commits}/{sha})" if sha else ""
+        base = f"{link} (merge base)" if entry.get("merge_base") else link
+        rows.append(f"| {mark} | {unit} | {describe(entry)} | {base} |")
     with pathlib.Path(env["GITHUB_STEP_SUMMARY"]).open("a") as summary:
-        print("\n".join(table), file=summary)
-
-    # The record outlives the run's logs, for tuning thresholds and prompts.
-    pull_request = event.get("pull_request") or {}
-    record = {
-        "run_id": env.get("GITHUB_RUN_ID"),
-        "event": env["GITHUB_EVENT_NAME"],
-        "pull_request": pull_request.get("number"),
-        "head": (pull_request.get("head") or {}).get("sha") or env.get("GITHUB_SHA"),
-        "fingerprint": select.fingerprint(config),
-        "threshold": select.THRESHOLD,
-        "units": decisions,
-        "jobs": jobs,
-    }
-    path = pathlib.Path(env.get("CI_PLAN_RECORD", ROOT / "build" / "ci-plan.json"))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(record, indent=2))
+        print(f"{heading}\n\n" + "\n".join(rows), file=summary)
 
 
 if __name__ == "__main__":

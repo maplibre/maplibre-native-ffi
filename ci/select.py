@@ -171,17 +171,15 @@ def own_changes_base(base: str, fork: str) -> str:
     return merged.stdout.split()[0] if merged.returncode in (0, 1) else base
 
 
-def forced_units(config: dict, paths: list[str]) -> set[str]:
-    """Return the units whose path patterns match a changed file."""
-    return {
-        unit["id"]
-        for unit in config["units"]
-        if any(
-            fnmatch.fnmatchcase(path, pattern)
-            for pattern in unit.get("paths", ())
-            for path in paths
-        )
-    }
+def forced_units(config: dict, paths: list[str]) -> dict[str, str]:
+    """Map each unit with a path pattern matching a changed file to that pattern."""
+    forced = {}
+    for unit in config["units"]:
+        for pattern in unit.get("paths", ()):
+            if any(fnmatch.fnmatchcase(path, pattern) for path in paths):
+                forced[unit["id"]] = pattern
+                break
+    return forced
 
 
 def fingerprint(config: dict) -> str:
@@ -298,6 +296,7 @@ def select(
     api_key: str | None = None,
     deadline: float | None = None,
     cache: pathlib.Path | None = None,
+    on_request=None,
 ) -> dict:
     """Return each unit's probability, the maximum across patch chunks.
 
@@ -328,7 +327,10 @@ def select(
                     "list covers the whole change."
                 )
             state = dict(fixed, change=change)
-            responses.append(ask(state, question_map, model, api_key, deadline))
+            response = ask(state, question_map, model, api_key, deadline)
+            if on_request:
+                on_request({"state": state, "questions": question_map}, response)
+            responses.append(response)
         result = {
             "model": responses[0]["model"],
             "units": {

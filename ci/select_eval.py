@@ -66,7 +66,7 @@ def commits(args, config: dict, cache: pathlib.Path) -> None:
 
     def chosen(result: dict, threshold: float) -> set[str]:
         units = {unit for unit, p in result["units"].items() if p >= threshold}
-        return units | result["forced"]
+        return units | set(result["forced"])
 
     units = [unit["id"] for unit in config["units"]]
     print("| commit | subject | " + " | ".join(units) + " |")

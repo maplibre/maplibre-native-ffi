@@ -288,17 +288,6 @@ def plan_job() -> dict:
                     "TYPESAFE_API_KEY": "${{ secrets.TYPESAFE_API_KEY }}",
                 },
             ),
-            # Each unit's decision and Jev's probability, for tuning selection.
-            action(
-                "actions/upload-artifact",
-                {
-                    "name": "ci-plan",
-                    "path": "build/ci-plan.json",
-                    "if-no-files-found": "error",
-                    "retention-days": 90,
-                },
-                name="Upload plan record",
-            ),
         ],
     }
 
