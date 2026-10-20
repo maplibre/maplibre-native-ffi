@@ -25,7 +25,7 @@ public readonly record struct StyleSourceTileInfo
     }
 
     /// <summary>
-    /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
+    /// Tile URL templates in TileJSON order.
     /// </summary>
     public string[] TileUrls
     {

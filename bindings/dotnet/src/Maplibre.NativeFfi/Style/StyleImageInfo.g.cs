@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Copied result, owned by the caller.
+/// One complete runtime style image, borrowed for a completion callback.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_info</c> in the <see
@@ -23,7 +23,7 @@ public sealed record StyleImageInfo
 
     /// <summary>
     /// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes,
-    /// top row first. Copied bytes, owned by the caller.
+    /// top row first.
     /// </summary>
     public byte[] Pixels
     {
@@ -33,7 +33,7 @@ public sealed record StyleImageInfo
     internal ValueArray<byte> PixelsStorage { get; set; }
 
     /// <summary>
-    /// Horizontally stretchable intervals. Copied value, owned by the caller.
+    /// Horizontally stretchable intervals.
     /// </summary>
     public ImageStretch[] StretchX
     {
@@ -43,7 +43,7 @@ public sealed record StyleImageInfo
     internal ValueArray<ImageStretch> StretchXStorage { get; set; }
 
     /// <summary>
-    /// Vertically stretchable intervals. Copied value, owned by the caller.
+    /// Vertically stretchable intervals.
     /// </summary>
     public ImageStretch[] StretchY
     {

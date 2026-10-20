@@ -46,12 +46,6 @@ class SummaryTests(unittest.TestCase):
 
 
 class ReferenceTests(unittest.TestCase):
-    def test_names_the_doxygen_file_page(self):
-        self.assertEqual(
-            docs.reference_url("maplibre_native_c/render_session.h"),
-            docs.REFERENCE + "render__session_8h.html",
-        )
-
     def test_rejects_a_header_without_a_page_name(self):
         with self.assertRaises(ValueError):
             docs.reference_url("maplibre_native_c/Upper.h")
@@ -63,14 +57,6 @@ class RenderTests(unittest.TestCase):
         "Accepts [0, 1] and <x> where a */ b; keeps `mln_x[i]` and & \\.",
         "https://example.invalid/api_8h.html",  # lint: not-fetched
     )
-
-    def test_kdoc_escapes_prose_without_backslashes_and_never_closes_early(self):
-        body = docs.block_comment(self.doc).removeprefix("/**").removesuffix("*/\n")
-        self.assertNotIn("*/", body)
-        # KDoc reads a backslash literally, so brackets become references.
-        self.assertIn("&#91;0, 1&#93;", body)
-        # Dokka would emit a decoded `<` as markup, so it stays in code.
-        self.assertIn("`<x>`", body)
 
     def test_xml_param_documents_a_positional_property(self):
         param = docs.xml_param(self.doc, "Range", "    ")

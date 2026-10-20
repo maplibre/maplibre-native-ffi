@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
-/// result, owned by the caller.
+/// Geographic bounds in degrees.
 /// </summary>
 /// <remarks>
 /// See <c>mln_lat_lng_bounds</c> in the <see

@@ -6,9 +6,8 @@ the C functions and upcall stubs that common code uses (see kotlin_native).
 """
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import Api
-from tools.bindgen.semantic import BoundApi, discarding_variants, view_support
+from tools.bindgen.semantic import BoundApi
 
 from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
@@ -58,7 +57,6 @@ def lowered(api: Api | BoundApi):
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
-    conflicts = conflicting_functions(bound, "kotlin")
     groups = {}
     for plan in bound.operations:
         receiver = receiver_value(plan).native if plan.receiver else None
@@ -66,8 +64,6 @@ def lowered(api: Api | BoundApi):
     for plan in (plan for plans in groups.values() for plan in plans):
         function = plan.function
         try:
-            if function.name in conflicts:
-                raise Unsupported("public method name collides after conversion")
             bodies[function.name] = operation(plan, values, native)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
@@ -185,7 +181,5 @@ def coverage(api: Api | BoundApi) -> dict:
     generated = [function.name for function in functions]
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
-        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

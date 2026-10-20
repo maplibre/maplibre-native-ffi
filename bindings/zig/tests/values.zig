@@ -43,14 +43,13 @@ test "optional fields and masks round-trip through presence bits" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
 
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{
-        .mode = .jump,
-        .camera = .{ .zoom = 3.0, .pitch = 30.0 },
-    }, null));
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{
-        .mode = .jump,
-        .camera = .{ .zoom = 5.0 },
-    }, null));
+    var update = try maplibre.cameraUpdateDefault(testing.allocator);
+    defer update.deinit();
+    update.value.mode = .jump;
+    update.value.camera = .{ .zoom = 3.0, .pitch = 30.0 };
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
+    update.value.camera = .{ .zoom = 5.0 };
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
     const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
     try testing.expectEqual(@as(?f64, 5.0), snapshot.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.camera.pitch.?, 1e-9);
@@ -120,11 +119,12 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     // completes.
     const transition_id: u64 = 0x8000_0000_0000_0029;
     var ended = support.EndProbe{};
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{
-        .mode = .ease,
-        .camera = .{ .zoom = 4.0 },
-        .animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() },
-    }, null));
+    var update = try maplibre.cameraUpdateDefault(testing.allocator);
+    defer update.deinit();
+    update.value.mode = .ease;
+    update.value.camera = .{ .zoom = 4.0 };
+    update.value.animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() };
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
     try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
     try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id, null));
@@ -156,8 +156,7 @@ test "an array input is copied at submission" {
     for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
 }
 
-// A struct's field defaults come from the header's field annotations, so the
-// record they build matches what the native default function returns.
-test "a record built from its field defaults equals the native default" {
-    try testing.expectEqual(try maplibre.mapOptionsDefault(), maplibre.MapOptions{});
+test "native record defaults round trip through generated conversion" {
+    const options = try maplibre.mapOptionsDefault();
+    try testing.expectEqual(options, maplibre.MapOptions.fromNative(options.toNative()));
 }

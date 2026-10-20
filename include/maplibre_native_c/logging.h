@@ -106,7 +106,7 @@ typedef struct mln_log_handler {
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
-  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /**

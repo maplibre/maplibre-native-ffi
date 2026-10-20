@@ -65,6 +65,8 @@ internal actual object C {
   private val mln_geojson_source_options_default =
     Ffm.downcall("mln_geojson_source_options_default", mln_geojson_source_options)
   private val mln_gpu_sync_default = Ffm.downcall("mln_gpu_sync_default", mln_gpu_sync)
+  private val mln_http_header_rule_default =
+    Ffm.downcall("mln_http_header_rule_default", mln_http_header_rule)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -1044,6 +1046,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_resource_route_default =
+    Ffm.downcall("mln_resource_route_default", mln_resource_route)
   private val mln_resource_transform_request_complete =
     Ffm.downcall(
       "mln_resource_transform_request_complete",
@@ -1377,6 +1381,11 @@ internal actual object C {
 
   actual fun mln_gpu_sync_default(returned: Long) {
     mln_gpu_sync_default.invokeExact(Ffm.into(returned, mln_gpu_sync)) as MemorySegment
+  }
+
+  actual fun mln_http_header_rule_default(returned: Long) {
+    mln_http_header_rule_default.invokeExact(Ffm.into(returned, mln_http_header_rule))
+      as MemorySegment
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -2906,6 +2915,10 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
+  actual fun mln_resource_route_default(returned: Long) {
+    mln_resource_route_default.invokeExact(Ffm.into(returned, mln_resource_route)) as MemorySegment
+  }
+
   actual fun mln_resource_transform_request_complete(
     request: Long,
     url: Long,
@@ -3369,6 +3382,14 @@ internal val mln_geojson_source_options: GroupLayout =
   )
 internal val mln_gpu_sync: GroupLayout =
   Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("object"))
+internal val mln_http_header_rule: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("kinds"),
+    JAVA_INT.withName("flags"),
+    mln_buffer_view.withName("url"),
+    ADDRESS.withName("headers"),
+    JAVA_LONG.withName("header_count"),
+  )
 internal val mln_projected_meters: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("northing"), JAVA_DOUBLE.withName("easting"))
 internal val mln_logical_extent: GroupLayout =
@@ -3547,6 +3568,12 @@ internal val mln_rendered_feature_query_options: GroupLayout =
     ADDRESS.withName("layer_ids"),
     JAVA_LONG.withName("layer_id_count"),
     mln_buffer_view.withName("filter"),
+  )
+internal val mln_resource_route: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("kinds"),
+    JAVA_INT.withName("flags"),
+    mln_buffer_view.withName("url"),
   )
 internal val mln_runtime_options: GroupLayout =
   Ffm.struct(

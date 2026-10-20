@@ -682,6 +682,35 @@ fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyR
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_http_header(
+    py: Python<'_>,
+    value: &sys::mln_http_header,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("name", generated_text(py, value.name)?)?;
+    dict.set_item("value", generated_text(py, value.value)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_http_header_rule(
+    py: Python<'_>,
+    value: &sys::mln_http_header_rule,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kinds", generated_value(py, value.kinds)?)?;
+    dict.set_item("flags", generated_value(py, value.flags)?)?;
+    dict.set_item("url", generated_text(py, value.url)?)?;
+    dict.set_item(
+        "headers",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.headers, value.header_count)? },
+            |element| generated_copy_mln_http_header(py, element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
     user_data: *mut std::ffi::c_void,
     kind: sys::mln_resource_kind,
@@ -1707,6 +1736,17 @@ fn generated_copy_mln_resource_request_info(
     dict.set_item("prior_data", unsafe {
         generated_bytes(py, generated_view(value.prior_data, value.prior_data_size)?)
     }?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_resource_route(
+    py: Python<'_>,
+    value: &sys::mln_resource_route,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kinds", generated_value(py, value.kinds)?)?;
+    dict.set_item("flags", generated_value(py, value.flags)?)?;
+    dict.set_item("url", generated_text(py, value.url)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2763,7 +2803,7 @@ fn generated_input_mln_camera_transition_handler<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_camera_transition_handler_callback)
         } else {
@@ -3085,7 +3125,10 @@ fn generated_input_mln_http_header_rule<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_http_header_rule> {
-    let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
+    if value.is_none() {
+        return Ok(unsafe { sys::mln_http_header_rule_default() });
+    }
+    let mut raw: sys::mln_http_header_rule = unsafe { sys::mln_http_header_rule_default() };
     raw.kinds = value
         .getattr("kinds")?
         .extract::<sys::mln_resource_kind_mask>()?;
@@ -3120,7 +3163,7 @@ fn generated_input_mln_http_header_transform<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_http_header_transform_callback)
         } else {
@@ -3605,7 +3648,7 @@ fn generated_input_mln_queue_lock<'py>(
             value.getattr("_invoke_lock")?.unbind(),
             value.getattr("_invoke_unlock")?.unbind(),
         ]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.lock = if lock_enabled {
             Some(generated_callback_mln_queue_lock_lock)
         } else {
@@ -3713,7 +3756,7 @@ fn generated_input_mln_resource_provider<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_provider_callback)
         } else {
@@ -3763,7 +3806,10 @@ fn generated_input_mln_resource_route<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_resource_route> {
-    let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
+    if value.is_none() {
+        return Ok(unsafe { sys::mln_resource_route_default() });
+    }
+    let mut raw: sys::mln_resource_route = unsafe { sys::mln_resource_route_default() };
     raw.kinds = value
         .getattr("kinds")?
         .extract::<sys::mln_resource_kind_mask>()?;
@@ -3784,7 +3830,7 @@ fn generated_input_mln_resource_transform<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_transform_callback)
         } else {
@@ -3804,7 +3850,7 @@ fn generated_input_mln_runtime_event_handler<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_runtime_event_handler_callback)
         } else {
@@ -4096,7 +4142,7 @@ fn generated_input_mln_wake<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_wake_callback)
         } else {
@@ -4298,6 +4344,13 @@ fn _default_gpu_sync(py: Python<'_>) -> PyResult<Py<PyAny>> {
 }
 
 #[pyfunction]
+fn _default_http_header_rule(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    generated_check_reentry()?;
+    let value = unsafe { sys::mln_http_header_rule_default() };
+    generated_copy_mln_http_header_rule(py, &value)
+}
+
+#[pyfunction]
 fn _default_map_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_map_options_default() };
@@ -4386,6 +4439,13 @@ fn _default_rendered_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>
     generated_check_reentry()?;
     let value = unsafe { sys::mln_rendered_feature_query_options_default() };
     generated_copy_mln_rendered_feature_query_options(py, &value)
+}
+
+#[pyfunction]
+fn _default_resource_route(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    generated_check_reentry()?;
+    let value = unsafe { sys::mln_resource_route_default() };
+    generated_copy_mln_resource_route(py, &value)
 }
 
 #[pyfunction]
@@ -9916,6 +9976,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(_default_free_camera_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_geojson_source_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_gpu_sync, module)?)?;
+    module.add_function(wrap_pyfunction!(_default_http_header_rule, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_tile_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_viewport_options, module)?)?;
@@ -9953,6 +10014,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         _default_rendered_feature_query_options,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(_default_resource_route, module)?)?;
     module.add_function(wrap_pyfunction!(_default_runtime_options, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_source_feature_query_options,

@@ -78,9 +78,9 @@ typedef enum mln_delivery_type : uint32_t {
 } mln_delivery_type;
 
 /** Copied mln_runtime_event_callback arguments. */
-typedef struct MLN_BINDING("capture=manual") mln_runtime_event_delivery {
+typedef struct mln_runtime_event_delivery {
   const mln_event_batch_view* events MLN_BINDING("lifetime=owner");
-} mln_runtime_event_delivery;
+} mln_runtime_event_delivery MLN_BINDING("capture=manual");
 
 /** Copied mln_log_callback arguments; fields mirror the callback parameters. */
 typedef struct mln_log_delivery {

@@ -47,10 +47,10 @@ typedef struct mln_metal_borrowed_texture_descriptor {
   mln_logical_extent extent;
   /** Physical texture width in device pixels. Must be positive. Defaults to
    * 256. */
-  uint32_t physical_width MLN_BINDING("default=256");
+  uint32_t physical_width;
   /** Physical texture height in device pixels. Must be positive. Defaults to
    * 256. */
-  uint32_t physical_height MLN_BINDING("default=256");
+  uint32_t physical_height;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    *
@@ -140,11 +140,11 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   /**
    * Physical image width in device pixels. Must be positive. Defaults to 256.
    */
-  uint32_t physical_width MLN_BINDING("default=256");
+  uint32_t physical_width;
   /**
    * Physical image height in device pixels. Must be positive. Defaults to 256.
    */
-  uint32_t physical_height MLN_BINDING("default=256");
+  uint32_t physical_height;
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
   /**
@@ -188,7 +188,7 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * Backend-native VkImageLayout value left after rendering succeeds. Defaults
    * to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
    */
-  uint32_t final_layout MLN_BINDING("default=5");
+  uint32_t final_layout;
 } mln_vulkan_borrowed_texture_descriptor;
 
 /** Vulkan frame acquired from a texture ring. */
@@ -259,10 +259,10 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   mln_logical_extent extent;
   /** Physical texture width in device pixels. Must be positive. Defaults to
    * 256. */
-  uint32_t physical_width MLN_BINDING("default=256");
+  uint32_t physical_width;
   /** Physical texture height in device pixels. Must be positive. Defaults to
    * 256. */
-  uint32_t physical_height MLN_BINDING("default=256");
+  uint32_t physical_height;
   /**
    * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
@@ -331,9 +331,9 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    */
   mln_logical_extent extent;
   /** Physical texture width in device pixels. Defaults to 256. */
-  uint32_t physical_width MLN_BINDING("default=256");
+  uint32_t physical_width;
   /** Physical texture height in device pixels. Defaults to 256. */
-  uint32_t physical_height MLN_BINDING("default=256");
+  uint32_t physical_height;
   /**
    * Borrowed WebGPU context. device is required. Rendering is submitted
    * through context.queue or that device's default queue.

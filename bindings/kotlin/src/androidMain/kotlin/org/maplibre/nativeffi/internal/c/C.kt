@@ -118,6 +118,8 @@ internal actual object C {
 
   @CriticalNative @JvmStatic actual external fun mln_gpu_sync_default(returned: Long): Unit
 
+  @CriticalNative @JvmStatic actual external fun mln_http_header_rule_default(returned: Long): Unit
+
   @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -1232,6 +1234,8 @@ internal actual object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
+
+  @CriticalNative @JvmStatic actual external fun mln_resource_route_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_resource_transform_request_complete(

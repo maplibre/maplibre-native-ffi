@@ -630,6 +630,8 @@ class Values:
         )
 
     def encoder(self, plan: ValuePlan) -> str:
+        if plan.native not in self.bound.inputs:
+            return ""
         if not self.can_encode(plan):
             raise Unsupported(f"{plan.native}: input requires an allocation scope")
         lines = [
@@ -984,14 +986,7 @@ class Values:
             )
             properties.append(
                 self.member_doc(plan, field)
-                + (
-                    self.initialized(
-                        f"    public {required}{type_} {member} {{ get; {accessor}; }}",
-                        field,
-                    )
-                    if masked
-                    else f"    public {required}{type_} {member} {{ get; {accessor}; }}"
-                )
+                + f"    public {required}{type_} {member} {{ get; {accessor}; }}"
             )
         declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
         if not masked:
@@ -1104,61 +1099,15 @@ class Values:
             "        }\n"
         )
 
-    def member_initial(self, field: FieldPlan) -> str | None:
-        """A member's annotated default, or None when its type's zero value is
-        the native default. A record member takes its type's own defaults."""
-        if field.presence:
-            return None
-        value = field.value
-        initial = field.initial
-        if initial is None:
-            if value.kind == "record" and self.has_initials(value):
-                return f"new {self.public_type(value)}()"
-            return None
-        type_ = self.public_type(value)
-        if value.kind == "enum":
-            return f"{type_}.{pascal(initial.member)}"
-        if type_ == "float":
-            return f"{initial.literal}f"
-        if type_ == "bool":
-            return initial.literal
-        return initial.literal if type_ == "double" else str(initial.value)
-
-    def has_initials(self, plan: ValuePlan) -> bool:
-        """Whether a record's native default holds a nonzero member."""
-        return any(
-            self.member_initial(field) is not None for _, field in self.members(plan)
-        )
-
-    def initialized(self, property_: str, field: FieldPlan) -> str:
-        """A property declaration that starts at the member's native default."""
-        initial = self.member_initial(field)
-        return property_ if initial is None else f"{property_} = {initial};"
-
-    def parameterless(self, plan: ValuePlan) -> str:
-        """A constructor that starts every member at its native default.
-
-        A struct's implicit parameterless constructor zeroes every member, so
-        a record whose native default holds a nonzero member declares its own.
-        """
-        if not self.has_initials(plan):
+    def parameterless(self, plan: ValuePlan, *, primary: bool = False) -> str:
+        if not plan.default:
             return ""
-        arguments = []
-        for member, field in self.members(plan):
-            initial = self.member_initial(field)
-            type_ = self.member_type(plan, member, field)
-            if initial is not None:
-                arguments.append(initial)
-            elif type_.endswith("?") or not (
-                type_ in {"string", "byte[]"} or self.is_reference_type(field.value)
-            ):
-                arguments.append("default")
-            else:
-                arguments.append("default!")
-        return (
-            f"    public {public_name(plan.native)}()\n"
-            f"        : this({', '.join(arguments)}) {{ }}\n"
+        initializer = (
+            " : this(" + ", ".join("default!" for _ in self.members(plan)) + ")"
+            if primary
+            else ""
         )
+        return f"    public {public_name(plan.native)}(){initializer} {{ this = Default; }}\n"
 
     def member_doc(self, plan: ValuePlan, field: FieldPlan) -> str:
         """The XML doc comment of a member."""
@@ -1193,9 +1142,7 @@ class Values:
                 )
                 properties.append(
                     self.member_doc(plan, field)
-                    + self.initialized(
-                        f"    public {required}{type_} {name} {{ get; set; }}", field
-                    )
+                    + f"    public {required}{type_} {name} {{ get; set; }}"
                 )
             properties.extend(
                 docs.xml_comment(self.bound.doc(flag.name), "    ")
@@ -1219,7 +1166,7 @@ class Values:
             )
             + ")"
         )
-        constructor = self.parameterless(plan)
+        constructor = self.parameterless(plan, primary=True)
         return (
             f"{declaration}\n{{\n{constructor}}}\n"
             if constructor

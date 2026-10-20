@@ -6,20 +6,9 @@ from .zig import SCALARS, doc, documented, identifier, pascal
 
 
 def field_default(values, field) -> str:
-    """The Zig default of a required field: its annotated initial value, a
-    record's own field defaults, or zero."""
-    value, initial = field.value, field.initial
+    value = field.value
     public = values.public(value)
-    if initial is None:
-        return ".{}" if value.kind == "record" else f"std.mem.zeroes({public})"
-    if value.kind != "enum":
-        return initial.literal
-    member = identifier(initial.member)
-    if value.enum_kind != "bitmask":
-        return f".{member}"
-    if initial.value & (initial.value - 1) == 0:
-        return f".{{ .{member} = true }}"
-    return f"{public}.{member}"
+    return ".{}" if value.kind == "record" else f"std.mem.zeroes({public})"
 
 
 class Values:
@@ -197,7 +186,9 @@ class Values:
             initial = "null" if optional else field_default(self, field)
             fields.append(
                 doc(self.bound, f"{value.native}.{field.name}", "    ")
-                + f"    {local}: {'?' if optional else ''}{self.public(field.value)} = {initial},"
+                + f"    {local}: {'?' if optional else ''}{self.public(field.value)}"
+                + (f" = {initial}" if not value.default or optional else "")
+                + ","
             )
             copy = self.capture(field.value, f"raw.{local}")
             if optional:
@@ -219,20 +210,27 @@ class Values:
             if value.default
             else f"std.mem.zeroes(c.{value.native})"
         )
-        return f"""pub const {public} = struct {{
-{chr(10).join(fields)}
-    pub fn toNative(self: {public}) c.{value.native} {{
+        encoder = (
+            f"""    pub fn toNative(self: {public}) c.{value.native} {{
         var raw = {initial};
 {chr(10).join(writes)}
         return raw;
     }}
-    pub fn fromNative(raw: c.{value.native}) {public} {{
+"""
+            if value.native in self.bound.inputs
+            else ""
+        )
+        rendered = f"""pub const {public} = struct {{
+{chr(10).join(fields)}
+{encoder}    pub fn fromNative(raw: c.{value.native}) {public} {{
         return .{{
 {chr(10).join(copies)}
         }};
     }}
 }};
 """
+
+        return rendered
 
     def enumeration(self, value):
         public = self.public(value)

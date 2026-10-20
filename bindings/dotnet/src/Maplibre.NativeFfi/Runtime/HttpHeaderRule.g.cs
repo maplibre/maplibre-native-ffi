@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public readonly record struct HttpHeaderRule
 {
     public HttpHeaderRule()
-        : this(ResourceKindMask.All, default, default!, default!) { }
+    {
+        this = Default;
+    }
 
     public HttpHeaderRule(
         ResourceKindMask Kinds,
@@ -52,4 +54,12 @@ public readonly record struct HttpHeaderRule
         init => HeadersStorage = ValueArray.Copy(value);
     }
     internal ValueArray<HttpHeader> HeadersStorage { get; init; }
+    public static HttpHeaderRule Default
+    {
+        get
+        {
+            using var call = NativeCall.Enter(null, "mln_http_header_rule_default");
+            return GeneratedValues.CopyHttpHeaderRule(NativeMethods.mln_http_header_rule_default());
+        }
+    }
 }

@@ -22,7 +22,10 @@ public readonly partial record struct WebgpuOwnedTextureDescriptor(
 )
 {
     public WebgpuOwnedTextureDescriptor()
-        : this(new LogicalExtent(), default) { }
+        : this(default!, default!)
+    {
+        this = Default;
+    }
 
     public static WebgpuOwnedTextureDescriptor Default
     {

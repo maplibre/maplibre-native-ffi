@@ -16,6 +16,12 @@ public readonly partial record struct CameraUpdate(
     GesturePhase GesturePhase
 )
 {
+    public CameraUpdate()
+        : this(default!, default!, default!, default!)
+    {
+        this = Default;
+    }
+
     public static CameraUpdate Default
     {
         get

@@ -114,17 +114,14 @@ typedef struct mln_render_session_attach_options {
    * One mln_render_driver_kind value. Defaults to
    * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
    */
-  uint32_t driver MLN_BINDING(
-    "enum=mln_render_driver_kind;"
-    "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
-  );
+  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
   /**
    * Requested slot count of a session-owned texture ring, from one to three.
    * Private targets grant one slot regardless of this value. A borrowed
    * texture ring's depth is its texture count, so borrowed and other targets
    * ignore this value. Defaults to 1.
    */
-  uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
+  uint32_t requested_texture_ring_depth;
   /**
    * Producer synchronization for acquired texture frames. Defaults to
    * MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared

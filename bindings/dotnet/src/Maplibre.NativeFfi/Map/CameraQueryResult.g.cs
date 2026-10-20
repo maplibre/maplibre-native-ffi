@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Copied result, owned by the caller.
+/// Camera result borrowed for an ordered camera-query completion.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_query_result</c> in the <see

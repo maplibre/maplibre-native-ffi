@@ -24,15 +24,6 @@ test "generated values round trip through native" {
     try std.testing.expectEqual(@as(usize, 0), absent.value.right.len);
 }
 
-test "generated nullable text keeps absence and emptiness" {
-    for ([_]?[]const u8{ null, "", "text" }) |text| {
-        var result = try api.probeNullableText(std.testing.allocator, text, null);
-        defer result.deinit();
-        try std.testing.expectEqual(text == null, result.value.text == null);
-        if (text) |expected| try std.testing.expectEqualStrings(expected, result.value.text.?);
-    }
-}
-
 test "generated keyword parameters keep their order" {
     const entry = try api.keywordCombine(5, 2, 7, 11, null);
     try std.testing.expectEqual(api.KeywordEntry{ .type = 3, .@"defer" = 7, .raw = 11 }, entry);
@@ -47,7 +38,7 @@ test "generated calls report native failures through the diagnostic" {
 }
 
 test "generated record defaults equal the native default" {
-    try api.probeSettingsCheck(.{}, null);
+    try api.probeSettingsCheck(try api.probeSettingsDefault(), null);
 }
 
 test "generated default copies keep values and leave registrations unset" {

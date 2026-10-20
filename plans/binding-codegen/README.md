@@ -62,8 +62,8 @@ mise run bindings:check
 mise run bindings:test-generator
 ```
 
-`bindings/generated-coverage.json` records the generated files, the semantic
-support relationships, and the operation coverage of each language. The check
-task fails on an ambiguous contract, on an unsupported public declaration, and
-on committed output that differs from regeneration. Native changes require a
-build of this checkout's library before the binding suites run against it.
+`bindings/generated-coverage.json` records the generated files and any
+unsupported declarations by language. The check task fails on an ambiguous
+contract, on an unsupported public declaration, and on committed output that
+differs from regeneration. Native changes require a build of this checkout's
+library before the binding suites run against it.

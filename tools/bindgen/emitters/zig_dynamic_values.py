@@ -201,8 +201,6 @@ def declaration(values, value):
                 f".{identifier(member.name)} => |item| {{ raw.{identifier(union.tag)} = c.{member.presence.variant}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}; }},"
                 for member in union.fields
             )
-            if union.empty_variant:
-                cases += f" .empty => {{ raw.{identifier(union.tag)} = c.{union.empty_variant[0]}; }},"
             writes.append(
                 f"        switch (self.{local}) {{ {cases} .unknown => return error.InvalidArgument, }}"
             )
@@ -218,7 +216,13 @@ def declaration(values, value):
         )
         fields.append(
             doc(values.bound, f"{value.native}.{field.name}", "    ")
-            + f"    {local}: {'?' if optional else ''}{public_type} = {default},"
+            + f"    {local}: {'?' if optional else ''}{public_type}"
+            + (
+                f" = {default}"
+                if not value.default or optional or public_type.startswith("?")
+                else ""
+            )
+            + ","
         )
         copied = decode(values, field.value, raw)
         if optional:
@@ -270,13 +274,19 @@ def declaration(values, value):
         if not value.registration or value.native in values.bound.returned
         else ""
     )
-    return f"""pub const {typ} = struct {{
-{chr(10).join(fields)}
-    pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.{value.native} {{
+    encoder = (
+        f"""    pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.{value.native} {{
 {write_use}{roots_use}        var raw = {initial};
 {chr(10).join(writes)}
         return raw;
     }}
-{chr(10).join(trampolines)}
+"""
+        if value.native in values.bound.inputs
+        else ""
+    )
+    rendered = f"""pub const {typ} = struct {{
+{chr(10).join(fields)}
+{encoder}{chr(10).join(trampolines)}
 {copy}}};
 """
+    return rendered

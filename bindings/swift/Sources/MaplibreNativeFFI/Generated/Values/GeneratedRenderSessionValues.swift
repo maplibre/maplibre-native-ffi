@@ -114,14 +114,6 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
     disposition = RenderAbandonDisposition(rawValue: raw.disposition)
     quarantinedResourceCount = raw.quarantined_resource_count
   }
-
-  func nativeValue() -> mln_render_abandon_result {
-    var raw = mln_render_abandon_result()
-    raw.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
-    raw.disposition = disposition.rawValue
-    raw.quarantined_resource_count = quarantinedResourceCount
-    return raw
-  }
 }
 
 /// A borrowed view of one owned frame-result batch.
@@ -129,7 +121,7 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
 /// See `mln_render_frame_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderFrameBatchView: Equatable, Hashable, Sendable {
-  /// Copied value, owned by the caller.
+  /// Borrowed array of result_count terminal frame results in completion order.
   public var results: [RenderFrameResult]
   public static var `default`: Self {
     Self()
@@ -148,16 +140,6 @@ public struct RenderFrameBatchView: Equatable, Hashable, Sendable {
       count: raw.result_count,
       stride: raw.result_size
     ) { item, _ in RenderFrameResult(raw: item) }
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_render_frame_batch_view
-  {
-    var raw = mln_render_frame_batch_view()
-    raw.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
-    raw.results = arena.array(results.map { $0.nativeValue() })
-    raw.result_count = try NativeInputArena.count(results.count)
-    return raw
   }
 }
 
@@ -220,18 +202,6 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     generation = raw.generation
     frameGeneration = raw.frame_generation
     needsRepaint = raw.needs_repaint
-  }
-
-  func nativeValue() -> mln_render_frame_result {
-    var raw = mln_render_frame_result()
-    raw.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-    raw.disposition = disposition.rawValue
-    raw.token = token
-    raw.map_update_generation = mapUpdateGeneration
-    raw.generation = generation
-    raw.frame_generation = frameGeneration
-    raw.needs_repaint = needsRepaint
-    return raw
   }
 }
 
@@ -324,20 +294,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     frameGeneration = raw.frame_generation
     acquiredFrameCount = raw.acquired_frame_count
     pendingChanges = raw.pending_changes
-  }
-
-  func nativeValue() -> mln_render_session_snapshot {
-    var raw = mln_render_session_snapshot()
-    raw.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
-    raw.state = state.rawValue
-    raw.extent = extent.nativeValue()
-    raw.generation = generation
-    raw.map_update_generation = mapUpdateGeneration
-    raw.rendered_update_generation = renderedUpdateGeneration
-    raw.frame_generation = frameGeneration
-    raw.acquired_frame_count = acquiredFrameCount
-    raw.pending_changes = pendingChanges
-    return raw
   }
 }
 

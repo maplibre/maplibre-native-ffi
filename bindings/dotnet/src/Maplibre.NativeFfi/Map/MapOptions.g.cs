@@ -32,7 +32,10 @@ public readonly partial record struct MapOptions(
 )
 {
     public MapOptions()
-        : this(new LogicalExtent(), default, default, RuntimeEventMask.All) { }
+        : this(default!, default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static MapOptions Default
     {

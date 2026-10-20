@@ -418,18 +418,24 @@ pub const OwnedTexture = struct {
         self.* = .{ .graphics = try Graphics.create(), .session = undefined, .caller_driven = driver == .caller_graphics_thread };
         errdefer self.graphics.destroy();
         if (build_options.supports_opengl and self.caller_driven) try self.graphics.makeCurrent();
-        const options = maplibre.RenderSessionAttachOptions{
-            .driver = driver,
-            .requested_texture_ring_depth = 2,
-            .frame_wake = self.wakes.wake(),
-            .driver_work_wake = self.wakes.wake(),
-        };
+        var defaults = try maplibre.renderSessionAttachOptionsDefault(testing.allocator);
+        defer defaults.deinit();
+        var options = defaults.value;
+        options.driver = driver;
+        options.requested_texture_ring_depth = 2;
+        options.frame_wake = self.wakes.wake();
+        options.driver_work_wake = self.wakes.wake();
         const attachment = if (build_options.supports_metal)
             try maplibre.mapAttachMetalOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = .{ .device = self.graphics.context.metal_device } }, options, null)
         else if (build_options.supports_vulkan)
             try maplibre.mapAttachVulkanOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
-        else
-            try maplibre.mapAttachOpenglOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.openglContext() }, options, null);
+        else attachment: {
+            var descriptor = try maplibre.openglOwnedTextureDescriptorDefault(testing.allocator);
+            defer descriptor.deinit();
+            descriptor.value.extent = extent;
+            descriptor.value.context = self.graphics.openglContext();
+            break :attachment try maplibre.mapAttachOpenglOwnedTexture(testing.allocator, map, descriptor.value, options, null);
+        };
         self.session = attachment.session;
         errdefer {
             _ = maplibre.renderSessionAbandon(self.session, null) catch {};

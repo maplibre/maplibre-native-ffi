@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Global style transition options. Copied result, owned by the caller.
+/// Global style transition options.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_transition_options</c> in the <see

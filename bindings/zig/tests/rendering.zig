@@ -115,7 +115,7 @@ test "a scoped frame view holds its frame until the scope returns" {
             // The view borrows the frame, so the binding refuses its release,
             // and native refuses to abandon the session that owns it.
             var diagnostic: maplibre.Diagnostic = .{};
-            try testing.expectError(error.InvalidState, maplibre.acquiredFrameRelease(testing.allocator, self.frame, .{ .kind = .cpu_complete }, &diagnostic));
+            try testing.expectError(error.InvalidState, maplibre.acquiredFrameRelease(testing.allocator, self.frame, try maplibre.gpuSyncDefault(), &diagnostic));
             try testing.expectEqualStrings("AcquiredFrame is in use", diagnostic.message());
             try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
             self.sibling.deinit();
@@ -126,7 +126,7 @@ test "a scoped frame view holds its frame until the scope returns" {
         }
     };
     try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
-    try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete }, null);
+    try maplibre.acquiredFrameRelease(testing.allocator, frame, try maplibre.gpuSyncDefault(), null);
 }
 
 // A frame anchors its session and a session its map. Disposing the map first

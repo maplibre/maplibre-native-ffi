@@ -301,19 +301,10 @@ class Values:
     def flag_name(self, value, flag):
         return identifier(flag.member)
 
-    def field_default(self, field):
-        """A field's default: its annotated initial value, or its type's."""
-        value, initial = field.value, field.initial
-        if initial is None:
-            return self.default(value)
-        if value.kind == "enum":
-            return f"{name(value.native)}.{initial.member.upper()}"
-        typ = self.public(value)
-        if typ == "Double":
-            return initial.literal
-        if typ == "Float":
-            return f"{initial.literal}f"
-        return literal(initial.value, typ)
+    def field_default(self, field, record=None):
+        if record and record.default:
+            return f"{name(record.native)}.default.{identifier(field.name)}"
+        return self.default(field.value)
 
     def default(self, value):
         if value.nullable or value.optional:
@@ -419,7 +410,9 @@ class Values:
             typed = []
             for member, typ, field in self.members(value):
                 typed.append((member, typ))
-                default = "null" if typ.endswith("?") else self.field_default(field)
+                default = (
+                    "null" if typ.endswith("?") else self.field_default(field, value)
+                )
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"
@@ -449,6 +442,10 @@ class Values:
             typed.extend(
                 (self.flag_name(value, flag), "Boolean") for flag in value.mask_flags
             )
+            if value.default:
+                companion = f"  public companion object {{ internal val default: {public} by lazy {{ GeneratedApi.{camel(value.default.removeprefix('mln_'))}() }} }}"
+            else:
+                companion = ""
             if value.native in self.views:
                 args = [arg.replace("public val ", "") for arg in args]
                 getters = [
@@ -469,6 +466,12 @@ class Values:
                     + "\n)"
                     + content_equality(public, typed)
                 )
+            if companion:
+                declaration = result[-1]
+                if declaration.rstrip().endswith("}"):
+                    result[-1] = declaration.rstrip()[:-1] + "\n" + companion + "\n}"
+                else:
+                    result[-1] += " {\n" + companion + "\n}"
         for public, (field, value) in self.attachments.items():
             result.append(
                 f"public data class {public}(public val {field}: {self.public(value)}, public val ready: kotlinx.coroutines.Deferred<Unit>)"

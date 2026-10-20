@@ -94,7 +94,7 @@ Pointer<raw.mln_unit_bezier> _writeUnitBezier(UnitBezier value, Arena arena) {
 }
 
 UnitBezier _readUnitBezier(raw.mln_unit_bezier source) =>
-    UnitBezier(source.x1, source.y1, source.x2, source.y2);
+    UnitBezier(x1: source.x1, y1: source.y1, x2: source.x2, y2: source.y2);
 
 CameraTransitionEnd _readCameraTransitionEnd(
   raw.mln_camera_transition_end source,
@@ -209,7 +209,7 @@ Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Arena arena) {
 }
 
 LatLng _readLatLng(raw.mln_lat_lng source) =>
-    LatLng(source.latitude, source.longitude);
+    LatLng(latitude: source.latitude, longitude: source.longitude);
 
 Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
   LatLngBounds value,
@@ -288,7 +288,7 @@ Pointer<raw.mln_screen_point> _writeScreenPoint(
 }
 
 ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
-    ScreenPoint(source.x, source.y);
+    ScreenPoint(x: source.x, y: source.y);
 
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
@@ -689,7 +689,8 @@ Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Arena arena) {
   return result;
 }
 
-Vec3 _readVec3(raw.mln_vec3 source) => Vec3(source.x, source.y, source.z);
+Vec3 _readVec3(raw.mln_vec3 source) =>
+    Vec3(x: source.x, y: source.y, z: source.z);
 
 Pointer<raw.mln_quaternion> _writeQuaternion(Quaternion value, Arena arena) {
   final result = arena<raw.mln_quaternion>();
@@ -701,7 +702,7 @@ Pointer<raw.mln_quaternion> _writeQuaternion(Quaternion value, Arena arena) {
 }
 
 Quaternion _readQuaternion(raw.mln_quaternion source) =>
-    Quaternion(source.x, source.y, source.z, source.w);
+    Quaternion(x: source.x, y: source.y, z: source.z, w: source.w);
 
 Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
   FreeCameraOptions value,
@@ -836,6 +837,53 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
       ? source.synchronous_tiling
       : null,
 );
+
+Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
+  final result = arena<raw.mln_http_header>();
+  result.ref.name = nativeStringView(value.name, arena).value;
+  result.ref.value = nativeStringView(value.value, arena).value;
+  return result;
+}
+
+HttpHeader _readHttpHeader(raw.mln_http_header source) => HttpHeader(
+  name: utf8.decode(_copyBufferView(source.name)),
+  value: utf8.decode(_copyBufferView(source.value)),
+);
+
+Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
+  HttpHeaderRule value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_http_header_rule>();
+  result.ref = raw.mln_http_header_rule_default();
+  result.ref.kinds = value.kinds.rawValue;
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeStringView(value.url, arena).value;
+  result.ref.headers = arena<raw.mln_http_header>(
+    value.headers.isEmpty ? 1 : value.headers.length,
+  );
+  result.ref.header_count = value.headers.length;
+  for (var index = 0; index < value.headers.length; index++) {
+    result.ref.headers[index] = _writeHttpHeader(
+      value.headers[index],
+      arena,
+    ).ref;
+  }
+  return result;
+}
+
+HttpHeaderRule _readHttpHeaderRule(raw.mln_http_header_rule source) =>
+    HttpHeaderRule(
+      kinds: ResourceKindMask.fromRawValue(source.kinds),
+      flags: UrlMatchFlags.fromRawValue(source.flags),
+      url: utf8.decode(_copyBufferView(source.url)),
+      headers: List<HttpHeader>.unmodifiable(
+        List.generate(
+          source.header_count,
+          (index) => _readHttpHeader(source.headers[index]),
+        ),
+      ),
+    );
 
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
@@ -1802,7 +1850,7 @@ Pointer<raw.mln_image_stretch> _writeImageStretch(
 }
 
 ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
-    ImageStretch(source.from, source.to);
+    ImageStretch(from: source.from, to: source.to);
 
 Pointer<raw.mln_image_content> _writeImageContent(
   ImageContent value,
@@ -2353,6 +2401,25 @@ _prepareResourceRequestCancelHandler(
   }
 }
 
+Pointer<raw.mln_resource_route> _writeResourceRoute(
+  ResourceRoute value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_resource_route>();
+  result.ref = raw.mln_resource_route_default();
+  result.ref.kinds = value.kinds.rawValue;
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeStringView(value.url, arena).value;
+  return result;
+}
+
+ResourceRoute _readResourceRoute(raw.mln_resource_route source) =>
+    ResourceRoute(
+      kinds: ResourceKindMask.fromRawValue(source.kinds),
+      flags: UrlMatchFlags.fromRawValue(source.flags),
+      url: utf8.decode(_copyBufferView(source.url)),
+    );
+
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
   Arena arena,
@@ -2680,34 +2747,6 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
   }
 }
 
-Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
-  final result = arena<raw.mln_http_header>();
-  result.ref.name = nativeStringView(value.name, arena).value;
-  result.ref.value = nativeStringView(value.value, arena).value;
-  return result;
-}
-
-Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
-  HttpHeaderRule value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_http_header_rule>();
-  result.ref.kinds = value.kinds.rawValue;
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeStringView(value.url, arena).value;
-  result.ref.headers = arena<raw.mln_http_header>(
-    value.headers.isEmpty ? 1 : value.headers.length,
-  );
-  result.ref.header_count = value.headers.length;
-  for (var index = 0; index < value.headers.length; index++) {
-    result.ref.headers[index] = _writeHttpHeader(
-      value.headers[index],
-      arena,
-    ).ref;
-  }
-  return result;
-}
-
 _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
   HttpHeaderTransform value,
 ) {
@@ -2733,7 +2772,10 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
 }
 
 ResourceRange _readResourceRange(raw.mln_resource_range source) =>
-    ResourceRange(uint64FromNative(source.start), uint64FromNative(source.end));
+    ResourceRange(
+      start: uint64FromNative(source.start),
+      end: uint64FromNative(source.end),
+    );
 
 ResourceRequestInfo _readResourceRequestInfo(
   raw.mln_resource_request_info source,
@@ -2786,17 +2828,6 @@ void _deliverResourceProviderCallback(
     owner?.close();
     rethrow;
   }
-}
-
-Pointer<raw.mln_resource_route> _writeResourceRoute(
-  ResourceRoute value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_resource_route>();
-  result.ref.kinds = value.kinds.rawValue;
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeStringView(value.url, arena).value;
-  return result;
 }
 
 _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
@@ -3137,6 +3168,16 @@ GpuSync gpuSyncDefault() {
   return _readGpuSync(nativeResult);
 }
 
+/// Returns default HTTP header rule options.
+///
+/// See `mln_http_header_rule_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+HttpHeaderRule httpHeaderRuleDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_http_header_rule_default();
+  return _readHttpHeaderRule(nativeResult);
+}
+
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
@@ -3401,6 +3442,16 @@ RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_rendered_feature_query_options_default();
   return _readRenderedFeatureQueryOptions(nativeResult);
+}
+
+/// Returns default resource route options.
+///
+/// See `mln_resource_route_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ResourceRoute resourceRouteDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_resource_route_default();
+  return _readResourceRoute(nativeResult);
 }
 
 /// Creates a runtime.

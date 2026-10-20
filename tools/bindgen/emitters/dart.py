@@ -7,15 +7,13 @@ from collections import defaultdict
 from dataclasses import replace
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
+from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
-    discarding_variants,
     output_member,
-    view_support,
 )
 
 from .dart_values import (
@@ -41,11 +39,7 @@ def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.parent in values.bound.public_handles:
         if not owned.parent_parameter:
             raise Unsupported("owned output requires its parent owner")
-        parent = (
-            "this"
-            if receiver and function.parameters[0].name == owned.parent_parameter
-            else camel(owned.parent_parameter)
-        )
+        parent = "this"
     arguments = (parent + ", " if parent else "") + f"{native}({expression})"
     result = f"{public}._({arguments})"
     if values.bound.operations_by_name[function.name].registrations:
@@ -95,7 +89,6 @@ def lower_function(
         "snapshot",
         "lifecycle",
         "event_batch",
-        "render_driver",
     }:
         raise Unsupported("execution requires another runtime skeleton")
     status_return = plan.status
@@ -216,10 +209,6 @@ def lower_function(
             raise Unsupported("parameter missing a resolved input contract")
         value = inputs[parameter.name].value
         values.check(value)
-        if value.kind == "buffer" and value.nullable and value.buffer_form != "view":
-            raise Unsupported(
-                "nullable counted pointer needs nullable count conversion"
-            )
         typ = values.public(value)
         if typ.endswith("?"):
             optional.append(f"{typ} {local}")
@@ -459,11 +448,8 @@ def lower(api: Api | BoundApi):
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
-    conflicts = conflicting_functions(bound, "dart")
     for plan in bound.operations:
         try:
-            if plan.name in conflicts:
-                raise Unsupported("public method name collides after conversion")
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)
             owner, body = lower_function(plan, local_values)
@@ -684,7 +670,6 @@ def coverage(api: Api | BoundApi):
     # A callback that must answer on its native thread has no Dart form, so its
     # registration carries native rules instead. The operations that only such
     # a callback calls, through the response records it writes, have no caller.
-    rules = {}
     for value in list(values.used.values()):
         if not value.registration:
             continue
@@ -707,15 +692,9 @@ def coverage(api: Api | BoundApi):
                     None,
                 )
                 if plan.scoped_receiver and receiver in responses:
-                    rules[plan.name] = (
-                        f"{callback.native} is answered by native rules in {value.native}"
-                    )
                     unsupported.pop(plan.name, None)
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
-        "native_rules": rules,
-        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }
 

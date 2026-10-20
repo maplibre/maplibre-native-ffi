@@ -7,8 +7,7 @@ Source locations use paths relative to the include directory.
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -28,8 +27,6 @@ class CType:
     canonical: str
     declaration: str | None = None
     const: bool = False
-    volatile: bool = False
-    restrict: bool = False
     pointee: CType | None = None
     element: CType | None = None
     length: int | None = None
@@ -66,7 +63,6 @@ class Field:
     metadata: dict[str, str]
     location: Location
     documentation: str = ""
-    bit_width: int | None = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +70,6 @@ class Record:
     name: str
     kind: str
     fields: tuple[Field, ...]
-    metadata: dict[str, str]
     location: Location
     documentation: str = ""
     complete: bool = True
@@ -113,12 +108,8 @@ class Api:
     records: tuple[Record, ...]
     enums: tuple[Enum, ...]
     typedefs: tuple[Typedef, ...]
-    schema_version: int = 1
     runtime_exports: tuple[str, ...] = ()
     runtime_types: tuple[str, ...] = ()
-
-    def to_json(self) -> str:
-        return json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
 
     @property
     def public_functions(self) -> tuple[Function, ...]:

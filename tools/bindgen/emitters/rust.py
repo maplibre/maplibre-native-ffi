@@ -10,8 +10,6 @@ from tools.bindgen.compiler import compile_api
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
-    discarding_variants,
-    view_support,
 )
 
 from ..model import Api, CType
@@ -310,7 +308,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         "immediate",
         "snapshot",
         "lifecycle",
-        "render_driver",
         "event_batch",
     }:
         raise Unsupported(f"execution {execution} requires another ownership skeleton")
@@ -332,16 +329,9 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             else []
         ),
     ]
-    parents = {
-        owner.parent_parameter for owner in owner_plans if owner.parent_parameter
-    }
-    if len(parents) > 1:
-        raise Unsupported("operation transfers owners from distinct parents")
     parent_line = None
-    if parents:
-        parent = next(iter(parents))
-        source = "self" if parent == plan.receiver else names[parent]
-        parent_line = f"let parent = {source}.inner.parent();"
+    if any(owner.parent_parameter for owner in owner_plans):
+        parent_line = "let parent = self.inner.parent();"
         prelude.append(parent_line)
     input_plans = {parameter.name: parameter for parameter in plan.inputs}
     output_plans = {parameter.name: parameter for parameter in plan.outputs}
@@ -790,7 +780,5 @@ def coverage(api: Api | BoundApi) -> dict:
     _, generated, unsupported = lower(bound)
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
-        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

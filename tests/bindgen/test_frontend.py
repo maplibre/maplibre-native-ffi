@@ -100,16 +100,6 @@ mln_status mln_read(mln_runtime runtime, const mln_map *map,
         )
         validate(api)
 
-    def test_pointer_and_pointee_qualifiers_remain_distinct(self):
-        api = self.parse("""
-void mln_qualified(const volatile double *restrict value);
-""")
-        pointer = api.functions[0].parameters[0].type
-        self.assertTrue(pointer.restrict)
-        self.assertFalse(pointer.const)
-        self.assertTrue(pointer.pointee.const)
-        self.assertTrue(pointer.pointee.volatile)
-
     def test_enum_typedef_underlying_preserves_unsigned_high_bits(self):
         api = self.parse("""
 typedef unsigned int sample_u32;
@@ -143,7 +133,7 @@ mln_options mln_options_default(void);
         for _ in range(2):
             with TemporaryDirectory() as directory:
                 (Path(directory) / "api.h").write_text(source)
-                models.append(parse_headers(Path(directory)).to_json())
+                models.append(parse_headers(Path(directory)))
         self.assertEqual(*models)
 
     def test_query_requires_a_result_and_defaults_its_payload(self):
@@ -187,18 +177,6 @@ mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *o
 BIND("execution=immediate;execution=query") mln_status mln_duplicate(mln_diagnostic *out_diagnostic);
 """)
 
-    def test_erased_results_reject_unsafe_ownership_and_absence_contracts(self):
-        api = self.parse("""
-BIND("execution=query;result=double;ownership=owned;encoding=json;nullable=true;optional=empty")
-mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        with self.assertRaises(ModelError) as raised:
-            validate(api)
-        diagnostics = str(raised.exception)
-        self.assertIn("owned completion requires a declared handle type", diagnostics)
-        self.assertIn("encoded completion requires a buffer", diagnostics)
-        self.assertIn("different absence representations", diagnostics)
-
     def test_bad_span_relation_and_scalar_encoding_are_rejected(self):
         api = self.parse("""
 mln_status mln_bad_span(const double *items BIND("length=missing"),
@@ -231,30 +209,6 @@ typedef struct mln_record {
 """)
             )
 
-    def test_owned_record_fields_require_a_release_contract(self):
-        with self.assertRaisesRegex(
-            ModelError, "owned field requires a declared handle release contract"
-        ):
-            validate(
-                self.parse("""
-typedef struct mln_record {
-  double value BIND("ownership=owned");
-} mln_record;
-""")
-            )
-
-    def test_opaque_record_cannot_be_an_erased_value_result(self):
-        with self.assertRaisesRegex(
-            ModelError, "requires a complete record definition"
-        ):
-            validate(
-                self.parse("""
-typedef struct mln_opaque mln_opaque;
-BIND("execution=query;result=mln_opaque")
-mln_status mln_invalid_value(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-            )
-
     def test_status_functions_report_through_a_final_diagnostic(self):
         api = self.parse("""
 mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic);
@@ -277,14 +231,6 @@ mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic)
         with self.assertRaisesRegex(ModelError, "must be the last parameter"):
             self.parse(
                 "mln_status mln_resize(mln_diagnostic *out_diagnostic, mln_map map);\n"
-            )
-
-    def test_variadic_functions_require_an_explicit_backend_design(self):
-        with self.assertRaisesRegex(ModelError, "variadic public functions"):
-            validate(
-                self.parse("""
-mln_status mln_format(const char *format, ...);
-""")
             )
 
 

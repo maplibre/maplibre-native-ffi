@@ -439,7 +439,7 @@ class Values:
                 chunks.append(
                     f"func copy{typename}(raw C.{native}) {typename} {{ var result {typename}; {'; '.join(lines)}; return result }}"
                 )
-            if native in self.inputs:
+            if native in self.inputs and native in self.api.inputs:
                 init = f"C.{value.default}()" if value.default else f"C.{native}{{}}"
                 lines = [f"raw := {init}"]
                 for f in visible.fields:
@@ -468,8 +468,6 @@ class Values:
                         )
                         tag = f"raw.{native_identifier(v.tag)} = {self.c_type(tag_type)}({expr}.bindingTag())"
                         body = f'if {expr} == nil {{ arena.fail("missing union variant") }}; {tag}; switch variant := {expr}.(type) {{ {"; ".join(arms)}; default: arena.fail("unknown input union variant") }}'
-                        if v.empty_variant:
-                            body = f"if {expr} == nil {{ raw.{native_identifier(v.tag)} = C.{v.empty_variant[0]} }} else {{ {body} }}"
                         lines.append(body)
                         continue
                     body = self.native(
@@ -498,20 +496,6 @@ class Values:
             if value.default:
                 chunks.append(
                     f"func Default{typename}() {typename} {{ return copy{typename}(C.{value.default}()) }}"
-                )
-            elif any(v is not None and f.initial is not None for _, v, f in members):
-                defaults = []
-                for member, v, f in members:
-                    if v is not None and f.initial is not None:
-                        initial = f.initial
-                        expression = (
-                            self.type(v) + name(initial.member)
-                            if v.kind == "enum"
-                            else initial.literal
-                        )
-                        defaults.append(f"{member}: {expression}")
-                chunks.append(
-                    f"func Default{typename}() {typename} {{ return {typename}{{{', '.join(defaults)}}} }}"
                 )
         for native, value in self.views.items():
             typename = public(native) + "View"

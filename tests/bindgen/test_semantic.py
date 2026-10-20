@@ -5,15 +5,12 @@ import unittest
 
 from support import parse, parse_sources, protocol_header
 
-from tools.bindgen import default_cases
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
     DefaultSupport,
     DeliveryPlan,
     DisposeSupport,
-    FieldInitial,
-    ViewSupport,
     bind,
 )
 
@@ -21,57 +18,6 @@ from tools.bindgen.semantic import (
 class SemanticTests(unittest.TestCase):
     def parse(self, source):
         return parse(source)
-
-    def test_copied_result_docs_follow_storage_ownership(self):
-        source = """
-typedef struct child {
-  /** Borrowed UTF-8 name, valid only during the callback. */
-  const char *name;
-} child;
-/** Borrowed result for a completion callback. */
-typedef struct snapshot {
-  /** Borrowed pixel bytes, valid only during the callback. */
-  mln_buffer_view pixels BIND("encoding=bytes");
-  /** UTF-8 title. */
-  mln_buffer_view title;
-  const child *children BIND("length=count");
-  unsigned long count;
-  const child *selected;
-  /** Borrowed graphics object, valid until frame release. */
-  void *object;
-} snapshot;
-typedef struct input { /** Borrowed for the call. */ const char *name; } input;
-BIND("execution=query;result=snapshot")
-mln_status read(const input *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        api = self.parse(source)
-        model = bind(api, require_complete=True)
-        self.assertEqual(
-            model.doc("snapshot").summary, "Copied result, owned by the caller."
-        )
-        for symbol, noun in (
-            ("snapshot.pixels", "bytes"),
-            ("snapshot.children", "value"),
-            ("snapshot.selected", "value"),
-            ("child.name", "text"),
-        ):
-            with self.subTest(symbol=symbol):
-                self.assertEqual(
-                    model.doc(symbol).summary, f"Copied {noun}, owned by the caller."
-                )
-        self.assertEqual(
-            model.doc("snapshot.object").summary,
-            "Borrowed graphics object, valid until frame release.",
-        )
-        self.assertEqual(model.doc("input.name").summary, "Borrowed for the call.")
-        self.assertEqual(
-            model.doc("snapshot.title").summary,
-            "UTF-8 title. Copied text, owned by the caller.",
-        )
-        self.assertEqual(
-            api.records_by_name["snapshot"].fields[0].documentation,
-            "/** Borrowed pixel bytes, valid only during the callback. */",
-        )
 
     def test_scalar_carriers_preserve_portable_typedefs_across_host_abis(self):
         for underlying in ("long", "long long"):
@@ -170,141 +116,6 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 self.parse(source.replace("variant=TEXT", "variant=ABSENT")),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "distinct values"):
-            bind(
-                self.parse(source.replace("variant=NUMBER", "variant=TEXT")),
-                require_complete=True,
-            )
-
-    def test_field_defaults_resolve_to_typed_initials(self):
-        bound = bind(parse(groups=("defaults",)), require_complete=True)
-        settings = bound.values["mln_probe_settings"]
-        initials = {
-            field.name: field.initial
-            for plan in (settings, bound.values["mln_probe_extent"])
-            for field in plan.fields
-        }
-        self.assertEqual(
-            initials,
-            {
-                "size": None,
-                "extent": None,
-                "width": FieldInitial("256", 256),
-                "scale": FieldInitial("1.5", 1.5),
-                "fit": FieldInitial(
-                    "MLN_PROBE_MODE_FIRST", 1, "MLN_PROBE_MODE_FIRST", "first"
-                ),
-                "mode": FieldInitial(
-                    "MLN_PROBE_MODE_SECOND", 2, "MLN_PROBE_MODE_SECOND", "second"
-                ),
-                "flags": FieldInitial(
-                    "MLN_PROBE_FLAG_ALL", 3, "MLN_PROBE_FLAG_ALL", "all"
-                ),
-                "heading": FieldInitial(
-                    "MLN_PROBE_FLAG_SOUTH", 2, "MLN_PROBE_FLAG_SOUTH", "south"
-                ),
-                "ratio": FieldInitial("0.25", 0.25),
-                "offset": FieldInitial("-3", -3),
-                "enabled": FieldInitial("true", True),
-                "count": None,
-            },
-        )
-        # The generated C case checks every field against the same values.
-        self.assertEqual(
-            [
-                (item.path, item.form, item.expected)
-                for item in default_cases.record_expectations(
-                    settings, "value", "settings"
-                )
-            ],
-            [
-                ("settings.size", "unsigned", "sizeof(mln_probe_settings)"),
-                ("settings.extent.width", "unsigned", "256"),
-                ("settings.extent.scale", "float", "1.5"),
-                ("settings.extent.fit", "unsigned", "MLN_PROBE_MODE_FIRST"),
-                ("settings.mode", "unsigned", "MLN_PROBE_MODE_SECOND"),
-                ("settings.flags", "unsigned", "MLN_PROBE_FLAG_ALL"),
-                ("settings.heading", "unsigned", "MLN_PROBE_FLAG_SOUTH"),
-                ("settings.ratio", "float", "0.25"),
-                ("settings.offset", "signed", "-3"),
-                ("settings.enabled", "unsigned", "true"),
-                ("settings.count", "signed", "0"),
-            ],
-        )
-
-    def test_field_defaults_state_nonzero_plain_values(self):
-        source = """
-typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
-typedef struct extent { unsigned width; } extent;
-typedef struct turn { double w; } turn;
-typedef enum BIND("kind=bitmask") settings_field : unsigned {
-  SETTINGS_TURN = 1, SETTINGS_ZOOM = 2
-} settings_field;
-typedef struct settings {
-  unsigned size;
-  unsigned fields BIND("enum=settings_field");
-  extent area;
-  turn orientation BIND("mask=fields;bit=SETTINGS_TURN");
-  unsigned level;
-  unsigned mode BIND("enum=mode");
-  double zoom BIND("mask=fields;bit=SETTINGS_ZOOM");
-  unsigned reserved BIND("kind=reserved");
-} settings;
-settings settings_default(void);
-typedef struct loose { unsigned width; } loose;
-mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
-"""
-        self.assertEqual(
-            bind(self.parse(source), require_complete=True)
-            .values["settings"]
-            .fields[5]
-            .initial,
-            None,
-        )
-        for before, after, message in (
-            ("unsigned level;", 'unsigned level BIND("default=0");', "restates zero"),
-            (
-                'BIND("enum=mode")',
-                'BIND("enum=mode;default=MODE_OFF")',
-                "restates zero",
-            ),
-            ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
-            ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
-            ("extent area;", 'extent area BIND("default=1");', "plain value"),
-            (
-                'BIND("kind=reserved")',
-                'BIND("kind=reserved;default=1")',
-                "is fixed",
-            ),
-        ):
-            with (
-                self.subTest(after=after),
-                self.assertRaisesRegex(ModelError, message),
-            ):
-                bind(self.parse(source.replace(before, after)), require_complete=True)
-        loose = source.replace(
-            "typedef struct loose { unsigned width; }",
-            'typedef struct loose { unsigned width BIND("default=1"); }',
-        )
-        self.assertEqual(
-            bind(self.parse(loose), require_complete=True)
-            .values["loose"]
-            .fields[0]
-            .initial.value,
-            1,
-        )
-        # A record nested by value in a default may state its own defaults.
-        nested = source.replace(
-            "typedef struct extent { unsigned width; }",
-            'typedef struct extent { unsigned width BIND("default=256"); }',
-        )
-        self.assertEqual(
-            bind(self.parse(nested), require_complete=True)
-            .values["extent"]
-            .fields[0]
-            .initial,
-            FieldInitial("256", 256),
-        )
 
     def test_each_struct_is_versioned_by_one_thing(self):
         header = protocol_header(groups=("versioning", "strided_records"))
@@ -397,74 +208,6 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 require_complete=True,
             )
 
-    def test_copied_values_hold_registrations_only_in_defaults(self):
-        source = """
-typedef void (*notify)(void *state);
-typedef void (*release)(void *state);
-typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
-typedef struct hook { notify fire; void *state BIND("kind=context"); release retire; double scale; } hook BIND("kind=callback_registration;release=retire");
-typedef struct extent { double width; } extent;
-typedef struct settings { extent extent; signals wake; } settings;
-typedef struct request { double zoom; } request;
-typedef struct reading { double zoom; } reading;
-settings settings_default(void);
-hook hook_default(void);
-mln_status configure(const settings *options, const hook *events, const request *input, reading *out_reading BIND("direction=out"), mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        self.assertEqual(
-            model.defaults.keys() & {"settings", "hook"}, {"settings", "hook"}
-        )
-        # A default's registration field is left unset rather than copied, and
-        # a registration's own default copies its other fields.
-        records = {"signals", "hook", "extent", "settings", "request", "reading"}
-        self.assertEqual(
-            model.returned & records, {"hook", "extent", "settings", "reading"}
-        )
-        for rejected in (
-            'mln_status inspect(settings *out_settings BIND("direction=out"), mln_diagnostic *out_diagnostic);',
-            (
-                'BIND("execution=query;result=settings")\n'
-                "mln_status mln_map_settings(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);"
-            ),
-            (
-                "typedef void (*observe)(void *state, settings current);\n"
-                'mln_status watch(observe callback, void *state BIND("kind=context"), mln_diagnostic *out_diagnostic);'
-            ),
-        ):
-            with (
-                self.subTest(rejected=rejected),
-                self.assertRaisesRegex(
-                    ModelError, "native cannot return a callback registration"
-                ),
-            ):
-                bind(self.parse(source + rejected), require_complete=True)
-
-    def test_defaults_hold_registrations_only_in_fields_without_presence(self):
-        # A copy would have to keep an optional registration's presence, so a
-        # default holds a registration only as a field without presence.
-        source = """
-typedef void (*notify)(void *state);
-typedef void (*release)(void *state);
-typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
-typedef enum BIND("kind=bitmask") settings_field : unsigned { SETTINGS_WAKE = 1 } settings_field;
-typedef struct settings { unsigned fields BIND("enum=settings_field"); FIELD } settings;
-settings settings_default(void);
-"""
-        for field in (
-            'signals wake BIND("mask=fields;bit=SETTINGS_WAKE");',
-            'const signals *wake BIND("nullable=true");',
-        ):
-            with (
-                self.subTest(field=field),
-                self.assertRaisesRegex(
-                    ModelError,
-                    "settings_default result.wake: a record default holds a "
-                    "callback registration only in a field without presence",
-                ),
-            ):
-                bind(self.parse(source.replace("FIELD", field)), require_complete=True)
-
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
             self.parse("""
@@ -484,29 +227,6 @@ mln_status create(const settings *options, mln_diagnostic *out_diagnostic);
         self.assertEqual(api.values["signals"].registration.user_data, "state")
         self.assertEqual(api.values["signals"].registration.release, "retire")
         self.assertEqual(api.callbacks["notify"].context, "state")
-
-    def test_protocol_reentry_names_operations_on_its_owner(self):
-        source = """
-typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=callback_response");
-typedef void (*answer)(void *state, reply *out BIND("direction=out")) BIND("reentry=protocol;reentry_owner=out;reentry_calls=reply_set");
-mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic);
-void stray(int value);
-"""
-        api = bind(self.parse(source), require_complete=True)
-        policy = api.callbacks["answer"].reentry_policy
-        self.assertEqual(
-            (policy.owner_parameter, policy.owner_type, policy.operations),
-            ("out", "reply", ("reply_set",)),
-        )
-        with self.assertRaisesRegex(
-            ModelError, "immediate operation on the declared owner"
-        ):
-            bind(
-                self.parse(
-                    source.replace("reentry_calls=reply_set", "reentry_calls=stray")
-                ),
-                require_complete=True,
-            )
 
     def test_strided_items_resolve_their_message_arena(self):
         source = """
@@ -563,9 +283,6 @@ mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
             (value.item_buffer.field, value.item_buffer.data, value.item_buffer.offset),
             ("message", "bytes", "offset"),
         )
-        self.assertEqual(
-            api.doc("item.message").summary, "Copied text, owned by the caller."
-        )
         with self.assertRaisesRegex(ModelError, "stride requires"):
             bind(
                 self.parse(source.replace("stride=stride", "stride=missing")),
@@ -607,18 +324,10 @@ mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic)
 """
         api = bind(self.parse(source), require_complete=True)
         response = api.values["reply"].response
-        self.assertEqual(response.context, "context")
-        self.assertEqual(response.callbacks, ("answer",))
         self.assertEqual(response.methods, ("reply_set",))
-        self.assertEqual(response.lifetime, "callback")
         self.assertEqual(
             api.operations_by_name["reply_set"].scoped_receiver, "response"
         )
-        with self.assertRaisesRegex(ModelError, "one context"):
-            bind(
-                self.parse(source.replace(' BIND("kind=context")', "")),
-                require_complete=True,
-            )
 
     def test_borrowed_output_view_tracks_owner_and_parent_invalidation(self):
         source = """
@@ -635,19 +344,9 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
         api = bind(self.parse(source), require_complete=True)
         view = api.operations_by_name["child_get_view"].view
         # The scope operations back the view and never become public members.
-        self.assertEqual(
-            {plan.name: plan.support for plan in api.view_scopes},
-            {
-                "child_begin": ViewSupport(api.handles["child"]),
-                "child_end": ViewSupport(api.handles["child"]),
-            },
-        )
         self.assertTrue({"child_begin", "child_end"}.isdisjoint(api.operations_by_name))
         self.assertEqual(view.owner_parameter, "owner")
         self.assertEqual(view.owner.native, "child")
-        self.assertEqual(
-            view.invalidated_by, ("child_close", "parent_close", "parent_abandon")
-        )
         self.assertEqual(
             (view.output.name, view.begin, view.end, view.stem),
             ("out", "child_begin", "child_end", "view"),
@@ -741,15 +440,6 @@ mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
                 self.parse(source.replace("  release release;", "  unsigned release;")),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "void context pointer"):
-            bind(
-                self.parse(
-                    source.replace(
-                        '  void *context BIND("kind=context");', "  unsigned context;"
-                    ).replace("release=release", "release=release;user_data=context")
-                ),
-                require_complete=True,
-            )
         with self.assertRaisesRegex(ModelError, "void callback contains its failure"):
             bind(
                 self.parse(
@@ -772,21 +462,12 @@ mln_status set_options(const options *value, mln_diagnostic *out_diagnostic);
         self.assertEqual(constructor.support, DefaultSupport("options"))
         self.assertEqual(model.defaults, {"options": constructor})
         self.assertEqual(model.operations_by_name["set_options"].role, "public")
-        # A constructor that takes arguments is no default, and naming one fails.
+        # A constructor that takes arguments is a public operation.
         with_argument = source.replace(
             "make_options(void)", "make_options(int ignored)"
         )
         model = bind(self.parse(with_argument), require_complete=True)
         self.assertEqual(model.operations_by_name["make_options"].role, "public")
-        with self.assertRaisesRegex(ModelError, "no-argument constructor"):
-            bind(
-                self.parse(
-                    with_argument.replace(
-                        "} options;", '} options BIND("default=make_options");'
-                    )
-                ),
-                require_complete=True,
-            )
 
     def test_attachment_keeps_immediate_owner_separate_from_completion(self):
         source = """
@@ -815,15 +496,6 @@ BIND("execution=lifecycle") mln_status attach(
                 ),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "receiver must be this handle type"):
-            bind(
-                self.parse(
-                    source.replace(
-                        "abandon_child(child value,", "abandon_child(root value,"
-                    )
-                ),
-                require_complete=True,
-            )
 
     def test_consuming_release_preserves_required_synchronization(self):
         model = bind(
@@ -831,7 +503,7 @@ BIND("execution=lifecycle") mln_status attach(
 typedef unsigned long frame BIND("kind=handle;release=release_frame");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
 mln_status release_frame(
-  frame value BIND("consumes=success"), const sync *consumer, mln_diagnostic *out_diagnostic);
+  frame value, const sync *consumer, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -1075,16 +747,6 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         self.assertTrue(result.nullable)
         self.assertFalse(result.element.nullable)
 
-    def test_owned_output_retains_its_parent_input_rather_than_the_receiver(self):
-        model = bind(parse(groups=("owned_output",)), require_complete=True)
-        operation = model.operations_by_name["mln_seed_plant"]
-        self.assertEqual(operation.receiver, "seed")
-        (output,) = operation.owned_outputs
-        self.assertEqual(
-            (output.parameter, output.parent_parameter, output.handle.parent),
-            ("out_tree", "forest", "mln_forest"),
-        )
-
     def test_receiver_registration_transfers_its_root_unless_declined(self):
         model = bind(parse(groups=("declinable_registration",)), require_complete=True)
         operation = model.operations_by_name["mln_ticket_on_cancel"]
@@ -1098,11 +760,8 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         # receives, so it calls back only into the ticket that registers it.
         callback = model.callbacks["mln_ticket_cancel"]
         self.assertEqual(
-            (
-                callback.reentry_policy.owner_parameter,
-                callback.reentry_policy.owner_type,
-            ),
-            ("ticket", "mln_ticket"),
+            (callback.reentry_policy.owner_parameter,),
+            ("ticket",),
         )
         self.assertEqual(callback.arguments, ())
         self.assertTrue(
@@ -1121,15 +780,6 @@ mln_status discard_owner(owner value, mln_diagnostic *out_diagnostic);
             DisposeSupport(model.handles["owner"]),
         )
         self.assertEqual(model.operations_by_name["close_owner"].role, "public")
-        with self.assertRaisesRegex(ModelError, "receiver must be this handle type"):
-            bind(
-                self.parse(
-                    source.replace(
-                        "discard_owner(owner value,", "discard_owner(unsigned value,"
-                    )
-                ),
-                require_complete=True,
-            )
 
 
 if __name__ == "__main__":

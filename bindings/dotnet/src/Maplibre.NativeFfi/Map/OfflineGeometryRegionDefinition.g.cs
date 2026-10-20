@@ -29,13 +29,12 @@ public readonly record struct OfflineGeometryRegionDefinition
     }
 
     /// <summary>
-    /// Style URL. Copied during region creation. Copied text, owned by the
-    /// caller.
+    /// Style URL. Copied during region creation.
     /// </summary>
     public string StyleUrl { get; init; }
 
     /// <summary>
-    /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
+    /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     /// </summary>
     public byte[] Geometry
     {

@@ -33,7 +33,10 @@ public readonly partial record struct WebgpuSurfaceDescriptor(
 )
 {
     public WebgpuSurfaceDescriptor()
-        : this(new LogicalExtent(), default, default, default) { }
+        : this(default!, default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static WebgpuSurfaceDescriptor Default
     {

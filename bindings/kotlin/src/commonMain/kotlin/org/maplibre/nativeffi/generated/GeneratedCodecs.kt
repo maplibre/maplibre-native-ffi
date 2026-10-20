@@ -1168,6 +1168,21 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
   )
 }
 
+internal fun readHttpHeaderRule(source: Long): HttpHeaderRule =
+  HttpHeaderRule(
+    kinds = ResourceKindMask(readU32(source)),
+    flags = UrlMatchFlags(readU32(source + 4)),
+    url = readViewString(source + 8),
+    headers =
+      readArray(
+        readAddress(source + w(16, 24)),
+        readSize(source + w(20, 32)),
+        w(16, 32).toLong(),
+      ) { item ->
+        readHttpHeader(item)
+      },
+  )
+
 internal fun readLatLng(source: Long): LatLng =
   LatLng(latitude = readF64(source), longitude = readF64(source + 8))
 
@@ -1297,6 +1312,13 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
     filter = if ((fields and 2u) != 0u) readView(source + w(16, 24)) else null,
   )
 }
+
+internal fun readResourceRoute(source: Long): ResourceRoute =
+  ResourceRoute(
+    kinds = ResourceKindMask(readU32(source)),
+    flags = UrlMatchFlags(readU32(source + 4)),
+    url = readViewString(source + 8),
+  )
 
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
   RuntimeOptions(
@@ -1880,6 +1902,9 @@ internal fun readQuaternion(source: Long): Quaternion =
     z = readF64(source + 16),
     w = readF64(source + 24),
   )
+
+internal fun readHttpHeader(source: Long): HttpHeader =
+  HttpHeader(name = readViewString(source), value = readViewString(source + w(8, 16)))
 
 internal fun readLogicalExtent(source: Long): LogicalExtent =
   LogicalExtent(

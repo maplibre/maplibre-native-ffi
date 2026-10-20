@@ -17,7 +17,8 @@ public readonly record struct RenderFrameBatchView
     }
 
     /// <summary>
-    /// Copied value, owned by the caller.
+    /// Borrowed array of result_count terminal frame results in completion
+    /// order.
     /// </summary>
     public RenderFrameResult[] Results
     {

@@ -3,9 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Camera fields used by snapshots and camera updates. Copied result, owned by
-/// the caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Camera fields used by snapshots and camera updates.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_options</c> in the <see

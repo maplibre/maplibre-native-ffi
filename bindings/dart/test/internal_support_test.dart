@@ -103,8 +103,8 @@ void main() {
       result.ref.value_size = stride;
 
       expect(decodeLatLngListForTesting(result.ref), const [
-        LatLng(1, 2),
-        LatLng(3, 4),
+        LatLng(latitude: 1, longitude: 2),
+        LatLng(latitude: 3, longitude: 4),
       ]);
       result.ref.value_size = sizeOf<raw.mln_lat_lng>() - 1;
       expect(

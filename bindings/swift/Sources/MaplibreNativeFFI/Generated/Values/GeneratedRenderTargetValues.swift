@@ -503,15 +503,6 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
     textureRingDepth = raw.texture_ring_depth
     flags = RenderSessionCapabilityFlag(rawValue: raw.flags)
   }
-
-  func nativeValue() -> mln_render_session_capabilities {
-    var raw = mln_render_session_capabilities()
-    raw.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
-    raw.driver = driver.rawValue
-    raw.texture_ring_depth = textureRingDepth
-    raw.flags = flags.rawValue
-    return raw
-  }
 }
 
 /// Optional render-session capabilities.
@@ -632,8 +623,7 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
   /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
   public var context: Int32
   /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-  /// canvas must still be transferable when attachment starts. Copied text,
-  /// owned by the caller.
+  /// canvas must still be transferable when attachment starts.
   public var canvasSelector: String
   public static var `default`: Self {
     Self()

@@ -12,9 +12,7 @@ from tools.bindgen.names import camel
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
-    discarding_variants,
     output_member,
-    view_support,
 )
 
 SCALARS = {
@@ -370,10 +368,7 @@ def operation(
 """,
             owner,
         )
-    if (
-        execution in {"immediate", "snapshot", "event_batch", "render_driver"}
-        and not completion
-    ):
+    if execution in {"immediate", "snapshot", "event_batch"} and not completion:
         if plan.result:
             from .swift_dynamic_values import decode
 
@@ -407,13 +402,6 @@ def operation(
                 parent = ""
                 if owned.parent_parameter and owned.parent_parameter == plan.receiver:
                     parent = ", parent: self"
-                elif owned.parent_parameter:
-                    position = next(
-                        i
-                        for i, p in enumerate(params)
-                        if p.name == owned.parent_parameter
-                    )
-                    parent = f", parent: bindingArg{position}"
                 storage.append(f"  var value{index}: {value.native} = 0")
                 types.append(value_types.public(value))
                 capture.append(
@@ -609,7 +597,5 @@ def coverage(api: Api | BoundApi) -> dict:
     _, _, generated, failures = lower(bound)
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
-        "support": view_support(bound, generated),
         "unsupported": failures,
     }

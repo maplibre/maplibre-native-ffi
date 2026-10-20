@@ -24,7 +24,10 @@ public readonly partial record struct OpenglOwnedTextureDescriptor(
 )
 {
     public OpenglOwnedTextureDescriptor()
-        : this(new LogicalExtent(), default) { }
+        : this(default!, default!)
+    {
+        this = Default;
+    }
 
     public static OpenglOwnedTextureDescriptor Default
     {

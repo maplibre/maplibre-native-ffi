@@ -42,12 +42,8 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         bound = compile_api(api)
         label = bound.values["mln_label"]
         fields = {field.name: field for field in label.fields}
-        self.assertEqual(
-            (fields["size"].role, fields["size"].default), ("size", "sizeof")
-        )
-        self.assertEqual(
-            (fields["reserved"].role, fields["reserved"].default), ("reserved", "0")
-        )
+        self.assertEqual(fields["size"].role, "size")
+        self.assertEqual(fields["reserved"].role, "reserved")
         self.assertEqual(fields["fields"].role, "presence_mask")
         self.assertEqual(
             (fields["text"].value.kind, fields["text"].value.encoding),
@@ -149,12 +145,6 @@ void use_options(const options *value);
 """
         bound = compile_api(parse(source))
         self.assertIsNone(bound.values["options"].default)
-        explicit = compile_api(
-            parse(
-                source.replace("} options;", '} options BIND("default=make_options");')
-            )
-        )
-        self.assertEqual(explicit.values["options"].default, "make_options")
 
     def test_an_annotation_that_names_an_absent_function_is_rejected(self):
         source = """
@@ -207,12 +197,6 @@ mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diag
                 "reentry_owner=owner",
                 "reentry_owner=missing",
                 "reentry_owner names an absent parameter 'missing'",
-            ),
-            ("watch(request value", "watch(other value", "must be the receiver"),
-            (
-                "typedef void (*release)(void *context);",
-                'typedef void (*release)(void *context) BIND("release_reentry=forbid");',
-                "release_reentry requires a callback registration",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):

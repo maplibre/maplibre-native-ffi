@@ -17,7 +17,7 @@ public readonly record struct EventBatchView
     }
 
     /// <summary>
-    /// Copied value, owned by the caller.
+    /// Borrowed array of event_count events in queue order.
     /// </summary>
     public RuntimeEvent[] Events
     {

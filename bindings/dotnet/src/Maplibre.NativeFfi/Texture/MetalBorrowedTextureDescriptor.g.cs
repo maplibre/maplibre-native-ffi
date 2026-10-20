@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public readonly record struct MetalBorrowedTextureDescriptor
 {
     public MetalBorrowedTextureDescriptor()
-        : this(new LogicalExtent(), 256, 256, default!) { }
+    {
+        this = Default;
+    }
 
     public MetalBorrowedTextureDescriptor(
         LogicalExtent Extent,
@@ -48,8 +50,7 @@ public readonly record struct MetalBorrowedTextureDescriptor
     public uint PhysicalHeight { get; init; }
 
     /// <summary>
-    /// The ring's textures, one per slot, in slot order. Required. Copied
-    /// value, owned by the caller.
+    /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
     public MetalBorrowedTexture[] Textures
     {

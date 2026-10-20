@@ -1189,7 +1189,7 @@ class AnimationOptions:
     """
 
     end_handler: CameraTransitionHandler = field(
-        default_factory=lambda: CameraTransitionHandler()
+        default_factory=lambda: AnimationOptions.default().end_handler
     )
     """Reports the end of the command's transitions. Disabled by default."""
 
@@ -1258,10 +1258,6 @@ class CameraDelta:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    animation: AnimationOptions
-
-    gesture_phase: GesturePhase
-
     offset: ScreenPoint | None = None
     """Pan in logical map pixels; the content moves by this offset."""
 
@@ -1278,6 +1274,14 @@ class CameraDelta:
     """Screen point in logical map pixels that scale, bearing, and pitch keep
     fixed.
     """
+
+    animation: AnimationOptions = field(
+        default_factory=lambda: CameraDelta.default().animation
+    )
+
+    gesture_phase: GesturePhase = field(
+        default_factory=lambda: CameraDelta.default().gesture_phase
+    )
 
     @classmethod
     def _from_native(cls, raw):
@@ -1329,9 +1333,7 @@ class CameraFitOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraOptions:
-    """Camera fields used by snapshots and camera updates. Copied result, owned
-    by the caller. Copied result, owned by the caller. Copied result, owned
-    by the caller.
+    """Camera fields used by snapshots and camera updates.
 
     See `mln_camera_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1379,7 +1381,7 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraQueryResult:
-    """Copied result, owned by the caller.
+    """Camera result borrowed for an ordered camera-query completion.
 
     See `mln_camera_query_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1448,13 +1450,17 @@ class CameraUpdate:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    mode: CameraUpdateMode
+    mode: CameraUpdateMode = field(default_factory=lambda: CameraUpdate.default().mode)
 
-    camera: CameraOptions
+    camera: CameraOptions = field(default_factory=lambda: CameraUpdate.default().camera)
 
-    animation: AnimationOptions
+    animation: AnimationOptions = field(
+        default_factory=lambda: CameraUpdate.default().animation
+    )
 
-    gesture_phase: GesturePhase
+    gesture_phase: GesturePhase = field(
+        default_factory=lambda: CameraUpdate.default().gesture_phase
+    )
 
     @classmethod
     def _from_native(cls, raw):
@@ -1660,7 +1666,7 @@ class EventBatchView:
     """
 
     events: tuple[RuntimeEvent, ...]
-    """Copied value, owned by the caller."""
+    """Borrowed array of event_count events in queue order."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1707,13 +1713,13 @@ class FrameDemand:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     """
 
-    token: int
-    """Host identity returned with the terminal frame result."""
-
-    flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
+    flags: FrameDemandFlag = field(default_factory=lambda: FrameDemand.default().flags)
     """A bitwise OR of `mln_frame_demand_flag` values. Defaults to
     `MLN_FRAME_DEMAND_IF_NEEDED`.
     """
+
+    token: int = field(default_factory=lambda: FrameDemand.default().token)
+    """Host identity returned with the terminal frame result."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1775,8 +1781,8 @@ class GeojsonSourceOptions:
 
     cluster_properties: bytes | None = None
     """Cluster aggregation expressions keyed by property name, as a JSON object
-    whose members follow the MapLibre Style Spec clusterProperties form.
-    Copied text, owned by the caller.
+    whose members follow the MapLibre Style Spec clusterProperties form. The
+    UTF-8 bytes are borrowed for the call.
     """
 
     buffer: int | None = None
@@ -1828,10 +1834,10 @@ class GpuSync:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    kind: GpuSyncKind
+    kind: GpuSyncKind = field(default_factory=lambda: GpuSync.default().kind)
     """One `mln_gpu_sync_kind` value."""
 
-    object: int
+    object: int = field(default_factory=lambda: GpuSync.default().object)
     """Bit pattern of the GLsync pointer."""
 
     @classmethod
@@ -1870,19 +1876,23 @@ class HttpHeaderRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    flags: UrlMatchFlags
+    kinds: ResourceKindMask = field(
+        default_factory=lambda: HttpHeaderRule.default().kinds
+    )
+    """The resource kinds to match."""
+
+    flags: UrlMatchFlags = field(default_factory=lambda: HttpHeaderRule.default().flags)
     """A bitwise OR of `mln_url_match_flags` values."""
 
-    url: str
+    url: str = field(default_factory=lambda: HttpHeaderRule.default().url)
     """The URL or glob pattern to compare."""
 
-    headers: tuple[HttpHeader, ...]
+    headers: tuple[HttpHeader, ...] = field(
+        default_factory=lambda: HttpHeaderRule.default().headers
+    )
     """The headers to set. Registration validates each one as
     `mln_http_header_transform_response_set_header()` does.
     """
-
-    kinds: ResourceKindMask = ResourceKindMask.ALL
-    """The resource kinds to match."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1892,6 +1902,12 @@ class HttpHeaderRule:
             url=raw["url"],
             headers=tuple(HttpHeader._from_native(item) for item in raw["headers"]),
         )
+
+    @classmethod
+    def default(cls):
+        from . import _native
+
+        return cls._from_native(_native._default_http_header_rule())
 
 
 @dataclass(frozen=True, slots=True)
@@ -1960,8 +1976,7 @@ class ImageStretch:
 
 @dataclass(frozen=True, slots=True)
 class LatLng:
-    """Geographic coordinate in degrees used by map and projection APIs. Copied
-    result, owned by the caller.
+    """Geographic coordinate in degrees used by map and projection APIs.
 
     See `mln_lat_lng` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1980,8 +1995,7 @@ class LatLng:
 
 @dataclass(frozen=True, slots=True)
 class LatLngBounds:
-    """Geographic bounds in degrees. Copied result, owned by the caller. Copied
-    result, owned by the caller.
+    """Geographic bounds in degrees.
 
     See `mln_lat_lng_bounds` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2023,13 +2037,13 @@ class LogicalExtent:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    width: int = 256
+    width: int
     """Width in UI pixels. Defaults to 256."""
 
-    height: int = 256
+    height: int
     """Height in UI pixels. Defaults to 256."""
 
-    scale_factor: float = 1.0
+    scale_factor: float
     """Device pixels per UI pixel. Defaults to 1.0."""
 
     @classmethod
@@ -2047,21 +2061,27 @@ class MapOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    initial_extent: LogicalExtent
+    initial_extent: LogicalExtent = field(
+        default_factory=lambda: MapOptions.default().initial_extent
+    )
     """Initial logical extent. Width and height must be nonzero, and
     scale_factor must be finite and positive. scale_factor is fixed for the
     map's lifetime.
     """
 
-    map_mode: MapMode
+    map_mode: MapMode = field(default_factory=lambda: MapOptions.default().map_mode)
     """One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`."""
 
-    fast_pfor_enabled: bool
+    fast_pfor_enabled: bool = field(
+        default_factory=lambda: MapOptions.default().fast_pfor_enabled
+    )
     """Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     encodings. Defaults to false.
     """
 
-    event_mask: RuntimeEventMask = RuntimeEventMask.ALL
+    event_mask: RuntimeEventMask = field(
+        default_factory=lambda: MapOptions.default().event_mask
+    )
     """Map-originated event types this map queues, as a bitwise OR of
     `mln_runtime_event_mask` values.
     """
@@ -2245,27 +2265,33 @@ class MetalBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: MetalBorrowedTextureDescriptor.default().extent
+    )
     """Logical texture extent. The map viewport uses width and height and the
     renderer uses scale_factor; the physical size is stated separately below.
     A scale_factor that differs from the map's is accepted and logged as a
     warning.
     """
 
-    textures: tuple[MetalBorrowedTexture, ...]
-    """The ring's textures, one per slot, in slot order. Required. Copied value,
-    owned by the caller.
-    """
-
-    physical_width: int = 256
+    physical_width: int = field(
+        default_factory=lambda: MetalBorrowedTextureDescriptor.default().physical_width
+    )
     """Physical texture width in device pixels. Must be positive. Defaults to
     256.
     """
 
-    physical_height: int = 256
+    physical_height: int = field(
+        default_factory=lambda: MetalBorrowedTextureDescriptor.default().physical_height
+    )
     """Physical texture height in device pixels. Must be positive. Defaults to
     256.
     """
+
+    textures: tuple[MetalBorrowedTexture, ...] = field(
+        default_factory=lambda: MetalBorrowedTextureDescriptor.default().textures
+    )
+    """The ring's textures, one per slot, in slot order. Required."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2309,12 +2335,16 @@ class MetalOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: MetalOwnedTextureDescriptor.default().extent
+    )
     """Logical texture extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: MetalContextDescriptor
+    context: MetalContextDescriptor = field(
+        default_factory=lambda: MetalOwnedTextureDescriptor.default().context
+    )
     """Metal backend context. device is required."""
 
     @classmethod
@@ -2339,15 +2369,19 @@ class MetalSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: MetalSurfaceDescriptor.default().extent
+    )
     """Logical surface extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: MetalContextDescriptor
+    context: MetalContextDescriptor = field(
+        default_factory=lambda: MetalSurfaceDescriptor.default().context
+    )
     """Metal backend context. device is optional for Metal surfaces."""
 
-    layer: int
+    layer: int = field(default_factory=lambda: MetalSurfaceDescriptor.default().layer)
     """`CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required."""
 
     @classmethod
@@ -2426,12 +2460,10 @@ class OfflineGeometryRegionDefinition:
     """
 
     style_url: str
-    """Style URL. Copied during region creation. Copied text, owned by the
-    caller.
-    """
+    """Style URL. Copied during region creation."""
 
     geometry: bytes
-    """UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller."""
+    """UTF-8 GeoJSON Geometry bytes. Borrowed during region creation."""
 
     min_zoom: float
 
@@ -2486,10 +2518,7 @@ class OfflineRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionInfo:
-    """Region data delivered by an offline completion. Copied result, owned by
-    the caller. Copied result, owned by the caller. Copied result, owned by
-    the caller. Copied result, owned by the caller. Copied result, owned by
-    the caller.
+    """Region data delivered by an offline completion.
 
     See `mln_offline_region_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2500,7 +2529,7 @@ class OfflineRegionInfo:
     definition: OfflineRegionDefinition
 
     metadata: bytes
-    """Metadata bytes. Copied bytes, owned by the caller."""
+    """Metadata bytes."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2513,7 +2542,7 @@ class OfflineRegionInfo:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionStatus:
-    """Offline region status snapshot. Copied result, owned by the caller.
+    """Offline region status snapshot.
 
     See `mln_offline_region_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2564,9 +2593,7 @@ class OfflineTilePyramidRegionDefinition:
     """
 
     style_url: str
-    """Style URL. Copied during region creation. Copied text, owned by the
-    caller.
-    """
+    """Style URL. Copied during region creation."""
 
     bounds: LatLngBounds
 
@@ -2617,35 +2644,47 @@ class OpenglBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: OpenglBorrowedTextureDescriptor.default().extent
+    )
     """Logical texture extent. The map viewport uses width and height and the
     renderer uses scale_factor; the physical size is stated separately below.
     A scale_factor that differs from the map's is accepted and logged as a
     warning.
     """
 
-    context: OpenglContextDescriptor
-    """Borrowed OpenGL context provider data. The textures must belong to this
-    context or a context in the same share group.
-    """
-
-    textures: tuple[OpenglBorrowedTexture, ...]
-    """The ring's textures, one per slot, in slot order. Required. Copied value,
-    owned by the caller.
-    """
-
-    target: int
-    """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
-
-    physical_width: int = 256
+    physical_width: int = field(
+        default_factory=lambda: OpenglBorrowedTextureDescriptor.default().physical_width
+    )
     """Physical texture width in device pixels. Must be positive. Defaults to
     256.
     """
 
-    physical_height: int = 256
+    physical_height: int = field(
+        default_factory=lambda: (
+            OpenglBorrowedTextureDescriptor.default().physical_height
+        )
+    )
     """Physical texture height in device pixels. Must be positive. Defaults to
     256.
     """
+
+    context: OpenglContextDescriptor = field(
+        default_factory=lambda: OpenglBorrowedTextureDescriptor.default().context
+    )
+    """Borrowed OpenGL context provider data. The textures must belong to this
+    context or a context in the same share group.
+    """
+
+    textures: tuple[OpenglBorrowedTexture, ...] = field(
+        default_factory=lambda: OpenglBorrowedTextureDescriptor.default().textures
+    )
+    """The ring's textures, one per slot, in slot order. Required."""
+
+    target: int = field(
+        default_factory=lambda: OpenglBorrowedTextureDescriptor.default().target
+    )
+    """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2712,12 +2751,16 @@ class OpenglOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: OpenglOwnedTextureDescriptor.default().extent
+    )
     """Logical texture extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: OpenglContextDescriptor
+    context: OpenglContextDescriptor = field(
+        default_factory=lambda: OpenglOwnedTextureDescriptor.default().context
+    )
     """Borrowed OpenGL context provider data. Shared ownership creates a context
     whose texture frames the host can acquire. Dedicated EGL or transferred
     WebGL ownership creates a private core-worker context for CPU readback.
@@ -2745,15 +2788,21 @@ class OpenglSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: OpenglSurfaceDescriptor.default().extent
+    )
     """Logical surface extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: OpenglContextDescriptor
+    context: OpenglContextDescriptor = field(
+        default_factory=lambda: OpenglSurfaceDescriptor.default().context
+    )
     """Borrowed OpenGL context provider data."""
 
-    surface: int
+    surface: int = field(
+        default_factory=lambda: OpenglSurfaceDescriptor.default().surface
+    )
     """Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
     EGL, both required. Null for WebGL, whose context carries its canvas
     binding.
@@ -2844,17 +2893,21 @@ class PremultipliedRgba8Image:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    width: int
+    width: int = field(default_factory=lambda: PremultipliedRgba8Image.default().width)
 
-    height: int
+    height: int = field(
+        default_factory=lambda: PremultipliedRgba8Image.default().height
+    )
 
-    stride: int
+    stride: int = field(
+        default_factory=lambda: PremultipliedRgba8Image.default().stride
+    )
     """Bytes per image row. Must be at least width \\* 4."""
 
-    pixels: bytes
-    """Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
-    Copied bytes, owned by the caller.
-    """
+    pixels: bytes = field(
+        default_factory=lambda: PremultipliedRgba8Image.default().pixels
+    )
+    """Premultiplied RGBA8 pixels. Must not be null for a non-empty image."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2944,23 +2997,19 @@ class Quaternion:
 
 @dataclass(frozen=True, slots=True)
 class QueriedFeature:
-    """Copied result, owned by the caller. Copied result, owned by the caller.
+    """One query hit borrowed for a completion callback.
 
     See `mln_queried_feature` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
     feature: bytes
-    """Copied text, owned by the caller."""
 
     source_id: str | None = None
-    """Copied text, owned by the caller."""
 
     source_layer_id: str | None = None
-    """Copied text, owned by the caller."""
 
     state: bytes | None = None
-    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3020,7 +3069,9 @@ class RenderFrameBatchView:
     """
 
     results: tuple[RenderFrameResult, ...]
-    """Copied value, owned by the caller."""
+    """Borrowed array of result_count terminal frame results in completion
+    order.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3098,7 +3149,27 @@ class RenderSessionAttachOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    producer_sync_kind: GpuSyncKind
+    driver: RenderDriverKind = field(
+        default_factory=lambda: RenderSessionAttachOptions.default().driver
+    )
+    """One `mln_render_driver_kind` value. Defaults to
+    `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+    """
+
+    requested_texture_ring_depth: int = field(
+        default_factory=lambda: (
+            RenderSessionAttachOptions.default().requested_texture_ring_depth
+        )
+    )
+    """Requested slot count of a session-owned texture ring, from one to three.
+    Private targets grant one slot regardless of this value. A borrowed
+    texture ring's depth is its texture count, so borrowed and other targets
+    ignore this value. Defaults to 1.
+    """
+
+    producer_sync_kind: GpuSyncKind = field(
+        default_factory=lambda: RenderSessionAttachOptions.default().producer_sync_kind
+    )
     """Producer synchronization for acquired texture frames. Defaults to
     `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
     shared EGL or WGL texture target and a caller-graphics-thread driver.
@@ -3106,25 +3177,19 @@ class RenderSessionAttachOptions:
     request.
     """
 
-    driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD
-    """One `mln_render_driver_kind` value. Defaults to
-    `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
-    """
-
-    requested_texture_ring_depth: int = 1
-    """Requested slot count of a session-owned texture ring, from one to three.
-    Private targets grant one slot regardless of this value. A borrowed
-    texture ring's depth is its texture count, so borrowed and other targets
-    ignore this value. Defaults to 1.
-    """
-
-    frame_wake: Wake = field(default_factory=lambda: Wake())
+    frame_wake: Wake = field(
+        default_factory=lambda: RenderSessionAttachOptions.default().frame_wake
+    )
     """Wakes the receiver when the frame-result queue becomes nonempty."""
 
-    driver_work_wake: Wake = field(default_factory=lambda: Wake())
+    driver_work_wake: Wake = field(
+        default_factory=lambda: RenderSessionAttachOptions.default().driver_work_wake
+    )
     """Wakes the graphics receiver when caller-driver work is available."""
 
-    queue_lock: QueueLock = field(default_factory=lambda: QueueLock())
+    queue_lock: QueueLock = field(
+        default_factory=lambda: RenderSessionAttachOptions.default().queue_lock
+    )
     """Host lock on the graphics queue, disabled by default. Only Vulkan targets
     accept an enabled lock; other backends fail the attach with
     `MLN_STATUS_UNSUPPORTED`.
@@ -3237,14 +3302,10 @@ class RenderedFeatureQueryOptions:
     """
 
     layer_ids: tuple[str, ...] | None = None
-    """Optional style layer IDs. When absent, all rendered layers are queried.
-    Copied value, owned by the caller.
-    """
+    """Optional style layer IDs. When absent, all rendered layers are queried."""
 
     filter: bytes | None = None
-    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    Copied text, owned by the caller.
-    """
+    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3394,16 +3455,13 @@ class ResourceRequestInfo:
     storage_policy: ResourceStoragePolicy
 
     prior_data: bytes
-    """Copied bytes, owned by the caller."""
 
     requested_url: str | None = None
-    """URL entering the network layer, before tile server normalization. Copied
-    text, owned by the caller.
-    """
+    """URL entering the network layer, before tile server normalization."""
 
     resolved_url: str | None = None
     """URL to fetch, after resource-kind normalization against the runtime's
-    tile server options and API key. Copied text, owned by the caller.
+    tile server options and API key.
     """
 
     range: ResourceRange | None = None
@@ -3413,7 +3471,6 @@ class ResourceRequestInfo:
     prior_expires_unix_ms: int | None = None
 
     prior_etag: str | None = None
-    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3483,14 +3540,16 @@ class ResourceRoute:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    flags: UrlMatchFlags
+    kinds: ResourceKindMask = field(
+        default_factory=lambda: ResourceRoute.default().kinds
+    )
+    """The resource kinds to match."""
+
+    flags: UrlMatchFlags = field(default_factory=lambda: ResourceRoute.default().flags)
     """A bitwise OR of `mln_url_match_flags` values."""
 
-    url: str
+    url: str = field(default_factory=lambda: ResourceRoute.default().url)
     """The URL or glob pattern to compare."""
-
-    kinds: ResourceKindMask = ResourceKindMask.ALL
-    """The resource kinds to match."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3499,6 +3558,12 @@ class ResourceRoute:
             flags=UrlMatchFlags(raw["flags"]),
             url=raw["url"],
         )
+
+    @classmethod
+    def default(cls):
+        from . import _native
+
+        return cls._from_native(_native._default_resource_route())
 
 
 @dataclass(frozen=True, slots=True)
@@ -3565,7 +3630,6 @@ class RuntimeEvent:
     """Typed payload selected by payload_type."""
 
     message: str
-    """Copied text, owned by the caller."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3740,14 +3804,11 @@ class RuntimeOptions:
 
     asset_path: str | None = None
     """Directory root for asset:// URLs. Copied during runtime creation. Empty
-    selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
-    by the caller.
+    selects `/android_asset` on Android and `.` elsewhere.
     """
 
     cache_path: str | None = None
-    """Cache database path. Copied during runtime creation. Copied text, owned
-    by the caller.
-    """
+    """Cache database path. Copied during runtime creation."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3825,13 +3886,11 @@ class SourceFeatureQueryOptions:
 
     source_layer_ids: tuple[str, ...] | None = None
     """Optional source-layer IDs. Required by vector sources; ignored by
-    GeoJSON. Copied value, owned by the caller.
+    GeoJSON.
     """
 
     filter: bytes | None = None
-    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    Copied text, owned by the caller.
-    """
+    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3851,7 +3910,7 @@ class SourceFeatureQueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageInfo:
-    """Copied result, owned by the caller.
+    """One complete runtime style image, borrowed for a completion callback.
 
     See `mln_style_image_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3865,14 +3924,14 @@ class StyleImageInfo:
 
     pixels: bytes
     """Premultiplied RGBA8 pixels in tightly packed rows of width \\* 4 bytes,
-    top row first. Copied bytes, owned by the caller.
+    top row first.
     """
 
     stretch_x: tuple[ImageStretch, ...]
-    """Horizontally stretchable intervals. Copied value, owned by the caller."""
+    """Horizontally stretchable intervals."""
 
     stretch_y: tuple[ImageStretch, ...]
-    """Vertically stretchable intervals. Copied value, owned by the caller."""
+    """Vertically stretchable intervals."""
 
     pixel_ratio: float
     """Sprite pixel ratio."""
@@ -3918,13 +3977,13 @@ class StyleImageOptions:
     """
 
     stretch_x: tuple[ImageStretch, ...] | None = None
-    """Horizontally stretchable intervals. May be null only when stretch_x_count
-    is 0. Copied value, owned by the caller.
+    """Horizontally stretchable intervals. Borrowed for the call and copied
+    before return. May be null only when stretch_x_count is 0.
     """
 
     stretch_y: tuple[ImageStretch, ...] | None = None
-    """Vertically stretchable intervals. May be null only when stretch_y_count
-    is 0. Copied value, owned by the caller.
+    """Vertically stretchable intervals. Borrowed for the call and copied before
+    return. May be null only when stretch_y_count is 0.
     """
 
     content: ImageContent | None = None
@@ -3967,17 +4026,17 @@ class StyleImageOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerInfo:
-    """Copied result, owned by the caller. Copied result, owned by the caller.
+    """One style layer, borrowed for a completion callback.
 
     See `mln_style_layer_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
-    """Layer ID. Copied text, owned by the caller."""
+    """Layer ID."""
 
     type: str
-    """The style-spec layer type string. Copied text, owned by the caller."""
+    """The style-spec layer type string."""
 
     min_zoom: float
     """Lowest zoom at which the layer draws; -INFINITY with no lower bound."""
@@ -3989,14 +4048,10 @@ class StyleLayerInfo:
     """One of `mln_style_layer_visibility`."""
 
     source_id: str | None = None
-    """Source ID. Empty for a layer type that takes no source. Copied text,
-    owned by the caller.
-    """
+    """Source ID. Empty for a layer type that takes no source."""
 
     source_layer: str | None = None
-    """Source-layer ID. Empty when the layer sets none. Copied text, owned by
-    the caller.
-    """
+    """Source-layer ID. Empty when the layer sets none."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -4013,14 +4068,15 @@ class StyleLayerInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
-    """Copied result, owned by the caller. Copied result, owned by the caller.
+    """Complete metadata of one style source, borrowed for a completion
+    callback.
 
     See `mln_style_source_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
-    """Source ID. Copied text, owned by the caller."""
+    """Source ID."""
 
     type: StyleSourceType
     """One of `mln_style_source_type`."""
@@ -4029,14 +4085,10 @@ class StyleSourceInfo:
     """Whether the source is marked volatile."""
 
     attribution: str | None = None
-    """Attribution string, when the source sets one. It may be empty. Copied
-    text, owned by the caller.
-    """
+    """Attribution string, when the source sets one. It may be empty."""
 
     url: str | None = None
-    """URL that the source loads from, when it has one. Copied text, owned by
-    the caller.
-    """
+    """URL that the source loads from, when it has one."""
 
     tilejson: StyleSourceTileInfo | None = None
     """Inline TileJSON metadata, when the source was defined with it."""
@@ -4078,7 +4130,7 @@ class StyleSourceTileInfo:
     """
 
     tile_urls: tuple[str, ...]
-    """Tile URL templates in TileJSON order. Copied value, owned by the caller."""
+    """Tile URL templates in TileJSON order."""
 
     min_zoom: float
     """Lowest zoom level the TileJSON provides tiles for."""
@@ -4101,7 +4153,7 @@ class StyleSourceTileInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleTransitionOptions:
-    """Global style transition options. Copied result, owned by the caller.
+    """Global style transition options.
 
     See `mln_style_transition_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4168,14 +4220,14 @@ class TextureImageInfo:
 
 @dataclass(frozen=True, slots=True)
 class TextureReadbackResult:
-    """Copied result, owned by the caller.
+    """Texture readback borrowed for a completion callback.
 
     See `mln_texture_readback_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     data: bytes
-    """Copied bytes, owned by the caller."""
+    """Borrowed pixel bytes, valid only during the callback."""
 
     info: TextureImageInfo
 
@@ -4282,38 +4334,54 @@ class VulkanBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().extent
+    )
     """Logical texture extent. The map viewport uses width and height and the
     renderer uses scale_factor; the physical size is stated separately below.
     A scale_factor that differs from the map's is accepted and logged as a
     warning.
     """
 
-    context: VulkanContextDescriptor
-    """Borrowed Vulkan context. All handles are required."""
-
-    textures: tuple[VulkanBorrowedTexture, ...]
-    """The ring's images, one per slot, in slot order. Required. Copied value,
-    owned by the caller.
-    """
-
-    format: int
-    """Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
-    invalid.
-    """
-
-    initial_layout: int
-    """Backend-native VkImageLayout value expected at render-pass begin."""
-
-    physical_width: int = 256
+    physical_width: int = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().physical_width
+    )
     """Physical image width in device pixels. Must be positive. Defaults to 256."""
 
-    physical_height: int = 256
+    physical_height: int = field(
+        default_factory=lambda: (
+            VulkanBorrowedTextureDescriptor.default().physical_height
+        )
+    )
     """Physical image height in device pixels. Must be positive. Defaults to
     256.
     """
 
-    final_layout: int = 5
+    context: VulkanContextDescriptor = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().context
+    )
+    """Borrowed Vulkan context. All handles are required."""
+
+    textures: tuple[VulkanBorrowedTexture, ...] = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().textures
+    )
+    """The ring's images, one per slot, in slot order. Required."""
+
+    format: int = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().format
+    )
+    """Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+    invalid.
+    """
+
+    initial_layout: int = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().initial_layout
+    )
+    """Backend-native VkImageLayout value expected at render-pass begin."""
+
+    final_layout: int = field(
+        default_factory=lambda: VulkanBorrowedTextureDescriptor.default().final_layout
+    )
     """Backend-native VkImageLayout value left after rendering succeeds.
     Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
     """
@@ -4393,12 +4461,16 @@ class VulkanOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: VulkanOwnedTextureDescriptor.default().extent
+    )
     """Logical texture extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: VulkanContextDescriptor
+    context: VulkanContextDescriptor = field(
+        default_factory=lambda: VulkanOwnedTextureDescriptor.default().context
+    )
     """Borrowed Vulkan context. All handles are required."""
 
     @classmethod
@@ -4423,18 +4495,24 @@ class VulkanSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: VulkanSurfaceDescriptor.default().extent
+    )
     """Logical surface extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: VulkanContextDescriptor
+    context: VulkanContextDescriptor = field(
+        default_factory=lambda: VulkanSurfaceDescriptor.default().context
+    )
     """Borrowed Vulkan context. All handles are required. The device must
     support VK_KHR_swapchain, and the queue family must support graphics and
     presentation to this descriptor's surface.
     """
 
-    surface: int
+    surface: int = field(
+        default_factory=lambda: VulkanSurfaceDescriptor.default().surface
+    )
     """Borrowed VkSurfaceKHR bit pattern. Required."""
 
     @classmethod
@@ -4549,8 +4627,7 @@ class WebglContextDescriptor:
 
     canvas_selector: str
     """Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-    canvas must still be transferable when attachment starts. Copied text,
-    owned by the caller.
+    canvas must still be transferable when attachment starts.
     """
 
     @classmethod
@@ -4591,33 +4668,45 @@ class WebgpuBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().extent
+    )
     """Logical texture extent. The map viewport uses width and height and the
     renderer uses scale_factor; the physical size is stated separately below.
     A scale_factor that differs from the map's is accepted and logged as a
     warning.
     """
 
-    context: WebgpuContextDescriptor
+    physical_width: int = field(
+        default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().physical_width
+    )
+    """Physical texture width in device pixels. Defaults to 256."""
+
+    physical_height: int = field(
+        default_factory=lambda: (
+            WebgpuBorrowedTextureDescriptor.default().physical_height
+        )
+    )
+    """Physical texture height in device pixels. Defaults to 256."""
+
+    context: WebgpuContextDescriptor = field(
+        default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().context
+    )
     """Borrowed WebGPU context. device is required. Rendering is submitted
     through context.queue or that device's default queue.
     """
 
-    textures: tuple[WebgpuBorrowedTexture, ...]
-    """The ring's textures, one per slot, in slot order. Required. Copied value,
-    owned by the caller.
-    """
+    textures: tuple[WebgpuBorrowedTexture, ...] = field(
+        default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().textures
+    )
+    """The ring's textures, one per slot, in slot order. Required."""
 
-    format: int
+    format: int = field(
+        default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().format
+    )
     """Backend-native WGPUTextureFormat value of every texture. Undefined is
     invalid.
     """
-
-    physical_width: int = 256
-    """Physical texture width in device pixels. Defaults to 256."""
-
-    physical_height: int = 256
-    """Physical texture height in device pixels. Defaults to 256."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -4671,12 +4760,16 @@ class WebgpuOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: WebgpuOwnedTextureDescriptor.default().extent
+    )
     """Logical texture extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: WebgpuContextDescriptor
+    context: WebgpuContextDescriptor = field(
+        default_factory=lambda: WebgpuOwnedTextureDescriptor.default().context
+    )
     """Borrowed WebGPU context. device is required."""
 
     @classmethod
@@ -4701,21 +4794,29 @@ class WebgpuSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    extent: LogicalExtent = field(
+        default_factory=lambda: WebgpuSurfaceDescriptor.default().extent
+    )
     """Logical surface extent. A scale_factor that differs from the map's is
     accepted and logged as a warning.
     """
 
-    context: WebgpuContextDescriptor
+    context: WebgpuContextDescriptor = field(
+        default_factory=lambda: WebgpuSurfaceDescriptor.default().context
+    )
     """Borrowed WebGPU context. device is required."""
 
-    surface: int
+    surface: int = field(
+        default_factory=lambda: WebgpuSurfaceDescriptor.default().surface
+    )
     """Borrowed WGPUSurface. Required, and must stay alive for the session. The
     session configures it for this device and extent, and unconfigures it
     when the session ends.
     """
 
-    format: int
+    format: int = field(
+        default_factory=lambda: WebgpuSurfaceDescriptor.default().format
+    )
     """WGPUTextureFormat to configure the surface with. Required. A browser host
     takes it from navigator.gpu.getPreferredCanvasFormat().
     """

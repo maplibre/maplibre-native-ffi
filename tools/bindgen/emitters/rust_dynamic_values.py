@@ -224,8 +224,6 @@ def declaration(values, value):
                 f"{union_name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {encode(values, member.value, '(*item)')}; }}"
                 for member in union.fields
             )
-            if union.empty_variant:
-                cases += f" {union_name}::Empty => raw.{tag} = sys::{union.empty_variant[0]},"
             writes.append(
                 f'match &self.{local} {{ {cases} {union_name}::Unknown(_) => return Err(Error::invalid_argument("unknown union variant cannot be submitted")), }}'
             )
@@ -275,34 +273,13 @@ def declaration(values, value):
         derives += ["Copy", "PartialEq"]
     elif comparable(value):
         derives.append("PartialEq")
-    initials = [
-        field for field in value.fields if field.public and field.initial is not None
-    ]
-    if not value.default and not initials:
+    if not value.default:
         derives.append("Default")
     default = (
         f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
         if value.default
         else ""
     )
-    if initials and not value.default:
-        defaults = []
-        for field in value.fields:
-            if not field.public:
-                continue
-            field_initial = field.initial
-            expression = "Default::default()"
-            if field_initial is not None:
-                expression = (
-                    f"{values.public(field.value)}::{field_initial.member.upper()}"
-                    if field.value.kind == "enum"
-                    else field_initial.literal
-                )
-            defaults.append(f"{identifier(field.name)}: {expression}")
-        defaults.extend(
-            f"{identifier(flag.member)}: false" for flag in value.mask_flags
-        )
-        default = f"impl Default for {name} {{ fn default() -> Self {{ Self {{ {', '.join(defaults)} }} }} }}\n"
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     impl = f"impl {name} {{ {' '.join(constructors)} }}\n" if constructors else ""
     directions = values.directions.get(value.native, {"in", "out"})

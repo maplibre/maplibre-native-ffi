@@ -46,7 +46,7 @@ Future<void> abandonHandles() async {
 Future<void> abandonSession() async {
   const extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final map = await runtime.createMap(const MapOptions(initialExtent: extent));
+  final map = await runtime.createMap(MapOptions(initialExtent: extent));
   await map.setStyleJson(
     _json(
       '{"version":8,"sources":{},"layers":[{"id":"background",'

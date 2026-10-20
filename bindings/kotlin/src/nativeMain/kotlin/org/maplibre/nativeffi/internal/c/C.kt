@@ -196,6 +196,12 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_gpu_sync_default().place(returned.toCPointer()!!)
   }
 
+  actual fun mln_http_header_rule_default(returned: Long) {
+    org.maplibre.nativeffi.internal.cinterop
+      .mln_http_header_rule_default()
+      .place(returned.toCPointer()!!)
+  }
+
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -1990,6 +1996,12 @@ internal actual object C {
       outCancelled.toCPointer(),
       outDiagnostic.toCPointer(),
     )
+
+  actual fun mln_resource_route_default(returned: Long) {
+    org.maplibre.nativeffi.internal.cinterop
+      .mln_resource_route_default()
+      .place(returned.toCPointer()!!)
+  }
 
   actual fun mln_resource_transform_request_complete(
     request: Long,

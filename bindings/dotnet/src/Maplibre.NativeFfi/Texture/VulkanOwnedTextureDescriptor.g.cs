@@ -22,7 +22,10 @@ public readonly partial record struct VulkanOwnedTextureDescriptor(
 )
 {
     public VulkanOwnedTextureDescriptor()
-        : this(new LogicalExtent(), default) { }
+        : this(default!, default!)
+    {
+        this = Default;
+    }
 
     public static VulkanOwnedTextureDescriptor Default
     {

@@ -25,5 +25,17 @@ public readonly partial record struct ResourceRoute(
 )
 {
     public ResourceRoute()
-        : this(ResourceKindMask.All, default, default!) { }
+        : this(default!, default!, default!)
+    {
+        this = Default;
+    }
+
+    public static ResourceRoute Default
+    {
+        get
+        {
+            using var call = NativeCall.Enter(null, "mln_resource_route_default");
+            return GeneratedValues.CopyResourceRoute(NativeMethods.mln_resource_route_default());
+        }
+    }
 }

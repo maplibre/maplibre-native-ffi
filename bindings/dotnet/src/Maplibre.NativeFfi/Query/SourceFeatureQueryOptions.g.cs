@@ -13,7 +13,7 @@ public sealed record SourceFeatureQueryOptions
 {
     /// <summary>
     /// Optional source-layer IDs. Required by vector sources; ignored by
-    /// GeoJSON. Copied value, owned by the caller.
+    /// GeoJSON.
     /// </summary>
     public string[]? SourceLayerIds
     {
@@ -24,7 +24,6 @@ public sealed record SourceFeatureQueryOptions
 
     /// <summary>
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    /// Copied text, owned by the caller.
     /// </summary>
     public byte[]? Filter
     {

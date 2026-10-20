@@ -437,8 +437,6 @@ class Values:
                         f"sys::{variant.presence.variant} => {{ raw.{rust_field(field.name)}.{rust_field(variant.name)} = {converted}; }}"
                     )
                 tag = 'field.getattr("_tag")?.extract::<u32>()?'
-                if value.empty_variant:
-                    tag = f"if field.is_none() {{ sys::{value.empty_variant[0]} }} else {{ {tag} }}"
                 lines.append(f"let tag = {tag};")
                 lines.append("match tag { " + ", ".join(arms) + ", _ => {} }")
                 lines.append(f"raw.{rust_field(value.tag)} = tag;")
@@ -474,6 +472,8 @@ class Values:
     def input_sources(self) -> str:
         functions = []
         for name, plan in sorted(self.inputs.items()):
+            if name not in self.api.inputs:
+                continue
             if plan.registration:
                 from . import python_callbacks
 
@@ -562,14 +562,13 @@ class Values:
                 public_copies.append(f'{member}=raw["{member}"]')
                 continue
             public_type = self.type(value)
-            if field.initial is not None:
-                initial = field.initial
-                expression = (
-                    f"{public_name(value.native)}.{initial.member.upper()}"
-                    if value.kind == "enum"
-                    else repr(initial.value)
-                )
-                default = f" = {expression}"
+            if (
+                plan.default
+                and not registration
+                and not optional(value)
+                and not field.presence
+            ):
+                default = f" = field(default_factory=lambda: {public_name(name)}.default().{member})"
             elif optional(value):
                 default = " = None"
             elif registration and value.kind == "array":

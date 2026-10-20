@@ -22,7 +22,10 @@ public readonly partial record struct MetalOwnedTextureDescriptor(
 )
 {
     public MetalOwnedTextureDescriptor()
-        : this(new LogicalExtent(), default) { }
+        : this(default!, default!)
+    {
+        this = Default;
+    }
 
     public static MetalOwnedTextureDescriptor Default
     {

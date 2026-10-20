@@ -195,8 +195,7 @@ class GeneratedShapesTest {
     }
   }
 
-  // A constructor's defaults come from the header's field annotations, so the record they build
-  // matches what the native default function returns.
+  // Constructor defaults use the native default function.
   @Test
   fun aRecordBuiltFromItsConstructorDefaultsEqualsTheNativeDefault() {
     assertEquals(GeneratedApi.mapOptionsDefault(), MapOptions())

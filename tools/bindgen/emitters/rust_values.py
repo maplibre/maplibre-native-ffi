@@ -109,6 +109,8 @@ class Values:
             self.used[value.native] = value
         if value.kind in {"record", "union"}:
             wanted = {"in", "out"} if direction == "both" else {direction}
+            if value.native not in self.bound.inputs:
+                wanted.discard("in")
             if value.default:
                 wanted.add("out")
             known = self.directions.setdefault(value.native, set())

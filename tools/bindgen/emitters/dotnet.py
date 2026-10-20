@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
+from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import (
@@ -21,11 +21,9 @@ from tools.bindgen.semantic import (
     DefaultSupport,
     HandlePlan,
     OperationPlan,
-    discarding_variants,
     enum_member_prefix,
     output_member,
     public_stem,
-    view_support,
 )
 
 from . import dotnet_native
@@ -84,11 +82,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
             return f"parameter {parameter.name!r} collides with generated allocation identifiers"
         planned = planned_parameters[parameter.name]
         value = planned.value
-        # A null pointer argument needs a pointer that is not a C string.
-        if value.nullable and not (
-            parameter.type.pointee and type_name(parameter.type.pointee) != "char"
-        ):
-            return f"parameter {parameter.name} needs a nullable input conversion"
         if (
             value.length not in (None, "1")
             and not (value.length == "nul" and value.encoding == "utf8")
@@ -377,7 +370,6 @@ def emit_operation(
         "snapshot",
         "lifecycle",
         "event_batch",
-        "render_driver",
     }:
         raise Unsupported(f"execution {execution!r} requires another runtime skeleton")
     asynchronous = plan.completion is not None
@@ -697,8 +689,6 @@ def emit_operation(
             if owner.parent_parameter and owner.parent_parameter == plan.receiver
             else ""
         )
-        if owner.parent_parameter and not parent:
-            raise Unsupported("owned output parent requires another input owner")
         if asynchronous:
             body = prologue + [
                 f"return scope.Attach<{native}, {result_type}>(",
@@ -738,8 +728,6 @@ def emit_operation(
             if owner.parent_parameter and owner.parent_parameter == plan.receiver
             else ""
         )
-        if owner.parent_parameter and not parent:
-            raise Unsupported("owned completion parent requires another input owner")
         result_type = f"Task<{owners[result]}>"
         name += "Async"
         parameters.append("CancellationToken cancellationToken = default")
@@ -865,7 +853,6 @@ def emit(api: Api | BoundApi) -> Emission:
     }
     default_records: set[str] = set()
     owner_headers: dict[str, str] = {}
-    conflicts = conflicting_functions(bound, "dotnet")
     for plan in bound.operations:
         function = plan.function
         try:
@@ -878,8 +865,6 @@ def emit(api: Api | BoundApi) -> Emission:
                     supported.append(function.name)
                     continue
                 raise Unsupported("support operation requires its generated owner")
-            if function.name in conflicts:
-                raise Unsupported("public method name collides after conversion")
             owner, emitted, used_records = emit_operation(plan, bound)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
@@ -1190,7 +1175,5 @@ def coverage(api: Api | BoundApi) -> dict:
     result = emit(bound)
     return {
         "generated": list(result.functions),
-        "discarding": discarding_variants(bound, result.functions),
-        "support": view_support(bound, result.functions),
         "unsupported": result.unsupported,
     }

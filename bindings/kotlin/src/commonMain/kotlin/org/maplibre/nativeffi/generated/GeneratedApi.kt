@@ -213,6 +213,19 @@ public object GeneratedApi {
     }
 
   /**
+   * Returns default HTTP header rule options.
+   *
+   * See `mln_http_header_rule_default` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun httpHeaderRuleDefault(): HttpHeaderRule =
+    nativeCall(null, null, "mln_http_header_rule_default") {
+      val out = allocate(w(24, 40), w(4, 8))
+      C.mln_http_header_rule_default(out)
+      readHttpHeaderRule(out)
+    }
+
+  /**
    * Sets one outgoing HTTP request header for the current transform invocation.
    *
    * See `mln_http_header_transform_response_set_header` in the
@@ -526,6 +539,19 @@ public object GeneratedApi {
       val out = sized(w(24, 40), w(4, 8))
       C.mln_rendered_feature_query_options_default(out)
       readRenderedFeatureQueryOptions(out)
+    }
+
+  /**
+   * Returns default resource route options.
+   *
+   * See `mln_resource_route_default` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun resourceRouteDefault(): ResourceRoute =
+    nativeCall(null, null, "mln_resource_route_default") {
+      val out = allocate(w(16, 24), w(4, 8))
+      C.mln_resource_route_default(out)
+      readResourceRoute(out)
     }
 
   /**

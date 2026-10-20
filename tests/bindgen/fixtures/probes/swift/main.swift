@@ -25,9 +25,8 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
 }
 
 // A record built from its initializer defaults equals the native default,
-// including a nested record that has no default function of its own.
+// including its nested record.
 try Maplibre.probeSettingsCheck(settings: ProbeSettings())
-try Maplibre.probeSettingsCheck(settings: ProbeSettings(extent: ProbeExtent()))
 
 let point = ProbePoint(type: 9.5, gain: 3.25)
 let input = ProbeOptions(
@@ -46,13 +45,6 @@ try check(
   Maplibre.probeRoundtrip(input: ProbeOptions()) == ProbeOptions(),
   "absent fields"
 )
-for text in [nil, "", "text"] as [String?] {
-  let result = try Maplibre.probeNullableText(text: text)
-  check(
-    result.text == text,
-    "nullable text \(String(describing: text)): \(result)"
-  )
-}
 
 let entry = try Maplibre.keywordCombine(
   defer: 5,

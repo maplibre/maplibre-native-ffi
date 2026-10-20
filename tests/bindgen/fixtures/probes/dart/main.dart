@@ -40,7 +40,7 @@ void main() {
   );
 
   // A record built from its constructor defaults equals the native default.
-  probeSettingsCheck(const ProbeSettings());
+  probeSettingsCheck(ProbeSettings());
 
   // A copy of a native default keeps its values and leaves a registration
   // unset.

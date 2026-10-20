@@ -1,7 +1,5 @@
 """Identifier rules shared by the managed-language emitters."""
 
-from .names import camel, pascal, type_name
-
 DART_RESERVED = {
     "assert",
     "break",
@@ -172,24 +170,3 @@ LOCALS = {
     "handle",
     "_handle",
 }
-
-
-def conflicting_functions(bound, language: str) -> set[str]:
-    """Reject ambiguous public method names instead of emitting overloads.
-
-    Two operations collide when they share a receiver and their members
-    convert to the same name in the target language.
-    """
-    convert = pascal if language == "dotnet" else camel
-    owners = {}
-    for plan in bound.operations:
-        receiver = plan.receiver or plan.scoped_receiver
-        owner = (
-            type_name(
-                next(p for p in plan.function.parameters if p.name == receiver).type
-            )
-            if receiver
-            else None
-        )
-        owners.setdefault((owner, convert(plan.member)), []).append(plan.name)
-    return {name for names in owners.values() if len(names) > 1 for name in names}

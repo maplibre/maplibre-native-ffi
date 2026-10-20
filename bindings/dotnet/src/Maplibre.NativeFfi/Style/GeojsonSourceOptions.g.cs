@@ -34,8 +34,8 @@ public sealed record GeojsonSourceOptions
 
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form.
-    /// Copied text, owned by the caller.
+    /// whose members follow the MapLibre Style Spec clusterProperties form. The
+    /// UTF-8 bytes are borrowed for the call.
     /// </summary>
     public byte[]? ClusterProperties
     {

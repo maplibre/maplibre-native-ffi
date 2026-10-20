@@ -191,9 +191,7 @@ def operation(plan, values, *, discard=False):
     def parent_of(owner):
         if owner is None or owner.parent_parameter is None:
             return "nil"
-        if owner.parent_parameter == receiver_name:
-            return "receiver"
-        return labels[owner.parent_parameter]
+        return "receiver"
 
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:

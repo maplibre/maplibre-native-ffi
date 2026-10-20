@@ -64,6 +64,8 @@ internal expect object C {
 
   fun mln_gpu_sync_default(returned: Long): Unit
 
+  fun mln_http_header_rule_default(returned: Long): Unit
+
   fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -857,6 +859,8 @@ internal expect object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
+
+  fun mln_resource_route_default(returned: Long): Unit
 
   fun mln_resource_transform_request_complete(request: Long, url: Long, outDiagnostic: Long): Int
 

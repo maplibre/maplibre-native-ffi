@@ -165,7 +165,7 @@ pub const AnimationOptions = struct {
     /// `mln_map_cancel_camera_transition()` matches.
     transition_id: ?u64 = null,
     /// Reports the end of the command's transitions. Disabled by default.
-    end_handler: CameraTransitionHandler = .{},
+    end_handler: CameraTransitionHandler,
     pub fn toNative(self: AnimationOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_animation_options {
         var raw = c.mln_animation_options_default();
         raw.fields = 0;
@@ -290,8 +290,8 @@ pub const CameraDelta = struct {
     /// Screen point in logical map pixels that scale, bearing, and pitch keep
     /// fixed.
     anchor: ?ScreenPoint = null,
-    animation: AnimationOptions = .{},
-    gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
+    animation: AnimationOptions,
+    gesture_phase: GesturePhase,
     pub fn toNative(self: CameraDelta, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
         raw.fields = 0;
@@ -406,9 +406,7 @@ pub const CameraOptionField = struct {
     pub const unionWith = methods.unionWith;
 };
 
-/// Camera fields used by snapshots and camera updates. Copied result, owned by
-/// the caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Camera fields used by snapshots and camera updates.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -452,19 +450,13 @@ pub const CameraOptions = struct {
     }
 };
 
-/// Copied result, owned by the caller.
+/// Camera result borrowed for an ordered camera-query completion.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraQueryResult = struct {
     generation: u64 = std.mem.zeroes(u64),
     camera: CameraOptions = .{},
-    pub fn toNative(self: CameraQueryResult) c.mln_camera_query_result {
-        var raw = std.mem.zeroes(c.mln_camera_query_result);
-        raw.generation = self.generation;
-        raw.camera = self.camera.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_camera_query_result) CameraQueryResult {
         return .{
             .generation = raw.generation,
@@ -485,13 +477,6 @@ pub const CameraTransitionEnd = struct {
     /// this generation and are queued before the callback runs. Zero for
     /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
     generation: u64 = std.mem.zeroes(u64),
-    pub fn toNative(self: CameraTransitionEnd) c.mln_camera_transition_end {
-        var raw = std.mem.zeroes(c.mln_camera_transition_end);
-        raw.size = @sizeOf(c.mln_camera_transition_end);
-        raw.outcome = self.outcome.toNative();
-        raw.generation = self.generation;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
         return .{
             .outcome = CameraTransitionOutcome.fromNative(raw.outcome),
@@ -560,10 +545,10 @@ pub const CameraTransitionOutcome = enum(u32) {
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraUpdate = struct {
-    mode: CameraUpdateMode = std.mem.zeroes(CameraUpdateMode),
-    camera: CameraOptions = .{},
-    animation: AnimationOptions = .{},
-    gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
+    mode: CameraUpdateMode,
+    camera: CameraOptions,
+    animation: AnimationOptions,
+    gesture_phase: GesturePhase,
     pub fn toNative(self: CameraUpdate, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_camera_update {
         var raw = c.mln_camera_update_default();
         raw.size = @sizeOf(c.mln_camera_update);
@@ -917,19 +902,8 @@ pub const EglContextDescriptor = struct {
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const EventBatchView = struct {
-    /// Copied value, owned by the caller.
+    /// Borrowed array of event_count events in queue order.
     events: []const RuntimeEvent = &.{},
-    pub fn toNative(self: EventBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_event_batch_view {
-        var raw = std.mem.zeroes(c.mln_event_batch_view);
-        raw.size = @sizeOf(c.mln_event_batch_view);
-        raw.events = blk: {
-            const items = try allocator.alloc(c.mln_runtime_event, self.events.len);
-            for (self.events, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
-            break :blk items.ptr;
-        };
-        raw.event_count = std.math.cast(@TypeOf(raw.event_count), self.events.len) orelse return error.InvalidArgument;
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_event_batch_view) status.Error!EventBatchView {
         return .{
@@ -1019,9 +993,9 @@ pub const FeatureStateSelectorField = struct {
 pub const FrameDemand = struct {
     /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
     /// `MLN_FRAME_DEMAND_IF_NEEDED`.
-    flags: FrameDemandFlag = .{ .if_needed = true },
+    flags: FrameDemandFlag,
     /// Host identity returned with the terminal frame result.
-    token: u64 = std.mem.zeroes(u64),
+    token: u64,
     pub fn toNative(self: FrameDemand) c.mln_frame_demand {
         var raw = c.mln_frame_demand_default();
         raw.flags = self.flags.toNative();
@@ -1152,8 +1126,8 @@ pub const GeojsonSourceOptions = struct {
     /// Highest zoom that clusters points. Defaults to 17.
     cluster_max_zoom: ?f64 = null,
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form.
-    /// Copied text, owned by the caller.
+    /// whose members follow the MapLibre Style Spec clusterProperties form. The
+    /// UTF-8 bytes are borrowed for the call.
     cluster_properties: ?[]const u8 = null,
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     buffer: ?u32 = null,
@@ -1235,9 +1209,9 @@ pub const GesturePhase = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSync = struct {
     /// One `mln_gpu_sync_kind` value.
-    kind: GpuSyncKind = std.mem.zeroes(GpuSyncKind),
+    kind: GpuSyncKind,
     /// Bit pattern of the GLsync pointer.
-    object: u64 = std.mem.zeroes(u64),
+    object: u64,
     pub fn toNative(self: GpuSync) c.mln_gpu_sync {
         var raw = c.mln_gpu_sync_default();
         raw.kind = self.kind.toNative();
@@ -1299,16 +1273,16 @@ pub const HttpHeader = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderRule = struct {
     /// The resource kinds to match.
-    kinds: ResourceKindMask = ResourceKindMask.all,
+    kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values.
-    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
+    flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
-    url: []const u8 = &.{},
+    url: []const u8,
     /// The headers to set. Registration validates each one as
     /// `mln_http_header_transform_response_set_header()` does.
-    headers: []const HttpHeader = &.{},
+    headers: []const HttpHeader,
     pub fn toNative(self: HttpHeaderRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_http_header_rule {
-        var raw = std.mem.zeroes(c.mln_http_header_rule);
+        var raw = c.mln_http_header_rule_default();
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = marshal.view(self.url);
@@ -1438,8 +1412,7 @@ pub const ImageStretch = struct {
     }
 };
 
-/// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller.
+/// Geographic coordinate in degrees used by map and projection APIs.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1462,8 +1435,7 @@ pub const LatLng = struct {
     }
 };
 
-/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
-/// result, owned by the caller.
+/// Geographic bounds in degrees.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1596,11 +1568,11 @@ pub const LogSeverityMask = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const LogicalExtent = struct {
     /// Width in UI pixels. Defaults to 256.
-    width: u32 = 256,
+    width: u32 = std.mem.zeroes(u32),
     /// Height in UI pixels. Defaults to 256.
-    height: u32 = 256,
+    height: u32 = std.mem.zeroes(u32),
     /// Device pixels per UI pixel. Defaults to 1.0.
-    scale_factor: f64 = 1.0,
+    scale_factor: f64 = std.mem.zeroes(f64),
     pub fn toNative(self: LogicalExtent) c.mln_logical_extent {
         var raw = std.mem.zeroes(c.mln_logical_extent);
         raw.width = self.width;
@@ -1663,15 +1635,15 @@ pub const MapOptions = struct {
     /// Initial logical extent. Width and height must be nonzero, and
     /// scale_factor must be finite and positive. scale_factor is fixed for the
     /// map's lifetime.
-    initial_extent: LogicalExtent = .{},
+    initial_extent: LogicalExtent,
     /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
-    map_mode: MapMode = std.mem.zeroes(MapMode),
+    map_mode: MapMode,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings. Defaults to false.
-    fast_pfor_enabled: bool = std.mem.zeroes(bool),
+    fast_pfor_enabled: bool,
     /// Map-originated event types this map queues, as a bitwise OR of
     /// `mln_runtime_event_mask` values.
-    event_mask: RuntimeEventMask = RuntimeEventMask.all,
+    event_mask: RuntimeEventMask,
     pub fn toNative(self: MapOptions) c.mln_map_options {
         var raw = c.mln_map_options_default();
         raw.initial_extent = self.initial_extent.toNative();
@@ -1716,25 +1688,6 @@ pub const MapSnapshot = struct {
     tile: MapTileOptions = .{},
     bounds: BoundOptions = .{},
     free_camera: FreeCameraOptions = .{},
-    pub fn toNative(self: MapSnapshot) c.mln_map_snapshot {
-        var raw = std.mem.zeroes(c.mln_map_snapshot);
-        raw.size = @sizeOf(c.mln_map_snapshot);
-        raw.debug_options = self.debug_options.toNative();
-        raw.generation = self.generation;
-        raw.camera = self.camera.toNative();
-        raw.logical_extent = self.logical_extent.toNative();
-        raw.projection_mode = self.projection_mode.toNative();
-        raw.viewport = self.viewport.toNative();
-        raw.fully_loaded = self.fully_loaded;
-        raw.rendering_stats_view_enabled = self.rendering_stats_view_enabled;
-        raw.gesture_in_progress = self.gesture_in_progress;
-        raw.event_mask = self.event_mask.toNative();
-        raw.latest_render_update_generation = self.latest_render_update_generation;
-        raw.tile = self.tile.toNative();
-        raw.bounds = self.bounds.toNative();
-        raw.free_camera = self.free_camera.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
             .debug_options = MapDebugOption.fromNative(raw.debug_options),
@@ -1890,16 +1843,15 @@ pub const MetalBorrowedTextureDescriptor = struct {
     /// renderer uses scale_factor; the physical size is stated separately
     /// below. A scale_factor that differs from the map's is accepted and logged
     /// as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_width: u32 = 256,
+    physical_width: u32,
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_height: u32 = 256,
-    /// The ring's textures, one per slot, in slot order. Required. Copied
-    /// value, owned by the caller.
-    textures: []const MetalBorrowedTexture = &.{},
+    physical_height: u32,
+    /// The ring's textures, one per slot, in slot order. Required.
+    textures: []const MetalBorrowedTexture,
     pub fn toNative(self: MetalBorrowedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_metal_borrowed_texture_descriptor {
         _ = roots;
         var raw = c.mln_metal_borrowed_texture_descriptor_default();
@@ -1956,9 +1908,9 @@ pub const MetalContextDescriptor = struct {
 pub const MetalOwnedTextureDescriptor = struct {
     /// Logical texture extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Metal backend context. device is required.
-    context: MetalContextDescriptor = .{},
+    context: MetalContextDescriptor,
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
         var raw = c.mln_metal_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -1980,11 +1932,11 @@ pub const MetalOwnedTextureDescriptor = struct {
 pub const MetalSurfaceDescriptor = struct {
     /// Logical surface extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Metal backend context. device is optional for Metal surfaces.
-    context: MetalContextDescriptor = .{},
+    context: MetalContextDescriptor,
     /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
-    layer: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    layer: ?*anyopaque,
     pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
         var raw = c.mln_metal_surface_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -2025,20 +1977,6 @@ pub const MetalTextureFrame = struct {
     device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Backend-native pixel format value. Metal uses MTLPixelFormat.
     pixel_format: u64 = std.mem.zeroes(u64),
-    pub fn toNative(self: MetalTextureFrame) c.mln_metal_texture_frame {
-        var raw = std.mem.zeroes(c.mln_metal_texture_frame);
-        raw.size = @sizeOf(c.mln_metal_texture_frame);
-        raw.generation = self.generation;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.frame_id = self.frame_id;
-        raw.slot = self.slot;
-        raw.texture = self.texture;
-        raw.device = self.device;
-        raw.pixel_format = self.pixel_format;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_metal_texture_frame) MetalTextureFrame {
         return .{
             .generation = raw.generation,
@@ -2081,10 +2019,9 @@ pub const NorthOrientation = enum(u32) {
 /// See `mln_offline_geometry_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const OfflineGeometryRegionDefinition = struct {
-    /// Style URL. Copied during region creation. Copied text, owned by the
-    /// caller.
+    /// Style URL. Copied during region creation.
     style_url: []const u8 = &.{},
-    /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
+    /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     geometry: []const u8 = &.{},
     min_zoom: f64 = std.mem.zeroes(f64),
     /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
@@ -2177,26 +2114,15 @@ pub const OfflineRegionDownloadState = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Region data delivered by an offline completion. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Region data delivered by an offline completion.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const OfflineRegionInfo = struct {
     id: i64 = std.mem.zeroes(i64),
     definition: OfflineRegionDefinition = .{},
-    /// Metadata bytes. Copied bytes, owned by the caller.
+    /// Metadata bytes.
     metadata: []const u8 = &.{},
-    pub fn toNative(self: OfflineRegionInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_region_info {
-        var raw = std.mem.zeroes(c.mln_offline_region_info);
-        raw.id = self.id;
-        raw.definition = try self.definition.toNative(allocator, roots);
-        raw.metadata = @ptrCast(self.metadata.ptr);
-        raw.metadata_size = std.math.cast(@TypeOf(raw.metadata_size), self.metadata.len) orelse return error.InvalidArgument;
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_offline_region_info) status.Error!OfflineRegionInfo {
         return .{
@@ -2207,7 +2133,7 @@ pub const OfflineRegionInfo = struct {
     }
 };
 
-/// Offline region status snapshot. Copied result, owned by the caller.
+/// Offline region status snapshot.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2222,19 +2148,6 @@ pub const OfflineRegionStatus = struct {
     required_resource_count: u64 = std.mem.zeroes(u64),
     required_resource_count_is_precise: bool = std.mem.zeroes(bool),
     complete: bool = std.mem.zeroes(bool),
-    pub fn toNative(self: OfflineRegionStatus) c.mln_offline_region_status {
-        var raw = std.mem.zeroes(c.mln_offline_region_status);
-        raw.download_state = self.download_state.toNative();
-        raw.completed_resource_count = self.completed_resource_count;
-        raw.completed_resource_size = self.completed_resource_size;
-        raw.completed_tile_count = self.completed_tile_count;
-        raw.required_tile_count = self.required_tile_count;
-        raw.completed_tile_size = self.completed_tile_size;
-        raw.required_resource_count = self.required_resource_count;
-        raw.required_resource_count_is_precise = self.required_resource_count_is_precise;
-        raw.complete = self.complete;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_offline_region_status) OfflineRegionStatus {
         return .{
             .download_state = OfflineRegionDownloadState.fromNative(raw.download_state),
@@ -2255,8 +2168,7 @@ pub const OfflineRegionStatus = struct {
 /// See `mln_offline_tile_pyramid_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const OfflineTilePyramidRegionDefinition = struct {
-    /// Style URL. Copied during region creation. Copied text, owned by the
-    /// caller.
+    /// Style URL. Copied during region creation.
     style_url: []const u8 = &.{},
     bounds: LatLngBounds = .{},
     min_zoom: f64 = std.mem.zeroes(f64),
@@ -2318,21 +2230,20 @@ pub const OpenglBorrowedTextureDescriptor = struct {
     /// renderer uses scale_factor; the physical size is stated separately
     /// below. A scale_factor that differs from the map's is accepted and logged
     /// as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_width: u32 = 256,
+    physical_width: u32,
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_height: u32 = 256,
+    physical_height: u32,
     /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
-    context: OpenglContextDescriptor = .{},
-    /// The ring's textures, one per slot, in slot order. Required. Copied
-    /// value, owned by the caller.
-    textures: []const OpenglBorrowedTexture = &.{},
+    context: OpenglContextDescriptor,
+    /// The ring's textures, one per slot, in slot order. Required.
+    textures: []const OpenglBorrowedTexture,
     /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
-    target: u32 = std.mem.zeroes(u32),
+    target: u32,
     pub fn toNative(self: OpenglBorrowedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_borrowed_texture_descriptor {
         var raw = c.mln_opengl_borrowed_texture_descriptor_default();
         raw.size = @sizeOf(c.mln_opengl_borrowed_texture_descriptor);
@@ -2494,12 +2405,12 @@ pub const OpenglContextProviderFlag = struct {
 pub const OpenglOwnedTextureDescriptor = struct {
     /// Logical texture extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed OpenGL context provider data. Shared ownership creates a
     /// context whose texture frames the host can acquire. Dedicated EGL or
     /// transferred WebGL ownership creates a private core-worker context for
     /// CPU readback.
-    context: OpenglContextDescriptor = .{},
+    context: OpenglContextDescriptor,
     pub fn toNative(self: OpenglOwnedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_owned_texture_descriptor {
         var raw = c.mln_opengl_owned_texture_descriptor_default();
         raw.size = @sizeOf(c.mln_opengl_owned_texture_descriptor);
@@ -2523,9 +2434,9 @@ pub const OpenglOwnedTextureDescriptor = struct {
 pub const OpenglSurfaceDescriptor = struct {
     /// Logical surface extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed OpenGL context provider data.
-    context: OpenglContextDescriptor = .{},
+    context: OpenglContextDescriptor,
     /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
     /// EGL, both required. Null for WebGL, whose context carries its canvas
     /// binding.
@@ -2578,22 +2489,6 @@ pub const OpenglTextureFrame = struct {
     /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed
     /// texture.
     type: u32 = std.mem.zeroes(u32),
-    pub fn toNative(self: OpenglTextureFrame) c.mln_opengl_texture_frame {
-        var raw = std.mem.zeroes(c.mln_opengl_texture_frame);
-        raw.size = @sizeOf(c.mln_opengl_texture_frame);
-        raw.generation = self.generation;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.frame_id = self.frame_id;
-        raw.slot = self.slot;
-        raw.texture = self.texture;
-        raw.target = self.target;
-        raw.internal_format = self.internal_format;
-        raw.format = self.format;
-        raw.type = self.type;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_opengl_texture_frame) OpenglTextureFrame {
         return .{
             .generation = raw.generation,
@@ -2616,13 +2511,12 @@ pub const OpenglTextureFrame = struct {
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const PremultipliedRgba8Image = struct {
-    width: u32 = std.mem.zeroes(u32),
-    height: u32 = std.mem.zeroes(u32),
+    width: u32,
+    height: u32,
     /// Bytes per image row. Must be at least width \* 4.
-    stride: u32 = std.mem.zeroes(u32),
+    stride: u32,
     /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
-    /// Copied bytes, owned by the caller.
-    pixels: []const u8 = &.{},
+    pixels: []const u8,
     pub fn toNative(self: PremultipliedRgba8Image, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_premultiplied_rgba8_image {
         _ = allocator;
         _ = roots;
@@ -2742,39 +2636,15 @@ pub const Quaternion = struct {
     }
 };
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One query hit borrowed for a completion callback.
 ///
 /// See `mln_queried_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const QueriedFeature = struct {
-    /// Copied text, owned by the caller.
     feature: []const u8 = &.{},
-    /// Copied text, owned by the caller.
     source_id: ?[]const u8 = null,
-    /// Copied text, owned by the caller.
     source_layer_id: ?[]const u8 = null,
-    /// Copied text, owned by the caller.
     state: ?[]const u8 = null,
-    pub fn toNative(self: QueriedFeature, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_queried_feature {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_queried_feature);
-        raw.fields = 0;
-        raw.feature = marshal.view(self.feature);
-        if (self.source_id) |item| {
-            raw.fields |= c.MLN_QUERIED_FEATURE_SOURCE_ID;
-            raw.source_id = marshal.view(item);
-        }
-        if (self.source_layer_id) |item| {
-            raw.fields |= c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID;
-            raw.source_layer_id = marshal.view(item);
-        }
-        if (self.state) |item| {
-            raw.fields |= c.MLN_QUERIED_FEATURE_STATE;
-            raw.state = marshal.view(item);
-        }
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_queried_feature) status.Error!QueriedFeature {
         return .{
@@ -2881,13 +2751,6 @@ pub const RenderAbandonResult = struct {
     disposition: RenderAbandonDisposition = std.mem.zeroes(RenderAbandonDisposition),
     /// Backend resource groups intentionally retained until process exit.
     quarantined_resource_count: u32 = std.mem.zeroes(u32),
-    pub fn toNative(self: RenderAbandonResult) c.mln_render_abandon_result {
-        var raw = std.mem.zeroes(c.mln_render_abandon_result);
-        raw.size = @sizeOf(c.mln_render_abandon_result);
-        raw.disposition = self.disposition.toNative();
-        raw.quarantined_resource_count = self.quarantined_resource_count;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_render_abandon_result) RenderAbandonResult {
         return .{
             .disposition = RenderAbandonDisposition.fromNative(raw.disposition),
@@ -2936,20 +2799,9 @@ pub const RenderDriverKind = enum(u32) {
 /// See `mln_render_frame_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderFrameBatchView = struct {
-    /// Copied value, owned by the caller.
+    /// Borrowed array of result_count terminal frame results in completion
+    /// order.
     results: []const RenderFrameResult = &.{},
-    pub fn toNative(self: RenderFrameBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_frame_batch_view {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_render_frame_batch_view);
-        raw.size = @sizeOf(c.mln_render_frame_batch_view);
-        raw.results = blk: {
-            const items = try allocator.alloc(c.mln_render_frame_result, self.results.len);
-            for (self.results, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.result_count = std.math.cast(@TypeOf(raw.result_count), self.results.len) orelse return error.InvalidArgument;
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_render_frame_batch_view) status.Error!RenderFrameBatchView {
         return .{
@@ -2999,17 +2851,6 @@ pub const RenderFrameResult = struct {
     /// without a runtime-event round trip; the host re-arms the demand as each
     /// result arrives.
     needs_repaint: bool = std.mem.zeroes(bool),
-    pub fn toNative(self: RenderFrameResult) c.mln_render_frame_result {
-        var raw = std.mem.zeroes(c.mln_render_frame_result);
-        raw.size = @sizeOf(c.mln_render_frame_result);
-        raw.disposition = self.disposition.toNative();
-        raw.token = self.token;
-        raw.map_update_generation = self.map_update_generation;
-        raw.generation = self.generation;
-        raw.frame_generation = self.frame_generation;
-        raw.needs_repaint = self.needs_repaint;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_render_frame_result) RenderFrameResult {
         return .{
             .disposition = RenderResult.fromNative(raw.disposition),
@@ -3066,26 +2907,26 @@ pub const RenderResult = enum(u32) {
 pub const RenderSessionAttachOptions = struct {
     /// One `mln_render_driver_kind` value. Defaults to
     /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
-    driver: RenderDriverKind = .caller_graphics_thread,
+    driver: RenderDriverKind,
     /// Requested slot count of a session-owned texture ring, from one to three.
     /// Private targets grant one slot regardless of this value. A borrowed
     /// texture ring's depth is its texture count, so borrowed and other targets
     /// ignore this value. Defaults to 1.
-    requested_texture_ring_depth: u32 = 1,
+    requested_texture_ring_depth: u32,
     /// Producer synchronization for acquired texture frames. Defaults to
     /// `MLN_GPU_SYNC_CPU_COMPLETE`. `MLN_GPU_SYNC_OPENGL_FENCE` requires a
     /// shared EGL or WGL texture target and a caller-graphics-thread driver.
     /// Other targets support only CPU completion and fail an unsupported
     /// request.
-    producer_sync_kind: GpuSyncKind = std.mem.zeroes(GpuSyncKind),
+    producer_sync_kind: GpuSyncKind,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
-    frame_wake: Wake = .{},
+    frame_wake: Wake,
     /// Wakes the graphics receiver when caller-driver work is available.
-    driver_work_wake: Wake = .{},
+    driver_work_wake: Wake,
     /// Host lock on the graphics queue, disabled by default. Only Vulkan
     /// targets accept an enabled lock; other backends fail the attach with
     /// `MLN_STATUS_UNSUPPORTED`.
-    queue_lock: QueueLock = .{},
+    queue_lock: QueueLock,
     pub fn toNative(self: RenderSessionAttachOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_session_attach_options {
         var raw = c.mln_render_session_attach_options_default();
         raw.size = @sizeOf(c.mln_render_session_attach_options);
@@ -3123,14 +2964,6 @@ pub const RenderSessionCapabilities = struct {
     texture_ring_depth: u32 = std.mem.zeroes(u32),
     /// A bitwise OR of `mln_render_session_capability_flag` values.
     flags: RenderSessionCapabilityFlag = std.mem.zeroes(RenderSessionCapabilityFlag),
-    pub fn toNative(self: RenderSessionCapabilities) c.mln_render_session_capabilities {
-        var raw = std.mem.zeroes(c.mln_render_session_capabilities);
-        raw.size = @sizeOf(c.mln_render_session_capabilities);
-        raw.driver = self.driver.toNative();
-        raw.texture_ring_depth = self.texture_ring_depth;
-        raw.flags = self.flags.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
@@ -3183,19 +3016,6 @@ pub const RenderSessionSnapshot = struct {
     /// True when a map update or an accepted resize arrived after the latest
     /// rendered frame.
     pending_changes: bool = std.mem.zeroes(bool),
-    pub fn toNative(self: RenderSessionSnapshot) c.mln_render_session_snapshot {
-        var raw = std.mem.zeroes(c.mln_render_session_snapshot);
-        raw.size = @sizeOf(c.mln_render_session_snapshot);
-        raw.state = self.state.toNative();
-        raw.extent = self.extent.toNative();
-        raw.generation = self.generation;
-        raw.map_update_generation = self.map_update_generation;
-        raw.rendered_update_generation = self.rendered_update_generation;
-        raw.frame_generation = self.frame_generation;
-        raw.acquired_frame_count = self.acquired_frame_count;
-        raw.pending_changes = self.pending_changes;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_render_session_snapshot) RenderSessionSnapshot {
         return .{
             .state = RenderSessionState.fromNative(raw.state),
@@ -3249,10 +3069,8 @@ pub const RenderedFeatureQueryOptionField = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const RenderedFeatureQueryOptions = struct {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
-    /// Copied value, owned by the caller.
     layer_ids: ?[]const []const u8 = null,
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    /// Copied text, owned by the caller.
     filter: ?[]const u8 = null,
     pub fn toNative(self: RenderedFeatureQueryOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_rendered_feature_query_options {
         _ = roots;
@@ -3365,15 +3183,6 @@ pub const RenderingStats = struct {
     draw_call_count: i64 = std.mem.zeroes(i64),
     /// Total draw calls executed by the native renderer.
     total_draw_call_count: i64 = std.mem.zeroes(i64),
-    pub fn toNative(self: RenderingStats) c.mln_rendering_stats {
-        var raw = std.mem.zeroes(c.mln_rendering_stats);
-        raw.encoding_time = self.encoding_time;
-        raw.rendering_time = self.rendering_time;
-        raw.frame_count = self.frame_count;
-        raw.draw_call_count = self.draw_call_count;
-        raw.total_draw_call_count = self.total_draw_call_count;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_rendering_stats) RenderingStats {
         return .{
             .encoding_time = raw.encoding_time,
@@ -3526,12 +3335,6 @@ pub const ResourceRange = struct {
     start: u64 = std.mem.zeroes(u64),
     /// Last byte offset of the requested range, inclusive.
     end: u64 = std.mem.zeroes(u64),
-    pub fn toNative(self: ResourceRange) c.mln_resource_range {
-        var raw = std.mem.zeroes(c.mln_resource_range);
-        raw.start = self.start;
-        raw.end = self.end;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_resource_range) ResourceRange {
         return .{
             .start = raw.start,
@@ -3601,11 +3404,10 @@ pub const ResourceRequestField = struct {
 };
 
 pub const ResourceRequestInfo = struct {
-    /// URL entering the network layer, before tile server normalization. Copied
-    /// text, owned by the caller.
+    /// URL entering the network layer, before tile server normalization.
     requested_url: ?[]const u8 = null,
     /// URL to fetch, after resource-kind normalization against the runtime's
-    /// tile server options and API key. Copied text, owned by the caller.
+    /// tile server options and API key.
     resolved_url: ?[]const u8 = null,
     kind: ResourceKind = std.mem.zeroes(ResourceKind),
     loading_method: ResourceLoadingMethod = std.mem.zeroes(ResourceLoadingMethod),
@@ -3615,30 +3417,8 @@ pub const ResourceRequestInfo = struct {
     range: ?ResourceRange = null,
     prior_modified_unix_ms: ?i64 = null,
     prior_expires_unix_ms: ?i64 = null,
-    /// Copied text, owned by the caller.
     prior_etag: ?[]const u8 = null,
-    /// Copied bytes, owned by the caller.
     prior_data: []const u8 = &.{},
-    pub fn toNative(self: ResourceRequestInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request_info {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_resource_request_info);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_resource_request_info);
-        raw.requested_url = if (self.requested_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.resolved_url = if (self.resolved_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.kind = self.kind.toNative();
-        raw.loading_method = self.loading_method.toNative();
-        raw.priority = self.priority.toNative();
-        raw.usage = self.usage.toNative();
-        raw.storage_policy = self.storage_policy.toNative();
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_RANGE, &raw.range, self.range);
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
-        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
-        raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        raw.prior_data = @ptrCast(self.prior_data.ptr);
-        raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request_info) status.Error!ResourceRequestInfo {
         return .{
@@ -3748,15 +3528,15 @@ pub const ResourceResponseStatus = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRoute = struct {
     /// The resource kinds to match.
-    kinds: ResourceKindMask = ResourceKindMask.all,
+    kinds: ResourceKindMask,
     /// A bitwise OR of `mln_url_match_flags` values.
-    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
+    flags: UrlMatchFlags,
     /// The URL or glob pattern to compare.
-    url: []const u8 = &.{},
+    url: []const u8,
     pub fn toNative(self: ResourceRoute, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_route {
         _ = allocator;
         _ = roots;
-        var raw = std.mem.zeroes(c.mln_resource_route);
+        var raw = c.mln_resource_route_default();
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = marshal.view(self.url);
@@ -3838,7 +3618,6 @@ pub const ResourceUsage = enum(u32) {
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEvent = struct {
-    /// Copied text, owned by the caller.
     message: []const u8 = &.{},
     /// One of `mln_runtime_event_type`.
     type: RuntimeEventType = std.mem.zeroes(RuntimeEventType),
@@ -3855,47 +3634,6 @@ pub const RuntimeEvent = struct {
     code: i32 = std.mem.zeroes(i32),
     /// Typed payload selected by payload_type.
     payload: RuntimeEventPayload = .{ .unknown = 0 },
-    pub fn toNative(self: RuntimeEvent, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_runtime_event);
-        raw.type = self.type.toNative();
-        raw.source_type = self.source_type.toNative();
-        raw.source = self.source;
-        raw.generation = self.generation;
-        raw.code = self.code;
-        switch (self.payload) {
-            .render_frame => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
-                raw.payload.render_frame = item.toNative();
-            },
-            .render_map => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
-                raw.payload.render_map = item.toNative();
-            },
-            .tile_action => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION;
-                raw.payload.tile_action = item.toNative();
-            },
-            .offline_region_status => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS;
-                raw.payload.offline_region_status = item.toNative();
-            },
-            .offline_region_response_error => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR;
-                raw.payload.offline_region_response_error = item.toNative();
-            },
-            .offline_region_tile_count_limit => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT;
-                raw.payload.offline_region_tile_count_limit = item.toNative();
-            },
-            .empty => {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE;
-            },
-            .unknown => return error.InvalidArgument,
-        }
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event) status.Error!RuntimeEvent {
         _ = allocator;
@@ -4005,12 +3743,6 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
     region_id: i64 = std.mem.zeroes(i64),
     /// One of `mln_resource_error_reason`.
     reason: ResourceErrorReason = std.mem.zeroes(ResourceErrorReason),
-    pub fn toNative(self: RuntimeEventOfflineRegionResponseError) c.mln_runtime_event_offline_region_response_error {
-        var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_response_error);
-        raw.region_id = self.region_id;
-        raw.reason = self.reason.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
         return .{
             .region_id = raw.region_id,
@@ -4026,12 +3758,6 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
 pub const RuntimeEventOfflineRegionStatus = struct {
     region_id: i64 = std.mem.zeroes(i64),
     status: OfflineRegionStatus = .{},
-    pub fn toNative(self: RuntimeEventOfflineRegionStatus) c.mln_runtime_event_offline_region_status {
-        var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_status);
-        raw.region_id = self.region_id;
-        raw.status = self.status.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_status) RuntimeEventOfflineRegionStatus {
         return .{
             .region_id = raw.region_id,
@@ -4047,12 +3773,6 @@ pub const RuntimeEventOfflineRegionStatus = struct {
 pub const RuntimeEventOfflineRegionTileCountLimit = struct {
     region_id: i64 = std.mem.zeroes(i64),
     limit: u64 = std.mem.zeroes(u64),
-    pub fn toNative(self: RuntimeEventOfflineRegionTileCountLimit) c.mln_runtime_event_offline_region_tile_count_limit {
-        var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_tile_count_limit);
-        raw.region_id = self.region_id;
-        raw.limit = self.limit;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
         return .{
             .region_id = raw.region_id,
@@ -4105,14 +3825,6 @@ pub const RuntimeEventRenderFrame = struct {
     /// Whether symbol placement changed during this frame.
     placement_changed: bool = std.mem.zeroes(bool),
     stats: RenderingStats = .{},
-    pub fn toNative(self: RuntimeEventRenderFrame) c.mln_runtime_event_render_frame {
-        var raw = std.mem.zeroes(c.mln_runtime_event_render_frame);
-        raw.mode = self.mode.toNative();
-        raw.needs_repaint = self.needs_repaint;
-        raw.placement_changed = self.placement_changed;
-        raw.stats = self.stats.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_render_frame) RuntimeEventRenderFrame {
         return .{
             .mode = RenderMode.fromNative(raw.mode),
@@ -4130,11 +3842,6 @@ pub const RuntimeEventRenderFrame = struct {
 pub const RuntimeEventRenderMap = struct {
     /// One of `mln_render_mode`.
     mode: RenderMode = std.mem.zeroes(RenderMode),
-    pub fn toNative(self: RuntimeEventRenderMap) c.mln_runtime_event_render_map {
-        var raw = std.mem.zeroes(c.mln_runtime_event_render_map);
-        raw.mode = self.mode.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_render_map) RuntimeEventRenderMap {
         return .{
             .mode = RenderMode.fromNative(raw.mode),
@@ -4162,12 +3869,6 @@ pub const RuntimeEventTileAction = struct {
     /// One of `mln_tile_operation`.
     operation: TileOperation = std.mem.zeroes(TileOperation),
     tile_id: TileId = .{},
-    pub fn toNative(self: RuntimeEventTileAction) c.mln_runtime_event_tile_action {
-        var raw = std.mem.zeroes(c.mln_runtime_event_tile_action);
-        raw.operation = self.operation.toNative();
-        raw.tile_id = self.tile_id.toNative();
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_runtime_event_tile_action) RuntimeEventTileAction {
         return .{
             .operation = TileOperation.fromNative(raw.operation),
@@ -4211,11 +3912,9 @@ pub const RuntimeEventType = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeOptions = struct {
     /// Directory root for asset:// URLs. Copied during runtime creation. Empty
-    /// selects `/android_asset` on Android and `.` elsewhere. Copied text,
-    /// owned by the caller.
+    /// selects `/android_asset` on Android and `.` elsewhere.
     asset_path: ?[]const u8 = null,
-    /// Cache database path. Copied during runtime creation. Copied text, owned
-    /// by the caller.
+    /// Cache database path. Copied during runtime creation.
     cache_path: ?[]const u8 = null,
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
         _ = allocator;
@@ -4330,10 +4029,9 @@ pub const SourceFeatureQueryOptionField = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeatureQueryOptions = struct {
     /// Optional source-layer IDs. Required by vector sources; ignored by
-    /// GeoJSON. Copied value, owned by the caller.
+    /// GeoJSON.
     source_layer_ids: ?[]const []const u8 = null,
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    /// Copied text, owned by the caller.
     filter: ?[]const u8 = null,
     pub fn toNative(self: SourceFeatureQueryOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_source_feature_query_options {
         _ = roots;
@@ -4399,7 +4097,7 @@ pub const Status = enum(i32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Copied result, owned by the caller.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4409,11 +4107,11 @@ pub const StyleImageInfo = struct {
     /// Image height in pixels.
     height: u32 = std.mem.zeroes(u32),
     /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes,
-    /// top row first. Copied bytes, owned by the caller.
+    /// top row first.
     pixels: []const u8 = &.{},
-    /// Horizontally stretchable intervals. Copied value, owned by the caller.
+    /// Horizontally stretchable intervals.
     stretch_x: []const ImageStretch = &.{},
-    /// Vertically stretchable intervals. Copied value, owned by the caller.
+    /// Vertically stretchable intervals.
     stretch_y: []const ImageStretch = &.{},
     /// Content box, when the image sets one.
     content: ?ImageContent = null,
@@ -4425,32 +4123,6 @@ pub const StyleImageInfo = struct {
     pixel_ratio: f32 = std.mem.zeroes(f32),
     /// Whether the image is a signed distance field icon.
     sdf: bool = std.mem.zeroes(bool),
-    pub fn toNative(self: StyleImageInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_info {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_image_info);
-        raw.fields = 0;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.pixels = marshal.view(self.pixels);
-        raw.stretch_x = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_x.len);
-            for (self.stretch_x, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_x_count = std.math.cast(@TypeOf(raw.stretch_x_count), self.stretch_x.len) orelse return error.InvalidArgument;
-        raw.stretch_y = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_y.len);
-            for (self.stretch_y, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_y_count = std.math.cast(@TypeOf(raw.stretch_y_count), self.stretch_y.len) orelse return error.InvalidArgument;
-        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, self.content);
-        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, self.text_fit_width);
-        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
-        raw.pixel_ratio = self.pixel_ratio;
-        raw.sdf = self.sdf;
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_info) status.Error!StyleImageInfo {
         return .{
@@ -4524,11 +4196,11 @@ pub const StyleImageOptionField = struct {
 /// See `mln_style_image_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleImageOptions = struct {
-    /// Horizontally stretchable intervals. May be null only when
-    /// stretch_x_count is 0. Copied value, owned by the caller.
+    /// Horizontally stretchable intervals. Borrowed for the call and copied
+    /// before return. May be null only when stretch_x_count is 0.
     stretch_x: ?[]const ImageStretch = null,
-    /// Vertically stretchable intervals. May be null only when stretch_y_count
-    /// is 0. Copied value, owned by the caller.
+    /// Vertically stretchable intervals. Borrowed for the call and copied
+    /// before return. May be null only when stretch_y_count is 0.
     stretch_y: ?[]const ImageStretch = null,
     /// Content box used when icon-text-fit applies.
     content: ?ImageContent = null,
@@ -4605,20 +4277,18 @@ pub const StyleImageTextFit = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleLayerInfo = struct {
-    /// Layer ID. Copied text, owned by the caller.
+    /// Layer ID.
     id: []const u8 = &.{},
-    /// The style-spec layer type string. Copied text, owned by the caller.
+    /// The style-spec layer type string.
     type: []const u8 = &.{},
-    /// Source ID. Empty for a layer type that takes no source. Copied text,
-    /// owned by the caller.
+    /// Source ID. Empty for a layer type that takes no source.
     source_id: ?[]const u8 = null,
-    /// Source-layer ID. Empty when the layer sets none. Copied text, owned by
-    /// the caller.
+    /// Source-layer ID. Empty when the layer sets none.
     source_layer: ?[]const u8 = null,
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     min_zoom: f64 = std.mem.zeroes(f64),
@@ -4626,19 +4296,6 @@ pub const StyleLayerInfo = struct {
     max_zoom: f64 = std.mem.zeroes(f64),
     /// One of `mln_style_layer_visibility`.
     visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
-    pub fn toNative(self: StyleLayerInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_info {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_layer_info);
-        raw.id = marshal.view(self.id);
-        raw.type = marshal.view(self.type);
-        raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        raw.source_layer = if (self.source_layer) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        raw.min_zoom = self.min_zoom;
-        raw.max_zoom = self.max_zoom;
-        raw.visibility = self.visibility.toNative();
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
         return .{
@@ -4677,22 +4334,20 @@ pub const StyleRasterDemEncoding = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceInfo = struct {
-    /// Source ID. Copied text, owned by the caller.
+    /// Source ID.
     id: []const u8 = &.{},
     /// One of `mln_style_source_type`.
     type: StyleSourceType = std.mem.zeroes(StyleSourceType),
     /// Whether the source is marked volatile.
     is_volatile: bool = std.mem.zeroes(bool),
-    /// Attribution string, when the source sets one. It may be empty. Copied
-    /// text, owned by the caller.
+    /// Attribution string, when the source sets one. It may be empty.
     attribution: ?[]const u8 = null,
-    /// URL that the source loads from, when it has one. Copied text, owned by
-    /// the caller.
+    /// URL that the source loads from, when it has one.
     url: ?[]const u8 = null,
     /// Inline TileJSON metadata, when the source was defined with it.
     tilejson: ?StyleSourceTileInfo = null,
@@ -4704,30 +4359,6 @@ pub const StyleSourceInfo = struct {
     vector_encoding: ?StyleVectorTileEncoding = null,
     /// DEM raster encoding, when inline TileJSON sets one.
     raster_encoding: ?StyleRasterDemEncoding = null,
-    pub fn toNative(self: StyleSourceInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_info {
-        var raw = std.mem.zeroes(c.mln_style_source_info);
-        raw.fields = 0;
-        raw.id = marshal.view(self.id);
-        raw.type = self.type.toNative();
-        raw.is_volatile = self.is_volatile;
-        if (self.attribution) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
-            raw.attribution = marshal.view(item);
-        }
-        if (self.url) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_URL;
-            raw.url = marshal.view(item);
-        }
-        if (self.tilejson) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
-            raw.tilejson = try item.toNative(allocator, roots);
-        }
-        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
-        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
-        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
-        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, &raw.raster_encoding, self.raster_encoding);
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_info) status.Error!StyleSourceInfo {
         return .{
@@ -4779,7 +4410,7 @@ pub const StyleSourceInfoField = struct {
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceTileInfo = struct {
-    /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
+    /// Tile URL templates in TileJSON order.
     tile_urls: []const []const u8 = &.{},
     /// Lowest zoom level the TileJSON provides tiles for.
     min_zoom: f64 = std.mem.zeroes(f64),
@@ -4787,20 +4418,6 @@ pub const StyleSourceTileInfo = struct {
     max_zoom: f64 = std.mem.zeroes(f64),
     /// One of `mln_style_tile_scheme`.
     scheme: StyleTileScheme = std.mem.zeroes(StyleTileScheme),
-    pub fn toNative(self: StyleSourceTileInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_tile_info {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_source_tile_info);
-        raw.tile_urls = blk: {
-            const items = try allocator.alloc(c.mln_buffer_view, self.tile_urls.len);
-            for (self.tile_urls, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
-            break :blk items.ptr;
-        };
-        raw.tile_url_count = std.math.cast(@TypeOf(raw.tile_url_count), self.tile_urls.len) orelse return error.InvalidArgument;
-        raw.min_zoom = self.min_zoom;
-        raw.max_zoom = self.max_zoom;
-        raw.scheme = self.scheme.toNative();
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_tile_info) status.Error!StyleSourceTileInfo {
         return .{
@@ -4866,7 +4483,7 @@ pub const StyleTransitionOptionField = struct {
     pub const unionWith = methods.unionWith;
 };
 
-/// Global style transition options. Copied result, owned by the caller.
+/// Global style transition options.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4923,14 +4540,6 @@ pub const TextureImageInfo = struct {
     stride: u32 = std.mem.zeroes(u32),
     /// Required output buffer byte length.
     byte_length: usize = std.mem.zeroes(usize),
-    pub fn toNative(self: TextureImageInfo) c.mln_texture_image_info {
-        var raw = std.mem.zeroes(c.mln_texture_image_info);
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.stride = self.stride;
-        raw.byte_length = self.byte_length;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_texture_image_info) TextureImageInfo {
         return .{
             .width = raw.width,
@@ -4941,22 +4550,14 @@ pub const TextureImageInfo = struct {
     }
 };
 
-/// Copied result, owned by the caller.
+/// Texture readback borrowed for a completion callback.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const TextureReadbackResult = struct {
-    /// Copied bytes, owned by the caller.
+    /// Borrowed pixel bytes, valid only during the callback.
     data: []const u8 = &.{},
     info: TextureImageInfo = .{},
-    pub fn toNative(self: TextureReadbackResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_texture_readback_result {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_texture_readback_result);
-        raw.data = marshal.view(self.data);
-        raw.info = self.info.toNative();
-        return raw;
-    }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_texture_readback_result) status.Error!TextureReadbackResult {
         return .{
@@ -4976,15 +4577,6 @@ pub const TileId = struct {
     canonical_z: u32 = std.mem.zeroes(u32),
     canonical_x: u32 = std.mem.zeroes(u32),
     canonical_y: u32 = std.mem.zeroes(u32),
-    pub fn toNative(self: TileId) c.mln_tile_id {
-        var raw = std.mem.zeroes(c.mln_tile_id);
-        raw.overscaled_z = self.overscaled_z;
-        raw.wrap = self.wrap;
-        raw.canonical_z = self.canonical_z;
-        raw.canonical_x = self.canonical_x;
-        raw.canonical_y = self.canonical_y;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_tile_id) TileId {
         return .{
             .overscaled_z = raw.overscaled_z,
@@ -5141,26 +4733,25 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     /// renderer uses scale_factor; the physical size is stated separately
     /// below. A scale_factor that differs from the map's is accepted and logged
     /// as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Physical image width in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_width: u32 = 256,
+    physical_width: u32,
     /// Physical image height in device pixels. Must be positive. Defaults to
     /// 256.
-    physical_height: u32 = 256,
+    physical_height: u32,
     /// Borrowed Vulkan context. All handles are required.
-    context: VulkanContextDescriptor = .{},
-    /// The ring's images, one per slot, in slot order. Required. Copied value,
-    /// owned by the caller.
-    textures: []const VulkanBorrowedTexture = &.{},
+    context: VulkanContextDescriptor,
+    /// The ring's images, one per slot, in slot order. Required.
+    textures: []const VulkanBorrowedTexture,
     /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
     /// invalid.
-    format: u32 = std.mem.zeroes(u32),
+    format: u32,
     /// Backend-native VkImageLayout value expected at render-pass begin.
-    initial_layout: u32 = std.mem.zeroes(u32),
+    initial_layout: u32,
     /// Backend-native VkImageLayout value left after rendering succeeds.
     /// Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
-    final_layout: u32 = 5,
+    final_layout: u32,
     pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
         _ = roots;
         var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
@@ -5251,9 +4842,9 @@ pub const VulkanContextDescriptor = struct {
 pub const VulkanOwnedTextureDescriptor = struct {
     /// Logical texture extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed Vulkan context. All handles are required.
-    context: VulkanContextDescriptor = .{},
+    context: VulkanContextDescriptor,
     pub fn toNative(self: VulkanOwnedTextureDescriptor) c.mln_vulkan_owned_texture_descriptor {
         var raw = c.mln_vulkan_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -5275,13 +4866,13 @@ pub const VulkanOwnedTextureDescriptor = struct {
 pub const VulkanSurfaceDescriptor = struct {
     /// Logical surface extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed Vulkan context. All handles are required. The device must
     /// support VK_KHR_swapchain, and the queue family must support graphics and
     /// presentation to this descriptor's surface.
-    context: VulkanContextDescriptor = .{},
+    context: VulkanContextDescriptor,
     /// Borrowed VkSurfaceKHR bit pattern. Required.
-    surface: u64 = std.mem.zeroes(u64),
+    surface: u64,
     pub fn toNative(self: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
         var raw = c.mln_vulkan_surface_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -5328,22 +4919,6 @@ pub const VulkanTextureFrame = struct {
     /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and
     /// the descriptor's final_layout for a borrowed one.
     layout: u32 = std.mem.zeroes(u32),
-    pub fn toNative(self: VulkanTextureFrame) c.mln_vulkan_texture_frame {
-        var raw = std.mem.zeroes(c.mln_vulkan_texture_frame);
-        raw.size = @sizeOf(c.mln_vulkan_texture_frame);
-        raw.generation = self.generation;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.frame_id = self.frame_id;
-        raw.slot = self.slot;
-        raw.image = self.image;
-        raw.image_view = self.image_view;
-        raw.device = self.device;
-        raw.format = self.format;
-        raw.layout = self.layout;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_vulkan_texture_frame) VulkanTextureFrame {
         return .{
             .generation = raw.generation,
@@ -5408,8 +4983,7 @@ pub const WebglContextDescriptor = struct {
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     context: i32 = std.mem.zeroes(i32),
     /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-    /// canvas must still be transferable when attachment starts. Copied text,
-    /// owned by the caller.
+    /// canvas must still be transferable when attachment starts.
     canvas_selector: []const u8 = &.{},
     pub fn toNative(self: WebglContextDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_webgl_context_descriptor {
         _ = allocator;
@@ -5478,20 +5052,19 @@ pub const WebgpuBorrowedTextureDescriptor = struct {
     /// renderer uses scale_factor; the physical size is stated separately
     /// below. A scale_factor that differs from the map's is accepted and logged
     /// as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Physical texture width in device pixels. Defaults to 256.
-    physical_width: u32 = 256,
+    physical_width: u32,
     /// Physical texture height in device pixels. Defaults to 256.
-    physical_height: u32 = 256,
+    physical_height: u32,
     /// Borrowed WebGPU context. device is required. Rendering is submitted
     /// through context.queue or that device's default queue.
-    context: WebgpuContextDescriptor = .{},
-    /// The ring's textures, one per slot, in slot order. Required. Copied
-    /// value, owned by the caller.
-    textures: []const WebgpuBorrowedTexture = &.{},
+    context: WebgpuContextDescriptor,
+    /// The ring's textures, one per slot, in slot order. Required.
+    textures: []const WebgpuBorrowedTexture,
     /// Backend-native WGPUTextureFormat value of every texture. Undefined is
     /// invalid.
-    format: u32 = std.mem.zeroes(u32),
+    format: u32,
     pub fn toNative(self: WebgpuBorrowedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_webgpu_borrowed_texture_descriptor {
         _ = roots;
         var raw = c.mln_webgpu_borrowed_texture_descriptor_default();
@@ -5561,9 +5134,9 @@ pub const WebgpuContextDescriptor = struct {
 pub const WebgpuOwnedTextureDescriptor = struct {
     /// Logical texture extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed WebGPU context. device is required.
-    context: WebgpuContextDescriptor = .{},
+    context: WebgpuContextDescriptor,
     pub fn toNative(self: WebgpuOwnedTextureDescriptor) c.mln_webgpu_owned_texture_descriptor {
         var raw = c.mln_webgpu_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -5585,16 +5158,16 @@ pub const WebgpuOwnedTextureDescriptor = struct {
 pub const WebgpuSurfaceDescriptor = struct {
     /// Logical surface extent. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Borrowed WebGPU context. device is required.
-    context: WebgpuContextDescriptor = .{},
+    context: WebgpuContextDescriptor,
     /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
     /// session configures it for this device and extent, and unconfigures it
     /// when the session ends.
-    surface: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    surface: ?*anyopaque,
     /// WGPUTextureFormat to configure the surface with. Required. A browser
     /// host takes it from navigator.gpu.getPreferredCanvasFormat().
-    format: u32 = std.mem.zeroes(u32),
+    format: u32,
     pub fn toNative(self: WebgpuSurfaceDescriptor) c.mln_webgpu_surface_descriptor {
         var raw = c.mln_webgpu_surface_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -5639,21 +5212,6 @@ pub const WebgpuTextureFrame = struct {
     device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Backend-native WGPUTextureFormat value.
     format: u32 = std.mem.zeroes(u32),
-    pub fn toNative(self: WebgpuTextureFrame) c.mln_webgpu_texture_frame {
-        var raw = std.mem.zeroes(c.mln_webgpu_texture_frame);
-        raw.size = @sizeOf(c.mln_webgpu_texture_frame);
-        raw.generation = self.generation;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.frame_id = self.frame_id;
-        raw.slot = self.slot;
-        raw.texture = self.texture;
-        raw.texture_view = self.texture_view;
-        raw.device = self.device;
-        raw.format = self.format;
-        return raw;
-    }
     pub fn fromNative(raw: c.mln_webgpu_texture_frame) WebgpuTextureFrame {
         return .{
             .generation = raw.generation,
@@ -5890,6 +5448,14 @@ pub fn geojsonSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!Ow
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub fn gpuSyncDefault() status.Error!GpuSync {
     return call.direct("mln_gpu_sync_default", .none, {}, GpuSync, null, .{});
+}
+
+/// Returns default HTTP header rule options.
+///
+/// See `mln_http_header_rule_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn httpHeaderRuleDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(HttpHeaderRule) {
+    return call.direct("mln_http_header_rule_default", .none, {}, OwnedValue(HttpHeaderRule), allocator, .{});
 }
 
 /// Sets one outgoing HTTP request header for the current transform invocation.
@@ -7180,6 +6746,14 @@ pub fn resourceRequestRelease(handle: ResourceRequest) status.Error!void {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequest, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
+}
+
+/// Returns default resource route options.
+///
+/// See `mln_resource_route_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn resourceRouteDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(ResourceRoute) {
+    return call.direct("mln_resource_route_default", .none, {}, OwnedValue(ResourceRoute), allocator, .{});
 }
 
 /// Answers a resource transform request with a replacement URL.

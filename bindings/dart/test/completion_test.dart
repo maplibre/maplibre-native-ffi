@@ -143,7 +143,7 @@ void main() {
   test('a wait that times out leaves its completion to arrive later', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap(
-      const MapOptions(
+      MapOptions(
         mapMode: MapMode.static,
         initialExtent: LogicalExtent(width: 64, height: 64, scaleFactor: 1),
         eventMask: RuntimeEventMask.all,

@@ -361,8 +361,8 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Highest zoom that clusters points. Defaults to 17.
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form.
-  /// Copied text, owned by the caller.
+  /// whose members follow the MapLibre Style Spec clusterProperties form. The
+  /// UTF-8 bytes are borrowed for the call.
   public var clusterProperties: Data?
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
@@ -576,8 +576,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// Bytes per image row. Must be at least width \* 4.
   public var stride: UInt32
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied
-  /// bytes, owned by the caller.
+  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   public var pixels: Data
   public static var `default`: Self {
     try! Self(raw: mln_premultiplied_rgba8_image_default())
@@ -622,7 +621,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   }
 }
 
-/// Copied result, owned by the caller.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -632,11 +631,11 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   /// Image height in pixels.
   public var height: UInt32
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
-  /// row first. Copied bytes, owned by the caller.
+  /// row first.
   public var pixels: Data
-  /// Horizontally stretchable intervals. Copied value, owned by the caller.
+  /// Horizontally stretchable intervals.
   public var stretchX: [ImageStretch]
-  /// Vertically stretchable intervals. Copied value, owned by the caller.
+  /// Vertically stretchable intervals.
   public var stretchY: [ImageStretch]
   /// Content box, when the image sets one.
   public var content: ImageContent?
@@ -703,33 +702,6 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     pixelRatio = raw.pixel_ratio
     sdf = raw.sdf
   }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_style_image_info {
-    var raw = mln_style_image_info()
-    raw.fields = 0
-    raw.width = width
-    raw.height = height
-    raw.pixels = arena.view(pixels)
-    raw.stretch_x = arena.array(stretchX.map { $0.nativeValue() })
-    raw.stretch_x_count = try NativeInputArena.count(stretchX.count)
-    raw.stretch_y = arena.array(stretchY.map { $0.nativeValue() })
-    raw.stretch_y_count = try NativeInputArena.count(stretchY.count)
-    if let item = content {
-      raw.fields |= MLN_STYLE_IMAGE_INFO_CONTENT.rawValue; raw.content = item
-        .nativeValue()
-    }
-    if let item = textFitWidth {
-      raw.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH.rawValue; raw
-        .text_fit_width = item.rawValue
-    }
-    if let item = textFitHeight {
-      raw.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT.rawValue; raw
-        .text_fit_height = item.rawValue
-    }
-    raw.pixel_ratio = pixelRatio
-    raw.sdf = sdf
-    return raw
-  }
 }
 
 /// Field mask values for `mln_style_image_info`.
@@ -778,11 +750,11 @@ public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_style_image_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
-  /// Horizontally stretchable intervals. May be null only when stretch_x_count
-  /// is 0. Copied value, owned by the caller.
+  /// Horizontally stretchable intervals. Borrowed for the call and copied
+  /// before return. May be null only when stretch_x_count is 0.
   public var stretchX: [ImageStretch]?
-  /// Vertically stretchable intervals. May be null only when stretch_y_count is
-  /// 0. Copied value, owned by the caller.
+  /// Vertically stretchable intervals. Borrowed for the call and copied before
+  /// return. May be null only when stretch_y_count is 0.
   public var stretchY: [ImageStretch]?
   /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
@@ -895,20 +867,18 @@ public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
 }
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerInfo: Equatable, Hashable, Sendable {
-  /// Layer ID. Copied text, owned by the caller.
+  /// Layer ID.
   public var id: String
-  /// The style-spec layer type string. Copied text, owned by the caller.
+  /// The style-spec layer type string.
   public var type: String
-  /// Source ID. Empty for a layer type that takes no source. Copied text, owned
-  /// by the caller.
+  /// Source ID. Empty for a layer type that takes no source.
   public var sourceId: String?
-  /// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
-  /// caller.
+  /// Source-layer ID. Empty when the layer sets none.
   public var sourceLayer: String?
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
   public var minZoom: Double
@@ -956,18 +926,6 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
     maxZoom = raw.max_zoom
     visibility = StyleLayerVisibility(rawValue: raw.visibility)
   }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_info {
-    var raw = mln_style_layer_info()
-    raw.id = arena.view(id)
-    raw.type = arena.view(type)
-    raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
-    raw.source_layer = sourceLayer.map { arena.view($0) } ?? mln_buffer_view()
-    raw.min_zoom = minZoom
-    raw.max_zoom = maxZoom
-    raw.visibility = visibility.rawValue
-    return raw
-  }
 }
 
 /// Layer visibility values used by the visibility setter and layer info.
@@ -1003,22 +961,20 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
   public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
 }
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
-  /// Source ID. Copied text, owned by the caller.
+  /// Source ID.
   public var id: String
   /// One of `mln_style_source_type`.
   public var type: StyleSourceType
   /// Whether the source is marked volatile.
   public var isVolatile: Bool
-  /// Attribution string, when the source sets one. It may be empty. Copied
-  /// text, owned by the caller.
+  /// Attribution string, when the source sets one. It may be empty.
   public var attribution: String?
-  /// URL that the source loads from, when it has one. Copied text, owned by the
-  /// caller.
+  /// URL that the source loads from, when it has one.
   public var url: String?
   /// Inline TileJSON metadata, when the source was defined with it.
   public var tilejson: StyleSourceTileInfo?
@@ -1088,43 +1044,6 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
       .rawValue != 0 ? StyleRasterDemEncoding(rawValue: raw.raster_encoding) :
       nil
   }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_style_source_info {
-    var raw = mln_style_source_info()
-    raw.fields = 0
-    raw.id = arena.view(id)
-    raw.type = type.rawValue
-    raw.is_volatile = isVolatile
-    if let item = attribution {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION.rawValue; raw
-        .attribution = arena.view(item)
-    }
-    if let item = url {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_URL.rawValue; raw.url = arena
-        .view(item)
-    }
-    if let item = tilejson {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue; raw
-        .tilejson = try item.nativeValue(arena: arena)
-    }
-    if let item = bounds {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue; raw.bounds = item
-        .nativeValue()
-    }
-    if let item = tileSize {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue; raw
-        .tile_size = item
-    }
-    if let item = vectorEncoding {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING.rawValue; raw
-        .vector_encoding = item.rawValue
-    }
-    if let item = rasterEncoding {
-      raw.fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING.rawValue; raw
-        .raster_encoding = item.rawValue
-    }
-    return raw
-  }
 }
 
 /// Fields available in `mln_style_source_info`.
@@ -1160,7 +1079,7 @@ public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
-  /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
+  /// Tile URL templates in TileJSON order.
   public var tileUrls: [String]
   /// Lowest zoom level the TileJSON provides tiles for.
   public var minZoom: Double
@@ -1195,18 +1114,6 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
     minZoom = raw.min_zoom
     maxZoom = raw.max_zoom
     scheme = StyleTileScheme(rawValue: raw.scheme)
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_style_source_tile_info
-  {
-    var raw = mln_style_source_tile_info()
-    raw.tile_urls = arena.array(tileUrls.map { arena.view($0) })
-    raw.tile_url_count = try NativeInputArena.count(tileUrls.count)
-    raw.min_zoom = minZoom
-    raw.max_zoom = maxZoom
-    raw.scheme = scheme.rawValue
-    return raw
   }
 }
 
@@ -1268,7 +1175,7 @@ public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 4)
 }
 
-/// Global style transition options. Copied result, owned by the caller.
+/// Global style transition options.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

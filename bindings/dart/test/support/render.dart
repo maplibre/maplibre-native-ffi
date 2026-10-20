@@ -27,7 +27,7 @@ const _extent = LogicalExtent(
 Future<MapHandle> openRenderMap(String styleJson) async {
   final runtime = await openRuntime();
   final map = await runtime.openMap(
-    const MapOptions(
+    MapOptions(
       initialExtent: LogicalExtent(
         width: renderSize,
         height: renderSize,

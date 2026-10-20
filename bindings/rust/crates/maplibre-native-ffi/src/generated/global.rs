@@ -170,6 +170,16 @@ pub fn gpu_sync_default() -> Result<GpuSync> {
     Ok(unsafe { from_native(value) }?)
 }
 
+/// Returns default HTTP header rule options.
+///
+/// See `mln_http_header_rule_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn http_header_rule_default() -> Result<HttpHeaderRule> {
+    let mut call = Call::global("mln_http_header_rule_default")?;
+    let value = call.run(|_| unsafe { sys::mln_http_header_rule_default() });
+    Ok(unsafe { from_native(value) }?)
+}
+
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
@@ -429,6 +439,16 @@ pub fn render_session_attach_options_default() -> Result<RenderSessionAttachOpti
 pub fn rendered_feature_query_options_default() -> Result<RenderedFeatureQueryOptions> {
     let mut call = Call::global("mln_rendered_feature_query_options_default")?;
     let value = call.run(|_| unsafe { sys::mln_rendered_feature_query_options_default() });
+    Ok(unsafe { from_native(value) }?)
+}
+
+/// Returns default resource route options.
+///
+/// See `mln_resource_route_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn resource_route_default() -> Result<ResourceRoute> {
+    let mut call = Call::global("mln_resource_route_default")?;
+    let value = call.run(|_| unsafe { sys::mln_resource_route_default() });
     Ok(unsafe { from_native(value) }?)
 }
 

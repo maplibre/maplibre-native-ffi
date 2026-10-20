@@ -142,7 +142,7 @@ typedef enum mln_style_raster_dem_encoding : uint32_t {
 typedef struct mln_image_stretch {
   float from;
   float to;
-} mln_image_stretch MLN_BINDING("fields=ordered");
+} mln_image_stretch;
 
 /**
  * Content-box insets in image pixels, measured from the image's top-left.
@@ -470,7 +470,7 @@ typedef struct mln_custom_geometry_source_options {
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_custom_geometry_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /** Options for custom MVT vector sources. */
@@ -520,7 +520,7 @@ typedef struct mln_custom_mvt_vector_source_options {
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_custom_mvt_vector_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /** Caller-owned premultiplied RGBA8 image pixels. */

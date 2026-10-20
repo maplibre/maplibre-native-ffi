@@ -313,8 +313,6 @@ def declaration(values, value):
                 f"    case .{identifier(camel(member.name))}(let item): raw.{identifier(union.tag)} = {member.presence.variant}{tag_suffix}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}"
                 for member in union.fields
             )
-            if union.empty_variant:
-                cases += f"\n    case .none: raw.{identifier(union.tag)} = {union.empty_variant[0]}{tag_suffix}"
             encode_lines.append(
                 f'    switch self.{local} {{\n{cases}\n    case .unknown: throw NativeStringError("unknown union variant cannot be submitted")\n    }}'
             )
@@ -325,9 +323,7 @@ def declaration(values, value):
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
-        default = (
-            values.initial(f) if f.initial is not None else zero(f.value, field_type)
-        )
+        default = zero(f.value, field_type)
         fields.append(
             f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
         )
@@ -365,7 +361,17 @@ def declaration(values, value):
         encode_lines = [
             '    throw NativeStringError("borrowed arena snapshots cannot be submitted")'
         ]
-    return f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
+    encoder = (
+        f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
+    {"" if controls else "var raw = " + initial}
+{chr(10).join(encode_lines)}
+    {"" if controls else "return raw"}
+  }}
+"""
+        if value.native in values.bound.inputs
+        else ""
+    )
+    rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
   public static var `default`: Self {{ {f"try! Self(raw: {initial})" if value.default else "Self()"} }}
 {chr(10).join(constructors)}
@@ -375,10 +381,6 @@ def declaration(values, value):
   init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil{extra_parameters}) throws {{
 {chr(10).join(decode_lines)}
   }}
-  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
-    {"" if controls else "var raw = " + initial}
-{chr(10).join(encode_lines)}
-    {"" if controls else "return raw"}
-  }}
-}}
+{encoder}}}
 """
+    return rendered

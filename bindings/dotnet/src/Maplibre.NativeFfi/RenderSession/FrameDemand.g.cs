@@ -19,7 +19,10 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token)
 {
     public FrameDemand()
-        : this(FrameDemandFlag.IfNeeded, default) { }
+        : this(default!, default!)
+    {
+        this = Default;
+    }
 
     public static FrameDemand Default
     {

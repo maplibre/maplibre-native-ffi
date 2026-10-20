@@ -117,9 +117,7 @@ typedef struct mln_frame_demand {
    * A bitwise OR of mln_frame_demand_flag values. Defaults to
    * MLN_FRAME_DEMAND_IF_NEEDED.
    */
-  uint32_t flags MLN_BINDING(
-    "enum=mln_frame_demand_flag;default=MLN_FRAME_DEMAND_IF_NEEDED"
-  );
+  uint32_t flags MLN_BINDING("enum=mln_frame_demand_flag");
   /** Host identity returned with the terminal frame result. */
   uint64_t token;
 } mln_frame_demand;
@@ -434,8 +432,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_acquired_frame_release(
-  mln_acquired_frame frame MLN_BINDING("consumes=success"),
-  const mln_gpu_sync* consumer_completion, mln_diagnostic* out_diagnostic
+  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -612,7 +610,6 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * - MLN_STATUS_BUSY when a driver call is already in flight.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=render_driver")
 MLN_API mln_status mln_render_session_service_driver_work(
   mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

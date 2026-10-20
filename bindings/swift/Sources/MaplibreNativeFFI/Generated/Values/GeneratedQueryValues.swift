@@ -3,18 +3,14 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One query hit borrowed for a completion callback.
 ///
 /// See `mln_queried_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct QueriedFeature: Equatable, Hashable, Sendable {
-  /// Copied text, owned by the caller.
   public var feature: Data
-  /// Copied text, owned by the caller.
   public var sourceId: String?
-  /// Copied text, owned by the caller.
   public var sourceLayerId: String?
-  /// Copied text, owned by the caller.
   public var state: Data?
   public static var `default`: Self {
     Self()
@@ -55,25 +51,6 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
         data: raw.state.data,
         size: raw.state.size
       ) : nil
-  }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_queried_feature {
-    var raw = mln_queried_feature()
-    raw.fields = 0
-    raw.feature = arena.view(feature)
-    if let item = sourceId {
-      raw.fields |= MLN_QUERIED_FEATURE_SOURCE_ID.rawValue; raw
-        .source_id = arena.view(item)
-    }
-    if let item = sourceLayerId {
-      raw.fields |= MLN_QUERIED_FEATURE_SOURCE_LAYER_ID.rawValue; raw
-        .source_layer_id = arena.view(item)
-    }
-    if let item = state {
-      raw.fields |= MLN_QUERIED_FEATURE_STATE.rawValue; raw.state = arena
-        .view(item)
-    }
-    return raw
   }
 }
 
@@ -117,10 +94,8 @@ public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
-  /// Copied value, owned by the caller.
   public var layerIds: [String]?
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  /// Copied text, owned by the caller.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_rendered_feature_query_options_default())
@@ -368,10 +343,8 @@ public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
-  /// Copied value, owned by the caller.
   public var sourceLayerIds: [String]?
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  /// Copied text, owned by the caller.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_source_feature_query_options_default())

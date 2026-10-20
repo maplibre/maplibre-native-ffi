@@ -8,7 +8,7 @@ from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel, pascal
-from tools.bindgen.semantic import BoundApi, discarding_variants, view_support
+from tools.bindgen.semantic import BoundApi
 
 SCALARS = {
     "int8_t": "i8",
@@ -232,7 +232,5 @@ def coverage(api: Api | BoundApi) -> dict:
     _, generated, unsupported = lower(bound)
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
-        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

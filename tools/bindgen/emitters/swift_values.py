@@ -201,27 +201,18 @@ class Values:
                     f"    {raw} = {self.native(field.value, 'self.' + local)}"
                 )
         initial = f"{value.default}()" if value.default else f"{value.native}()"
-        # A record without a default function of its own zero-fills, so its
-        # default sets each field's annotated initial value over that.
-        initials = (
-            []
-            if value.default
-            else [
-                f"    value.{identifier(camel(field.name))} = {self.initial(field)}"
-                for field in value.fields
-                if field.initial is not None
-                and field.public
-                and not (field.presence and field.presence.mask)
-            ]
+        default = f"  public static var `default`: Self {{ Self(raw: {initial}) }}"
+        encoder = (
+            f"""  func nativeValue() -> {value.native} {{
+    var raw = {initial}
+{chr(10).join(materialize)}
+    return raw
+  }}
+"""
+            if value.native in self.bound.inputs
+            else ""
         )
-        default = (
-            f"  public static var `default`: Self {{\n    var value = Self(raw: {initial})\n"
-            + "\n".join(initials)
-            + "\n    return value\n  }"
-            if initials
-            else f"  public static var `default`: Self {{ Self(raw: {initial}) }}"
-        )
-        return f"""{doc(self.bound, value.native)}public struct {public}: Equatable, Hashable, Sendable {{
+        rendered = f"""{doc(self.bound, value.native)}public struct {public}: Equatable, Hashable, Sendable {{
 {chr(10).join(fields)}
 {default}
   public init({", ".join(init)}) {{
@@ -230,20 +221,10 @@ class Values:
   init(raw: {value.native}) {{
 {chr(10).join(captures)}
   }}
-  func nativeValue() -> {value.native} {{
-    var raw = {initial}
-{chr(10).join(materialize)}
-    return raw
-  }}
-}}
+{encoder}}}
 """
 
-    def initial(self, field):
-        """A field's annotated initial value as a public Swift expression."""
-        initial = field.initial
-        if field.value.kind == "enum":
-            return f"{self.public(field.value)}.{identifier(camel(initial.member))}"
-        return initial.literal
+        return rendered
 
     def enumeration(self, value):
         public = self.public(value)

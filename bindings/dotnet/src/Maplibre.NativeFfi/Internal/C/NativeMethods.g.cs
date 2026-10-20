@@ -128,6 +128,9 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_gpu_sync mln_gpu_sync_default();
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_http_header_rule mln_http_header_rule_default();
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
         mln_http_header_transform_response* response,
         mln_buffer_view name,
@@ -1290,6 +1293,9 @@ internal static unsafe partial class NativeMethods
         bool* out_cancelled,
         mln_diagnostic* out_diagnostic
     );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_resource_route mln_resource_route_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_transform_request_complete(

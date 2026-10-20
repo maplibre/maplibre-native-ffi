@@ -27,7 +27,10 @@ public readonly partial record struct MetalSurfaceDescriptor(
 )
 {
     public MetalSurfaceDescriptor()
-        : this(new LogicalExtent(), default, default) { }
+        : this(default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static MetalSurfaceDescriptor Default
     {

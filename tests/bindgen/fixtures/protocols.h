@@ -94,7 +94,7 @@ typedef struct mln_completion_result {
   uint32_t value_size;
   uint64_t generation;
   mln_buffer_view diagnostic;
-  const void* value BIND("kind=erased;length=value_count;stride=value_size");
+  const void* value;
   size_t value_count;
 } mln_completion_result;
 typedef void (*mln_completion_callback)(
@@ -140,7 +140,7 @@ typedef unsigned long long mln_map;
 
 #ifdef MLN_PROTOCOL_VALUES
 // Copied values: a nested record behind a presence bit, nullable and required
-// counted arrays with narrow counts, and nullable UTF-8 with explicit length.
+// counted arrays.
 typedef struct mln_probe_point {
   double type;
   double gain;
@@ -153,20 +153,12 @@ typedef struct mln_probe_options {
   uint32_t fields BIND("enum=mln_probe_option_field");
   mln_probe_point point BIND("mask=fields;bit=MLN_PROBE_OPTION_POINT");
   const mln_probe_point* left BIND("length=left_count;nullable=true");
-  uint16_t left_count;
+  size_t left_count;
   const mln_probe_point* right BIND("length=right_count");
-  uint32_t right_count;
+  size_t right_count;
 } mln_probe_options;
 mln_status mln_probe_roundtrip(
   mln_probe_options input, mln_probe_options* out_options BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-typedef struct mln_probe_text_result {
-  mln_buffer_view text BIND("nullable=true");
-} mln_probe_text_result;
-mln_status mln_probe_nullable_text(
-  const char* text BIND("length=text_size;nullable=true"), uint16_t text_size,
-  mln_probe_text_result* out_result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 #endif
@@ -174,7 +166,7 @@ mln_status mln_probe_nullable_text(
 #ifdef MLN_PROTOCOL_DEFAULTS
 // A record whose native default holds nonzero values: a scalar of each kind,
 // an enumerator, a bitmask with one flag and with several, and a nested record
-// with defaults of its own. A binding builds it from language defaults.
+// with defaults of its own. Bindings copy the native default.
 typedef enum mln_probe_mode : uint32_t {
   MLN_PROBE_MODE_FIRST = 1,
   MLN_PROBE_MODE_SECOND = 2,
@@ -186,19 +178,19 @@ typedef enum BIND("kind=bitmask") mln_probe_flag : uint32_t {
   MLN_PROBE_FLAG_ALL = 3,
 } mln_probe_flag;
 typedef struct mln_probe_extent {
-  uint32_t width BIND("default=256");
-  double scale BIND("default=1.5");
-  uint32_t fit BIND("enum=mln_probe_mode;default=MLN_PROBE_MODE_FIRST");
+  uint32_t width;
+  double scale;
+  uint32_t fit BIND("enum=mln_probe_mode");
 } mln_probe_extent;
 typedef struct mln_probe_settings {
   uint32_t size;
   mln_probe_extent extent;
-  uint32_t mode BIND("enum=mln_probe_mode;default=MLN_PROBE_MODE_SECOND");
-  uint32_t flags BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_ALL");
-  uint32_t heading BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_SOUTH");
-  float ratio BIND("default=0.25");
-  int32_t offset BIND("default=-3");
-  bool enabled BIND("default=true");
+  uint32_t mode BIND("enum=mln_probe_mode");
+  uint32_t flags BIND("enum=mln_probe_flag");
+  uint32_t heading BIND("enum=mln_probe_flag");
+  float ratio;
+  int32_t offset;
+  bool enabled;
   int32_t count;
 } mln_probe_settings;
 mln_probe_settings mln_probe_settings_default(void);
@@ -221,7 +213,7 @@ typedef struct mln_probe_signal {
 } mln_probe_signal BIND("kind=callback_registration;release=release_user_data");
 typedef struct mln_probe_hooks {
   uint32_t size;
-  uint32_t limit BIND("default=4");
+  uint32_t limit;
   mln_probe_signal signal;
 } mln_probe_hooks;
 mln_probe_hooks mln_probe_hooks_default(void);
@@ -346,7 +338,7 @@ mln_status mln_pass_stamp(mln_pass pass, mln_diagnostic* out_diagnostic);
 typedef struct mln_point {
   double x;
   double y;
-} mln_point BIND("fields=ordered");
+} mln_point;
 typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
   MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN = 1u << 0u,
   MLN_FRAME_WINDOW_FIELD_SCALE = 1u << 1u,
@@ -383,26 +375,6 @@ typedef struct mln_event {
 BIND("execution=query;result=mln_event")
 mln_status mln_map_event(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
-);
-#endif
-
-#ifdef MLN_PROTOCOL_OWNED_OUTPUT
-// An owned output whose parent is an input other than the receiver.
-typedef unsigned long long mln_forest BIND(
-  "kind=handle;release=mln_forest_close;"
-  "dispose=mln_forest_close"
-);
-typedef unsigned long long mln_seed
-  BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close");
-typedef unsigned long long mln_tree BIND(
-  "kind=handle;release=mln_tree_close;dispose=mln_tree_close;parent=mln_forest"
-);
-void mln_forest_close(mln_forest forest);
-void mln_seed_close(mln_seed seed);
-void mln_tree_close(mln_tree tree);
-mln_status mln_seed_plant(
-  mln_seed seed, mln_forest forest, mln_tree* out_tree BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
 );
 #endif
 
@@ -620,9 +592,7 @@ typedef struct mln_notice_handler {
   void* context BIND("kind=context");
   mln_notice_release release;
   mln_delivery_queue queue BIND("kind=delivery_queue");
-} mln_notice_handler BIND(
-  "kind=callback_registration;release=release;release_reentry=forbid"
-);
+} mln_notice_handler BIND("kind=callback_registration;release=release");
 mln_status mln_notice_set_callback(
   const mln_notice_handler* handler, mln_diagnostic* out_diagnostic
 );

@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public readonly record struct WebgpuBorrowedTextureDescriptor
 {
     public WebgpuBorrowedTextureDescriptor()
-        : this(new LogicalExtent(), 256, 256, default, default!, default) { }
+    {
+        this = Default;
+    }
 
     public WebgpuBorrowedTextureDescriptor(
         LogicalExtent Extent,
@@ -56,8 +58,7 @@ public readonly record struct WebgpuBorrowedTextureDescriptor
     public WebgpuContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// The ring's textures, one per slot, in slot order. Required. Copied
-    /// value, owned by the caller.
+    /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
     public WebgpuBorrowedTexture[] Textures
     {

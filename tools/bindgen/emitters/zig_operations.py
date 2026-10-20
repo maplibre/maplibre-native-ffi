@@ -82,15 +82,7 @@ def parent_of(plan, owner):
     parent = owner.parent_parameter
     if parent is None:
         return ".none"
-    if parent == plan.receiver:
-        return ".receiver"
-    arguments = [
-        p.name
-        for p in plan.function.parameters
-        if p.name != (plan.receiver or plan.scoped_receiver)
-        and not (plan.completion and p.name == plan.completion.parameter)
-    ]
-    return f".{{ .argument = {arguments.index(parent)} }}"
+    return ".receiver"
 
 
 def copier(plan, values):

@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import parse, protocol_groups, real_api
+from support import parse, protocol_groups
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import (
@@ -25,15 +25,12 @@ EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, zig)
 # only on its isolate, so it serves a notification that carries arguments only
 # through a delivery queue, which these fixtures leave out.
 PROTOCOL_GAPS = {
-    ("values", "dart"): {"mln_probe_nullable_text"},
     ("retained_registration", "dart"): {"mln_map_observe_sample"},
     ("record_notification", "dart"): {"mln_map_request_reading"},
     ("owned_argument", "dart"): {"mln_map_set_query_handler"},
     ("declinable_registration", "dart"): {"mln_ticket_on_cancel"},
     ("delivery", "dart"): {"mln_ticket_on_cancel"},
-    ("values", "kotlin"): {"mln_probe_nullable_text"},
-    ("values", "rust"): {"mln_probe_nullable_text", "mln_probe_roundtrip"},
-    ("owned_output", "dotnet"): {"mln_seed_plant"},
+    ("values", "rust"): {"mln_probe_roundtrip"},
     ("declinable_registration", "python"): {"mln_ticket_on_cancel"},
     ("declinable_registration", "rust"): {"mln_ticket_on_cancel"},
     ("decision", "dart"): {"mln_host_set_provider", "mln_ticket_on_cancel"},
@@ -44,16 +41,6 @@ PROTOCOL_GAPS = {
 
 
 class GenerationTests(unittest.TestCase):
-    def test_only_commands_have_discarding_variants(self):
-        bound = compile_api(real_api())
-        commands = {p.name for p in bound.operations if p.execution == "command"}
-        self.assertTrue(commands)
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(bound)
-                self.assertEqual(set(coverage["discarding"]), commands)
-                self.assertLessEqual(commands, set(coverage["generated"]))
-
     def parse(self, source, *, owned_map=False):
         api = parse(
             source,
@@ -81,8 +68,7 @@ class GenerationTests(unittest.TestCase):
                     self.assertEqual(
                         set(coverage["generated"])
                         | set(coverage["unsupported"])
-                        | set(coverage.get("support", ()))
-                        | set(coverage.get("native_rules", ())),
+                        | set(coverage.get("support", ())),
                         {function.name for function in api.public_functions},
                     )
 
@@ -117,22 +103,6 @@ mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction
             dart_native.generate(compile_api(after)),
         )
 
-    def test_partial_field_metadata_rejects_whole_record_and_operation(self):
-        api = self.parse("""
-typedef struct mln_new_entry {
-  mln_buffer_view title;
-  const double *positions;
-  unsigned long count;
-} mln_new_entry;
-BIND("execution=query;result=mln_new_entry;shape=array")
-mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertEqual(coverage["generated"], [])
-                self.assertTrue(coverage["unsupported"]["mln_map_new_entries"])
-
     def test_every_declaration_is_generated_or_has_a_reason(self):
         api = self.parse("""
 BIND("execution=query;result=double")
@@ -152,76 +122,6 @@ void mln_global_hook(void (*callback)(void *), void *context);
                 self.assertIn("mln_map_scalar", generated)
                 self.assertIn("values", coverage["unsupported"]["mln_map_span"])
                 self.assertTrue(all(coverage["unsupported"].values()))
-
-    def test_union_results_require_active_variant_decoding(self):
-        api = self.parse("""
-typedef union mln_variant { double number; bool flag; } mln_variant;
-BIND("execution=query;result=mln_variant;shape=array")
-mln_status mln_map_variants(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertEqual(coverage["generated"], [])
-                self.assertIn("mln_map_variants", coverage["unsupported"])
-
-    def test_consumed_input_requires_a_resolved_owner(self):
-        for contract, receiver in (
-            (";consumes=success", "mln_map map"),
-            ("", 'mln_map map BIND("consumes=success")'),
-        ):
-            api = self.parse(f"""
-BIND("execution=command{contract}")
-mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-            for emitter in EMITTERS:
-                with self.subTest(emitter=emitter.__name__, contract=contract):
-                    coverage = emitter.coverage(api)
-                    self.assertEqual(coverage["generated"], [])
-                    self.assertIn("mln_map_consume", coverage["unsupported"])
-
-    def test_nullable_record_field_preserves_pointer_presence(self):
-        api = self.parse("""
-typedef struct mln_nullable_entry {
-  mln_buffer_view title BIND("nullable=true");
-} mln_nullable_entry;
-BIND("execution=query;result=mln_nullable_entry;shape=array")
-mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertEqual(
-                    coverage["generated"],
-                    ["mln_map_nullable_entries"],
-                    coverage["unsupported"],
-                )
-
-    def test_scalar_bitfield_requires_a_layout_rule(self):
-        api = self.parse("""
-typedef unsigned int uint32_t;
-typedef struct mln_bit_entry { uint32_t flags : 3; } mln_bit_entry;
-BIND("execution=query;result=mln_bit_entry;shape=array")
-mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertEqual(coverage["generated"], [])
-                self.assertTrue(coverage["unsupported"]["mln_map_bit_entries"])
-
-    def test_retained_input_requires_a_lifetime_adapter(self):
-        api = self.parse("""
-BIND("execution=command")
-mln_status mln_map_store_view(mln_map map,
-  mln_buffer_view view BIND("lifetime=owner"),
-  const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertEqual(coverage["generated"], [])
-                self.assertIn("mln_map_store_view", coverage["unsupported"])
 
 
 if __name__ == "__main__":

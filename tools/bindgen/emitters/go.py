@@ -5,7 +5,6 @@ import re
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import discarding_variants, view_support
 
 GO_KEYWORDS = {
     "break",
@@ -151,8 +150,6 @@ def coverage(api):
     _, _, _, generated, unsupported = lower(bound)
     return {
         "generated": sorted(generated),
-        "discarding": discarding_variants(bound, generated),
-        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }
 

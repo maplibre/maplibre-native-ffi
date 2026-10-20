@@ -46,7 +46,10 @@ public readonly partial record struct RenderSessionAttachOptions(
 )
 {
     public RenderSessionAttachOptions()
-        : this(RenderDriverKind.CallerGraphicsThread, 1, default, default!, default!, default!) { }
+        : this(default!, default!, default!, default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static RenderSessionAttachOptions Default
     {

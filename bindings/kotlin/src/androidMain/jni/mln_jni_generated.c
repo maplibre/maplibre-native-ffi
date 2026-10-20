@@ -259,6 +259,17 @@ static void mln_gpu_sync_default_jni(JNIEnv* env, jclass type, jlong returned) {
   mln_gpu_sync_default_critical(returned);
 }
 
+static void mln_http_header_rule_default_critical(jlong returned) {
+  *MLN_JNI_POINTER(mln_http_header_rule*, returned) =
+    mln_http_header_rule_default();
+}
+
+static void mln_http_header_rule_default_jni(
+  JNIEnv* env, jclass type, jlong returned
+) {
+  mln_http_header_rule_default_critical(returned);
+}
+
 static jint mln_http_header_transform_response_set_header_jni(
   JNIEnv* env, jclass type, jlong response, jlong name, jlong value,
   jlong out_diagnostic
@@ -2003,6 +2014,17 @@ static jint mln_resource_request_set_cancel_callback_jni(
   );
 }
 
+static void mln_resource_route_default_critical(jlong returned) {
+  *MLN_JNI_POINTER(mln_resource_route*, returned) =
+    mln_resource_route_default();
+}
+
+static void mln_resource_route_default_jni(
+  JNIEnv* env, jclass type, jlong returned
+) {
+  mln_resource_route_default_critical(returned);
+}
+
 static jint mln_resource_transform_request_complete_jni(
   JNIEnv* env, jclass type, jlong request, jlong url, jlong out_diagnostic
 ) {
@@ -2468,6 +2490,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_geojson_source_options_default", "(J)V",
    (void*)mln_geojson_source_options_default_jni},
   {"mln_gpu_sync_default", "(J)V", (void*)mln_gpu_sync_default_jni},
+  {"mln_http_header_rule_default", "(J)V",
+   (void*)mln_http_header_rule_default_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2749,6 +2773,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",
    (void*)mln_resource_request_set_cancel_callback_jni},
+  {"mln_resource_route_default", "(J)V", (void*)mln_resource_route_default_jni},
   {"mln_resource_transform_request_complete", "(JJJ)I",
    (void*)mln_resource_transform_request_complete_jni},
   {"mln_resource_transform_request_release", "(J)V",
@@ -2877,6 +2902,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_geojson_source_options_default", "(J)V",
    (void*)mln_geojson_source_options_default_critical},
   {"mln_gpu_sync_default", "(J)V", (void*)mln_gpu_sync_default_critical},
+  {"mln_http_header_rule_default", "(J)V",
+   (void*)mln_http_header_rule_default_critical},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -3158,6 +3185,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",
    (void*)mln_resource_request_set_cancel_callback_jni},
+  {"mln_resource_route_default", "(J)V",
+   (void*)mln_resource_route_default_critical},
   {"mln_resource_transform_request_complete", "(JJJ)I",
    (void*)mln_resource_transform_request_complete_jni},
   {"mln_resource_transform_request_release", "(J)V",

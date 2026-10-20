@@ -1702,6 +1702,7 @@ unsafe extern "C" {
     pub fn mln_geojson_source_data_release(data: mln_geojson_source_data);
     pub fn mln_geojson_source_options_default() -> mln_geojson_source_options;
     pub fn mln_gpu_sync_default() -> mln_gpu_sync;
+    pub fn mln_http_header_rule_default() -> mln_http_header_rule;
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -2553,6 +2554,7 @@ unsafe extern "C" {
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_resource_route_default() -> mln_resource_route;
     pub fn mln_resource_transform_request_complete(
         request: mln_resource_transform_request,
         url: mln_buffer_view,

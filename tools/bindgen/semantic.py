@@ -7,7 +7,6 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 from __future__ import annotations
 
 import functools
-from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
@@ -25,7 +24,7 @@ from .protocol import (
     is_completion,
     is_status,
 )
-from .schema import validate
+from .schema import record_reaches, validate
 
 
 @dataclass(frozen=True)
@@ -101,9 +100,6 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    # Whether the release runs where host code must not call back into the
-    # C API: "forbid", or "allow".
-    release_reentry: str = "allow"
     # Whether a callback's reentry owner is a handle that only names the
     # receiver of the call that registers it, which the host's callback
     # already holds.
@@ -115,10 +111,7 @@ class RegistrationDescriptorPlan:
 @dataclass(frozen=True)
 class CallbackResponsePlan:
     native: str
-    context: str
-    callbacks: tuple[str, ...]
     methods: tuple[str, ...]
-    lifetime: str = "callback"
 
 
 @dataclass(frozen=True)
@@ -160,9 +153,6 @@ class ValuePlan:
     # For kind="buffer": "view" for the mln_buffer_view struct, "pointer" for a
     # character or byte pointer with a separate length or NUL terminator.
     buffer_form: str | None = None
-    # For a record annotated `fields=ordered`: its field order is part of its
-    # meaning, as with coordinates, so a binding may construct it positionally.
-    ordered: bool = False
 
     @property
     def unwrapped(self) -> ValuePlan:
@@ -190,33 +180,13 @@ CONTROL_ROLES = frozenset(
 
 
 @dataclass(frozen=True)
-class FieldInitial:
-    """The nonzero initial value that a binding constructor gives a field.
-
-    `literal` is the annotation as written; `value` is the number it denotes.
-    For an enum field, `enumerator` names the constant and `member` is that
-    constant without its enum's shared prefix, in lower case.
-    """
-
-    literal: str
-    value: int | float | bool
-    enumerator: str | None = None
-    member: str | None = None
-
-
-@dataclass(frozen=True)
 class FieldPlan:
     name: str
     value: ValuePlan
     presence: Presence | None = None
-    default: str | None = None
     # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
     # a binding writes or derives rather than a member a host sets or reads.
     role: str = "value"
-    # The field's annotated `default=`: its value in the record's native
-    # default, which a binding that builds the record from language defaults
-    # uses in place of zero.
-    initial: FieldInitial | None = None
 
     @property
     def public(self) -> bool:
@@ -228,14 +198,12 @@ class ParameterPlan:
     name: str
     value: ValuePlan
     direction: str
-    consumes: str | None = None
 
 
 @dataclass(frozen=True)
 class CallbackReentryPlan:
     # The callback parameter that identifies the owner.
     owner_parameter: str
-    owner_type: str
     operations: tuple[str, ...]
 
 
@@ -315,7 +283,6 @@ class RegistrationPlan:
 class BorrowedViewPlan:
     owner_parameter: str
     owner: HandlePlan
-    invalidated_by: tuple[str, ...]
     # The one output that the view borrows, and the owner's scope operations.
     output: ParameterPlan
     begin: str
@@ -412,13 +379,14 @@ class BoundApi:
     diagnostics: tuple[str, ...] = ()
     unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
     runtime_operations: tuple[OperationPlan, ...] = ()
-    # The scope operations of borrowed views, which bindings call from the
-    # views they generate instead of exposing.
-    view_scopes: tuple[OperationPlan, ...] = ()
     # The records and unions that a binding copies from native: those that an
     # operation's output or result, a callback's argument, or a record default
     # reaches. A copy leaves a callback registration field unset.
     returned: frozenset[str] = frozenset()
+
+    @functools.cached_property
+    def inputs(self) -> set[str]:
+        return record_reaches(self.source)[1]
 
     @functools.cached_property
     def enum_numbers(self) -> dict[str, int]:
@@ -434,44 +402,7 @@ class BoundApi:
     @functools.cached_property
     def docs(self) -> dict[str, docs.Doc]:
         """The documentation of each documented public declaration, by C name."""
-        index = docs.index(self.source)
-        for native in self.returned:
-            value = self.values[native]
-            for member in value.fields:
-                copied = member.value
-                if copied.item_buffer and copied.element:
-                    symbol = f"{copied.element.native}.{copied.item_buffer.field}"
-                    index[symbol] = docs.copied(
-                        index.get(symbol),
-                        symbol,
-                        "bytes" if copied.item_buffer.encoding == "bytes" else "text",
-                    )
-                if not member.public or not (
-                    copied.kind == "buffer"
-                    or copied.kind in {"array", "reference"}
-                    and copied.ownership == "borrowed"
-                ):
-                    continue
-                noun = (
-                    "bytes"
-                    if copied.kind == "buffer" and copied.encoding == "bytes"
-                    else "text"
-                    if copied.kind == "buffer"
-                    else "value"
-                )
-                symbol = f"{native}.{member.name}"
-                index[symbol] = docs.copied(index.get(symbol), symbol, noun)
-        for operation in self.operations:
-            result = operation.result
-            if result and result.ownership == "borrowed":
-                value = result.element or result
-                if value.kind in {"record", "union"} and value.native in index:
-                    index[value.native] = docs.copied(
-                        index[value.native],
-                        value.native,
-                        "result",
-                    )
-        return index
+        return docs.index(self.source)
 
     def doc(self, native: str) -> docs.Doc | None:
         """The documentation of a declaration, or `record.field` member."""
@@ -531,64 +462,14 @@ def support_relation(plan: OperationPlan) -> dict[str, str] | None:
     return None
 
 
-def view_support(bound: BoundApi, generated: Iterable[str]) -> dict[str, dict]:
-    """The support relations of the view scopes that generated views call.
-
-    A binding reports these with its coverage, since it calls each scope only
-    from the borrowed views that it generates.
-    """
-    generated = set(generated)
-    used = {
-        name
-        for plan in bound.operations
-        if plan.view and plan.name in generated
-        for name in (plan.view.begin, plan.view.end)
-    }
-    return {
-        plan.name: support_relation(plan)
-        for plan in bound.view_scopes
-        if plan.name in used
-    }
-
-
 def output_member(name: str) -> str:
     """An output parameter's public member name: its name without `out_`."""
     return name.removeprefix("out_")
 
 
-def discarding_variants(bound: BoundApi, generated: Iterable[str]) -> list[str]:
-    """The commands that a binding also exposes through discarding views."""
-    generated = set(generated)
-    return [
-        plan.name
-        for plan in bound.operations
-        if plan.name in generated
-        and plan.receiver
-        and plan.completion
-        and plan.completion.discardable
-    ]
-
-
 def public_stem(native: str) -> str:
     """A declaration's name without the C API's `mln_` namespace."""
     return native.removeprefix("mln_")
-
-
-def field_initial(value: ValuePlan, literal: str) -> FieldInitial:
-    """Resolve a field's `default=` annotation, which the schema checked."""
-    if value.kind == "enum":
-        constants = dict(value.enum_values)
-        return FieldInitial(
-            literal,
-            constants[literal],
-            literal,
-            literal.removeprefix(enum_member_prefix(constants)).lower(),
-        )
-    if literal == "true":
-        return FieldInitial(literal, True)
-    if "." in literal:
-        return FieldInitial(literal, float(literal))
-    return FieldInitial(literal, int(literal))
 
 
 def enum_member_prefix(constants) -> str:
@@ -756,9 +637,6 @@ class Binder:
         }
         if metadata.get("kind") == "native_pointer":
             return ValuePlan(kind="native_pointer", **common)
-        if type_.volatile or type_.restrict:
-            # These qualifiers remain in the CType for raw ABI emission.
-            pass
         resolved = typedef.type if typedef else type_
         enum_name = metadata.get("enum", name)
         if enum_name in self.enums and resolved.kind != "pointer":
@@ -855,7 +733,7 @@ class Binder:
                 raise ModelError(
                     [f"{context}: recursive record requires a lifetime boundary"]
                 )
-            record_metadata = {**record.metadata, **metadata}
+            record_metadata = metadata
             if name in self.values:
                 return replace(
                     self.values[name],
@@ -876,12 +754,6 @@ class Binder:
                 fields = []
                 for item in record.fields:
                     field_context = f"{item.location}: {name}.{item.name}"
-                    if item.bit_width is not None:
-                        raise ModelError(
-                            [
-                                f"{field_context}: bitfield has no portable ABI conversion"
-                            ]
-                        )
                     presence = None
                     if any(key in item.metadata for key in ("mask", "tag", "variant")):
                         presence = Presence(
@@ -892,17 +764,12 @@ class Binder:
                         )
                     role = item.metadata.get("kind", "value")
                     member_value = self.value(item.type, item.metadata, field_context)
-                    control_default = role in {"size", "reserved"}
                     fields.append(
                         FieldPlan(
                             item.name,
                             member_value,
                             presence,
-                            item.metadata.get("default") if control_default else None,
                             role,
-                            None
-                            if control_default or "default" not in item.metadata
-                            else field_initial(member_value, item.metadata["default"]),
                         )
                     )
                 storage_roles = {}
@@ -930,7 +797,7 @@ class Binder:
                 value = ValuePlan(
                     kind="union" if record.kind == "union" else "record",
                     fields=tuple(fields),
-                    default=record_metadata.get("default"),
+                    default=record_metadata.get("default_function"),
                     tag=record_metadata.get("tag"),
                     empty_variant=next(
                         (
@@ -941,7 +808,6 @@ class Binder:
                         ),
                         None,
                     ),
-                    ordered=record_metadata.get("fields") == "ordered",
                     response=self.response(record.name)
                     if record_metadata.get("kind") == "callback_response"
                     else None,
@@ -954,7 +820,6 @@ class Binder:
                         ),
                         record_metadata["user_data"],
                         record_metadata["release"],
-                        record_metadata.get("release_reentry", "allow"),
                         any(
                             self.callbacks[member.value.native].borrowed_owner
                             for member in fields
@@ -1060,7 +925,6 @@ class Binder:
                 parameter.name,
                 value,
                 direction,
-                metadata.get("consumes"),
             )
 
             def validate_input_lifetime(item, parameter_name=parameter.name):
@@ -1107,33 +971,6 @@ class Binder:
                 validate_input_lifetime(value)
             (outputs if direction == "out" else inputs).append(plan)
 
-            def validate_owned_reentry(descriptor):
-                """A callback whose owner its host never receives may call
-                back only into the receiver that registered it."""
-                for member in descriptor.fields:
-                    callback = self.callbacks.get(member.value.native)
-                    policy = callback.reentry_policy if callback else None
-                    if policy is None or callback.borrowed_owner is None:
-                        continue
-                    owner = next(
-                        (
-                            type_name(p.type.pointee or p.type)
-                            for p in function.parameters
-                            if p.name == receiver
-                        ),
-                        None,
-                    )
-                    if owner != policy.owner_type:
-                        raise ModelError(
-                            [
-                                (
-                                    f"{context}: {member.value.native} calls back "
-                                    f"into {policy.owner_type}, which must be the "
-                                    "receiver"
-                                )
-                            ]
-                        )
-
             def collect_registrations(
                 descriptor, path=(), parameter_name=parameter.name
             ):
@@ -1154,7 +991,6 @@ class Binder:
                                 registration.queue,
                             )
                         )
-                        validate_owned_reentry(descriptor)
                     else:
                         for member in descriptor.fields:
                             collect_registrations(member.value, (*path, member.name))
@@ -1209,7 +1045,7 @@ class Binder:
                 support = DeliverySupport(delivery_handle)
                 break
         for name, typedef in self.typedefs.items():
-            if typedef.metadata.get("default") == function.name:
+            if typedef.metadata.get("default_function") == function.name:
                 support = DefaultSupport(name)
                 break
         completion_parameter = next(
@@ -1242,6 +1078,10 @@ class Binder:
                             f"{context}: owned output {output.name} requires its parent handle input"
                         ]
                     )
+                if parent is not None and parent != receiver:
+                    raise ModelError(
+                        [f"{context}: owned output requires its parent receiver"]
+                    )
                 owners.append(OwnedOutputPlan(output.name, value.handle, parent))
         completion = None
         if completion_parameter:
@@ -1268,6 +1108,10 @@ class Binder:
                             f"{context}: owned completion requires its parent handle input"
                         ]
                     )
+                if parent is not None and parent != receiver:
+                    raise ModelError(
+                        [f"{context}: owned completion requires its parent receiver"]
+                    )
                 result_owner = OwnedOutputPlan("result", result_value.handle, parent)
             completion = CompletionPlan(
                 completion_parameter,
@@ -1276,7 +1120,7 @@ class Binder:
                 result_owner=result_owner,
                 discardable=metadata["execution"] == "command",
             )
-        consumes = metadata.get("consumes")
+        consumes = None
         for handle in self.handles.values():
             if function.name in {handle.release, handle.dispose}:
                 consumes = handle.release_consumes
@@ -1286,22 +1130,6 @@ class Binder:
             if function.name in {handle.view_begin, handle.view_end}:
                 support = ViewSupport(handle)
                 break
-        for parameter in inputs:
-            if parameter.consumes:
-                consumed = (
-                    parameter.value.element
-                    if parameter.value.kind == "reference"
-                    else parameter.value
-                )
-                if consumed.kind != "handle" or parameter.name != receiver:
-                    raise ModelError(
-                        [
-                            f"{context}: consumed input requires its managed handle receiver"
-                        ]
-                    )
-                if consumes and consumes != parameter.consumes:
-                    raise ModelError([f"{context}: conflicting consumption rules"])
-                consumes = parameter.consumes
         if consumes and receiver is None:
             raise ModelError(
                 [f"{context}: consumption requires a managed handle receiver"]
@@ -1324,15 +1152,6 @@ class Binder:
                 p for p in function.parameters if p.name == metadata["view_owner"]
             )
             handle = self.handles[type_name(parameter.type)]
-            invalidated_by = []
-            current = handle
-            while current:
-                invalidated_by.extend(
-                    operation
-                    for operation in (current.release, current.dispose, current.abandon)
-                    if operation
-                )
-                current = self.handles.get(current.parent) if current.parent else None
             if (
                 handle.view_begin is None
                 or handle.view_end is None
@@ -1346,7 +1165,6 @@ class Binder:
             view = BorrowedViewPlan(
                 parameter.name,
                 handle,
-                tuple(dict.fromkeys(invalidated_by)),
                 outputs[0],
                 handle.view_begin,
                 handle.view_end,
@@ -1474,26 +1292,6 @@ class Binder:
         return public_stem(function.name)
 
     def response(self, name: str) -> CallbackResponsePlan:
-        record = self.records[name]
-        contexts = [
-            f.name for f in record.fields if f.metadata.get("kind") == "context"
-        ]
-        if len(contexts) != 1:
-            raise ModelError(
-                [f"{record.location}: callback response requires one context field"]
-            )
-        callbacks = tuple(
-            t.name
-            for t in self.typedefs.values()
-            if t.type.pointee
-            and t.type.pointee.kind == "function"
-            and any(
-                p.type.pointee
-                and type_name(p.type.pointee) == name
-                and p.metadata.get("direction") == "out"
-                for p in t.parameters
-            )
-        )
         methods = tuple(
             f.name
             for f in self.api.functions
@@ -1501,11 +1299,7 @@ class Binder:
             and f.parameters[0].type.pointee
             and type_name(f.parameters[0].type.pointee) == name
         )
-        if not callbacks or not methods:
-            raise ModelError(
-                [f"{record.location}: callback response requires callbacks and methods"]
-            )
-        return CallbackResponsePlan(name, contexts[0], callbacks, methods)
+        return CallbackResponsePlan(name, methods)
 
     def callback(self, name: str) -> CallbackPlan:
         typedef = self.typedefs[name]
@@ -1532,7 +1326,6 @@ class Binder:
                     context + " parameter " + parameter.name,
                 ),
                 parameter.metadata.get("direction", "in"),
-                parameter.metadata.get("consumes"),
             )
             for parameter in typedef.parameters
         )
@@ -1586,7 +1379,6 @@ class Binder:
             )
         return CallbackReentryPlan(
             parameter.name,
-            type_name(parameter.type.pointee or parameter.type),
             tuple(metadata["reentry_calls"].split(",")),
         )
 
@@ -1649,12 +1441,6 @@ class Binder:
                 for operation in operations
                 if operation.name in self.api.runtime_exports
                 or isinstance(operation.support, DeliverySupport)
-            ),
-            tuple(
-                operation
-                for operation in operations
-                if operation.name not in self.api.runtime_exports
-                and isinstance(operation.support, ViewSupport)
             ),
             frozenset(self.returned),
         )

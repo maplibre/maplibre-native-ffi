@@ -46,21 +46,6 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
                 with self.subTest(name=name, emitter=emitter.__name__):
                     self.assertIn("mln_map_run", emitter.coverage(owned)["generated"])
 
-    def test_public_method_name_collisions_are_rejected(self):
-        header = """
-BIND("execution=query;result=double")
-mln_status mln_map_read_scale(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=query;result=double")
-mln_status mln_map_readScale(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        api = self.parse(header)
-        self.assertEqual(dotnet.coverage(api)["generated"], [])
-        owned = self.parse(header, map_handle=True)
-        for emitter in (dart, kotlin):
-            self.assertEqual(
-                set(emitter.coverage(owned)["generated"]) - {"mln_map_close"}, set()
-            )
-
     def test_native_declarations_keep_inline_array_fields_inline(self):
         # A pointer in place of an inline array would change the struct size,
         # so an array field declares its elements inline, through a typedef too.
@@ -120,54 +105,6 @@ mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diag
             with self.subTest(emitter=emitter.__name__):
                 self.assertIn("mln_map_class", emitter.coverage(owned)["generated"])
 
-    def test_nullable_input_is_rejected_by_dotnet_and_generates_elsewhere(self):
-        header = """
-BIND("execution=command")
-mln_status mln_map_set_label(mln_map map,
-  mln_buffer_view text BIND("nullable=true"),
-  const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        api = self.parse(header)
-        for emitter in (dotnet,):
-            self.assertEqual(emitter.coverage(api)["generated"], [])
-
-        owned = self.parse(header, map_handle=True)
-        for emitter in (dart, kotlin):
-            with self.subTest(emitter=emitter.__name__):
-                self.assertIn("mln_map_set_label", emitter.coverage(owned)["generated"])
-
-    def test_optional_buffer_array_is_rejected_by_dotnet_and_generates_elsewhere(self):
-        for absence in ("nullable=true", "optional=empty"):
-            api = self.parse(f"""
-BIND("execution=query;result=mln_buffer_view;shape=array;{absence}")
-mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-            for emitter in (dotnet,):
-                with self.subTest(absence=absence, emitter=emitter.__name__):
-                    self.assertEqual(emitter.coverage(api)["generated"], [])
-
-        header = """
-BIND("execution=query;result=mln_buffer_view;shape=array;nullable=true")
-mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        owned = self.parse(header, map_handle=True)
-        for emitter in (dart, kotlin):
-            with self.subTest(emitter=emitter.__name__):
-                self.assertIn("mln_map_labels", emitter.coverage(owned)["generated"])
-
-    def test_binary_optional_result_is_rejected_by_dotnet_and_generates_elsewhere(self):
-        header = """
-BIND("execution=query;result=mln_buffer_view;encoding=bytes;optional=empty")
-mln_status mln_map_bytes(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        api = self.parse(header)
-        for emitter in (dotnet,):
-            self.assertEqual(emitter.coverage(api)["generated"], [])
-        owned = self.parse(header, map_handle=True)
-        for emitter in (dart, kotlin):
-            with self.subTest(emitter=emitter.__name__):
-                self.assertIn("mln_map_bytes", emitter.coverage(owned)["generated"])
-
     def test_dotnet_new_record_generates_in_its_header_namespace(self):
         api = self.parse("""
 typedef struct mln_metric { double event; } mln_metric;
@@ -221,6 +158,8 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
         api = self.parse(
             """
 typedef struct mln_metric { double event; } mln_metric;
+mln_status mln_map_set_metric(mln_map map, mln_metric metric, mln_diagnostic *out_diagnostic);
+mln_status mln_map_set_snapshot(mln_map map, const mln_snapshot *snapshot, mln_diagnostic *out_diagnostic);
 BIND("execution=query;result=mln_metric")
 mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,

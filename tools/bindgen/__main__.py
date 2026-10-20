@@ -10,12 +10,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import copy_cases, default_cases, native_capture
+from . import native_capture
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
 from .schema import validate
-from .semantic import support_relation
 
 ROOT = Path(__file__).resolve().parents[2]
 COVERAGE = "bindings/generated-coverage.json"
@@ -40,8 +39,6 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         raise ModelError(list(bound.diagnostics))
     outputs = native_capture.generate(bound)
     outputs.update(native_results.generate(bound))
-    outputs.update(copy_cases.generate(bound))
-    outputs.update(default_cases.generate(bound))
     for directory, emitter in (
         ("bindings/go", go),
         ("bindings/dotnet/src/Maplibre.NativeFfi", dotnet),
@@ -94,27 +91,14 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             for path in sorted(generated_binding_paths)
         )
     )
-    report = {
-        "schema_version": api.schema_version,
-        "function_count": len(api.functions),
-        "public_function_count": len(api.public_functions),
-        "runtime_exports": list(api.runtime_exports),
-        "semantic": {
-            "resolved_operations": len(bound.operations),
-            "resolved_callbacks": len(bound.callbacks),
-            "support_relations": {
-                plan.name: support_relation(plan)
-                for plan in (
-                    *bound.operations,
-                    *bound.view_scopes,
-                    *bound.runtime_operations,
-                )
-                if plan.support
-            },
-        },
-        "files": sorted(outputs),
-        "languages": reports,
+    report = {"files": sorted(outputs)}
+    unsupported = {
+        language: coverage["unsupported"]
+        for language, coverage in reports.items()
+        if coverage["unsupported"]
     }
+    if unsupported:
+        report["unsupported"] = unsupported
     outputs[COVERAGE] = dprint_format(
         json.dumps(report, indent=2, sort_keys=True) + "\n", "json"
     )
@@ -198,65 +182,12 @@ def dart_language_version() -> str:
     return f"{match[1]}.{match[2]}"
 
 
-CONFLICT_MARKERS = ("<<<<<<<", "|||||||", "=======", ">>>>>>>")
-
-
-def recorded_files(text: str) -> list[str] | None:
-    """Return the `files` entries of a coverage report, or None without one.
-
-    A report that a merge left with conflict markers is not JSON, so this
-    reads the one entry per line that the report holds instead, and keeps the
-    entries from every side of each conflict.
-    """
-    try:
-        recorded = json.loads(text)
-    except ValueError:
-        pass
-    else:
-        files = recorded.get("files") if isinstance(recorded, dict) else None
-        if isinstance(files, list) and all(isinstance(path, str) for path in files):
-            return files
-        return None
-    lines = iter(text.splitlines())
-    if not any(line.strip() == '"files": [' for line in lines):
-        return None
-    files = []
-    for line in lines:
-        entry = line.strip()
-        if entry in ("]", "],"):
-            return files
-        if entry.startswith(CONFLICT_MARKERS):
-            continue
-        try:
-            path = json.loads(entry.removesuffix(","))
-        except ValueError:
-            return None
-        if not isinstance(path, str):
-            return None
-        files.append(path)
-    return None
-
-
 def previous_outputs(root: Path) -> set[str]:
     """Read the outputs that the last run recorded in its coverage report."""
     manifest = root / COVERAGE
     if not manifest.is_file():
         return set()
-    files = recorded_files(manifest.read_text())
-    if files is None:
-        message = "cannot read the previous output list; resolve or restore the file"
-        raise ModelError([f"{COVERAGE}: {message}, then regenerate"])
-    unsafe = [
-        path for path in files if Path(path).is_absolute() or ".." in Path(path).parts
-    ]
-    if unsafe:
-        raise ModelError(
-            [
-                f"{COVERAGE}: output path outside the repository: {path}"
-                for path in unsafe
-            ]
-        )
-    return set(files)
+    return set(json.loads(manifest.read_text())["files"])
 
 
 def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -> int:
@@ -289,14 +220,9 @@ def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -
             target = root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(outputs[path])
-    incomplete = False
-    for language, coverage in sorted(report["languages"].items()):
-        missing = len(coverage["unsupported"])
-        incomplete |= missing > 0
-        print(
-            f"{language}: {len(coverage['generated'])}/{len(api.public_functions)} generated; "
-            f"{missing} declarations require implementation"
-        )
+    incomplete = bool(report.get("unsupported"))
+    for language, missing in sorted(report.get("unsupported", {}).items()):
+        print(f"{language}: {len(missing)} declarations require implementation")
     return int(
         (check and bool(stale or different)) or (require_complete and incomplete)
     )
@@ -304,7 +230,7 @@ def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory", "validate", "generate"))
+    parser.add_argument("command", choices=("generate",))
     parser.add_argument("--include", type=Path, default=ROOT / "include")
     parser.add_argument(
         "--native-include",
@@ -313,7 +239,6 @@ def main() -> int:
     )
     parser.add_argument("--clang", default="clang")
     parser.add_argument("--clang-arg", action="append", default=[])
-    parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
@@ -324,23 +249,15 @@ def main() -> int:
             clang=args.clang,
             clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
         )
-        if args.command != "inventory":
-            validate(api)
-            bound = compile_api(api)
-            if bound.diagnostics:
-                raise ModelError(list(bound.diagnostics))
+        validate(api)
+        bound = compile_api(api)
+        if bound.diagnostics:
+            raise ModelError(list(bound.diagnostics))
         return api
 
     try:
         api = load()
-        if args.command == "generate":
-            return generate(api, args.check, args.require_complete)
-        if args.output:
-            args.output.write_text(api.to_json())
-        elif args.command == "inventory":
-            sys.stdout.write(api.to_json())
-        else:
-            print(f"validated {len(api.functions)} functions")
+        return generate(api, args.check, args.require_complete)
     except (ModelError, OSError, subprocess.CalledProcessError) as error:
         print(error, file=sys.stderr)
         return 1

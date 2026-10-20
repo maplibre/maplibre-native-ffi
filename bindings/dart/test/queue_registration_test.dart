@@ -58,7 +58,7 @@ void main() {
       await expectCommitted(
         map.updateCamera(
           CameraUpdate(
-            camera: const CameraOptions(zoom: 4),
+            camera: CameraOptions(zoom: 4),
             mode: CameraUpdateMode.ease,
             animation: AnimationOptions(
               durationMs: 60000,

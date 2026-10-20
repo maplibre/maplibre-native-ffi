@@ -1,14 +1,10 @@
-// The copies that queue deliveries make of completion values. The generated
-// table synthesizes two values of each completion value type, with every
-// pointer set and every array of two elements, and each copy must hold equal
-// content in storage of its own.
+// Queue deliveries own the nested storage of completion values.
 
 #include <cstddef>
 #include <cstdint>
 #include <new>
 
 #include "delivery/delivery_queue.hpp"
-#include "internal/delivery_copy_cases_generated.inc"
 #include "maplibre_native_c.h"
 #include "support/env.h"
 #include "support/harness.h"
@@ -41,23 +37,53 @@ void copy_values(
   out.value = capture.write(write, values, count);
 }
 
-void every_value_type_copies_into_storage_of_its_own() {
-  for (const auto& entry : mln_delivery_copy_cases) {
-    auto count = std::size_t{};
-    const auto* source = entry.value(&count);
-    auto copy = Copy{};
-    copy_values(*entry.capture, source, count, copy);
-    TEST_ASSERT_TRUE_MESSAGE(copy.value != source, entry.type);
-    TEST_ASSERT_TRUE_MESSAGE(
-      entry.matches(copy.value, source, count), entry.type
-    );
-    // The synthesized handles were never issued, so nothing disposes them.
-  }
-}
-
 template <class T>
 void copy_one(const T& value, Copy& out) {
   copy_values(mln::delivery::completion_capture<T>, &value, 1, out);
+}
+
+void a_copy_owns_arrays_and_their_nested_buffers() {
+  char text[] = "tile";
+  const auto url = mln_buffer_view{text, sizeof(text) - 1};
+  auto source = mln_style_source_info{};
+  source.id = url;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
+  source.tilejson.tile_urls = &url;
+  source.tilejson.tile_url_count = 1;
+  const mln_style_source_info sources[] = {source, source};
+  auto copy = Copy{};
+  copy_values(
+    mln::delivery::completion_capture<mln_style_source_info>, sources, 2, copy
+  );
+  const auto* copied = static_cast<const mln_style_source_info*>(copy.value);
+  text[0] = 'X';
+  for (std::size_t index = 0; index < 2; ++index) {
+    TEST_ASSERT_EQUAL_MEMORY("tile", copied[index].id.data, 4);
+    TEST_ASSERT_EQUAL_size_t(1, copied[index].tilejson.tile_url_count);
+    TEST_ASSERT_TRUE(copied[index].tilejson.tile_urls != &url);
+    TEST_ASSERT_EQUAL_MEMORY(
+      "tile", copied[index].tilejson.tile_urls[0].data, 4
+    );
+  }
+}
+
+void a_copy_preserves_the_selected_union_variant() {
+  char geometry[] = "{}";
+  auto region = mln_offline_region_info{};
+  region.definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
+  region.definition.data.geometry.geometry = {geometry, 2};
+  region.definition.data.geometry.pixel_ratio = 2.0F;
+  auto copy = Copy{};
+  copy_one(region, copy);
+  geometry[0] = 'X';
+  const auto* copied = static_cast<const mln_offline_region_info*>(copy.value);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_OFFLINE_REGION_DEFINITION_GEOMETRY, copied->definition.type
+  );
+  TEST_ASSERT_EQUAL_FLOAT(2.0F, copied->definition.data.geometry.pixel_ratio);
+  TEST_ASSERT_EQUAL_MEMORY(
+    "{}", copied->definition.data.geometry.geometry.data, 2
+  );
 }
 
 // A field its presence bit marks absent reaches the host cleared, whatever
@@ -126,6 +152,7 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(every_value_type_copies_into_storage_of_its_own);
+  RUN_TEST(a_copy_owns_arrays_and_their_nested_buffers);
+  RUN_TEST(a_copy_preserves_the_selected_union_variant);
   RUN_TEST(a_copy_clears_the_fields_its_presence_bits_mark_absent);
 }

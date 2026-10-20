@@ -402,9 +402,7 @@ public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let fov: CameraOptionField = .init(rawValue: 256)
 }
 
-/// Camera fields used by snapshots and camera updates. Copied result, owned by
-/// the caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Camera fields used by snapshots and camera updates.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -501,7 +499,7 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Copied result, owned by the caller.
+/// Camera result borrowed for an ordered camera-query completion.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -523,13 +521,6 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
   init(raw: mln_camera_query_result) {
     generation = raw.generation
     camera = CameraOptions(raw: raw.camera)
-  }
-
-  func nativeValue() -> mln_camera_query_result {
-    var raw = mln_camera_query_result()
-    raw.generation = generation
-    raw.camera = camera.nativeValue()
-    return raw
   }
 }
 
@@ -560,14 +551,6 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   init(raw: mln_camera_transition_end) {
     outcome = CameraTransitionOutcome(rawValue: raw.outcome)
     generation = raw.generation
-  }
-
-  func nativeValue() -> mln_camera_transition_end {
-    var raw = mln_camera_transition_end()
-    raw.size = UInt32(MemoryLayout<mln_camera_transition_end>.size)
-    raw.outcome = outcome.rawValue
-    raw.generation = generation
-    return raw
   }
 }
 
@@ -944,8 +927,7 @@ public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
   public static let cancel: GesturePhase = .init(rawValue: 4)
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller.
+/// Geographic coordinate in degrees used by map and projection APIs.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -979,8 +961,7 @@ public struct LatLng: Equatable, Hashable, Sendable {
   }
 }
 
-/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
-/// result, owned by the caller.
+/// Geographic bounds in degrees.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1024,11 +1005,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
-    var value = Self(raw: mln_logical_extent())
-    value.width = 256
-    value.height = 256
-    value.scaleFactor = 1.0
-    return value
+    Self(raw: mln_logical_extent())
   }
 
   public init(
@@ -1224,26 +1201,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     tile = MapTileOptions(raw: raw.tile)
     bounds = BoundOptions(raw: raw.bounds)
     freeCamera = FreeCameraOptions(raw: raw.free_camera)
-  }
-
-  func nativeValue() -> mln_map_snapshot {
-    var raw = mln_map_snapshot()
-    raw.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
-    raw.debug_options = debugOptions.rawValue
-    raw.generation = generation
-    raw.camera = camera.nativeValue()
-    raw.logical_extent = logicalExtent.nativeValue()
-    raw.projection_mode = projectionMode.nativeValue()
-    raw.viewport = viewport.nativeValue()
-    raw.fully_loaded = fullyLoaded
-    raw.rendering_stats_view_enabled = renderingStatsViewEnabled
-    raw.gesture_in_progress = gestureInProgress
-    raw.event_mask = eventMask.rawValue
-    raw.latest_render_update_generation = latestRenderUpdateGeneration
-    raw.tile = tile.nativeValue()
-    raw.bounds = bounds.nativeValue()
-    raw.free_camera = freeCamera.nativeValue()
-    return raw
   }
 }
 
@@ -1451,10 +1408,9 @@ public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_offline_geometry_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
-  /// Style URL. Copied during region creation. Copied text, owned by the
-  /// caller.
+  /// Style URL. Copied during region creation.
   public var styleUrl: String
-  /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
+  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
   public var geometry: Data
   public var minZoom: Double
   /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
@@ -1600,17 +1556,14 @@ public enum OfflineRegionDefinitionData: Equatable, Hashable, Sendable {
   }
 }
 
-/// Region data delivered by an offline completion. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Region data delivered by an offline completion.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
   public var id: Int64
   public var definition: OfflineRegionDefinition
-  /// Metadata bytes. Copied bytes, owned by the caller.
+  /// Metadata bytes.
   public var metadata: Data
   public static var `default`: Self {
     Self()
@@ -1637,16 +1590,6 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
       size: Int(raw.metadata_size)
     )
   }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_offline_region_info {
-    var raw = mln_offline_region_info()
-    raw.id = id
-    raw.definition = try definition.nativeValue(arena: arena)
-    raw.metadata = arena.view(metadata).data?
-      .assumingMemoryBound(to: UInt8.self)
-    raw.metadata_size = try NativeInputArena.count(metadata.count)
-    return raw
-  }
 }
 
 /// Tile-pyramid offline region definition.
@@ -1656,8 +1599,7 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
 public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   Sendable
 {
-  /// Style URL. Copied during region creation. Copied text, owned by the
-  /// caller.
+  /// Style URL. Copied during region creation.
   public var styleUrl: String
   public var bounds: LatLngBounds
   public var minZoom: Double

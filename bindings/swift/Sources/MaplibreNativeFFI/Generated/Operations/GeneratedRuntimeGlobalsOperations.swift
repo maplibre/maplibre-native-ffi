@@ -3,28 +3,17 @@
 internal import MaplibreNativeC
 import Foundation
 
-public extension HttpHeaderTransformResponse {
-  /// Sets one outgoing HTTP request header for the current transform
-  /// invocation.
+public extension Maplibre {
+  /// Returns default HTTP header rule options.
   ///
-  /// See `mln_http_header_transform_response_set_header` in the
+  /// See `mln_http_header_rule_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setHeader(name bindingArg0: String, value bindingArg1: String) throws {
-    try nativeInvoke(
-      owner: self,
-      "mln_http_header_transform_response_set_header"
-    ) { _, arena, diagnostic in
-      try mln_http_header_transform_response_set_header(
-        nativePointer,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        diagnostic
-      )
+  static func httpHeaderRuleDefault() throws -> HttpHeaderRule {
+    try nativeDirect("mln_http_header_rule_default") { _ in
+      try HttpHeaderRule(raw: mln_http_header_rule_default())
     }
   }
-}
 
-public extension Maplibre {
   /// Reads MapLibre Native's process-global network status.
   ///
   /// See `mln_network_get_status` in the
@@ -52,6 +41,16 @@ public extension Maplibre {
     }
   }
 
+  /// Returns default resource route options.
+  ///
+  /// See `mln_resource_route_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  static func resourceRouteDefault() throws -> ResourceRoute {
+    try nativeDirect("mln_resource_route_default") { _ in
+      try ResourceRoute(raw: mln_resource_route_default())
+    }
+  }
+
   /// Creates a runtime.
   ///
   /// See `mln_runtime_create` in the
@@ -76,6 +75,27 @@ public extension Maplibre {
   static func runtimeOptionsDefault() throws -> RuntimeOptions {
     try nativeDirect("mln_runtime_options_default") { _ in
       try RuntimeOptions(raw: mln_runtime_options_default())
+    }
+  }
+}
+
+public extension HttpHeaderTransformResponse {
+  /// Sets one outgoing HTTP request header for the current transform
+  /// invocation.
+  ///
+  /// See `mln_http_header_transform_response_set_header` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func setHeader(name bindingArg0: String, value bindingArg1: String) throws {
+    try nativeInvoke(
+      owner: self,
+      "mln_http_header_transform_response_set_header"
+    ) { _, arena, diagnostic in
+      try mln_http_header_transform_response_set_header(
+        nativePointer,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        diagnostic
+      )
     }
   }
 }

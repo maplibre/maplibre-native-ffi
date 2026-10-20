@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Copied result, owned by the caller.
+/// Texture readback borrowed for a completion callback.
 /// </summary>
 /// <remarks>
 /// See <c>mln_texture_readback_result</c> in the <see
@@ -18,7 +18,7 @@ public readonly record struct TextureReadbackResult
     }
 
     /// <summary>
-    /// Copied bytes, owned by the caller.
+    /// Borrowed pixel bytes, valid only during the callback.
     /// </summary>
     public byte[] Data
     {

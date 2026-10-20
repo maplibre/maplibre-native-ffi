@@ -40,18 +40,6 @@ class PlanNameTests(unittest.TestCase):
         window = self.bind().values["mln_frame_window"]
         self.assertEqual([flag.member for flag in window.mask_flags], ["locked"])
 
-    def test_ordered_fields_are_declared_on_a_record_of_plain_values(self):
-        bound = self.bind()
-        self.assertTrue(bound.values["mln_point"].ordered)
-        self.assertFalse(bound.values["mln_frame_window"].ordered)
-        with self.assertRaisesRegex(
-            ModelError, "fields=ordered requires a struct of plain values"
-        ):
-            self.bind(
-                'typedef struct mln_span { const char *text; } mln_span BIND("fields=ordered");\n'
-                "mln_status mln_pass_span(mln_pass pass, mln_span span, mln_diagnostic *out_diagnostic);\n"
-            )
-
     def test_only_a_leading_handle_is_the_receiver(self):
         operation = self.bind(
             "mln_status mln_pass_after(int count, mln_pass pass, mln_diagnostic *out_diagnostic);\n"

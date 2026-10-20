@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public readonly record struct VulkanBorrowedTextureDescriptor
 {
     public VulkanBorrowedTextureDescriptor()
-        : this(new LogicalExtent(), 256, 256, default, default!, default, default, 5) { }
+    {
+        this = Default;
+    }
 
     public VulkanBorrowedTextureDescriptor(
         LogicalExtent Extent,
@@ -61,8 +63,7 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     public VulkanContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// The ring's images, one per slot, in slot order. Required. Copied value,
-    /// owned by the caller.
+    /// The ring's images, one per slot, in slot order. Required.
     /// </summary>
     public VulkanBorrowedTexture[] Textures
     {

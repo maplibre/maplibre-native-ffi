@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller.
+/// Geographic coordinate in degrees used by map and projection APIs.
 /// </summary>
 /// <remarks>
 /// See <c>mln_lat_lng</c> in the <see

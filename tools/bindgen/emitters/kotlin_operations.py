@@ -18,7 +18,6 @@ EXECUTIONS = {
     "snapshot",
     "immediate",
     "operation",
-    "render_driver",
     "lifecycle",
     "event_batch",
 }
@@ -149,14 +148,6 @@ def signature(plan, values):
     ]
     params = []
     for parameter in inputs:
-        if (
-            parameter.value.kind == "buffer"
-            and parameter.value.nullable
-            and parameter.value.buffer_form != "view"
-        ):
-            raise Unsupported(
-                "nullable input buffer requires independent presence storage"
-            )
         values.check(parameter.value)
         params.append((parameter_name(parameter.name), values.public(parameter.value)))
     result = (

@@ -1340,10 +1340,9 @@ final class OpenglTextureFrame extends _Value {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class GpuSync extends _Value {
-  const GpuSync({
-    this.kind = const GpuSyncKind.fromRawValue(0),
-    required this.object,
-  });
+  GpuSync({GpuSyncKind? kind, BigInt? object})
+    : kind = kind ?? gpuSyncDefault().kind,
+      object = object ?? gpuSyncDefault().object;
 
   /// One `mln_gpu_sync_kind` value.
   final GpuSyncKind kind;
@@ -1552,7 +1551,7 @@ final class WebgpuTextureFrame extends _Value {
 /// See `mln_unit_bezier` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class UnitBezier extends _Value {
-  const UnitBezier(this.x1, this.y1, this.x2, this.y2);
+  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
   final double x1;
   final double y1;
   final double x2;
@@ -1606,14 +1605,14 @@ final class CameraTransitionHandler {
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class AnimationOptions extends _Value {
-  const AnimationOptions({
+  AnimationOptions({
     this.durationMs,
     this.velocity,
     this.minZoom,
     this.easing,
     this.transitionId,
-    this.endHandler = const CameraTransitionHandler(),
-  });
+    CameraTransitionHandler? endHandler,
+  }) : endHandler = endHandler ?? animationOptionsDefault().endHandler;
 
   /// Duration in milliseconds. Must be finite and non-negative. Values that
   /// would overflow MapLibre Native's internal duration are invalid.
@@ -1647,13 +1646,12 @@ final class AnimationOptions extends _Value {
   ];
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs. Copied
-/// result, owned by the caller.
+/// Geographic coordinate in degrees used by map and projection APIs.
 ///
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class LatLng extends _Value {
-  const LatLng(this.latitude, this.longitude);
+  const LatLng({this.latitude = 0, this.longitude = 0});
 
   /// Latitude in degrees, finite and within \[-90, 90\] on input.
   final double latitude;
@@ -1665,15 +1663,14 @@ final class LatLng extends _Value {
   List<Object?> get _members => [latitude, longitude];
 }
 
-/// Geographic bounds in degrees. Copied result, owned by the caller. Copied
-/// result, owned by the caller.
+/// Geographic bounds in degrees.
 ///
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class LatLngBounds extends _Value {
   const LatLngBounds({
-    this.southwest = const LatLng(0, 0),
-    this.northeast = const LatLng(0, 0),
+    this.southwest = const LatLng(),
+    this.northeast = const LatLng(),
   });
   final LatLng southwest;
   final LatLng northeast;
@@ -1687,7 +1684,7 @@ final class LatLngBounds extends _Value {
 /// See `mln_bound_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class BoundOptions extends _Value {
-  const BoundOptions({
+  BoundOptions({
     this.bounds,
     this.minZoom,
     this.maxZoom,
@@ -1725,7 +1722,7 @@ final class BoundOptions extends _Value {
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class ScreenPoint extends _Value {
-  const ScreenPoint(this.x, this.y);
+  const ScreenPoint({this.x = 0, this.y = 0});
   final double x;
   final double y;
 
@@ -1738,15 +1735,16 @@ final class ScreenPoint extends _Value {
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraDelta extends _Value {
-  const CameraDelta({
+  CameraDelta({
     this.offset,
     this.scale,
     this.bearing,
     this.pitch,
     this.anchor,
-    this.animation = const AnimationOptions(),
-    this.gesturePhase = const GesturePhase.fromRawValue(0),
-  });
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) : animation = animation ?? cameraDeltaDefault().animation,
+       gesturePhase = gesturePhase ?? cameraDeltaDefault().gesturePhase;
 
   /// Pan in logical map pixels; the content moves by this offset.
   final ScreenPoint? offset;
@@ -1803,7 +1801,7 @@ final class EdgeInsets extends _Value {
 /// See `mln_camera_fit_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraFitOptions extends _Value {
-  const CameraFitOptions({this.padding, this.bearing, this.pitch});
+  CameraFitOptions({this.padding, this.bearing, this.pitch});
   final EdgeInsets? padding;
   final double? bearing;
   final double? pitch;
@@ -1812,14 +1810,12 @@ final class CameraFitOptions extends _Value {
   List<Object?> get _members => [padding, bearing, pitch];
 }
 
-/// Camera fields used by snapshots and camera updates. Copied result, owned by
-/// the caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Camera fields used by snapshots and camera updates.
 ///
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraOptions extends _Value {
-  const CameraOptions({
+  CameraOptions({
     this.center,
     this.centerAltitude,
     this.padding,
@@ -1861,12 +1857,15 @@ final class CameraOptions extends _Value {
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraUpdate extends _Value {
-  const CameraUpdate({
-    this.mode = const CameraUpdateMode.fromRawValue(0),
-    this.camera = const CameraOptions(),
-    this.animation = const AnimationOptions(),
-    this.gesturePhase = const GesturePhase.fromRawValue(0),
-  });
+  CameraUpdate({
+    CameraUpdateMode? mode,
+    CameraOptions? camera,
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) : mode = mode ?? cameraUpdateDefault().mode,
+       camera = camera ?? cameraUpdateDefault().camera,
+       animation = animation ?? cameraUpdateDefault().animation,
+       gesturePhase = gesturePhase ?? cameraUpdateDefault().gesturePhase;
   final CameraUpdateMode mode;
   final CameraOptions camera;
   final AnimationOptions animation;
@@ -1961,10 +1960,9 @@ final class CustomMvtVectorSourceOptions {
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 final class FrameDemand extends _Value {
-  const FrameDemand({
-    this.flags = FrameDemandFlag.ifNeeded,
-    required this.token,
-  });
+  FrameDemand({FrameDemandFlag? flags, BigInt? token})
+    : flags = flags ?? frameDemandDefault().flags,
+      token = token ?? frameDemandDefault().token;
 
   /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
   /// `MLN_FRAME_DEMAND_IF_NEEDED`.
@@ -1982,7 +1980,7 @@ final class FrameDemand extends _Value {
 /// See `mln_vec3` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class Vec3 extends _Value {
-  const Vec3(this.x, this.y, this.z);
+  const Vec3({this.x = 0, this.y = 0, this.z = 0});
   final double x;
   final double y;
   final double z;
@@ -1996,7 +1994,7 @@ final class Vec3 extends _Value {
 /// See `mln_quaternion` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class Quaternion extends _Value {
-  const Quaternion(this.x, this.y, this.z, this.w);
+  const Quaternion({this.x = 0, this.y = 0, this.z = 0, this.w = 0});
   final double x;
   final double y;
   final double z;
@@ -2011,7 +2009,7 @@ final class Quaternion extends _Value {
 /// See `mln_free_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class FreeCameraOptions extends _Value {
-  const FreeCameraOptions({this.position, this.orientation});
+  FreeCameraOptions({this.position, this.orientation});
   final Vec3? position;
   final Quaternion? orientation;
 
@@ -2054,8 +2052,8 @@ final class GeojsonSourceOptions extends _Value {
   final double? clusterMaxZoom;
 
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form.
-  /// Copied text, owned by the caller.
+  /// whose members follow the MapLibre Style Spec clusterProperties form. The
+  /// UTF-8 bytes are borrowed for the call.
   final Uint8List? clusterProperties;
 
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
@@ -2090,6 +2088,51 @@ final class GeojsonSourceOptions extends _Value {
     cluster,
     synchronousTiling,
   ];
+}
+
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeader extends _Value {
+  const HttpHeader({required this.name, required this.value});
+  final String name;
+  final String value;
+
+  @override
+  List<Object?> get _members => [name, value];
+}
+
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeaderRule extends _Value {
+  HttpHeaderRule({
+    ResourceKindMask? kinds,
+    UrlMatchFlags? flags,
+    String? url,
+    List<HttpHeader>? headers,
+  }) : kinds = kinds ?? httpHeaderRuleDefault().kinds,
+       flags = flags ?? httpHeaderRuleDefault().flags,
+       url = url ?? httpHeaderRuleDefault().url,
+       headers = List.unmodifiable(headers ?? httpHeaderRuleDefault().headers);
+
+  /// The resource kinds to match.
+  final ResourceKindMask kinds;
+
+  /// A bitwise OR of `mln_url_match_flags` values.
+  final UrlMatchFlags flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  /// The headers to set. Registration validates each one as
+  /// `mln_http_header_transform_response_set_header()` does.
+  final List<HttpHeader> headers;
+
+  @override
+  List<Object?> get _members => [kinds, flags, url, headers];
 }
 
 /// Lower-level Spherical Mercator projected-meter coordinate.
@@ -2131,11 +2174,7 @@ final class LogHandler {
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class LogicalExtent extends _Value {
-  const LogicalExtent({
-    this.width = 256,
-    this.height = 256,
-    this.scaleFactor = 1.0,
-  });
+  const LogicalExtent({this.width = 0, this.height = 0, this.scaleFactor = 0});
 
   /// Width in UI pixels. Defaults to 256.
   final int width;
@@ -2156,12 +2195,15 @@ final class LogicalExtent extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class PremultipliedRgba8Image extends _Value {
   PremultipliedRgba8Image({
-    this.width = 0,
-    this.height = 0,
-    this.stride = 0,
+    int? width,
+    int? height,
+    int? stride,
     Uint8List? pixels,
-  }) : pixels = Uint8List.fromList(
-         pixels ?? const <int>[],
+  }) : width = width ?? premultipliedRgba8ImageDefault().width,
+       height = height ?? premultipliedRgba8ImageDefault().height,
+       stride = stride ?? premultipliedRgba8ImageDefault().stride,
+       pixels = Uint8List.fromList(
+         pixels ?? premultipliedRgba8ImageDefault().pixels,
        ).asUnmodifiableView();
   final int width;
   final int height;
@@ -2169,8 +2211,7 @@ final class PremultipliedRgba8Image extends _Value {
   /// Bytes per image row. Must be at least width \* 4.
   final int stride;
 
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image. Copied
-  /// bytes, owned by the caller.
+  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   final Uint8List pixels;
 
   @override
@@ -2197,11 +2238,20 @@ final class MetalBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
   MetalBorrowedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.physicalWidth = 256,
-    this.physicalHeight = 256,
-    required List<MetalBorrowedTexture> textures,
-  }) : textures = List.unmodifiable(textures);
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+  }) : extent = extent ?? metalBorrowedTextureDescriptorDefault().extent,
+       physicalWidth =
+           physicalWidth ??
+           metalBorrowedTextureDescriptorDefault().physicalWidth,
+       physicalHeight =
+           physicalHeight ??
+           metalBorrowedTextureDescriptorDefault().physicalHeight,
+       textures = List.unmodifiable(
+         textures ?? metalBorrowedTextureDescriptorDefault().textures,
+       );
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2217,8 +2267,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// The ring's textures, one per slot, in slot order. Required. Copied value,
-  /// owned by the caller.
+  /// The ring's textures, one per slot, in slot order. Required.
   final List<MetalBorrowedTexture> textures;
 
   @override
@@ -2252,13 +2301,22 @@ final class Wake {
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class RenderSessionAttachOptions extends _Value {
-  const RenderSessionAttachOptions({
-    this.driver = RenderDriverKind.callerGraphicsThread,
-    this.requestedTextureRingDepth = 1,
-    this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
-    this.frameWake = const Wake(),
-    this.driverWorkWake = const Wake(),
-  });
+  RenderSessionAttachOptions({
+    RenderDriverKind? driver,
+    int? requestedTextureRingDepth,
+    GpuSyncKind? producerSyncKind,
+    Wake? frameWake,
+    Wake? driverWorkWake,
+  }) : driver = driver ?? renderSessionAttachOptionsDefault().driver,
+       requestedTextureRingDepth =
+           requestedTextureRingDepth ??
+           renderSessionAttachOptionsDefault().requestedTextureRingDepth,
+       producerSyncKind =
+           producerSyncKind ??
+           renderSessionAttachOptionsDefault().producerSyncKind,
+       frameWake = frameWake ?? renderSessionAttachOptionsDefault().frameWake,
+       driverWorkWake =
+           driverWorkWake ?? renderSessionAttachOptionsDefault().driverWorkWake;
 
   /// One `mln_render_driver_kind` value. Defaults to
   /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
@@ -2311,10 +2369,11 @@ final class MetalContextDescriptor extends _Value {
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalOwnedTextureDescriptor extends _Value {
-  const MetalOwnedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const MetalContextDescriptor(),
-  });
+  MetalOwnedTextureDescriptor({
+    LogicalExtent? extent,
+    MetalContextDescriptor? context,
+  }) : extent = extent ?? metalOwnedTextureDescriptorDefault().extent,
+       context = context ?? metalOwnedTextureDescriptorDefault().context;
 
   /// Logical texture extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2332,11 +2391,13 @@ final class MetalOwnedTextureDescriptor extends _Value {
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class MetalSurfaceDescriptor extends _Value {
-  const MetalSurfaceDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const MetalContextDescriptor(),
-    this.layer = NativePointer.nullPointer,
-  });
+  MetalSurfaceDescriptor({
+    LogicalExtent? extent,
+    MetalContextDescriptor? context,
+    NativePointer? layer,
+  }) : extent = extent ?? metalSurfaceDescriptorDefault().extent,
+       context = context ?? metalSurfaceDescriptorDefault().context,
+       layer = layer ?? metalSurfaceDescriptorDefault().layer;
 
   /// Logical surface extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2444,8 +2505,7 @@ final class WebglContextDescriptor extends _Value {
   final int context;
 
   /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-  /// canvas must still be transferable when attachment starts. Copied text,
-  /// owned by the caller.
+  /// canvas must still be transferable when attachment starts.
   final String canvasSelector;
 
   @override
@@ -2518,13 +2578,24 @@ final class OpenglBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTextureDescriptor extends _Value {
   OpenglBorrowedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.physicalWidth = 256,
-    this.physicalHeight = 256,
-    required this.context,
-    required List<OpenglBorrowedTexture> textures,
-    this.target = 0,
-  }) : textures = List.unmodifiable(textures);
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    OpenglContextDescriptor? context,
+    List<OpenglBorrowedTexture>? textures,
+    int? target,
+  }) : extent = extent ?? openglBorrowedTextureDescriptorDefault().extent,
+       physicalWidth =
+           physicalWidth ??
+           openglBorrowedTextureDescriptorDefault().physicalWidth,
+       physicalHeight =
+           physicalHeight ??
+           openglBorrowedTextureDescriptorDefault().physicalHeight,
+       context = context ?? openglBorrowedTextureDescriptorDefault().context,
+       textures = List.unmodifiable(
+         textures ?? openglBorrowedTextureDescriptorDefault().textures,
+       ),
+       target = target ?? openglBorrowedTextureDescriptorDefault().target;
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2544,8 +2615,7 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// context or a context in the same share group.
   final OpenglContextDescriptor context;
 
-  /// The ring's textures, one per slot, in slot order. Required. Copied value,
-  /// owned by the caller.
+  /// The ring's textures, one per slot, in slot order. Required.
   final List<OpenglBorrowedTexture> textures;
 
   /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
@@ -2567,10 +2637,11 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglOwnedTextureDescriptor extends _Value {
-  const OpenglOwnedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    required this.context,
-  });
+  OpenglOwnedTextureDescriptor({
+    LogicalExtent? extent,
+    OpenglContextDescriptor? context,
+  }) : extent = extent ?? openglOwnedTextureDescriptorDefault().extent,
+       context = context ?? openglOwnedTextureDescriptorDefault().context;
 
   /// Logical texture extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2590,11 +2661,13 @@ final class OpenglOwnedTextureDescriptor extends _Value {
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class OpenglSurfaceDescriptor extends _Value {
-  const OpenglSurfaceDescriptor({
-    this.extent = const LogicalExtent(),
-    required this.context,
-    this.surface = NativePointer.nullPointer,
-  });
+  OpenglSurfaceDescriptor({
+    LogicalExtent? extent,
+    OpenglContextDescriptor? context,
+    NativePointer? surface,
+  }) : extent = extent ?? openglSurfaceDescriptorDefault().extent,
+       context = context ?? openglSurfaceDescriptorDefault().context,
+       surface = surface ?? openglSurfaceDescriptorDefault().surface;
 
   /// Logical surface extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2686,15 +2759,31 @@ final class VulkanBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
   VulkanBorrowedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.physicalWidth = 256,
-    this.physicalHeight = 256,
-    this.context = const VulkanContextDescriptor(),
-    required List<VulkanBorrowedTexture> textures,
-    this.format = 0,
-    this.initialLayout = 0,
-    this.finalLayout = 5,
-  }) : textures = List.unmodifiable(textures);
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    VulkanContextDescriptor? context,
+    List<VulkanBorrowedTexture>? textures,
+    int? format,
+    int? initialLayout,
+    int? finalLayout,
+  }) : extent = extent ?? vulkanBorrowedTextureDescriptorDefault().extent,
+       physicalWidth =
+           physicalWidth ??
+           vulkanBorrowedTextureDescriptorDefault().physicalWidth,
+       physicalHeight =
+           physicalHeight ??
+           vulkanBorrowedTextureDescriptorDefault().physicalHeight,
+       context = context ?? vulkanBorrowedTextureDescriptorDefault().context,
+       textures = List.unmodifiable(
+         textures ?? vulkanBorrowedTextureDescriptorDefault().textures,
+       ),
+       format = format ?? vulkanBorrowedTextureDescriptorDefault().format,
+       initialLayout =
+           initialLayout ??
+           vulkanBorrowedTextureDescriptorDefault().initialLayout,
+       finalLayout =
+           finalLayout ?? vulkanBorrowedTextureDescriptorDefault().finalLayout;
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2711,8 +2800,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
 
-  /// The ring's images, one per slot, in slot order. Required. Copied value,
-  /// owned by the caller.
+  /// The ring's images, one per slot, in slot order. Required.
   final List<VulkanBorrowedTexture> textures;
 
   /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
@@ -2744,10 +2832,11 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanOwnedTextureDescriptor extends _Value {
-  const VulkanOwnedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const VulkanContextDescriptor(),
-  });
+  VulkanOwnedTextureDescriptor({
+    LogicalExtent? extent,
+    VulkanContextDescriptor? context,
+  }) : extent = extent ?? vulkanOwnedTextureDescriptorDefault().extent,
+       context = context ?? vulkanOwnedTextureDescriptorDefault().context;
 
   /// Logical texture extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2765,11 +2854,13 @@ final class VulkanOwnedTextureDescriptor extends _Value {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class VulkanSurfaceDescriptor extends _Value {
-  const VulkanSurfaceDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const VulkanContextDescriptor(),
-    required this.surface,
-  });
+  VulkanSurfaceDescriptor({
+    LogicalExtent? extent,
+    VulkanContextDescriptor? context,
+    BigInt? surface,
+  }) : extent = extent ?? vulkanSurfaceDescriptorDefault().extent,
+       context = context ?? vulkanSurfaceDescriptorDefault().context,
+       surface = surface ?? vulkanSurfaceDescriptorDefault().surface;
 
   /// Logical surface extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2839,13 +2930,24 @@ final class WebgpuBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuBorrowedTextureDescriptor extends _Value {
   WebgpuBorrowedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.physicalWidth = 256,
-    this.physicalHeight = 256,
-    this.context = const WebgpuContextDescriptor(),
-    required List<WebgpuBorrowedTexture> textures,
-    this.format = 0,
-  }) : textures = List.unmodifiable(textures);
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    WebgpuContextDescriptor? context,
+    List<WebgpuBorrowedTexture>? textures,
+    int? format,
+  }) : extent = extent ?? webgpuBorrowedTextureDescriptorDefault().extent,
+       physicalWidth =
+           physicalWidth ??
+           webgpuBorrowedTextureDescriptorDefault().physicalWidth,
+       physicalHeight =
+           physicalHeight ??
+           webgpuBorrowedTextureDescriptorDefault().physicalHeight,
+       context = context ?? webgpuBorrowedTextureDescriptorDefault().context,
+       textures = List.unmodifiable(
+         textures ?? webgpuBorrowedTextureDescriptorDefault().textures,
+       ),
+       format = format ?? webgpuBorrowedTextureDescriptorDefault().format;
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2863,8 +2965,7 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
   /// through context.queue or that device's default queue.
   final WebgpuContextDescriptor context;
 
-  /// The ring's textures, one per slot, in slot order. Required. Copied value,
-  /// owned by the caller.
+  /// The ring's textures, one per slot, in slot order. Required.
   final List<WebgpuBorrowedTexture> textures;
 
   /// Backend-native WGPUTextureFormat value of every texture. Undefined is
@@ -2887,10 +2988,11 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
 /// See `mln_webgpu_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuOwnedTextureDescriptor extends _Value {
-  const WebgpuOwnedTextureDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const WebgpuContextDescriptor(),
-  });
+  WebgpuOwnedTextureDescriptor({
+    LogicalExtent? extent,
+    WebgpuContextDescriptor? context,
+  }) : extent = extent ?? webgpuOwnedTextureDescriptorDefault().extent,
+       context = context ?? webgpuOwnedTextureDescriptorDefault().context;
 
   /// Logical texture extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2908,12 +3010,15 @@ final class WebgpuOwnedTextureDescriptor extends _Value {
 /// See `mln_webgpu_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class WebgpuSurfaceDescriptor extends _Value {
-  const WebgpuSurfaceDescriptor({
-    this.extent = const LogicalExtent(),
-    this.context = const WebgpuContextDescriptor(),
-    this.surface = NativePointer.nullPointer,
-    this.format = 0,
-  });
+  WebgpuSurfaceDescriptor({
+    LogicalExtent? extent,
+    WebgpuContextDescriptor? context,
+    NativePointer? surface,
+    int? format,
+  }) : extent = extent ?? webgpuSurfaceDescriptorDefault().extent,
+       context = context ?? webgpuSurfaceDescriptorDefault().context,
+       surface = surface ?? webgpuSurfaceDescriptorDefault().surface,
+       format = format ?? webgpuSurfaceDescriptorDefault().format;
 
   /// Logical surface extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2935,15 +3040,12 @@ final class WebgpuSurfaceDescriptor extends _Value {
   List<Object?> get _members => [extent, context, surface, format];
 }
 
-/// Copied result, owned by the caller.
+/// Camera result borrowed for an ordered camera-query completion.
 ///
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraQueryResult extends _Value {
-  const CameraQueryResult({
-    required this.generation,
-    this.camera = const CameraOptions(),
-  });
+  const CameraQueryResult({required this.generation, required this.camera});
   final BigInt generation;
   final CameraOptions camera;
 
@@ -2984,7 +3086,7 @@ final class FeatureStateSelector extends _Value {
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class ProjectionMode extends _Value {
-  const ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
+  ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
 
   /// Enables a non-perspective axonometric render transform.
   final bool? axonometric;
@@ -3004,7 +3106,7 @@ final class ProjectionMode extends _Value {
 /// See `mln_map_viewport_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapViewportOptions extends _Value {
-  const MapViewportOptions({
+  MapViewportOptions({
     this.northOrientation,
     this.constrainMode,
     this.viewportMode,
@@ -3035,7 +3137,7 @@ final class MapViewportOptions extends _Value {
 /// See `mln_map_tile_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapTileOptions extends _Value {
-  const MapTileOptions({
+  MapTileOptions({
     this.prefetchZoomDelta,
     this.lodMinRadius,
     this.lodScale,
@@ -3073,18 +3175,18 @@ final class MapSnapshot extends _Value {
   const MapSnapshot({
     this.debugOptions = const MapDebugOption.fromRawValue(0),
     required this.generation,
-    this.camera = const CameraOptions(),
+    required this.camera,
     this.logicalExtent = const LogicalExtent(),
-    this.projectionMode = const ProjectionMode(),
-    this.viewport = const MapViewportOptions(),
+    required this.projectionMode,
+    required this.viewport,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
     this.eventMask = const RuntimeEventMask.fromRawValue(0),
     required this.latestRenderUpdateGeneration,
-    this.tile = const MapTileOptions(),
-    this.bounds = const BoundOptions(),
-    this.freeCamera = const FreeCameraOptions(),
+    required this.tile,
+    required this.bounds,
+    required this.freeCamera,
   });
 
   /// Debug overlay mask of `mln_map_debug_option` values.
@@ -3135,7 +3237,7 @@ final class MapSnapshot extends _Value {
 /// See `mln_image_stretch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class ImageStretch extends _Value {
-  const ImageStretch(this.from, this.to);
+  const ImageStretch({this.from = 0, this.to = 0});
   final double from;
   final double to;
 
@@ -3163,7 +3265,7 @@ final class ImageContent extends _Value {
   List<Object?> get _members => [left, top, right, bottom];
 }
 
-/// Copied result, owned by the caller.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3192,13 +3294,13 @@ final class StyleImageInfo extends _Value {
   final int height;
 
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
-  /// row first. Copied bytes, owned by the caller.
+  /// row first.
   final Uint8List pixels;
 
-  /// Horizontally stretchable intervals. Copied value, owned by the caller.
+  /// Horizontally stretchable intervals.
   final List<ImageStretch> stretchX;
 
-  /// Vertically stretchable intervals. Copied value, owned by the caller.
+  /// Vertically stretchable intervals.
   final List<ImageStretch> stretchY;
 
   /// Content box, when the image sets one.
@@ -3231,7 +3333,7 @@ final class StyleImageInfo extends _Value {
   ];
 }
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3246,18 +3348,16 @@ final class StyleLayerInfo extends _Value {
     this.visibility = const StyleLayerVisibility.fromRawValue(0),
   });
 
-  /// Layer ID. Copied text, owned by the caller.
+  /// Layer ID.
   final String id;
 
-  /// The style-spec layer type string. Copied text, owned by the caller.
+  /// The style-spec layer type string.
   final String type;
 
-  /// Source ID. Empty for a layer type that takes no source. Copied text, owned
-  /// by the caller.
+  /// Source ID. Empty for a layer type that takes no source.
   final String? sourceId;
 
-  /// Source-layer ID. Empty when the layer sets none. Copied text, owned by the
-  /// caller.
+  /// Source-layer ID. Empty when the layer sets none.
   final String? sourceLayer;
 
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
@@ -3293,7 +3393,7 @@ final class StyleSourceTileInfo extends _Value {
     this.scheme = const StyleTileScheme.fromRawValue(0),
   }) : tileUrls = List.unmodifiable(tileUrls);
 
-  /// Tile URL templates in TileJSON order. Copied value, owned by the caller.
+  /// Tile URL templates in TileJSON order.
   final List<String> tileUrls;
 
   /// Lowest zoom level the TileJSON provides tiles for.
@@ -3309,7 +3409,7 @@ final class StyleSourceTileInfo extends _Value {
   List<Object?> get _members => [tileUrls, minZoom, maxZoom, scheme];
 }
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3327,7 +3427,7 @@ final class StyleSourceInfo extends _Value {
     this.rasterEncoding,
   });
 
-  /// Source ID. Copied text, owned by the caller.
+  /// Source ID.
   final String id;
 
   /// One of `mln_style_source_type`.
@@ -3336,12 +3436,10 @@ final class StyleSourceInfo extends _Value {
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution string, when the source sets one. It may be empty. Copied
-  /// text, owned by the caller.
+  /// Attribution string, when the source sets one. It may be empty.
   final String? attribution;
 
-  /// URL that the source loads from, when it has one. Copied text, owned by the
-  /// caller.
+  /// URL that the source loads from, when it has one.
   final String? url;
 
   /// Inline TileJSON metadata, when the source was defined with it.
@@ -3374,12 +3472,12 @@ final class StyleSourceInfo extends _Value {
   ];
 }
 
-/// Global style transition options. Copied result, owned by the caller.
+/// Global style transition options.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleTransitionOptions extends _Value {
-  const StyleTransitionOptions({
+  StyleTransitionOptions({
     this.durationMs,
     this.delayMs,
     this.enablePlacementTransitions,
@@ -3410,12 +3508,15 @@ final class StyleTransitionOptions extends _Value {
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapOptions extends _Value {
-  const MapOptions({
-    this.initialExtent = const LogicalExtent(),
-    this.mapMode = const MapMode.fromRawValue(0),
-    this.fastPforEnabled = false,
-    this.eventMask = RuntimeEventMask.all,
-  });
+  MapOptions({
+    LogicalExtent? initialExtent,
+    MapMode? mapMode,
+    bool? fastPforEnabled,
+    RuntimeEventMask? eventMask,
+  }) : initialExtent = initialExtent ?? mapOptionsDefault().initialExtent,
+       mapMode = mapMode ?? mapOptionsDefault().mapMode,
+       fastPforEnabled = fastPforEnabled ?? mapOptionsDefault().fastPforEnabled,
+       eventMask = eventMask ?? mapOptionsDefault().eventMask;
 
   /// Initial logical extent. Width and height must be nonzero, and scale_factor
   /// must be finite and positive. scale_factor is fixed for the map's lifetime.
@@ -3457,12 +3558,12 @@ final class StyleImageOptions extends _Value {
   }) : stretchX = stretchX == null ? null : List.unmodifiable(stretchX),
        stretchY = stretchY == null ? null : List.unmodifiable(stretchY);
 
-  /// Horizontally stretchable intervals. May be null only when stretch_x_count
-  /// is 0. Copied value, owned by the caller.
+  /// Horizontally stretchable intervals. Borrowed for the call and copied
+  /// before return. May be null only when stretch_x_count is 0.
   final List<ImageStretch>? stretchX;
 
-  /// Vertically stretchable intervals. May be null only when stretch_y_count is
-  /// 0. Copied value, owned by the caller.
+  /// Vertically stretchable intervals. Borrowed for the call and copied before
+  /// return. May be null only when stretch_y_count is 0.
   final List<ImageStretch>? stretchY;
 
   /// Content box used when icon-text-fit applies.
@@ -3500,7 +3601,7 @@ final class RenderFrameBatchView extends _Value {
   RenderFrameBatchView({required List<RenderFrameResult> results})
     : results = List.unmodifiable(results);
 
-  /// Copied value, owned by the caller.
+  /// Borrowed array of result_count terminal frame results in completion order.
   final List<RenderFrameResult> results;
 
   @override
@@ -3610,8 +3711,8 @@ final class RenderSessionSnapshot extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class ScreenBox extends _Value {
   const ScreenBox({
-    this.min = const ScreenPoint(0, 0),
-    this.max = const ScreenPoint(0, 0),
+    this.min = const ScreenPoint(),
+    this.max = const ScreenPoint(),
   });
   final ScreenPoint min;
   final ScreenPoint max;
@@ -3691,18 +3792,16 @@ final class RenderedFeatureQueryOptions extends _Value {
           : Uint8List.fromList(filter).asUnmodifiableView();
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
-  /// Copied value, owned by the caller.
   final List<String>? layerIds;
 
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  /// Copied text, owned by the caller.
   final Uint8List? filter;
 
   @override
   List<Object?> get _members => [layerIds, filter];
 }
 
-/// Copied result, owned by the caller. Copied result, owned by the caller.
+/// One query hit borrowed for a completion callback.
 ///
 /// See `mln_queried_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -3718,17 +3817,9 @@ final class QueriedFeature extends _Value {
        state = state == null
            ? null
            : Uint8List.fromList(state).asUnmodifiableView();
-
-  /// Copied text, owned by the caller.
   final Uint8List feature;
-
-  /// Copied text, owned by the caller.
   final String? sourceId;
-
-  /// Copied text, owned by the caller.
   final String? sourceLayerId;
-
-  /// Copied text, owned by the caller.
   final Uint8List? state;
 
   @override
@@ -3749,11 +3840,9 @@ final class SourceFeatureQueryOptions extends _Value {
           : Uint8List.fromList(filter).asUnmodifiableView();
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
-  /// Copied value, owned by the caller.
   final List<String>? sourceLayerIds;
 
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  /// Copied text, owned by the caller.
   final Uint8List? filter;
 
   @override
@@ -3788,7 +3877,7 @@ final class TextureImageInfo extends _Value {
   List<Object?> get _members => [width, height, stride, byteLength];
 }
 
-/// Copied result, owned by the caller.
+/// Texture readback borrowed for a completion callback.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3796,7 +3885,7 @@ final class TextureReadbackResult extends _Value {
   TextureReadbackResult({Uint8List? data, this.info = const TextureImageInfo()})
     : data = Uint8List.fromList(data ?? const <int>[]).asUnmodifiableView();
 
-  /// Copied bytes, owned by the caller.
+  /// Borrowed pixel bytes, valid only during the callback.
   final Uint8List data;
   final TextureImageInfo info;
 
@@ -3863,20 +3952,41 @@ final class ResourceRequestCancelHandler {
   final ResourceRequestCancelCallback callback;
 }
 
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRoute extends _Value {
+  ResourceRoute({ResourceKindMask? kinds, UrlMatchFlags? flags, String? url})
+    : kinds = kinds ?? resourceRouteDefault().kinds,
+      flags = flags ?? resourceRouteDefault().flags,
+      url = url ?? resourceRouteDefault().url;
+
+  /// The resource kinds to match.
+  final ResourceKindMask kinds;
+
+  /// A bitwise OR of `mln_url_match_flags` values.
+  final UrlMatchFlags flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  @override
+  List<Object?> get _members => [kinds, flags, url];
+}
+
 /// Options used when creating a runtime.
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
-  const RuntimeOptions({this.assetPath, this.cachePath});
+  RuntimeOptions({this.assetPath, this.cachePath});
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
-  /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
-  /// by the caller.
+  /// selects `/android_asset` on Android and `.` elsewhere.
   final String? assetPath;
 
-  /// Cache database path. Copied during runtime creation. Copied text, owned by
-  /// the caller.
+  /// Cache database path. Copied during runtime creation.
   final String? cachePath;
 
   @override
@@ -3897,8 +4007,7 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
     this.includeIdeographs = false,
   });
 
-  /// Style URL. Copied during region creation. Copied text, owned by the
-  /// caller.
+  /// Style URL. Copied during region creation.
   final String styleUrl;
   final LatLngBounds bounds;
   final double minZoom;
@@ -3936,11 +4045,10 @@ final class OfflineGeometryRegionDefinition extends _Value {
          geometry ?? const <int>[],
        ).asUnmodifiableView();
 
-  /// Style URL. Copied during region creation. Copied text, owned by the
-  /// caller.
+  /// Style URL. Copied during region creation.
   final String styleUrl;
 
-  /// UTF-8 GeoJSON Geometry bytes. Copied text, owned by the caller.
+  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
   final Uint8List geometry;
   final double minZoom;
 
@@ -3995,10 +4103,7 @@ final class OfflineRegionDefinitionGeometry extends OfflineRegionDefinition {
   int get hashCode => value.hashCode;
 }
 
-/// Region data delivered by an offline completion. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller. Copied result, owned by the caller. Copied result, owned by the
-/// caller.
+/// Region data delivered by an offline completion.
 ///
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4013,14 +4118,14 @@ final class OfflineRegionInfo extends _Value {
   final int id;
   final OfflineRegionDefinition definition;
 
-  /// Metadata bytes. Copied bytes, owned by the caller.
+  /// Metadata bytes.
   final Uint8List metadata;
 
   @override
   List<Object?> get _members => [id, definition, metadata];
 }
 
-/// Offline region status snapshot. Copied result, owned by the caller.
+/// Offline region status snapshot.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4278,8 +4383,6 @@ final class RuntimeEvent {
   /// Number of message bytes, excluding the trailing null terminator that
   /// follows them in the arena. Zero when this event carries no message.
   final int messageSize;
-
-  /// Copied text, owned by the caller.
   final String message;
   final RuntimeEventPayload payload;
 }
@@ -4340,7 +4443,7 @@ final class EventBatchView extends _Value {
   EventBatchView({required List<RuntimeEvent> events})
     : events = List.unmodifiable(events);
 
-  /// Copied value, owned by the caller.
+  /// Borrowed array of event_count events in queue order.
   final List<RuntimeEvent> events;
 
   @override
@@ -4362,48 +4465,6 @@ final class RuntimeEventHandler {
   final RuntimeEventCallback? callback;
 }
 
-/// One HTTP header that a header rule supplies.
-///
-/// See `mln_http_header` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class HttpHeader extends _Value {
-  const HttpHeader({required this.name, required this.value});
-  final String name;
-  final String value;
-
-  @override
-  List<Object?> get _members => [name, value];
-}
-
-/// One rule of a native HTTP header transform.
-///
-/// See `mln_http_header_rule` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class HttpHeaderRule extends _Value {
-  HttpHeaderRule({
-    this.kinds = ResourceKindMask.all,
-    this.flags = const UrlMatchFlags.fromRawValue(0),
-    required this.url,
-    required List<HttpHeader> headers,
-  }) : headers = List.unmodifiable(headers);
-
-  /// The resource kinds to match.
-  final ResourceKindMask kinds;
-
-  /// A bitwise OR of `mln_url_match_flags` values.
-  final UrlMatchFlags flags;
-
-  /// The URL or glob pattern to compare.
-  final String url;
-
-  /// The headers to set. Registration validates each one as
-  /// `mln_http_header_transform_response_set_header()` does.
-  final List<HttpHeader> headers;
-
-  @override
-  List<Object?> get _members => [kinds, flags, url, headers];
-}
-
 /// HTTP header transform state: a callback, or native header rules.
 ///
 /// See `mln_http_header_transform` in the
@@ -4421,7 +4482,7 @@ final class HttpHeaderTransform {
 /// See `mln_resource_range` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRange extends _Value {
-  const ResourceRange(this.start, this.end);
+  const ResourceRange({required this.start, required this.end});
 
   /// First byte offset of the requested range.
   final BigInt start;
@@ -4451,12 +4512,11 @@ final class ResourceRequestInfo extends _Value {
          priorData ?? const <int>[],
        ).asUnmodifiableView();
 
-  /// URL entering the network layer, before tile server normalization. Copied
-  /// text, owned by the caller.
+  /// URL entering the network layer, before tile server normalization.
   final String? requestedUrl;
 
   /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key. Copied text, owned by the caller.
+  /// server options and API key.
   final String? resolvedUrl;
   final ResourceKind kind;
   final ResourceLoadingMethod loadingMethod;
@@ -4466,11 +4526,7 @@ final class ResourceRequestInfo extends _Value {
   final ResourceRange? range;
   final int? priorModifiedUnixMs;
   final int? priorExpiresUnixMs;
-
-  /// Copied text, owned by the caller.
   final String? priorEtag;
-
-  /// Copied bytes, owned by the caller.
   final Uint8List priorData;
 
   @override
@@ -4496,30 +4552,6 @@ final class ResourceRequestInfo extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceProviderCallback =
     void Function(ResourceRequestInfo, ResourceRequestHandle);
-
-/// One request pattern that a resource provider claims.
-///
-/// See `mln_resource_route` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRoute extends _Value {
-  const ResourceRoute({
-    this.kinds = ResourceKindMask.all,
-    this.flags = const UrlMatchFlags.fromRawValue(0),
-    required this.url,
-  });
-
-  /// The resource kinds to match.
-  final ResourceKindMask kinds;
-
-  /// A bitwise OR of `mln_url_match_flags` values.
-  final UrlMatchFlags flags;
-
-  /// The URL or glob pattern to compare.
-  final String url;
-
-  @override
-  List<Object?> get _members => [kinds, flags, url];
-}
 
 /// Resource provider state.
 ///

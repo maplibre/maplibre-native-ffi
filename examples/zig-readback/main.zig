@@ -288,11 +288,12 @@ fn attachOwnedTexture(
     signal: *WakeSignal,
     extent: maplibre.LogicalExtent,
 ) !Attachment {
-    const wakes: maplibre.RenderSessionAttachOptions = .{
-        .requested_texture_ring_depth = 1,
-        .frame_wake = signal.wake(),
-        .driver_work_wake = if (uses_caller_driver) signal.wake() else .{},
-    };
+    var defaults = try maplibre.renderSessionAttachOptionsDefault(allocator);
+    defer defaults.deinit();
+    var wakes = defaults.value;
+    wakes.requested_texture_ring_depth = 1;
+    wakes.frame_wake = signal.wake();
+    wakes.driver_work_wake = if (uses_caller_driver) signal.wake() else .{};
     const result = if (build_options.supports_vulkan)
         try maplibre.mapAttachVulkanOwnedTexture(allocator, map.*, .{
             .extent = extent,
@@ -582,12 +583,15 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
 }
 
 fn setInitialCamera(allocator: std.mem.Allocator, map: *maplibre.Map) !void {
-    var completion = try maplibre.mapUpdateCamera(allocator, map.*, .{ .camera = .{
+    var update = try maplibre.cameraUpdateDefault(allocator);
+    defer update.deinit();
+    update.value.camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    } }, null);
+    };
+    var completion = try maplibre.mapUpdateCamera(allocator, map.*, update.value, null);
     completion.deinit();
 }
 

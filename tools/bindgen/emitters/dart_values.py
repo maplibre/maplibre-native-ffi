@@ -541,13 +541,7 @@ class Values:
         return f"result.ref.{mask} |= {self.enum_constant(bit)};"
 
     def field_default(self, field):
-        """A field's default: its annotated initial value, or its type's."""
-        value, initial = field.value, field.initial
-        if initial is None:
-            return self.default_expression(value)
-        if value.kind == "enum":
-            return f"{public_name(value.native)}.{identifier(initial.member)}"
-        return initial.literal
+        return self.default_expression(field.value)
 
     def default_expression(self, value):
         if value.nullable or value.optional:
@@ -564,18 +558,15 @@ class Values:
                 else None
             )
         if value.kind == "record":
-            if any(f.value.kind == "union" for f in value.fields):
+            if value.default or any(f.value.kind == "union" for f in value.fields):
                 return None
-            args = []
             for _name, typ, field in self.members(value):
                 if typ.endswith("?"):
                     continue
                 default = self.field_default(field)
                 if default is None:
                     return None
-                if value.ordered:
-                    args.append(default)
-            return f"const {public_name(value.native)}({', '.join(args)})"
+            return f"const {public_name(value.native)}()"
         return None
 
     def delivered_owner(self, callback, parameter):
@@ -1000,6 +991,10 @@ class Values:
                     else self.render_union(value, union)
                 )
                 declarations.append(declaration)
+                if value.native not in self.bound.inputs:
+                    conversion = conversion[
+                        conversion.index(f"{public} _read{public}(") :
+                    ]
                 conversions.append(conversion)
                 continue
             members = self.members(value)
@@ -1015,9 +1010,20 @@ class Values:
                 f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
                 for name, flag in flags
             )
-            positional = value.ordered
             args, initializers = [], []
             for name, typ, field in members:
+                if value.default and not typ.endswith("?"):
+                    args.append(f"{typ}? {name}")
+                    fallback = f"{name} ?? {camel(value.default.removeprefix('mln_'))}().{name}"
+                    expression = (
+                        f"List.unmodifiable({fallback})"
+                        if typ.startswith("List<")
+                        else f"Uint8List.fromList({fallback}).asUnmodifiableView()"
+                        if typ == "Uint8List"
+                        else fallback
+                    )
+                    initializers.append(f"{name} = {expression}")
+                    continue
                 default = self.field_default(field)
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
                 if copied:
@@ -1036,20 +1042,19 @@ class Values:
                 else:
                     args.append(
                         f"this.{name}"
-                        if positional or typ.endswith("?")
+                        if typ.endswith("?")
                         else f"this.{name} = {default}"
                         if default
                         else f"required this.{name}"
                     )
             args += [f"this.{name} = false" for name, _ in flags]
             signature = ", ".join(args)
-            if not positional:
-                signature = "{" + signature + "}"
+            signature = "{" + signature + "}"
             compared = ", ".join(
                 [name for name, _, _ in members] + [name for name, _ in flags]
             )
             declarations.append(
-                f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
+                f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
             )
             write = [
                 f"Pointer<raw.{value.native}> _write{public}({public} value, Arena arena"
@@ -1129,10 +1134,8 @@ class Values:
                     capture = f"{self.present(presence.mask, presence.bit)} ? {capture} : null"
                 read.append(f"    {name}: {capture},")
             write += ["  return result;", "}"]
-            if positional:
-                read = [line.split(": ", 1)[1] for line in read]
             conversions.append(
-                "\n".join(write)
+                ("\n".join(write) if value.native in self.bound.inputs else "")
                 + f"\n{public} _read{public}(raw.{value.native} source) => {public}(\n"
                 + "\n".join(read)
                 + "\n);\n"

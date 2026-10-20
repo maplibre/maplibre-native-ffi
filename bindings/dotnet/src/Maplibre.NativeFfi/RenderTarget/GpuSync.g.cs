@@ -17,6 +17,12 @@ namespace Maplibre.NativeFfi;
 /// </param>
 public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Object)
 {
+    public GpuSync()
+        : this(default!, default!)
+    {
+        this = Default;
+    }
+
     public static GpuSync Default
     {
         get

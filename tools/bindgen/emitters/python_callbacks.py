@@ -69,11 +69,7 @@ def input_source(plan, values):
     lines.append(
         f"raw.{descriptor.user_data} = storage.register_callbacks(vec![{methods}]);"
     )
-    release_fn = (
-        "generated_release_callbacks_no_reentry"
-        if descriptor.release_reentry == "forbid"
-        else "generated_release_callbacks"
-    )
+    release_fn = "generated_release_callbacks_no_reentry"
     lines.append(f"raw.{descriptor.release} = Some({release_fn});")
     for name in descriptor.callbacks:
         lines.append(

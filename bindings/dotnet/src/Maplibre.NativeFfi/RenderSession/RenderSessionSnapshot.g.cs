@@ -45,9 +45,4 @@ public readonly partial record struct RenderSessionSnapshot(
     ulong FrameGeneration,
     uint AcquiredFrameCount,
     bool PendingChanges
-)
-{
-    public RenderSessionSnapshot()
-        : this(default, new LogicalExtent(), default, default, default, default, default, default)
-    { }
-}
+);

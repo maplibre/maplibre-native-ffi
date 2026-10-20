@@ -161,11 +161,11 @@ typedef enum mln_map_mode : uint32_t {
 /** Logical extent in UI pixels and the device-pixel scale. */
 typedef struct mln_logical_extent {
   /** Width in UI pixels. Defaults to 256. */
-  uint32_t width MLN_BINDING("default=256");
+  uint32_t width;
   /** Height in UI pixels. Defaults to 256. */
-  uint32_t height MLN_BINDING("default=256");
+  uint32_t height;
   /** Device pixels per UI pixel. Defaults to 1.0. */
-  double scale_factor MLN_BINDING("default=1.0");
+  double scale_factor;
 } mln_logical_extent;
 
 /** Options used when creating a map. */
@@ -203,16 +203,14 @@ typedef struct mln_map_options {
    * The mask applies throughout construction, including the camera events that
    * MapLibre reports while it initializes the map's size.
    */
-  uint64_t event_mask MLN_BINDING(
-    "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"
-  );
+  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
 } mln_map_options;
 
 /** Screen-space point in logical map pixels. */
 typedef struct mln_screen_point {
   double x;
   double y;
-} mln_screen_point MLN_BINDING("fields=ordered");
+} mln_screen_point;
 
 /** Screen-space inset in logical map pixels. */
 typedef struct mln_edge_insets {
@@ -228,7 +226,7 @@ typedef struct mln_lat_lng {
   double latitude;
   /** Longitude in degrees. Input longitude must be finite. */
   double longitude;
-} mln_lat_lng MLN_BINDING("fields=ordered");
+} mln_lat_lng;
 
 /** Camera fields used by snapshots and camera updates. */
 typedef struct mln_camera_options {
@@ -255,7 +253,7 @@ typedef struct mln_unit_bezier {
   double y1;
   double x2;
   double y2;
-} mln_unit_bezier MLN_BINDING("fields=ordered");
+} mln_unit_bezier;
 
 /** How the transitions of one camera command ended. */
 typedef enum mln_camera_transition_outcome : uint32_t {
@@ -509,7 +507,7 @@ typedef struct mln_vec3 {
   double x;
   double y;
   double z;
-} mln_vec3 MLN_BINDING("fields=ordered");
+} mln_vec3;
 
 /** Quaternion stored as x, y, z, w components. */
 typedef struct mln_quaternion {
@@ -517,7 +515,7 @@ typedef struct mln_quaternion {
   double y;
   double z;
   double w;
-} mln_quaternion MLN_BINDING("fields=ordered");
+} mln_quaternion;
 
 /** Free camera position and orientation in MapLibre Native camera space. */
 typedef struct mln_free_camera_options {

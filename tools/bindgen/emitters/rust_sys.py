@@ -129,8 +129,6 @@ class Declarations:
         if name in self.records:
             record = self.records[name]
             for field in record.fields:
-                if field.bit_width is not None:
-                    raise Unsupported(f"{name}: bit-fields have no Rust layout")
                 if not field.name:
                     raise Unsupported(f"{name}: anonymous members need a name")
                 self.type(field.type)

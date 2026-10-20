@@ -2338,6 +2338,9 @@ external mln_geojson_source_options mln_geojson_source_options_default();
 @Native<mln_gpu_sync Function()>()
 external mln_gpu_sync mln_gpu_sync_default();
 
+@Native<mln_http_header_rule Function()>()
+external mln_http_header_rule mln_http_header_rule_default();
+
 @Native<
   Int32 Function(
     Pointer<mln_http_header_transform_response>,
@@ -4365,6 +4368,9 @@ external int mln_resource_request_set_cancel_callback(
   Pointer<Bool> out_cancelled,
   Pointer<mln_diagnostic> out_diagnostic,
 );
+
+@Native<mln_resource_route Function()>()
+external mln_resource_route mln_resource_route_default();
 
 @Native<
   Int32 Function(

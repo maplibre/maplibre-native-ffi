@@ -40,7 +40,7 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct EventBatchView: Equatable, Hashable, Sendable {
-  /// Copied value, owned by the caller.
+  /// Borrowed array of event_count events in queue order.
   public var events: [RuntimeEvent]
   public static var `default`: Self {
     Self()
@@ -68,10 +68,6 @@ public struct EventBatchView: Equatable, Hashable, Sendable {
         length: item.message_size
       )
     ) }
-  }
-
-  func nativeValue(arena _: NativeInputArena) throws -> mln_event_batch_view {
-    throw NativeStringError("borrowed arena snapshots cannot be submitted")
   }
 }
 
@@ -125,14 +121,14 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   /// `mln_http_header_transform_response_set_header()` does.
   public var headers: [HttpHeader]
   public static var `default`: Self {
-    Self()
+    try! Self(raw: mln_http_header_rule_default())
   }
 
   public init(
-    kinds: ResourceKindMask = ResourceKindMask.all,
-    flags: UrlMatchFlags = .init(rawValue: 0),
-    url: String = "",
-    headers: [HttpHeader] = []
+    kinds: ResourceKindMask = HttpHeaderRule.default.kinds,
+    flags: UrlMatchFlags = HttpHeaderRule.default.flags,
+    url: String = HttpHeaderRule.default.url,
+    headers: [HttpHeader] = HttpHeaderRule.default.headers
   ) {
     self.kinds = kinds
     self.flags = flags
@@ -154,7 +150,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
-    var raw = mln_http_header_rule()
+    var raw = mln_http_header_rule_default()
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = arena.view(url)
@@ -289,7 +285,7 @@ public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
   public static let active: OfflineRegionDownloadState = .init(rawValue: 1)
 }
 
-/// Offline region status snapshot. Copied result, owned by the caller.
+/// Offline region status snapshot.
 ///
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -345,20 +341,6 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
     requiredResourceCount = raw.required_resource_count
     requiredResourceCountIsPrecise = raw.required_resource_count_is_precise
     complete = raw.complete
-  }
-
-  func nativeValue() -> mln_offline_region_status {
-    var raw = mln_offline_region_status()
-    raw.download_state = downloadState.rawValue
-    raw.completed_resource_count = completedResourceCount
-    raw.completed_resource_size = completedResourceSize
-    raw.completed_tile_count = completedTileCount
-    raw.required_tile_count = requiredTileCount
-    raw.completed_tile_size = completedTileSize
-    raw.required_resource_count = requiredResourceCount
-    raw.required_resource_count_is_precise = requiredResourceCountIsPrecise
-    raw.complete = complete
-    return raw
   }
 }
 
@@ -418,16 +400,6 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
     frameCount = raw.frame_count
     drawCallCount = raw.draw_call_count
     totalDrawCallCount = raw.total_draw_call_count
-  }
-
-  func nativeValue() -> mln_rendering_stats {
-    var raw = mln_rendering_stats()
-    raw.encoding_time = encodingTime
-    raw.rendering_time = renderingTime
-    raw.frame_count = frameCount
-    raw.draw_call_count = drawCallCount
-    raw.total_draw_call_count = totalDrawCallCount
-    return raw
   }
 }
 
@@ -634,13 +606,6 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
     start = raw.start
     end = raw.end
   }
-
-  func nativeValue() -> mln_resource_range {
-    var raw = mln_resource_range()
-    raw.start = start
-    raw.end = end
-    return raw
-  }
 }
 
 /// Cancel callback or queue state for one handled resource request.
@@ -729,11 +694,10 @@ public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
 }
 
 public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
-  /// URL entering the network layer, before tile server normalization. Copied
-  /// text, owned by the caller.
+  /// URL entering the network layer, before tile server normalization.
   public var requestedUrl: String?
   /// URL to fetch, after resource-kind normalization against the runtime's tile
-  /// server options and API key. Copied text, owned by the caller.
+  /// server options and API key.
   public var resolvedUrl: String?
   public var kind: ResourceKind
   public var loadingMethod: ResourceLoadingMethod
@@ -743,9 +707,7 @@ public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
   public var range: ResourceRange?
   public var priorModifiedUnixMs: Int64?
   public var priorExpiresUnixMs: Int64?
-  /// Copied text, owned by the caller.
   public var priorEtag: String?
-  /// Copied bytes, owned by the caller.
   public var priorData: Data
   public static var `default`: Self {
     Self()
@@ -804,38 +766,6 @@ public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
       data: raw.prior_data,
       size: Int(raw.prior_data_size)
     )
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_resource_request_info
-  {
-    var raw = mln_resource_request_info()
-    raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_resource_request_info>.size)
-    raw.requested_url = try requestedUrl.map { try arena.cString($0) }
-    raw.resolved_url = try resolvedUrl.map { try arena.cString($0) }
-    raw.kind = kind.rawValue
-    raw.loading_method = loadingMethod.rawValue
-    raw.priority = priority.rawValue
-    raw.usage = usage.rawValue
-    raw.storage_policy = storagePolicy.rawValue
-    if let item = range {
-      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range = item
-        .nativeValue()
-    }
-    if let item = priorModifiedUnixMs {
-      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
-        .prior_modified_unix_ms = item
-    }
-    if let item = priorExpiresUnixMs {
-      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES.rawValue; raw
-        .prior_expires_unix_ms = item
-    }
-    raw.prior_etag = try priorEtag.map { try arena.cString($0) }
-    raw.prior_data = arena.view(priorData).data?
-      .assumingMemoryBound(to: UInt8.self)
-    raw.prior_data_size = try NativeInputArena.count(priorData.count)
-    return raw
   }
 }
 
@@ -985,13 +915,13 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   /// The URL or glob pattern to compare.
   public var url: String
   public static var `default`: Self {
-    Self()
+    try! Self(raw: mln_resource_route_default())
   }
 
   public init(
-    kinds: ResourceKindMask = ResourceKindMask.all,
-    flags: UrlMatchFlags = .init(rawValue: 0),
-    url: String = ""
+    kinds: ResourceKindMask = ResourceRoute.default.kinds,
+    flags: UrlMatchFlags = ResourceRoute.default.flags,
+    url: String = ResourceRoute.default.url
   ) {
     self.kinds = kinds
     self.flags = flags
@@ -1008,7 +938,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
-    var raw = mln_resource_route()
+    var raw = mln_resource_route_default()
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = arena.view(url)
@@ -1102,7 +1032,6 @@ public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
-  /// Copied text, owned by the caller.
   public var message: String
   /// One of `mln_runtime_event_type`.
   public var type: RuntimeEventType
@@ -1192,10 +1121,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
         )
       }
     }()
-  }
-
-  func nativeValue(arena _: NativeInputArena) throws -> mln_runtime_event {
-    throw NativeStringError("borrowed arena snapshots cannot be submitted")
   }
 }
 
@@ -1324,13 +1249,6 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
     regionId = raw.region_id
     reason = ResourceErrorReason(rawValue: raw.reason)
   }
-
-  func nativeValue() -> mln_runtime_event_offline_region_response_error {
-    var raw = mln_runtime_event_offline_region_response_error()
-    raw.region_id = regionId
-    raw.reason = reason.rawValue
-    return raw
-  }
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
@@ -1355,13 +1273,6 @@ public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   init(raw: mln_runtime_event_offline_region_status) {
     regionId = raw.region_id
     status = OfflineRegionStatus(raw: raw.status)
-  }
-
-  func nativeValue() -> mln_runtime_event_offline_region_status {
-    var raw = mln_runtime_event_offline_region_status()
-    raw.region_id = regionId
-    raw.status = status.nativeValue()
-    return raw
   }
 }
 
@@ -1389,13 +1300,6 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   init(raw: mln_runtime_event_offline_region_tile_count_limit) {
     regionId = raw.region_id
     limit = raw.limit
-  }
-
-  func nativeValue() -> mln_runtime_event_offline_region_tile_count_limit {
-    var raw = mln_runtime_event_offline_region_tile_count_limit()
-    raw.region_id = regionId
-    raw.limit = limit
-    return raw
   }
 }
 
@@ -1475,15 +1379,6 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
     placementChanged = raw.placement_changed
     stats = RenderingStats(raw: raw.stats)
   }
-
-  func nativeValue() -> mln_runtime_event_render_frame {
-    var raw = mln_runtime_event_render_frame()
-    raw.mode = mode.rawValue
-    raw.needs_repaint = needsRepaint
-    raw.placement_changed = placementChanged
-    raw.stats = stats.nativeValue()
-    return raw
-  }
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
@@ -1503,12 +1398,6 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
 
   init(raw: mln_runtime_event_render_map) {
     mode = RenderMode(rawValue: raw.mode)
-  }
-
-  func nativeValue() -> mln_runtime_event_render_map {
-    var raw = mln_runtime_event_render_map()
-    raw.mode = mode.rawValue
-    return raw
   }
 }
 
@@ -1551,13 +1440,6 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   init(raw: mln_runtime_event_tile_action) {
     operation = TileOperation(rawValue: raw.operation)
     tileId = TileId(raw: raw.tile_id)
-  }
-
-  func nativeValue() -> mln_runtime_event_tile_action {
-    var raw = mln_runtime_event_tile_action()
-    raw.operation = operation.rawValue
-    raw.tile_id = tileId.nativeValue()
-    return raw
   }
 }
 
@@ -1605,11 +1487,9 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
-  /// selects `/android_asset` on Android and `.` elsewhere. Copied text, owned
-  /// by the caller.
+  /// selects `/android_asset` on Android and `.` elsewhere.
   public var assetPath: String?
-  /// Cache database path. Copied during runtime creation. Copied text, owned by
-  /// the caller.
+  /// Cache database path. Copied during runtime creation.
   public var cachePath: String?
   public static var `default`: Self {
     try! Self(raw: mln_runtime_options_default())
@@ -1680,16 +1560,6 @@ public struct TileId: Equatable, Hashable, Sendable {
     canonicalZ = raw.canonical_z
     canonicalX = raw.canonical_x
     canonicalY = raw.canonical_y
-  }
-
-  func nativeValue() -> mln_tile_id {
-    var raw = mln_tile_id()
-    raw.overscaled_z = overscaledZ
-    raw.wrap = wrap
-    raw.canonical_z = canonicalZ
-    raw.canonical_x = canonicalX
-    raw.canonical_y = canonicalY
-    return raw
   }
 }
 

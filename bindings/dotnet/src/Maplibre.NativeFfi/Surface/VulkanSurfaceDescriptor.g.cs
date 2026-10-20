@@ -28,7 +28,10 @@ public readonly partial record struct VulkanSurfaceDescriptor(
 )
 {
     public VulkanSurfaceDescriptor()
-        : this(new LogicalExtent(), default, default) { }
+        : this(default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static VulkanSurfaceDescriptor Default
     {

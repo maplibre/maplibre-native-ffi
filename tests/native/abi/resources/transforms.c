@@ -112,12 +112,11 @@ static void header_transform_with_zero_size(void* descriptor) {
 }
 
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
-static const mln_http_header_rule unused_header_rule = {
-  .url = MLN_BUFFER_LITERAL("http://127.0.0.1/unused"),
-};
-
 static void header_transform_with_rules(void* descriptor) {
-  ((mln_http_header_transform*)descriptor)->rules = &unused_header_rule;
+  static mln_http_header_rule rule;
+  rule = mln_http_header_rule_default();
+  rule.url = (mln_buffer_view)MLN_BUFFER_LITERAL("http://127.0.0.1/unused");
+  ((mln_http_header_transform*)descriptor)->rules = &rule;
   ((mln_http_header_transform*)descriptor)->rule_count = 1;
 }
 #endif

@@ -6,7 +6,6 @@ unsupported shapes; they never invent ownership or erased completion types.
 
 from __future__ import annotations
 
-import re
 from dataclasses import replace
 
 from .model import Api, CType, Function, ModelError
@@ -14,6 +13,7 @@ from .protocol import (
     BUFFER_VIEW,
     COMPLETION,
     COMPLETION_RESULT,
+    COMPLETION_VALUE,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
     DELIVERY_PAYLOAD,
@@ -34,7 +34,6 @@ EXECUTIONS = frozenset(
         "immediate",
         "snapshot",
         "event_batch",
-        "render_driver",
     }
 )
 COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"})
@@ -42,10 +41,9 @@ ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
 # ownership=value, encoding=utf8, and reentry=allow, so a header never writes
-# them; an absent nullable means false. The semantic
-# layer in semantic.py supplies the remaining values: lifetime=completion for an
-# array completion result, consumes=always for a release that returns void, and
-# discardable completions for commands.
+# them; an absent nullable means false. The semantic layer supplies
+# lifetime=completion for an array completion result and discardable
+# completions for commands.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -55,9 +53,7 @@ ANNOTATION_VALUES = {
     "nullable": frozenset({"true"}),
     "optional": frozenset({"empty"}),
     "lifetime": frozenset({"call", "owner", "process"}),
-    "consumes": frozenset({"success"}),
     "reentry": frozenset({"forbid", "protocol"}),
-    "release_reentry": frozenset({"forbid"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
 }
@@ -70,7 +66,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "execution",
         "result",
         "shape",
-        "consumes",
         "kind",
         "length",
         "accepted_unless",
@@ -79,15 +74,12 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "enum",
     }
 )
-PARAMETER_KEYS = COMMON_KEYS | frozenset(
-    {"direction", "length", "consumes", "enum", "kind"}
-)
+PARAMETER_KEYS = COMMON_KEYS | frozenset({"direction", "length", "enum", "kind"})
 FIELD_KEYS = COMMON_KEYS | frozenset(
     {
         "length",
         "mask",
         "bit",
-        "default",
         "tag",
         "enum",
         "direction",
@@ -103,29 +95,16 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "item_encoding",
     }
 )
-RECORD_KEYS = COMMON_KEYS | frozenset(
+TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     {
         "capture",
         "kind",
-        "default",
-        "mask",
-        "tag",
         "release",
-        "release_reentry",
-        "user_data",
-        "fields",
-    }
-)
-TYPEDEF_KEYS = COMMON_KEYS | frozenset(
-    {
-        "kind",
-        "release",
-        "release_reentry",
         "parent",
         "dispose",
         "view_begin",
         "view_end",
-        "default",
+        "default_function",
         "user_data",
         "failure",
         "enum",
@@ -142,7 +121,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancel_registration",
         "delivery",
         "synchronous",
-        "fields",
     }
 )
 ENUM_KEYS = frozenset({"kind"})
@@ -164,9 +142,8 @@ KINDS = {
             "delivery_queue",
         }
     ),
-    "record": frozenset({"callback_registration", "callback_response"}),
     "typedef": frozenset({"handle", "callback_registration", "callback_response"}),
-    "enum": frozenset({"open", "bitmask"}),
+    "enum": frozenset({"bitmask"}),
 }
 
 
@@ -184,24 +161,8 @@ INTEGER_RANGES = {
 }
 
 
-# The integer ranges a field's `default=` may name. A `long` takes the narrower
-# range of the targets where it is 32 bits.
-DEFAULT_RANGES = {
-    **INTEGER_RANGES,
-    "long": INTEGER_RANGES["int"],
-    "unsigned long": INTEGER_RANGES["unsigned int"],
-}
-INTEGER_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)")
-DECIMAL_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)\.[0-9]+")
-CONTROL_DEFAULTS = {"size": "sizeof", "reserved": "0"}
-
-
 def has_completion(function: Function) -> bool:
     return any(is_completion(parameter.type) for parameter in function.parameters)
-
-
-def has_diagnostic(function: Function) -> bool:
-    return function.diagnostic
 
 
 # Conventions: the metadata that a declaration's C shape implies. A header
@@ -327,11 +288,12 @@ class Conventions:
         ):
             if any(item.metadata.get(key) == field.name for item in record.fields):
                 defaults["kind"] = role
-        kind = explicit.get("kind", defaults.get("kind"))
-        if kind == "size":
-            defaults["default"] = "sizeof"
-        elif kind == "reserved":
-            defaults["default"] = "0"
+        if record.name == COMPLETION_RESULT and field.name == COMPLETION_VALUE:
+            defaults.update(
+                kind="erased",
+                length=COMPLETION_VALUE_COUNT,
+                stride=COMPLETION_VALUE_SIZE,
+            )
         return {**self.value(field.type, {**defaults, **explicit}), **defaults}
 
     def function(self, function: Function) -> dict[str, str]:
@@ -396,7 +358,7 @@ class Conventions:
                 and function.return_type.declaration == typedef.name
             ]
             if len(constructors) == 1:
-                defaults["default"] = constructors[0]
+                defaults["default_function"] = constructors[0]
         return defaults
 
 
@@ -407,7 +369,7 @@ def apply_defaults(api: Api) -> Api:
     stay minimal and each annotation marks a real departure from convention. An
     annotation also writes only a value in ANNOTATION_VALUES. This step fills in
     a key's conventional values, and the semantic layer supplies the rest:
-    lifetime=completion for an array completion result, and consumes=always for
+    lifetime=completion for an array completion result, and consumption for
     a release that returns void.
     """
     conventions = Conventions(api)
@@ -487,11 +449,6 @@ def apply_defaults(api: Api) -> Api:
         )
         for typedef in api.typedefs
     )
-    for enum in api.enums:
-        if enum.metadata.get("kind") == "open":
-            errors.append(
-                f"{enum.location}: {enum.name}: kind=open restates the default"
-            )
     if errors:
         raise ModelError(errors)
     return replace(api, functions=tuple(functions), records=records, typedefs=typedefs)
@@ -636,8 +593,6 @@ def validate(api: Api) -> None:
         }:
             errors.append(f"{context}: return enum names an absent enum")
         execution = metadata.get("execution")
-        if execution is None:
-            errors.append(f"{context}: missing execution metadata")
         returns_status = is_status(function.return_type)
         if function.diagnostic != returns_status:
             errors.append(
@@ -672,19 +627,12 @@ def validate(api: Api) -> None:
                     f"{context}: completion requires command, query, operation, or lifecycle execution"
                 )
             result = metadata.get("result")
-            shape = metadata.get("shape")
             if result and result not in known_types:
                 errors.append(f"{context}: unknown result type {result!r}")
             record = api.records_by_name.get(result or "")
             if record is not None and not record.complete:
                 errors.append(
                     f"{context}: completion value requires a complete record definition"
-                )
-            if result == "void" and shape != "none":
-                errors.append(f"{context}: void completion requires shape=none")
-            if execution == "command" and result != "void":
-                errors.append(
-                    f"{context}: commands use disposition and generation, not a value payload"
                 )
             if execution == "query" and result == "void":
                 errors.append(f"{context}: query requires a value payload")
@@ -708,8 +656,6 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: {execution} execution requires a completion parameter"
                 )
-            if "result" in metadata or "shape" in metadata:
-                errors.append(f"{context}: result and shape describe a completion")
             if is_status(function.return_type) or (function.return_type.kind == "void"):
                 extra = sorted(metadata.keys() & VALUE_KEYS)
                 if extra:
@@ -764,11 +710,6 @@ def validate(api: Api) -> None:
                 errors.append(f"{pcontext}: length names an absent parameter")
     for record in api.records:
         context = f"{record.location}: {record.name}"
-        errors.extend(
-            metadata_errors(record.metadata, RECORD_KEYS, context, KINDS["record"])
-        )
-        if "fields" in record.metadata:
-            errors.extend(ordered_errors(record, record.metadata["fields"], context))
         # A presence bit guards one member, so a value that several fields
         # describe together is a record embedded under that bit. An array's
         # count takes the array's presence and names no bit of its own.
@@ -884,28 +825,13 @@ def validate(api: Api) -> None:
                 errors.append(f"{fcontext}: mask must name a sibling field")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
                 errors.append(f"{fcontext}: presence requires both mask and bit")
-            if "bit" in field.metadata:
-                constant = enum_constants.get(field.metadata["bit"])
-                if (
-                    constant is None
-                    or constant[1] <= 0
-                    or constant[1] & (constant[1] - 1)
-                ):
-                    errors.append(
-                        f"{fcontext}: bit requires one declared positive flag"
-                    )
-                mask = field_path(record.name, field.metadata.get("mask", ""))
-                if (
-                    mask
-                    and constant
-                    and mask.metadata.get("enum") not in {None, constant[0]}
-                ):
-                    errors.append(f"{fcontext}: bit belongs to a different mask enum")
             if (
                 "variant" in field.metadata
                 and field.metadata["variant"] not in enum_constants
             ):
                 errors.append(f"{fcontext}: variant requires a declared enum value")
+            if "bit" in field.metadata and field.metadata["bit"] not in enum_constants:
+                errors.append(f"{fcontext}: bit names an absent constant")
             if "variant" in field.metadata and record.kind != "union":
                 errors.append(f"{fcontext}: variant requires a union member")
             if "empty_variant" in field.metadata and "tag" not in field.metadata:
@@ -934,17 +860,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{fcontext}: tagged union variants must belong to the tag enum"
                     )
-                elif len({variant[1] for variant in variants if variant}) != len(
-                    variants
-                ):
-                    errors.append(
-                        f"{fcontext}: tagged union variants must have distinct values"
-                    )
-            if (
-                field.metadata.get("kind") == "size"
-                and field.type.canonical != "unsigned int"
-            ):
-                errors.append(f"{fcontext}: struct size requires a uint32_t field")
             if field.metadata.get("ownership") == "owned":
                 handle = api.typedefs_by_name.get(field.type.declaration or "")
                 if handle is None or handle.metadata.get("kind") != "handle":
@@ -963,14 +878,6 @@ def validate(api: Api) -> None:
         errors.extend(
             metadata_errors(typedef.metadata, TYPEDEF_KEYS, context, KINDS["typedef"])
         )
-        if "fields" in typedef.metadata:
-            errors.extend(
-                ordered_errors(
-                    api.records_by_name.get(typedef.name),
-                    typedef.metadata["fields"],
-                    context,
-                )
-            )
         for parameter in typedef.parameters:
             pcontext = f"{context} callback parameter {parameter.name}"
             errors.extend(
@@ -999,46 +906,10 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration release requires a callback typedef"
                 )
-            else:
-                callback = release_type.type.pointee
-                if (
-                    callback is None
-                    or callback.result is None
-                    or callback.result.kind != "void"
-                    or len(callback.parameters) != 1
-                    or callback.parameters[0].spelling != "void *"
-                ):
-                    errors.append(
-                        f"{context}: registration release must take one void pointer and return void"
-                    )
-            user_data = fields.get(typedef.metadata.get("user_data", ""))
-            if user_data is not None and (
-                user_data.type.spelling != "void *"
-                or user_data.metadata.get("kind") != "context"
-            ):
-                errors.append(
-                    f"{context}: registration user_data requires a void context pointer"
-                )
             errors.extend(delivery_queue_errors(api, typedef, record, context))
-        elif "release_reentry" in typedef.metadata:
-            errors.append(
-                f"{context}: release_reentry requires a callback registration"
-            )
-        default = typedef.metadata.get("default")
-        if default:
-            constructor = api.functions_by_name.get(default)
-            if (
-                constructor is None
-                or constructor.parameters
-                or constructor.return_type.declaration != typedef.name
-            ):
-                errors.append(
-                    f"{context}: default requires a no-argument constructor for this type"
-                )
         if typedef.metadata.get("kind") == "handle":
-            for key in ("release", "parent"):
-                if key not in typedef.metadata:
-                    errors.append(f"{context}: handle requires {key} metadata")
+            if "release" not in typedef.metadata:
+                errors.append(f"{context}: handle requires release metadata")
             parent = typedef.metadata.get("parent", "none")
             if parent != "none" and (
                 parent not in api.typedefs_by_name
@@ -1065,25 +936,23 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{context}: view scope requires handle/token begin and token end operations"
                     )
-            for key in ("release", "dispose", "abandon"):
-                operation = api.functions_by_name.get(typedef.metadata.get(key, ""))
-                if key not in typedef.metadata:
-                    continue
+            if "release" in typedef.metadata:
+                operation = api.functions_by_name.get(typedef.metadata["release"])
                 if operation is None or not operation.parameters:
-                    errors.append(f"{context}: {key} requires a handle operation")
-                    continue
-                receiver = operation.parameters[0].type
-                if receiver.kind == "pointer" and receiver.pointee:
-                    receiver = receiver.pointee
-                if receiver.declaration != typedef.name:
-                    errors.append(f"{context}: {key} receiver must be this handle type")
-                if (
-                    not is_status(operation.return_type)
-                    and operation.return_type.kind != "void"
-                ):
-                    errors.append(f"{context}: {key} must return status or void")
-                if key in {"dispose", "abandon"} and has_completion(operation):
-                    errors.append(f"{context}: {key} must have synchronous acceptance")
+                    errors.append(f"{context}: release requires a handle operation")
+                else:
+                    receiver = operation.parameters[0].type
+                    if receiver.kind == "pointer" and receiver.pointee:
+                        receiver = receiver.pointee
+                    if receiver.declaration != typedef.name:
+                        errors.append(
+                            f"{context}: release receiver must be this handle type"
+                        )
+                    if (
+                        not is_status(operation.return_type)
+                        and operation.return_type.kind != "void"
+                    ):
+                        errors.append(f"{context}: release must return status or void")
         if typedef.metadata.get("reentry") == "protocol":
             owner = reentry_owner(typedef)
             names = tuple(
@@ -1203,19 +1072,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{context}: {key} requires an immediate status operation on the decision handle"
                     )
-    for typedef in api.typedefs:
-        if typedef.metadata.get("kind") != "handle":
-            continue
-        seen = {typedef.name}
-        parent = typedef.metadata.get("parent", "none")
-        while parent in api.typedefs_by_name:
-            if parent in seen:
-                errors.append(
-                    f"{typedef.location}: {typedef.name}: handle parent graph contains a cycle"
-                )
-                break
-            seen.add(parent)
-            parent = api.typedefs_by_name[parent].metadata.get("parent", "none")
     for enum in api.enums:
         errors.extend(
             metadata_errors(
@@ -1223,7 +1079,6 @@ def validate(api: Api) -> None:
             )
         )
     errors.extend(reference_errors(api))
-    errors.extend(field_default_errors(api))
     errors.extend(versioning_errors(api))
     if errors:
         raise ModelError(errors)
@@ -1259,9 +1114,9 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
     inputs: set[str] = set()
     internal = set(api.runtime_types)
     defaults = {
-        typedef.metadata["default"]
+        typedef.metadata["default_function"]
         for typedef in api.typedefs
-        if "default" in typedef.metadata
+        if "default_function" in typedef.metadata
     }
 
     def record_of(type_: CType) -> str | None:
@@ -1357,16 +1212,6 @@ def versioning_errors(api: Api) -> list[str]:
     """
     reaches, inputs = record_reaches(api)
     errors = []
-    completion = api.records_by_name.get(COMPLETION_RESULT)
-    for field in completion.fields if completion else ():
-        if field.metadata.get("kind") == "erased" and (
-            field.metadata.get("length"),
-            field.metadata.get("stride"),
-        ) != (COMPLETION_VALUE_COUNT, COMPLETION_VALUE_SIZE):
-            errors.append(
-                f"{field.location}: {COMPLETION_RESULT}.{field.name}: requires "
-                f"length={COMPLETION_VALUE_COUNT};stride={COMPLETION_VALUE_SIZE}"
-            )
     for record in api.records:
         how = reaches.get(record.name)
         if (
@@ -1380,7 +1225,7 @@ def versioning_errors(api: Api) -> list[str]:
             )
     for typedef in api.typedefs:
         if (
-            "default" in typedef.metadata
+            "default_function" in typedef.metadata
             and typedef.name in api.records_by_name
             and typedef.name in reaches
             and typedef.name not in inputs
@@ -1392,101 +1237,6 @@ def versioning_errors(api: Api) -> list[str]:
     return errors
 
 
-def defaulted_records(api: Api) -> set[str]:
-    """The structs whose fields the generated default cases check.
-
-    These are the structs that a record default function returns, and the
-    structs nested by value in one through a required member. The cases skip
-    optional members, unions, buffer views, and arrays, so a struct reached
-    only through one of those has no case to check its defaults.
-    """
-    conventions = Conventions(api)
-    pending = [
-        typedef.name
-        for typedef in api.typedefs
-        if typedef.metadata.get("default") and typedef.name in api.records_by_name
-    ]
-    found: set[str] = set()
-    while pending:
-        name = pending.pop()
-        record = api.records_by_name.get(name)
-        if name in found or record is None or record.kind != "struct":
-            continue
-        found.add(name)
-        for field in record.fields:
-            if "mask" in field.metadata or is_buffer_view(field.type):
-                continue
-            pending.append(conventions.resolve(field.type).declaration or "")
-    return found
-
-
-def field_default_errors(api: Api) -> list[str]:
-    """Check each field's `default=`: its initial value in binding constructors.
-
-    A control role keeps its conventional value. Any other field may state a
-    nonzero literal of its own type, or an enumerator of its enum, when it is
-    a plain value. When a native default function exists, a generated C test
-    checks the value against that function.
-    """
-    conventions = Conventions(api)
-    enums = {enum.name: enum for enum in api.enums}
-    errors = []
-    for record in api.records:
-        for field in record.fields:
-            literal = field.metadata.get("default")
-            if literal is None:
-                continue
-            context = f"{field.location}: {record.name}.{field.name}"
-            kind = field.metadata.get("kind")
-            if kind in CONTROL_DEFAULTS:
-                if literal != CONTROL_DEFAULTS[kind]:
-                    errors.append(f"{context}: a {kind} member's default is fixed")
-                continue
-            resolved = conventions.resolve(field.type)
-            if (
-                kind is not None
-                or field.metadata.keys() & {"mask", "tag", "variant"}
-                or resolved.kind in {"pointer", "array"}
-                or conventions.is_record(resolved)
-            ):
-                errors.append(f"{context}: default requires a plain value member")
-                continue
-            enum = enums.get(
-                field.metadata.get("enum", field.type.declaration or "")
-            ) or enums.get(resolved.declaration or "")
-            canonical = resolved.canonical.removeprefix("const ")
-            if enum is not None:
-                values = {value.name: value.value for value in enum.values}
-                if literal not in values:
-                    errors.append(f"{context}: default names no {enum.name} value")
-                    continue
-                zero = values[literal] == 0
-            elif canonical in {"bool", "_Bool"}:
-                if literal not in {"true", "false"}:
-                    errors.append(f"{context}: default requires true")
-                    continue
-                zero = literal == "false"
-            elif canonical in {"float", "double"}:
-                if not DECIMAL_LITERAL.fullmatch(literal):
-                    errors.append(f"{context}: default requires a decimal with a point")
-                    continue
-                zero = float(literal) == 0
-            elif canonical in DEFAULT_RANGES:
-                low, high = DEFAULT_RANGES[canonical]
-                if not INTEGER_LITERAL.fullmatch(literal) or not (
-                    low <= int(literal) <= high
-                ):
-                    errors.append(f"{context}: default requires a decimal {canonical}")
-                    continue
-                zero = int(literal) == 0
-            else:
-                errors.append(f"{context}: default requires a scalar or enum")
-                continue
-            if zero:
-                errors.append(f"{context}: default={literal} restates zero")
-    return errors
-
-
 FUNCTION_REFERENCES = {
     "function": (),
     "typedef": (
@@ -1495,7 +1245,7 @@ FUNCTION_REFERENCES = {
         "abandon",
         "view_begin",
         "view_end",
-        "default",
+        "default_function",
         "complete",
         "resume",
         "cancelled",
@@ -1616,27 +1366,6 @@ def absence_errors(api: Api, function: Function, context: str) -> list[str]:
     if statuses.get(function.metadata["absent_on"], 0) == 0:
         errors.append(f"{context}: absent_on requires a failure enumerator of {STATUS}")
     return errors
-
-
-def ordered_errors(record, value: str, context: str) -> list[str]:
-    """Check a `fields=ordered` record: a struct of plain values only.
-
-    Its fields are the whole value in declaration order, so none may be
-    control state, a pointer, or an array.
-    """
-    if value != "ordered":
-        return [f"{context}: unsupported fields={value!r}"]
-    if (
-        record is None
-        or record.kind != "struct"
-        or not record.complete
-        or any(
-            "kind" in field.metadata or field.type.kind in {"pointer", "array"}
-            for field in record.fields
-        )
-    ):
-        return [f"{context}: fields=ordered requires a struct of plain values"]
-    return []
 
 
 def callback_result_errors(

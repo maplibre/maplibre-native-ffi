@@ -43,15 +43,6 @@ mln_status mln_probe_roundtrip(
   return MLN_STATUS_OK;
 }
 
-mln_status mln_probe_nullable_text(
-  const char* text, uint16_t text_size, mln_probe_text_result* out_result,
-  mln_diagnostic* out_diagnostic
-) {
-  (void)out_diagnostic;
-  out_result->text = (mln_buffer_view){text, text_size};
-  return MLN_STATUS_OK;
-}
-
 // Moves each argument into a distinct field, so a probe can tell them apart.
 mln_status mln_keyword_combine(
   double defer, double self, double raw, double bindingArg0,

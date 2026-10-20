@@ -176,11 +176,7 @@ def registration_input(values, plan):
     release_type = next(
         f.value.native for f in plan.fields if f.name == descriptor.release
     )
-    release = (
-        "binding_release_forbid"
-        if descriptor.release_reentry == "forbid"
-        else "binding_release"
-    )
+    release = "binding_release_forbid"
     lines = [
         f"if {enabled} {{",
         f"raw.{native_identifier(descriptor.user_data)} = arena.register(input)",

@@ -11,6 +11,11 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct PremultipliedRgba8Image
 {
+    public PremultipliedRgba8Image()
+    {
+        this = Default;
+    }
+
     public PremultipliedRgba8Image(uint Width, uint Height, uint Stride, byte[] Pixels)
     {
         this.Width = Width;
@@ -29,7 +34,6 @@ public readonly record struct PremultipliedRgba8Image
 
     /// <summary>
     /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
-    /// Copied bytes, owned by the caller.
     /// </summary>
     public byte[] Pixels
     {

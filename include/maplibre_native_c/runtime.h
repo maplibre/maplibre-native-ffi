@@ -669,14 +669,15 @@ typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
  */
 typedef struct mln_resource_route {
   /** The resource kinds to match. */
-  uint32_t kinds MLN_BINDING(
-    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
-  );
+  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
   mln_buffer_view url;
 } mln_resource_route;
+
+/** Returns default resource route options. */
+MLN_API mln_resource_route mln_resource_route_default(void) MLN_NOEXCEPT;
 
 /** One HTTP header that a header rule supplies. */
 typedef struct mln_http_header {
@@ -692,9 +693,7 @@ typedef struct mln_http_header {
  */
 typedef struct mln_http_header_rule {
   /** The resource kinds to match. */
-  uint32_t kinds MLN_BINDING(
-    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
-  );
+  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
   /** A bitwise OR of mln_url_match_flags values. */
   uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
   /** The URL or glob pattern to compare. */
@@ -706,6 +705,9 @@ typedef struct mln_http_header_rule {
   const mln_http_header* headers MLN_BINDING("length=header_count");
   size_t header_count;
 } mln_http_header_rule;
+
+/** Returns default HTTP header rule options. */
+MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
 
 /**
  * Asks the host for the URL of one network resource request.
@@ -866,7 +868,7 @@ typedef struct mln_resource_range {
   uint64_t start;
   /** Last byte offset of the requested range, inclusive. */
   uint64_t end;
-} mln_resource_range MLN_BINDING("fields=ordered");
+} mln_resource_range;
 
 /** Field mask values for mln_resource_request_info. */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {

@@ -27,7 +27,10 @@ public readonly partial record struct OpenglSurfaceDescriptor(
 )
 {
     public OpenglSurfaceDescriptor()
-        : this(new LogicalExtent(), default, default) { }
+        : this(default!, default!, default!)
+    {
+        this = Default;
+    }
 
     public static OpenglSurfaceDescriptor Default
     {

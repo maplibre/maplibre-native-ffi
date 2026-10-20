@@ -204,8 +204,6 @@ class Extractor:
             return replace(
                 self.type(native.get_named_type()),
                 const=native.is_const_qualified(),
-                volatile=native.is_volatile_qualified(),
-                restrict=native.is_restrict_qualified(),
                 spelling=self.type_spelling(native.spelling),
                 canonical=self.type_spelling(native.get_canonical().spelling),
             )
@@ -222,8 +220,6 @@ class Extractor:
             canonical=self.type_spelling(native.get_canonical().spelling),
             declaration=name,
             const=native.is_const_qualified(),
-            volatile=native.is_volatile_qualified(),
-            restrict=native.is_restrict_qualified(),
         )
         if kind == TypeKind.POINTER:
             return replace(
@@ -298,6 +294,12 @@ class Extractor:
                         )
                     )
             elif child.kind == CursorKind.FIELD_DECL:
+                if child.is_bitfield():
+                    raise ModelError(
+                        [
+                            f"{self.location(child)}: bitfield has no portable ABI conversion"
+                        ]
+                    )
                 fields.append(
                     Field(
                         name=child.spelling,
@@ -305,16 +307,12 @@ class Extractor:
                         metadata=self.metadata(child),
                         location=self.location(child),
                         documentation=self.comment(child),
-                        bit_width=child.get_bitfield_width()
-                        if child.is_bitfield()
-                        else None,
                     )
                 )
         value = Record(
             name=name,
             kind="union" if cursor.kind == CursorKind.UNION_DECL else "struct",
             fields=tuple(fields),
-            metadata=self.metadata(cursor),
             location=self.location(cursor),
             documentation=self.comment(cursor),
             complete=cursor.is_definition(),

@@ -97,7 +97,7 @@ def delivery_capture(bound: BoundApi) -> str:
     records = set()
     for callback, plan in delivery_records(bound):
         if (
-            bound.source.records_by_name[plan.native].metadata.get("capture")
+            bound.source.typedefs_by_name[plan.native].metadata.get("capture")
             == "manual"
         ):
             continue

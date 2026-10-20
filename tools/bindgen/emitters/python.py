@@ -20,10 +20,8 @@ from tools.bindgen.semantic import (
     DisposeSupport,
     HandlePlan,
     OperationPlan,
-    discarding_variants,
     output_member,
     support_relation,
-    view_support,
 )
 
 from .python_values import Values, ok, public_name, scalar_type
@@ -156,8 +154,6 @@ def operation(
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
         )
-    if any(p.consumes for p in plan.inputs if p.name != plan.receiver):
-        raise unsupported(function, "consuming parameter requires an owner transaction")
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     decision = owned_decision(values.api, receiver.value.native) if receiver else None
@@ -1123,10 +1119,9 @@ def coverage(api: Api | BoundApi) -> dict:
         plan.name: support_relation(plan)
         for plan in bound.operations
         if plan.support and plan.name not in errors
-    } | view_support(bound, generated)
+    }
     return {
         "generated": generated,
-        "discarding": discarding_variants(bound, generated),
         "support": support,
         "unsupported": errors,
     }

@@ -60,8 +60,7 @@ typedef struct mln_completion_result {
   /** Borrowed diagnostic bytes, empty on success. */
   mln_buffer_view diagnostic;
   /** Borrowed function-specific result, or null when the function has none. */
-  const void* value
-    MLN_BINDING("kind=erased;length=value_count;stride=value_size");
+  const void* value;
   /** Function-specific element count for value. */
   size_t value_count;
 } mln_completion_result;

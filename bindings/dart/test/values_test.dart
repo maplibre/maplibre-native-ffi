@@ -14,7 +14,7 @@ void main() {
   test('host strings use views and native-lent strings decode', () async {
     // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(
-      () => runtimeCreate(const RuntimeOptions(cachePath: 'cache\u0000tail')),
+      () => runtimeCreate(RuntimeOptions(cachePath: 'cache\u0000tail')),
       throwsA(isA<InvalidArgumentException>()),
     );
 
@@ -53,7 +53,7 @@ void main() {
       final fixture = await openRuntime();
       final map = await fixture.openStyledMap();
 
-      const options = StyleTransitionOptions(
+      final options = StyleTransitionOptions(
         durationMs: 0,
         enablePlacementTransitions: false,
       );
@@ -93,7 +93,7 @@ void main() {
     await expectCommitted(
       map.updateCamera(
         CameraUpdate(
-          camera: const CameraOptions(zoom: 2),
+          camera: CameraOptions(zoom: 2),
           mode: CameraUpdateMode.ease,
           animation: AnimationOptions(
             durationMs: 60000,
@@ -111,19 +111,21 @@ void main() {
   test('an array input is copied when the call submits it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openStyledMap();
-    final coordinates = [const LatLng(10, 20), const LatLng(12, 21)];
+    final coordinates = [
+      const LatLng(latitude: 10, longitude: 20),
+      const LatLng(latitude: 12, longitude: 21),
+    ];
     final expected = await map.cameraForLatLngs(List.of(coordinates));
     final pending = map.cameraForLatLngs(coordinates);
     coordinates.clear();
     expect(await pending, expected);
   });
 
-  // A constructor's defaults come from the header's field annotations, so
-  // the record they build matches what the native default function returns.
+  // Constructors copy the native record defaults.
   test(
     'a record built from its constructor defaults equals the native default',
     () {
-      expect(const MapOptions(), mapOptionsDefault());
+      expect(MapOptions(), mapOptionsDefault());
     },
   );
 

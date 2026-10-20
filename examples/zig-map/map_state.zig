@@ -28,11 +28,11 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| {};
 
-        var map_future = maplibre.runtimeCreateMap(allocator, runtime, .{
-            .initial_extent = render_target.extent(viewport),
-            .map_mode = .continuous,
-            .event_mask = .{},
-        }, &diagnostic) catch |err| {
+        var map_options = try maplibre.mapOptionsDefault();
+        map_options.initial_extent = render_target.extent(viewport);
+        map_options.map_mode = .continuous;
+        map_options.event_mask = .{};
+        var map_future = maplibre.runtimeCreateMap(allocator, runtime, map_options, &diagnostic) catch |err| {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
@@ -74,56 +74,75 @@ pub const MapState = struct {
     }
 
     pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase) !void {
-        try self.updateCamera(.{ .gesture_phase = phase });
+        var update = try maplibre.cameraUpdateDefault(self.allocator);
+        defer update.deinit();
+        update.value.gesture_phase = phase;
+        try self.updateCamera(update.value);
     }
 
     pub fn moveBy(self: *MapState, dx: f64, dy: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .offset = .{ .x = dx, .y = dy } }, &self.diagnostic));
+        var delta = try maplibre.cameraDeltaDefault(self.allocator);
+        defer delta.deinit();
+        delta.value.offset = .{ .x = dx, .y = dy };
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .offset = .{ .x = dx, .y = dy },
-            .animation = .{ .duration_ms = duration_ms },
-        }, &self.diagnostic));
+        var delta = try maplibre.cameraDeltaDefault(self.allocator);
+        defer delta.deinit();
+        delta.value.offset = .{ .x = dx, .y = dy };
+        delta.value.animation.duration_ms = duration_ms;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .scale = scale, .anchor = anchor }, &self.diagnostic));
+        var delta = try maplibre.cameraDeltaDefault(self.allocator);
+        defer delta.deinit();
+        delta.value.scale = scale;
+        delta.value.anchor = anchor;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .scale = scale,
-            .anchor = anchor,
-            .animation = .{ .duration_ms = duration_ms },
-        }, &self.diagnostic));
+        var delta = try maplibre.cameraDeltaDefault(self.allocator);
+        defer delta.deinit();
+        delta.value.scale = scale;
+        delta.value.anchor = anchor;
+        delta.value.animation.duration_ms = duration_ms;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
     }
 
     pub fn adjustOrientation(self: *MapState, bearing: f64, pitch: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .bearing = bearing, .pitch = pitch }, &self.diagnostic));
+        var delta = try maplibre.cameraDeltaDefault(self.allocator);
+        defer delta.deinit();
+        delta.value.bearing = bearing;
+        delta.value.pitch = pitch;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .bearing = delta,
-            .animation = .{ .duration_ms = duration_ms },
-        }, &self.diagnostic));
+        var update = try maplibre.cameraDeltaDefault(self.allocator);
+        defer update.deinit();
+        update.value.bearing = delta;
+        update.value.animation.duration_ms = duration_ms;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, update.value, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .pitch = delta,
-            .animation = .{ .duration_ms = duration_ms },
-        }, &self.diagnostic));
+        var update = try maplibre.cameraDeltaDefault(self.allocator);
+        defer update.deinit();
+        update.value.pitch = delta;
+        update.value.animation.duration_ms = duration_ms;
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, update.value, &self.diagnostic));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
-        try self.updateCamera(.{
-            .mode = .ease,
-            .camera = .{ .bearing = 0, .pitch = 0 },
-            .animation = .{ .duration_ms = duration_ms },
-        });
+        var update = try maplibre.cameraUpdateDefault(self.allocator);
+        defer update.deinit();
+        update.value.mode = .ease;
+        update.value.camera = .{ .bearing = 0, .pitch = 0 };
+        update.value.animation.duration_ms = duration_ms;
+        try self.updateCamera(update.value);
     }
 
     fn updateCamera(self: *MapState, update: maplibre.CameraUpdate) !void {
@@ -172,12 +191,15 @@ fn setCamera(
     map: *maplibre.Map,
     diagnostic: *maplibre.Diagnostic,
 ) !void {
-    var completion = maplibre.mapUpdateCamera(allocator, map.*, .{ .camera = .{
+    var update = try maplibre.cameraUpdateDefault(allocator);
+    defer update.deinit();
+    update.value.camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    } }, diagnostic) catch |err| {
+    };
+    var completion = maplibre.mapUpdateCamera(allocator, map.*, update.value, diagnostic) catch |err| {
         diagnostics.logError("camera jump failed", err, diagnostic);
         return types.AppError.CameraJumpFailed;
     };
