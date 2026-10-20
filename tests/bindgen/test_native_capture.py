@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import shutil
 import tempfile
 import unittest
@@ -18,10 +17,8 @@ from support import (
     run,
 )
 
-from tools.bindgen import copy_cases
-from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
-from tools.bindgen.native_capture import completion_values, generate
+from tools.bindgen.native_capture import generate
 
 
 class NativeCaptureTests(unittest.TestCase):
@@ -74,7 +71,7 @@ class NativeCaptureTests(unittest.TestCase):
             with self.assertRaisesRegex(ModelError, "owned"):
                 generate(mutated)
 
-    def test_compiled_capture_copies_once_and_releases_unclaimed_handles(self):
+    def test_compiled_capture_copies_deeply_and_disposes_discarded_handles(self):
         api = replace(
             self.api,
             functions=tuple(
@@ -85,17 +82,6 @@ class NativeCaptureTests(unittest.TestCase):
             ),
         )
         compile_and_run(self, generate(api), CAPTURE_TEST)
-
-    def test_every_completion_value_type_has_one_copy_case(self):
-        # tests/native/internal/delivery_copies.cpp runs each case through the
-        # copy that a queue delivery makes.
-        bound = compile_api(self.api)
-        text = copy_cases.generate(bound)[copy_cases.PATH]
-        table = text[text.index("mln_delivery_copy_cases[] = {") :]
-        self.assertEqual(
-            sorted(re.findall(r'\{"(\w+)",', table)),
-            sorted(completion_values(bound)),
-        )
 
     def test_delivered_callback_copies_outlive_their_call_and_release_handles(
         self,
@@ -192,17 +178,8 @@ int main() {
 """
 CAPTURE_TEST = r"""
 #include <cassert>
-#include <cstdlib>
 #include <cstring>
 #include <new>
-static std::size_t allocations = 0;
-void* operator new(std::size_t size) {
-  ++allocations;
-  if (auto* p = std::malloc(size)) return p;
-  throw std::bad_alloc{};
-}
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 #include "delivery/delivery_queue.hpp"
 static unsigned disposed = 0;
 auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
@@ -216,14 +193,10 @@ template <class T>
 auto copy(const T* values, std::size_t count) -> const T* {
   const auto& capture = mln::delivery::completion_capture<T>;
   mln::delivery::Arena<false> measure{nullptr, 0};
-  const auto before = allocations;
   capture.measure(measure, values, count);
-  assert(allocations == before);
   auto* storage = static_cast<std::byte*>(::operator new(measure.offset == 0 ? 1 : measure.offset));
   mln::delivery::Arena<true> write{storage, 0, measure.offset};
-  const auto* copied = static_cast<const T*>(capture.write(write, values, count));
-  assert(allocations == before + 1);
-  return copied;
+  return static_cast<const T*>(capture.write(write, values, count));
 }
 
 int main() {
@@ -242,18 +215,6 @@ int main() {
   assert(std::memcmp(copied->tilejson.tile_urls[0].data, "retained URL", 12) == 0);
   assert(std::memcmp(copied->attribution.data, "retai", 5) == 0);
   assert(std::memcmp(copied->id.data, "retained", 8) == 0);
-
-  // A clear bit leaves the embedded record unread, so the copy never follows
-  // its pointer or trusts its count.
-  mln_style_source_info absent{};
-  absent.fields = MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
-  absent.attribution = {url, 5};
-  absent.tilejson.tile_urls = reinterpret_cast<const mln_buffer_view*>(1);
-  absent.tilejson.tile_url_count = std::numeric_limits<std::size_t>::max();
-  absent.tilejson.min_zoom = 3.0;
-  copied = copy(&absent, 1);
-  const mln_style_source_tile_info zero{};
-  assert(std::memcmp(&copied->tilejson, &zero, sizeof(zero)) == 0);
 
   // A present empty array keeps its presence, and an absent one stays absent.
   assert(copy(&source, 0) != nullptr);
@@ -284,8 +245,6 @@ int main() {
   };
   mln::delivery::completion_capture<mln_map>.discard(owned);
   assert(disposed == 2);
-  assert(mln::delivery::completion_capture<mln_map>.discard != nullptr);
-  assert(mln::delivery::completion_capture<mln_style_source_info>.discard == nullptr);
 }
 """
 

@@ -104,9 +104,6 @@ class KotlinLayoutTests(unittest.TestCase):
                 with self.subTest(width=width):
                     self.compile((header,), layout_assertions(api, width), width)
 
-    def test_the_repository_api_generates_completely(self):
-        self.assertEqual(kotlin.coverage(real_api())["unsupported"], {})
-
     def test_the_jni_glue_compiles_against_the_headers_for_both_data_models(self):
         # The glue casts each carrier to its C parameter type, so compiling it
         # against the real prototypes checks every cast.

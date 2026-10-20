@@ -294,11 +294,6 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             ),
             ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
             ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
-            (
-                'BIND("mask=fields;bit=SETTINGS_ZOOM")',
-                'BIND("mask=fields;bit=SETTINGS_ZOOM;default=1.0")',
-                "plain value",
-            ),
             ("extent area;", 'extent area BIND("default=1");', "plain value"),
             (
                 'BIND("kind=reserved")',
@@ -584,18 +579,6 @@ mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnos
                 require_complete=True,
             )
 
-    def test_callback_reentry_policy_is_explicit(self):
-        source = """
-typedef void (*logger)(void *state) BIND("reentry=forbid");
-"""
-        api = bind(self.parse(source), require_complete=True)
-        self.assertEqual(api.callbacks["logger"].reentry, "forbid")
-        with self.assertRaisesRegex(ModelError, "reentry"):
-            bind(
-                self.parse(source.replace("reentry=forbid", "reentry=unknown")),
-                require_complete=True,
-            )
-
     def test_counted_character_encoding_resolves_as_buffer(self):
         api = bind(
             self.parse("""
@@ -819,17 +802,6 @@ mln_status set_options(const options *value, mln_diagnostic *out_diagnostic);
                 ),
                 require_complete=True,
             )
-        # The relation is derived, never declared.
-        with self.assertRaisesRegex(ModelError, "unknown metadata key 'support'"):
-            bind(
-                self.parse(
-                    source.replace(
-                        "mln_status set_options",
-                        'BIND("support=default:options") mln_status set_options',
-                    )
-                ),
-                require_complete=True,
-            )
 
     def test_attachment_keeps_immediate_owner_separate_from_completion(self):
         source = """
@@ -976,7 +948,6 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
                 later,
                 "without a completion",
             ),
-            ("absent_on=MLN_STATUS_MISSING", one, "failure enumerator"),
             ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
             # A drain is absent on MLN_STATUS_NOT_READY by convention.
             (

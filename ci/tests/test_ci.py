@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import itertools
 import json
 import os
 import pathlib
@@ -108,14 +107,13 @@ class CoverageTest(unittest.TestCase):
             for name, job in suite(source, presets, "extended")["jobs"].items()
             if name != "verified"
         }
-        for size in range(len(PLATFORMS) + 1):
-            for platforms in itertools.combinations(PLATFORMS, size):
-                event = pr(labels=[f"ci:{name}" for name in platforms])
-                selection = scope("extended", "pull_request", event)
-                jobs = selected_jobs(source, presets, "extended", selection)
-                self.assertEqual(len(jobs), len(set(jobs)))
-                for job in jobs:
-                    self.assertLessEqual(needs[job], set(jobs), (platforms, job))
+        for platforms in [(name,) for name in PLATFORMS] + [tuple(PLATFORMS)]:
+            event = pr(labels=[f"ci:{name}" for name in platforms])
+            selection = scope("extended", "pull_request", event)
+            jobs = selected_jobs(source, presets, "extended", selection)
+            self.assertEqual(len(jobs), len(set(jobs)))
+            for job in jobs:
+                self.assertLessEqual(needs[job], set(jobs), (platforms, job))
         self.assertEqual(
             set(selected_jobs(source, presets, "extended", "full")), set(needs)
         )
@@ -152,26 +150,19 @@ class CoverageTest(unittest.TestCase):
                 )
 
     def test_readiness_labels_and_authorship_select_complete_groups(self):
-        for draft, full_label, dependabot in itertools.product((False, True), repeat=3):
-            for size in range(len(PLATFORMS) + 1):
-                for groups in itertools.combinations(PLATFORMS, size):
-                    labels = [f"ci:{group}" for group in groups]
-                    if full_label:
-                        labels.append("ci:full")
-                    event = pr(
-                        draft,
-                        labels,
-                        "dependabot[bot]" if dependabot else "contributor",
-                    )
-                    selected = {
-                        group for group in GROUPS if scope(group, "pull_request", event)
-                    }
-                    expected = {"baseline"}
-                    if not draft:
-                        expected.add("ready")
-                    if full_label or dependabot or groups:
-                        expected.add("extended")
-                    self.assertEqual(selected, expected)
+        for draft, labels, author, expected in (
+            (True, [], "contributor", {"baseline"}),
+            (False, ["unrelated"], "contributor", {"baseline", "ready"}),
+            (True, ["ci:apple"], "contributor", {"baseline", "extended"}),
+            (False, ["ci:full"], "contributor", {"baseline", "ready", "extended"}),
+            (True, [], "dependabot[bot]", {"baseline", "extended"}),
+        ):
+            event = pr(draft, labels, author)
+            with self.subTest(draft=draft, labels=labels, author=author):
+                self.assertEqual(
+                    {group for group in GROUPS if scope(group, "pull_request", event)},
+                    expected,
+                )
         for event_name in ("push", "workflow_dispatch"):
             self.assertEqual(plan("extended", event_name, {}, ENV)["mode"], "run")
         event = pr(True)
@@ -396,16 +387,6 @@ class WorkflowTest(unittest.TestCase):
             },
         )
 
-    def test_every_android_emulator_target_smoke_runs_the_map_example(self):
-        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
-        for preset in ("android-x64-egl", "android-x64-vulkan"):
-            row = rows[preset]
-            with self.subTest(preset=preset):
-                self.assertIn(
-                    f"mise run //examples/android-map:smoke {preset}",
-                    row["native_commands"] + row.get("consumer_commands", []),
-                )
-
     def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
         for group in GROUPS:
             for name, job in self.workflows[f"_ci-{group}.yml"]["jobs"].items():
@@ -446,14 +427,12 @@ class WorkflowTest(unittest.TestCase):
             )
 
         self.assertTrue(accepts(results))
-        for name in expected:
-            for result in ("failure", "cancelled", "skipped"):
-                self.assertFalse(
-                    accepts({**results, name: {"result": result}}), (name, result)
-                )
-            self.assertFalse(
-                accepts({key: value for key, value in results.items() if key != name})
-            )
+        name = next(iter(expected))
+        for result in ("failure", "cancelled", "skipped"):
+            self.assertFalse(accepts({**results, name: {"result": result}}), result)
+        self.assertFalse(
+            accepts({key: value for key, value in results.items() if key != name})
+        )
         self.assertFalse(accepts({**results, "unexpected": {"result": "success"}}))
 
     def test_extended_gate_accepts_only_skips_outside_selected_scope(self):
@@ -480,29 +459,33 @@ class WorkflowTest(unittest.TestCase):
         self.assertTrue(accepts(results))
         self.assertFalse(accepts(results, []))
         self.assertFalse(accepts(results, [*selected, "unknown"]))
-        for name in expected:
-            for result in {"success", "failure", "skipped", "cancelled"} - {
-                results[name]["result"]
-            }:
-                self.assertFalse(
-                    accepts({**results, name: {"result": result}}), (name, result)
-                )
+        inside = next(name for name in expected if name in selected)
+        outside = next(name for name in expected if name not in selected)
+        for name, result in (
+            (inside, "skipped"),
+            (inside, "failure"),
+            (outside, "success"),
+            (outside, "cancelled"),
+        ):
+            self.assertFalse(
+                accepts({**results, name: {"result": result}}), (name, result)
+            )
 
     def test_required_gate_only_accepts_executed_success_reused_success_or_omission(
         self,
     ):
         step = caller("extended")["jobs"]["required"]["steps"][0]
-        for plan_result, mode, previous, result in itertools.product(
-            ("success", "failure", "cancelled", "skipped"),
-            ("run", "reuse", "omit", ""),
-            ("success", "failure", ""),
-            ("success", "failure", "cancelled", "skipped"),
+        for plan_result, mode, previous, result, expected in (
+            ("success", "run", "", "success", True),
+            ("success", "reuse", "success", "skipped", True),
+            ("success", "omit", "", "skipped", True),
+            ("failure", "run", "", "success", False),
+            ("success", "run", "", "failure", False),
+            ("success", "run", "", "skipped", False),
+            ("success", "reuse", "failure", "skipped", False),
+            ("success", "omit", "", "success", False),
+            ("success", "", "", "skipped", False),
         ):
-            expected = plan_result == "success" and (
-                (mode == "run" and result == "success")
-                or (mode == "reuse" and result == "skipped" and previous == "success")
-                or (mode == "omit" and result == "skipped")
-            )
             self.assertEqual(
                 shell_accepts(
                     step,

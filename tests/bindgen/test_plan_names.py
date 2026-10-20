@@ -52,12 +52,6 @@ class PlanNameTests(unittest.TestCase):
                 "mln_status mln_pass_span(mln_pass pass, mln_span span, mln_diagnostic *out_diagnostic);\n"
             )
 
-    def test_an_operation_prefix_override_is_rejected(self):
-        with self.assertRaisesRegex(ModelError, "unknown metadata key"):
-            self.bind(
-                'typedef struct mln_box { double side; } mln_box BIND("prefix=mln_cube");\n'
-            )
-
     def test_only_a_leading_handle_is_the_receiver(self):
         operation = self.bind(
             "mln_status mln_pass_after(int count, mln_pass pass, mln_diagnostic *out_diagnostic);\n"

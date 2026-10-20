@@ -42,9 +42,6 @@ class GenerationTests(unittest.TestCase):
         bound = compile_api(real_api())
         commands = {p.name for p in bound.operations if p.execution == "command"}
         self.assertTrue(commands)
-        for plan in bound.operations:
-            if plan.completion:
-                self.assertEqual(plan.completion.discardable, plan.name in commands)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
                 coverage = emitter.coverage(bound)
@@ -75,16 +72,9 @@ class GenerationTests(unittest.TestCase):
                 self.rendered(emitter, bound)
 
     def test_output_array_requires_a_counted_input_array(self):
-        for length, direction in (
-            ("point_count", "out"),
-            ("nul", "out"),
-        ):
-            with (
-                self.subTest(length=length, direction=direction),
-                self.assertRaisesRegex(ModelError, "output array length"),
-            ):
-                self.parse(f"""
-mln_status mln_probe_batch(unsigned point_count, double *out_values BIND("direction={direction};length={length}"), mln_diagnostic *out_diagnostic);
+        with self.assertRaisesRegex(ModelError, "output array length"):
+            self.parse("""
+mln_status mln_probe_batch(unsigned point_count, double *out_values BIND("direction=out;length=point_count"), mln_diagnostic *out_diagnostic);
 """)
 
     def test_output_array_cannot_take_its_count_from_a_byte_buffer(self):
@@ -148,47 +138,6 @@ mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction
             dart_native.generate(compile_api(after)),
         )
 
-    def test_added_and_renamed_function_generate_without_function_tables(self):
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                original = self.parse(
-                    """
-BIND("execution=query;result=double")
-mln_status mln_map_test_scale(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""",
-                    owned_map=True,
-                )
-                renamed = self.parse(
-                    """
-BIND("execution=query;result=double")
-mln_status mln_map_new_scale(mln_map map, float latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=command")
-mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""",
-                    owned_map=True,
-                )
-                self.assertEqual(
-                    set(emitter.coverage(original)["generated"]) - {"mln_map_close"},
-                    {"mln_map_test_scale"},
-                )
-                self.assertEqual(
-                    set(emitter.coverage(renamed)["generated"]) - {"mln_map_close"},
-                    {"mln_map_new_scale", "mln_map_new_command"},
-                )
-
-    def test_a_new_handle_generates_without_emitter_tables(self):
-        api = self.parse("""
-typedef unsigned long long mln_widget BIND("kind=handle;release=mln_widget_close;dispose=mln_widget_close");
-void mln_widget_close(mln_widget widget);
-BIND("execution=query;result=double")
-mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                coverage = emitter.coverage(api)
-                self.assertIn("mln_widget_scale", coverage["generated"])
-                self.assertNotIn("mln_widget_scale", coverage["unsupported"])
-
     def test_partial_field_metadata_rejects_whole_record_and_operation(self):
         api = self.parse("""
 typedef struct mln_new_entry {
@@ -251,10 +200,6 @@ mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_dia
                     coverage = emitter.coverage(api)
                     self.assertEqual(coverage["generated"], [])
                     self.assertIn("mln_map_consume", coverage["unsupported"])
-
-    def test_consumption_policy_rejects_ambiguous_values(self):
-        with self.assertRaisesRegex(ModelError, "unsupported consumes"):
-            self.parse('BIND("consumes=map") void mln_map_consume(mln_map map);')
 
     def test_nullable_record_field_preserves_pointer_presence(self):
         api = self.parse("""

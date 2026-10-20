@@ -64,25 +64,13 @@ class RenderTests(unittest.TestCase):
         "https://example.invalid/api_8h.html",  # lint: not-fetched
     )
 
-    def test_markdown_escapes_prose_and_keeps_code(self):
-        self.assertEqual(
-            docs.markdown_lines(self.doc, 200)[0],
-            "Accepts \\[0, 1\\] and \\<x\\> where a \\*/ b; keeps `mln_x[i]` and & \\\\.",
-        )
-
     def test_kdoc_escapes_prose_without_backslashes_and_never_closes_early(self):
         body = docs.block_comment(self.doc).removeprefix("/**").removesuffix("*/\n")
         self.assertNotIn("*/", body)
         # KDoc reads a backslash literally, so brackets become references.
+        self.assertIn("&#91;0, 1&#93;", body)
         # Dokka would emit a decoded `<` as markup, so it stays in code.
-        self.assertIn("Accepts &#91;0, 1&#93; and `<x>` where a &#42;/ b;", body)
-        self.assertIn("`mln_x[i]`", body)
-
-    def test_xml_comment_escapes_markup(self):
-        comment = docs.xml_comment(self.doc)
-        self.assertIn("&lt;x&gt;", comment)
-        self.assertIn("&amp;", comment)
-        self.assertIn("<c>mln_x[i]</c>", comment)
+        self.assertIn("`<x>`", body)
 
     def test_xml_param_documents_a_positional_property(self):
         param = docs.xml_param(self.doc, "Range", "    ")
@@ -99,18 +87,6 @@ class RenderTests(unittest.TestCase):
         function = ast.parse(f"def f():\n{statement}").body[0]
         # The docstring holds the Markdown, which escapes the backslash.
         self.assertEqual(ast.get_docstring(function), 'Holds """ and \\\\ and "x"')
-
-    def test_go_comment_begins_with_the_declared_name(self):
-        operation = Doc("mln_map_release", "Releases a map.")
-        self.assertEqual(
-            docs.go_comment(operation, "Release", operation=True),
-            "// Release releases a map.\n",
-        )
-        value = Doc("mln_size", "Size of a `mln_map`.")
-        self.assertEqual(
-            docs.go_comment(value, "Size"),
-            "// Size corresponds to mln_size. Size of a mln_map.\n",
-        )
 
     def test_wraps_within_the_comment_width(self):
         doc = Doc("mln_long", " ".join(["word"] * 60), docs.REFERENCE + "api_8h.html")

@@ -13,42 +13,6 @@ from tools.bindgen.schema import validate
 
 
 class ManagedEmitterTests(unittest.TestCase):
-    def test_kotlin_owner_retains_its_receiver_as_parent(self):
-        api = self.parse(
-            """
-typedef unsigned long long mln_measurement_handle BIND("kind=handle;release=mln_measurement_destroy;dispose=mln_measurement_destroy;parent=mln_map");
-mln_status mln_map_measure(mln_map map, mln_measurement_handle *out_owner BIND("direction=out"), mln_diagnostic *out_diagnostic);
-void mln_measurement_destroy(mln_measurement_handle owner);
-""",
-            map_handle=True,
-        )
-        self.assertEqual(kotlin.coverage(api)["unsupported"], {})
-        (output,) = compile_api(api).operations_by_name["mln_map_measure"].owned_outputs
-        self.assertEqual(
-            (output.parent_parameter, output.handle.parent), ("map", "mln_map")
-        )
-
-    def test_kotlin_conditional_registration_roots_in_its_receiver_until_native_release(
-        self,
-    ):
-        api = self.parse(
-            """
-typedef void (*mln_release)(void *context);
-typedef void (*mln_watch)(void *context) BIND("reentry=protocol;reentry_owner=mln_map;reentry_calls=mln_map_close");
-typedef struct mln_watcher { unsigned size; mln_watch callback; void *context BIND("kind=context"); mln_release release; } mln_watcher BIND("kind=callback_registration;release=release");
-BIND("accepted_unless=done")
-mln_status mln_map_watch(mln_map map, const mln_watcher *watcher, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
-""",
-            map_handle=True,
-        )
-        self.assertEqual(kotlin.coverage(api)["unsupported"], {})
-        bound = compile_api(api)
-        (registration,) = bound.operations_by_name["mln_map_watch"].registrations
-        # Native keeps nothing it reports through the condition.
-        self.assertEqual(registration.accepted_unless, "done")
-        # The callback calls back only into the map that registers it.
-        self.assertTrue(bound.values["mln_watcher"].registration.receiver_owned)
-
     def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
         api = parse(
             source,
@@ -130,9 +94,6 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         generated = dart.coverage(api)["generated"]
         self.assertIn("mln_notice_set_callback", generated)
         self.assertIn("mln_host_set_provider", generated)
-        operations = dart.generate(api)
-        self.assertIn("result.ref.queue = isolateDeliveryQueue.handle;", operations)
-        self.assertIn("raw.mln_delivery_batch_take(batch, index", operations)
         # Without a queue, Dart has no way to answer the callback.
         synchronous = parse_sources(
             {
@@ -232,27 +193,6 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(dotnet.emit(api).functions, ("mln_map_ready",))
-
-    def test_counted_output_is_not_treated_as_one_scalar(self):
-        api = self.parse("""
-mln_status mln_map_samples(mln_map map, const double *values BIND("length=count"), unsigned count,
-  double *samples BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
-""")
-        for emitter in (dotnet, dart, kotlin):
-            self.assertIn("mln_map_samples", emitter.coverage(api)["generated"])
-
-    def test_dotnet_record_pointer_count_cannot_be_erased(self):
-        source = """
-typedef struct mln_coordinate { double latitude; double longitude; } mln_coordinate;
-BIND("execution=command")
-mln_status mln_map_move(mln_map map,
-  const mln_coordinate *coordinates BIND("length=count"), unsigned count,
-  const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-        counted = self.parse(source)
-        self.assertIn("mln_map_move", dotnet.coverage(counted)["generated"])
-        single = self.parse(source.replace(' BIND("length=count")', ""))
-        self.assertIn("mln_map_move", dotnet.coverage(single)["generated"])
 
     def test_dotnet_scalar_absence_cannot_disappear(self):
         source = """

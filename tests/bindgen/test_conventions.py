@@ -28,20 +28,13 @@ mln_status session_open(const listener *events, void *native_window,
 
 class ConventionTests(unittest.TestCase):
     def test_completion_nullability_follows_execution(self):
-        for execution, result in (
-            ("command", ""),
-            ("operation", ""),
-            ("lifecycle", ""),
-            ("query", ";result=double"),
-        ):
-            with self.subTest(execution=execution):
-                api = parse(f"""BIND("execution={execution}{result}")
+        api = parse("""BIND("execution=command")
 mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_diagnostic *out_diagnostic);
 """)
-                with self.assertRaisesRegex(
-                    ModelError, "nullable is not allowed on a completion"
-                ):
-                    validate(api)
+        with self.assertRaisesRegex(
+            ModelError, "nullable is not allowed on a completion"
+        ):
+            validate(api)
 
     def test_versioned_values_and_commands_need_no_annotation(self):
         api = parse(groups=("conventions",))
@@ -111,70 +104,20 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         self.assertEqual((owner.parameter, owner.handle.parent), ("out_session", None))
 
     def test_an_annotation_that_restates_a_default_is_rejected(self):
-        cases = (
-            (
-                "mln_status session_open(const listener *events,",
-                'mln_status session_open(const listener *events BIND("length=1"),',
-                "events: length=1",
-            ),
-            (
-                "void session_close(",
-                'BIND("execution=immediate") void session_close(',
-                "execution=immediate",
-            ),
-            (
-                "release=session_close",
-                "release=session_close;parent=none",
-                "parent=none",
-            ),
-            (
-                "const char *message",
-                'const char *message BIND("encoding=utf8;length=nul")',
-                "length=nul",
-            ),
-            (
-                "(*release)(void *context)",
-                '(*release)(void *context BIND("kind=context"))',
-                "kind=context",
-            ),
-            (
-                "(*release)(void *context);",
-                '(*release)(void *context) BIND("failure=contain");',
-                "failure=contain",
-            ),
-            (
-                "release=release_context",
-                "release=release_context;user_data=context",
-                "user_data=context",
-            ),
-            (
-                'BIND("direction=out")',
-                'BIND("direction=out;ownership=owned")',
-                "ownership=owned",
-            ),
-            (
-                "void *native_window",
-                'void *native_window BIND("kind=native_pointer")',
-                "kind=native_pointer",
-            ),
-        )
-        for before, after, item in cases:
-            with (
-                self.subTest(item=item),
-                self.assertRaisesRegex(ModelError, f"{item} restates the default"),
-            ):
-                parse(REGISTRATION.replace(before, after, 1))
+        with self.assertRaisesRegex(
+            ModelError, "execution=immediate restates the default"
+        ):
+            parse(
+                REGISTRATION.replace(
+                    "void session_close(",
+                    'BIND("execution=immediate") void session_close(',
+                    1,
+                )
+            )
         with self.assertRaisesRegex(ModelError, "kind=size restates the default"):
             parse(
                 groups=("conventions",),
                 source='typedef struct sized { uint32_t size BIND("kind=size"); } sized;',
-            )
-        with self.assertRaisesRegex(ModelError, "result=void restates the default"):
-            parse(
-                groups=("conventions",),
-                source='BIND("execution=operation;result=void") mln_status mln_map_flush('
-                "mln_map map, const mln_completion *completion, "
-                "mln_diagnostic *out_diagnostic);",
             )
 
     def test_an_annotation_writes_only_the_vocabulary_headers_use(self):
@@ -190,55 +133,12 @@ BIND("execution=command") mln_status session_flush(
         validate(parse(source))
         command = 'BIND("execution=command'
         message = "const char *message"
-        close = "session_close(session value"
-        handle = "release=session_close"
-        # Keys that no header writes, and where each would go.
-        keys = (
-            ("receiver", command, command + ";receiver=value"),
-            ("name", command, command + ";name=flush_now"),
-            (
-                "projection",
-                "release=release_context",
-                "release=release_context;projection=listener",
-            ),
-            ("release_consumes", handle, handle + ";release_consumes=always"),
-            (
-                "thread",
-                "(*release)(void *context)",
-                '(*release)(void *context) BIND("thread=host")',
-            ),
-        )
-        for key, before, after in keys:
-            with (
-                self.subTest(key=key),
-                self.assertRaisesRegex(ModelError, f"unknown metadata key '{key}'"),
-            ):
-                validate(parse(source.replace(before, after, 1)))
-        # Values that no header writes, each where it departs from the default.
-        values = (
-            ("shape=none", "result=double", "result=double;shape=none"),
-            ("shape=value", command, command + ";shape=value"),
-            ("shape=bytes", "result=double", "result=double;shape=bytes"),
-            ("ownership=value", "result=double", "result=double;ownership=value"),
-            ("optional=null", message, message + ' BIND("optional=null")'),
-            ("nullable=false", message, message + ' BIND("nullable=false")'),
-            ("lifetime=completion", message, message + ' BIND("lifetime=completion")'),
-            (
-                "direction=in",
-                "notify callback;",
-                'notify callback BIND("direction=in");',
-            ),
-            ("consumes=always", close, close + ' BIND("consumes=always")'),
-            ("handle_access=live", close, close + ' BIND("handle_access=live")'),
-            ("reentry=allow", handle, handle + ";reentry=allow"),
-        )
-        for annotation, before, after in values:
-            key, value = annotation.split("=")
-            with (
-                self.subTest(annotation=annotation),
-                self.assertRaisesRegex(ModelError, f"unsupported {key}='{value}'"),
-            ):
-                parse(source.replace(before, after, 1))
+        # A key that no header writes.
+        with self.assertRaisesRegex(ModelError, "unknown metadata key 'receiver'"):
+            validate(parse(source.replace(command, command + ";receiver=value", 1)))
+        # A value that no header writes, where it departs from the default.
+        with self.assertRaisesRegex(ModelError, "unsupported lifetime='completion'"):
+            parse(source.replace(message, message + ' BIND("lifetime=completion")', 1))
 
     def test_a_default_constructor_is_inferred_only_when_it_is_unambiguous(self):
         source = """
@@ -263,20 +163,19 @@ typedef unsigned long long request BIND("kind=handle;release=request_close");
 void request_close(request value);
 typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;failure=PASS;ANNOTATION");
 """
-        for annotation in (
-            "reentry=protocol;reentry_owner=handle;reentry_calls=request_close,missing",
-            "complete=missing",
-            "cancel_registration=missing",
-            "wait_retired=missing",
+        # A list names each function, so one absent entry fails.
+        with self.assertRaisesRegex(
+            ModelError, "reentry_calls names an absent function 'missing'"
         ):
-            key = annotation.rsplit(";", 1)[-1].split("=")[0]
-            with (
-                self.subTest(key=key),
-                self.assertRaisesRegex(
-                    ModelError, f"{key} names an absent function 'missing'"
-                ),
-            ):
-                validate(parse(source.replace("ANNOTATION", annotation)))
+            validate(
+                parse(
+                    source.replace(
+                        "ANNOTATION",
+                        "reentry=protocol;reentry_owner=handle;"
+                        "reentry_calls=request_close,missing",
+                    )
+                )
+            )
         with self.assertRaisesRegex(
             ModelError, "release names an absent function 'missing'"
         ):

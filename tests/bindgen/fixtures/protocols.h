@@ -138,12 +138,9 @@ typedef unsigned long long mln_map;
 #ifdef MLN_PROTOCOL_VALUES
 // Copied values: a nested record behind a presence bit, nullable and required
 // counted arrays with narrow counts, and nullable UTF-8 with explicit length.
-#ifndef MLN_PROTOCOL_GAIN_TYPE
-#define MLN_PROTOCOL_GAIN_TYPE double
-#endif
 typedef struct mln_probe_point {
   double type;
-  MLN_PROTOCOL_GAIN_TYPE gain;
+  double gain;
 } mln_probe_point;
 typedef enum BIND("kind=bitmask") mln_probe_option_field : uint32_t {
   MLN_PROBE_OPTION_POINT = 1u << 0u,

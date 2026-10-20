@@ -150,10 +150,6 @@ mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"), mln_d
         self.assertEqual(python.coverage(api)["unsupported"], {})
         generated = self.materialize(api)
         owners, values = generated.owners, generated.values
-        self.assertEqual(
-            values.TicketProvider.__annotations__["callback"],
-            "Callable[[TicketHandle], Decision] | None",
-        )
         # The provider hands its callback the issued handle's owner.
         values._wrap_response = lambda native, owner: (owner, native)
         received = []

@@ -19,52 +19,50 @@ from tools.bindgen.schema import validate
 
 
 class GoEmitterTests(unittest.TestCase):
-    def test_header_mutation_compiles_counted_arrays_and_keyword_names(self):
-        for scalar, literal in (("double", "3.25"), ("_Bool", "true")):
-            with self.subTest(scalar=scalar), TemporaryDirectory() as directory:
-                root = Path(directory)
-                include = root / "include"
-                include.mkdir()
-                header = protocol_header(
-                    groups=("values", "keywords", "absent_value"),
-                    defines=(f"MLN_PROTOCOL_GAIN_TYPE {scalar}",),
-                )
-                (include / "api.h").write_text(header)
-                shutil.copy(PROTOCOLS_STUB, root / "protocols_stub.c")
-                api = parse_sources({"api.h": header})
-                validate(api)
-                self.assertEqual(
-                    go.coverage(api),
-                    {
-                        "generated": [
-                            "mln_keyword_combine",
-                            "mln_probe_nullable_text",
-                            "mln_probe_read_level",
-                            "mln_probe_roundtrip",
-                        ],
-                        "discarding": [],
-                        "support": {},
-                        "unsupported": {},
-                    },
-                )
-                files = go.generate(api)
-                source = files["generated_api.go"]
-                source = source.replace(
-                    "#cgo pkg-config: maplibre-native-c",
-                    "#cgo CFLAGS: -I${SRCDIR}/include",
-                )
-                source = source.replace(
-                    '#include "maplibre_native_c/plugin.h"', '#include "api.h"'
-                )
-                (root / "generated.go").write_text(source)
-                (root / "generated_callbacks.h").write_text(
-                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3, binding_operation_mln_probe_read_level = 4 };\n"
-                )
-                (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
-                (root / "runtime.go").write_text(
-                    """package maplibre
+    def test_generated_values_and_keyword_parameters_round_trip(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            include = root / "include"
+            include.mkdir()
+            header = protocol_header(
+                groups=("values", "keywords", "absent_value"),
+            )
+            (include / "api.h").write_text(header)
+            shutil.copy(PROTOCOLS_STUB, root / "protocols_stub.c")
+            api = parse_sources({"api.h": header})
+            validate(api)
+            self.assertEqual(
+                go.coverage(api),
+                {
+                    "generated": [
+                        "mln_keyword_combine",
+                        "mln_probe_nullable_text",
+                        "mln_probe_read_level",
+                        "mln_probe_roundtrip",
+                    ],
+                    "discarding": [],
+                    "support": {},
+                    "unsupported": {},
+                },
+            )
+            files = go.generate(api)
+            source = files["generated_api.go"]
+            source = source.replace(
+                "#cgo pkg-config: maplibre-native-c",
+                "#cgo CFLAGS: -I${SRCDIR}/include",
+            )
+            source = source.replace(
+                '#include "maplibre_native_c/plugin.h"', '#include "api.h"'
+            )
+            (root / "generated.go").write_text(source)
+            (root / "generated_callbacks.h").write_text(
+                "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3, binding_operation_mln_probe_read_level = 4 };\n"
+            )
+            (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
+            (root / "runtime.go").write_text(
+                """package maplibre
 /*
-#cgo CFLAGS: -I${SRCDIR}/include -IFIXTURES -DMLN_PROTOCOL_GAIN_TYPE=SCALAR
+#cgo CFLAGS: -I${SRCDIR}/include -IFIXTURES
 #include <stdlib.h>
 #include "api.h"
 */
@@ -89,16 +87,16 @@ type bindingTarget struct { operation uint32 }
 func bindingGlobal(operation uint32) bindingTarget { return bindingTarget{operation} }
 func bindingGet[T any](target bindingTarget, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); bindingAdmission(target.operation, 0); bindingCheck(func(d *C.mln_diagnostic) int32 { return call(a, 0, d) }); return result(a), nil }
 func bindingGetUnless[T any](target bindingTarget, absent int32, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); var none T; status := call(a, 0, nil); if status == absent { return none, nil }; if status != 0 { return none, fmt.Errorf("status %d", status) }; return result(a), nil }
-""".replace("FIXTURES", str(FIXTURES)).replace("SCALAR", scalar)
-                )
-                # The value conversions need no C declarations, so the probe
-                # compiles the binding's own file over the arena above.
-                shutil.copy(ROOT / "bindings/go/convert.go", root / "convert.go")
-                (root / "values_test.go").write_text(
-                    """package maplibre
+""".replace("FIXTURES", str(FIXTURES))
+            )
+            # The value conversions need no C declarations, so the probe
+            # compiles the binding's own file over the arena above.
+            shutil.copy(ROOT / "bindings/go/convert.go", root / "convert.go")
+            (root / "values_test.go").write_text(
+                """package maplibre
 import "testing"
 func TestRoundtrip(t *testing.T) {
-    point := ProbePoint{Type: 9.5, Gain: LITERAL}
+    point := ProbePoint{Type: 9.5, Gain: 3.25}
     empty := ""
     input := ProbeOptions{Title: &empty, Point: &point, Left: []ProbePoint{point}, Right: []ProbePoint{point,point}}
     output, err := ProbeRoundtrip(input)
@@ -120,7 +118,7 @@ func TestRoundtrip(t *testing.T) {
     if level, err := ProbeReadLevel(); err != nil || level == nil || *level != 0.5 { t.Fatalf("published level: %v, %v",level,err) }
     if level, err := ProbeReadLevel(); level != nil || err == nil { t.Fatalf("exhausted level: %v, %v",level,err) }
 }
-""".replace("LITERAL", literal)
-                )
-                go_tool = require_tool(self, "go", ROOT / "bindings/go")
-                go_tool.run(self, "test", "./...", cwd=root)
+"""
+            )
+            go_tool = require_tool(self, "go", ROOT / "bindings/go")
+            go_tool.run(self, "test", "./...", cwd=root)

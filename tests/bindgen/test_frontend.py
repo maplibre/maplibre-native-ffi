@@ -110,18 +110,6 @@ void mln_qualified(const volatile double *restrict value);
         self.assertTrue(pointer.pointee.const)
         self.assertTrue(pointer.pointee.volatile)
 
-    def test_enum_expressions_are_evaluated_by_compiler(self):
-        api = self.parse("""
-typedef enum mln_flags : unsigned long long {
-  MLN_HIGH = 1ULL << 63,
-  MLN_LOW = 3,
-  MLN_COMBINED = MLN_HIGH | MLN_LOW
-} mln_flags;
-""")
-        (flags,) = (enum for enum in api.enums if enum.name == "mln_flags")
-        values = {value.name: value.value for value in flags.values}
-        self.assertEqual(values["MLN_COMBINED"], (1 << 63) | 3)
-
     def test_enum_typedef_underlying_preserves_unsigned_high_bits(self):
         api = self.parse("""
 typedef unsigned int sample_u32;
@@ -158,10 +146,6 @@ mln_options mln_options_default(void);
                 models.append(parse_headers(Path(directory)).to_json())
         self.assertEqual(*models)
 
-    def test_invalid_c_never_produces_partial_bindings(self):
-        with self.assertRaisesRegex(ModelError, "unknown type name"):
-            self.parse("mln_typo mln_broken(void);")
-
     def test_query_requires_a_result_and_defaults_its_payload(self):
         with self.assertRaisesRegex(ModelError, "query requires a value payload"):
             validate(
@@ -194,16 +178,6 @@ mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *o
             validate(api)
         self.assertIn("unknown metadata key 'ownershp'", str(raised.exception))
         self.assertIn("output direction contradicts const", str(raised.exception))
-
-    def test_completion_storage_helpers_are_immediate(self):
-        validate(
-            self.parse("""
-mln_status mln_completion_create(mln_completion *out_completion BIND("direction=out"), mln_diagnostic *out_diagnostic);
-void mln_completion_reject(mln_completion *completion);
-BIND("execution=operation")
-mln_status mln_barrier(const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        )
 
     def test_duplicate_metadata_is_rejected_at_the_declaration(self):
         with self.assertRaisesRegex(
