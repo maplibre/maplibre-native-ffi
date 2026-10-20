@@ -93,10 +93,16 @@ auto string(Arena<Writing>& arena, const char* value) -> const char* {
   return bytes(arena, value, length + 1);
 }
 
-// The generated copies: capture_element() and discard_element() for each
-// completion value type, the copies of mln_log_delivery and
-// mln_resource_request_delivery. A completion value type
-// without an overload fails to compile where its completion is delivered.
+// The record that each delivery type copies from a delivered callback's
+// arguments, and the mln_delivery_payload member that holds it.
+template <mln_delivery_type Type>
+struct Delivered;
+
+// The generated copies: capture_element(), discard_element(), and
+// element_owns_handles() for each completion value type and each delivered
+// callback's record, and a Delivered specialization for each delivered
+// callback. A value type without an overload fails to compile where it is
+// delivered.
 #include "delivery/capture_generated.inc"
 
 }  // namespace mln::delivery

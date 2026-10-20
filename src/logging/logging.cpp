@@ -9,7 +9,7 @@
 
 #include "logging/logging.hpp"
 
-#include "delivery/delivery_queue.hpp"
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/forbid_reentry.hpp"
 #include "execution/process_exit.hpp"
@@ -67,72 +67,23 @@ class CallbackLogObserver final : public mln::Log::Observer {
   mln_user_data_release release_user_data_ = nullptr;
 };
 
-// Copies each record into a delivery queue. A record the queue refuses goes to
-// the platform logger.
-class QueueLogObserver final : public mln::Log::Observer {
- public:
-  QueueLogObserver(
-    std::shared_ptr<mln::delivery::DeliveryQueueState> queue, void* user_data,
-    mln::delivery::ItemPtr retired
-  ) noexcept
-      : queue_(std::move(queue)),
-        user_data_(user_data),
-        retired_(std::move(retired)) {}
-
-  QueueLogObserver(const QueueLogObserver&) = delete;
-  QueueLogObserver(QueueLogObserver&&) = delete;
-  auto operator=(const QueueLogObserver&) -> QueueLogObserver& = delete;
-  auto operator=(QueueLogObserver&&) -> QueueLogObserver& = delete;
-
-  // Retirement follows the handler's final record, where callback mode runs
-  // release_user_data. A replacement destroys this observer under the log
-  // mutex, so its wake follows the log callback restrictions. So does the
-  // wake's release, which runs here when this observer holds the last share
-  // of a released queue.
-  ~QueueLogObserver() override {
-    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
-    if (mln::core::process_exiting()) {
-      mln::delivery::forget_item(std::move(retired_));
-    } else {
-      static_cast<void>(queue_->push(retired_));
-    }
-    queue_.reset();
-  }
-
-  auto onRecord(
-    mln::EventSeverity severity, mln::Event event, std::int64_t code,
-    const std::string& message
-  ) -> bool override {
-    if (mln::core::process_exiting()) {
-      // Consumed, so the platform logger stays quiet too.
-      return true;
-    }
-    const auto record = mln_log_delivery{
-      .severity = static_cast<std::uint32_t>(severity),
-      .event = static_cast<std::uint32_t>(event),
-      .code = code,
-      .message = message.c_str(),
-    };
-    const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
-    try {
-      auto item = mln::delivery::make_item(
-        MLN_DELIVERY_TYPE_LOG_RECORD, user_data_,
-        [&](auto& arena, mln_delivery_payload& payload) {
-          payload.log_record =
-            mln::delivery::capture_mln_log_delivery(arena, record);
-        }
-      );
-      return queue_->push(item);
-    } catch (...) {
-      return false;
-    }
-  }
-
- private:
-  std::shared_ptr<mln::delivery::DeliveryQueueState> queue_;
-  void* user_data_ = nullptr;
-  mln::delivery::ItemPtr retired_;
-};
+// Consumes each record and queues a copy, or leaves a record the queue
+// refuses to the platform logger.
+auto queue_log_record(
+  void* registration, std::uint32_t severity, std::uint32_t event,
+  std::int64_t code, const char* message
+) noexcept -> std::uint32_t {
+  const auto record = mln_log_delivery{
+    .severity = severity,
+    .event = event,
+    .code = code,
+    .message = message,
+  };
+  return static_cast<const mln::delivery::QueuedRegistration*>(registration)
+             ->push<MLN_DELIVERY_TYPE_LOG_RECORD>(record)
+           ? 1U
+           : 0U;
+}
 
 auto set_severity_async(
   std::uint32_t mask, mln_log_severity_mask bit, mln::EventSeverity severity
@@ -153,34 +104,30 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
     set_thread_error("mln_log_handler.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto queued = handler->queue != MLN_HANDLE_NULL;
-  if ((handler->callback == nullptr) == !queued) {
-    set_thread_error(
-      "log handler requires exactly one of a callback and a delivery queue"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "log handler", handler->queue, handler->callback != nullptr,
+    handler->release_user_data != nullptr, queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
 
-  if (queued) {
-    if (handler->release_user_data != nullptr) {
-      set_thread_error("a queue log handler must not carry release_user_data");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto queue = mln::delivery::resolve_delivery_queue(handler->queue);
-    if (queue == nullptr) return recorded_handle_fault_status();
-    auto observer = std::make_unique<QueueLogObserver>(
-      std::move(queue), handler->user_data,
-      mln::delivery::make_light_item(
-        MLN_DELIVERY_TYPE_RETIRED, handler->user_data
-      )
+  watch_process_exit();
+  if (queue != nullptr) {
+    // A replacement destroys the observer under the log mutex, so the
+    // retirement's wake follows the log callback restrictions, as does the
+    // wake's release when the observer holds the last share of a released
+    // queue.
+    auto registration = std::make_unique<mln::delivery::QueuedRegistration>(
+      std::move(queue), handler->user_data
     );
-    watch_process_exit();
+    auto observer = std::make_unique<CallbackLogObserver>(
+      &queue_log_record, registration.get(),
+      &mln::delivery::QueuedRegistration::retire
+    );
+    static_cast<void>(registration.release());
     mln::Log::setObserver(std::move(observer));
     return MLN_STATUS_OK;
   }
-
-  watch_process_exit();
-
   mln::Log::setObserver(
     std::make_unique<CallbackLogObserver>(
       handler->callback, handler->user_data, handler->release_user_data

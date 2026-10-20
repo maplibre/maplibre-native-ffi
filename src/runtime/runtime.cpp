@@ -39,7 +39,7 @@
 
 #include "completion/completion.hpp"
 #include "completion/completion_result.hpp"
-#include "delivery/delivery_queue.hpp"
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
@@ -2313,63 +2313,25 @@ auto offline_region_delete_start(
 
 namespace {
 
-// The registration of a provider in queue mode. Native code answers each
-// request and queues a copy for the host.
-struct QueuedProvider {
-  std::shared_ptr<mln::delivery::DeliveryQueueState> queue;
-  void* host_user_data = nullptr;
-  // Pushed after the registration's last request, where callback mode runs
-  // release_user_data.
-  mln::delivery::ItemPtr retired;
-};
-
-auto discard_queued_request(mln::delivery::DeliveryItem& item) noexcept
-  -> void {
-  mln::delivery::discard_mln_resource_request_delivery(
-    item.view.payload.resource_request
-  );
-}
-
-auto queued_provider_callback(
-  void* user_data, const mln_resource_request_info* request,
+// Answers HANDLE and queues a copy of the request with its handle. A request
+// the queue refuses fails, unless the process is exiting.
+auto queue_provider_request(
+  void* registration, const mln_resource_request_info* request,
   mln_resource_request handle
 ) noexcept -> uint32_t {
-  auto& provider = *static_cast<QueuedProvider*>(user_data);
   const auto arguments = mln_resource_request_delivery{
     .request = request,
     .handle = handle,
   };
-  try {
-    auto item = mln::delivery::make_item(
-      MLN_DELIVERY_TYPE_RESOURCE_REQUEST, provider.host_user_data,
-      [&](auto& arena, mln_delivery_payload& payload) {
-        payload.resource_request =
-          mln::delivery::capture_mln_resource_request_delivery(
-            arena, arguments
-          );
-      }
-    );
-    item->discard = &discard_queued_request;
-    if (provider.queue->push(item)) {
-      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-    }
-    // Release below owns the refused handle; the item must not release it.
-    item->discard = nullptr;
-  } catch (...) {
+  if (
+    static_cast<const mln::delivery::QueuedRegistration*>(registration)
+      ->push<MLN_DELIVERY_TYPE_RESOURCE_REQUEST>(arguments)
+  ) {
+    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
   }
   if (process_exiting()) return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   release_resource_request(handle);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-}
-
-auto release_queued_provider(void* user_data) noexcept -> void {
-  const auto provider =
-    std::unique_ptr<QueuedProvider>{static_cast<QueuedProvider*>(user_data)};
-  if (process_exiting()) {
-    mln::delivery::forget_item(std::move(provider->retired));
-    return;
-  }
-  static_cast<void>(provider->queue->push(provider->retired));
 }
 
 }  // namespace
@@ -2388,46 +2350,35 @@ auto set_resource_provider(
     set_thread_error("mln_resource_provider.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto queued = provider->queue != MLN_HANDLE_NULL;
-  if ((provider->callback == nullptr) == !queued) {
-    set_thread_error(
-      "provider requires exactly one of a callback and a delivery queue"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "provider", provider->queue, provider->callback != nullptr,
+    provider->release_user_data != nullptr, queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
 
   auto routes = std::make_shared<RouteTable>();
   const auto routes_status =
     copy_routes(provider->routes, provider->route_count, *routes);
   if (routes_status != MLN_STATUS_OK) return routes_status;
 
-  auto queued_provider = std::unique_ptr<QueuedProvider>{};
-  if (queued) {
-    if (provider->release_user_data != nullptr) {
-      set_thread_error("a queue provider must not carry release_user_data");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto queue = mln::delivery::resolve_delivery_queue(provider->queue);
-    if (queue == nullptr) return recorded_handle_fault_status();
-    queued_provider = std::make_unique<QueuedProvider>(QueuedProvider{
-      .queue = std::move(queue),
-      .host_user_data = provider->user_data,
-      .retired = mln::delivery::make_light_item(
-        MLN_DELIVERY_TYPE_RETIRED, provider->user_data
-      ),
-    });
+  auto registration = std::unique_ptr<mln::delivery::QueuedRegistration>{};
+  if (queue != nullptr) {
+    registration = std::make_unique<mln::delivery::QueuedRegistration>(
+      std::move(queue), provider->user_data
+    );
   }
-
-  const auto context = queued_provider != nullptr
-                         ? std::make_shared<RuntimeCallbackContext>(
-                             queued_provider.get(), &release_queued_provider
-                           )
-                         : std::make_shared<RuntimeCallbackContext>(
-                             provider->user_data, provider->release_user_data
-                           );
+  const auto context =
+    registration != nullptr
+      ? std::make_shared<RuntimeCallbackContext>(
+          registration.get(), &mln::delivery::QueuedRegistration::retire
+        )
+      : std::make_shared<RuntimeCallbackContext>(
+          provider->user_data, provider->release_user_data
+        );
   const auto copied = ResourceProvider{
-    .callback = queued_provider != nullptr ? &queued_provider_callback
-                                           : provider->callback,
+    .callback =
+      registration != nullptr ? &queue_provider_request : provider->callback,
     .context = context,
     .routes = routes->routes.empty() ? nullptr : std::move(routes),
   };
@@ -2440,7 +2391,7 @@ auto set_resource_provider(
       }
     );
   if (status == MLN_STATUS_OK) {
-    static_cast<void>(queued_provider.release());
+    static_cast<void>(registration.release());
     transfer.accept();
   }
   return status;

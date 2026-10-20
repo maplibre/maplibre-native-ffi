@@ -387,22 +387,26 @@ constexpr auto element_owns_handles(const mln_texture_readback_result*) noexcept
   return false;
 }
 template <bool Writing>
-auto capture_mln_log_delivery(
+auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_log_delivery& source
 ) -> mln_log_delivery {
   auto result = source;
   result.message = string(arena, source.message);
   return result;
 }
-// Releases the handles of a copy that the host did not take.
-inline auto discard_mln_log_delivery(
+inline auto discard_element(
   [[maybe_unused]] const mln_log_delivery& value
 ) noexcept -> void {}
-constexpr auto mln_log_delivery_owns_handles() noexcept -> bool {
+constexpr auto element_owns_handles(const mln_log_delivery*) noexcept -> bool {
   return false;
 }
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_LOG_RECORD> {
+  using Record = mln_log_delivery;
+  static constexpr auto member = &mln_delivery_payload::log_record;
+};
 template <bool Writing>
-auto capture_mln_resource_request_delivery(
+auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena,
   const mln_resource_request_delivery& source
 ) -> mln_resource_request_delivery {
@@ -433,14 +437,20 @@ auto capture_mln_resource_request_delivery(
   );
   return result;
 }
-// Releases the handles of a copy that the host did not take.
-inline auto discard_mln_resource_request_delivery(
+inline auto discard_element(
   [[maybe_unused]] const mln_resource_request_delivery& value
 ) noexcept -> void {
   static_cast<void>(
     dispose_owner(mln::core::HandleKind::ResourceRequest, value.handle)
   );
 }
-constexpr auto mln_resource_request_delivery_owns_handles() noexcept -> bool {
+constexpr auto element_owns_handles(
+  const mln_resource_request_delivery*
+) noexcept -> bool {
   return true;
 }
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST> {
+  using Record = mln_resource_request_delivery;
+  static constexpr auto member = &mln_delivery_payload::resource_request;
+};

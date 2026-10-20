@@ -122,6 +122,7 @@ def compile_and_run(test, outputs, test_source):
 DELIVERY_TEST = r"""
 #include <cassert>
 #include <cstring>
+#include <type_traits>
 #include "delivery/capture.hpp"
 static unsigned releases = 0;
 auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
@@ -143,11 +144,11 @@ int main() {
   char message[] = "borrowed";
   const mln_log_delivery log{1, 2, 3, message};
   const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {
-    return mln::delivery::capture_mln_log_delivery(arena, value);
+    return mln::delivery::capture_element(arena, value);
   });
   std::memset(message, 0, sizeof(message));
   assert(copied.code == 3 && std::strcmp(copied.message, "borrowed") == 0);
-  mln::delivery::discard_mln_log_delivery(copied);
+  mln::delivery::discard_element(copied);
   assert(releases == 0);
 
   char url[] = "custom://style.json";
@@ -155,22 +156,23 @@ int main() {
   request.requested_url = url;
   const mln_resource_request_delivery provided{&request, 9};
   const auto arguments = copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
-    return mln::delivery::capture_mln_resource_request_delivery(arena, value);
+    return mln::delivery::capture_element(arena, value);
   });
   std::memset(url, 0, sizeof(url));
   assert(arguments.handle == 9 && arguments.request != &request);
   assert(std::strcmp(arguments.request->requested_url, "custom://style.json") == 0);
   // An untaken request only releases its handle; native fails the request.
-  mln::delivery::discard_mln_resource_request_delivery(arguments);
+  mln::delivery::discard_element(arguments);
   assert(releases == 1);
-  static_assert(mln::delivery::mln_resource_request_delivery_owns_handles());
-  static_assert(!mln::delivery::mln_log_delivery_owns_handles());
+  static_assert(mln::delivery::element_owns_handles(static_cast<const mln_resource_request_delivery*>(nullptr)));
+  static_assert(!mln::delivery::element_owns_handles(static_cast<const mln_log_delivery*>(nullptr)));
+  static_assert(std::is_same_v<mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::Record, mln_log_delivery>);
 
   // A request whose byte count names no bytes cannot be copied.
   request.prior_data_size = 1;
   bool invalid = false;
   try { static_cast<void>(copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
-    return mln::delivery::capture_mln_resource_request_delivery(arena, value);
+    return mln::delivery::capture_element(arena, value);
   })); }
   catch (const std::invalid_argument&) { invalid = true; }
   assert(invalid);
