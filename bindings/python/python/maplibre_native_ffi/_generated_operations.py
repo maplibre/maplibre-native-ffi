@@ -956,7 +956,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.request_still_image()
 
-    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
+    def resize(self, extent: LogicalExtent | None = None) -> Future[CommandCompletion]:
         """Submits the sole post-creation logical extent update.
 
         See `mln_map_resize` in the
@@ -1527,7 +1527,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.request_frame(demand)
 
-    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
+    def resize(self, extent: LogicalExtent | None = None) -> Future[CommandCompletion]:
         """Starts an ordered logical resize of the driver and the map. The
         driver applies the extent in order with its other work, and later
         driver work does not wait for the map. The completion runs after both
@@ -2005,7 +2005,7 @@ def log_set_callback(handler: LogHandler) -> None:
 
 
 def logical_extent_physical_size(
-    extent: LogicalExtent,
+    extent: LogicalExtent | None = None,
 ) -> LogicalExtentPhysicalSizeResult:
     """Computes the physical device-pixel size of a logical extent.
 
@@ -2310,7 +2310,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_request_repaint()
 
-    def resize(self, extent: LogicalExtent) -> None:
+    def resize(self, extent: LogicalExtent | None = None) -> None:
         """Submits the sole post-creation logical extent update.
 
         See `mln_map_resize` in the
@@ -2590,7 +2590,7 @@ class RenderSessionHandleDiscarding:
     def __init__(self, owner: _RenderSessionHandleOperations):
         self._native = owner._native
 
-    def resize(self, extent: LogicalExtent) -> None:
+    def resize(self, extent: LogicalExtent | None = None) -> None:
         """Starts an ordered logical resize of the driver and the map. The
         driver applies the extent in order with its other work, and later
         driver work does not wait for the map. The completion runs after both

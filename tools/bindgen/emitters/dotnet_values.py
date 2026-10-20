@@ -536,13 +536,18 @@ class Values:
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
         arrays = {name: self.array_member(plan, name, field) for name, field in members}
+        masked = any(
+            field.presence and field.presence.mask for field in self.fields(plan)
+        )
         if self.union_only(plan):
             copied = values[0]
-        elif any(
-            field.presence and field.presence.mask for field in self.fields(plan)
-        ) or any(array for array, _ in arrays.values()):
+        elif masked or any(array for array, _ in arrays.values()):
             copied = (
-                "new() { "
+                (
+                    "new() { "
+                    if masked
+                    else f"default({public_name(plan.native)}) with {{ "
+                )
                 + ", ".join(
                     (
                         f"{name}Storage = {'ValueArray.Optional(' if arrays[name][1] else 'new('}{value})"

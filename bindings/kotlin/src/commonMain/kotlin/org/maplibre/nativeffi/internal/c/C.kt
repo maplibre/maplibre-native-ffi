@@ -81,6 +81,8 @@ internal expect object C {
 
   fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
+  fun mln_logical_extent_default(returned: Long): Unit
+
   fun mln_logical_extent_physical_size(
     extent: Long,
     outWidth: Long,

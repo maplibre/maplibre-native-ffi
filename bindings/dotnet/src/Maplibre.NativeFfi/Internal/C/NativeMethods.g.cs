@@ -161,6 +161,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_logical_extent mln_logical_extent_default();
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_logical_extent_physical_size(
         mln_logical_extent extent,
         uint* out_width,

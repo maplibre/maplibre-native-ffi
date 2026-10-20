@@ -44,7 +44,7 @@ Future<void> abandonHandles() async {
 /// runtime and map, for the isolate's shutdown to finalize while the process
 /// exits. The graphics context stays open, as a host's would until exit.
 Future<void> abandonSession() async {
-  const extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
+  final extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = runtimeCreate(runtimeOptionsDefault());
   final map = await runtime.createMap(MapOptions(initialExtent: extent));
   await map.setStyleJson(
@@ -56,7 +56,7 @@ Future<void> abandonSession() async {
   var frames = Completer<void>();
   final attachment = TestGraphics.create().attachOwnedTexture(
     map,
-    const LogicalExtent(width: 32, height: 32, scaleFactor: 1),
+    LogicalExtent(width: 32, height: 32, scaleFactor: 1),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       requestedTextureRingDepth: 1,

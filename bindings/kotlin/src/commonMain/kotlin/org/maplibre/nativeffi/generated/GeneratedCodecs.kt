@@ -1186,6 +1186,13 @@ internal fun readHttpHeaderRule(source: Long): HttpHeaderRule =
 internal fun readLatLng(source: Long): LatLng =
   LatLng(latitude = readF64(source), longitude = readF64(source + 8))
 
+internal fun readLogicalExtent(source: Long): LogicalExtent =
+  LogicalExtent(
+    width = readU32(source),
+    height = readU32(source + 4),
+    scaleFactor = readF64(source + 8),
+  )
+
 internal fun readMapOptions(source: Long): MapOptions =
   MapOptions(
     initialExtent = readLogicalExtent(source + 8),
@@ -1905,13 +1912,6 @@ internal fun readQuaternion(source: Long): Quaternion =
 
 internal fun readHttpHeader(source: Long): HttpHeader =
   HttpHeader(name = readViewString(source), value = readViewString(source + w(8, 16)))
-
-internal fun readLogicalExtent(source: Long): LogicalExtent =
-  LogicalExtent(
-    width = readU32(source),
-    height = readU32(source + 4),
-    scaleFactor = readF64(source + 8),
-  )
 
 internal fun readMetalBorrowedTexture(source: Long): MetalBorrowedTexture =
   MetalBorrowedTexture(texture = NativePointer.ofAddress(readAddress(source)))

@@ -142,6 +142,8 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
+  @CriticalNative @JvmStatic actual external fun mln_logical_extent_default(returned: Long): Unit
+
   @JvmStatic
   actual external fun mln_logical_extent_physical_size(
     extent: Long,

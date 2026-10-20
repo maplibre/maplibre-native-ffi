@@ -1723,6 +1723,7 @@ unsafe extern "C" {
         handler: *const mln_log_handler,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_logical_extent_default() -> mln_logical_extent;
     pub fn mln_logical_extent_physical_size(
         extent: mln_logical_extent,
         out_width: *mut u32,

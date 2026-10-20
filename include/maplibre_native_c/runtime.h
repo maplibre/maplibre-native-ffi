@@ -676,7 +676,7 @@ typedef struct mln_resource_route {
   mln_buffer_view url;
 } mln_resource_route;
 
-/** Returns default resource route options. */
+/** Returns an exact-match route for every resource kind. */
 MLN_API mln_resource_route mln_resource_route_default(void) MLN_NOEXCEPT;
 
 /** One HTTP header that a header rule supplies. */
@@ -706,7 +706,8 @@ typedef struct mln_http_header_rule {
   size_t header_count;
 } mln_http_header_rule;
 
-/** Returns default HTTP header rule options. */
+/** Returns an exact-match header rule for every resource kind, with no headers.
+ */
 MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
 
 /**

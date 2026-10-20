@@ -453,8 +453,9 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
 static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
-  options.initial_extent =
-    (mln_logical_extent){.width = 512, .height = 256, .scale_factor = 1.1};
+  options.initial_extent = mln_logical_extent_default();
+  options.initial_extent.width = 512;
+  options.initial_extent.scale_factor = 1.1;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   mln_map_snapshot snapshot = read_snapshot(map);

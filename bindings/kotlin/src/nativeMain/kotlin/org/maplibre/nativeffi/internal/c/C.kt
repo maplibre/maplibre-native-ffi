@@ -241,6 +241,12 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_logical_extent_default(returned: Long) {
+    org.maplibre.nativeffi.internal.cinterop
+      .mln_logical_extent_default()
+      .place(returned.toCPointer()!!)
+  }
+
   actual fun mln_logical_extent_physical_size(
     extent: Long,
     outWidth: Long,

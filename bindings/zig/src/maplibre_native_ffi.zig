@@ -456,7 +456,7 @@ pub const CameraOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraQueryResult = struct {
     generation: u64 = std.mem.zeroes(u64),
-    camera: CameraOptions = .{},
+    camera: CameraOptions,
     pub fn fromNative(raw: c.mln_camera_query_result) CameraQueryResult {
         return .{
             .generation = raw.generation,
@@ -1568,13 +1568,13 @@ pub const LogSeverityMask = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const LogicalExtent = struct {
     /// Width in UI pixels. Defaults to 256.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32,
     /// Height in UI pixels. Defaults to 256.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32,
     /// Device pixels per UI pixel. Defaults to 1.0.
-    scale_factor: f64 = std.mem.zeroes(f64),
+    scale_factor: f64,
     pub fn toNative(self: LogicalExtent) c.mln_logical_extent {
-        var raw = std.mem.zeroes(c.mln_logical_extent);
+        var raw = c.mln_logical_extent_default();
         raw.width = self.width;
         raw.height = self.height;
         raw.scale_factor = self.scale_factor;
@@ -1670,10 +1670,10 @@ pub const MapSnapshot = struct {
     /// Debug overlay mask of `mln_map_debug_option` values.
     debug_options: MapDebugOption = std.mem.zeroes(MapDebugOption),
     generation: u64 = std.mem.zeroes(u64),
-    camera: CameraOptions = .{},
-    logical_extent: LogicalExtent = .{},
-    projection_mode: ProjectionMode = .{},
-    viewport: MapViewportOptions = .{},
+    camera: CameraOptions,
+    logical_extent: LogicalExtent,
+    projection_mode: ProjectionMode,
+    viewport: MapViewportOptions,
     /// True once every requested style and tile resource finished loading.
     fully_loaded: bool = std.mem.zeroes(bool),
     rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
@@ -1685,9 +1685,9 @@ pub const MapSnapshot = struct {
     /// snapshot observes, though animations and resource loads finish in later
     /// frames.
     latest_render_update_generation: u64 = std.mem.zeroes(u64),
-    tile: MapTileOptions = .{},
-    bounds: BoundOptions = .{},
-    free_camera: FreeCameraOptions = .{},
+    tile: MapTileOptions,
+    bounds: BoundOptions,
+    free_camera: FreeCameraOptions,
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
             .debug_options = MapDebugOption.fromNative(raw.debug_options),
@@ -3000,7 +3000,7 @@ pub const RenderSessionSnapshot = struct {
     /// One `mln_render_session_state` value.
     state: RenderSessionState = std.mem.zeroes(RenderSessionState),
     /// Logical extent applied by the driver.
-    extent: LogicalExtent = .{},
+    extent: LogicalExtent,
     /// Increases when the session's lifecycle state, target, or applied extent
     /// changes. An acquired texture frame reports the value it rendered under.
     generation: u64 = std.mem.zeroes(u64),
@@ -5450,7 +5450,7 @@ pub fn gpuSyncDefault() status.Error!GpuSync {
     return call.direct("mln_gpu_sync_default", .none, {}, GpuSync, null, .{});
 }
 
-/// Returns default HTTP header rule options.
+/// Returns an exact-match header rule for every resource kind, with no headers.
 ///
 /// See `mln_http_header_rule_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5496,6 +5496,14 @@ pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic: ?*diagnostics.
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub fn logSetCallback(allocator: std.mem.Allocator, handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_log_set_callback", .none, {}, allocator, diagnostic, .{handler});
+}
+
+/// Returns a 256 by 256 logical extent with one device pixel per UI pixel.
+///
+/// See `mln_logical_extent_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn logicalExtentDefault() status.Error!LogicalExtent {
+    return call.direct("mln_logical_extent_default", .none, {}, LogicalExtent, null, .{});
 }
 
 /// Computes the physical device-pixel size of a logical extent.
@@ -6748,7 +6756,7 @@ pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: Re
     return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
 }
 
-/// Returns default resource route options.
+/// Returns an exact-match route for every resource kind.
 ///
 /// See `mln_resource_route_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

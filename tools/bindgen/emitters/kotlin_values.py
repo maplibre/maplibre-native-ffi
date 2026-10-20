@@ -752,15 +752,6 @@ class Values:
                 + self.place(variant.value, union, "variant.value")
                 + " }"
             )
-        if field.value.empty_variant:
-            lines.append(
-                f"    {public}.None -> "
-                + self.write_scalar(
-                    tag.value,
-                    tag_address,
-                    literal(field.value.empty_variant[1], tag_type),
-                )
-            )
         lines.append(
             f'    is {public}.Unknown -> throw Status.invalidArgument("unknown native union variants cannot be submitted")'
         )

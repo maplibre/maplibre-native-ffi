@@ -2384,6 +2384,9 @@ external int mln_log_set_callback(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
+@Native<mln_logical_extent Function()>()
+external mln_logical_extent mln_logical_extent_default();
+
 @Native<
   Int32 Function(
     mln_logical_extent,

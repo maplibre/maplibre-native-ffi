@@ -89,6 +89,8 @@ internal actual object C {
     Ffm.downcall("mln_log_set_async_severity_mask", JAVA_INT, JAVA_INT, JAVA_LONG)
   private val mln_log_set_callback =
     Ffm.downcall("mln_log_set_callback", JAVA_INT, JAVA_LONG, JAVA_LONG)
+  private val mln_logical_extent_default =
+    Ffm.downcall("mln_logical_extent_default", mln_logical_extent)
   private val mln_logical_extent_physical_size =
     Ffm.downcall(
       "mln_logical_extent_physical_size",
@@ -1420,6 +1422,10 @@ internal actual object C {
 
   actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
     mln_log_set_callback.invokeExact(handler, outDiagnostic) as Int
+
+  actual fun mln_logical_extent_default(returned: Long) {
+    mln_logical_extent_default.invokeExact(Ffm.into(returned, mln_logical_extent)) as MemorySegment
+  }
 
   actual fun mln_logical_extent_physical_size(
     extent: Long,

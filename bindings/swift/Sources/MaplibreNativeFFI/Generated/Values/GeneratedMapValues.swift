@@ -1005,7 +1005,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
-    Self(raw: mln_logical_extent())
+    Self(raw: mln_logical_extent_default())
   }
 
   public init(
@@ -1025,7 +1025,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_logical_extent {
-    var raw = mln_logical_extent()
+    var raw = mln_logical_extent_default()
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor

@@ -449,19 +449,6 @@ class BoundApi:
         }
 
 
-def support_relation(plan: OperationPlan) -> dict[str, str] | None:
-    """The support relation of an operation, as coverage reports record it."""
-    if isinstance(plan.support, DeliverySupport):
-        return {"delivery": "runtime delivery protocol"}
-    if isinstance(plan.support, DefaultSupport):
-        return {"default": plan.support.value}
-    if isinstance(plan.support, DisposeSupport):
-        return {"dispose": plan.support.handle.native}
-    if isinstance(plan.support, ViewSupport):
-        return {"view": plan.support.handle.native}
-    return None
-
-
 def output_member(name: str) -> str:
     """An output parameter's public member name: its name without `out_`."""
     return name.removeprefix("out_")

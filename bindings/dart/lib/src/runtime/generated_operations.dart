@@ -941,6 +941,7 @@ Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   Arena arena,
 ) {
   final result = arena<raw.mln_logical_extent>();
+  result.ref = raw.mln_logical_extent_default();
   result.ref.width = _nativeInteger(value.width, 0, 4294967295);
   result.ref.height = _nativeInteger(value.height, 0, 4294967295);
   result.ref.scale_factor = value.scaleFactor;
@@ -3168,7 +3169,8 @@ GpuSync gpuSyncDefault() {
   return _readGpuSync(nativeResult);
 }
 
-/// Returns default HTTP header rule options.
+/// Returns an exact-match header rule for every resource kind, with no
+/// headers.
 ///
 /// See `mln_http_header_rule_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3231,6 +3233,16 @@ void logSetCallback(LogHandler handler) {
       ),
     ),
   );
+}
+
+/// Returns a 256 by 256 logical extent with one device pixel per UI pixel.
+///
+/// See `mln_logical_extent_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+LogicalExtent logicalExtentDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_logical_extent_default();
+  return _readLogicalExtent(nativeResult);
 }
 
 /// Computes the physical device-pixel size of a logical extent.
@@ -3444,7 +3456,7 @@ RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
   return _readRenderedFeatureQueryOptions(nativeResult);
 }
 
-/// Returns default resource route options.
+/// Returns an exact-match route for every resource kind.
 ///
 /// See `mln_resource_route_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

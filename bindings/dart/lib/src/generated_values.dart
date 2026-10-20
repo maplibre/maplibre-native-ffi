@@ -2174,7 +2174,10 @@ final class LogHandler {
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class LogicalExtent extends _Value {
-  const LogicalExtent({this.width = 0, this.height = 0, this.scaleFactor = 0});
+  LogicalExtent({int? width, int? height, double? scaleFactor})
+    : width = width ?? logicalExtentDefault().width,
+      height = height ?? logicalExtentDefault().height,
+      scaleFactor = scaleFactor ?? logicalExtentDefault().scaleFactor;
 
   /// Width in UI pixels. Defaults to 256.
   final int width;
@@ -3176,7 +3179,7 @@ final class MapSnapshot extends _Value {
     this.debugOptions = const MapDebugOption.fromRawValue(0),
     required this.generation,
     required this.camera,
-    this.logicalExtent = const LogicalExtent(),
+    required this.logicalExtent,
     required this.projectionMode,
     required this.viewport,
     this.fullyLoaded = false,
@@ -3656,7 +3659,7 @@ final class RenderSessionCapabilities extends _Value {
 final class RenderSessionSnapshot extends _Value {
   const RenderSessionSnapshot({
     required this.state,
-    this.extent = const LogicalExtent(),
+    required this.extent,
     required this.generation,
     required this.mapUpdateGeneration,
     required this.renderedUpdateGeneration,

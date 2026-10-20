@@ -2037,13 +2037,15 @@ class LogicalExtent:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    width: int
+    width: int = field(default_factory=lambda: LogicalExtent.default().width)
     """Width in UI pixels. Defaults to 256."""
 
-    height: int
+    height: int = field(default_factory=lambda: LogicalExtent.default().height)
     """Height in UI pixels. Defaults to 256."""
 
-    scale_factor: float
+    scale_factor: float = field(
+        default_factory=lambda: LogicalExtent.default().scale_factor
+    )
     """Device pixels per UI pixel. Defaults to 1.0."""
 
     @classmethod
@@ -2051,6 +2053,12 @@ class LogicalExtent:
         return cls(
             width=raw["width"], height=raw["height"], scale_factor=raw["scale_factor"]
         )
+
+    @classmethod
+    def default(cls):
+        from . import _native
+
+        return cls._from_native(_native._default_logical_extent())
 
 
 @dataclass(frozen=True, slots=True)

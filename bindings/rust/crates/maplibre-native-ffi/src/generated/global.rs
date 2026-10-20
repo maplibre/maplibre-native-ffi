@@ -170,7 +170,8 @@ pub fn gpu_sync_default() -> Result<GpuSync> {
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns default HTTP header rule options.
+/// Returns an exact-match header rule for every resource kind, with no
+/// headers.
 ///
 /// See `mln_http_header_rule_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -226,6 +227,16 @@ pub fn log_set_callback(handler: LogHandler) -> Result<()> {
     let handler = call.reference(&handler)?;
     call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
     Ok(())
+}
+
+/// Returns a 256 by 256 logical extent with one device pixel per UI pixel.
+///
+/// See `mln_logical_extent_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn logical_extent_default() -> Result<LogicalExtent> {
+    let mut call = Call::global("mln_logical_extent_default")?;
+    let value = call.run(|_| unsafe { sys::mln_logical_extent_default() });
+    Ok(unsafe { from_native(value) }?)
 }
 
 /// Computes the physical device-pixel size of a logical extent.
@@ -442,7 +453,7 @@ pub fn rendered_feature_query_options_default() -> Result<RenderedFeatureQueryOp
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns default resource route options.
+/// Returns an exact-match route for every resource kind.
 ///
 /// See `mln_resource_route_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

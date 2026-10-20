@@ -18,4 +18,20 @@ namespace Maplibre.NativeFfi;
 /// <param name="ScaleFactor">
 /// Device pixels per UI pixel. Defaults to 1.0.
 /// </param>
-public readonly partial record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);
+public readonly partial record struct LogicalExtent(uint Width, uint Height, double ScaleFactor)
+{
+    public LogicalExtent()
+        : this(default!, default!, default!)
+    {
+        this = Default;
+    }
+
+    public static LogicalExtent Default
+    {
+        get
+        {
+            using var call = NativeCall.Enter(null, "mln_logical_extent_default");
+            return GeneratedValues.CopyLogicalExtent(NativeMethods.mln_logical_extent_default());
+        }
+    }
+}

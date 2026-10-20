@@ -4,7 +4,8 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns default HTTP header rule options.
+  /// Returns an exact-match header rule for every resource kind, with no
+  /// headers.
   ///
   /// See `mln_http_header_rule_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -41,7 +42,7 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default resource route options.
+  /// Returns an exact-match route for every resource kind.
   ///
   /// See `mln_resource_route_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

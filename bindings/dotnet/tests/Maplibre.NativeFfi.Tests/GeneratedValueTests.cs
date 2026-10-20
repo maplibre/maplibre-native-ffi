@@ -74,12 +74,20 @@ public sealed class GeneratedValueTests
         Assert.Equal(30, camera.Bearing.Value, 6);
     }
 
-    // A parameterless constructor starts each member at the header's annotated default, so the
-    // record it builds matches what the native default function returns.
     [Fact]
     public void ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault()
     {
         Assert.Equal(MapOptions.Default, new MapOptions());
+        Assert.Equal(LogicalExtent.Default, new LogicalExtent());
+        Assert.Equal(HttpHeaderRule.Default, new HttpHeaderRule());
+        Assert.Equal(PremultipliedRgba8Image.Default, new PremultipliedRgba8Image());
+        Assert.Equal(
+            HttpHeaderRule.Default with
+            {
+                Url = "/headers",
+            },
+            new HttpHeaderRule { Url = "/headers" }
+        );
     }
 
     [Fact]

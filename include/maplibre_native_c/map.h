@@ -168,6 +168,9 @@ typedef struct mln_logical_extent {
   double scale_factor;
 } mln_logical_extent;
 
+/** Returns a 256 by 256 logical extent with one device pixel per UI pixel. */
+MLN_API mln_logical_extent mln_logical_extent_default(void) MLN_NOEXCEPT;
+
 /** Options used when creating a map. */
 typedef struct mln_map_options {
   uint32_t size;

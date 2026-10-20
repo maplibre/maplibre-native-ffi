@@ -27,7 +27,7 @@ void main() {
       expect(map.getSnapshot().debugOptions, MapDebugOption.tileBorders);
       expect(
         () => map.discarding.resize(
-          const LogicalExtent(width: 0, height: 8, scaleFactor: 1),
+          LogicalExtent(width: 0, height: 8, scaleFactor: 1),
         ),
         throwsA(isA<InvalidArgumentException>()),
       );

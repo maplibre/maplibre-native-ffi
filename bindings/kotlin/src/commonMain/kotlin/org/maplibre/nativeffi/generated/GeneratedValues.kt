@@ -2451,12 +2451,16 @@ public data class ProjectedMeters(
  */
 public data class LogicalExtent(
   /** Width in UI pixels. Defaults to 256. */
-  public val width: UInt = 0u,
+  public val width: UInt = LogicalExtent.default.width,
   /** Height in UI pixels. Defaults to 256. */
-  public val height: UInt = 0u,
+  public val height: UInt = LogicalExtent.default.height,
   /** Device pixels per UI pixel. Defaults to 1.0. */
-  public val scaleFactor: Double = 0.0,
-)
+  public val scaleFactor: Double = LogicalExtent.default.scaleFactor,
+) {
+  public companion object {
+    internal val default: LogicalExtent by lazy { GeneratedApi.logicalExtentDefault() }
+  }
+}
 
 /**
  * Options used when creating a map.

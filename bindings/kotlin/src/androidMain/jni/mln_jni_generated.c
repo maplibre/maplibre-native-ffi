@@ -318,6 +318,17 @@ static jint mln_log_set_callback_jni(
   );
 }
 
+static void mln_logical_extent_default_critical(jlong returned) {
+  *MLN_JNI_POINTER(mln_logical_extent*, returned) =
+    mln_logical_extent_default();
+}
+
+static void mln_logical_extent_default_jni(
+  JNIEnv* env, jclass type, jlong returned
+) {
+  mln_logical_extent_default_critical(returned);
+}
+
 static jint mln_logical_extent_physical_size_jni(
   JNIEnv* env, jclass type, jlong extent, jlong out_width, jlong out_height,
   jlong out_diagnostic
@@ -2500,6 +2511,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_log_set_async_severity_mask", "(IJ)I",
    (void*)mln_log_set_async_severity_mask_jni},
   {"mln_log_set_callback", "(JJ)I", (void*)mln_log_set_callback_jni},
+  {"mln_logical_extent_default", "(J)V", (void*)mln_logical_extent_default_jni},
   {"mln_logical_extent_physical_size", "(JJJJ)I",
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
@@ -2912,6 +2924,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_log_set_async_severity_mask", "(IJ)I",
    (void*)mln_log_set_async_severity_mask_jni},
   {"mln_log_set_callback", "(JJ)I", (void*)mln_log_set_callback_jni},
+  {"mln_logical_extent_default", "(J)V",
+   (void*)mln_logical_extent_default_critical},
   {"mln_logical_extent_physical_size", "(JJJJ)I",
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",

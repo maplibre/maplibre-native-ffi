@@ -213,7 +213,7 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns default HTTP header rule options.
+   * Returns an exact-match header rule for every resource kind, with no headers.
    *
    * See `mln_http_header_rule_default` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -294,6 +294,19 @@ public object GeneratedApi {
     nativeCall(null, null, "mln_log_set_callback") {
       check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
       accept(CallbackOwner.global)
+    }
+
+  /**
+   * Returns a 256 by 256 logical extent with one device pixel per UI pixel.
+   *
+   * See `mln_logical_extent_default` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun logicalExtentDefault(): LogicalExtent =
+    nativeCall(null, null, "mln_logical_extent_default") {
+      val out = allocate(16, 8)
+      C.mln_logical_extent_default(out)
+      readLogicalExtent(out)
     }
 
   /**
@@ -542,7 +555,7 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns default resource route options.
+   * Returns an exact-match route for every resource kind.
    *
    * See `mln_resource_route_default` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

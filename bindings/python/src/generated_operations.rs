@@ -3243,7 +3243,10 @@ fn generated_input_mln_logical_extent<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_logical_extent> {
     let _ = storage;
-    let mut raw: sys::mln_logical_extent = unsafe { std::mem::zeroed() };
+    if value.is_none() {
+        return Ok(unsafe { sys::mln_logical_extent_default() });
+    }
+    let mut raw: sys::mln_logical_extent = unsafe { sys::mln_logical_extent_default() };
     raw.width = value.getattr("width")?.extract::<u32>()?;
     raw.height = value.getattr("height")?.extract::<u32>()?;
     raw.scale_factor = value.getattr("scale_factor")?.extract::<f64>()?;
@@ -4348,6 +4351,13 @@ fn _default_http_header_rule(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_http_header_rule_default() };
     generated_copy_mln_http_header_rule(py, &value)
+}
+
+#[pyfunction]
+fn _default_logical_extent(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    generated_check_reentry()?;
+    let value = unsafe { sys::mln_logical_extent_default() };
+    generated_copy_mln_logical_extent(py, &value)
 }
 
 #[pyfunction]
@@ -6821,10 +6831,11 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (extent))]
-    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent=None))]
+    fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_resize", self.admission())?;
         let storage = &mut call.storage;
+        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
@@ -6833,10 +6844,15 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (extent))]
-    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent=None))]
+    fn _discard_resize(
+        &self,
+        py: Python<'_>,
+        extent: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_resize", self.admission())?;
         let storage = &mut call.storage;
+        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
@@ -8597,10 +8613,11 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (extent))]
-    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent=None))]
+    fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_render_session_resize", self.admission())?;
         let storage = &mut call.storage;
+        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
@@ -8609,10 +8626,15 @@ impl RenderSessionHandle {
             })
         }
     }
-    #[pyo3(signature = (extent))]
-    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent=None))]
+    fn _discard_resize(
+        &self,
+        py: Python<'_>,
+        extent: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_render_session_resize", self.admission())?;
         let storage = &mut call.storage;
+        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
@@ -9845,10 +9867,14 @@ fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<P
 }
 
 #[pyfunction]
-#[pyo3(signature = (extent))]
-fn logical_extent_physical_size(py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+#[pyo3(signature = (extent=None))]
+fn logical_extent_physical_size(
+    py: Python<'_>,
+    extent: Option<Bound<'_, PyAny>>,
+) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py, "mln_logical_extent_physical_size", 0)?;
     let storage = &mut call.storage;
+    let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
     let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
     let mut out_width: u32 = unsafe { std::mem::zeroed() };
     let mut out_height: u32 = unsafe { std::mem::zeroed() };
@@ -9977,6 +10003,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(_default_geojson_source_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_gpu_sync, module)?)?;
     module.add_function(wrap_pyfunction!(_default_http_header_rule, module)?)?;
+    module.add_function(wrap_pyfunction!(_default_logical_extent, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_tile_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_map_viewport_options, module)?)?;

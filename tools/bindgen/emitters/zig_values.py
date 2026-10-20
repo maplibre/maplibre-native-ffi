@@ -5,8 +5,10 @@ from ..semantic import ValuePlan, enum_member_prefix
 from .zig import SCALARS, doc, documented, identifier, pascal
 
 
-def field_default(values, field) -> str:
+def field_default(values, field) -> str | None:
     value = field.value
+    if value.default:
+        return None
     public = values.public(value)
     return ".{}" if value.kind == "record" else f"std.mem.zeroes({public})"
 
@@ -187,7 +189,11 @@ class Values:
             fields.append(
                 doc(self.bound, f"{value.native}.{field.name}", "    ")
                 + f"    {local}: {'?' if optional else ''}{self.public(field.value)}"
-                + (f" = {initial}" if not value.default or optional else "")
+                + (
+                    f" = {initial}"
+                    if initial is not None and (not value.default or optional)
+                    else ""
+                )
                 + ","
             )
             copy = self.capture(field.value, f"raw.{local}")

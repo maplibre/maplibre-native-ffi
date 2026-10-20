@@ -19,6 +19,10 @@
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
 
+auto mln_logical_extent_default(void) noexcept -> mln_logical_extent {
+  return mln::core::map_options_default().initial_extent;
+}
+
 auto mln_map_options_default(void) noexcept -> mln_map_options {
   return mln::core::map_options_default();
 }

@@ -4,6 +4,16 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
+  /// Returns a 256 by 256 logical extent with one device pixel per UI pixel.
+  ///
+  /// See `mln_logical_extent_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  static func logicalExtentDefault() throws -> LogicalExtent {
+    try nativeDirect("mln_logical_extent_default") { _ in
+      LogicalExtent(raw: mln_logical_extent_default())
+    }
+  }
+
   /// Returns map options initialized for this C API version.
   ///
   /// See `mln_map_options_default` in the

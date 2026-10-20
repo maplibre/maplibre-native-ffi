@@ -2002,7 +2002,7 @@ pub struct LogSeverityMask: u32 {
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LogicalExtent {
     /// Width in UI pixels. Defaults to 256.
     pub width: u32,
@@ -2010,6 +2010,11 @@ pub struct LogicalExtent {
     pub height: u32,
     /// Device pixels per UI pixel. Defaults to 1.0.
     pub scale_factor: f64,
+}
+impl Default for LogicalExtent {
+    fn default() -> Self {
+        convert::native_default(unsafe { sys::mln_logical_extent_default() })
+    }
 }
 impl LogicalExtent {
     pub const fn new(width: u32, height: u32, scale_factor: f64) -> Self {
@@ -2022,7 +2027,7 @@ impl LogicalExtent {
 }
 impl ToNative<sys::mln_logical_extent> for LogicalExtent {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_logical_extent> {
-        let mut raw: sys::mln_logical_extent = unsafe { std::mem::zeroed() };
+        let mut raw: sys::mln_logical_extent = unsafe { sys::mln_logical_extent_default() };
         raw.width = self.width;
         raw.height = self.height;
         raw.scale_factor = self.scale_factor;

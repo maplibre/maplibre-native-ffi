@@ -901,9 +901,6 @@ class Values:
             declarations.append(
                 f"final class {variant} extends {payload} {{ const {variant}() : super._(); }}"
             )
-            cases.append(
-                f"    case {variant}(): result.ref.{union.presence.tag} = {tag};"
-            )
             read_cases.append(f"      {tag} => const {variant}(),")
         unknown = payload + "Unknown"
         declarations.append(

@@ -533,7 +533,10 @@ internal static unsafe class GeneratedValues
     }
 
     internal static EventBatchView CopyEventBatchView(mln_event_batch_view value) =>
-        new() { EventsStorage = new(CopyEventBatchViewEvents(value)) };
+        default(EventBatchView) with
+        {
+            EventsStorage = new(CopyEventBatchViewEvents(value)),
+        };
 
     internal static RuntimeEvent[] CopyEventBatchViewEvents(mln_event_batch_view value)
     {
@@ -769,7 +772,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static HttpHeaderRule CopyHttpHeaderRule(mln_http_header_rule value) =>
-        new()
+        default(HttpHeaderRule) with
         {
             Kinds = (ResourceKindMask)value.kinds,
             Flags = (UrlMatchFlags)value.flags,
@@ -955,7 +958,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_logical_extent NativeLogicalExtent(LogicalExtent value)
     {
-        var native = new mln_logical_extent();
+        var native = NativeMethods.mln_logical_extent_default();
         native.width = value.Width;
         native.height = value.Height;
         native.scale_factor = value.ScaleFactor;
@@ -1120,7 +1123,7 @@ internal static unsafe class GeneratedValues
     internal static MetalBorrowedTextureDescriptor CopyMetalBorrowedTextureDescriptor(
         mln_metal_borrowed_texture_descriptor value
     ) =>
-        new()
+        default(MetalBorrowedTextureDescriptor) with
         {
             Extent = CopyLogicalExtent(value.extent),
             PhysicalWidth = value.physical_width,
@@ -1217,7 +1220,7 @@ internal static unsafe class GeneratedValues
     internal static OfflineGeometryRegionDefinition CopyOfflineGeometryRegionDefinition(
         mln_offline_geometry_region_definition value
     ) =>
-        new()
+        default(OfflineGeometryRegionDefinition) with
         {
             StyleUrl = RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
             GeometryStorage = new(ValueStructs.CopyBufferView(value.geometry)),
@@ -1291,7 +1294,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static OfflineRegionInfo CopyOfflineRegionInfo(mln_offline_region_info value) =>
-        new()
+        default(OfflineRegionInfo) with
         {
             Id = value.id,
             Definition = CopyOfflineRegionDefinition(value.definition),
@@ -1357,7 +1360,7 @@ internal static unsafe class GeneratedValues
     internal static OpenglBorrowedTextureDescriptor CopyOpenglBorrowedTextureDescriptor(
         mln_opengl_borrowed_texture_descriptor value
     ) =>
-        new()
+        default(OpenglBorrowedTextureDescriptor) with
         {
             Extent = CopyLogicalExtent(value.extent),
             PhysicalWidth = value.physical_width,
@@ -1503,7 +1506,7 @@ internal static unsafe class GeneratedValues
     internal static PremultipliedRgba8Image CopyPremultipliedRgba8Image(
         mln_premultiplied_rgba8_image value
     ) =>
-        new()
+        default(PremultipliedRgba8Image) with
         {
             Width = value.width,
             Height = value.height,
@@ -1645,7 +1648,11 @@ internal static unsafe class GeneratedValues
 
     internal static RenderFrameBatchView CopyRenderFrameBatchView(
         mln_render_frame_batch_view value
-    ) => new() { ResultsStorage = new(CopyRenderFrameBatchViewResults(value)) };
+    ) =>
+        default(RenderFrameBatchView) with
+        {
+            ResultsStorage = new(CopyRenderFrameBatchViewResults(value)),
+        };
 
     internal static RenderFrameResult[] CopyRenderFrameBatchViewResults(
         mln_render_frame_batch_view value
@@ -2477,7 +2484,7 @@ internal static unsafe class GeneratedValues
         };
 
     internal static StyleSourceTileInfo CopyStyleSourceTileInfo(mln_style_source_tile_info value) =>
-        new()
+        default(StyleSourceTileInfo) with
         {
             TileUrlsStorage = new(
                 NativeCallScope.CopyArray<mln_buffer_view, string>(
@@ -2537,7 +2544,7 @@ internal static unsafe class GeneratedValues
     internal static TextureReadbackResult CopyTextureReadbackResult(
         mln_texture_readback_result value
     ) =>
-        new()
+        default(TextureReadbackResult) with
         {
             DataStorage = new(ValueStructs.CopyBufferView(value.data)),
             Info = CopyTextureImageInfo(value.info),
@@ -2593,7 +2600,7 @@ internal static unsafe class GeneratedValues
     internal static VulkanBorrowedTextureDescriptor CopyVulkanBorrowedTextureDescriptor(
         mln_vulkan_borrowed_texture_descriptor value
     ) =>
-        new()
+        default(VulkanBorrowedTextureDescriptor) with
         {
             Extent = CopyLogicalExtent(value.extent),
             PhysicalWidth = value.physical_width,
@@ -2780,7 +2787,7 @@ internal static unsafe class GeneratedValues
     internal static WebgpuBorrowedTextureDescriptor CopyWebgpuBorrowedTextureDescriptor(
         mln_webgpu_borrowed_texture_descriptor value
     ) =>
-        new()
+        default(WebgpuBorrowedTextureDescriptor) with
         {
             Extent = CopyLogicalExtent(value.extent),
             PhysicalWidth = value.physical_width,

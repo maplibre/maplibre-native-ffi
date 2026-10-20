@@ -2422,12 +2422,14 @@ func copyLogicalExtent(raw C.mln_logical_extent) LogicalExtent {
 }
 
 func nativeLogicalExtent(input LogicalExtent, arena *bindingArena) C.mln_logical_extent {
-	raw := C.mln_logical_extent{}
+	raw := C.mln_logical_extent_default()
 	raw.width = C.uint32_t(input.Width)
 	raw.height = C.uint32_t(input.Height)
 	raw.scale_factor = C.double(input.ScaleFactor)
 	return raw
 }
+
+func DefaultLogicalExtent() LogicalExtent { return copyLogicalExtent(C.mln_logical_extent_default()) }
 
 // MapOptions corresponds to mln_map_options. Options used when creating a map.
 //

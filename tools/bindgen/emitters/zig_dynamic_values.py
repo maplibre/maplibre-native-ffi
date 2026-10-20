@@ -219,7 +219,8 @@ def declaration(values, value):
             + f"    {local}: {'?' if optional else ''}{public_type}"
             + (
                 f" = {default}"
-                if not value.default or optional or public_type.startswith("?")
+                if default is not None
+                and (not value.default or optional or public_type.startswith("?"))
                 else ""
             )
             + ","

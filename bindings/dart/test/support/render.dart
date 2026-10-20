@@ -16,7 +16,7 @@ const renderSize = 32;
 /// that rendered.
 const _frameAttempts = 8;
 
-const _extent = LogicalExtent(
+final _extent = LogicalExtent(
   width: renderSize,
   height: renderSize,
   scaleFactor: 1,
