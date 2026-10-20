@@ -550,9 +550,13 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
+    // A request completed or passed through while deciding is handled
+    // whatever the decision says; the decision only says who holds the handle.
+    auto answered = false;
     {
       const std::scoped_lock lock(invocation.object->mutex);
       invocation.object->deciding = false;
+      answered = invocation.object->completed;
       if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
         invocation.object->claimed = true;
         if (invocation.object->released_while_deciding) {
@@ -562,7 +566,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
       retire_request(invocation.handle);
-      return false;
+      return answered;
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
       fail_request(

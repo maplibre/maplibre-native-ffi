@@ -296,6 +296,36 @@ static uint32_t release_then_unknown_decision_provider(
   return UINT32_MAX;
 }
 
+// Completes its request inline, then returns PASS_THROUGH, as a binding does
+// whose host answered without claiming the handle.
+static uint32_t complete_then_pass_through(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)user_data;
+  (void)request;
+  const mln_resource_response response =
+    mln_test_text_response(inline_style_json);
+  MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+// A request completed during its decision is answered whatever the decision
+// says, so native loading never fetches its unsupported scheme.
+static void a_request_completed_while_deciding_is_answered(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = complete_then_pass_through,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://completed.json"));
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void releasing_a_request_before_an_unknown_decision_fails_it(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
@@ -1114,6 +1144,7 @@ MLN_TEST_GROUP {
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
   RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
   RUN_TEST(releasing_a_request_before_an_unknown_decision_fails_it);
+  RUN_TEST(a_request_completed_while_deciding_is_answered);
   RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
   RUN_TEST(a_held_request_does_not_hold_its_runtime_open);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);

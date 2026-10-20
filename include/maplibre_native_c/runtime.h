@@ -1020,6 +1020,9 @@ typedef struct mln_resource_response {
  *   loader.
  * - After returning PASS_THROUGH, the provider must not retain, complete, or
  *   release the handle.
+ * - A request that the callback completes or passes through before returning
+ *   is answered whatever the callback returns. The return value then decides
+ *   only whether the provider still holds the handle.
  * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
  *   request through the handle inline or later.
  * - A callback that returns HANDLE may release the handle during the callback.
