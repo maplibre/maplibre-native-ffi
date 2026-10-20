@@ -2,7 +2,8 @@
 
 Labels go only into groups that have none, so a label that a template, a bot,
 or a person set always wins. The workflow runs once, when an item opens, and
-only adds labels.
+only adds labels. Groups, meanings, and thresholds live in `ci/labels.toml`.
+Run `uv run python -m ci.label_eval` before changing that file.
 """
 
 from __future__ import annotations

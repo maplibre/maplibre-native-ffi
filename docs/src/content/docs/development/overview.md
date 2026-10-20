@@ -1,7 +1,6 @@
 ---
 title: Overview
-description:
-  Set up a development environment, run the common tasks, and work with CI.
+description: Set up a development environment and run the common tasks.
 sidebar:
   order: 1
 ---
@@ -123,27 +122,8 @@ date.
 
 ## CI coverage
 
-Each pull request push runs only the coverage that the change puts at risk.
-[Jev](https://docs.typesafe.ai/) reads the diff and decides which coverage units
-to run, such as the Windows targets or the docs build. A unit that already
-passed on the pull request runs again only if the newer changes put it at risk.
-Hygiene runs on every push, and `ci-required` is the one required check.
-
-Main pushes, manual runs, and pull requests from forks or Dependabot run every
-unit, and so does any planning failure. Because main runs every unit after
-merge, a missed selection surfaces there. When the selection on a pull request
-looks wrong, start a manual run with `gh workflow run CI --ref <branch>`.
-
-## Labels
-
-When an issue or a pull request opens, the Label workflow asks Jev which labels
-from the scheme in AGENTS.md it needs. Jev reads the title, the description, and
-for a pull request the first chunk of the change description that coverage
-selection reads. The workflow adds labels only to groups that have none yet. A
-kind or an area from an issue template, from Dependabot, or from the author
-therefore stays as set. The workflow runs once per item, and it never removes a
-label, so later edits by maintainers are final. The job summary lists each
-label's score.
+Applicable CI jobs are selected automatically. If the selection looks wrong,
+trigger a manual run (`gh workflow run CI --ref <branch>`).
 
 ## Tests and examples
 

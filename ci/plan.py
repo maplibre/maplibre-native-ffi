@@ -3,6 +3,10 @@
 Main pushes and manual runs execute every unit. A pull request push asks Jev
 which units the change puts at risk, judging each unit only on what changed
 since that unit last passed for the pull request.
+
+A pull request without TYPESAFE_API_KEY runs every unit. Dependabot
+pull_request jobs do not receive Actions secrets. Store the same key as a
+Dependabot secret so those jobs get normal selection.
 """
 
 from __future__ import annotations

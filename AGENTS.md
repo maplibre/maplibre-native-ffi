@@ -51,9 +51,7 @@ Label an issue or a pull request with exactly one kind (`bug`, `feature`,
 `perf`, `chore`, or `research`) and at least one `area:*` label. Add `binding:`,
 `platform:`, and `renderer:` labels when the work is specific to one, and add
 `upstream` when the cause is in MapLibre Native. A patch we carry early still
-gets `area:upstream`. Leave GitHub's native issue type unset. When an item
-opens, the Label workflow fills each of these groups that has no label yet; see
-[Labels](docs/src/content/docs/development/overview.md#labels).
+gets `area:upstream`. Leave GitHub's native issue type unset.
 
 `needs-info` and `do-not-merge` are workflow state, and they do not replace a
 kind or an area.
@@ -118,7 +116,7 @@ Read these docs before changing related code:
 - [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
   for example requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for setup, common
-  tasks, tool ownership, and CI.
+  tasks, and tool ownership.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
