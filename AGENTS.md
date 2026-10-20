@@ -55,8 +55,8 @@ gets `area:upstream`. Leave GitHub's native issue type unset. When an item
 opens, the Label workflow fills each of these groups that has no label yet; see
 [Labels](docs/src/content/docs/development/overview.md#labels).
 
-`ci:*` labels are CI instructions, separate from that scheme. `needs-info` and
-`do-not-merge` are workflow state, and they do not replace a kind or an area.
+`needs-info` and `do-not-merge` are workflow state, and they do not replace a
+kind or an area.
 
 ## Pull requests
 
@@ -65,11 +65,8 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-CI runs the coverage that each push puts at risk; see
-[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage). To
-force a unit, run `gh pr edit <number> --add-label 'ci:<unit>'` with a unit ID
-from `ci/select.toml`, or `ci:full` for every unit. A label change on a closed
-pull request runs no jobs.
+Applicable CI jobs are selected automatically. If the selection looks wrong,
+trigger a manual run (`gh workflow run CI --ref <branch>`).
 
 ## Project Invariants
 
