@@ -21,8 +21,8 @@ Object? _field(Object target, String name, [LibraryMirror? library]) =>
 
 /// The one callback registration that owner still roots, or null.
 DeliveryRegistration? singleRegistrationProbeForTesting(Object owner) {
-  final ports = _field(owner, '_callbackRoots')!;
-  final queued = _field(ports, 'queued') as Set<DeliveryRegistration>;
+  final roots = _field(owner, '_callbackRoots')!;
+  final queued = _field(roots, 'queued') as Set<DeliveryRegistration>;
   return queued.isEmpty ? null : queued.single;
 }
 
