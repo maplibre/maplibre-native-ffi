@@ -16,7 +16,8 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = pathlib.Path(__file__).with_name("select.toml")
-ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+# A proxy such as LiteLLM's TypeSafe pass-through can stand in for the API.
+BASE_URL = os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
 DEFAULT_MODEL = "jev-latest"
 THRESHOLD = 0.5
 # Bump when the change description sent to Jev changes shape.
@@ -73,12 +74,22 @@ def truncate(path: str, text: str) -> str:
 
 def submodule_commits(base: str, head: str, path: str) -> list[str]:
     """List upstream commit subjects between two submodule pins."""
+
+    def quiet(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=ROOT, capture_output=True, text=True, check=False
+        ).stdout.strip()
+
+    # An added or removed submodule has a pin on only one side.
     old, new = (
-        git("rev-parse", f"{rev}:{path}").strip() if rev else "" for rev in (base, head)
+        quiet("rev-parse", "--verify", "--quiet", f"{rev}:{path}")
+        for rev in (base, head)
     )
-    url = git("config", "-f", ".gitmodules", f"submodule.{path}.url").strip()
+    if not (old and new):
+        return []
+    url = quiet("config", "-f", ".gitmodules", f"submodule.{path}.url")
     match = re.search(r"github\.com[:/](.+?)(\.git)?$", url)
-    if not (old and new and match):
+    if not match:
         return []
     try:
         output = subprocess.check_output(
@@ -264,7 +275,7 @@ def ask(
         if deadline is not None and time.monotonic() > deadline:
             raise TimeoutError("Jev selection exceeded its deadline")
         request = urllib.request.Request(
-            ENDPOINT,
+            f"{BASE_URL.rstrip('/')}/v1/systemone",
             data=body,
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -287,6 +298,20 @@ def ask(
                 continue
             raise
     raise AssertionError("unreachable")
+
+
+def log_request(request: dict, response: dict) -> None:
+    """Print one Jev request and its answers as a collapsed log group."""
+    change = request["state"].get("change", {})
+    part = change.get("patch_part", "").split(" of the patch")[0].lower()
+    print(f"::group::Jev request{f' ({part})' if part else ''}")
+    print(json.dumps(request, indent=2))
+    print(
+        json.dumps(
+            {"model": response["model"], "answers": response["answers"]}, indent=2
+        )
+    )
+    print("::endgroup::")
 
 
 def select(

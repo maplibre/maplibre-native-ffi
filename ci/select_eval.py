@@ -265,7 +265,7 @@ def prs(args, config: dict, cache: pathlib.Path) -> None:
         return
     spent = sum(minutes[job] for push in pushes for job in push["jobs"])
     fallbacks = sum(
-        push["decisions"][HYGIENE]["reason"].startswith("selection failed")
+        push["decisions"][HYGIENE]["rule"].startswith("full: selection failed")
         for push in pushes
     )
     print(

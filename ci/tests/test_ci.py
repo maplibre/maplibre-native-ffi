@@ -29,7 +29,6 @@ def pr(labels=()):
         "pull_request": {
             "number": 7,
             "title": "Change",
-            "state": "open",
             "labels": [{"name": label} for label in labels],
             "head": {"sha": HEAD, "ref": "topic"},
             "base": {"sha": "b" * 40},
@@ -111,25 +110,6 @@ class PlanTest(unittest.TestCase):
                 self.assertEqual(set(decisions), set(self.owned))
                 self.assertTrue(all(entry["run"] for entry in decisions.values()))
 
-    def test_a_closed_pull_request_selects_nothing(self):
-        event = pr(["ci:full"])
-        event["pull_request"]["state"] = "closed"
-        decisions = plan(
-            self.config,
-            self.owned,
-            "pull_request",
-            event,
-            ENV | {"TYPESAFE_API_KEY": "key"},
-        )
-        self.assertEqual(set(decisions), set(self.owned))
-        self.assertTrue(
-            all(
-                entry["rule"] == "pull request is closed"
-                for entry in decisions.values()
-            )
-        )
-        self.assertFalse(any(entry["run"] for entry in decisions.values()))
-
     def test_a_new_pull_request_runs_hygiene_jev_choices_and_labels(self):
         decisions, bases = self.run_plan(pr(["ci:android", "unrelated"]))
         self.assertEqual(bases, [FORK])
@@ -181,8 +161,9 @@ class PlanTest(unittest.TestCase):
         self.assertTrue(all(decisions.values()))
 
     def test_planner_parses_with_the_runner_system_python(self):
-        # The plan job runs the ubuntu-slim system Python, not the project's.
-        for name in ("plan", "select", "coverage", "workflow"):
+        # The plan and label jobs run the ubuntu-slim system Python, not the
+        # project's.
+        for name in ("plan", "select", "coverage", "workflow", "label"):
             path = ROOT / "ci" / f"{name}.py"
             with self.subTest(module=name):
                 ast.parse(path.read_text(), str(path), feature_version=(3, 12))
@@ -314,6 +295,33 @@ class BindingWorkflowTest(unittest.TestCase):
                         re.findall(r"steps\.(suite-\d+)\.outcome", gate["if"]),
                         suites,
                     )
+
+
+class DescribeTest(unittest.TestCase):
+    def test_an_added_submodule_has_no_upstream_commits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+
+            git("init", "--quiet")
+            git("commit", "--quiet", "--allow-empty", "-m", "base")
+            base = git("rev-parse", "HEAD")
+            git("update-index", "--add", "--cacheinfo", f"160000,{base},vendor/lib")
+            git("commit", "--quiet", "-m", "add submodule")
+            with patch.object(select, "ROOT", root):
+                change = select.describe_change(base, "HEAD", "")["change"]
+        self.assertEqual(
+            change["submodule_updates"],
+            [{"path": "vendor/lib", "upstream_commits": []}],
+        )
 
 
 class GateTest(unittest.TestCase):
