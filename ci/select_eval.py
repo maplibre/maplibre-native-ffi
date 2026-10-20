@@ -3,7 +3,8 @@
 `commits` asks about past commits one at a time and compares the answers with
 the labels in `ci/select_cases.toml`. `prs` replays the pushes of merged pull
 requests through the CI planner and compares the runner time of the jobs it
-selects with full coverage. Both cache Jev's answers under `build/ci-select/`.
+selects with full coverage. It treats each commit of a pull request's final
+history as a push, so it approximates force pushes and multi-commit pushes. Both cache Jev's answers under `build/ci-select/`.
 """
 
 from __future__ import annotations
@@ -259,6 +260,9 @@ def prs(args, config: dict, cache: pathlib.Path) -> None:
     (cache / "replay.json").write_text(json.dumps(replays, indent=2))
 
     pushes = [push for pushes in replays.values() for push in pushes]
+    if not pushes:
+        print("No pull request pushes to replay.")
+        return
     spent = sum(minutes[job] for push in pushes for job in push["jobs"])
     fallbacks = sum(
         push["decisions"][HYGIENE]["reason"].startswith("selection failed")

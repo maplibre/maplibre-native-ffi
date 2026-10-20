@@ -313,7 +313,7 @@ def ci_workflow(source: dict, presets: dict) -> dict:
             run(
                 'test "$PLAN" = success &&\n'
                 'jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED" '
-                "  '($selected | length > 0) and (($selected - $expected) | length == 0)\n"
+                "  '(($selected - $expected) | length == 0)\n"
                 "   and all($expected[]; . as $job | $results[$job].result ==\n"
                 '     (if $selected | index($job) then "success" else "skipped" end))\'\n',
                 name="Require every selected job",

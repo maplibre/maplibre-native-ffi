@@ -43,15 +43,18 @@ class PlanTest(unittest.TestCase):
         cls.units = [unit["id"] for unit in cls.config["units"]]
 
     def passing_run(self, units, *, run_id=90, head=OLD, number=7):
-        # The Kotlin Maven reusable workflow reports nested job names.
         jobs = [
-            {
-                "name": job_name(job) + (" / verify" if job == "kotlin-maven" else ""),
-                "conclusion": "success",
-            }
+            {"name": job_name(job), "conclusion": "success"}
             for unit in units
             for job in self.owned[unit]
+            if job != "kotlin-maven"
         ]
+        if "maven" in units:
+            # The reusable workflow nests its jobs and skips publishing in PRs.
+            jobs += [
+                {"name": "Kotlin Maven / verify", "conclusion": "success"},
+                {"name": "Kotlin Maven / publish", "conclusion": "skipped"},
+            ]
         run = {"id": run_id, "head_sha": head, "pull_requests": [{"number": number}]}
         return run, jobs
 
@@ -129,8 +132,9 @@ class PlanTest(unittest.TestCase):
 
         decisions, _ = self.run_plan(pr(), runs=runs, choose=jev)
         self.assertEqual(judged, {FORK, OLD, NEWER})
-        self.assertTrue(decisions[HYGIENE])
-        self.assertFalse(any(decisions[unit] for unit in self.units))
+        # A unit that failed most recently runs again whatever Jev answers.
+        selected = {unit for unit, run in decisions.items() if run}
+        self.assertEqual(selected, {HYGIENE, "windows"})
 
     def test_nothing_new_reruns_nothing_that_passed(self):
         cases = {
@@ -211,6 +215,7 @@ class GateTest(unittest.TestCase):
             return done.returncode == 0
 
         self.assertTrue(accepts(results))
+        self.assertTrue(accepts({job: {"result": "skipped"} for job in expected}, []))
         self.assertFalse(accepts(results, plan_result="failure"))
         self.assertFalse(accepts(results, []))
         self.assertFalse(accepts(results, [*selected, "unknown"]))

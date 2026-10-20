@@ -190,7 +190,10 @@ def fingerprint(config: dict) -> str:
             questions(config),
             STATE_BUDGET,
             FILE_LIMIT,
+            SUMMARY_FILE_LIMIT,
+            SUMMARY_PATTERNS.pattern,
             FILE_LIST_LIMIT,
+            MAX_CHUNKS,
             INPUT_VERSION,
         ]
     )

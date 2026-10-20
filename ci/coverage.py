@@ -92,16 +92,21 @@ def selected_jobs(
     return sorted(jobs)
 
 
-def unit_passed(jobs: list[str], conclusions: dict[str, str]) -> bool:
-    """Whether every job of a unit succeeded in one workflow run."""
+def unit_outcome(jobs: list[str], conclusions: dict[str, str]) -> str | None:
+    """Return whether a unit passed or failed in one run, or None if neither."""
+    outcomes = []
     for job in jobs:
         name = job_name(job)
-        # A reusable workflow reports its jobs as `<caller> / <job>`.
-        matches = [
-            conclusion
-            for reported, conclusion in conclusions.items()
-            if reported == name or reported.startswith(f"{name} / ")
-        ]
-        if not matches or any(conclusion != "success" for conclusion in matches):
-            return False
-    return True
+        # A reusable workflow reports its jobs as `<caller> / <job>`, and some of
+        # them, such as Kotlin Maven publishing, skip in pull request CI.
+        nested = [c for r, c in conclusions.items() if r.startswith(f"{name} / ")]
+        found = nested or [conclusions.get(name)]
+        if any(conclusion in {"failure", "timed_out"} for conclusion in found):
+            outcomes.append("failed")
+        elif "success" in found and set(found) <= {"success", "skipped"}:
+            outcomes.append("passed")
+        else:
+            outcomes.append(None)
+    if "failed" in outcomes:
+        return "failed"
+    return "passed" if all(outcomes) else None

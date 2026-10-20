@@ -15,7 +15,7 @@ import time
 import urllib.parse
 
 from ci import select
-from ci.coverage import HYGIENE, dependencies, selected_jobs, unit_jobs, unit_passed
+from ci.coverage import HYGIENE, dependencies, selected_jobs, unit_jobs, unit_outcome
 from ci.workflow import load_configuration
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -52,10 +52,10 @@ def present(sha: str) -> bool:
     )
 
 
-def last_passed(
+def history(
     owned: dict[str, list[str]], event: dict, env: dict, api=github
-) -> dict[str, str]:
-    """Return the latest pull request head at which each unit passed."""
+) -> tuple[dict[str, str], set[str]]:
+    """Return each unit's latest passing head, and the units that last failed."""
     repository = env["GITHUB_REPOSITORY"]
     pr = event["pull_request"]
     branch = urllib.parse.quote(pr["head"]["ref"], safe="")
@@ -64,6 +64,7 @@ def last_passed(
         f"?event=pull_request&branch={branch}&per_page={LOOKBACK_RUNS}"
     )["workflow_runs"]
     passed: dict[str, str] = {}
+    failed: set[str] = set()
     for run in sorted(runs, key=lambda run: run["id"], reverse=True):
         if str(run["id"]) == env["GITHUB_RUN_ID"] or not any(
             other["number"] == pr["number"] for other in run.get("pull_requests") or []
@@ -78,11 +79,16 @@ def last_passed(
             raise ValueError("CI jobs exceed the lookup page")
         conclusions = {job["name"]: job["conclusion"] for job in response["jobs"]}
         for unit, jobs in owned.items():
-            if unit not in passed and unit_passed(jobs, conclusions):
+            if unit in passed or unit in failed:
+                continue
+            outcome = unit_outcome(jobs, conclusions)
+            if outcome == "passed":
                 passed[unit] = run["head_sha"]
-        if len(passed) == len(owned):
+            elif outcome == "failed":
+                failed.add(unit)
+        if len(passed) + len(failed) == len(owned):
             break
-    return {unit: sha for unit, sha in passed.items() if present(sha)}
+    return {unit: sha for unit, sha in passed.items() if present(sha)}, failed
 
 
 def decision(run: bool, *, score: float | None = None, rule: str = "", **since) -> dict:
@@ -181,7 +187,7 @@ def plan(
     try:
         head = pr["head"]["sha"]
         fork = select.git("merge-base", pr["base"]["sha"], head).strip()
-        passed = last_passed(owned, event, env, api)
+        passed, failed = history(owned, event, env, api)
         bases: dict[str, list[str]] = {}
         for unit in owned:
             bases.setdefault(passed.get(unit, fork), []).append(unit)
@@ -215,6 +221,9 @@ def plan(
     except Exception as error:  # noqa: BLE001
         return everything(config, f"full: selection failed: {error}")
 
+    # A unit runs until it passes again, whatever Jev answers for the new change.
+    for unit in failed:
+        decisions[unit] = decisions[unit] | {"run": True, "rule": "failed last run"}
     for unit in owned:
         if f"ci:{unit}" in labels:
             decisions[unit] = decisions[unit] | {

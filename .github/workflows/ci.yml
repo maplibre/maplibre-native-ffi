@@ -1946,6 +1946,6 @@ jobs:
           SELECTED: ${{ needs.plan.outputs.jobs }}
         run: |
           test "$PLAN" = success &&
-          jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED"   '($selected | length > 0) and (($selected - $expected) | length == 0)
+          jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED"   '(($selected - $expected) | length == 0)
              and all($expected[]; . as $job | $results[$job].result ==
                (if $selected | index($job) then "success" else "skipped" end))'
