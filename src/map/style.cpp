@@ -1379,7 +1379,9 @@ auto to_native_premultiplied_rgba8_image(
   const auto row_bytes = static_cast<size_t>(image.width) * 4U;
   auto result = mln::PremultipliedImage{
     mln::Size{image.width, image.height},
-    std::make_unique_for_overwrite<uint8_t[]>(row_bytes * image.height)
+    // Uninitialized storage; every byte is written below. OpenHarmony's
+    // libc++ lacks std::make_unique_for_overwrite.
+    std::unique_ptr<uint8_t[]>(new uint8_t[row_bytes * image.height])
   };
   if (image.stride == row_bytes) {
     std::memcpy(result.data.get(), image.pixels, result.bytes());

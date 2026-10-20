@@ -2114,11 +2114,14 @@ auto render_session_render_update_on_driver(
     }
   }
 
+  // Lambdas capture this reference rather than the structured binding, which
+  // OpenHarmony's clang does not accept as a capture.
+  const auto& rendered_update = update;
   // Returns an early status, or nothing once the render attempt returns.
   const auto render_once = [&]() -> std::optional<mln_status> {
     try {
       live->frame_observer.begin_render();
-      live->renderer->render(update);
+      live->renderer->render(rendered_update);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
     } catch (const mln::vulkan::SurfaceNotReady&) {
       // The swapchain had no free image within the acquire bound. The frame

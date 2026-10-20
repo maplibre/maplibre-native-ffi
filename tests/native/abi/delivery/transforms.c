@@ -21,6 +21,7 @@
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
+#if !defined(__EMSCRIPTEN__)
 static mln_buffer_view copy_view(const char* text) {
   const size_t size = strlen(text);
   char* copy = malloc(size);
@@ -28,6 +29,7 @@ static mln_buffer_view copy_view(const char* text) {
   memcpy(copy, text, size);
   return (mln_buffer_view){.data = copy, .size = size};
 }
+#endif
 
 static mln_status submit_rewrite_rules(
   mln_runtime runtime, const mln_resource_rewrite_rule* rules, size_t count,

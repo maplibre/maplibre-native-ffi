@@ -382,6 +382,8 @@ static void invalid_routes_are_rejected(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#if !defined(__EMSCRIPTEN__)
+
 // A callback provider that answers every request it sees with an empty style.
 static uint32_t answer_with_style(
   void* user_data, const mln_resource_request_info* request,
@@ -394,8 +396,6 @@ static uint32_t answer_with_style(
   mln_resource_request_release(handle);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
-
-#if !defined(__EMSCRIPTEN__)
 
 static void load_style(mln_runtime runtime, const char* url) {
   mln_map map = mln_test_create_map(runtime);
