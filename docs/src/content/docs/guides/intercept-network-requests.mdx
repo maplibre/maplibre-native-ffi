@@ -15,9 +15,7 @@ import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 
 Choose a resource transform to rewrite URLs, an HTTP header transform to add
 headers, or a resource provider to supply response bytes from host storage.
-Register each configuration on the runtime. Use native rules for fixed URL
-rewrites or headers, and callbacks when the result depends on host computation.
-Native rules also support hosts that cannot run callbacks on MapLibre threads.
+Register each configuration on the runtime.
 
 Callbacks can run concurrently on native threads. Protect shared state and
 return quickly. Keep registered callback state reachable until native code
@@ -25,26 +23,23 @@ releases it. Release host locks that callbacks acquire before closing the runtim
 
 ## Rewrite a URL
 
-Use a transform to sign a URL or select another host. For a fixed rewrite,
-register a table of rules; registration copies the table and its strings.
-
-<Code code={region(transformSnippet, "rules")} lang="c" title="resource-transform.c" />
-
-Rules select resource kinds and compare complete URLs, exactly or with globs.
-The first match decides the result; a rule without a replacement preserves the
-URL and stops the search. Clear the transform to remove the table.
-
-For a computed rewrite, register a callback. Check the destination
-before adding credentials: styles can request tiles, sprites, and glyphs from
-origins that the host does not control.
+Use a transform to sign a URL or select another host. Each request reaches the
+transform with a request handle, and MapLibre waits for the answer before it
+fetches. Check the destination before adding credentials: styles can request
+tiles, sprites, and glyphs from origins that the host does not control.
+Releasing the handle without an answer keeps the URL.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Build and set the replacement URL.
+Complete the request with the replacement URL, then release it. The handle
+also answers later from any thread, so a host can compute the URL
+asynchronously.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Register the transform before loading resources that need it.
+Register the transform before loading resources that need it. A host that
+cannot run code on MapLibre threads sets a delivery queue in place of the
+callback and answers each drained request.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
@@ -52,8 +47,9 @@ Register the transform before loading resources that need it.
 
 Use a header transform for credentials that belong in headers. It runs after URL
 transformation, so check the transformed origin before returning credentials.
-A table of header rules supplies fixed headers without a callback; the first
-matching rule supplies its complete header list.
+A table of header rules supplies fixed headers without a callback, for hosts
+that cannot run code on MapLibre threads; the first matching rule supplies its
+complete header list.
 
 <Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
 

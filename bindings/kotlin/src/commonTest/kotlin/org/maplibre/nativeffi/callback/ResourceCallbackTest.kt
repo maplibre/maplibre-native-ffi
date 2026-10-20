@@ -18,6 +18,8 @@ import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.HttpHeaderTransform
+import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
 import org.maplibre.nativeffi.generated.ResourceKind
 import org.maplibre.nativeffi.generated.ResourceKindMask
 import org.maplibre.nativeffi.generated.ResourceProvider
@@ -28,7 +30,7 @@ import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
 import org.maplibre.nativeffi.generated.ResourceRoute
 import org.maplibre.nativeffi.generated.ResourceTransform
-import org.maplibre.nativeffi.generated.ResourceTransformResponse
+import org.maplibre.nativeffi.generated.ResourceTransformRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.UrlMatchFlags
@@ -174,7 +176,11 @@ class ResourceCallbackTest {
       ) {
         runtime
           .setResourceTransform(
-            ResourceTransform(callback = { _, url, _ -> if (url == STYLE_URL) throw thrown }),
+            ResourceTransform(
+              callback = { _, url, request ->
+                if (url == STYLE_URL) throw thrown else request.close()
+              },
+            ),
           )
           .awaitWithin("the transform")
         map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -213,28 +219,63 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun aTransformResponseRefusesUseAfterItsCallbackAndFromAnotherThread(): Unit = runSuspendTest {
+  fun aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread(): Unit = runSuspendTest {
     val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()
-    var escaped: ResourceTransformResponse? = null
+    var escaped: HttpHeaderTransformResponse? = null
     val transform =
-      ResourceTransform(
+      HttpHeaderTransform(
         callback = { _, url, response ->
-          if (url != STYLE_URL || outcome.isCompleted) return@ResourceTransform
+          if (url != HTTP_STYLE_URL || outcome.isCompleted) return@HttpHeaderTransform
           escaped = response
           var fromAnotherThread: Throwable? = null
           runOnBackgroundThread {
             fromAnotherThread =
-              runCatching { GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL) }
+              runCatching {
+                GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
+              }
                 .exceptionOrNull()
           }
           val inside = runCatching {
-            GeneratedApi.resourceTransformResponseSetUrl(response, REWRITTEN_URL)
+            GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
           }
             .exceptionOrNull()
           outcome.complete(inside to fromAnotherThread)
         },
       )
-    // The provider passes the style through to the online source, which applies the transform.
+    // The provider passes the style through to the HTTP client, which runs the header transform
+    // before it tries a port that nothing serves.
+    withMap(
+      provider =
+        denyingProvider { request, _ ->
+          if (request.requestedUrl == HTTP_STYLE_URL) ResourceProviderDecision.PASS_THROUGH
+          else null
+        },
+    ) {
+      runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
+      map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
+      val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
+      assertEquals(null, inside, "setting a header inside the callback is allowed")
+      assertTrue(
+        fromAnotherThread is InvalidStateException,
+        "the response from another thread: $fromAnotherThread",
+      )
+      assertFailsWith<InvalidStateException> {
+        GeneratedApi.httpHeaderTransformResponseSetHeader(escaped!!, "X-Test", "1")
+      }
+      runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")
+    }
+  }
+
+  @Test
+  fun aTransformRequestIsAnsweredFromAnotherThreadAfterItsCallbackReturns(): Unit = runSuspendTest {
+    val received = CompletableDeferred<ResourceTransformRequestHandle>()
+    val transform =
+      ResourceTransform(
+        callback = { _, url, request ->
+          if (url == STYLE_URL) received.complete(request) else request.close()
+        },
+      )
+    // The provider passes the style through to the online source, which waits for the answer.
     withMap(
       provider =
         denyingProvider { request, _ ->
@@ -243,15 +284,20 @@ class ResourceCallbackTest {
     ) {
       runtime.setResourceTransform(transform).awaitWithin("the transform")
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      val (inside, fromAnotherThread) = outcome.awaitWithin("the transform callback")
-      assertEquals(null, inside, "setting the URL inside the callback is allowed")
-      assertTrue(
-        fromAnotherThread is InvalidStateException,
-        "the response from another thread: $fromAnotherThread",
-      )
-      assertFailsWith<InvalidStateException> {
-        GeneratedApi.resourceTransformResponseSetUrl(escaped!!, REWRITTEN_URL)
+      val request = received.awaitWithin("the transform callback")
+      var answered: Throwable? = null
+      runOnBackgroundThread {
+        answered =
+          runCatching {
+            request.complete(REWRITTEN_URL)
+            request.close()
+          }
+            .exceptionOrNull()
       }
+      assertEquals(null, answered, "answering after the callback returned")
+      assertTrue(request.isClosed)
+      // The online source cannot load the rewritten scheme.
+      awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
       runtime.clearResourceTransform().awaitWithin("the transform clear")
     }
   }
@@ -318,6 +364,8 @@ class ResourceCallbackTest {
   private companion object {
     const val STYLE_URL = "custom://style.json"
     const val REWRITTEN_URL = "unsupported://rewritten-style.json"
+    // A loopback port that nothing serves, so the request fails without leaving the machine.
+    const val HTTP_STYLE_URL = "http://127.0.0.1:1/style.json"
     const val ROUTED_STYLE_URL = "custom://routed/style.json"
     const val ROUTED_SOURCE_URL = "custom://routed/source.json"
     const val UNROUTED_STYLE_URL = "custom://unrouted/style.json"

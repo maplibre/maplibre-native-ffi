@@ -128,20 +128,34 @@ def trampoline(values, callback, name, host, state="Self"):
         f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
         for p in callback.parameters
     )
+    # An owned handle is adopted before the other arguments convert, so a
+    # conversion that fails drops its owner, which releases the handle.
+    owned = [
+        p
+        for p in arguments
+        if p.value.kind == "handle" and p.value.ownership == "owned"
+    ]
+    adoptions = "".join(
+        f"let {locals_by_name[p.name]} = {callback_parameter_capture(values, p, locals_by_name[p.name])}; "
+        for p in owned
+    )
     copies = ", ".join(
-        callback_parameter_capture(values, p, locals_by_name[p.name]) for p in arguments
+        locals_by_name[p.name]
+        if p in owned
+        else callback_parameter_capture(values, p, locals_by_name[p.name])
+        for p in arguments
     )
     public, raw, converted = callback_output(values, callback)
     returns = "" if raw == "()" else f" -> {raw}"
     context = locals_by_name[callback.context]
-    host = f"{host}({copies})"
+    host = f"{adoptions}{host}({copies})"
     if callback.status:
         failure = (
             f"sys::{callback.failure}"
             if callback.failure not in {None, "contain"}
             else "Default::default()"
         )
-        run = f'callback::invoke_status("{callback.native}", {reentry(callback, locals_by_name)}, {failure}, || {host})'
+        run = f'callback::invoke_status("{callback.native}", {reentry(callback, locals_by_name)}, {failure}, || {{ {host} }})'
     else:
         fallback = (
             "()"
@@ -351,6 +365,8 @@ def callback_parameter_capture(values, parameter, local=None):
     scoped = response(parameter.value)
     if scoped:
         return f"&mut {values.name(scoped)}::new({local})?"
+    if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
+        return f"{values.public(parameter.value)}::adopt({local}, None)?"
     if parameter.value.kind == "handle":
         return f"{values.name(parameter.value)} {{ state: std::sync::Arc::clone(&request_state), not_sync: std::marker::PhantomData }}"
     return decode(values, parameter.value, local)

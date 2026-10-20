@@ -97,6 +97,15 @@ pub const ResourceRequest = owner.Handle("mln_resource_request", "ResourceReques
         c.mln_resource_request_release(raw);
     }
 }.dispose);
+/// A resource URL transform that waits for its host's answer.
+///
+/// See `mln_resource_transform_request` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const ResourceTransformRequest = owner.Handle("mln_resource_transform_request", "ResourceTransformRequest", struct {
+    fn dispose(raw: u64) status.Error!void {
+        c.mln_resource_transform_request_release(raw);
+    }
+}.dispose);
 /// A runtime: the native scheduler thread and event store for its maps.
 ///
 /// See `mln_runtime` in the
@@ -3757,40 +3766,6 @@ pub const ResourceResponseStatus = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// One rule of a native resource transform.
-///
-/// See `mln_resource_rewrite_rule` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const ResourceRewriteRule = struct {
-    /// The resource kinds to match.
-    kinds: ResourceKindMask = ResourceKindMask.all,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    flags: UrlMatchFlags = std.mem.zeroes(UrlMatchFlags),
-    /// The URL or glob pattern to compare.
-    url: []const u8 = &.{},
-    /// The replacement URL, or empty to keep the URL and stop the search.
-    replacement_url: ?[]const u8 = null,
-    pub fn toNative(self: ResourceRewriteRule, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_rewrite_rule {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_resource_rewrite_rule);
-        raw.kinds = self.kinds.toNative();
-        raw.flags = self.flags.toNative();
-        raw.url = marshal.view(self.url);
-        raw.replacement_url = if (self.replacement_url) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_rewrite_rule) status.Error!ResourceRewriteRule {
-        return .{
-            .kinds = ResourceKindMask.fromNative(raw.kinds),
-            .flags = UrlMatchFlags.fromNative(raw.flags),
-            .url = try marshal.copyView(allocator, raw.url),
-            .replacement_url = if (raw.replacement_url.size == 0) null else try marshal.copyView(allocator, raw.replacement_url),
-        };
-    }
-};
-
 /// One request pattern that a resource provider claims.
 ///
 /// See `mln_resource_route` in the
@@ -3829,25 +3804,18 @@ pub const ResourceStoragePolicy = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Resource transform state: a callback, or native rewrite rules.
+/// Resource transform state.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceTransform = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (?*anyopaque, ResourceKind, []const u8, ResourceTransformResponse) status.Error!void = null,
-    /// Rewrite rules for a transform without a callback; empty with one.
-    rules: []const ResourceRewriteRule = &.{},
+    callback: ?*const fn (?*anyopaque, ResourceKind, []const u8, ResourceTransformRequest) status.Error!void = null,
     pub fn toNative(self: ResourceTransform, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_transform {
+        _ = allocator;
         var raw = std.mem.zeroes(c.mln_resource_transform);
         raw.size = @sizeOf(c.mln_resource_transform);
-        raw.rules = blk: {
-            const items = try allocator.alloc(c.mln_resource_rewrite_rule, self.rules.len);
-            for (self.rules, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
-            break :blk items.ptr;
-        };
-        raw.rule_count = std.math.cast(@TypeOf(raw.rule_count), self.rules.len) orelse return error.InvalidArgument;
         raw.callback = if (self.callback != null) callbackTrampoline else null;
         if (!(self.callback == null)) {
             const retained = try roots.retain(ResourceTransform, self);
@@ -3861,28 +3829,24 @@ pub const ResourceTransform = struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_transform_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_transform_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_transform_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_resource_transform_callback, 3)) status.Error!marshal.CallbackResult(c.mln_resource_transform_callback) {
                 const state = callback.Registration(ResourceTransform).get(callback_arg_0);
                 const host = state.value.callback orelse {
-                    return c.MLN_STATUS_NATIVE_ERROR;
+                    return;
                 };
-                var scope: callback.Scope = .{};
-                scope.enter(&.{"mln_resource_transform_response_set_url"}, @intFromPtr(callback_arg_3));
-                defer scope.leave();
+                const owned_request = try ResourceTransformRequest.adopt(callback_arg_3, null);
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
-                host(state.value.context, ResourceKind.fromNative(callback_arg_1), try allocator.dupe(u8, std.mem.span(callback_arg_2 orelse return error.NativeError)), .{ .native = @ptrCast(callback_arg_3) }) catch |err| {
+                host(state.value.context, ResourceKind.fromNative(callback_arg_1), try allocator.dupe(u8, std.mem.span(callback_arg_2 orelse return error.NativeError)), owned_request) catch |err| {
                     callback.reportError("mln_resource_transform_callback", err);
-                    return status.rawStatus(err);
+                    resourceTransformRequestRelease(owned_request) catch {};
+                    return;
                 };
-                return c.MLN_STATUS_OK;
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callback.reportError("mln_resource_transform_callback", err);
-            return c.MLN_STATUS_NATIVE_ERROR;
+            return;
         };
     }
 };
-
-pub const ResourceTransformResponse = struct { native: *c.mln_resource_transform_response };
 
 pub const ResourceUsage = enum(u32) {
     offline = 1,
@@ -7247,13 +7211,20 @@ pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: Re
     return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
 }
 
-/// Copies a replacement URL into C API-managed storage for the current
-/// callback.
+/// Answers a resource transform request with a replacement URL.
 ///
-/// See `mln_resource_transform_response_set_url` in the
+/// See `mln_resource_transform_request_complete` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_resource_transform_response_set_url", .scoped, response, null, diagnostic, .{url});
+pub fn resourceTransformRequestComplete(request: ResourceTransformRequest, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_resource_transform_request_complete", .lease, request, null, diagnostic, .{url});
+}
+
+/// Releases a resource transform request.
+///
+/// See `mln_resource_transform_request_release` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn resourceTransformRequestRelease(request: ResourceTransformRequest) status.Error!void {
+    return call.direct("mln_resource_transform_request_release", .close, request, void, null, .{});
 }
 
 /// Stops event delivery and retires the previous handler.

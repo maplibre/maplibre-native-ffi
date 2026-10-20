@@ -189,18 +189,18 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
 	invoked := make(chan struct{}, 1)
-	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, url string, response *ResourceTransformResponseScope) Status {
+	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) Status {
 		offer(invoked, struct{}{})
-		_, err := f.runtime.ClearHttpHeaderTransform()
+		_, err := f.runtime.ClearResourceTransform()
 		var native *Error
 		if !errors.As(err, &native) || !strings.Contains(native.Diagnostic(), "unavailable in this native callback") {
-			failures.add("ClearHttpHeaderTransform inside the transform = %v, want the admission error", err)
+			failures.add("ClearResourceTransform inside the header transform = %v, want the admission error", err)
 		}
 		if _, ok := native.RawStatus(); ok {
 			failures.add("the admission error came from native")
 		}
-		if err := response.SetUrl(url); err != nil {
-			failures.add("SetUrl inside the transform: %v", err)
+		if err := response.SetHeader("X-Test", "1"); err != nil {
+			failures.add("SetHeader inside the header transform: %v", err)
 		}
 		return StatusOk
 	}})))
@@ -209,7 +209,7 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
-	receive(t, invoked, "the transform's invocation")
+	receive(t, invoked, "the header transform's invocation")
 	failures.check(t)
 }
 
@@ -226,21 +226,21 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	}
 	submissions := make(chan submission, 1)
 	var spawn sync.Once
-	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, _ *ResourceTransformResponseScope) Status {
+	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status {
 		spawn.Do(func() {
-			if _, err := f.runtime.ClearHttpHeaderTransform(); !errors.Is(err, ErrInvalidState) {
-				failures.add("ClearHttpHeaderTransform inside the transform = %v, want ErrInvalidState", err)
+			if _, err := f.runtime.ClearResourceTransform(); !errors.Is(err, ErrInvalidState) {
+				failures.add("ClearResourceTransform inside the header transform = %v, want ErrInvalidState", err)
 			}
 			accepted := make(chan submission, 1)
 			go func() {
-				future, err := f.runtime.ClearHttpHeaderTransform()
+				future, err := f.runtime.ClearResourceTransform()
 				accepted <- submission{future, err}
 			}()
 			select {
 			case result := <-accepted:
 				submissions <- result
 			case <-time.After(testTimeout()):
-				failures.add("the goroutine's ClearHttpHeaderTransform did not return while the transform ran")
+				failures.add("the goroutine's ClearResourceTransform did not return while the header transform ran")
 			}
 		})
 		return StatusOk
@@ -253,22 +253,21 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	failures.check(t)
 	result := receive(t, submissions, "the goroutine's submission")
 	if result.err != nil {
-		t.Fatalf("ClearHttpHeaderTransform from the goroutine: %v", result.err)
+		t.Fatalf("ClearResourceTransform from the goroutine: %v", result.err)
 	}
 	await(t, result.future)
 }
 
-// A panic in a callback stays in the binding, which returns the callback's
-// declared failure value to native: a transform's rewrite is dropped, and a
-// provider's request passes through to the built-in sources. The binding logs
-// each panic through the default slog logger.
+// A panic in a callback stays in the binding, which settles what native waits
+// for: a transform's request keeps its URL, and a provider's request passes
+// through to the built-in sources. The binding logs each panic through the
+// default slog logger.
 func TestCallbackPanicIsContained(t *testing.T) {
 	panics := capturePanicLogs(t)
 	f := newFixture(t)
 	base := f.serveLoopback(t, map[string]string{"/original.json": emptyStyle})
 	panicked := make(chan struct{}, 1)
-	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, response *ResourceTransformResponseScope) Status {
-		_ = response.SetUrl(base + "/rewritten.json")
+	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(ResourceKind, string, *ResourceTransformRequestHandle) {
 		offer(panicked, struct{}{})
 		panic("transform failed")
 	}})))
@@ -467,17 +466,17 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	}
 }
 
-// A transform's response object works only inside its invocation and on the
-// thread native called it on.
+// A header transform's response object works only inside its invocation and
+// on the thread native called it on.
 func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
-	responses := make(chan *ResourceTransformResponseScope, 1)
-	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, url string, response *ResourceTransformResponseScope) Status {
+	responses := make(chan *HttpHeaderTransformResponseScope, 1)
+	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) Status {
 		foreign := make(chan error, 1)
-		go func() { foreign <- response.SetUrl(url) }()
+		go func() { foreign <- response.SetHeader("X-Test", "1") }()
 		if err := <-foreign; !errors.Is(err, ErrInvalidState) {
-			failures.add("SetUrl from another goroutine = %v, want ErrInvalidState", err)
+			failures.add("SetHeader from another goroutine = %v, want ErrInvalidState", err)
 		}
 		offer(responses, response)
 		return StatusOk
@@ -488,10 +487,38 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
 	failures.check(t)
-	response := receive(t, responses, "the transform's response")
-	if err := response.SetUrl(base + "/late.json"); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("SetUrl after the callback returned = %v, want ErrInvalidState", err)
+	response := receive(t, responses, "the header transform's response")
+	if err := response.SetHeader("X-Test", "late"); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("SetHeader after the callback returned = %v, want ErrInvalidState", err)
 	}
+}
+
+// A transform owns the request its callback receives, and another goroutine
+// answers it after the callback returns; MapLibre fetches the answer.
+func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
+	f := newFixture(t)
+	base := f.serveLoopback(t, map[string]string{"/rewritten.json": emptyStyle})
+	requests := make(chan *ResourceTransformRequestHandle, 1)
+	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, url string, request *ResourceTransformRequestHandle) {
+		if strings.HasSuffix(url, "/original.json") {
+			requests <- request
+			return
+		}
+		_ = request.Close()
+	}})))
+	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
+		t.Fatal(err)
+	}
+	request := receive(t, requests, "the transform's request")
+	answered := make(chan error, 1)
+	go func() {
+		err := request.Complete(base + "/rewritten.json")
+		answered <- errors.Join(err, request.Close())
+	}()
+	if err := receive(t, answered, "the answer"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the style load from the answer", isStyleLoaded)
 }
 
 // Installing a process-global callback replaces the registration native held,

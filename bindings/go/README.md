@@ -33,9 +33,10 @@ such as a submission's completion, because native work can depend on the
 callback's return.
 
 A resource provider that returns `ResourceProviderDecisionHandle` keeps its
-`ResourceRequestHandle`, and any goroutine can complete and close that handle
-after the provider returns. A scoped response such as
-`ResourceTransformResponseScope` works only during its callback and on the
+`ResourceRequestHandle`, and a resource transform owns its
+`ResourceTransformRequestHandle`. Any goroutine can answer and close either
+handle after the callback returns. A scoped response such as
+`HttpHeaderTransformResponseScope` works only during its callback and on the
 callback's thread.
 
 Native cannot receive a panic, so the binding recovers a callback's panic and

@@ -79,22 +79,3 @@ public extension Maplibre {
     }
   }
 }
-
-public extension ResourceTransformResponse {
-  /// Copies a replacement URL into C API-managed storage for the current
-  /// callback.
-  ///
-  /// See `mln_resource_transform_response_set_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setUrl(url bindingArg0: String) throws {
-    try nativeInvoke(owner: self,
-                     "mln_resource_transform_response_set_url")
-    { _, arena, diagnostic in
-      try mln_resource_transform_response_set_url(
-        nativePointer,
-        arena.view(bindingArg0),
-        diagnostic
-      )
-    }
-  }
-}

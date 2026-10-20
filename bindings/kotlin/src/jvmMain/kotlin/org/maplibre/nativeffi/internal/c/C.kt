@@ -1044,14 +1044,16 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_resource_transform_response_set_url =
+  private val mln_resource_transform_request_complete =
     Ffm.downcall(
-      "mln_resource_transform_response_set_url",
+      "mln_resource_transform_request_complete",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
       JAVA_LONG,
     )
+  private val mln_resource_transform_request_release =
+    Ffm.downcall("mln_resource_transform_request_release", null, JAVA_LONG)
   private val mln_runtime_clear_event_handler =
     Ffm.downcall("mln_runtime_clear_event_handler", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_clear_http_header_transform =
@@ -2904,16 +2906,20 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_resource_transform_response_set_url(
-    response: Long,
+  actual fun mln_resource_transform_request_complete(
+    request: Long,
     url: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_resource_transform_response_set_url.invokeExact(
-      response,
+    mln_resource_transform_request_complete.invokeExact(
+      request,
       Ffm.value(url, mln_buffer_view),
       outDiagnostic,
     ) as Int
+
+  actual fun mln_resource_transform_request_release(request: Long) {
+    mln_resource_transform_request_release.invoke(request)
+  }
 
   actual fun mln_runtime_clear_event_handler(
     runtime: Long,

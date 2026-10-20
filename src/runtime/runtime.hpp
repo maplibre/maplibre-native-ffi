@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include <mln/storage/resource_transform.hpp>
+
 #include "completion/completion.hpp"
 #include "execution/control_state.hpp"
 #include "execution/process_exit.hpp"
@@ -358,9 +360,6 @@ auto set_resource_transform(
   mln_runtime runtime, const mln_resource_transform* transform,
   const mln_completion* completion
 ) -> mln_status;
-auto resource_transform_response_set_url(
-  mln_resource_transform_response* response, mln_buffer_view url
-) -> mln_status;
 auto clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
@@ -381,10 +380,11 @@ auto clear_http_header_transform(
 auto invoke_http_header_transform(
   void* platform_context, uint32_t kind, const char* url
 ) noexcept -> HttpHeaders;
+// Answers finished with the transformed URL, now or once the host answers.
 auto invoke_resource_transform(
-  void* platform_context, uint32_t kind, const char* url,
-  std::string& out_replacement_url
-) noexcept -> mln_status;
+  void* platform_context, uint32_t kind, const std::string& url,
+  mln::ResourceTransform::FinishedCallback finished
+) -> void;
 auto run_ambient_cache_operation_start(
   mln_runtime runtime, uint32_t operation, const mln_completion* completion
 ) -> mln_status;

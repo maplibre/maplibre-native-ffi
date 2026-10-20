@@ -103,16 +103,13 @@ internal actual object UpcallStubs {
     }
     .toLong()
   actual val resourceTransformCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      kind: UInt,
-      url: CPointer<ByteVar>?,
-      outResponse: CPointer<mln_resource_transform_response>? ->
+    staticCFunction { userData: COpaquePointer?, kind: UInt, url: CPointer<ByteVar>?, request: ULong
+      ->
       Upcalls.resourceTransformCallback(
         userData.toLong(),
         kind.toInt(),
         url.toLong(),
-        outResponse.toLong(),
+        request.toLong(),
       )
     }
     .toLong()

@@ -530,3 +530,29 @@ struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST> {
   using Record = mln_resource_request_delivery;
   static constexpr auto member = &mln_delivery_payload::resource_request;
 };
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const mln_resource_transform_delivery& source
+) -> mln_resource_transform_delivery {
+  auto result = source;
+  result.url = string(arena, source.url);
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_resource_transform_delivery& value
+) noexcept -> void {
+  static_cast<void>(dispose_owner(
+    mln::core::HandleKind::ResourceTransformRequest, value.request
+  ));
+}
+constexpr auto element_owns_handles(
+  const mln_resource_transform_delivery*
+) noexcept -> bool {
+  return true;
+}
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM> {
+  using Record = mln_resource_transform_delivery;
+  static constexpr auto member = &mln_delivery_payload::resource_transform;
+};

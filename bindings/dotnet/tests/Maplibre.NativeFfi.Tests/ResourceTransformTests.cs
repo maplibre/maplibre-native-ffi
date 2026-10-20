@@ -10,19 +10,19 @@ public sealed class ResourceTransformTests
     [Fact]
     public unsafe void AScopedResponseExpiresWithItsCallbackAndRejectsOtherThreads()
     {
-        ResourceTransformResponse? retained = null;
+        HttpHeaderTransformResponse? retained = null;
         string? copied = null;
         Exception? crossThread = null;
         using var scope = new NativeCallScope();
-        var native = GeneratedValues.NativeResourceTransform(
-            new ResourceTransform
+        var native = GeneratedValues.NativeHttpHeaderTransform(
+            new HttpHeaderTransform
             {
                 Callback = (_, url, response) =>
                 {
                     copied = url;
                     retained = response;
                     var otherThread = new Thread(() =>
-                        crossThread = Record.Exception(() => response.SetUrl("other"))
+                        crossThread = Record.Exception(() => response.SetHeader("X-Test", "other"))
                     );
                     otherThread.Start();
                     otherThread.Join();
@@ -31,9 +31,9 @@ public sealed class ResourceTransformTests
             },
             scope
         );
-        var response = new mln_resource_transform_response
+        var response = new mln_http_header_transform_response
         {
-            size = (uint)sizeof(mln_resource_transform_response),
+            size = (uint)sizeof(mln_http_header_transform_response),
         };
         var url = scope.CString("transform-test://é/style.json");
         Assert.Equal(
@@ -43,6 +43,50 @@ public sealed class ResourceTransformTests
         Assert.Equal("transform-test://é/style.json", copied);
         Assert.IsType<InvalidOperationException>(crossThread);
         Assert.NotNull(retained);
-        Assert.Throws<InvalidOperationException>(() => retained.SetUrl("other"));
+        Assert.Throws<InvalidOperationException>(() => retained.SetHeader("X-Test", "late"));
+    }
+
+    [Fact]
+    public async Task ATransformRequestIsAnsweredFromAnotherThreadAfterItsCallback()
+    {
+        const string styleUrl = "transform-test://style.json";
+        var received = new TaskCompletionSource<ResourceTransformRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        // The provider passes the style through to the online source, which waits for the answer.
+        var deny = NativeFixture.DenyingProvider.Callback!;
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider
+            {
+                Callback = (request, handle) =>
+                    request.RequestedUrl == styleUrl
+                        ? ResourceProviderDecision.PassThrough
+                        : deny(request, handle),
+            }
+        );
+        await fixture.Runtime.SetResourceTransformAsync(
+            new ResourceTransform(
+                (_, url, request) =>
+                {
+                    if (url == styleUrl)
+                        received.TrySetResult(request);
+                    else
+                        request.Close();
+                }
+            ),
+            TestWaits.Token
+        );
+        await fixture.Map.SetStyleUrlAsync(styleUrl, TestWaits.Token);
+        var request = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+
+        await Task.Run(() =>
+        {
+            request.Complete("unsupported://rewritten.json");
+            request.Close();
+        });
+        Assert.True(request.IsClosed);
+        // The online source cannot load the rewritten scheme.
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        await fixture.Runtime.ClearResourceTransformAsync(TestWaits.Token);
     }
 }

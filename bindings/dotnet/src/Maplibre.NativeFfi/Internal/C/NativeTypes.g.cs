@@ -21,6 +21,8 @@ internal readonly record struct MlnRenderSession(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnResourceRequest(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnResourceTransformRequest(ulong Value) : IMlnHandle;
+
 internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal unsafe struct mln_animation_options
@@ -782,14 +784,6 @@ internal unsafe struct mln_resource_response
     public long retry_after_unix_ms;
 }
 
-internal unsafe struct mln_resource_rewrite_rule
-{
-    public uint kinds;
-    public uint flags;
-    public mln_buffer_view url;
-    public mln_buffer_view replacement_url;
-}
-
 internal unsafe struct mln_resource_route
 {
     public uint kinds;
@@ -804,19 +798,11 @@ internal unsafe struct mln_resource_transform
         void*,
         uint,
         sbyte*,
-        mln_resource_transform_response*,
-        mln_status> callback;
+        MlnResourceTransformRequest,
+        void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
-    public mln_resource_rewrite_rule* rules;
-    public nuint rule_count;
-}
-
-internal unsafe struct mln_resource_transform_response
-{
-    public uint size;
-    public mln_buffer_view url;
-    public void* context;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_runtime_event

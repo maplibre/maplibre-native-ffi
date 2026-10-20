@@ -24,7 +24,7 @@ auto reject(const char* what, std::size_t index, const char* reason)
   return MLN_STATUS_INVALID_ARGUMENT;
 }
 
-// Checks the members that routes and rules share.
+// Checks the members that routes and header rules share.
 auto check_pattern(
   const char* what, std::size_t index, std::uint32_t kinds, std::uint32_t flags,
   mln_buffer_view url
@@ -166,37 +166,6 @@ auto copy_routes(
   return MLN_STATUS_OK;
 }
 
-auto copy_rewrite_rules(
-  const mln_resource_rewrite_rule* rules, std::size_t count,
-  RewriteRuleTable& out
-) -> mln_status {
-  if (rules == nullptr && count != 0) {
-    set_thread_error("rules must not be null with a nonzero rule_count");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  out.rules.clear();
-  out.rules.reserve(count);
-  for (std::size_t index = 0; index < count; ++index) {
-    const auto& rule = rules[index];
-    const auto status =
-      check_pattern("rewrite rule", index, rule.kinds, rule.flags, rule.url);
-    if (status != MLN_STATUS_OK) return status;
-    if (!validate_c_string_view(rule.replacement_url, "replacement_url"))
-      return MLN_STATUS_INVALID_ARGUMENT;
-    out.rules.push_back(
-      RewriteRuleTable::Rule{
-        .pattern = {rule.kinds, rule.flags, string_view_from_view(rule.url)},
-        .replacement_url = rule.replacement_url.size == 0
-                             ? std::nullopt
-                             : std::optional<std::string>{
-                                 string_from_view(rule.replacement_url)
-                               },
-      }
-    );
-  }
-  return MLN_STATUS_OK;
-}
-
 auto copy_header_rules(
   const mln_http_header_rule* rules, std::size_t count, HeaderRuleTable& out
 ) -> mln_status {
@@ -241,26 +210,6 @@ auto copy_header_rules(
       );
     }
     out.rules.push_back(std::move(copied));
-  }
-  return MLN_STATUS_OK;
-}
-
-auto rewrite_rules_callback(
-  void* user_data, std::uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
-) -> mln_status {
-  if (user_data == nullptr || url == nullptr || out_response == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  const auto& table = *static_cast<const RewriteRuleTable*>(user_data);
-  const auto candidate = std::string_view{url};
-  for (const auto& rule : table.rules) {
-    if (!rule.pattern.matches(kind, candidate)) continue;
-    if (!rule.replacement_url.has_value()) return MLN_STATUS_OK;
-    return resource_transform_response_set_url(
-      out_response, {.data = rule.replacement_url->data(),
-                     .size = rule.replacement_url->size()}
-    );
   }
   return MLN_STATUS_OK;
 }

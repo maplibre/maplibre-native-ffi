@@ -24,6 +24,8 @@ mod render_frame_batch;
 pub use render_frame_batch::*;
 mod render_session;
 pub use render_session::*;
+mod resource_transform_request;
+pub use resource_transform_request::*;
 mod runtime;
 pub use runtime::*;
 mod global;
@@ -41,5 +43,7 @@ static_assertions::assert_impl_all!(MapProjectionHandle: Send, Sync);
 static_assertions::assert_impl_all!(RenderFrameBatchHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(RenderSessionHandle: Send, Sync);
+#[cfg(test)]
+static_assertions::assert_impl_all!(ResourceTransformRequestHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(RuntimeHandle: Send, Sync);

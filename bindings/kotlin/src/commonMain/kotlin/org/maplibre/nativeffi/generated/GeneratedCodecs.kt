@@ -943,20 +943,14 @@ internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
   allocate(w(32, 56), 8).also { putResourceProvider(it, value) }
 
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
-  writeU32(target, w(24, 48).toUInt())
-  writeAddress(
-    target + w(16, 32),
-    array(value.rules, w(24, 40), w(4, 8)) { at, item -> putResourceRewriteRule(at, item) },
-  )
-  writeSize(target + w(20, 40), value.rules.size.toULong())
-  if (value.callback == null) return
+  writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
-  allocate(w(24, 48), w(4, 8)).also { putResourceTransform(it, value) }
+  allocate(w(24, 40), 8).also { putResourceTransform(it, value) }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
@@ -1818,16 +1812,6 @@ internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
 
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
   allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
-
-internal fun NativeArena.putResourceRewriteRule(target: Long, value: ResourceRewriteRule) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
-  putView(target + w(16, 24), value.replacementUrl)
-}
-
-internal fun NativeArena.writeResourceRewriteRule(value: ResourceRewriteRule): Long =
-  allocate(w(24, 40), w(4, 8)).also { putResourceRewriteRule(it, value) }
 
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))

@@ -103,6 +103,9 @@ class Values:
         if plan.response:
             self.records[plan.native] = plan
             return
+        if plan.kind == "handle" and plan.ownership == "owned":
+            # A callback adopts an owned handle into its generated owner.
+            return
         if plan.ownership == "owned":
             self.fail(plan, "owned values require a handle adoption transaction")
         if plan.kind in {"scalar", "enum"} and (plan.nullable or plan.optional):

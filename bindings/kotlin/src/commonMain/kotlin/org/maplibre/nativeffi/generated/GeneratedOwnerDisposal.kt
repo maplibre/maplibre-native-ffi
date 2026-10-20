@@ -41,6 +41,11 @@ internal object GeneratedOwnerDisposal {
     C.mln_resource_request_release(handle)
   }
 
+  fun resourceTransformRequest(handle: Long) {
+    CallbackAdmission.check(handle, "mln_resource_transform_request_release")
+    C.mln_resource_transform_request_release(handle)
+  }
+
   fun runtime(handle: Long) {
     CallbackAdmission.check(handle, "mln_runtime_dispose")
     NativeDiagnostics.check { diagnostic -> C.mln_runtime_dispose(handle, diagnostic) }

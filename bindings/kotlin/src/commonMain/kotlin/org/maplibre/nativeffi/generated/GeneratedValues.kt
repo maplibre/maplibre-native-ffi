@@ -3974,23 +3974,6 @@ public data class ResourceRoute(
   public val url: String = "",
 )
 
-/**
- * One rule of a native resource transform.
- *
- * See `mln_resource_rewrite_rule` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceRewriteRule(
-  /** The resource kinds to match. */
-  public val kinds: ResourceKindMask = ResourceKindMask.ALL,
-  /** A bitwise OR of `mln_url_match_flags` values. */
-  public val flags: UrlMatchFlags = UrlMatchFlags(0u),
-  /** The URL or glob pattern to compare. */
-  public val url: String = "",
-  /** The replacement URL, or empty to keep the URL and stop the search. */
-  public val replacementUrl: String? = null,
-)
-
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,
   public val ready: kotlinx.coroutines.Deferred<Unit>,
@@ -4136,12 +4119,6 @@ public data class QueueLock(
  */
 public typealias QueueLockCallback = () -> Unit
 
-public class ResourceTransformResponse
-internal constructor(
-  internal val bindingAddress: Long,
-  internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
-)
-
 /**
  * Cancel callback or queue state for one handled resource request.
  *
@@ -4224,23 +4201,21 @@ public typealias ResourceProviderCallback =
   (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
 /**
- * Resource transform state: a callback, or native rewrite rules.
+ * Resource transform state.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceTransform(
-  /** The callback, or null to apply rules. */
-  public val callback: ResourceTransformCallback? = null,
-  /** Rewrite rules for a transform without a callback; empty with one. */
-  public val rules: List<ResourceRewriteRule> = emptyList(),
+  /** Required in callback mode; null in queue mode. */
+  public val callback: ResourceTransformCallback,
 )
 
 /**
- * Rewrites a network resource URL.
+ * Asks the host for the URL of one network resource request.
  *
  * See `mln_resource_transform_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias ResourceTransformCallback =
-  (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
+  (kind: ResourceKind, url: String, request: ResourceTransformRequestHandle) -> Unit

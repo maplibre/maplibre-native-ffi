@@ -88,7 +88,7 @@ def input_source(plan, values):
 
 
 def sources(values, plan):
-    from .python import OWNERS
+    from .python import OWNERS, owned_native
     from .rust_callbacks import cancel_notification
 
     for decision in values.api.decisions.values():
@@ -105,9 +105,20 @@ def sources(values, plan):
         decision_owner = (
             OWNERS[callback.decision.handle.native] if callback.decision else None
         )
+        # A handle the callback owns arrives in its generated owner, which a
+        # callback that raises closes, so native never waits on it.
+        owned = [
+            p
+            for p in parameters
+            if p.value.kind == "handle"
+            and p.value.ownership == "owned"
+            and not (callback.decision and p.name == callback.decision.parameter)
+        ]
         types = ", ".join(
             decision_owner
             if callback.decision and p.name == callback.decision.parameter
+            else OWNERS[p.value.native]
+            if p in owned
             else values.type(p.value)
             for p in parameters
         )
@@ -119,19 +130,33 @@ def sources(values, plan):
         arguments = ", ".join(
             f"_wrap_response({p.name}, {decision_owner!r})"
             if callback.decision and p.name == callback.decision.parameter
+            else p.name
+            if p in owned
             else values.facade_copy(p.value, p.name)
             for p in parameters
         )
+        wraps = "".join(
+            f"        {p.name} = _wrap_response({p.name}, {OWNERS[p.value.native]!r})\n"
+            for p in owned
+        )
+        invoke = f"return callback({arguments})"
+        if owned:
+            closes = "".join(f"            {p.name}.close()\n" for p in owned)
+            invoke = f"try:\n            return callback({arguments})\n        except BaseException:\n{closes}            raise"
         methods.append(
-            f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n        return callback({arguments})\n"
+            f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n{wraps}        {invoke}\n"
         )
         native_parameters = ", ".join(
             f"{rust_field(p.name)}: {ffi_type(p.value)}" for p in callback.parameters
         )
 
-        def copy_parameter(parameter, callback=callback, owner=decision_owner):
+        def copy_parameter(
+            parameter, callback=callback, owner=decision_owner, owned=owned
+        ):
             if callback.decision and parameter.name == callback.decision.parameter:
                 return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(std::sync::Weak::new()) }})?"
+            if parameter in owned:
+                return f"{rust_field(parameter.name)}_owner"
             value = parameter.value.unwrapped
             if value.response:
                 return f"Py::new(py, {public_name(value.native)}Scope {{ native: {rust_field(parameter.name)} as usize, scope: callback_scope.scope() }})?"
@@ -142,6 +167,23 @@ def sources(values, plan):
             "let callback_scope = GeneratedCallbackGuard::new();"
             if any((p.value.unwrapped).response for p in parameters)
             else ""
+        )
+        # A handle the callback owns is adopted before anything else can fail,
+        # and one the body never reaches, as during interpreter shutdown, is
+        # released natively, so native never waits on it.
+        scope += "".join(
+            f"let {rust_field(p.name)}_owner = {owned_native(p.value, rust_field(p.name))}; "
+            f"{rust_field(p.name)}_adopted.set(true); "
+            f"let {rust_field(p.name)}_owner = {rust_field(p.name)}_owner?;"
+            for p in owned
+        )
+        adoption_flags = "".join(
+            f"let {rust_field(p.name)}_adopted = std::cell::Cell::new(false);"
+            for p in owned
+        )
+        unadopted = "".join(
+            f"if !{rust_field(p.name)}_adopted.get() {{ unsafe {{ sys::{p.value.handle.release}({rust_field(p.name)}) }}; }} "
+            for p in owned
         )
         if len(parameters) == 1:
             copied += ","
@@ -190,7 +232,8 @@ def sources(values, plan):
     {"let _reentry = GeneratedCallbackPolicy::enter(&[], 0);" if callback.reentry == "forbid" else ""}
     {policy_guard}
     {decision_setup}
-    generated_invoke(|| {failure}, |py| {{
+    {adoption_flags}
+    generated_invoke(|| {{ {unadopted}{"" if unadopted and failure == "()" else failure} }}, |py| {{
         {scope}
         let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({failure}); }};
         let {"_result" if callback.result.native == "void" else "result"} = callback.bind(py).call1(({copied}))?;

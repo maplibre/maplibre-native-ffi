@@ -12,9 +12,9 @@
  *
  * Every registration whose callbacks a host need not answer on a native thread
  * accepts a queue: mln_completion, mln_runtime_event_handler, mln_log_handler,
- * mln_resource_provider,
- * mln_resource_request_cancel_handler, mln_camera_transition_handler, and the
- * custom geometry and custom MVT vector source options.
+ * mln_resource_provider, mln_resource_request_cancel_handler,
+ * mln_resource_transform, mln_camera_transition_handler, and the custom
+ * geometry and custom MVT vector source options.
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. Events and completions that select
@@ -73,6 +73,8 @@ typedef enum mln_delivery_type : uint32_t {
   MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8,
   /** Selected runtime and map events, in publication order. */
   MLN_DELIVERY_TYPE_RUNTIME_EVENTS = 9,
+  /** One request for a queue-mode mln_resource_transform. */
+  MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM = 10,
 } mln_delivery_type;
 
 /** Copied mln_runtime_event_callback arguments. */
@@ -111,6 +113,19 @@ typedef struct mln_resource_request_cancel_delivery {
   mln_resource_request handle;
 } mln_resource_request_cancel_delivery;
 
+/** Copied mln_resource_transform_callback arguments. */
+typedef struct mln_resource_transform_delivery {
+  /** One of mln_resource_kind. */
+  uint32_t kind MLN_BINDING("enum=mln_resource_kind");
+  /** The URL to transform, owned by the batch. */
+  const char* url MLN_BINDING("lifetime=owner");
+  /**
+   * Owned by the batch until mln_delivery_batch_take(); releasing the batch
+   * without taking it releases the request, which keeps its URL.
+   */
+  mln_resource_transform_request request MLN_BINDING("ownership=owned");
+} mln_resource_transform_delivery;
+
 /** Copied mln_camera_transition_end_callback arguments. */
 typedef struct mln_camera_transition_end_delivery {
   /** The copied end, owned by the batch. */
@@ -147,6 +162,8 @@ typedef union mln_delivery_payload {
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE");
   mln_runtime_event_delivery runtime_events
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_RUNTIME_EVENTS");
+  mln_resource_transform_delivery resource_transform
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM");
 } mln_delivery_payload;
 
 /**
@@ -228,12 +245,13 @@ MLN_API mln_status mln_delivery_queue_create(
  *
  * The call consumes the handle, closes the queue, and returns without blocking.
  * It discards pending items: an untaken owned completion value is disposed,
- * and an untaken request handle is released, which fails its request.
+ * an untaken provider request is released, which fails it, and an untaken
+ * transform request is released, which keeps its URL.
  *
  * Registrations that still name the queue keep working, but the queue refuses
  * their later pushes: a completion is discarded and its owned value disposed,
- * a log record goes to the platform logger, a provider request fails, and
- * other queued callbacks are dropped.
+ * a log record goes to the platform logger, a provider request fails, a
+ * transform request keeps its URL, and other queued callbacks are dropped.
  *
  * No wake call starts after release. The wake's release_user_data runs once
  * in-flight wake calls return, on whichever thread finishes last. The host may
@@ -276,9 +294,9 @@ MLN_API mln_status mln_delivery_queue_drain(
  * Transfers the owned handles of one delivery to the caller.
  *
  * An owned completion value, such as the mln_map from
- * mln_runtime_create_map(), or a resource request's handle becomes the
- * caller's to release. A delivery that owns nothing is unchanged. The
- * delivery's view stays readable.
+ * mln_runtime_create_map(), or a resource or transform request's handle
+ * becomes the caller's to release. A delivery that owns nothing is unchanged.
+ * The delivery's view stays readable.
  *
  * Returns:
  * - MLN_STATUS_OK when the delivery's handles now belong to the caller, or the
@@ -296,8 +314,9 @@ MLN_API mln_status mln_delivery_batch_take(
  * Releases an owned delivery batch. A null handle is a no-op.
  *
  * Owned values that the host did not take are disposed: a map without
- * blocking, as mln_map_dispose() does, and a request handle through
- * mln_resource_request_release(), which fails its request.
+ * blocking, as mln_map_dispose() does, and a request handle through its
+ * release function: a provider request fails, and a transform request keeps
+ * its URL.
  */
 MLN_API void mln_delivery_batch_release(mln_delivery_batch batch) MLN_NOEXCEPT;
 

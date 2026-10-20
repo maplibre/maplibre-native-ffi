@@ -41,9 +41,9 @@ uint32_t binding_mln_resource_provider_callback(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 );
-mln_status binding_mln_resource_transform_callback(
+void binding_mln_resource_transform_callback(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 );
 enum { binding_operation_mln_acquired_frame_dispose = 1 };
 enum { binding_operation_mln_acquired_frame_get_metal_texture = 2 };
@@ -238,42 +238,43 @@ enum { binding_operation_mln_resource_request_is_cancelled = 176 };
 enum { binding_operation_mln_resource_request_pass_through = 177 };
 enum { binding_operation_mln_resource_request_release = 178 };
 enum { binding_operation_mln_resource_request_set_cancel_callback = 179 };
-enum { binding_operation_mln_resource_transform_response_set_url = 180 };
-enum { binding_operation_mln_runtime_clear_event_handler = 181 };
-enum { binding_operation_mln_runtime_clear_http_header_transform = 182 };
-enum { binding_operation_mln_runtime_clear_resource_provider = 183 };
-enum { binding_operation_mln_runtime_clear_resource_transform = 184 };
-enum { binding_operation_mln_runtime_create = 185 };
-enum { binding_operation_mln_runtime_create_map = 186 };
-enum { binding_operation_mln_runtime_create_offline_region = 187 };
-enum { binding_operation_mln_runtime_delete_offline_region = 188 };
-enum { binding_operation_mln_runtime_dispose = 189 };
-enum { binding_operation_mln_runtime_get_event_mask = 190 };
-enum { binding_operation_mln_runtime_get_offline_region = 191 };
-enum { binding_operation_mln_runtime_get_offline_region_status = 192 };
-enum { binding_operation_mln_runtime_invalidate_offline_region = 193 };
-enum { binding_operation_mln_runtime_list_offline_regions = 194 };
-enum { binding_operation_mln_runtime_merge_offline_regions = 195 };
-enum { binding_operation_mln_runtime_options_default = 196 };
-enum { binding_operation_mln_runtime_release = 197 };
-enum { binding_operation_mln_runtime_run_ambient_cache_operation = 198 };
-enum { binding_operation_mln_runtime_set_event_handler = 199 };
-enum { binding_operation_mln_runtime_set_event_mask = 200 };
-enum { binding_operation_mln_runtime_set_http_header_transform = 201 };
-enum { binding_operation_mln_runtime_set_maximum_ambient_cache_size = 202 };
-enum { binding_operation_mln_runtime_set_offline_region_download_state = 203 };
-enum { binding_operation_mln_runtime_set_offline_region_observed = 204 };
-enum { binding_operation_mln_runtime_set_resource_provider = 205 };
-enum { binding_operation_mln_runtime_set_resource_transform = 206 };
-enum { binding_operation_mln_runtime_update_offline_region_metadata = 207 };
-enum { binding_operation_mln_source_feature_query_options_default = 208 };
-enum { binding_operation_mln_style_image_options_default = 209 };
-enum { binding_operation_mln_style_transition_options_default = 210 };
-enum { binding_operation_mln_supported_render_backend_mask = 211 };
-enum { binding_operation_mln_vulkan_borrowed_texture_descriptor_default = 212 };
-enum { binding_operation_mln_vulkan_owned_texture_descriptor_default = 213 };
-enum { binding_operation_mln_vulkan_surface_descriptor_default = 214 };
-enum { binding_operation_mln_webgpu_borrowed_texture_descriptor_default = 215 };
-enum { binding_operation_mln_webgpu_owned_texture_descriptor_default = 216 };
-enum { binding_operation_mln_webgpu_surface_descriptor_default = 217 };
+enum { binding_operation_mln_resource_transform_request_complete = 180 };
+enum { binding_operation_mln_resource_transform_request_release = 181 };
+enum { binding_operation_mln_runtime_clear_event_handler = 182 };
+enum { binding_operation_mln_runtime_clear_http_header_transform = 183 };
+enum { binding_operation_mln_runtime_clear_resource_provider = 184 };
+enum { binding_operation_mln_runtime_clear_resource_transform = 185 };
+enum { binding_operation_mln_runtime_create = 186 };
+enum { binding_operation_mln_runtime_create_map = 187 };
+enum { binding_operation_mln_runtime_create_offline_region = 188 };
+enum { binding_operation_mln_runtime_delete_offline_region = 189 };
+enum { binding_operation_mln_runtime_dispose = 190 };
+enum { binding_operation_mln_runtime_get_event_mask = 191 };
+enum { binding_operation_mln_runtime_get_offline_region = 192 };
+enum { binding_operation_mln_runtime_get_offline_region_status = 193 };
+enum { binding_operation_mln_runtime_invalidate_offline_region = 194 };
+enum { binding_operation_mln_runtime_list_offline_regions = 195 };
+enum { binding_operation_mln_runtime_merge_offline_regions = 196 };
+enum { binding_operation_mln_runtime_options_default = 197 };
+enum { binding_operation_mln_runtime_release = 198 };
+enum { binding_operation_mln_runtime_run_ambient_cache_operation = 199 };
+enum { binding_operation_mln_runtime_set_event_handler = 200 };
+enum { binding_operation_mln_runtime_set_event_mask = 201 };
+enum { binding_operation_mln_runtime_set_http_header_transform = 202 };
+enum { binding_operation_mln_runtime_set_maximum_ambient_cache_size = 203 };
+enum { binding_operation_mln_runtime_set_offline_region_download_state = 204 };
+enum { binding_operation_mln_runtime_set_offline_region_observed = 205 };
+enum { binding_operation_mln_runtime_set_resource_provider = 206 };
+enum { binding_operation_mln_runtime_set_resource_transform = 207 };
+enum { binding_operation_mln_runtime_update_offline_region_metadata = 208 };
+enum { binding_operation_mln_source_feature_query_options_default = 209 };
+enum { binding_operation_mln_style_image_options_default = 210 };
+enum { binding_operation_mln_style_transition_options_default = 211 };
+enum { binding_operation_mln_supported_render_backend_mask = 212 };
+enum { binding_operation_mln_vulkan_borrowed_texture_descriptor_default = 213 };
+enum { binding_operation_mln_vulkan_owned_texture_descriptor_default = 214 };
+enum { binding_operation_mln_vulkan_surface_descriptor_default = 215 };
+enum { binding_operation_mln_webgpu_borrowed_texture_descriptor_default = 216 };
+enum { binding_operation_mln_webgpu_owned_texture_descriptor_default = 217 };
+enum { binding_operation_mln_webgpu_surface_descriptor_default = 218 };
 #endif

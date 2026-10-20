@@ -4642,42 +4642,6 @@ pub enum ResourceResponseStatus: u32 {
 } Unknown
 }
 
-/// One rule of a native resource transform.
-///
-/// See `mln_resource_rewrite_rule` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResourceRewriteRule {
-    /// The resource kinds to match.
-    pub kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    pub flags: UrlMatchFlags,
-    /// The URL or glob pattern to compare.
-    pub url: String,
-    /// The replacement URL, or empty to keep the URL and stop the search.
-    pub replacement_url: Option<String>,
-}
-impl Default for ResourceRewriteRule {
-    fn default() -> Self {
-        Self {
-            kinds: ResourceKindMask::ALL,
-            flags: Default::default(),
-            url: Default::default(),
-            replacement_url: Default::default(),
-        }
-    }
-}
-impl ToNative<sys::mln_resource_rewrite_rule> for ResourceRewriteRule {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_rewrite_rule> {
-        let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
-        raw.kinds = to_native(&self.kinds, arena)?;
-        raw.flags = to_native(&self.flags, arena)?;
-        raw.url = to_native(&self.url, arena)?;
-        raw.replacement_url = to_native(&self.replacement_url, arena)?;
-        Ok(raw)
-    }
-}
-
 /// One request pattern that a resource provider claims.
 ///
 /// See `mln_resource_route` in the
@@ -4717,23 +4681,21 @@ pub enum ResourceStoragePolicy: u32 {
 } Unknown
 }
 
-/// Resource transform state: a callback, or native rewrite rules.
+/// Resource transform state.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct ResourceTransform {
-    /// The callback, or null to apply rules.
+    /// Required in callback mode; null in queue mode.
     pub callback: Option<
         std::sync::Arc<
-            dyn Fn(ResourceKind, String, &mut ResourceTransformResponse<'_>) -> Result<()>
+            dyn Fn(ResourceKind, String, ResourceTransformRequestHandle) -> ()
                 + Send
                 + Sync
                 + 'static,
         >,
     >,
-    /// Rewrite rules for a transform without a callback; empty with one.
-    pub rules: Vec<ResourceRewriteRule>,
 }
 impl std::fmt::Debug for ResourceTransform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4743,20 +4705,14 @@ impl std::fmt::Debug for ResourceTransform {
 impl ResourceTransform {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, &mut ResourceTransformResponse<'_>) -> Result<()>
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(ResourceKind, String, ResourceTransformRequestHandle) -> () + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, &mut ResourceTransformResponse<'_>) -> Result<()>
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(ResourceKind, String, ResourceTransformRequestHandle) -> () + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -4764,26 +4720,20 @@ impl ResourceTransform {
         user_data: *mut std::ffi::c_void,
         kind: u32,
         url: *const std::ffi::c_char,
-        out_response: *mut sys::mln_resource_transform_response,
-    ) -> sys::mln_status {
+        request: sys::mln_resource_transform_request,
+    ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke_status(
-            "mln_resource_transform_callback",
-            Some((
-                &["mln_resource_transform_response_set_url"],
-                out_response as usize as u64,
-            )),
-            sys::MLN_STATUS_NATIVE_ERROR,
-            || {
-                callback::require(&state.callback)?(
-                    unsafe { from_native(kind) }?,
-                    unsafe { from_native(url) }?,
-                    &mut ResourceTransformResponse::new(out_response)?,
-                )
-            },
-        )
+        callback::invoke("mln_resource_transform_callback", None, (), || {
+            let request = ResourceTransformRequestHandle::adopt(request, None)?;
+            callback::require(&state.callback)?(
+                unsafe { from_native(kind) }?,
+                unsafe { from_native(url) }?,
+                request,
+            );
+            Ok(())
+        })
     }
 }
 impl ToNative<sys::mln_resource_transform> for ResourceTransform {
@@ -4794,51 +4744,12 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
             .callback
             .as_ref()
             .map(|_| Self::callback_trampoline as _);
-        raw.rules = convert::array(&self.rules, arena)?;
-        raw.rule_count = convert::count(self.rules.len())?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-
-/// A native response borrowed only for one host callback.
-#[derive(Debug)]
-pub struct ResourceTransformResponse<'a> {
-    raw: std::ptr::NonNull<sys::mln_resource_transform_response>,
-    lifetime: std::marker::PhantomData<&'a mut sys::mln_resource_transform_response>,
-}
-impl ResourceTransformResponse<'_> {
-    fn new(raw: *mut sys::mln_resource_transform_response) -> Result<Self> {
-        let raw = std::ptr::NonNull::new(raw)
-            .ok_or_else(|| Error::invalid_argument("null callback response"))?;
-        Ok(Self {
-            raw,
-            lifetime: std::marker::PhantomData,
-        })
-    }
-    /// Copies a replacement URL into C API-managed storage for the current
-    /// callback.
-    ///
-    /// See `mln_resource_transform_response_set_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_url(&mut self, url: &str) -> Result<()> {
-        maplibre_core::callback::check(
-            "mln_resource_transform_response_set_url",
-            self.raw.as_ptr() as usize as u64,
-        )?;
-        let arena = &mut InputArena::default();
-        let native_url = to_native(&url, arena)?;
-        maplibre_core::check(|out_diagnostic| unsafe {
-            sys::mln_resource_transform_response_set_url(
-                self.raw.as_ptr(),
-                native_url,
-                out_diagnostic,
-            )
-        })
     }
 }
 

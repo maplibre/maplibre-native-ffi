@@ -532,8 +532,22 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_http_server_stop(server);
 }
 
-// The host can decline after taking a queued request. Native transforms still
-// apply, and the request never visits the provider a second time.
+// Answers every transform with the URL in user_data.
+static void transform_to(
+  void* user_data, uint32_t kind, const char* url,
+  mln_resource_transform_request request
+) {
+  (void)kind;
+  (void)url;
+  const char* target = user_data;
+  MLN_TEST_OK(mln_resource_transform_request_complete(
+    request, (mln_buffer_view){.data = target, .size = strlen(target)}, NULL
+  ));
+  mln_resource_transform_request_release(request);
+}
+
+// The host can decline after taking a queued request. The resource transform
+// still applies, and the request never visits the provider a second time.
 static void a_drained_request_can_pass_through_once(void) {
   const mln_test_http_route route = {
     .path = "/rewritten.json",
@@ -554,16 +568,10 @@ static void a_drained_request_can_pass_through_once(void) {
   const mln_resource_provider provider = queue_provider(queue.handle, NULL);
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
-  const mln_resource_rewrite_rule rule = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url = (mln_buffer_view){.data = original, .size = strlen(original)},
-    .replacement_url =
-      (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-  };
   const mln_resource_transform transform = {
     .size = sizeof(mln_resource_transform),
-    .rules = &rule,
-    .rule_count = 1,
+    .callback = transform_to,
+    .user_data = rewritten,
   };
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
   mln_map map = mln_test_create_map(runtime);

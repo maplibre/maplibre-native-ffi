@@ -1234,11 +1234,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_resource_transform_response_set_url(
-    response: Long,
+  actual external fun mln_resource_transform_request_complete(
+    request: Long,
     url: Long,
     outDiagnostic: Long,
   ): Int
+
+  @JvmStatic actual external fun mln_resource_transform_request_release(request: Long): Unit
 
   @JvmStatic
   actual external fun mln_runtime_clear_event_handler(

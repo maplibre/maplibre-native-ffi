@@ -3886,37 +3886,6 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	return raw
 }
 
-// ResourceRewriteRule corresponds to mln_resource_rewrite_rule. One rule of a
-// native resource transform.
-//
-// See mln_resource_rewrite_rule in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceRewriteRule struct {
-	// The resource kinds to match.
-	Kinds ResourceKindMask
-	// A bitwise OR of mln_url_match_flags values.
-	Flags UrlMatchFlags
-	// The URL or glob pattern to compare.
-	Url string
-	// The replacement URL, or empty to keep the URL and stop the search.
-	ReplacementUrl *string
-}
-
-func nativeResourceRewriteRule(input ResourceRewriteRule, arena *bindingArena) C.mln_resource_rewrite_rule {
-	raw := C.mln_resource_rewrite_rule{}
-	raw.kinds = C.uint32_t(input.Kinds)
-	raw.flags = C.uint32_t(input.Flags)
-	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
-	if input.ReplacementUrl != nil {
-		raw.replacement_url = C.mln_buffer_view{data: arena.bytes([]byte((*input.ReplacementUrl))), size: C.size_t(len((*input.ReplacementUrl)))}
-	}
-	return raw
-}
-
-func DefaultResourceRewriteRule() ResourceRewriteRule {
-	return ResourceRewriteRule{Kinds: ResourceKindMaskAll}
-}
-
 // ResourceRoute corresponds to mln_resource_route. One request pattern that a
 // resource provider claims.
 //
@@ -3942,28 +3911,18 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 func DefaultResourceRoute() ResourceRoute { return ResourceRoute{Kinds: ResourceKindMaskAll} }
 
 // ResourceTransform corresponds to mln_resource_transform. Resource transform
-// state: a callback, or native rewrite rules.
+// state.
 //
 // See mln_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransform struct {
-	// Rewrite rules for a transform without a callback; empty with one.
-	Rules []ResourceRewriteRule
-	// The callback, or null to apply rules.
-	Callback func(ResourceKind, string, *ResourceTransformResponseScope) Status
+	// Required in callback mode; null in queue mode.
+	Callback func(ResourceKind, string, *ResourceTransformRequestHandle)
 }
 
 func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln_resource_transform {
 	raw := C.mln_resource_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	{
-		raw.rules = (*C.mln_resource_rewrite_rule)(arena.array(len(input.Rules), unsafe.Sizeof(*raw.rules)))
-		items := unsafe.Slice(raw.rules, len(input.Rules))
-		raw.rule_count = bindingCountLike(raw.rule_count, len(input.Rules))
-		for i, item := range input.Rules {
-			items[i] = nativeResourceRewriteRule(item, arena)
-		}
-	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -3972,18 +3931,6 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 		}
 	}
 	return raw
-}
-
-type ResourceTransformResponseScope struct {
-	native *C.mln_resource_transform_response
-	scope  *bindingScope
-}
-
-func (response *ResourceTransformResponseScope) target(operation uint32) bindingTarget {
-	if response == nil {
-		return bindingScoped(nil, 0, operation)
-	}
-	return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation)
 }
 
 // RuntimeEvent corresponds to mln_runtime_event. One delivered runtime event.
@@ -5936,6 +5883,26 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// ResourceTransformRequestHandle corresponds to mln_resource_transform_request.
+// A resource URL transform that waits for its host's answer.
+//
+// See mln_resource_transform_request in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type ResourceTransformRequestHandle struct{ *bindingOwner }
+
+func adoptResourceTransformRequestHandle(raw uint64, parent any) *ResourceTransformRequestHandle {
+	owner := &ResourceTransformRequestHandle{bindingAdopt(raw, parent, "ResourceTransformRequestHandle", func(raw uint64) { C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw)) })}
+	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *ResourceTransformRequestHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 // RuntimeHandle corresponds to mln_runtime. A runtime: the native scheduler
 // thread and event store for its maps.
 //
@@ -7800,15 +7767,26 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 	})
 }
 
-// SetUrl copies a replacement URL into C API-managed storage for the current
-// callback.
+// Complete answers a resource transform request with a replacement URL.
 //
-// See mln_resource_transform_response_set_url in the C API reference:
+// See mln_resource_transform_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
-	return bindingDo(receiver.target(C.binding_operation_mln_resource_transform_response_set_url), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_transform_response_set_url(receiver.native, bindingView(url, arena), diagnostic))
+func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_resource_transform_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_transform_request_complete(C.mln_resource_transform_request(raw), bindingView(url, arena), diagnostic))
 	})
+}
+
+// Close releases a resource transform request.
+//
+// See mln_resource_transform_request_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *ResourceTransformRequestHandle) Close() error {
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_resource_transform_request_release), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // ClearEventHandler stops event delivery and retires the previous handler.
@@ -8698,22 +8676,21 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 }
 
 //export mlnGo_mln_resource_transform_callback
-func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_out_response *C.mln_resource_transform_response) (result C.mln_status) {
+func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_request C.mln_resource_transform_request) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	result = C.MLN_STATUS_NATIVE_ERROR
+	owned_request := adoptResourceTransformRequestHandle(uint64(native_request), nil)
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_transform_callback", failure)
-			result = C.MLN_STATUS_NATIVE_ERROR
+			owned_request.Close()
 		}
 	}()
-	scope := bindingNewScope()
-	defer scope.alive.Store(false)
 	callbacks, ok := bindingCallbackValue[ResourceTransform](native_user_data)
 	if !ok || callbacks.Callback == nil {
+		owned_request.Close()
 		return
 	}
-	result = C.mln_status(callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &ResourceTransformResponseScope{native: native_out_response, scope: scope}))
+	callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), owned_request)
 	return
 }

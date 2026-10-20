@@ -146,6 +146,11 @@ typedef uint64_t mln_resource_request MLN_BINDING(
   "kind=handle;release=mln_resource_request_release;"
   "dispose=mln_resource_request_release"
 );
+/** A resource URL transform that waits for its host's answer. */
+typedef uint64_t mln_resource_transform_request MLN_BINDING(
+  "kind=handle;release=mln_resource_transform_request_release;"
+  "dispose=mln_resource_transform_request_release"
+);
 /** A render session, which renders one map to one render target. */
 typedef uint64_t mln_render_session MLN_BINDING(
   "kind=handle;release=mln_render_session_release;parent=mln_map;"

@@ -1,6 +1,6 @@
 """Generate retained callback descriptors from their resolved registration plans."""
 
-from .zig import identifier
+from .zig import camel, identifier
 from .zig_dynamic_values import decode
 
 
@@ -66,10 +66,22 @@ def parts(values, value):
             else "return std.mem.zeroes(marshal.CallbackResult(c." + plan.native + "));"
         )
         converted = []
+        owned = []
         for parameter in parameters:
             raw = names[parameter.name]
             if plan.decision and parameter.name == plan.decision.parameter:
                 converted.append("request")
+            elif (
+                parameter.value.kind == "handle"
+                and parameter.value.ownership == "owned"
+            ):
+                # The callback owns the handle; adoption disposes it on failure,
+                # and a host error releases it.
+                adopted = "owned_" + parameter.name
+                owned.append(
+                    f"const {adopted} = try {values.public(parameter.value)}.adopt({raw}, null); "
+                )
+                converted.append(adopted)
             elif (
                 parameter.value.kind == "reference" and parameter.value.element.response
             ):
@@ -102,8 +114,15 @@ def parts(values, value):
         )
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
         report = f'callback.reportError("{plan.native}", err);'
+        release = "".join(
+            f"{camel(p.value.handle.release.removeprefix('mln_'))}(owned_{p.name}) catch {{}}; "
+            for p in parameters
+            if p.value.kind == "handle"
+            and p.value.ownership == "owned"
+            and not (plan.decision and p.name == plan.decision.parameter)
+        )
         if plan.result.ctype.kind == "void":
-            action = f"{call} catch |err| {{ {report} return; }};"
+            action = f"{call} catch |err| {{ {report} {release}return; }};"
         elif plan.status:
             action = f"{call} catch |err| {{ {report} return status.rawStatus(err); }}; return c.MLN_STATUS_OK;"
         else:
@@ -117,7 +136,7 @@ def parts(values, value):
             )
             decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
             action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
-        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} "
+        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
         body += action + " }"

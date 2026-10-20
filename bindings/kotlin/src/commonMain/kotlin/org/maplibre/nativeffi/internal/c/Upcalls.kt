@@ -171,25 +171,18 @@ internal object Upcalls {
         .toInt()
     }
 
-  private val resourceTransformCallbackAllowed: Set<String> =
-    setOf("mln_resource_transform_response_set_url")
-
   @JvmStatic
-  fun resourceTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
-    upcall<ResourceTransform, Int>(
-      "mln_resource_transform_callback",
-      userData,
-      -5,
-      resourceTransformCallbackAllowed,
-      { outResponse },
-    ) { value, scope ->
-      val invoke = value.callback ?: return@upcall -5
-      invoke(
-        ResourceKind(kind.toUInt()),
-        readCString(url),
-        ResourceTransformResponse(outResponse, scope),
-      )
-      0
+  fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit =
+    upcall<ResourceTransform, Unit>("mln_resource_transform_callback", userData, Unit, null) {
+      value,
+      scope ->
+      val requestOwner = ResourceTransformRequestHandle(request)
+      try {
+        value.callback(ResourceKind(kind.toUInt()), readCString(url), requestOwner)
+      } catch (failure: Throwable) {
+        requestOwner.close()
+        throw failure
+      }
     }
 
   @JvmStatic

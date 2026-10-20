@@ -204,9 +204,9 @@ class Values:
     def check_delivery(self, callback):
         """Accept a delivered callback whose copied arguments Dart can decode."""
         for parameter in callback.arguments:
-            if callback.decision and parameter.name == callback.decision.parameter:
+            if self.delivered_owner(callback, parameter):
                 if parameter.value.native not in self.bound.public_handles:
-                    raise Unsupported("delivered decision requires a generated owner")
+                    raise Unsupported("delivered handle requires a generated owner")
                 continue
             if parameter.value.kind == "handle":
                 raise Unsupported("delivered handle argument requires an owner rule")
@@ -261,7 +261,11 @@ class Values:
         )
 
     def public(self, value):
-        self.check(value)
+        # An owned handle names its owner class, as a borrowed one does;
+        # adopting it is the caller's job.
+        self.check(
+            replace(value, ownership="value") if value.kind == "handle" else value
+        )
         if value.kind == "handle":
             name = owner_names(value.handle)[0]
         elif value.kind == "native_pointer":
@@ -574,17 +578,27 @@ class Values:
             return f"const {public_name(value.native)}({', '.join(args)})"
         return None
 
+    def delivered_owner(self, callback, parameter):
+        """Whether a delivered argument is a handle that the host takes from
+        the batch: a decision handle, or one the callback owns."""
+        return (
+            callback.decision and parameter.name == callback.decision.parameter
+        ) or (parameter.value.kind == "handle" and parameter.value.ownership == "owned")
+
     def render_delivery(self, callback):
         """Decode one queued delivery and run the host callback with it.
 
         MapLibre already has native code's answer, so a callback error reaches
         the registering zone instead of the native caller. The owner takes a
-        decision handle from the batch before the callback runs; closing it
+        delivered handle from the batch before the callback runs; closing it
         after a failure releases the unanswered request, which native then
-        fails.
+        settles: a provider request fails, and a transform keeps its URL.
         """
         public = public_name(callback.native)
-        decision = callback.delivery and callback.decision
+        owned = next(
+            (p for p in callback.arguments if self.delivered_owner(callback, p)),
+            None,
+        )
         member = callback.delivery.payload_member
         lines = [
             f"void _deliver{public}({public} callback, int batch, int index, Pointer<raw.mln_delivery> delivery) {{",
@@ -597,8 +611,8 @@ class Values:
         decoded = []
         body = []
         for parameter in callback.arguments:
-            if decision and parameter.name == decision.parameter:
-                owner, native = owner_names(decision.handle)
+            if parameter is owned:
+                owner, native = owner_names(parameter.value.handle)
                 body += [
                     "    _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));",
                     f"    final adopted = owner = {owner}._({native}(payload.{parameter.name}));",
@@ -606,8 +620,8 @@ class Values:
                 decoded.append("adopted")
             else:
                 decoded.append(self.copy(parameter.value, f"payload.{parameter.name}"))
-        if decision:
-            owner, _ = owner_names(decision.handle)
+        if owned:
+            owner, _ = owner_names(owned.value.handle)
             lines += [
                 f"  {owner}? owner;",
                 "  try {",

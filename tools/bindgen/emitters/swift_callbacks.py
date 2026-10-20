@@ -180,9 +180,22 @@ def descriptor(values, plan):
             for parameter in callback.parameters
             if parameter.value.element and parameter.value.element.response
         ]
+        # A handle the callback owns is adopted before the host runs, and
+        # closed when the host throws, so native never waits on it.
+        owned = [
+            parameter
+            for parameter in callback.arguments
+            if parameter.value.kind == "handle"
+            and parameter.value.ownership == "owned"
+            and not (
+                callback.decision and parameter.name == callback.decision.parameter
+            )
+        ]
         args = ", ".join(
             "decisionOwner"
             if callback.decision and parameter.name == callback.decision.parameter
+            else "owned" + name(parameter.name)
+            if parameter in owned
             else "response" + name(parameter.name)
             if parameter in responses
             else decode(values, parameter.value, identifier(parameter.name))
@@ -198,10 +211,12 @@ def descriptor(values, plan):
             f"  guard let {identifier(parameter.name)} else {{ {fail or 'return'} }}\n  let response{name(parameter.name)} = {values.public(parameter.value.element)}(pointer: {identifier(parameter.name)})\n  defer {{ response{name(parameter.name)}.expire() }}\n"
             for parameter in responses
         )
+        from .swift_ownership import owner_name
+
+        for parameter in owned:
+            setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(parameter.value.handle)}(adopting: {identifier(parameter.name)}) else {{ {parameter.value.handle.release}({identifier(parameter.name)}); {fail or 'return'} }}\n"
         if callback.decision:
             decision = callback.decision
-            from .swift_ownership import owner_name
-
             setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}, pendingDecision: true) else {{ {fail} }}\n"
         guard = ""
         if callback.reentry_policy:
@@ -233,6 +248,10 @@ def descriptor(values, plan):
             fail = f"return decisionOwner.handle.finishDecision(accepted: false) ? {decision.accept}{suffix} : {decision.pass_through}{suffix}"
         if responses:
             invoke += f"; return MLN_STATUS_OK{suffix}"
+        if owned:
+            fail = " ".join(f"try? owned{name(p.name)}.close();" for p in owned) + (
+                " " + fail if fail else ""
+            )
         declarations += f"""private func invoke{public}{name(field.name)}({parameters}) -> {result} {{
   guard let {identifier(callback.context)} else {{ {"return " + callback.failure + suffix if result != "Void" else "return"} }}
   let box = Unmanaged<GeneratedCallbackBox<{stored}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()

@@ -10,30 +10,31 @@ bool build_keyed_url(
   const char* url, const char* key, char* out, size_t out_size
 );
 
-static mln_status add_api_key(
+static void add_api_key(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 ) {
   // #region match
   const char* api_key = user_data;
   (void)kind;
 
   if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
-    return MLN_STATUS_OK;  // An empty response preserves the original URL.
+    // Releasing the request without an answer keeps the original URL.
+    mln_resource_transform_request_release(request);
+    return;
   }
   // #endregion match
 
   // #region rewrite
   char rewritten[2048];
-  if (!build_keyed_url(url, api_key, rewritten, sizeof(rewritten))) {
-    return MLN_STATUS_OK;
+  if (build_keyed_url(url, api_key, rewritten, sizeof(rewritten))) {
+    // The call copies the URL before rewritten leaves scope.
+    mln_resource_transform_request_complete(
+      request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
+      NULL
+    );
   }
-
-  // The helper copies the URL before rewritten leaves scope.
-  return mln_resource_transform_response_set_url(
-    out_response,
-    (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)}, NULL
-  );
+  mln_resource_transform_request_release(request);
   // #endregion rewrite
 }
 
@@ -51,30 +52,3 @@ mln_status install_transform(
   );
 }
 // #endregion install
-
-mln_status install_rewrite_rules(
-  mln_runtime runtime, const mln_completion* completion
-) {
-  // #region rules
-  const mln_resource_rewrite_rule rule = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
-    .url =
-      (mln_buffer_view){
-        .data = "https://tiles.example.com/style.json",
-        .size = sizeof("https://tiles.example.com/style.json") - 1
-      },
-    .replacement_url = (mln_buffer_view){
-      .data = "https://mirror.example.com/style.json",
-      .size = sizeof("https://mirror.example.com/style.json") - 1
-    },
-  };
-  const mln_resource_transform transform = {
-    .size = sizeof(transform),
-    .rules = &rule,
-    .rule_count = 1,
-  };
-  // #endregion rules
-  return mln_runtime_set_resource_transform(
-    runtime, &transform, completion, NULL
-  );
-}

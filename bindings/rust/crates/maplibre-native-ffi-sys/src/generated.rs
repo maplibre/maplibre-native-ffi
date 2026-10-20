@@ -1166,14 +1166,6 @@ pub struct mln_resource_response {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_resource_rewrite_rule {
-    pub kinds: u32,
-    pub flags: u32,
-    pub url: mln_buffer_view,
-    pub replacement_url: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_route {
     pub kinds: u32,
     pub flags: u32,
@@ -1186,15 +1178,7 @@ pub struct mln_resource_transform {
     pub callback: mln_resource_transform_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
-    pub rules: *const mln_resource_rewrite_rule,
-    pub rule_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_resource_transform_response {
-    pub size: u32,
-    pub url: mln_buffer_view,
-    pub context: *mut std::ffi::c_void,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1619,9 +1603,12 @@ pub type mln_resource_transform_callback = Option<
         user_data: *mut std::ffi::c_void,
         kind: u32,
         url: *const std::ffi::c_char,
-        out_response: *mut mln_resource_transform_response,
-    ) -> mln_status,
+        request: mln_resource_transform_request,
+    ),
 >;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_resource_transform_request(pub u64);
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_runtime(pub u64);
@@ -1640,6 +1627,7 @@ native_handles!(
     mln_render_frame_batch,
     mln_render_session,
     mln_resource_request,
+    mln_resource_transform_request,
     mln_runtime
 );
 
@@ -2565,11 +2553,12 @@ unsafe extern "C" {
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_resource_transform_response_set_url(
-        response: *mut mln_resource_transform_response,
+    pub fn mln_resource_transform_request_complete(
+        request: mln_resource_transform_request,
         url: mln_buffer_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_resource_transform_request_release(request: mln_resource_transform_request);
     pub fn mln_runtime_clear_event_handler(
         runtime: mln_runtime,
         completion: *const mln_completion,

@@ -8,6 +8,7 @@
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
 #include "resources/custom_resource_provider.hpp"
+#include "resources/resource_transform.hpp"
 
 auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
   return mln_runtime_options{
@@ -96,15 +97,6 @@ auto mln_runtime_set_resource_transform(
   });
 }
 
-auto mln_resource_transform_response_set_url(
-  mln_resource_transform_response* response, mln_buffer_view url,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::resource_transform_response_set_url(response, url);
-  });
-}
-
 auto mln_runtime_clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -112,6 +104,21 @@ auto mln_runtime_clear_resource_transform(
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::clear_resource_transform(runtime, completion);
   });
+}
+
+auto mln_resource_transform_request_complete(
+  mln_resource_transform_request request, mln_buffer_view url,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::complete_resource_transform_request(request, url);
+  });
+}
+
+auto mln_resource_transform_request_release(
+  mln_resource_transform_request request
+) noexcept -> void {
+  mln::core::release_resource_transform_request(request);
 }
 
 auto mln_runtime_set_http_header_transform(

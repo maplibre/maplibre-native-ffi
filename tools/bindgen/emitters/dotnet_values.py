@@ -108,12 +108,12 @@ class Values:
             raise Unsupported(
                 f"{plan.native}: scalar absence requires a value representation"
             )
+        if plan.kind == "handle" and plan.handle:
+            return
         if plan.ownership == "owned":
             raise Unsupported(
                 f"{plan.native}: owned value requires an adoption transaction"
             )
-        if plan.kind == "handle" and plan.handle:
-            return
         if plan.kind == "callback":
             callback = self.bound.callbacks[plan.native]
             if callback.result.kind == "enum":
@@ -863,15 +863,37 @@ class Values:
                 and parameter.value.element
                 and parameter.value.element.response
             ]
+            # A handle the callback owns is adopted before the host runs and
+            # disposed when the host throws, so native never waits on it.
+            owned = [
+                parameter
+                for parameter in callback.arguments
+                if parameter.value.kind == "handle"
+                and parameter.value.ownership == "owned"
+            ]
             converted = ", ".join(
                 "response" + pascal(parameter.name)
                 if parameter in responses
+                else "owned" + pascal(parameter.name)
+                if parameter in owned
                 else self.copy(parameter.value, f"{member(parameter.name)}")
                 for parameter in callback.arguments
             )
             setup = "".join(
                 f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.element.native)}({member(parameter.name)});\n"
                 for parameter in responses
+            )
+            declared = "".join(
+                f"        {self.public_type(parameter.value)}? owned{pascal(parameter.name)} = null;\n"
+                for parameter in owned
+            )
+            setup += "".join(
+                f"            owned{pascal(parameter.name)} = {self.public_type(parameter.value)}.Adopt({member(parameter.name)});\n"
+                for parameter in owned
+            )
+            disposals = "".join(
+                f"            owned{pascal(parameter.name)}?.Dispose();\n"
+                for parameter in owned
             )
             cleanup = " ".join(
                 f"response{pascal(parameter.name)}.Expire();" for parameter in responses
@@ -911,8 +933,8 @@ class Values:
             methods.append(
                 "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                 f"    private static {result_type} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
-                f"        try\n        {{\n{setup}{restriction}            {invoke}\n{success}        }}\n"
-                f'        catch (Exception error)\n        {{\n            NativeCallbackFailure.Report("{callback.native}", error);\n            {failure}\n        }}\n    }}\n'
+                f"{declared}        try\n        {{\n{setup}{restriction}            {invoke}\n{success}        }}\n"
+                f'        catch (Exception error)\n        {{\n            NativeCallbackFailure.Report("{callback.native}", error);\n{disposals}            {failure}\n        }}\n    }}\n'
             )
         return "\n".join(methods)
 

@@ -68,10 +68,10 @@ auto provider_callback(
 ) -> uint32_t {
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
-auto rewrite_callback(
-  void*, uint32_t, const char*, mln_resource_transform_response*
-) -> mln_status {
-  return MLN_STATUS_OK;
+void transform_callback(
+  void*, uint32_t, const char*, mln_resource_transform_request request
+) {
+  mln_resource_transform_request_release(request);
 }
 auto header_callback(
   void*, uint32_t, const char*, mln_http_header_transform_response*
@@ -95,13 +95,12 @@ void rejected_callback_registrations_never_release_caller_data() {
         .routes = nullptr,
         .route_count = 0
       };
-      const auto rewrite = mln_resource_transform{
+      const auto transform = mln_resource_transform{
         .size = sizeof(mln_resource_transform),
-        .callback = rewrite_callback,
+        .callback = transform_callback,
         .user_data = &releases,
         .release_user_data = count_release,
-        .rules = nullptr,
-        .rule_count = 0
+        .queue = MLN_HANDLE_NULL
       };
       const auto header = mln_http_header_transform{
         .size = sizeof(mln_http_header_transform),
@@ -121,7 +120,7 @@ void rejected_callback_registrations_never_release_caller_data() {
           );
         else if (mode == 1)
           status = mln_runtime_set_resource_transform(
-            runtime, &rewrite, &completion.descriptor, nullptr
+            runtime, &transform, &completion.descriptor, nullptr
           );
         else
           status = mln_runtime_set_http_header_transform(

@@ -858,7 +858,9 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_resource_transform_response_set_url(response: Long, url: Long, outDiagnostic: Long): Int
+  fun mln_resource_transform_request_complete(request: Long, url: Long, outDiagnostic: Long): Int
+
+  fun mln_resource_transform_request_release(request: Long): Unit
 
   fun mln_runtime_clear_event_handler(runtime: Long, completion: Long, outDiagnostic: Long): Int
 

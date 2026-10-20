@@ -1619,6 +1619,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
         Ok(state) => state,
         Err(_) => return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
     };
+
     generated_invoke(
         || decision_state.finish_decision(false),
         |py| {
@@ -1713,32 +1714,29 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
     user_data: *mut std::ffi::c_void,
     kind: sys::mln_resource_kind,
     url: *const std::ffi::c_char,
-    out_response: *mut sys::mln_resource_transform_response,
-) -> sys::mln_status {
-    let _policy = GeneratedCallbackPolicy::enter(
-        &["mln_resource_transform_response_set_url"],
-        out_response as usize as u64,
-    );
-
+    request: sys::mln_resource_transform_request,
+) {
+    let request_adopted = std::cell::Cell::new(false);
     generated_invoke(
-        || sys::MLN_STATUS_NATIVE_ERROR,
+        || {
+            if !request_adopted.get() {
+                unsafe { sys::mln_resource_transform_request_release(request) };
+            }
+        },
         |py| {
-            let callback_scope = GeneratedCallbackGuard::new();
+            let request_owner =
+                unsafe { ResourceTransformRequestHandle::adopt(py, request, Vec::new()) };
+            request_adopted.set(true);
+            let request_owner = request_owner?;
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(sys::MLN_STATUS_NATIVE_ERROR);
+                return Ok(());
             };
-            let result = callback.bind(py).call1((
+            let _result = callback.bind(py).call1((
                 generated_value(py, kind)?,
                 unsafe { generated_c_string(py, url, false) }?,
-                Py::new(
-                    py,
-                    ResourceTransformResponseScope {
-                        native: out_response as usize,
-                        scope: callback_scope.scope(),
-                    },
-                )?,
+                request_owner,
             ))?;
-            result.extract::<sys::mln_status>()
+            Ok(())
         },
     )
 }
@@ -3761,22 +3759,6 @@ fn generated_input_mln_resource_response<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_resource_rewrite_rule<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_resource_rewrite_rule> {
-    let mut raw: sys::mln_resource_rewrite_rule = unsafe { std::mem::zeroed() };
-    raw.kinds = value
-        .getattr("kinds")?
-        .extract::<sys::mln_resource_kind_mask>()?;
-    raw.flags = value
-        .getattr("flags")?
-        .extract::<sys::mln_url_match_flags>()?;
-    raw.url = storage.buffer(value.getattr("url")?, true)?;
-    raw.replacement_url = storage.buffer(value.getattr("replacement_url")?, true)?;
-    Ok(raw)
-}
-
 fn generated_input_mln_resource_route<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3798,13 +3780,6 @@ fn generated_input_mln_resource_transform<'py>(
 ) -> PyResult<sys::mln_resource_transform> {
     let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
-    raw.rules = {
-        let items = generated_items(&value.getattr("rules")?, |item| {
-            generated_input_mln_resource_rewrite_rule(&item, storage)
-        })?;
-        raw.rule_count = generated_length(items.len())?;
-        storage.keep_array(items)
-    };
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -4517,6 +4492,13 @@ unsafe extern "C" fn generated_dispose_mln_render_session(
     handle: sys::mln_render_session,
 ) -> sys::mln_status {
     unsafe { sys::mln_render_session_dispose(handle, std::ptr::null_mut()) }
+}
+
+unsafe extern "C" fn generated_dispose_mln_resource_transform_request(
+    handle: sys::mln_resource_transform_request,
+) -> sys::mln_status {
+    unsafe { sys::mln_resource_transform_request_release(handle) };
+    sys::MLN_STATUS_OK
 }
 
 unsafe extern "C" fn generated_dispose_mln_runtime(handle: sys::mln_runtime) -> sys::mln_status {
@@ -8947,22 +8929,37 @@ impl ResourceRequestHandle {
 }
 
 #[pymethods]
-impl ResourceTransformResponseScope {
+impl ResourceTransformRequestHandle {
     #[pyo3(signature = (url))]
-    fn set_url(&self, py: Python<'_>, url: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    fn complete(&self, py: Python<'_>, url: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
             py,
-            "mln_resource_transform_response_set_url",
-            self.native as u64,
+            "mln_resource_transform_request_complete",
+            self.admission(),
         )?;
         let storage = &mut call.storage;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.scope.pointer(self.native)? as *mut sys::mln_resource_transform_response;
+        let handle = self.live()?;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_resource_transform_response_set_url(handle, url_value, diagnostic)
+                sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
             })
         }?;
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(
+            py,
+            "mln_resource_transform_request_release",
+            self.admission(),
+        )?;
+        let Some(mut reservation) = self.reserve()? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_resource_transform_request_release(handle)) };
+        reservation.commit();
         Ok(py.None())
     }
 }
@@ -9666,6 +9663,16 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         ],
     )
 };
+generated_owner!(
+    ResourceTransformRequestHandle,
+    "_ResourceTransformRequestHandle",
+    mln_resource_transform_request,
+    Some(generated_dispose_mln_resource_transform_request),
+    None,
+    |_, owner| GeneratedReadScope::new::<sys::mln_resource_transform_request, _>(Arc::clone(
+        &owner.state
+    ))
+);
 unsafe extern "C" fn generated_exit_release_mln_runtime(
     handle: sys::mln_runtime,
     completion: *const sys::mln_completion,
@@ -9888,9 +9895,9 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RenderFrameBatchHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
+    module.add_class::<ResourceTransformRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<HttpHeaderTransformResponseScope>()?;
-    module.add_class::<ResourceTransformResponseScope>()?;
     module.add_function(wrap_pyfunction!(_default_animation_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_bound_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_camera_delta, module)?)?;
@@ -10000,12 +10007,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyclass(name = "_HttpHeaderTransformResponseScope")]
 struct HttpHeaderTransformResponseScope {
-    native: usize,
-    scope: GeneratedCallbackScope,
-}
-
-#[pyclass(name = "_ResourceTransformResponseScope")]
-struct ResourceTransformResponseScope {
     native: usize,
     scope: GeneratedCallbackScope,
 }

@@ -37,6 +37,9 @@ class Values:
             return
         if value.kind == "handle" and value.native in self.bound.decisions:
             return
+        # A callback adopts an owned handle into its generated owner.
+        if value.kind == "handle" and value.ownership == "owned":
+            return
         if value.registration:
             from .rust_callbacks import validate
 
@@ -75,6 +78,8 @@ class Values:
         """Uses `value`, which converts to native for "in", from native for
         "out", or both ways."""
         self.check(value)
+        if value.kind == "handle" and value.native not in self.bound.decisions:
+            return self.public(value)
         if value.kind == "handle":
             if value.native not in self.used:
                 self.used[value.native] = value
@@ -141,6 +146,14 @@ class Values:
             )
         if value.response:
             return f"{self.name(value)}<'_>"
+        if (
+            value.kind == "handle"
+            and value.ownership == "owned"
+            and value.native not in self.bound.decisions
+        ):
+            from .rust_owners import owner_name
+
+            return owner_name(value.native)
         specialized = public(self, value)
         if specialized:
             return specialized

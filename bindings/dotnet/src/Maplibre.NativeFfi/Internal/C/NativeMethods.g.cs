@@ -1292,10 +1292,15 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_resource_transform_response_set_url(
-        mln_resource_transform_response* response,
+    internal static partial mln_status mln_resource_transform_request_complete(
+        MlnResourceTransformRequest request,
         mln_buffer_view url,
         mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_resource_transform_request_release(
+        MlnResourceTransformRequest request
     );
 
     [LibraryImport(LibraryName)]

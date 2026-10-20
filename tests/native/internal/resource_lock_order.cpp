@@ -82,23 +82,21 @@ struct BlockingTransform {
   std::atomic_bool released = false;
 };
 
-auto blocking_transform(
+void blocking_transform(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
-) -> mln_status {
+  mln_resource_transform_request request
+) {
   static_cast<void>(kind);
   auto& transform = *static_cast<BlockingTransform*>(user_data);
-  if (out_response != nullptr) out_response->url = {};
   if (
-    transform.only_url != nullptr &&
-    (url == nullptr || std::strstr(url, transform.only_url) == nullptr)
+    transform.only_url == nullptr ||
+    (url != nullptr && std::strstr(url, transform.only_url) != nullptr)
   ) {
-    return MLN_STATUS_OK;
+    mln_test_flag_set(&transform.entered);
+    static_cast<void>(mln_test_wait_for_flag(&transform.other->call_done));
+    transform.observed_call = transform.other->call_done.load();
   }
-  mln_test_flag_set(&transform.entered);
-  static_cast<void>(mln_test_wait_for_flag(&transform.other->call_done));
-  transform.observed_call = transform.other->call_done.load();
-  return MLN_STATUS_OK;
+  mln_resource_transform_request_release(request);
 }
 
 void mark_transform_released(void* user_data) {

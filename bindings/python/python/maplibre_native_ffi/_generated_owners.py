@@ -9,24 +9,13 @@ from ._generated_operations import (
     _RenderFrameBatchHandleOperations,
     _RenderSessionHandleOperations,
     _ResourceRequestHandleOperations,
-    _ResourceTransformResponseScopeOperations,
+    _ResourceTransformRequestHandleOperations,
     _RuntimeHandleOperations,
 )
 from ._lifecycle import NativeHandleMixin
 
 
 class HttpHeaderTransformResponseScope(_HttpHeaderTransformResponseScopeOperations):
-    def __init__(self):
-        raise TypeError("response scopes are supplied during callbacks")
-
-    @classmethod
-    def _from_native(cls, native):
-        value = cls.__new__(cls)
-        value._native = native
-        return value
-
-
-class ResourceTransformResponseScope(_ResourceTransformResponseScopeOperations):
     def __init__(self):
         raise TypeError("response scopes are supplied during callbacks")
 
@@ -171,6 +160,29 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin)
     """
 
     _handle_name = "ResourceRequestHandle"
+    _parent: NativeHandleMixin | None
+
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+
+    @classmethod
+    def _from_native(cls, native, parent=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        return owner
+
+
+class ResourceTransformRequestHandle(
+    _ResourceTransformRequestHandleOperations, NativeHandleMixin
+):
+    """A resource URL transform that waits for its host's answer.
+
+    See `mln_resource_transform_request` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    _handle_name = "ResourceTransformRequestHandle"
     _parent: NativeHandleMixin | None
 
     def __init__(self):

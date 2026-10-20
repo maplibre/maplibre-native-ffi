@@ -2003,13 +2003,21 @@ static jint mln_resource_request_set_cancel_callback_jni(
   );
 }
 
-static jint mln_resource_transform_response_set_url_jni(
-  JNIEnv* env, jclass type, jlong response, jlong url, jlong out_diagnostic
+static jint mln_resource_transform_request_complete_jni(
+  JNIEnv* env, jclass type, jlong request, jlong url, jlong out_diagnostic
 ) {
-  return (jint)mln_resource_transform_response_set_url(
-    MLN_JNI_POINTER(mln_resource_transform_response*, response),
+  return (jint)mln_resource_transform_request_complete(
+    (mln_resource_transform_request)request,
     MLN_JNI_RECORD(mln_buffer_view, url),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_resource_transform_request_release_jni(
+  JNIEnv* env, jclass type, jlong request
+) {
+  mln_resource_transform_request_release(
+    (mln_resource_transform_request)request
   );
 }
 
@@ -2741,8 +2749,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",
    (void*)mln_resource_request_set_cancel_callback_jni},
-  {"mln_resource_transform_response_set_url", "(JJJ)I",
-   (void*)mln_resource_transform_response_set_url_jni},
+  {"mln_resource_transform_request_complete", "(JJJ)I",
+   (void*)mln_resource_transform_request_complete_jni},
+  {"mln_resource_transform_request_release", "(J)V",
+   (void*)mln_resource_transform_request_release_jni},
   {"mln_runtime_clear_event_handler", "(JJJ)I",
    (void*)mln_runtime_clear_event_handler_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
@@ -3148,8 +3158,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_release_jni},
   {"mln_resource_request_set_cancel_callback", "(JJJJ)I",
    (void*)mln_resource_request_set_cancel_callback_jni},
-  {"mln_resource_transform_response_set_url", "(JJJ)I",
-   (void*)mln_resource_transform_response_set_url_jni},
+  {"mln_resource_transform_request_complete", "(JJJ)I",
+   (void*)mln_resource_transform_request_complete_jni},
+  {"mln_resource_transform_request_release", "(J)V",
+   (void*)mln_resource_transform_request_release_jni},
   {"mln_runtime_clear_event_handler", "(JJJ)I",
    (void*)mln_runtime_clear_event_handler_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
@@ -3235,7 +3247,7 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"runtimeEventHandlerCallback", "(JJ)V", NULL},
   {"httpHeaderTransformCallback", "(JIJJ)I", NULL},
   {"resourceProviderCallback", "(JJJ)I", NULL},
-  {"resourceTransformCallback", "(JIJJ)I", NULL},
+  {"resourceTransformCallback", "(JIJJ)V", NULL},
   {"wakeCallback", "(J)V", NULL},
   {"queueLockLock", "(J)V", NULL},
   {"queueLockUnlock", "(J)V", NULL},
@@ -3358,19 +3370,17 @@ static uint32_t mln_jni_resourceProviderCallback(
   return (uint32_t)result;
 }
 
-static mln_status mln_jni_resourceTransformCallback(
+static void mln_jni_resourceTransformCallback(
   void* userData, uint32_t kind, const char* url,
-  mln_resource_transform_response* outResponse
+  mln_resource_transform_request request
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)},
     {.i = (jint)kind},
     {.j = MLN_JNI_ADDRESS(url)},
-    {.j = MLN_JNI_ADDRESS(outResponse)}
+    {.j = (jlong)request}
   };
-  jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[12], arguments, &result);
-  return (mln_status)result;
+  mln_jni_upcall_void(&mln_jni_upcalls[12], arguments);
 }
 
 static void mln_jni_wakeCallback(void* userData) {

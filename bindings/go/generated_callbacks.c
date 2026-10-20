@@ -168,25 +168,15 @@ uint32_t binding_mln_resource_provider_callback(
   binding_policy_leave(&policy);
   return result;
 }
-extern mln_status mlnGo_mln_resource_transform_callback(
+extern void mlnGo_mln_resource_transform_callback(
   void* user_data, uint32_t kind, char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 );
-mln_status binding_mln_resource_transform_callback(
+void binding_mln_resource_transform_callback(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 ) {
-  static const uint32_t operations[] = {
-    binding_operation_mln_resource_transform_response_set_url
-  };
-  binding_policy policy = {
-    NULL, operations, 1, (uint64_t)(uintptr_t)out_response
-  };
-  binding_policy_enter(&policy);
-  mln_status result = mlnGo_mln_resource_transform_callback(
-    (void*)user_data, kind, (char*)url,
-    (mln_resource_transform_response*)out_response
+  mlnGo_mln_resource_transform_callback(
+    (void*)user_data, kind, (char*)url, request
   );
-  binding_policy_leave(&policy);
-  return result;
 }

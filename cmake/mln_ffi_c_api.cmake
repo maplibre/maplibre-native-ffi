@@ -167,6 +167,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/file_source_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/network_status.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
+      ${PROJECT_SOURCE_DIR}/src/resources/resource_transform.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/url_rules.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp

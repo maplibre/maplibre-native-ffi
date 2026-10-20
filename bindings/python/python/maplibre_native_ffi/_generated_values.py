@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ._generated_owners import (
         HttpHeaderTransformResponseScope,
         ResourceRequestHandle,
-        ResourceTransformResponseScope,
+        ResourceTransformRequestHandle,
     )
 
 
@@ -3476,36 +3476,6 @@ class ResourceResponse:
 
 
 @dataclass(frozen=True, slots=True)
-class ResourceRewriteRule:
-    """One rule of a native resource transform.
-
-    See `mln_resource_rewrite_rule` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    flags: UrlMatchFlags
-    """A bitwise OR of `mln_url_match_flags` values."""
-
-    url: str
-    """The URL or glob pattern to compare."""
-
-    kinds: ResourceKindMask = ResourceKindMask.ALL
-    """The resource kinds to match."""
-
-    replacement_url: str | None = None
-    """The replacement URL, or empty to keep the URL and stop the search."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            kinds=ResourceKindMask(raw["kinds"]),
-            flags=UrlMatchFlags(raw["flags"]),
-            url=raw["url"],
-            replacement_url=raw["replacement_url"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class ResourceRoute:
     """One request pattern that a resource provider claims.
 
@@ -3533,26 +3503,25 @@ class ResourceRoute:
 
 @dataclass(frozen=True, slots=True)
 class ResourceTransform:
-    """Resource transform state: a callback, or native rewrite rules.
+    """Resource transform state.
 
     See `mln_resource_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
     callback: (
-        Callable[[ResourceKind, str, ResourceTransformResponseScope], Status] | None
+        Callable[[ResourceKind, str, ResourceTransformRequestHandle], None] | None
     ) = None
-    rules: tuple[ResourceRewriteRule, ...] = ()
-    """Rewrite rules for a transform without a callback; empty with one."""
 
-    def _invoke_callback(self, kind, url, out_response):
+    def _invoke_callback(self, kind, url, request):
         callback = self.callback
         assert callback is not None
-        return callback(
-            ResourceKind(kind),
-            url,
-            _wrap_response(out_response, "ResourceTransformResponseScope"),
-        )
+        request = _wrap_response(request, "ResourceTransformRequestHandle")
+        try:
+            return callback(ResourceKind(kind), url, request)
+        except BaseException:
+            request.close()
+            raise
 
 
 @dataclass(frozen=True, slots=True)

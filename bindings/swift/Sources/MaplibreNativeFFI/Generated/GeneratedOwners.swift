@@ -260,6 +260,44 @@ public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
   }
 }
 
+struct NativeResourceTransformRequestHandle: NativeHandle {
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_resource_transform_request_release(raw); return true
+  }
+}
+
+/// A resource URL transform that waits for its host's answer.
+///
+/// See `mln_resource_transform_request` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class ResourceTransformRequestHandle: @unchecked Sendable,
+  NativeReceiver
+{
+  let handle: NativeHandleBox<NativeResourceTransformRequestHandle>
+  init(adopting raw: mln_resource_transform_request) throws {
+    handle = try NativeHandleBox(
+      typeName: "ResourceTransformRequestHandle",
+      handle: NativeResourceTransformRequestHandle(raw: raw)
+    )
+  }
+
+  public var isClosed: Bool {
+    handle.isClosed
+  }
+
+  public var id: UInt64 {
+    handle.issued.raw
+  }
+
+  func requireLiveHandle() throws
+    -> NativeResourceTransformRequestHandle
+  {
+    try handle.requireLive()
+  }
+}
+
 struct NativeRuntimeHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_runtime_dispose(

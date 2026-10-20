@@ -20,15 +20,14 @@
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-static mln_status keep_url(
+static void keep_url(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 ) {
   (void)user_data;
   (void)kind;
   (void)url;
-  (void)out_response;
-  return MLN_STATUS_OK;
+  mln_resource_transform_request_release(request);
 }
 
 static mln_status add_no_headers(
@@ -62,22 +61,17 @@ static void resource_transform_with_zero_size(void* descriptor) {
   ((mln_resource_transform*)descriptor)->size = 0;
 }
 
-static const mln_resource_rewrite_rule unused_rewrite_rule = {
-  .url = MLN_BUFFER_LITERAL("http://127.0.0.1/unused"),
-};
-
-// A callback transform takes no rules; a rules transform has no callback.
-static void resource_transform_with_rules(void* descriptor) {
-  ((mln_resource_transform*)descriptor)->rules = &unused_rewrite_rule;
-  ((mln_resource_transform*)descriptor)->rule_count = 1;
+static void resource_transform_with_release_and_queue(void* descriptor) {
+  ((mln_resource_transform*)descriptor)->callback = NULL;
+  ((mln_resource_transform*)descriptor)->release_user_data = free;
 }
 
 static const mln_test_validation_case resource_transform_cases[] = {
   {"a well-formed transform", NULL, MLN_STATUS_OK, NULL},
   {"a zero size", resource_transform_with_zero_size,
    MLN_STATUS_INVALID_ARGUMENT, "size"},
-  {"a callback with rules", resource_transform_with_rules,
-   MLN_STATUS_INVALID_ARGUMENT, "rules"},
+  {"neither a callback nor a queue", resource_transform_with_release_and_queue,
+   MLN_STATUS_INVALID_ARGUMENT, NULL},
 };
 
 static void resource_transform_registration_validates_its_descriptor(void) {
@@ -95,31 +89,6 @@ static void resource_transform_registration_validates_its_descriptor(void) {
   MLN_TEST_INVALID(mln_test_clear_resource_transform(MLN_HANDLE_NULL));
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_runtime(runtime);
-}
-
-// Outside a transform callback there is no invocation to hold a URL, and
-// inside one the helper still checks what it copies.
-static void a_replacement_url_needs_a_transform_invocation(void) {
-  mln_resource_transform_response response = {
-    .size = sizeof(mln_resource_transform_response),
-  };
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_resource_transform_response_set_url(
-      &response, (mln_buffer_view){.data = "http://127.0.0.1/", .size = 17},
-      NULL
-    )
-  );
-  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
-    NULL, (mln_buffer_view){.data = "x", .size = 1}, NULL
-  ));
-  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
-    &response, MLN_BUFFER_LITERAL("custom://before\0after"), NULL
-  ));
-  response.size = 0;
-  MLN_TEST_INVALID(mln_resource_transform_response_set_url(
-    &response, (mln_buffer_view){.data = "x", .size = 1}, NULL
-  ));
 }
 
 static mln_status submit_header_transform(
@@ -242,29 +211,30 @@ typedef struct rewriting_transform {
   atomic_int calls;
 } rewriting_transform;
 
-static mln_status rewrite_a_to_b(
+static void rewrite_a_to_b(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 ) {
   (void)kind;
   rewriting_transform* transform = user_data;
   atomic_fetch_add(&transform->calls, 1);
   const char* path = strstr(url, "/a/");
-  if (path == NULL) {
-    return MLN_STATUS_OK;
-  }
   char rewritten[512];
-  const int written = snprintf(
-    rewritten, sizeof(rewritten), "%.*sb/%s", (int)(path - url + 1), url,
-    path + 3
-  );
-  if (written <= 0 || (size_t)written >= sizeof(rewritten)) {
-    return MLN_STATUS_NATIVE_ERROR;
+  const int written = path == NULL ? 0
+                                   : snprintf(
+                                       rewritten, sizeof(rewritten), "%.*sb/%s",
+                                       (int)(path - url + 1), url, path + 3
+                                     );
+  if (written > 0 && (size_t)written < sizeof(rewritten)) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_resource_transform_request_complete(
+        request, (mln_buffer_view){.data = rewritten, .size = (size_t)written},
+        NULL
+      )
+    );
   }
-  return mln_resource_transform_response_set_url(
-    out_response, (mln_buffer_view){.data = rewritten, .size = (size_t)written},
-    NULL
-  );
+  mln_resource_transform_request_release(request);
 }
 
 static void load_from_server(
@@ -343,17 +313,16 @@ typedef struct image_kind_probe {
 
 static const char overlay_path[] = "/overlay.png";
 
-static mln_status record_image_resource_kind(
+static void record_image_resource_kind(
   void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  mln_resource_transform_request request
 ) {
-  (void)out_response;
   image_kind_probe* probe = user_data;
   if (strstr(url, overlay_path) != NULL) {
     atomic_store(&probe->resource_kind, kind);
     mln_test_flag_set(&probe->resource_seen);
   }
-  return MLN_STATUS_OK;
+  mln_resource_transform_request_release(request);
 }
 
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
@@ -607,7 +576,6 @@ static void a_redirect_keeps_headers_only_within_the_origin(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(resource_transform_registration_validates_its_descriptor);
-  RUN_TEST(a_replacement_url_needs_a_transform_invocation);
   RUN_TEST(header_transform_registration_validates_its_descriptor);
   RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
 #if !defined(__EMSCRIPTEN__)

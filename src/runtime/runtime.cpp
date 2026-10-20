@@ -49,6 +49,7 @@
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "resources/custom_resource_provider.hpp"
+#include "resources/resource_transform.hpp"
 #include "resources/url_rules.hpp"
 #include "testing/sync_point.hpp"
 #include "wake/wake.hpp"
@@ -1005,12 +1006,25 @@ class RegistrationTransfer {
   bool accepted_ = false;
 };
 
-auto delete_rewrite_rules(void* table) noexcept -> void {
-  delete static_cast<RewriteRuleTable*>(table);
-}
-
 auto delete_header_rules(void* table) noexcept -> void {
   delete static_cast<HeaderRuleTable*>(table);
+}
+
+// Queues a copy of the URL with its request handle. A request the queue
+// refuses keeps its URL.
+auto queue_resource_transform(
+  void* registration, uint32_t kind, const char* url,
+  mln_resource_transform_request request
+) noexcept -> void {
+  const auto arguments = mln_resource_transform_delivery{
+    .kind = kind,
+    .url = url,
+    .request = request,
+  };
+  if (!static_cast<const mln::delivery::QueuedRegistration*>(registration)
+         ->push<MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM>(arguments)) {
+    release_resource_transform_request(request);
+  }
 }
 
 }  // namespace
@@ -1029,44 +1043,30 @@ auto set_resource_transform(
     set_thread_error("mln_resource_transform.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto rules = std::unique_ptr<RewriteRuleTable>{};
-  if (transform->callback == nullptr) {
-    if (transform->rule_count == 0) {
-      set_thread_error(
-        "a transform requires a callback or rules; use the clear function"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (
-      transform->user_data != nullptr || transform->release_user_data != nullptr
-    ) {
-      set_thread_error(
-        "a rules resource transform must not carry user_data or "
-        "release_user_data"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    rules = std::make_unique<RewriteRuleTable>();
-    const auto copied =
-      copy_rewrite_rules(transform->rules, transform->rule_count, *rules);
-    if (copied != MLN_STATUS_OK) return copied;
-  } else if (transform->rule_count != 0) {
-    set_thread_error("a resource transform callback takes no rules");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "resource transform", transform->queue, transform->callback != nullptr,
+    transform->release_user_data != nullptr, queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
 
-  // A rules table belongs to its context, which deletes it on retirement.
-  const auto context = rules != nullptr
-                         ? std::make_shared<RuntimeCallbackContext>(
-                             rules.get(), &delete_rewrite_rules
-                           )
-                         : std::make_shared<RuntimeCallbackContext>(
-                             transform->user_data, transform->release_user_data
-                           );
+  auto queued = queue == nullptr
+                  ? std::unique_ptr<mln::delivery::QueuedRegistration>{}
+                  : std::make_unique<mln::delivery::QueuedRegistration>(
+                      std::move(queue), transform->user_data
+                    );
+  const auto context =
+    queued != nullptr
+      ? std::make_shared<RuntimeCallbackContext>(
+          queued.get(), &mln::delivery::QueuedRegistration::retire
+        )
+      : std::make_shared<RuntimeCallbackContext>(
+          transform->user_data, transform->release_user_data
+        );
   const auto registration = std::make_shared<ResourceTransformRegistration>(
     ResourceTransformRegistration{
       .callback =
-        rules != nullptr ? &rewrite_rules_callback : transform->callback,
+        queued != nullptr ? &queue_resource_transform : transform->callback,
       .context = context,
     }
   );
@@ -1081,45 +1081,10 @@ auto set_resource_transform(
       }
     );
   if (status == MLN_STATUS_OK) {
-    static_cast<void>(rules.release());
+    static_cast<void>(queued.release());
     transfer.accept();
   }
   return status;
-}
-
-auto resource_transform_response_set_url(
-  mln_resource_transform_response* response, mln_buffer_view url
-) -> mln_status {
-  if (response == nullptr) {
-    set_thread_error("resource transform response must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (response->size < sizeof(mln_resource_transform_response)) {
-    set_thread_error("mln_resource_transform_response.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!validate_c_string_view(url, "resource transform response URL")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* const replacement_url = static_cast<std::string*>(response->context);
-  if (replacement_url == nullptr) {
-    set_thread_error(
-      "resource transform response URL can only be set during a transform "
-      "callback"
-    );
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (url.size == 0) {
-    replacement_url->clear();
-    response->url = {};
-    return MLN_STATUS_OK;
-  }
-
-  replacement_url->assign(static_cast<const char*>(url.data), url.size);
-  response->url = {
-    .data = replacement_url->data(), .size = replacement_url->size()
-  };
-  return MLN_STATUS_OK;
 }
 
 auto clear_resource_transform(
@@ -2644,43 +2609,27 @@ auto has_resource_transform_for_platform_context(
 }
 
 auto invoke_resource_transform(
-  void* platform_context, uint32_t kind, const char* url,
-  std::string& out_replacement_url
-) noexcept -> mln_status {
+  void* platform_context, uint32_t kind, const std::string& url,
+  mln::ResourceTransform::FinishedCallback finished
+) -> void {
   const auto state = lease_resource_transform_state(platform_context);
   if (state == nullptr) {
-    return MLN_STATUS_OK;
+    finished(url);
+    return;
   }
 
   // Same locking rule as `acquire_resource_provider_for_platform_context()`.
   mln::testing::hit(mln::testing::SyncPoint::ResourceTransformLookup);
   const std::shared_lock transform_lock(state->mutex);
   const auto registration = state->registration;
-  if (registration == nullptr || process_exiting()) {
-    return MLN_STATUS_OK;
+  if (registration == nullptr) {
+    finished(url);
+    return;
   }
-
-  auto response = mln_resource_transform_response{
-    .size = sizeof(mln_resource_transform_response),
-    .url = {},
-    .context = &out_replacement_url,
-  };
-  try {
-    const auto status = registration->callback(
-      registration->context->user_data(), kind, url, &response
-    );
-    if (status == MLN_STATUS_OK && response.url.size != 0) {
-      if (!validate_c_string_view(
-            response.url, "resource transform response URL"
-          )) {
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      out_replacement_url = string_from_view(response.url);
-    }
-    return status;
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  request_resource_transform(
+    registration->callback, registration->context->user_data(), kind, url,
+    std::move(finished)
+  );
 }
 
 auto invoke_http_header_transform(

@@ -214,38 +214,37 @@ func installProvider(
   }
 }
 
-/// A resource transform's response object works only on the callback's
-/// thread and only until the callback returns.
-@Test func aTransformResponseExpiresWithItsCallback() async throws {
+/// A header transform's response object works only on the callback's thread
+/// and only until the callback returns.
+@Test func aHeaderResponseExpiresWithItsCallback() async throws {
   try await withMapFixture { fixture in
-    // A transform applies to requests that reach the network file source, so
-    // the provider passes this one through. The transform rewrites it to a
-    // scheme no transport serves, so it fails without a connection.
-    let url = "http://127.0.0.1:1/transformed.json"
+    // The provider passes this request to the HTTP client, which runs the
+    // header transform before it tries a port that nothing serves.
+    let url = "http://127.0.0.1:1/headers.json"
     try await installProvider(on: fixture.runtime, for: url) { _ in
       .passThrough
     }
-    let escaped = LockedBox<ResourceTransformResponse?>(nil)
+    let escaped = LockedBox<HttpHeaderTransformResponse?>(nil)
     let otherThread = LockedBox<MaplibreError?>(nil)
-    try await fixture.runtime.setResourceTransform(
-      transform: ResourceTransform(callback: { _, requested, response in
+    try await fixture.runtime.setHttpHeaderTransform(
+      transform: HttpHeaderTransform(callback: { _, requested, response in
         guard requested == url else { return }
         let done = DispatchSemaphore(value: 0)
         Thread {
-          do { try response.setUrl(url: "custom://other-thread.json") }
+          do { try response.setHeader(name: "X-Test", value: "other") }
           catch let error as MaplibreError {
             otherThread.update { $0 = error }
           } catch {}
           done.signal()
         }.start()
         _ = isSignalled(done)
-        try response.setUrl(url: "custom://rewritten.json")
+        try response.setHeader(name: "X-Test", value: "inside")
         escaped.update { $0 = response }
       })
     )
     try await fixture.map.setStyleUrl(url: url)
     let failure = try await fixture
-      .awaitEvent("the rewritten request to fail") {
+      .awaitEvent("the request to fail") {
         $0.type == .mapLoadingFailed
       }
     #expect(failure != nil)
@@ -253,8 +252,49 @@ func installProvider(
     #expect(otherThread.value?.kind == .invalidState)
     let response = try #require(escaped.value)
     await expectMaplibreError(.invalidState) {
-      try response.setUrl(url: "custom://late.json")
+      try response.setHeader(name: "X-Test", value: "late")
     }
+  }
+}
+
+/// A transform owns the request its callback receives, and another thread
+/// answers it after the callback returns.
+@Test func aTransformRequestIsAnsweredLater() async throws {
+  try await withMapFixture { fixture in
+    // The provider passes the style through to the online source, which
+    // waits for the transform's answer.
+    let url = "custom://transformed.json"
+    try await installProvider(on: fixture.runtime, for: url) { _ in
+      .passThrough
+    }
+    let taken = LockedBox<ResourceTransformRequestHandle?>(nil)
+    try await fixture.runtime.setResourceTransform(
+      transform: ResourceTransform(callback: { _, requested, request in
+        guard requested == url else { return try request.close() }
+        taken.update { $0 = request }
+      })
+    )
+    try await fixture.map.setStyleUrl(url: url)
+    await awaitCondition("the transform to take the request") {
+      taken.value != nil
+    }
+    let request = try #require(taken.value)
+    let answered = LockedBox<Error?>(nil)
+    let done = DispatchSemaphore(value: 0)
+    Thread {
+      do {
+        try request.complete(url: "unsupported://rewritten.json")
+        try request.close()
+      } catch { answered.update { $0 = error } }
+      done.signal()
+    }.start()
+    #expect(isSignalled(done))
+    #expect(answered.value == nil)
+    #expect(request.isClosed)
+    // The online source cannot load the rewritten scheme.
+    #expect(try await fixture.awaitEvent("the rewritten request to fail") {
+      $0.type == .mapLoadingFailed
+    } != nil)
   }
 }
 

@@ -2837,40 +2837,53 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
   }
 }
 
-Pointer<raw.mln_resource_rewrite_rule> _writeResourceRewriteRule(
-  ResourceRewriteRule value,
-  Arena arena,
+void _deliverResourceTransformCallback(
+  ResourceTransformCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
 ) {
-  final result = arena<raw.mln_resource_rewrite_rule>();
-  result.ref.kinds = value.kinds.rawValue;
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeStringView(value.url, arena).value;
-  result.ref.replacement_url = nativeStringView(
-    (value.replacementUrl ?? ''),
-    arena,
-  ).value;
-  return result;
+  final payload = delivery.ref.payload.resource_transform;
+  ResourceTransformRequestHandle? owner;
+  try {
+    _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
+    final adopted = owner = ResourceTransformRequestHandle._(
+      NativeResourceTransformRequest(payload.request),
+    );
+    callback(
+      ResourceKind.fromRawValue(payload.kind),
+      payload.url.cast<Utf8>().toDartString(),
+      adopted,
+    );
+  } catch (_) {
+    owner?.close();
+    rethrow;
+  }
 }
 
 _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   ResourceTransform value,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_resource_transform>();
     result.ref.size = sizeOf<raw.mln_resource_transform>();
-    result.ref.rules = arena<raw.mln_resource_rewrite_rule>(
-      value.rules.isEmpty ? 1 : value.rules.length,
-    );
-    result.ref.rule_count = value.rules.length;
-    for (var index = 0; index < value.rules.length; index++) {
-      result.ref.rules[index] = _writeResourceRewriteRule(
-        value.rules[index],
-        arena,
-      ).ref;
-    }
-    return _NativeRegistration(result, () {}, arena.releaseAll);
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM: (batch, index, delivery) =>
+          _deliverResourceTransformCallback(
+            value.callback,
+            batch,
+            index,
+            delivery,
+          ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -6671,6 +6684,55 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
       });
 }
 
+/// Issued `mln_resource_transform_request` handle id.
+extension type const NativeResourceTransformRequest(int raw)
+    implements NativeHandle {}
+
+/// Owner of one native `mln_resource_transform_request` handle.
+///
+/// A resource URL transform that waits for its host's answer.
+///
+/// See `mln_resource_transform_request` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class ResourceTransformRequestHandle implements Finalizable {
+  ResourceTransformRequestHandle._(NativeResourceTransformRequest handle)
+    : _state = NativeHandleState(handle, 'ResourceTransformRequestHandle');
+  final NativeHandleState<NativeResourceTransformRequest> _state;
+  NativeResourceTransformRequest get _handle => _state.handle;
+
+  /// Whether this binding object has released its native handle.
+  bool get isClosed => _state.isClosed;
+
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
+
+  /// Answers a resource transform request with a replacement URL.
+  ///
+  /// See `mln_resource_transform_request_complete` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  void complete(String url) => withNativeArena((arena) {
+    _check(
+      raw.mln_resource_transform_request_complete(
+        _handle.raw,
+        nativeStringView(url, arena).value,
+        nativeDiagnostic,
+      ),
+    );
+  });
+
+  /// Releases a resource transform request.
+  ///
+  /// See `mln_resource_transform_request_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  void close() => _state.close((handle) {
+    raw.mln_resource_transform_request_release(handle.raw);
+    return nativeStatusOk;
+  });
+}
+
 /// Issued `mln_runtime` handle id.
 extension type const NativeRuntime(int raw) implements NativeHandle {}
 
@@ -7034,7 +7096,9 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
         return registrations.run(
           () => raw.mln_runtime_set_resource_transform(
             _handle.raw,
-            registrations.add(_prepareResourceTransform(transform)),
+            registrations.add(
+              _prepareResourceTransform(transform, registrations.roots),
+            ),
             completion,
             nativeDiagnostic,
           ),

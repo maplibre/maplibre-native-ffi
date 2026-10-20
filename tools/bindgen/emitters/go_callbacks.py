@@ -116,9 +116,24 @@ def sources(values, plan):
             setup.append(
                 f"request := adopt{owner}(uint64(native_{decision.parameter}), nil); request.state.beginDecision(); defer func() {{ result = {values.c_type(callback.result)}(request.state.finishDecision(uint32(result), uint32(C.{decision.accept}), uint32(C.{decision.pass_through}))); runtime.KeepAlive(request) }}()"
             )
+        # A handle the callback owns is adopted first; a callback that never
+        # runs or panics closes it, so native never waits on it.
+        owned = [
+            p
+            for p in parameters
+            if p.value.kind == "handle"
+            and p.value.ownership == "owned"
+            and not (decision and p.name == decision.parameter)
+        ]
+        for p in owned:
+            setup.append(
+                f"owned_{p.name} := adopt{values.owner(p.value.native)}(uint64(native_{p.name}), nil)"
+            )
+        closes = "".join(f"owned_{p.name}.Close(); " for p in owned)
         setup.append(
             "defer func() { if failure := recover(); failure != nil { "
             + f'bindingReportCallbackPanic("{callback.native}", failure); '
+            + closes
             + failure
             + " } }()"
         )
@@ -128,6 +143,8 @@ def sources(values, plan):
             value = p.value.unwrapped
             if decision and p.name == decision.parameter:
                 copied.append("request")
+            elif value.kind == "handle" and value.ownership == "owned":
+                copied.append("owned_" + p.name)
             elif value.response:
                 copied.append(
                     f"&{public(value.native)}Scope{{native: native_{p.name}, scope: scope}}"
@@ -137,7 +154,7 @@ def sources(values, plan):
                     values.copy(p.value, "native_" + native_identifier(p.name))
                 )
         setup.append(
-            f"callbacks, ok := bindingCallbackValue[{public(plan.native)}](native_{callback.context}); if !ok || callbacks.{name(member)} == nil {{ return }}"
+            f"callbacks, ok := bindingCallbackValue[{public(plan.native)}](native_{callback.context}); if !ok || callbacks.{name(member)} == nil {{ {closes}return }}"
         )
         invoke = f"callbacks.{name(member)}({', '.join(copied)})"
         setup.append(

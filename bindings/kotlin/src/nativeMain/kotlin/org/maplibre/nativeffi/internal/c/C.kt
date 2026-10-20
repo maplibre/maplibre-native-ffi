@@ -1991,16 +1991,22 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_resource_transform_response_set_url(
-    response: Long,
+  actual fun mln_resource_transform_request_complete(
+    request: Long,
     url: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_response_set_url(
-      response.toCPointer(),
+    org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_request_complete(
+      request.toULong(),
       url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       outDiagnostic.toCPointer(),
     )
+
+  actual fun mln_resource_transform_request_release(request: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_request_release(
+      request.toULong(),
+    )
+  }
 
   actual fun mln_runtime_clear_event_handler(
     runtime: Long,

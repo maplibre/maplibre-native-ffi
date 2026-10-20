@@ -529,24 +529,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Copies a replacement URL into C API-managed storage for the current callback.
-   *
-   * See `mln_resource_transform_response_set_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun resourceTransformResponseSetUrl(
-    response: ResourceTransformResponse,
-    url: String,
-  ): Unit =
-    nativeRespond(
-      response.bindingScope,
-      response.bindingAddress,
-      "mln_resource_transform_response_set_url",
-    ) {
-      check(C.mln_resource_transform_response_set_url(handle, view(url), diagnostic))
-    }
-
-  /**
    * Creates a runtime.
    *
    * See `mln_runtime_create` in the

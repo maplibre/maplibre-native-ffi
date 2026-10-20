@@ -27,6 +27,7 @@ enum class HandleKind : std::uint8_t {
   MapProjection = 3,
   RenderSession = 4,
   ResourceRequest = 12,
+  ResourceTransformRequest = 13,
   AcquiredFrame = 20,
   RenderFrameBatch = 21,
   GeoJsonSourceData = 22,

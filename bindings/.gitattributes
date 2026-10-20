@@ -136,12 +136,10 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponse.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseStatus.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRewriteRule.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRoute.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventHandler.g.cs linguist-generated=true
@@ -232,6 +230,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRenderFrameBatchOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRenderSessionOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceRequestOperations.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceTransformRequestOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRuntimeOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedValues.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeojsonSourceDataHandle.kt linguist-generated=true
@@ -240,6 +239,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RenderFrameBatchHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RenderSessionHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceRequestHandle.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceTransformRequestHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RuntimeHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/RuntimeLayouts.kt linguist-generated=true
@@ -263,6 +263,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/mod.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_frame_batch.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_session.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/resource_transform_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/runtime.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift linguist-generated=true
@@ -289,6 +290,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderTargetGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceRequestOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceTransformRequestOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeRuntimeOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGeojsonSourceDataOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGlobalsOperations.swift linguist-generated=true

@@ -29,10 +29,14 @@
 #define MLN_PROTOCOL_DECLINABLE_REGISTRATION
 #endif
 #if defined(MLN_PROTOCOL_DECLINABLE_REGISTRATION) || \
-  defined(MLN_PROTOCOL_RECORD_NOTIFICATION)
+  defined(MLN_PROTOCOL_RECORD_NOTIFICATION) ||       \
+  defined(MLN_PROTOCOL_OWNED_ARGUMENT)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
-#if defined(MLN_PROTOCOL_RETAINED_REGISTRATION) && \
+#if (                                            \
+  defined(MLN_PROTOCOL_RETAINED_REGISTRATION) || \
+  defined(MLN_PROTOCOL_OWNED_ARGUMENT)           \
+) &&                                             \
   !defined(MLN_PROTOCOL_MAP_RELEASE)
 #define MLN_PROTOCOL_MAP_CLOSE
 #endif
@@ -448,6 +452,32 @@ mln_status mln_map_observe_sample(
   mln_map map, const mln_sample_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
+#endif
+
+#ifdef MLN_PROTOCOL_OWNED_ARGUMENT
+// A callback that owns a handle it receives, answers through it inline or
+// later, and releases it.
+typedef unsigned long long mln_query
+  BIND("kind=handle;release=mln_query_release;dispose=mln_query_release");
+typedef void (*mln_query_callback)(
+  void* context, const char* text, mln_query query BIND("ownership=owned")
+);
+typedef void (*mln_query_release_context)(void* context);
+typedef struct mln_query_handler {
+  unsigned int size;
+  mln_query_callback callback;
+  void* context BIND("kind=context");
+  mln_query_release_context release;
+} mln_query_handler BIND("kind=callback_registration;release=release");
+BIND("execution=command")
+mln_status mln_map_set_query_handler(
+  mln_map map, const mln_query_handler* handler,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+mln_status mln_query_answer(
+  mln_query query, mln_buffer_view text, mln_diagnostic* out_diagnostic
+);
+void mln_query_release(mln_query query);
 #endif
 
 #ifdef MLN_PROTOCOL_RECORD_NOTIFICATION

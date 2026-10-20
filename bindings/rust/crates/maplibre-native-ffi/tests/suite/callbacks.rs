@@ -203,8 +203,8 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     assert!(calls.load(Ordering::SeqCst) > 0);
 
-    // A transform's error leaves the URL as it was, and the reporter
-    // receives it, since native keeps only a status.
+    // A transform that panics drops its request, which keeps its URL instead
+    // of leaving MapLibre waiting.
     let deny = denying_provider().callback.unwrap();
     wait_for(
         fixture
@@ -217,10 +217,11 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
             })),
     );
     wait_for(
-        fixture.runtime().set_resource_transform(
-            ResourceTransform::default()
-                .with_callback(|_, _, _| Err(Error::invalid_argument("the transform refused"))),
-        ),
+        fixture
+            .runtime()
+            .set_resource_transform(ResourceTransform::new(|_, _, _| {
+                std::panic::resume_unwind(Box::new("the transform panicked"));
+            })),
     );
     fixture
         .map()
@@ -228,6 +229,23 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
         .unwrap();
     // The online source cannot load the untransformed URL.
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
+    wait_for(fixture.runtime().clear_resource_transform());
+
+    // A header transform's error drops its headers, and the reporter receives
+    // it, since native keeps only a status.
+    let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
+    wait_for(fixture.runtime().clear_resource_provider());
+    wait_for(
+        fixture.runtime().set_http_header_transform(
+            HttpHeaderTransform::default()
+                .with_callback(|_, _, _| Err(Error::invalid_argument("the transform refused"))),
+        ),
+    );
+    fixture
+        .map()
+        .set_style_url(&server.url("/style.json"))
+        .unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     set_reporter(None);
     // Other tests may run callbacks concurrently, so only this test's error
     // counts.
@@ -239,10 +257,10 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
             _ => None,
         })
         .collect();
-    assert_eq!(callbacks, ["mln_resource_transform_callback"]);
+    assert_eq!(callbacks, ["mln_http_header_transform_callback"]);
 
     // The runtime keeps working.
-    wait_for(fixture.runtime().clear_resource_transform());
+    wait_for(fixture.runtime().clear_http_header_transform());
     wait_for(fixture.runtime().set_resource_provider(denying_provider()));
     fixture.fence();
 }
@@ -277,6 +295,40 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
     .join()
     .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+}
+
+#[test]
+fn a_transform_hands_its_request_to_another_thread_and_answers_later() {
+    let fixture = Fixture::new();
+    let server = LoopbackServer::start("/rewritten.json", BACKGROUND_STYLE_JSON);
+    let original = server.url("/original.json");
+    let rewritten = server.url("/rewritten.json");
+    let (sender, requests) = mpsc::channel();
+    let sender = Mutex::new(sender);
+    let wanted = original.clone();
+    // The transform applies to native loading, which the fixture's provider
+    // would otherwise take over.
+    wait_for(fixture.runtime().clear_resource_provider());
+    wait_for(
+        fixture
+            .runtime()
+            .set_resource_transform(ResourceTransform::new(move |_, url, request| {
+                if url == wanted {
+                    sender.lock().unwrap().send(request).unwrap();
+                }
+            })),
+    );
+
+    fixture.map().set_style_url(&original).unwrap();
+    let request = requests.recv_timeout(timeout()).unwrap();
+    std::thread::spawn(move || {
+        request.complete(&rewritten).unwrap();
+        request.release().unwrap();
+    })
+    .join()
+    .unwrap();
+    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
+    assert_eq!(server.requests(), ["/rewritten.json"]);
 }
 
 #[test]

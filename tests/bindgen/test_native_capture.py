@@ -125,7 +125,13 @@ DELIVERY_TEST = r"""
 #include <type_traits>
 #include "delivery/capture.hpp"
 static unsigned releases = 0;
+static unsigned transform_releases = 0;
 auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
+  if (kind == mln::core::HandleKind::ResourceTransformRequest) {
+    assert(handle == 11);
+    ++transform_releases;
+    return MLN_STATUS_OK;
+  }
   assert(kind == mln::core::HandleKind::ResourceRequest && handle == 9);
   ++releases;
   return MLN_STATUS_OK;
@@ -167,6 +173,17 @@ int main() {
   static_assert(mln::delivery::element_owns_handles(static_cast<const mln_resource_request_delivery*>(nullptr)));
   static_assert(!mln::delivery::element_owns_handles(static_cast<const mln_log_delivery*>(nullptr)));
   static_assert(std::is_same_v<mln::delivery::Delivered<MLN_DELIVERY_TYPE_LOG_RECORD>::Record, mln_log_delivery>);
+
+  // An owned handle field of a delivered record is released with it.
+  char transformed[] = "custom://tile.pbf";
+  const mln_resource_transform_delivery transform{MLN_RESOURCE_KIND_TILE, transformed, 11};
+  const auto transform_copy = copy(transform, [](auto& arena, const mln_resource_transform_delivery& value) {
+    return mln::delivery::capture_element(arena, value);
+  });
+  std::memset(transformed, 0, sizeof(transformed));
+  assert(std::strcmp(transform_copy.url, "custom://tile.pbf") == 0);
+  mln::delivery::discard_element(transform_copy);
+  assert(transform_releases == 1);
 
   // A request whose byte count names no bytes cannot be copied.
   request.prior_data_size = 1;

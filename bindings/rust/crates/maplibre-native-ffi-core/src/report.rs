@@ -19,7 +19,7 @@ pub enum Report {
     /// the callback's failure value instead.
     CallbackError {
         /// The C callback type that failed, such as
-        /// `mln_resource_transform_callback`.
+        /// `mln_http_header_transform_callback`.
         callback: &'static str,
         /// The error that native could not receive.
         error: Error,

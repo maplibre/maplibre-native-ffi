@@ -101,13 +101,17 @@ def delivery_capture(bound: BoundApi) -> str:
             == "manual"
         ):
             continue
-        _validate_capture_ownership(plan)
+        _validate_capture_ownership(plan, delivered=True)
         decision = callback.decision
-        owned = (
-            [_release_call(decision.handle, f"value.{decision.parameter}")]
-            if decision
-            else []
-        )
+        owned = [
+            _release_call(field.value.handle, f"value.{field.name}")
+            for field in plan.fields
+            if field.value.kind == "handle"
+            and (
+                field.value.ownership == "owned"
+                or (decision and field.name == decision.parameter)
+            )
+        ]
         # Callbacks of the same shape share a record and its overloads.
         if plan.native not in records:
             records.add(plan.native)
@@ -143,12 +147,16 @@ def _element(native: str, plan, releases: list[str]) -> list[str]:
     ]
 
 
-def _validate_capture_ownership(plan, *, nested=False):
+def _validate_capture_ownership(plan, *, nested=False, delivered=False):
+    """A delivered record may own the handles in its own fields, which its
+    discard releases; any deeper owned handle would need recursive disposal."""
     if plan.kind == "handle" and plan.ownership == "owned" and nested:
         raise ModelError(
             [f"{plan.native}: nested owned capture requires recursive disposal"]
         )
     for field in plan.fields:
+        if delivered and field.value.kind == "handle":
+            continue
         _validate_capture_ownership(field.value, nested=True)
     if plan.element is not None:
         _validate_capture_ownership(plan.element, nested=True)
@@ -157,10 +165,6 @@ def _validate_capture_ownership(plan, *, nested=False):
 def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[str]:
     indent = "  " * depth
     if plan.kind in {"scalar", "enum", "handle"}:
-        if plan.kind == "handle" and plan.ownership == "owned" and parent:
-            raise ModelError(
-                [f"{plan.native}: nested owned capture requires recursive disposal"]
-            )
         return []
     if plan.kind == "buffer":
         if plan.buffer_form == "view":

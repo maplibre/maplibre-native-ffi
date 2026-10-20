@@ -16,14 +16,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
   logSetCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = runtimeCreate(runtimeOptionsDefault());
   await runtime.setResourceTransform(
-    ResourceTransform(
-      rules: const [
-        ResourceRewriteRule(
-          url: 'liveness://old',
-          replacementUrl: 'liveness://new',
-        ),
-      ],
-    ),
+    ResourceTransform(callback: (_, _, request) => request.close()),
   );
   await runtime.setResourceProvider(
     ResourceProvider(

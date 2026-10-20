@@ -973,62 +973,6 @@ public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
 }
 
-/// One rule of a native resource transform.
-///
-/// See `mln_resource_rewrite_rule` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceRewriteRule: Equatable, Hashable, Sendable {
-  /// The resource kinds to match.
-  public var kinds: ResourceKindMask
-  /// A bitwise OR of `mln_url_match_flags` values.
-  public var flags: UrlMatchFlags
-  /// The URL or glob pattern to compare.
-  public var url: String
-  /// The replacement URL, or empty to keep the URL and stop the search.
-  public var replacementUrl: String?
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(
-    kinds: ResourceKindMask = ResourceKindMask.all,
-    flags: UrlMatchFlags = .init(rawValue: 0),
-    url: String = "",
-    replacementUrl: String? = nil
-  ) {
-    self.kinds = kinds
-    self.flags = flags
-    self.url = url
-    self.replacementUrl = replacementUrl
-  }
-
-  init(
-    raw: mln_resource_rewrite_rule,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    kinds = ResourceKindMask(rawValue: raw.kinds)
-    flags = UrlMatchFlags(rawValue: raw.flags)
-    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
-    replacementUrl = raw.replacement_url.size == 0 ? nil : try NativeString
-      .copyUTF8(
-        data: raw.replacement_url.data,
-        size: raw.replacement_url.size
-      )
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_resource_rewrite_rule
-  {
-    var raw = mln_resource_rewrite_rule()
-    raw.kinds = kinds.rawValue
-    raw.flags = flags.rawValue
-    raw.url = arena.view(url)
-    raw.replacement_url = replacementUrl
-      .map { arena.view($0) } ?? mln_buffer_view()
-    return raw
-  }
-}
-
 /// One request pattern that a resource provider claims.
 ///
 /// See `mln_resource_route` in the
@@ -1084,26 +1028,23 @@ public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
   public static let volatile: ResourceStoragePolicy = .init(rawValue: 1)
 }
 
-/// Resource transform state: a callback, or native rewrite rules.
+/// Resource transform state.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
-  /// The callback, or null to apply rules.
+  /// Required in callback mode; null in queue mode.
   public var callback: (@Sendable (
     ResourceKind,
     String,
-    ResourceTransformResponse
+    ResourceTransformRequestHandle
   ) throws -> Void)?
-  /// Rewrite rules for a transform without a callback; empty with one.
-  public var rules: [ResourceRewriteRule]
-  public init(
-    callback: (@Sendable (ResourceKind, String,
-                          ResourceTransformResponse) throws -> Void)? = nil,
-    rules: [ResourceRewriteRule] = []
-  ) {
+  public init(callback: (@Sendable (
+    ResourceKind,
+    String,
+    ResourceTransformRequestHandle
+  ) throws -> Void)? = nil) {
     self.callback = callback
-    self.rules = rules
   }
 
   public static var `default`: Self {
@@ -1114,8 +1055,6 @@ public struct ResourceTransform: Sendable {
     var raw = mln_resource_transform()
     raw.size = UInt32(MemoryLayout<mln_resource_transform>.size)
     raw.callback = callback == nil ? nil : invokeResourceTransformCallback
-    raw.rules = try arena.array(rules.map { try $0.nativeValue(arena: arena) })
-    raw.rule_count = try NativeInputArena.count(rules.count)
     if callback != nil {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
@@ -1124,49 +1063,26 @@ public struct ResourceTransform: Sendable {
   }
 }
 
-private let allowedResourceTransformCallback: Set<String> =
-  ["mln_resource_transform_response_set_url"]
 private func invokeResourceTransformCallback(
   user_data: UnsafeMutableRawPointer?,
   kind: UInt32,
   url: UnsafePointer<CChar>?,
-  out_response: UnsafeMutablePointer<mln_resource_transform_response>?
-) -> mln_status {
-  guard let user_data else { return MLN_STATUS_NATIVE_ERROR }
+  request: mln_resource_transform_request
+) {
+  guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<ResourceTransform>>
     .fromOpaque(user_data).takeUnretainedValue()
-  guard let out_response else { return MLN_STATUS_NATIVE_ERROR }
-  let responseOutResponse = ResourceTransformResponse(pointer: out_response)
-  defer { responseOutResponse.expire() }
-  let admission = NativeCallbackGuard.enter(
-    owner: responseOutResponse,
-    operations: allowedResourceTransformCallback
-  )
-  defer { admission.end() }
+  guard let ownedRequest =
+    try? ResourceTransformRequestHandle(adopting: request)
+  else { mln_resource_transform_request_release(request); return }
   do { try box.value.callback?(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
-    responseOutResponse
-  ); return MLN_STATUS_OK } catch { NativeDiagnostics.report(.callbackError(
+    ownedRequest
+  ) } catch { NativeDiagnostics.report(.callbackError(
     callback: "mln_resource_transform_callback",
     error: error
-  )); return MLN_STATUS_NATIVE_ERROR }
-}
-
-public final class ResourceTransformResponse: @unchecked Sendable {
-  private let pointer: UnsafeMutablePointer<mln_resource_transform_response>
-  private let scope = NativeViewScope()
-  init(pointer: UnsafeMutablePointer<mln_resource_transform_response>) {
-    self.pointer = pointer
-  }
-
-  var nativePointer: UnsafeMutablePointer<mln_resource_transform_response> {
-    get throws { try scope.check(); return pointer }
-  }
-
-  func expire() {
-    scope.expire()
-  }
+  )); try? ownedRequest.close() }
 }
 
 public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,

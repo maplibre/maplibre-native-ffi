@@ -6,6 +6,7 @@
 #include "map/map.hpp"
 #include "render/render_session_common.hpp"
 #include "resources/custom_resource_provider.hpp"
+#include "resources/resource_transform.hpp"
 #include "runtime/runtime.hpp"
 
 namespace mln::delivery {
@@ -36,6 +37,9 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         return core::render_session_dispose(handle);
       case core::HandleKind::ResourceRequest:
         core::release_resource_request(handle);
+        return MLN_STATUS_OK;
+      case core::HandleKind::ResourceTransformRequest:
+        core::release_resource_transform_request(handle);
         return MLN_STATUS_OK;
       case core::HandleKind::Runtime:
         return core::dispose_runtime(handle);

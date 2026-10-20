@@ -286,31 +286,76 @@ fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.Reso
     return .pass_through;
 }
 
-const TransformProbe = struct {
+const HeaderProbe = struct {
     calls: std.atomic.Value(usize) = .init(0),
-    saved: ?maplibre.ResourceTransformResponse = null,
+    saved: ?maplibre.HttpHeaderTransformResponse = null,
     other_thread: ?anyerror = null,
 
-    fn setUrlOnThread(response: maplibre.ResourceTransformResponse, result: *?anyerror) void {
-        result.* = if (maplibre.resourceTransformResponseSetUrl(response, "unsupported://elsewhere.json", null)) null else |err| err;
+    fn setHeaderOnThread(response: maplibre.HttpHeaderTransformResponse, result: *?anyerror) void {
+        result.* = if (maplibre.httpHeaderTransformResponseSetHeader(response, "X-Test", "other", null)) null else |err| err;
     }
 
-    fn transform(context: ?*anyopaque, kind: maplibre.ResourceKind, _: []const u8, response: maplibre.ResourceTransformResponse) maplibre.Error!void {
-        const self: *TransformProbe = @ptrCast(@alignCast(context.?));
+    fn transform(context: ?*anyopaque, kind: maplibre.ResourceKind, _: []const u8, response: maplibre.HttpHeaderTransformResponse) maplibre.Error!void {
+        const self: *HeaderProbe = @ptrCast(@alignCast(context.?));
         if (kind != .style or self.calls.load(.acquire) != 0) return;
-        const thread = std.Thread.spawn(.{}, setUrlOnThread, .{ response, &self.other_thread }) catch return error.OutOfMemory;
+        const thread = std.Thread.spawn(.{}, setHeaderOnThread, .{ response, &self.other_thread }) catch return error.OutOfMemory;
         thread.join();
-        try maplibre.resourceTransformResponseSetUrl(response, "unsupported://rewritten.json", null);
+        try maplibre.httpHeaderTransformResponseSetHeader(response, "X-Test", "inside", null);
         self.saved = response;
         _ = self.calls.fetchAdd(1, .release);
     }
 };
 
-// A transform's response object is valid only on the callback's thread while
-// the callback runs. The transform runs in the native network loader, after
-// the provider passes a request through. No loader serves either the original
-// or the rewritten scheme, so the style fails to load without a fetch.
+// A header transform's response object is valid only on the callback's thread
+// while the callback runs. The provider passes the request through to the HTTP
+// client, which runs the header transform before it tries a loopback port
+// that nothing serves, so the style fails to load without leaving the machine.
 test "a scoped response rejects use after its callback and from another thread" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    try fixture.setProvider(.{ .callback = passThrough });
+    var probe = HeaderProbe{};
+    try support.resolve(try maplibre.runtimeSetHttpHeaderTransform(testing.allocator, fixture.runtime, .{ .callback = HeaderProbe.transform, .context = &probe }, null));
+
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "http://127.0.0.1:1/style.json", null));
+    var failed = try fixture.waitForEvent(.map_loading_failed);
+    failed.deinit();
+    try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
+
+    try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.other_thread);
+    var diagnostic: maplibre.Diagnostic = .{};
+    try testing.expectError(error.InvalidState, maplibre.httpHeaderTransformResponseSetHeader(probe.saved.?, "X-Test", "late", &diagnostic));
+    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try support.resolve(try maplibre.runtimeClearHttpHeaderTransform(fixture.runtime, null));
+}
+
+const TransformProbe = struct {
+    saved: ?maplibre.ResourceTransformRequest = null,
+    taken: support.Counter = .{},
+
+    fn transform(context: ?*anyopaque, kind: maplibre.ResourceKind, _: []const u8, request: maplibre.ResourceTransformRequest) maplibre.Error!void {
+        const self: *TransformProbe = @ptrCast(@alignCast(context.?));
+        if (kind != .style or self.saved != null) return maplibre.resourceTransformRequestRelease(request);
+        self.saved = request;
+        self.taken.add();
+    }
+
+    fn answer(request: maplibre.ResourceTransformRequest, result: *?anyerror) void {
+        maplibre.resourceTransformRequestComplete(request, "unsupported://rewritten.json", null) catch |err| {
+            result.* = err;
+            return;
+        };
+        maplibre.resourceTransformRequestRelease(request) catch |err| {
+            result.* = err;
+        };
+    }
+};
+
+// A transform owns the request its callback receives, and another thread
+// answers it after the callback returns. The transform runs in the native
+// network loader, after the provider passes a request through, and no loader
+// serves the rewritten scheme.
+test "a transform request is answered from another thread after its callback" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
@@ -318,14 +363,14 @@ test "a scoped response rejects use after its callback and from another thread" 
     try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .callback = TransformProbe.transform, .context = &probe }, null));
 
     try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "unsupported://original.json", null));
+    try probe.taken.waitFor(1);
+    var answered: ?anyerror = null;
+    const thread = try std.Thread.spawn(.{}, TransformProbe.answer, .{ probe.saved.?, &answered });
+    thread.join();
+    try testing.expectEqual(@as(?anyerror, null), answered);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
-    try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
-
-    try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.other_thread);
-    var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidState, maplibre.resourceTransformResponseSetUrl(probe.saved.?, "unsupported://late.json", &diagnostic));
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try support.resolve(try maplibre.runtimeClearResourceTransform(fixture.runtime, null));
 }
 
 const routed_style_url = "custom://routed/style.json";

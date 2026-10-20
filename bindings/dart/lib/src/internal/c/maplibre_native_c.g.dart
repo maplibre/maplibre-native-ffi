@@ -16,6 +16,7 @@ typedef mln_map_projection = Uint64;
 typedef mln_render_frame_batch = Uint64;
 typedef mln_render_session = Uint64;
 typedef mln_resource_request = Uint64;
+typedef mln_resource_transform_request = Uint64;
 typedef mln_runtime = Uint64;
 
 typedef mln_camera_transition_end_callback =
@@ -77,11 +78,11 @@ typedef mln_resource_request_cancel_callbackFunction =
 typedef mln_resource_transform_callback =
     Pointer<NativeFunction<mln_resource_transform_callbackFunction>>;
 typedef mln_resource_transform_callbackFunction =
-    Int32 Function(
+    Void Function(
       Pointer<Void> user_data,
       Uint32 kind,
       Pointer<Char> url,
-      Pointer<mln_resource_transform_response> out_response,
+      mln_resource_transform_request request,
     );
 typedef mln_runtime_event_callback =
     Pointer<NativeFunction<mln_runtime_event_callbackFunction>>;
@@ -339,6 +340,7 @@ final class mln_delivery_payload extends Union {
   external mln_custom_source_tile_delivery custom_source_fetch_tile;
   external mln_custom_source_tile_delivery custom_source_cancel_tile;
   external mln_runtime_event_delivery runtime_events;
+  external mln_resource_transform_delivery resource_transform;
 }
 
 final class mln_delivery_queue_options extends Struct {
@@ -1094,15 +1096,6 @@ final class mln_resource_response extends Struct {
   external int retry_after_unix_ms;
 }
 
-final class mln_resource_rewrite_rule extends Struct {
-  @Uint32()
-  external int kinds;
-  @Uint32()
-  external int flags;
-  external mln_buffer_view url;
-  external mln_buffer_view replacement_url;
-}
-
 final class mln_resource_route extends Struct {
   @Uint32()
   external int kinds;
@@ -1117,16 +1110,16 @@ final class mln_resource_transform extends Struct {
   external mln_resource_transform_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
-  external Pointer<mln_resource_rewrite_rule> rules;
-  @Size()
-  external int rule_count;
+  @Uint64()
+  external int queue;
 }
 
-final class mln_resource_transform_response extends Struct {
+final class mln_resource_transform_delivery extends Struct {
   @Uint32()
-  external int size;
-  external mln_buffer_view url;
-  external Pointer<Void> context;
+  external int kind;
+  external Pointer<Char> url;
+  @Uint64()
+  external int request;
 }
 
 final class mln_runtime_event extends Struct {
@@ -1664,6 +1657,7 @@ const MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END = 6;
 const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE = 7;
 const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8;
 const MLN_DELIVERY_TYPE_RUNTIME_EVENTS = 9;
+const MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM = 10;
 
 // mln_feature_state_selector_field
 const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
@@ -4374,16 +4368,19 @@ external int mln_resource_request_set_cancel_callback(
 
 @Native<
   Int32 Function(
-    Pointer<mln_resource_transform_response>,
+    mln_resource_transform_request,
     mln_buffer_view,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_resource_transform_response_set_url(
-  Pointer<mln_resource_transform_response> response,
+external int mln_resource_transform_request_complete(
+  int request,
   mln_buffer_view url,
   Pointer<mln_diagnostic> out_diagnostic,
 );
+
+@Native<Void Function(mln_resource_transform_request)>()
+external void mln_resource_transform_request_release(int request);
 
 @Native<
   Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)

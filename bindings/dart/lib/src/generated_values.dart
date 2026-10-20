@@ -4538,42 +4538,20 @@ final class ResourceProvider {
   final List<ResourceRoute> routes;
 }
 
-/// One rule of a native resource transform.
+/// Asks the host for the URL of one network resource request.
 ///
-/// See `mln_resource_rewrite_rule` in the
+/// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRewriteRule extends _Value {
-  const ResourceRewriteRule({
-    this.kinds = ResourceKindMask.all,
-    this.flags = const UrlMatchFlags.fromRawValue(0),
-    required this.url,
-    this.replacementUrl,
-  });
+typedef ResourceTransformCallback =
+    void Function(ResourceKind, String, ResourceTransformRequestHandle);
 
-  /// The resource kinds to match.
-  final ResourceKindMask kinds;
-
-  /// A bitwise OR of `mln_url_match_flags` values.
-  final UrlMatchFlags flags;
-
-  /// The URL or glob pattern to compare.
-  final String url;
-
-  /// The replacement URL, or empty to keep the URL and stop the search.
-  final String? replacementUrl;
-
-  @override
-  List<Object?> get _members => [kinds, flags, url, replacementUrl];
-}
-
-/// Resource transform state: a callback, or native rewrite rules.
+/// Resource transform state.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceTransform {
-  ResourceTransform({List<ResourceRewriteRule> rules = const []})
-    : rules = List.unmodifiable(rules);
+  const ResourceTransform({required this.callback});
 
-  /// Rewrite rules for a transform without a callback; empty with one.
-  final List<ResourceRewriteRule> rules;
+  /// Required in callback mode; null in queue mode.
+  final ResourceTransformCallback callback;
 }

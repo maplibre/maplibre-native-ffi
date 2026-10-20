@@ -194,16 +194,9 @@ auto make_resource_transform(void* platform_context) -> mln::ResourceTransform {
       mln::Resource::Kind kind, const std::string& url,
       mln::ResourceTransform::FinishedCallback finished
     ) -> void {
-      std::string replacement_url;
-      const auto status = invoke_resource_transform(
-        platform_context, resource_kind_to_abi(kind), url.c_str(),
-        replacement_url
+      invoke_resource_transform(
+        platform_context, resource_kind_to_abi(kind), url, std::move(finished)
       );
-      if (status == MLN_STATUS_OK && !replacement_url.empty()) {
-        finished(replacement_url);
-        return;
-      }
-      finished(url);
     }
   };
 }

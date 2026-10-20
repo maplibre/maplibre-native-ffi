@@ -2240,20 +2240,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_resource_rewrite_rule NativeResourceRewriteRule(
-        ResourceRewriteRule value,
-        NativeCallScope scope
-    )
-    {
-        Required(value.Url, "ResourceRewriteRule.Url must not be null.");
-        var native = new mln_resource_rewrite_rule();
-        native.kinds = (uint)value.Kinds;
-        native.flags = (uint)value.Flags;
-        native.url = scope.Utf8(value.Url);
-        native.replacement_url = scope.Utf8(value.ReplacementUrl ?? "");
-        return native;
-    }
-
     internal static mln_resource_route NativeResourceRoute(
         ResourceRoute value,
         NativeCallScope scope
@@ -2267,44 +2253,28 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    private static readonly string[] AllowedResourceTransformCallback =
-    [
-        "mln_resource_transform_response_set_url",
-    ];
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static mln_status InvokeResourceTransformCallback(
+    private static void InvokeResourceTransformCallback(
         void* user_data,
         uint kind,
         sbyte* url,
-        mln_resource_transform_response* out_response
+        MlnResourceTransformRequest request
     )
     {
+        ResourceTransformRequestHandle? ownedRequest = null;
         try
         {
-            var responseOutResponse = new ResourceTransformResponse(out_response);
-            using var restriction = NativeCallbackGuard.Restrict(
-                responseOutResponse,
-                AllowedResourceTransformCallback
+            ownedRequest = ResourceTransformRequestHandle.Adopt(request);
+            ((ResourceTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
+                (ResourceKind)kind,
+                NativeCallScope.CopyCString(url),
+                ownedRequest
             );
-            try
-            {
-                ((ResourceTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                    (ResourceKind)kind,
-                    NativeCallScope.CopyCString(url),
-                    responseOutResponse
-                );
-            }
-            finally
-            {
-                responseOutResponse.Expire();
-            }
-            return mln_status.MLN_STATUS_OK;
         }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_resource_transform_callback", error);
-            return mln_status.MLN_STATUS_NATIVE_ERROR;
+            ownedRequest?.Dispose();
         }
     }
 
@@ -2321,11 +2291,6 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeResourceTransformCallback;
         }
-        native.rules = scope.Array<mln_resource_rewrite_rule, ResourceRewriteRule>(
-            value.RulesStorage.Items,
-            item => NativeResourceRewriteRule(item, scope)
-        );
-        native.rule_count = checked((nuint)value.RulesStorage.Items.Length);
         return native;
     }
 

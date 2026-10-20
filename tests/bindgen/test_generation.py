@@ -28,6 +28,7 @@ PROTOCOL_GAPS = {
     ("values", "dart"): {"mln_probe_nullable_text"},
     ("retained_registration", "dart"): {"mln_map_observe_sample"},
     ("record_notification", "dart"): {"mln_map_request_reading"},
+    ("owned_argument", "dart"): {"mln_map_set_query_handler"},
     ("declinable_registration", "dart"): {"mln_ticket_on_cancel"},
     ("delivery", "dart"): {"mln_ticket_on_cancel"},
     ("values", "kotlin"): {"mln_probe_nullable_text"},

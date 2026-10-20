@@ -271,6 +271,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
         )
     arguments = []
     lines = []
+    owned = []
     decision = callback.decision
     for parameter in callback.arguments:
         if decision and parameter.name == decision.parameter:
@@ -278,6 +279,14 @@ def callback_site(site_name, callback_value, member, root_type, values):
                 f"val decisionOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
             )
             arguments.append("decisionOwner")
+        elif parameter.value.kind == "handle" and parameter.value.ownership == "owned":
+            # The callback owns the handle; a callback that throws releases it.
+            local = identifier(parameter.name) + "Owner"
+            lines.append(
+                f"val {local} = {owner_class(parameter.value.handle)}({identifier(parameter.name)})"
+            )
+            arguments.append(local)
+            owned.append(local)
         else:
             arguments.append(callback_argument(parameter, values))
     invoke = f"value.{member}"
@@ -285,6 +294,9 @@ def callback_site(site_name, callback_value, member, root_type, values):
         lines.insert(0, f"val invoke = {invoke} ?: return@upcall {failure}")
         invoke = "invoke"
     invocation = f"{invoke}({', '.join(arguments)})"
+    if owned:
+        closes = "; ".join(f"{local}.close()" for local in owned)
+        invocation = f"try {{ {invocation} }} catch (failure: Throwable) {{ {closes}; throw failure }}"
     if decision:
         lines.append(
             f'decisionOwner.binding.decide(decisionOwner, "{callback.native}") {{ {invocation}.rawValue }}'

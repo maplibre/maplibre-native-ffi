@@ -678,25 +678,6 @@ typedef struct mln_resource_route {
   mln_buffer_view url;
 } mln_resource_route;
 
-/**
- * One rule of a native resource transform.
- *
- * The first rule whose kind and URL match decides the replacement. A matching
- * rule with an empty replacement_url keeps the URL and stops the search.
- */
-typedef struct mln_resource_rewrite_rule {
-  /** The resource kinds to match. */
-  uint32_t kinds MLN_BINDING(
-    "enum=mln_resource_kind_mask;default=MLN_RESOURCE_KIND_MASK_ALL"
-  );
-  /** A bitwise OR of mln_url_match_flags values. */
-  uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
-  /** The URL or glob pattern to compare. */
-  mln_buffer_view url;
-  /** The replacement URL, or empty to keep the URL and stop the search. */
-  mln_buffer_view replacement_url MLN_BINDING("optional=empty");
-} mln_resource_rewrite_rule;
-
 /** One HTTP header that a header rule supplies. */
 typedef struct mln_http_header {
   mln_buffer_view name;
@@ -726,94 +707,63 @@ typedef struct mln_http_header_rule {
   size_t header_count;
 } mln_http_header_rule;
 
-typedef struct mln_resource_transform_response {
-  uint32_t size;
-  /** Replacement URL, copied on return. Empty keeps the original. */
-  mln_buffer_view url MLN_BINDING("optional=empty");
-  /** C API-managed callback context, which callbacks leave unchanged. */
-  void* context MLN_BINDING("kind=context;lifetime=call");
-} mln_resource_transform_response MLN_BINDING("kind=callback_response");
-
 /**
- * Copies a replacement URL into C API-managed storage for the current callback.
+ * Asks the host for the URL of one network resource request.
  *
- * Use this helper inside mln_resource_transform_callback implementations to set
- * out_response->url from temporary host-language storage. The copied URL stays
- * valid until the current resource transform invocation finishes. Empty input
- * clears the replacement URL.
+ * MapLibre waits for the answer before it schedules the request. The host
+ * answers through request, inline or later from any thread:
+ * mln_resource_transform_request_complete() replaces the URL, and releasing
+ * request without completing it keeps the URL. The callback owns request and
+ * releases it exactly once, after answering or to keep the URL.
  *
- * Returns:
- * - MLN_STATUS_OK when the replacement URL was copied.
- * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
- *   small, url.data is null with a nonzero size, or url contains embedded NUL.
- * - MLN_STATUS_INVALID_STATE when called outside a resource transform callback.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The callback runs on a MapLibre network thread. It must be thread-safe and
+ * return promptly, and must not wait for runtime work. url is borrowed for the
+ * callback. The C API invokes release_user_data after the final callback
+ * returns.
+ *
+ * A transform in queue mode queues a copy as an
+ * mln_resource_transform_delivery instead.
  */
-MLN_API mln_status mln_resource_transform_response_set_url(
-  mln_resource_transform_response* response, mln_buffer_view url,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Rewrites a network resource URL.
- *
- * This callback can only replace the request URL. It cannot mutate headers,
- * bodies, cache policy, or convert a request into an error.
- *
- * Callback invocations follow these rules:
- *
- * - MapLibre may invoke the callback on a runtime, worker, or network thread.
- * - The callback must be thread-safe, return quickly, and must not call C API
- *   functions other than mln_resource_transform_response_set_url().
- * - url and out_response are borrowed for the callback duration.
- * - Use mln_resource_transform_response_set_url() for a replacement URL whose
- *   storage expires before the callback returns.
- * - A non-OK return status is treated as no rewrite and does not fail the
- *   resource request.
- * - The C API invokes release_user_data after the final callback returns.
- */
-MLN_BINDING(
-  "failure=MLN_STATUS_NATIVE_ERROR;"
-  "reentry=protocol;"
-  "reentry_owner=out_response;"
-  "reentry_calls=mln_resource_transform_response_set_url"
-)
-typedef mln_status (*mln_resource_transform_callback)(
+MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM")
+typedef void (*mln_resource_transform_callback)(
   void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
   const char* url,
-  mln_resource_transform_response* out_response MLN_BINDING("direction=out")
+  mln_resource_transform_request request MLN_BINDING("ownership=owned")
 );
 
 /**
- * Resource transform state: a callback, or native rewrite rules.
+ * Resource transform state.
  *
- * The struct itself is borrowed for the registering call, which copies every
- * rule and string before it returns. With a null callback, rules rewrite each
- * request in native code: the first matching rule decides the replacement.
- * A transform requires a callback or at least one rule; clear it through
- * mln_runtime_clear_resource_transform(). A rules transform carries no
- * user_data or release_user_data.
+ * The struct itself is borrowed for the registering call. Exactly one of
+ * callback and queue is set.
  */
 typedef struct mln_resource_transform {
   uint32_t size;
-  /** The callback, or null to apply rules. */
-  mln_resource_transform_callback callback MLN_BINDING("nullable=true");
+  /** Required in callback mode; null in queue mode. */
+  mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data exactly once for each accepted registration,
    * after replacement, clear, or runtime teardown has retired the registration
-   * and every in-flight callback has returned.
+   * and every in-flight callback has returned. Requests the callback already
+   * received keep their handles.
    *
    * It may run on a runtime, worker, network, or closing thread, and never runs
    * for a rejected registration. Another thread may retire an accepted
    * registration before its registration function returns, so the caller
    * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected.
+   * when the registration is rejected. Null in queue mode.
    */
   mln_user_data_release release_user_data;
-  /** Rewrite rules for a transform without a callback; empty with one. */
-  const mln_resource_rewrite_rule* rules MLN_BINDING("length=rule_count");
-  size_t rule_count;
+  /**
+   * Optional. Queue delivery: each request is copied with its handle into an
+   * MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM delivery carrying user_data. A
+   * request the queue refuses keeps its URL. After replacement, clear, or
+   * runtime teardown retires the registration, the queue receives one
+   * MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data, after the
+   * registration's last request.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -1431,20 +1381,17 @@ MLN_API void mln_resource_request_release(
  * keeps user_data valid until a committed replacement or clear command, or
  * until native runtime teardown finishes.
  *
- * A transform without a callback rewrites URLs through its rules in native
- * code, which a host that cannot run code on a MapLibre thread can use.
+ * In queue mode, no host code runs on a MapLibre thread: each request reaches
+ * the transform's queue, and the host answers its handle after draining.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
- *   null, transform->size is too small, neither a callback nor rules are set,
- *   a callback comes with rules, a rules
- *   transform carries user_data or release_user_data, a rule is invalid, or
- *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, or the rule's url is null, its kinds are zero or hold unknown
- *   bits, or its flags hold an unknown bit; the diagnostic names the rule's
- * index.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
+ *   null, transform->size is too small, neither or both of callback and queue
+ *   are set, release_user_data is set in queue mode, queue is an invalid
+ *   handle, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
+ *   runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_BINDING("execution=operation")
@@ -1459,8 +1406,9 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  * The function accepts the change from any thread and orders it with every
  * other command for this runtime. The completion reports the terminal command
  * disposition. The C API invokes the previous transform's release_user_data
- * after every in-flight callback returns. Network resource URLs then pass
- * through unchanged.
+ * after every in-flight callback returns. Later network resource URLs pass
+ * through unchanged; requests the previous transform already received wait
+ * for their answers.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1473,6 +1421,38 @@ MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Answers a resource transform request with a replacement URL.
+ *
+ * Call from any thread, inline in the transform callback or later. The C API
+ * copies url before returning. An answer is one-shot: completion consumes the
+ * answer, and the caller still releases the handle. A request that MapLibre
+ * cancelled while it waited accepts the answer and discards it.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when MapLibre will fetch url.
+ * - MLN_STATUS_INVALID_ARGUMENT when request is an invalid handle, url is
+ *   empty, or url has null data with a nonzero size or contains embedded NUL.
+ * - MLN_STATUS_INVALID_STATE when request has been released or already
+ *   answered.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_resource_transform_request_complete(
+  mln_resource_transform_request request, mln_buffer_view url,
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a resource transform request.
+ *
+ * Release each request exactly once. A request released without an answer
+ * keeps its URL. Passing MLN_HANDLE_NULL is a no-op, as is passing a handle
+ * this call already released.
+ */
+MLN_API void mln_resource_transform_request_release(
+  mln_resource_transform_request request
 ) MLN_NOEXCEPT;
 
 /**

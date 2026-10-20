@@ -1682,17 +1682,24 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.set_cancel_callback(handler)
 
 
-class _ResourceTransformResponseScopeOperations(GeneratedOperations):
-    _native: _native._ResourceTransformResponseScope
+class _ResourceTransformRequestHandleOperations(GeneratedOperations):
+    _native: _native._ResourceTransformRequestHandle
 
-    def set_url(self, url: str) -> None:
-        """Copies a replacement URL into C API-managed storage for the current
-        callback.
+    def complete(self, url: str) -> None:
+        """Answers a resource transform request with a replacement URL.
 
-        See `mln_resource_transform_response_set_url` in the
+        See `mln_resource_transform_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.set_url(url)
+        return self._native.complete(url)
+
+    def close(self) -> None:
+        """Releases a resource transform request.
+
+        See `mln_resource_transform_request_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.close()
 
 
 class _RuntimeHandleOperations(GeneratedOperations):

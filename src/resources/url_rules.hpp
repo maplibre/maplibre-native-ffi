@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,7 +32,7 @@ class CompiledGlob {
   std::vector<Token> tokens_;
 };
 
-// Whether a rule or route with the kinds mask applies to a request of
+// Whether a route or header rule with the kinds mask applies to a request of
 // request_kind.
 [[nodiscard]] constexpr auto matches_kind(
   std::uint32_t kinds, std::uint32_t request_kind
@@ -41,7 +40,7 @@ class CompiledGlob {
   return request_kind < 32U && ((kinds >> request_kind) & 1U) != 0;
 }
 
-// One copied route, rule, or header rule pattern.
+// One copied route or header rule pattern.
 struct UrlPattern {
   UrlPattern(std::uint32_t kinds, std::uint32_t flags, std::string_view url);
   std::uint32_t kinds;
@@ -64,14 +63,6 @@ struct RouteTable {
   ) const noexcept -> bool;
 };
 
-struct RewriteRuleTable {
-  struct Rule {
-    UrlPattern pattern;
-    std::optional<std::string> replacement_url;
-  };
-  std::vector<Rule> rules;
-};
-
 struct HeaderRuleTable {
   struct Rule {
     UrlPattern pattern;
@@ -86,19 +77,12 @@ struct HeaderRuleTable {
 auto copy_routes(
   const mln_resource_route* routes, std::size_t count, RouteTable& out
 ) -> mln_status;
-auto copy_rewrite_rules(
-  const mln_resource_rewrite_rule* rules, std::size_t count,
-  RewriteRuleTable& out
-) -> mln_status;
 auto copy_header_rules(
   const mln_http_header_rule* rules, std::size_t count, HeaderRuleTable& out
 ) -> mln_status;
 
-// The transform callbacks that apply a table, which user_data points to.
-auto rewrite_rules_callback(
-  void* user_data, std::uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
-) -> mln_status;
+// The header transform callback that applies a table, which user_data points
+// to.
 auto header_rules_callback(
   void* user_data, std::uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response

@@ -275,11 +275,10 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
 def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    # The URLs name a loopback port that nothing serves, so the rewritten
-    # request fails without leaving the machine.
-    style = "http://127.0.0.1:0/style.json"
-    rewritten = "http://127.0.0.1:0/rewritten.json"
-    scopes: list[mln.ResourceTransformResponseScope] = []
+    # The URL names a loopback port that nothing serves, so the request fails
+    # after the header transform without leaving the machine.
+    style = "http://127.0.0.1:1/style.json"
+    scopes: list[mln.HttpHeaderTransformResponseScope] = []
     passed_through: list[mln.ResourceRequestHandle] = []
     refusals: list[str] = []
 
@@ -290,14 +289,18 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
             refusals.append(error.diagnostic)
 
     def transform(
-        kind: mln.ResourceKind, url: str, response: mln.ResourceTransformResponseScope
+        kind: mln.ResourceKind,
+        url: str,
+        response: mln.HttpHeaderTransformResponseScope,
     ) -> mln.Status:
+        if url != style:
+            return mln.Status.OK
         worker = threading.Thread(
-            target=refused, args=(lambda: response.set_url(rewritten),)
+            target=refused, args=(lambda: response.set_header("X-Test", "other"),)
         )
         worker.start()
         worker.join(TIMEOUT)
-        response.set_url(rewritten)
+        response.set_header("X-Test", "inside")
         scopes.append(response)
         return mln.Status.OK
 
@@ -309,13 +312,14 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
 
     harness.routes[style] = pass_through
     result(
-        harness.runtime.set_resource_transform(
-            mln.ResourceTransform(callback=transform)
+        harness.runtime.set_http_header_transform(
+            mln.HttpHeaderTransform(callback=transform)
         )
     )
     map_handle.set_style_url(style)
     harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
-    refused(lambda: scopes[0].set_url(rewritten))
+    refused(lambda: scopes[0].set_header("X-Test", "late"))
+    result(harness.runtime.clear_http_header_transform())
 
     assert refusals == [
         "response belongs to its callback thread",
@@ -328,7 +332,49 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         passed_through[0].complete(ok_response())
 
 
-@pytest.mark.global_state
+def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
+    harness: Harness, map_handle: mln.MapHandle
+) -> None:
+    style = "custom://transformed.json"
+    received: list[mln.ResourceTransformRequestHandle] = []
+    taken = threading.Event()
+
+    def transform(
+        kind: mln.ResourceKind, url: str, request: mln.ResourceTransformRequestHandle
+    ) -> None:
+        if url != style:
+            request.close()
+            return
+        received.append(request)
+        taken.set()
+
+    # The provider passes the style through to the online source, which waits
+    # for the transform's answer.
+    harness.routes[style] = lambda request, handle: (
+        mln.ResourceProviderDecision.PASS_THROUGH
+    )
+    result(
+        harness.runtime.set_resource_transform(
+            mln.ResourceTransform(callback=transform)
+        )
+    )
+    map_handle.set_style_url(style)
+    assert taken.wait(TIMEOUT)
+    request = received[0]
+
+    def answer() -> None:
+        request.complete("unsupported://rewritten.json")
+        request.close()
+
+    worker = threading.Thread(target=answer)
+    worker.start()
+    worker.join(TIMEOUT)
+    assert request.closed
+    # The online source cannot load the rewritten scheme.
+    harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
+    result(harness.runtime.clear_resource_transform())
+
+
 def test_replacing_the_log_callback_releases_the_previous_one(
     map_handle: mln.MapHandle,
 ) -> None:
