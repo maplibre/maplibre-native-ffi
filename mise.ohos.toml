@@ -16,6 +16,4 @@ ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
 [hooks]
 # Register the plugin before the first SDK installation resolves it. The root
 # postinstall hook refreshes the same symlink for ordinary installs.
-preinstall = [
-  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
-]
+preinstall = ["mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk"]

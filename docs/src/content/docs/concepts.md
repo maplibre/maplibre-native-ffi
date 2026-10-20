@@ -1,6 +1,7 @@
 ---
 title: Concepts
-description: How runtimes, maps, and render sessions fit into a host application.
+description:
+  How runtimes, maps, and render sessions fit into a host application.
 ---
 
 MapLibre Native FFI provides map state and rendering through a C API and

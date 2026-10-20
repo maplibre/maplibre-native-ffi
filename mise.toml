@@ -74,12 +74,10 @@ dprint_version = "0.63.0"
 emsdk_version = "6.0.12"
 go_version = "1.27.2"
 doc2go_version = "0.12.2"
-gofumpt_version = "0.12.0"
 flutter_version = "3.47.7"
 hk_version = "2.7.0"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
-ktfmt_version = "0.65"
 libxml2_version = "2.13.9"
 node_version = "26.12.0"
 ninja_version = "1.13.2"
@@ -117,7 +115,7 @@ sccache = "{{vars.sccache_version}}"
 
 # SwiftFormat is a standalone repository formatter and does not require the
 # Swift compiler.
-swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
+"github:nicklockwood/SwiftFormat" = { version = "{{vars.swiftformat_version}}", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
@@ -221,9 +219,15 @@ description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
   'case "$usage_preset" in android-*) mise run //:android-sdk-packages --ndk-only ;; esac',
-  { task = "//:build-preset", args = ["{{usage.preset}}"] },
-  { task = "//:check-exports", args = ["{{usage.preset}}"] },
-  { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
+  { task = "//:build-preset", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = "//:check-exports", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = "//:select-clangd-preset", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.build-preset]
@@ -258,7 +262,9 @@ outputs = { auto = true }
 # test-graphics component, also left out of the package, holds the GPU fixtures
 # that binding suites load.
 run = [
-  { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
+  { task = "//:check-cross-sdk", args = [
+    "{{usage.preset}}",
+  ] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
@@ -324,9 +330,13 @@ run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
 description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
 run = [
-  { task = "//:check-exports", args = ["{{usage.preset}}"] },
+  { task = "//:check-exports", args = [
+    "{{usage.preset}}",
+  ] },
   'cpack --preset "$usage_preset"',
-  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+  { task = "//:verify-native-package", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.test]
@@ -465,27 +475,25 @@ description = "Stop the OpenHarmony emulator started by mise."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",
 ] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
-mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install
 hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",
 ] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
-mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install
 hk fix --all
 '''

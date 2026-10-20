@@ -71,10 +71,10 @@ keep those verbs.
 Each declaration follows these rules, which every binding relies on:
 
 - Declare each function as `MLN_API <type> <name>(...) MLN_NOEXCEPT`.
-- A fallible function returns `mln_status` and takes `mln_diagnostic*
-  out_diagnostic` as its last parameter, except a callback implementation, which
-  matches its callback typedef. The handle comment in `base.h` defines the
-  status for an invalid or released handle.
+- A fallible function returns `mln_status` and takes
+  `mln_diagnostic* out_diagnostic` as its last parameter, except a callback
+  implementation, which matches its callback typedef. The handle comment in
+  `base.h` defines the status for an invalid or released handle.
 - A new or changed function lists every status that it returns under `Returns:`
   in its comment. An asynchronous function also lists its completion outcomes
   under `Completes with:`.
@@ -113,6 +113,7 @@ Each declaration follows these rules, which every binding relies on:
   array that one of those records borrows reaches its elements the same way: a
   binding indexes an array without a stride by its own size, so those elements
   are frozen like an embedded struct.
+
 - An input struct whose defaults are not all zero has a `mln_<struct>_default()`
   function. It returns the struct with size set and every member at its default.
   A binding starts each record from that function, or from zero with size set

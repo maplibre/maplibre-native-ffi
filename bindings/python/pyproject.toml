@@ -22,12 +22,8 @@ dev = [
   "maturin>=1.15.0,<2 ; sys_platform == 'linux'",
   "pytest>=9,<10",
 ]
-docs = [
-  "pdoc>=16,<17",
-]
-android = [
-  "cibuildwheel>=4.3.1,<5",
-]
+docs = ["pdoc>=16,<17"]
+android = ["cibuildwheel>=4.3.1,<5"]
 
 [tool.maturin]
 module-name = "maplibre_native_ffi._native"

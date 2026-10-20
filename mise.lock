@@ -525,35 +525,6 @@ checksum = "sha256:bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac
 url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip"
 url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605998125"
 
-[[tools."aqua:Kotlin/ktfmt"]]
-version = "0.65"
-backend = "aqua:Kotlin/ktfmt"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.linux-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.linux-x64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.macos-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.windows-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.windows-x64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
 [[tools."aqua:astral-sh/uv"]]
 version = "0.13.1"
 backend = "aqua:astral-sh/uv"
@@ -679,35 +650,6 @@ url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/2790
 checksum = "sha256:8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e"
 url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip"
 url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056944"
-
-[[tools."aqua:mvdan/gofumpt"]]
-version = "0.12.0"
-backend = "aqua:mvdan/gofumpt"
-
-[tools."aqua:mvdan/gofumpt"."platforms.linux-arm64"]
-checksum = "sha256:4322f081241ab0618356aa5921a8c110e4c7acfc17175cc15dc57b2f4a4b652d"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_linux_arm64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473501"
-
-[tools."aqua:mvdan/gofumpt"."platforms.linux-x64"]
-checksum = "sha256:3bc4fcad497439918f5f56d4987de4709a99da0a355e6bec13a7278532b01d38"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_linux_amd64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473521"
-
-[tools."aqua:mvdan/gofumpt"."platforms.macos-arm64"]
-checksum = "sha256:1a3e325b956ed12c21031d9e13382bd51a4fabb57de8d40428819b9583c3cfb9"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_darwin_arm64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473536"
-
-[tools."aqua:mvdan/gofumpt"."platforms.windows-arm64"]
-checksum = "sha256:66bd679908b64864fc85417e7ea01148774b477364b9a02ab1c194333a55c997"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_windows_amd64.exe"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473475"
-
-[tools."aqua:mvdan/gofumpt"."platforms.windows-x64"]
-checksum = "sha256:66bd679908b64864fc85417e7ea01148774b477364b9a02ab1c194333a55c997"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_windows_amd64.exe"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473475"
 
 [[tools."aqua:pnpm/pnpm"]]
 version = "12.14.0"
@@ -1132,6 +1074,38 @@ checksum = "sha256:0c395ccfbdbfaf7f0f6459729284c30fb18391a9e7a95c2b64573fd2edd1c
 url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-windows-amd64.tar.gz"
 url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584158"
 
+[[tools."github:nicklockwood/SwiftFormat"]]
+version = "0.64.0"
+backend = "github:nicklockwood/SwiftFormat"
+
+[tools."github:nicklockwood/SwiftFormat".options]
+no_app = "true"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.linux-arm64"]
+checksum = "sha256:6b53c985b3849be0c9544bf93a378c12aaa761a7225f05f0b9948f827dd7db52"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux_aarch64.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824031"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.linux-x64"]
+checksum = "sha256:599eb5d2d8cf43e1128e79cd72f3bc2fec1b3189c3ac7593fbe732f2568fed36"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824032"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.macos-arm64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.windows-arm64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
+[tools."github:nicklockwood/SwiftFormat"."platforms.windows-x64"]
+checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
+
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
 backend = "github:sargunv/jvl"
@@ -1378,38 +1352,6 @@ url = "https://download.swift.org/swift-6.4.1-release/windows10-arm64/swift-6.4.
 
 [tools.swift."platforms.windows-x64"]
 url = "https://download.swift.org/swift-6.4.1-release/windows10/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-windows10.exe"
-
-[[tools.swiftformat]]
-version = "0.64.0"
-backend = "github:nicklockwood/SwiftFormat"
-
-[tools.swiftformat.options]
-no_app = "true"
-
-[tools.swiftformat."platforms.linux-arm64"]
-checksum = "sha256:6b53c985b3849be0c9544bf93a378c12aaa761a7225f05f0b9948f827dd7db52"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux_aarch64.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824031"
-
-[tools.swiftformat."platforms.linux-x64"]
-checksum = "sha256:599eb5d2d8cf43e1128e79cd72f3bc2fec1b3189c3ac7593fbe732f2568fed36"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat_linux.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824032"
-
-[tools.swiftformat."platforms.macos-arm64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
-
-[tools.swiftformat."platforms.windows-arm64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
-
-[tools.swiftformat."platforms.windows-x64"]
-checksum = "sha256:95ea62625d0b898a7af870293311ae6f09e4a3147ecd900593687e4b9ab2fd98"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.64.0/swiftformat.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/648824039"
 
 [[tools.zig]]
 version = "0.17.0"

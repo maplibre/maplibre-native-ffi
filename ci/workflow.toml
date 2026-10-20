@@ -21,11 +21,17 @@ ready = [
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
-  { task = "//bindings/rust:test", exclude = ["linux-gnu-x64-vulkan"] },
-  { task = "//bindings/rust:test", args = ["release"], include = [
+  { task = "//bindings/rust:test", exclude = [
     "linux-gnu-x64-vulkan",
   ] },
-  { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
+  { task = "//bindings/rust:test", args = [
+    "release",
+  ], include = [
+    "linux-gnu-x64-vulkan",
+  ] },
+  { task = "//examples/rust-map:check", exclude = [
+    "macos-arm64-egl",
+  ] },
   { task = "//examples/rust-map:smoke", exclude = [
     "macos-arm64-egl",
   ], display = true },
@@ -97,11 +103,17 @@ environments = [
 [[suites]]
 platforms = ["linux-gnu", "macos"]
 commands = [
-  { task = "//bindings/swift:test", exclude = ["linux-gnu-x64-vulkan"] },
-  { task = "//bindings/swift:test", args = ["release"], include = [
+  { task = "//bindings/swift:test", exclude = [
     "linux-gnu-x64-vulkan",
   ] },
-  { task = "//examples/swift-map:smoke", include = ["macos-arm64-metal"] },
+  { task = "//bindings/swift:test", args = [
+    "release",
+  ], include = [
+    "linux-gnu-x64-vulkan",
+  ] },
+  { task = "//examples/swift-map:smoke", include = [
+    "macos-arm64-metal",
+  ] },
 ]
 
 [[suites]]

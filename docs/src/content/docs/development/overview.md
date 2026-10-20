@@ -1,6 +1,7 @@
 ---
 title: Overview
-description: Set up a development environment, build any target, and run CI and coverage.
+description:
+  Set up a development environment, build any target, and run CI and coverage.
 sidebar:
   order: 1
 ---
@@ -97,9 +98,9 @@ export MISE_ENV=android,ohos
 ```
 
 Android native builds install the pinned NDK into the selected SDK when it is
-missing. To prepare the SDK before you run Gradle or CMake directly, run `mise
-run android-sdk-packages`. Pass `--ndk-only` for native compilation alone, or
-`--sdk-root <path>` to provision a specific SDK. The package versions are
+missing. To prepare the SDK before you run Gradle or CMake directly, run
+`mise run android-sdk-packages`. Pass `--ndk-only` for native compilation alone,
+or `--sdk-root <path>` to provision a specific SDK. The package versions are
 variables in `mise.toml`, and a Git-ignored `mise.local.toml` overrides them.
 After an NDK change, run `mise run clean <preset>` for each Android preset that
 you built, because CMake caches the compiler path.
@@ -126,11 +127,11 @@ boot takes an hour or more.
 Native builds use [`sccache`](https://github.com/mozilla/sccache), which
 `mise.toml` sets as the CMake compiler launcher.
 
-Locally, every checkout of the repository shares one disk cache. `mise run
-build` lists each Git worktree in `SCCACHE_BASEDIRS`, so a new worktree reuses
-what its siblings compiled. The build turns off sccache's preprocessor cache
-mode, because its hits restore depfiles that name another worktree's headers,
-and Ninja then misses header edits in the current one.
+Locally, every checkout of the repository shares one disk cache.
+`mise run build` lists each Git worktree in `SCCACHE_BASEDIRS`, so a new
+worktree reuses what its siblings compiled. The build turns off sccache's
+preprocessor cache mode, because its hits restore depfiles that name another
+worktree's headers, and Ninja then misses header edits in the current one.
 
 CI uses an R2 backend that `.github/actions/setup-ci-deps` configures. Push runs
 write to it, and pull request runs read it through the public endpoint.

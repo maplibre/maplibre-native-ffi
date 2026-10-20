@@ -155,50 +155,11 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         return [str(staging / path) for path in outputs if path.endswith(suffixes)]
 
     for path in outputs:
-        if not path.endswith((".h", ".inc", ".c")):
+        if not path.endswith((".h", ".inc", ".c", ".go", ".cs", ".kt")):
             continue
         target = staging / path
-        extension = "cpp" if target.suffix == ".inc" else "h"
+        extension = "cpp" if target.suffix == ".inc" else target.suffix[1:]
         target.write_text(dprint_format(target.read_text(), extension))
-    run_tool(
-        "gofumpt",
-        "-w",
-        str(staging / "bindings/go/generated_api.go"),
-        cwd=ROOT / "bindings/go",
-    )
-    if csharp := staged(".cs"):
-        csharp_ignore = staging / "csharpier.ignore"
-        csharp_ignore.write_text("")
-        dotnet = ROOT / "bindings/dotnet"
-        run_tool(
-            "dotnet",
-            "tool",
-            "restore",
-            "--tool-manifest",
-            str(ROOT / ".config/dotnet-tools.json"),
-            "--verbosity",
-            "quiet",
-            cwd=dotnet,
-            quiet=True,
-        )
-        run_tool(
-            "python",
-            "-c",
-            "import os, sys; os.chdir(sys.argv[1]); os.execvp(sys.argv[2], sys.argv[2:])",
-            str(ROOT),
-            "dotnet",
-            "tool",
-            "run",
-            "csharpier",
-            "format",
-            "--include-generated",
-            "--no-cache",
-            "--ignore-path",
-            str(csharp_ignore),
-            *csharp,
-            cwd=dotnet,
-            quiet=True,
-        )
     run_tool("rustfmt", "--edition", "2024", *staged(".rs"))
     python_files = staged(".py", ".pyi")
     run_tool(
@@ -223,16 +184,6 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         f"--language-version={dart_language_version()}",
         *staged(".dart"),
         cwd=ROOT / "bindings/dart",
-        quiet=True,
-    )
-    run_tool(
-        "env",
-        "MLN_FFI_DPRINT_SCOPED_TOOLS=1",
-        "bash",
-        str(ROOT / ".mise/bin/dprint-ktfmt"),
-        "--google-style",
-        *staged(".kt"),
-        cwd=ROOT / "bindings/kotlin",
         quiet=True,
     )
     run_tool("zig", "fmt", *staged(".zig"), cwd=ROOT / "bindings/zig", quiet=True)

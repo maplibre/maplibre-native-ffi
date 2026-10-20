@@ -631,8 +631,12 @@
         "mln_resource_transform_response_set_url": "mln_resource_transform_callback is answered by native rules in mln_resource_transform"
       },
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -936,8 +940,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -1241,8 +1249,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -1546,8 +1558,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -1811,34 +1827,60 @@
         "mln_supported_render_backend_mask"
       ],
       "support": {
-        "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" },
-        "mln_animation_options_default": { "default": "mln_animation_options" },
-        "mln_bound_options_default": { "default": "mln_bound_options" },
-        "mln_camera_delta_default": { "default": "mln_camera_delta" },
+        "mln_acquired_frame_dispose": {
+          "dispose": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_animation_options_default": {
+          "default": "mln_animation_options"
+        },
+        "mln_bound_options_default": {
+          "default": "mln_bound_options"
+        },
+        "mln_camera_delta_default": {
+          "default": "mln_camera_delta"
+        },
         "mln_camera_fit_options_default": {
           "default": "mln_camera_fit_options"
         },
-        "mln_camera_options_default": { "default": "mln_camera_options" },
-        "mln_camera_update_default": { "default": "mln_camera_update" },
+        "mln_camera_options_default": {
+          "default": "mln_camera_options"
+        },
+        "mln_camera_update_default": {
+          "default": "mln_camera_update"
+        },
         "mln_custom_geometry_source_options_default": {
           "default": "mln_custom_geometry_source_options"
         },
         "mln_custom_mvt_vector_source_options_default": {
           "default": "mln_custom_mvt_vector_source_options"
         },
-        "mln_frame_demand_default": { "default": "mln_frame_demand" },
+        "mln_frame_demand_default": {
+          "default": "mln_frame_demand"
+        },
         "mln_free_camera_options_default": {
           "default": "mln_free_camera_options"
         },
         "mln_geojson_source_options_default": {
           "default": "mln_geojson_source_options"
         },
-        "mln_gpu_sync_default": { "default": "mln_gpu_sync" },
-        "mln_map_dispose": { "dispose": "mln_map" },
-        "mln_map_options_default": { "default": "mln_map_options" },
-        "mln_map_tile_options_default": { "default": "mln_map_tile_options" },
+        "mln_gpu_sync_default": {
+          "default": "mln_gpu_sync"
+        },
+        "mln_map_dispose": {
+          "dispose": "mln_map"
+        },
+        "mln_map_options_default": {
+          "default": "mln_map_options"
+        },
+        "mln_map_tile_options_default": {
+          "default": "mln_map_tile_options"
+        },
         "mln_map_viewport_options_default": {
           "default": "mln_map_viewport_options"
         },
@@ -1863,16 +1905,24 @@
         "mln_premultiplied_rgba8_image_default": {
           "default": "mln_premultiplied_rgba8_image"
         },
-        "mln_projection_mode_default": { "default": "mln_projection_mode" },
+        "mln_projection_mode_default": {
+          "default": "mln_projection_mode"
+        },
         "mln_render_session_attach_options_default": {
           "default": "mln_render_session_attach_options"
         },
-        "mln_render_session_dispose": { "dispose": "mln_render_session" },
+        "mln_render_session_dispose": {
+          "dispose": "mln_render_session"
+        },
         "mln_rendered_feature_query_options_default": {
           "default": "mln_rendered_feature_query_options"
         },
-        "mln_runtime_dispose": { "dispose": "mln_runtime" },
-        "mln_runtime_options_default": { "default": "mln_runtime_options" },
+        "mln_runtime_dispose": {
+          "dispose": "mln_runtime"
+        },
+        "mln_runtime_options_default": {
+          "default": "mln_runtime_options"
+        },
         "mln_source_feature_query_options_default": {
           "default": "mln_source_feature_query_options"
         },
@@ -2206,8 +2256,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -2511,8 +2565,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     },
@@ -2816,8 +2874,12 @@
         "mln_webgpu_surface_descriptor_default"
       ],
       "support": {
-        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+        "mln_acquired_frame_view_begin": {
+          "view": "mln_acquired_frame"
+        },
+        "mln_acquired_frame_view_end": {
+          "view": "mln_acquired_frame"
+        }
       },
       "unsupported": {}
     }
@@ -2844,38 +2906,78 @@
     "resolved_callbacks": 11,
     "resolved_operations": 235,
     "support_relations": {
-      "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
-      "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
-      "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" },
-      "mln_animation_options_default": { "default": "mln_animation_options" },
-      "mln_bound_options_default": { "default": "mln_bound_options" },
-      "mln_camera_delta_default": { "default": "mln_camera_delta" },
-      "mln_camera_fit_options_default": { "default": "mln_camera_fit_options" },
-      "mln_camera_options_default": { "default": "mln_camera_options" },
-      "mln_camera_update_default": { "default": "mln_camera_update" },
+      "mln_acquired_frame_dispose": {
+        "dispose": "mln_acquired_frame"
+      },
+      "mln_acquired_frame_view_begin": {
+        "view": "mln_acquired_frame"
+      },
+      "mln_acquired_frame_view_end": {
+        "view": "mln_acquired_frame"
+      },
+      "mln_animation_options_default": {
+        "default": "mln_animation_options"
+      },
+      "mln_bound_options_default": {
+        "default": "mln_bound_options"
+      },
+      "mln_camera_delta_default": {
+        "default": "mln_camera_delta"
+      },
+      "mln_camera_fit_options_default": {
+        "default": "mln_camera_fit_options"
+      },
+      "mln_camera_options_default": {
+        "default": "mln_camera_options"
+      },
+      "mln_camera_update_default": {
+        "default": "mln_camera_update"
+      },
       "mln_custom_geometry_source_options_default": {
         "default": "mln_custom_geometry_source_options"
       },
       "mln_custom_mvt_vector_source_options_default": {
         "default": "mln_custom_mvt_vector_source_options"
       },
-      "mln_delivery_batch_get": { "delivery": "runtime delivery protocol" },
-      "mln_delivery_batch_release": { "delivery": "runtime delivery protocol" },
-      "mln_delivery_batch_take": { "delivery": "runtime delivery protocol" },
-      "mln_delivery_queue_create": { "delivery": "runtime delivery protocol" },
-      "mln_delivery_queue_drain": { "delivery": "runtime delivery protocol" },
-      "mln_delivery_queue_release": { "delivery": "runtime delivery protocol" },
-      "mln_frame_demand_default": { "default": "mln_frame_demand" },
+      "mln_delivery_batch_get": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_delivery_batch_release": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_delivery_batch_take": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_delivery_queue_create": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_delivery_queue_drain": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_delivery_queue_release": {
+        "delivery": "runtime delivery protocol"
+      },
+      "mln_frame_demand_default": {
+        "default": "mln_frame_demand"
+      },
       "mln_free_camera_options_default": {
         "default": "mln_free_camera_options"
       },
       "mln_geojson_source_options_default": {
         "default": "mln_geojson_source_options"
       },
-      "mln_gpu_sync_default": { "default": "mln_gpu_sync" },
-      "mln_map_dispose": { "dispose": "mln_map" },
-      "mln_map_options_default": { "default": "mln_map_options" },
-      "mln_map_tile_options_default": { "default": "mln_map_tile_options" },
+      "mln_gpu_sync_default": {
+        "default": "mln_gpu_sync"
+      },
+      "mln_map_dispose": {
+        "dispose": "mln_map"
+      },
+      "mln_map_options_default": {
+        "default": "mln_map_options"
+      },
+      "mln_map_tile_options_default": {
+        "default": "mln_map_tile_options"
+      },
       "mln_map_viewport_options_default": {
         "default": "mln_map_viewport_options"
       },
@@ -2900,16 +3002,24 @@
       "mln_premultiplied_rgba8_image_default": {
         "default": "mln_premultiplied_rgba8_image"
       },
-      "mln_projection_mode_default": { "default": "mln_projection_mode" },
+      "mln_projection_mode_default": {
+        "default": "mln_projection_mode"
+      },
       "mln_render_session_attach_options_default": {
         "default": "mln_render_session_attach_options"
       },
-      "mln_render_session_dispose": { "dispose": "mln_render_session" },
+      "mln_render_session_dispose": {
+        "dispose": "mln_render_session"
+      },
       "mln_rendered_feature_query_options_default": {
         "default": "mln_rendered_feature_query_options"
       },
-      "mln_runtime_dispose": { "dispose": "mln_runtime" },
-      "mln_runtime_options_default": { "default": "mln_runtime_options" },
+      "mln_runtime_dispose": {
+        "dispose": "mln_runtime"
+      },
+      "mln_runtime_options_default": {
+        "default": "mln_runtime_options"
+      },
       "mln_source_feature_query_options_default": {
         "default": "mln_source_feature_query_options"
       },
