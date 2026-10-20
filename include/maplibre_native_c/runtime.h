@@ -1427,12 +1427,12 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  * Answers a resource transform request with a replacement URL.
  *
  * Call from any thread, inline in the transform callback or later. The C API
- * copies url before returning. An answer is one-shot: completion consumes the
- * answer, and the caller still releases the handle. A request that MapLibre
- * cancelled while it waited accepts the answer and discards it.
+ * copies url before returning. A request takes one answer, and the caller still
+ * releases it afterward. A request that MapLibre cancelled while it waited
+ * accepts the answer and discards it.
  *
  * Returns:
- * - MLN_STATUS_OK when MapLibre will fetch url.
+ * - MLN_STATUS_OK when the answer was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when request is an invalid handle, url is
  *   empty, or url has null data with a nonzero size or contains embedded NUL.
  * - MLN_STATUS_INVALID_STATE when request has been released or already

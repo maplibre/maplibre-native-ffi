@@ -614,6 +614,23 @@ class NativeShims:
             upcall = f"&mln_jni_upcalls[{index}]"
             if result is None:
                 body = f"mln_jni_upcall_void({upcall}, {array});"
+                callback = self.bound.callbacks.get(site.callback)
+                releases = (
+                    [
+                        f"{parameter.value.handle.release}({identifier(parameter.name)});"
+                        for parameter in callback.arguments
+                        if parameter.value.kind == "handle"
+                        and parameter.value.ownership == "owned"
+                    ]
+                    if callback
+                    else []
+                )
+                if releases:
+                    body = (
+                        f"if (!mln_jni_upcall_void({upcall}, {array})) {{\n"
+                        + "".join(f"    {release}\n" for release in releases)
+                        + "  }"
+                    )
                 c_result = "void"
             else:
                 width = "long" if site.result_carrier == "Long" else "int"

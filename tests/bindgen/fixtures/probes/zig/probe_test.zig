@@ -68,3 +68,47 @@ test "generated absence returns null and other failures still report" {
     try std.testing.expect(try api.probeReadLevel(null) == null);
     try std.testing.expectEqual(@as(?f64, 0.5), try api.probeReadLevel(null));
 }
+
+const callbacks = @import("callback.zig");
+var released_query: u64 = 0;
+
+export fn mln_query_release(query: u64) void {
+    released_query = query;
+}
+
+const QueryProbe = struct {
+    calls: usize = 0,
+    fail: bool = false,
+    saved: ?api.Query = null,
+
+    fn receive(context: ?*anyopaque, _: []const u8, query: api.Query) api.Error!void {
+        const self: *QueryProbe = @ptrCast(@alignCast(context.?));
+        self.calls += 1;
+        if (self.fail) return error.NativeError;
+        self.saved = query;
+    }
+};
+
+test "generated owned callback arguments are released on conversion and host errors" {
+    var roots: callbacks.Roots = .{};
+    defer roots.deinit();
+    var probe = QueryProbe{};
+    const handler = api.QueryHandler{ .callback = QueryProbe.receive, .context = &probe };
+    const raw = try handler.toNative(std.testing.allocator, &roots);
+    released_query = 0;
+    raw.callback.?(raw.context, null, 41);
+    try std.testing.expectEqual(@as(u64, 41), released_query);
+    try std.testing.expectEqual(@as(usize, 0), probe.calls);
+
+    probe.fail = true;
+    raw.callback.?(raw.context, "query", 42);
+    try std.testing.expectEqual(@as(u64, 42), released_query);
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+
+    probe.fail = false;
+    raw.callback.?(raw.context, "query", 43);
+    try std.testing.expectEqual(@as(usize, 2), probe.calls);
+    try std.testing.expectEqual(@as(u64, 42), released_query);
+    try api.queryRelease(probe.saved.?);
+    try std.testing.expectEqual(@as(u64, 43), released_query);
+}

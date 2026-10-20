@@ -1,5 +1,6 @@
 """The Kotlin emitter's layouts and native shims, checked by the C compiler."""
 
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -123,6 +124,69 @@ class KotlinLayoutTests(unittest.TestCase):
                     home / "include",
                     machine,
                 )
+
+    def test_failed_jni_upcall_releases_owned_arguments(self):
+        java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)
+        home = java.resolve().parents[1]
+        machine = next((home / "include").glob("*/jni_md.h")).parent
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "upcall.c"
+            source.write_text(kotlin.generate(real_api())[kotlin.JNI] + UPCALL_TEST)
+            executable = root / "upcall"
+            require_tool(self, "clang").run(
+                self,
+                "-std=c2x",
+                "-DMLN_STATIC",
+                "-ffunction-sections",
+                "-fdata-sections",
+                (
+                    "-Wl,-dead_strip"
+                    if sys.platform == "darwin"
+                    else "-Wl,/OPT:REF"
+                    if sys.platform == "win32"
+                    else "-Wl,--gc-sections"
+                ),
+                f"-I{ROOT / 'include'}",
+                f"-I{NATIVE_INCLUDE}",
+                f"-I{ROOT / 'bindings/kotlin/src/androidMain/jni'}",
+                f"-I{home / 'include'}",
+                f"-I{machine}",
+                str(source),
+                "-o",
+                str(executable),
+                cwd=root,
+            )
+            run(self, [str(executable)], root)
+
+
+UPCALL_TEST = r"""
+#include <assert.h>
+static bool upcall_succeeds;
+static unsigned calls;
+static mln_resource_transform_request released;
+
+bool mln_jni_upcall_void(mln_jni_upcall* upcall, const jvalue* arguments) {
+  (void)upcall;
+  assert(arguments[3].j == 41);
+  ++calls;
+  return upcall_succeeds;
+}
+
+void mln_resource_transform_request_release(mln_resource_transform_request request) {
+  assert(released == 0);
+  released = request;
+}
+
+int main(void) {
+  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, "custom://style.json", 41);
+  assert(calls == 1 && released == 41);
+  upcall_succeeds = true;
+  released = 0;
+  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, "custom://style.json", 41);
+  assert(calls == 2 && released == 0);
+}
+"""
 
 
 if __name__ == "__main__":

@@ -67,6 +67,7 @@ def parts(values, value):
         )
         converted = []
         owned = []
+        transfer = ""
         for parameter in parameters:
             raw = names[parameter.name]
             if plan.decision and parameter.name == plan.decision.parameter:
@@ -75,11 +76,13 @@ def parts(values, value):
                 parameter.value.kind == "handle"
                 and parameter.value.ownership == "owned"
             ):
-                # The callback owns the handle; adoption disposes it on failure,
-                # and a host error releases it.
+                # Keep the handle until the host accepts ownership.
                 adopted = "owned_" + parameter.name
+                transfer = "ownership_transferred = true; "
+                release = camel(parameter.value.handle.release.removeprefix("mln_"))
                 owned.append(
                     f"const {adopted} = try {values.public(parameter.value)}.adopt({raw}, null); "
+                    f"defer if (!ownership_transferred) {{ {release}({adopted}) catch {{}}; }}; "
                 )
                 converted.append(adopted)
             elif (
@@ -114,19 +117,12 @@ def parts(values, value):
         )
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
         report = f'callback.reportError("{plan.native}", err);'
-        release = "".join(
-            f"{camel(p.value.handle.release.removeprefix('mln_'))}(owned_{p.name}) catch {{}}; "
-            for p in parameters
-            if p.value.kind == "handle"
-            and p.value.ownership == "owned"
-            and not (plan.decision and p.name == plan.decision.parameter)
-        )
         if plan.result.ctype.kind == "void":
-            action = f"{call} catch |err| {{ {report} {release}return; }};"
+            action = f"try {call}; {transfer}"
         elif plan.status:
-            action = f"{call} catch |err| {{ {report} return status.rawStatus(err); }}; return c.MLN_STATUS_OK;"
+            action = f"{call} catch |err| {{ {report} return status.rawStatus(err); }}; {transfer}return c.MLN_STATUS_OK;"
         else:
-            action = f"const result = {call} catch |err| {{ {report} {fallback} }}; return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
+            action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
         decision_setup = ""
         if plan.decision:
             decision = plan.decision
@@ -135,8 +131,9 @@ def parts(values, value):
                 next(p.value for p in plan.parameters if p.name == decision.parameter)
             )
             decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
-            action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
-        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {''.join(owned)}"
+            action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; {transfer}return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
+        ownership_setup = "var ownership_transferred = false; " if owned else ""
+        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
         body += action + " }"

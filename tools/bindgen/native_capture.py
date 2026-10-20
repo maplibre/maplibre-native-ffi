@@ -102,15 +102,10 @@ def delivery_capture(bound: BoundApi) -> str:
         ):
             continue
         _validate_capture_ownership(plan, delivered=True)
-        decision = callback.decision
         owned = [
             _release_call(field.value.handle, f"value.{field.name}")
             for field in plan.fields
-            if field.value.kind == "handle"
-            and (
-                field.value.ownership == "owned"
-                or (decision and field.name == decision.parameter)
-            )
+            if field.value.kind == "handle" and field.value.ownership == "owned"
         ]
         # Callbacks of the same shape share a record and its overloads.
         if plan.native not in records:

@@ -27,6 +27,7 @@ class Site:
     body: str
     failure: str = "0"
     allowed: str | None = None
+    callback: str | None = None
 
 
 def status_callback(callback):
@@ -323,6 +324,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
         body,
         failure,
         None if allowed_value == "null" else allowed_value,
+        callback.native,
     )
     return site_name
 

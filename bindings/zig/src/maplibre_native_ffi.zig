@@ -527,10 +527,7 @@ pub const CameraTransitionHandler = struct {
                 const host = state.value.callback orelse {
                     return;
                 };
-                host(state.value.context, CameraTransitionEnd.fromNative((callback_arg_1 orelse return error.NativeError).*)) catch |err| {
-                    callback.reportError("mln_camera_transition_end_callback", err);
-                    return;
-                };
+                try host(state.value.context, CameraTransitionEnd.fromNative((callback_arg_1 orelse return error.NativeError).*));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_camera_transition_end_callback", err);
@@ -719,10 +716,7 @@ pub const CustomGeometrySourceOptions = struct {
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
-                host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_fetch_tile_callback", err);
-                    return;
-                };
+                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_custom_source_fetch_tile_callback", err);
@@ -736,10 +730,7 @@ pub const CustomGeometrySourceOptions = struct {
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
-                host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_cancel_tile_callback", err);
-                    return;
-                };
+                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_custom_source_cancel_tile_callback", err);
@@ -815,10 +806,7 @@ pub const CustomMvtVectorSourceOptions = struct {
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
-                host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_fetch_tile_callback", err);
-                    return;
-                };
+                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_custom_source_fetch_tile_callback", err);
@@ -832,10 +820,7 @@ pub const CustomMvtVectorSourceOptions = struct {
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
-                host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_cancel_tile_callback", err);
-                    return;
-                };
+                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_custom_source_cancel_tile_callback", err);
@@ -2851,10 +2836,7 @@ pub const QueueLock = struct {
                 var scope: callback.Scope = .{};
                 scope.enter(&.{}, 0);
                 defer scope.leave();
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_queue_lock_callback", err);
-                    return;
-                };
+                try host(state.value.context);
             }
         }.invoke(native_arg_0) catch |err| {
             callback.reportError("mln_queue_lock_callback", err);
@@ -2871,10 +2853,7 @@ pub const QueueLock = struct {
                 var scope: callback.Scope = .{};
                 scope.enter(&.{}, 0);
                 defer scope.leave();
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_queue_lock_callback", err);
-                    return;
-                };
+                try host(state.value.context);
             }
         }.invoke(native_arg_0) catch |err| {
             callback.reportError("mln_queue_lock_callback", err);
@@ -3591,10 +3570,7 @@ pub const ResourceRequestCancelHandler = struct {
                 var scope: callback.Scope = .{};
                 scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_pass_through", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_1);
                 defer scope.leave();
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_resource_request_cancel_callback", err);
-                    return;
-                };
+                try host(state.value.context);
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_resource_request_cancel_callback", err);
@@ -3831,15 +3807,16 @@ pub const ResourceTransform = struct {
                 const host = state.value.callback orelse {
                     return;
                 };
+                var ownership_transferred = false;
                 const owned_request = try ResourceTransformRequest.adopt(callback_arg_3, null);
+                defer if (!ownership_transferred) {
+                    resourceTransformRequestRelease(owned_request) catch {};
+                };
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
-                host(state.value.context, ResourceKind.fromNative(callback_arg_1), try allocator.dupe(u8, std.mem.span(callback_arg_2 orelse return error.NativeError)), owned_request) catch |err| {
-                    callback.reportError("mln_resource_transform_callback", err);
-                    resourceTransformRequestRelease(owned_request) catch {};
-                    return;
-                };
+                try host(state.value.context, ResourceKind.fromNative(callback_arg_1), try allocator.dupe(u8, std.mem.span(callback_arg_2 orelse return error.NativeError)), owned_request);
+                ownership_transferred = true;
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callback.reportError("mln_resource_transform_callback", err);
@@ -3973,10 +3950,7 @@ pub const RuntimeEventHandler = struct {
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
-                host(state.value.context, try EventBatchView.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*)) catch |err| {
-                    callback.reportError("mln_runtime_event_callback", err);
-                    return;
-                };
+                try host(state.value.context, try EventBatchView.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*));
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
             callback.reportError("mln_runtime_event_callback", err);
@@ -5415,10 +5389,7 @@ pub const Wake = struct {
                 const host = state.value.callback orelse {
                     return;
                 };
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_wake_callback", err);
-                    return;
-                };
+                try host(state.value.context);
             }
         }.invoke(native_arg_0) catch |err| {
             callback.reportError("mln_wake_callback", err);

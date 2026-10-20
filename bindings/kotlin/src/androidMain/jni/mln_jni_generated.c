@@ -3380,7 +3380,9 @@ static void mln_jni_resourceTransformCallback(
     {.j = MLN_JNI_ADDRESS(url)},
     {.j = (jlong)request}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[12], arguments);
+  if (!mln_jni_upcall_void(&mln_jni_upcalls[12], arguments)) {
+    mln_resource_transform_request_release(request);
+  }
 }
 
 static void mln_jni_wakeCallback(void* userData) {

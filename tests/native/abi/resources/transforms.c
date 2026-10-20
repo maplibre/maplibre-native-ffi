@@ -61,17 +61,17 @@ static void resource_transform_with_zero_size(void* descriptor) {
   ((mln_resource_transform*)descriptor)->size = 0;
 }
 
-static void resource_transform_with_release_and_queue(void* descriptor) {
+static void resource_transform_without_callback_or_queue(void* descriptor) {
   ((mln_resource_transform*)descriptor)->callback = NULL;
-  ((mln_resource_transform*)descriptor)->release_user_data = free;
 }
 
 static const mln_test_validation_case resource_transform_cases[] = {
   {"a well-formed transform", NULL, MLN_STATUS_OK, NULL},
   {"a zero size", resource_transform_with_zero_size,
    MLN_STATUS_INVALID_ARGUMENT, "size"},
-  {"neither a callback nor a queue", resource_transform_with_release_and_queue,
-   MLN_STATUS_INVALID_ARGUMENT, NULL},
+  {"neither a callback nor a queue",
+   resource_transform_without_callback_or_queue, MLN_STATUS_INVALID_ARGUMENT,
+   NULL},
 };
 
 static void resource_transform_registration_validates_its_descriptor(void) {

@@ -30,6 +30,7 @@ class ZigEmitterTests(unittest.TestCase):
                 "default_registration",
                 "absent_handle",
                 "absent_value",
+                "owned_argument",
             ),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
         )

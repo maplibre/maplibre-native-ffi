@@ -101,7 +101,7 @@ typedef struct mln_resource_request_delivery {
    * Owned by the batch until mln_delivery_batch_take(); releasing the batch
    * without taking it releases the handle, which fails the request.
    */
-  mln_resource_request handle;
+  mln_resource_request handle MLN_BINDING("ownership=owned");
 } mln_resource_request_delivery;
 
 /** Copied mln_resource_request_cancel_callback arguments. */
