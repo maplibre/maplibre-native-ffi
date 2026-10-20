@@ -10,6 +10,7 @@
 #include "completion/completion.hpp"
 
 #include "completion/completion_result.hpp"
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "handles/handle_table.hpp"
@@ -261,35 +262,22 @@ auto make_completion_sink(
     set_thread_error("mln_completion.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto queued = completion->queue != MLN_HANDLE_NULL;
-  if ((completion->callback == nullptr) == !queued) {
-    set_thread_error(
-      "completion requires exactly one of a callback and a delivery queue"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (queued) {
-    if (completion->release_user_data != nullptr) {
-      set_thread_error("a queue completion must not carry release_user_data");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    queue = delivery::resolve_delivery_queue(completion->queue);
-    if (queue == nullptr) {
-      return recorded_handle_fault_status();
-    }
-  }
-  const auto* descriptor = completion;
+  const auto status = delivery::resolve_registration_queue(
+    "completion", completion->queue, completion->callback != nullptr,
+    completion->release_user_data != nullptr, queue
+  );
+  if (status != MLN_STATUS_OK) return status;
   try {
-    if (descriptor->queue != MLN_HANDLE_NULL) {
+    if (queue != nullptr) {
       sink.queue_ = std::move(queue);
-      sink.user_data_ = descriptor->user_data;
+      sink.user_data_ = completion->user_data;
       fallback = delivery::ItemPtr{delivery::detail::allocate_item(
         sizeof(delivery::DeliveryItem) + reserved_result_bytes
       )};
       fallback->view.type = MLN_DELIVERY_TYPE_COMPLETION;
-      fallback->view.user_data = descriptor->user_data;
+      fallback->view.user_data = completion->user_data;
     } else {
-      sink.descriptor_ = *descriptor;
+      sink.descriptor_ = *completion;
     }
   } catch (...) {
     set_thread_error("asynchronous completion state could not be allocated");

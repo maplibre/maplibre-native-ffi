@@ -4,9 +4,14 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <mln/map/map.hpp>
+
 #include "delivery/delivery_queue.hpp"
+#include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
 #include "support/allocation_faults.hpp"
+#include "support/delivery.h"
 #include "support/test_support.h"
 
 namespace {
@@ -127,9 +132,96 @@ void the_next_push_wakes_after_a_failed_drain() {
   TEST_ASSERT_EQUAL_size_t(3, count);
 }
 
+// A release during a failed batch allocation discards the detached owned map,
+// allowing its runtime to close even while a registration retains the state.
+void a_failed_drain_discards_its_items_when_the_queue_closes() {
+  auto queue = mln_test_delivery_queue{};
+  mln_test_delivery_queue_create(&queue);
+  const auto retained = mln::delivery::resolve_delivery_queue(queue.handle);
+  const auto runtime = mln_test_create_runtime();
+  const auto completion = mln_test_queue_completion(queue.handle, nullptr);
+  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
+
+  auto batch = MLN_HANDLE_NULL;
+  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+  auto status = MLN_STATUS_OK;
+  {
+    const auto faults = mln::native_tests::AllocationFaults{
+      0,
+      [](void* context) {
+        mln_test_delivery_queue_release(
+          static_cast<mln_test_delivery_queue*>(context)
+        );
+      },
+      &queue
+    };
+    status = mln_delivery_queue_drain(queue.handle, &batch, &view, nullptr);
+  }
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  mln_test_destroy_runtime(runtime);
+}
+
+// End an accepted transition on the worker with allocations disabled. The
+// end delivery must precede retirement even when its producer cannot allocate.
+void a_camera_end_reaches_its_queue_without_allocating() {
+  auto queue = mln_test_delivery_queue{};
+  mln_test_delivery_queue_create(&queue);
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  auto camera = mln_camera_update_default();
+  camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.camera.zoom = 6;
+  camera.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  camera.animation.duration_ms = 60000;
+  camera.animation.end_handler.queue = queue.handle;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &camera, &completion.descriptor, nullptr)
+  );
+  auto live = mln::core::handle_table<mln::core::MapObject>().lease(map);
+  auto ended = std::atomic_bool{false};
+  live->runtime_state->executor.invoke([live, &ended] {
+    {
+      const auto faults = mln::native_tests::AllocationFaults{};
+      try {
+        live->map->cancelTransitions();
+      } catch (const std::bad_alloc&) {
+        // MapLibre may allocate for the update after the transition ends.
+      }
+    }
+    ended.store(true);
+    mln_test_pulse();
+  });
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&ended));
+
+  auto drain = mln_test_delivery_drain{};
+  MLN_TEST_OK(mln_test_delivery_drain_into(queue.handle, &drain));
+  TEST_ASSERT_EQUAL_size_t(2, drain.view.delivery_count);
+  const auto* delivery = mln_test_delivery_at(&drain.view, 0);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END, delivery->type
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED,
+    delivery->payload.camera_transition_end.end->outcome
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_DELIVERY_TYPE_RETIRED, mln_test_delivery_at(&drain.view, 1)->type
+  );
+  mln_delivery_batch_release(drain.batch);
+  live.reset();
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_drain_keeps_every_delivery_in_order);
   RUN_TEST(the_next_push_wakes_after_a_failed_drain);
+  RUN_TEST(a_failed_drain_discards_its_items_when_the_queue_closes);
+  RUN_TEST(a_camera_end_reaches_its_queue_without_allocating);
 }

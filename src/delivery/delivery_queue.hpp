@@ -119,8 +119,7 @@ inline constexpr auto completion_capture = CompletionCapture{
                : nullptr,
 };
 
-// A delivery with no copied payload, such as MLN_DELIVERY_TYPE_RETIRED or a
-// completion's preallocated fallback.
+// A delivery with no copied payload, such as MLN_DELIVERY_TYPE_RETIRED.
 auto make_light_item(mln_delivery_type type, void* user_data) -> ItemPtr;
 
 // The queue behind one mln_delivery_queue handle. Registrations hold it, so a
@@ -142,8 +141,9 @@ class DeliveryQueueState final {
 
   // Moves every queued item, in push order, into a new owned batch, writes
   // its view, and returns its handle; or returns the null handle when nothing
-  // is queued. Allocation failure throws, leaves every item queued in order,
-  // and makes the next push wake the receiver.
+  // is queued. Allocation failure throws and returns every item to an open
+  // queue in order, making the next push wake the receiver. A closed queue
+  // discards the items.
   auto drain(mln_delivery_batch_view& view) -> mln_delivery_batch;
 
   // Refuses later pushes, stops the wake, and discards queued items.

@@ -142,21 +142,14 @@ a capture invokes the declared disposal operation; owned root arrays dispose
 every element. The compiler rejects nested owned handle fields before any array
 or pointer conversion.
 
-Dart drains completions, log records, and resource requests from one delivery
-queue per isolate. A native queue finalizer disposes undrained deliveries when
-the isolate exits. Static native wake callbacks post integer messages to the
-isolate. A queue used for logging wakes inline under the native log mutex, so
-its wake follows the log callback restrictions. Request cancellation keeps its
-native port context in the request through callback quiescence. These paths
-remain callable after isolate shutdown without executable Dart callback
-addresses.
-
-Dart notification stubs are generated from registration descriptors with void
-callbacks and recursively copyable scalar records. Each descriptor field has a
-sequential message identifier within the generated API. Native code copies the
-arguments into a Dart port message, and a shared release callback closes the
-native context after callback quiescence. Host callbacks run in the registration
-zone, and owner close waits for the release messages.
+Every Dart callback registration uses one delivery queue per isolate. A native
+queue finalizer disposes undrained deliveries when the isolate exits. Static
+native wake callbacks post integer messages to isolate ports. A queue used for
+logging wakes inline under the native log mutex, so its wake follows the log
+callback restrictions. These paths remain callable after isolate shutdown
+without executable Dart callback addresses. Host callbacks run in the
+registration zone, and owner close waits for retirement deliveries and wake
+release messages.
 
 ## Ownership protocols
 

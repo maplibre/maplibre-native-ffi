@@ -120,22 +120,20 @@ struct OwnedCallbackSourceOptions {
   )
       : value(options) {
     if (queue == nullptr) return;
-    auto registration = std::make_unique<mln::delivery::QueuedRegistration>(
+    registration = std::make_unique<mln::delivery::QueuedRegistration>(
       std::move(queue), options.user_data
     );
     value.fetch_tile = &queue_tile_fetch;
     value.cancel_tile = &queue_tile_cancel;
-    value.user_data = registration.release();
+    value.user_data = registration.get();
     value.release_user_data = &mln::delivery::QueuedRegistration::retire;
     value.queue = MLN_HANDLE_NULL;
-    queued = true;
   }
 
   ~OwnedCallbackSourceOptions() {
     const auto state = ownership.load(std::memory_order_acquire);
-    if (queued && state == Ownership::pending) {
-      delete static_cast<mln::delivery::QueuedRegistration*>(value.user_data);
-      return;
+    if (state != Ownership::pending) {
+      static_cast<void>(registration.release());
     }
     if (
       state == Ownership::accepted && value.release_user_data != nullptr &&
@@ -149,7 +147,7 @@ struct OwnedCallbackSourceOptions {
   }
 
  private:
-  bool queued = false;
+  std::unique_ptr<mln::delivery::QueuedRegistration> registration;
 };
 
 auto valid_view(mln_buffer_view view, const char* name) -> bool {

@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:mirrors';
 
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
@@ -70,3 +71,38 @@ T adoptOwnedForTesting<T>(
           dispose,
         ]).reflectee
         as T;
+
+/// Exercises the handwritten wake bridge without a render backend.
+final class WakeRootsProbe {
+  WakeRootsProbe()
+    : _roots =
+          (_runtime.declarations[_symbol('_CallbackRoots', _runtime)]
+                      as ClassMirror)
+                  .newInstance(const Symbol(''), [])
+                  .reflectee
+              as Object;
+
+  final Object _roots;
+
+  WakeProbe register(void Function() callback) => WakeProbe._(
+    reflect(_roots).invoke(_symbol('wake', _runtime), [callback]).reflectee
+        as Object,
+  );
+}
+
+final class WakeProbe {
+  WakeProbe._(this._registration);
+
+  final Object _registration;
+
+  Pointer<raw.mln_wake> get _pointer =>
+      _field(_registration, 'pointer')! as Pointer<raw.mln_wake>;
+
+  void notify() => _pointer.ref.callback
+      .asFunction<void Function(Pointer<Void>)>()(_pointer.ref.user_data);
+
+  void release() {
+    (_field(_registration, 'reject')! as void Function())();
+    (_field(_registration, 'releaseMemory')! as void Function())();
+  }
+}

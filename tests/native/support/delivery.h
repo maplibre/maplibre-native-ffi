@@ -26,13 +26,13 @@ typedef struct mln_test_delivery_queue {
 } mln_test_delivery_queue;
 
 static inline void mln_test_delivery_count_wake(void* user_data) {
-  mln_test_delivery_queue* queue = user_data;
+  mln_test_delivery_queue* queue = (mln_test_delivery_queue*)user_data;
   atomic_fetch_add(&queue->wakes, 1);
   mln_test_pulse();
 }
 
 static inline void mln_test_delivery_count_wake_release(void* user_data) {
-  mln_test_delivery_queue* queue = user_data;
+  mln_test_delivery_queue* queue = (mln_test_delivery_queue*)user_data;
   atomic_fetch_add(&queue->wake_releases, 1);
   mln_test_pulse();
 }
@@ -91,7 +91,7 @@ static inline mln_status mln_test_delivery_drain_into(
 }
 
 static inline bool mln_test_delivery_try_drain(void* context) {
-  mln_test_delivery_drain* drain = context;
+  mln_test_delivery_drain* drain = (mln_test_delivery_drain*)context;
   const mln_status status = mln_test_delivery_drain_into(drain->queue, drain);
   if (status == MLN_STATUS_NOT_READY) return false;
   MLN_TEST_OK(status);

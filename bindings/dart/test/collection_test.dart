@@ -12,6 +12,7 @@ import 'package:test/test.dart';
 
 import 'support/collection.dart';
 import 'support/fixture.dart';
+import 'support/runtime_probes.dart';
 
 /// A runtime, by identity and weak reference, that only its callbacks name.
 typedef _Unreachable = (int, WeakReference<RuntimeHandle>);
@@ -109,9 +110,31 @@ final class _StderrOverrides extends IOOverrides {
   Stdout get stderr => _stderr;
 }
 
+final class _WakeReceiver {
+  final calls = StreamController<void>();
+
+  void wake() => calls.add(null);
+}
+
+(WakeProbe, WakeProbe) _registerWakes(
+  WakeRootsProbe roots,
+  _WakeReceiver receiver,
+  bool identicalCallback,
+) {
+  final callback = receiver.wake;
+  return (
+    roots.register(callback),
+    roots.register(identicalCallback ? callback : receiver.wake),
+  );
+}
+
+Future<void> _collectUnrootedObjects() {
+  final control = WeakReference(Object());
+  return collectGarbageUntil(() => control.target == null, 'a control object');
+}
+
 void main() {
-  // Every test here abandons owners on purpose, so each one collects the leak
-  // reports instead of writing them to the suite's output.
+  // Capture the leak reports from tests that abandon owners.
   late _CapturedStderr errors;
   setUp(() {
     errors = _CapturedStderr();
@@ -182,4 +205,31 @@ void main() {
     await within(runtime.clearResourceTransform(), 'a later runtime command');
     await within(runtime.close(), 'runtime close');
   });
+  for (final identicalCallback in [false, true]) {
+    test(
+      'wake ports retain ${identicalCallback ? "identical callbacks" : "equal method tear-offs"} independently',
+      () async {
+        final roots = WakeRootsProbe();
+        final receiver = _WakeReceiver();
+        final calls = StreamIterator(receiver.calls.stream);
+        final (first, second) = _registerWakes(
+          roots,
+          receiver,
+          identicalCallback,
+        );
+        await _collectUnrootedObjects();
+        second.notify();
+        expect(await within(calls.moveNext(), 'the second wake'), isTrue);
+        first.release();
+        await _collectUnrootedObjects();
+        second.notify();
+        expect(await within(calls.moveNext(), 'the remaining wake'), isTrue);
+        second.release();
+        // Keep the owner reachable through both ports' last wakes.
+        roots.register(() {}).release();
+        await calls.cancel();
+        await receiver.calls.close();
+      },
+    );
+  }
 }

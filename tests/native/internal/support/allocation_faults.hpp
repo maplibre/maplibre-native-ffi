@@ -18,7 +18,11 @@ class AllocationFaults {
  public:
   AllocationFaults() noexcept;
   // Fails one allocation after this many successes, then permits allocations.
-  explicit AllocationFaults(std::size_t successful_allocations) noexcept;
+  // Runs before_failure just before throwing, to order work during allocation.
+  explicit AllocationFaults(
+    std::size_t successful_allocations, void (*before_failure)(void*) = nullptr,
+    void* user_data = nullptr
+  ) noexcept;
   ~AllocationFaults();
   AllocationFaults(const AllocationFaults&) = delete;
   auto operator=(const AllocationFaults&) -> AllocationFaults& = delete;

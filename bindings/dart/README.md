@@ -26,9 +26,9 @@ checked in so Git and pub package consumers receive a complete library.
 and `mise run bindings:check` fails on any diff.
 
 The suite tests what the binding adds on top of the C API: handle ownership,
-completions, callback ports, generated value shapes, rendering through a
-session, and loading and shutdown. `tests/conformance/dart.toml` maps each
-shared conformance case to its test. Every test builds on the fixture in
+completions, queued callback registrations, generated value shapes, rendering
+through a session, and loading and shutdown. `tests/conformance/dart.toml` maps
+each shared conformance case to its test. Every test builds on the fixture in
 `test/support/fixture.dart`, which closes each handle it opens in a teardown and
 installs a resource provider that answers every request with an error, so no
 test reaches the network. Render tests take their GPU context from

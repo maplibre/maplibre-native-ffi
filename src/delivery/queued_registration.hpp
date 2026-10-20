@@ -56,6 +56,32 @@ class QueuedRegistration final {
     return false;
   }
 
+  // Reserves a one-shot delivery without owned handles before accepting its
+  // registration. The delivered record must fit this initial record's storage.
+  template <mln_delivery_type Type>
+  auto reserve(const typename Delivered<Type>::Record& record) -> void {
+    using Record = typename Delivered<Type>::Record;
+    static_assert(!element_owns_handles(static_cast<const Record*>(nullptr)));
+    auto measure = Arena<false>{nullptr, sizeof(DeliveryItem)};
+    static_cast<void>(capture_element(measure, record));
+    reserved_size_ = measure.offset;
+    reserved_ = ItemPtr{detail::allocate_item(reserved_size_)};
+    reserved_->view.type = Type;
+    reserved_->view.user_data = user_data_;
+  }
+
+  template <mln_delivery_type Type>
+  auto push_reserved(const typename Delivered<Type>::Record& record) noexcept
+    -> void {
+    auto arena = Arena<true>{
+      reinterpret_cast<std::byte*>(reserved_.get()), sizeof(DeliveryItem),
+      reserved_size_
+    };
+    reserved_->view.payload.*Delivered<Type>::member =
+      capture_element(arena, record);
+    static_cast<void>(queue_->push(reserved_));
+  }
+
   // The release_user_data of a queue registration: pushes
   // MLN_DELIVERY_TYPE_RETIRED after the last delivery, as callback mode
   // releases user_data after the last call, and frees the state.
@@ -71,6 +97,8 @@ class QueuedRegistration final {
   void* user_data_ = nullptr;
   // Preallocated, so retirement reaches a live queue without allocating.
   ItemPtr retired_;
+  ItemPtr reserved_;
+  std::size_t reserved_size_ = 0;
 };
 
 }  // namespace mln::delivery

@@ -8,6 +8,8 @@ namespace {
 thread_local bool reject_allocations = false;
 thread_local std::size_t allocations_before_failure = 0;
 thread_local bool fail_one_allocation = false;
+thread_local void (*allocation_failure_hook)(void*) = nullptr;
+thread_local void* allocation_failure_data = nullptr;
 }  // namespace
 
 // The replacements cover every allocation in this executable, the static
@@ -18,6 +20,9 @@ auto operator new(std::size_t size) -> void* {
   if (fail_one_allocation) {
     if (allocations_before_failure == 0) {
       fail_one_allocation = false;
+      if (allocation_failure_hook != nullptr) {
+        allocation_failure_hook(allocation_failure_data);
+      }
       throw std::bad_alloc{};
     }
     --allocations_before_failure;
@@ -57,15 +62,20 @@ namespace mln::native_tests {
 AllocationFaults::AllocationFaults() noexcept { reject_allocations = true; }
 
 AllocationFaults::AllocationFaults(
-  std::size_t successful_allocations
+  std::size_t successful_allocations, void (*before_failure)(void*),
+  void* user_data
 ) noexcept {
   allocations_before_failure = successful_allocations;
   fail_one_allocation = true;
+  allocation_failure_hook = before_failure;
+  allocation_failure_data = user_data;
 }
 
 AllocationFaults::~AllocationFaults() {
   reject_allocations = false;
   fail_one_allocation = false;
+  allocation_failure_hook = nullptr;
+  allocation_failure_data = nullptr;
 }
 
 auto AllocationFaults::active() noexcept -> bool {

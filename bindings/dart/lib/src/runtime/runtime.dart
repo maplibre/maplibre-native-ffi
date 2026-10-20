@@ -36,7 +36,7 @@ abstract interface class _CallbackRootOwner {
 /// and wakes through their ports.
 final class _CallbackRoots {
   final queued = <DeliveryRegistration>{};
-  final wakes = <void Function()>{};
+  final wakes = <_WakeRegistration>{};
 
   DeliveryRegistration registerQueued(Map<int, DeliveryHandler> handlers) {
     final registration = isolateDeliveryQueue.register(handlers);
@@ -48,8 +48,8 @@ final class _CallbackRoots {
   /// Prepares a wake that posts to a port of this isolate, which runs
   /// [callback] for each wake and closes when native releases the wake.
   ///
-  /// The port holds the callback weakly, and this owner holds it until the
-  /// port closes, so a callback that captures its owner leaves the two
+  /// The port holds its registration weakly, and this owner holds it until
+  /// the port closes, so a callback that captures its owner leaves the two
   /// collectible together. Like a registration, the port leaves the isolate
   /// free to finish.
   _NativeRegistration<raw.mln_wake> wake(void Function()? callback) {
@@ -58,10 +58,11 @@ final class _CallbackRoots {
     if (callback == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
-    wakes.add(callback);
+    final registration = _WakeRegistration(callback);
+    wakes.add(registration);
     final port = _wakePort(
       Zone.current,
-      WeakReference(callback),
+      WeakReference(registration),
       WeakReference(this),
     );
     try {
@@ -75,7 +76,7 @@ final class _CallbackRoots {
       );
     } catch (_) {
       port.close();
-      wakes.remove(callback);
+      wakes.remove(registration);
       arena.releaseAll();
       rethrow;
     }
@@ -90,22 +91,28 @@ final class _CallbackRoots {
   }
 }
 
+final class _WakeRegistration {
+  _WakeRegistration(this.callback);
+
+  final void Function() callback;
+}
+
 /// The port of one wake. An open port is a root, so its handler reaches the
 /// callback and its owner only weakly, and drops the owner's root once native
 /// releases the wake.
 RawReceivePort _wakePort(
   Zone zone,
-  WeakReference<void Function()> callback,
+  WeakReference<_WakeRegistration> registration,
   WeakReference<_CallbackRoots> owner,
 ) {
   final port = RawReceivePort()..keepIsolateAlive = false;
   port.handler = (dynamic message) {
-    final target = callback.target;
+    final target = registration.target;
     if (message != 0) {
       port.close();
       if (target != null) owner.target?.wakes.remove(target);
     } else if (target != null) {
-      zone.runGuarded(target);
+      zone.runGuarded(target.callback);
     }
   };
   return port;

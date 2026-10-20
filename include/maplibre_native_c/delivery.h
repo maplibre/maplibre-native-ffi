@@ -222,7 +222,8 @@ MLN_API mln_status mln_delivery_queue_create(
  *
  * Registrations that still name the queue keep working, but the queue refuses
  * their later pushes: a completion is discarded and its owned value disposed,
- * a log record goes to the platform logger, and a provider request fails.
+ * a log record goes to the platform logger, a provider request fails, and
+ * other queued callbacks are dropped.
  *
  * No wake call starts after release. The wake's release_user_data runs once
  * in-flight wake calls return, on whichever thread finishes last. The host may

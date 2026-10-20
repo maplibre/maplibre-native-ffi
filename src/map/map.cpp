@@ -395,16 +395,6 @@ class CameraTransitionEnd final {
     const mln_camera_transition_handler& handler
   ) noexcept
       : handler_(handler) {}
-  explicit CameraTransitionEnd(
-    std::unique_ptr<mln::delivery::QueuedRegistration> registration
-  ) noexcept
-      : handler_{
-          .callback = &queue_end,
-          .user_data = registration.get(),
-          .release_user_data = nullptr,
-          .queue = MLN_HANDLE_NULL,
-        },
-        registration_(std::move(registration)) {}
   CameraTransitionEnd(const CameraTransitionEnd&) = delete;
   CameraTransitionEnd(CameraTransitionEnd&&) = delete;
   auto operator=(const CameraTransitionEnd&) -> CameraTransitionEnd& = delete;
@@ -431,10 +421,6 @@ class CameraTransitionEnd final {
     } catch (...) {
       // Host callbacks must not unwind through the C boundary.
     }
-    if (registration_ != nullptr) {
-      mln::delivery::QueuedRegistration::retire(registration_.release());
-      return;
-    }
     if (handler_.release_user_data == nullptr || process_exiting()) return;
     try {
       handler_.release_user_data(handler_.user_data);
@@ -442,20 +428,17 @@ class CameraTransitionEnd final {
     }
   }
 
- private:
   static auto queue_end(
     void* registration, const mln_camera_transition_end* end
   ) noexcept -> void {
-    static_cast<void>(
-      static_cast<const mln::delivery::QueuedRegistration*>(registration)
-        ->push<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
-          mln_camera_transition_end_delivery{.end = end}
-        )
-    );
+    static_cast<mln::delivery::QueuedRegistration*>(registration)
+      ->push_reserved<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
+        mln_camera_transition_end_delivery{.end = end}
+      );
   }
 
+ private:
   mln_camera_transition_handler handler_;
-  std::unique_ptr<mln::delivery::QueuedRegistration> registration_;
   std::atomic_bool owned_{false};
 };
 
@@ -2113,7 +2096,8 @@ struct CommandTransitionFinish {
 // Copies the command's end handler, or leaves out a disabled one.
 auto camera_transition_end(
   const mln_animation_options& animation,
-  std::shared_ptr<mln::core::CameraTransitionEnd>& out
+  std::shared_ptr<mln::core::CameraTransitionEnd>& out,
+  std::unique_ptr<mln::delivery::QueuedRegistration>& registration
 ) -> mln_status {
   const auto& handler = animation.end_handler;
   if (handler.callback == nullptr && handler.queue == MLN_HANDLE_NULL) {
@@ -2125,30 +2109,46 @@ auto camera_transition_end(
     handler.release_user_data != nullptr, queue
   );
   if (queue_status != MLN_STATUS_OK) return queue_status;
-  out = queue == nullptr
-          ? std::make_shared<mln::core::CameraTransitionEnd>(handler)
-          : std::make_shared<mln::core::CameraTransitionEnd>(
-              std::make_unique<mln::delivery::QueuedRegistration>(
-                std::move(queue), handler.user_data
-              )
-            );
+  auto copied = handler;
+  if (queue != nullptr) {
+    registration = std::make_unique<mln::delivery::QueuedRegistration>(
+      std::move(queue), handler.user_data
+    );
+    const auto end = mln_camera_transition_end{};
+    registration->reserve<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
+      mln_camera_transition_end_delivery{.end = &end}
+    );
+    copied.callback = &mln::core::CameraTransitionEnd::queue_end;
+    copied.user_data = registration.get();
+    copied.release_user_data = &mln::delivery::QueuedRegistration::retire;
+    copied.queue = MLN_HANDLE_NULL;
+  }
+  out = std::make_shared<mln::core::CameraTransitionEnd>(copied);
   return MLN_STATUS_OK;
 }
 
 template <typename Submit>
 auto submit_with_transition_end(
-  const std::shared_ptr<mln::core::CameraTransitionEnd>& end, Submit submit
+  const mln_animation_options& animation, Submit submit
 ) -> mln_status {
-  if (end == nullptr) return submit();
+  auto end = std::shared_ptr<mln::core::CameraTransitionEnd>{};
+  auto registration = std::unique_ptr<mln::delivery::QueuedRegistration>{};
+  const auto end_status = camera_transition_end(animation, end, registration);
+  if (end_status != MLN_STATUS_OK) return end_status;
+  if (end == nullptr) return submit(end);
   end->transfer_to_runtime();
   auto status = MLN_STATUS_NATIVE_ERROR;
   try {
-    status = submit();
+    status = submit(end);
   } catch (...) {
     end->return_to_caller();
     throw;
   }
-  if (status != MLN_STATUS_OK) end->return_to_caller();
+  if (status == MLN_STATUS_OK) {
+    static_cast<void>(registration.release());
+  } else {
+    end->return_to_caller();
+  }
   return status;
 }
 
@@ -4216,37 +4216,36 @@ auto map_update_camera(
     return animation_status;
   }
   const auto copied = *update;
-  auto end = std::shared_ptr<mln::core::CameraTransitionEnd>{};
-  const auto end_status = camera_transition_end(copied.animation, end);
-  if (end_status != MLN_STATUS_OK) return end_status;
-  return submit_with_transition_end(end, [&]() -> mln_status {
-    return submit_camera_command(
-      map,
-      [copied, end](MapObject& live) -> void {
-        const auto animation =
-          to_native_animation(live.event_state, copied.animation, end);
-        apply_gesture_phase_before(live, copied.gesture_phase);
-        switch (copied.mode) {
-          case MLN_CAMERA_UPDATE_MODE_JUMP:
-            // MapLibre gives a jump no animation options, so the jump ends
-            // its command here, as soon as it applies.
-            live.map->jumpTo(to_native_camera(copied.camera));
-            if (animation.transitionFinishFn) animation.transitionFinishFn();
-            break;
-          case MLN_CAMERA_UPDATE_MODE_EASE:
-            live.map->easeTo(to_native_camera(copied.camera), animation);
-            break;
-          case MLN_CAMERA_UPDATE_MODE_FLY:
-            live.map->flyTo(to_native_camera(copied.camera), animation);
-            break;
-          default:
-            break;
-        }
-        apply_gesture_phase_after(live, copied.gesture_phase);
-      },
-      completion
-    );
-  });
+  return submit_with_transition_end(
+    copied.animation, [&](const auto& end) -> mln_status {
+      return submit_camera_command(
+        map,
+        [copied, end](MapObject& live) -> void {
+          const auto animation =
+            to_native_animation(live.event_state, copied.animation, end);
+          apply_gesture_phase_before(live, copied.gesture_phase);
+          switch (copied.mode) {
+            case MLN_CAMERA_UPDATE_MODE_JUMP:
+              // MapLibre gives a jump no animation options, so the jump ends
+              // its command here, as soon as it applies.
+              live.map->jumpTo(to_native_camera(copied.camera));
+              if (animation.transitionFinishFn) animation.transitionFinishFn();
+              break;
+            case MLN_CAMERA_UPDATE_MODE_EASE:
+              live.map->easeTo(to_native_camera(copied.camera), animation);
+              break;
+            case MLN_CAMERA_UPDATE_MODE_FLY:
+              live.map->flyTo(to_native_camera(copied.camera), animation);
+              break;
+            default:
+              break;
+          }
+          apply_gesture_phase_after(live, copied.gesture_phase);
+        },
+        completion
+      );
+    }
+  );
 }
 
 namespace {
@@ -4354,43 +4353,43 @@ auto map_apply_camera_delta(
   const auto delta_status = validate_camera_delta(delta);
   if (delta_status != MLN_STATUS_OK) return delta_status;
   const auto copied = *delta;
-  auto end = std::shared_ptr<mln::core::CameraTransitionEnd>{};
-  const auto end_status = camera_transition_end(copied.animation, end);
-  if (end_status != MLN_STATUS_OK) return end_status;
-  return submit_with_transition_end(end, [&]() -> mln_status {
-    return submit_camera_command(
-      map,
-      [copied, end](MapObject& live) -> void {
-        // The pan and the scale, bearing, and pitch change are separate
-        // MapLibre transitions, because an explicit center overrides an anchor.
-        // The ease reads the camera after the pan, so an immediate pan moves
-        // the camera that the anchor refers to. The transaction around this
-        // work publishes both in one snapshot and announces one render update
-        // for them.
-        const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
-        const auto eases = (copied.fields & camera_delta_anchored_fields) != 0U;
-        const auto transitions =
-          static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
-        const auto animation = to_native_animation(
-          live.event_state, copied.animation, end, std::max(transitions, 1U)
-        );
-        apply_gesture_phase_before(live, copied.gesture_phase);
-        if (pans) {
-          live.map->moveBy(to_native_screen_point(copied.offset), animation);
-        }
-        if (eases) {
-          live.map->easeTo(camera_delta_target(*live.map, copied), animation);
-        }
-        // A delta without components starts no transition, so it ends its
-        // command here, as an empty camera update does.
-        if (transitions == 0 && animation.transitionFinishFn) {
-          animation.transitionFinishFn();
-        }
-        apply_gesture_phase_after(live, copied.gesture_phase);
-      },
-      completion
-    );
-  });
+  return submit_with_transition_end(
+    copied.animation, [&](const auto& end) -> mln_status {
+      return submit_camera_command(
+        map,
+        [copied, end](MapObject& live) -> void {
+          // The pan and the scale, bearing, and pitch change are separate
+          // MapLibre transitions, because an explicit center overrides an
+          // anchor. The ease reads the camera after the pan, so an immediate
+          // pan moves the camera that the anchor refers to. The transaction
+          // around this work publishes both in one snapshot and announces one
+          // render update for them.
+          const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
+          const auto eases =
+            (copied.fields & camera_delta_anchored_fields) != 0U;
+          const auto transitions =
+            static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
+          const auto animation = to_native_animation(
+            live.event_state, copied.animation, end, std::max(transitions, 1U)
+          );
+          apply_gesture_phase_before(live, copied.gesture_phase);
+          if (pans) {
+            live.map->moveBy(to_native_screen_point(copied.offset), animation);
+          }
+          if (eases) {
+            live.map->easeTo(camera_delta_target(*live.map, copied), animation);
+          }
+          // A delta without components starts no transition, so it ends its
+          // command here, as an empty camera update does.
+          if (transitions == 0 && animation.transitionFinishFn) {
+            animation.transitionFinishFn();
+          }
+          apply_gesture_phase_after(live, copied.gesture_phase);
+        },
+        completion
+      );
+    }
+  );
 }
 
 auto map_cancel_transitions(mln_map map, const mln_completion* completion)

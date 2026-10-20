@@ -135,14 +135,29 @@ auto DeliveryQueueState::drain(mln_delivery_batch_view& view)
     batch->views.reserve(count);
     handle = handle_table<DeliveryBatchObject>().insert(batch);
   } catch (...) {
-    // Pushes only append and drains are serialized, so the items go back
-    // ahead of everything pushed since.
-    const auto lock = std::scoped_lock{mutex_};
-    last->next = head_;
-    head_ = items;
-    if (tail_ == nullptr) tail_ = last;
-    count_ += count;
-    wake_on_push_ = true;
+    {
+      const auto lock = std::scoped_lock{mutex_};
+      if (!closed_) {
+        // Pushes only append and drains are serialized, so the items go back
+        // ahead of everything pushed since.
+        last->next = head_;
+        head_ = std::exchange(items, nullptr);
+        if (tail_ == nullptr) tail_ = last;
+        count_ += count;
+        wake_on_push_ = true;
+      }
+    }
+    // Closure may have finished while the batch allocation was in progress.
+    // Dispose outside the lock, as close() does for pending items.
+    while (items != nullptr) {
+      auto* next = items->next;
+      if (core::process_exiting()) {
+        forget_item(ItemPtr{items});
+      } else {
+        static_cast<void>(ItemPtr{items});
+      }
+      items = next;
+    }
     throw;
   }
   while (items != nullptr) {

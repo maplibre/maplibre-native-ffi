@@ -107,8 +107,8 @@ final NativeFinalizer _queueFinalizer = NativeFinalizer(
 /// The delivery queue that every completion and queued callback of this
 /// isolate arrives on.
 ///
-/// Native code copies each terminal result, log record, and resource request
-/// into the queue and wakes this isolate's port, whose handler drains the
+/// Native code copies every completion and queued callback delivery into
+/// the queue and wakes this isolate's port, whose handler drains the
 /// queue and dispatches each delivery by its user data token. The port keeps
 /// the isolate alive while any completion is pending, so an awaited future
 /// resolves before the isolate finishes. Registrations leave the isolate free
