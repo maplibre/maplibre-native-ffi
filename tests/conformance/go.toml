@@ -8,9 +8,7 @@
 # Metal, and Vulkan preset, including the Android and OpenHarmony emulator
 # presets, whose runners push tests/graphics beside the test binaries. WGL
 # presets build no render tests, since the Go wrapper of tests/graphics has no
-# WGL context. EX-01 is `mise run //examples/go-map:smoke <preset>` on an EGL
-# preset, since go-map drives OpenGL directly. Its smoke run renders one frame
-# in a hidden window.
+# WGL context.
 #
 # CB-04: the Go binding contains a callback's panic and logs it through the
 # default slog logger. The callback returns its declared failure value to
@@ -42,8 +40,6 @@
 "CB-08" = "bindings/go/callbacks_test.go::TestCancelCallbackIsRootedOnlyWhenStored"
 "CB-09" = "bindings/go/callbacks_test.go::TestCameraEndHandlerIsRootedUntilItRuns"
 "CB-10" = "bindings/go/callbacks_test.go::TestProviderRoutesDecideWhichRequestsReachIt"
-"CB-11" = "bindings/go/callbacks_test.go::TestTransformRulesRewriteWithoutACallback"
-"CB-12" = "bindings/go/callbacks_test.go::TestProviderPassesADeferredRequestToNativeLoading"
 "VAL-01" = "bindings/go/values_test.go::TestHostStringsUseViewsAndNativeLentStringsDecode"
 "VAL-02" = "bindings/go/values_test.go::TestPresenceFieldsRoundTrip"
 "VAL-03" = "bindings/go/events_test.go::TestEventDecoderReadsAStridedBatchWithUnknownValues"
@@ -58,4 +54,3 @@
 "PLAT-01" = "bindings/go/platform_test.go::TestLinkedLibraryMatchesTheBuild"
 "PLAT-02" = "bindings/go/platform_test.go::TestProcessExitsCleanlyWithLiveHandles"
 "PLAT-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
-"EX-01" = "examples/go-map/main.go::smokeMode"

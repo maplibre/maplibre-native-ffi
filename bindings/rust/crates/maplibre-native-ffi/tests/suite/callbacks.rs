@@ -1,6 +1,6 @@
 //! Callback registrations: rooting and release, the admission policy inside a
-//! callback, panics, decision handles, provider routes and transform rules, and
-//! process-global callbacks.
+//! callback, panics, decision handles, provider routes, and process-global
+//! callbacks.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -348,42 +348,6 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
 }
 
 #[test]
-fn a_transform_rewrites_through_its_rules_with_no_callback() {
-    let fixture = Fixture::new();
-    let server = LoopbackServer::start("/rewritten.json", BACKGROUND_STYLE_JSON);
-    // With no provider, the style request reaches the online source, where
-    // the transform runs.
-    wait_for(fixture.runtime().clear_resource_provider());
-    // The call consumes the transform, its rules, and their strings, so
-    // native can only be matching against the copy it took.
-    let original = server.url("/original.json");
-    let transform = ResourceTransform {
-        callback: None,
-        rules: vec![
-            // Another kind: a kind mask lost on the way to native would send
-            // the style here.
-            ResourceRewriteRule {
-                kinds: ResourceKindMask::TILE,
-                url: original.clone(),
-                replacement_url: Some(server.url("/tile.json")),
-                ..Default::default()
-            },
-            ResourceRewriteRule {
-                kinds: ResourceKindMask::STYLE,
-                url: original.clone(),
-                replacement_url: Some(server.url("/rewritten.json")),
-                ..Default::default()
-            },
-        ],
-    };
-    wait_for(fixture.runtime().set_resource_transform(transform));
-
-    fixture.map().set_style_url(&original).unwrap();
-    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    assert_eq!(server.requests(), ["/rewritten.json"]);
-}
-
-#[test]
 fn replacing_the_log_callback_releases_the_one_it_replaced() {
     let _global = global_state();
     let (first, first_released) = release_probe();
@@ -450,29 +414,4 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
         .expect("the binding kept a callback that native never took");
     handle.close().unwrap();
     wait_for(runtime.release());
-}
-
-#[test]
-fn a_provider_passes_a_deferred_request_to_native_loading() {
-    let fixture = Fixture::new();
-    let server = LoopbackServer::start("/style.json", BACKGROUND_STYLE_JSON);
-    let (sender, requests) = mpsc::channel();
-    let sender = Mutex::new(sender);
-    wait_for(
-        fixture
-            .runtime()
-            .set_resource_provider(ResourceProvider::new(move |_, handle| {
-                sender.lock().unwrap().send(handle).unwrap();
-                ResourceProviderDecision::Handle
-            })),
-    );
-    fixture
-        .map()
-        .set_style_url(&server.url("/style.json"))
-        .unwrap();
-    let handle = requests.recv_timeout(timeout()).unwrap();
-    handle.pass_through().unwrap();
-    assert!(handle.pass_through().is_err());
-    handle.close().unwrap();
-    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
 }

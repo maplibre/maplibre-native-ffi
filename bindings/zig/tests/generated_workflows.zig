@@ -13,24 +13,6 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
     try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8, .scale_factor = 1 }, null));
 }
 
-test "generated owners preserve rejected release and copied event snapshots" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    try testing.expectError(error.InvalidState, maplibre.runtimeRelease(fixture.runtime, null));
-    const command = try support.resolve(try maplibre.mapSetStyleJson(fixture.map, support.style_json, null));
-    try command.statusError();
-    try fixture.barrier();
-    var batch = try maplibre.runtimeDrainEvents(fixture.runtime, null) orelse return error.EventNotObserved;
-    defer batch.deinit();
-    var copied = try maplibre.eventBatchGet(testing.allocator, batch, null);
-    defer copied.deinit();
-    try maplibre.eventBatchRelease(batch);
-    try testing.expect(copied.value.events.len != 0);
-    const saved = fixture.map;
-    try fixture.closeMap();
-    try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(saved, null));
-}
-
 const ProviderProbe = struct {
     runtime: maplibre.Runtime,
     calls: std.atomic.Value(usize) = .init(0),

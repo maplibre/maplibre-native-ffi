@@ -36,20 +36,6 @@ public sealed unsafe class GeneratedCallbackTests
     }
 
     [Fact]
-    public void RegistrationRootsFollowAcceptanceAndNativeRelease()
-    {
-        var accepted = Prepare(accept: true);
-        var rejected = Prepare(accept: false);
-        Gc.Collect();
-        Assert.True(accepted.Root.IsAlive);
-        Assert.False(rejected.Root.IsAlive);
-
-        accepted.Native.release_user_data(accepted.Native.user_data);
-        Gc.Collect();
-        Assert.False(accepted.Root.IsAlive);
-    }
-
-    [Fact]
     public void RetiringAnOwnerRetainsCallbacksUntilNativeReleaseAndContainsStaleDispatch()
     {
         var owner = new NativeCallbackOwner();
@@ -81,22 +67,6 @@ public sealed unsafe class GeneratedCallbackTests
         );
         var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
         scope.Accept(owner);
-        return (native, weak);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (mln_custom_geometry_source_options Native, WeakReference Root) Prepare(
-        bool accept
-    )
-    {
-        using var scope = new NativeCallScope();
-        var native = GeneratedValues.NativeCustomGeometrySourceOptions(
-            new CustomGeometrySourceOptions { FetchTile = _ => { } },
-            scope
-        );
-        var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
-        if (accept)
-            scope.Accept();
         return (native, weak);
     }
 }

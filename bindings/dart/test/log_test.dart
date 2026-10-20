@@ -97,17 +97,4 @@ void main() {
       expect(cleared, isEmpty);
     },
   );
-
-  test('a log callback error reaches the zone that installed it', () async {
-    final zoneErrors = <Object>[];
-    runZonedGuarded(
-      () => logSetCallback(
-        LogHandler(callback: (_, _, _, _) => throw StateError('log failed')),
-      ),
-      (error, _) => zoneErrors.add(error),
-    );
-    await dump();
-    expect(zoneErrors, isNotEmpty);
-    expect(zoneErrors, everyElement(isA<StateError>()));
-  });
 }

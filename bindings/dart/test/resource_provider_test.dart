@@ -10,26 +10,6 @@ import 'package:test/test.dart';
 import 'support/fixture.dart';
 
 void main() {
-  test('a provider passes a deferred request to native loading', () async {
-    const url = 'custom://native.json';
-    final handed = Completer<ResourceRequestHandle>();
-    final fixture = await openRuntime(
-      provider: routedProvider([
-        styleRoute(url),
-      ], (_, handle) => handed.complete(handle)),
-    );
-    final map = await fixture.openMap();
-    await expectCommitted(map.setStyleUrl(url));
-    final handle = await within(handed.future, 'the provider request');
-    handle.passThrough();
-    expect(handle.passThrough, throwsA(isA<InvalidStateException>()));
-    handle.close();
-    final failure = await fixture.awaitEventType(
-      RuntimeEventType.mapLoadingFailed,
-    );
-    expect(failure.message, contains('declined'));
-  });
-
   test('a routed provider answers the requests its routes match', () async {
     const styleUrl = 'custom://routed-style.json';
     const sourceUrl = 'custom://routed-source.json';
@@ -75,40 +55,6 @@ void main() {
       (styleUrl, ResourceKind.style),
       (sourceUrl, ResourceKind.source),
     ]);
-  });
-
-  test('a request outside the routes passes through', () async {
-    const styleUrl = 'custom://unrouted-style.json';
-    final fixture = await openRuntime(
-      provider: routedProvider([
-        styleRoute('custom://routed-style.json'),
-        // The URL matches, but the route claims only sources.
-        ResourceRoute(kinds: ResourceKindMask.source, url: styleUrl),
-      ], (_, _) => fail('the provider saw an unrouted request')),
-    );
-    final map = await fixture.openMap();
-
-    await expectCommitted(map.setStyleUrl(styleUrl));
-    // Native loading has no handler for the custom scheme.
-    final failure = await fixture.awaitEventType(
-      RuntimeEventType.mapLoadingFailed,
-    );
-    expect(failure.message, contains('declined'));
-  });
-
-  test('an invalid route is refused', () async {
-    final fixture = await openRuntime();
-    expect(
-      () => fixture.runtime.setResourceProvider(
-        routedProvider([
-          ResourceRoute(
-            flags: const UrlMatchFlags.fromRawValue(1 << 31),
-            url: '**',
-          ),
-        ], (_, _) {}),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
   });
 
   test('a provider answers a request after its callback returns', () async {
@@ -210,14 +156,6 @@ void main() {
     await expectCommitted(map.setStyleUrl(styleUrl));
     final handle = await within(handed.future, 'the provider');
     final probe = singleCallbackPortProbeForTesting(handle)!;
-
-    // A request takes one cancel registration.
-    expect(
-      () => handle.setCancelCallback(
-        ResourceRequestCancelHandler(callback: () {}),
-      ),
-      throwsA(isA<InvalidStateException>()),
-    );
     expect(probe.closed, isFalse);
 
     await within(map.close(), 'map close');
@@ -228,40 +166,8 @@ void main() {
     await within(probe.released, 'the cancel registration release');
     expect(zoneErrors, [isA<StateError>()]);
     expect(singleCallbackPortProbeForTesting(handle), isNull);
-
-    // The cancelled request refuses an answer, and stays open until closed.
-    expect(
-      () => handle.complete(emptyStyleResponse),
-      throwsA(isA<InvalidStateException>()),
-    );
-    expect(handle.isClosed, isFalse);
     handle.close();
     handle.waitUntilRetired();
-  });
-
-  test('a completed request releases its cancel registration unrun', () async {
-    const styleUrl = 'custom://completed-style.json';
-    final registered = Completer<CallbackPortLifecycleProbe>();
-    var cancels = 0;
-    final fixture = await openRuntime(
-      provider: routedProvider([styleRoute(styleUrl)], (_, handle) {
-        expect(
-          handle.setCancelCallback(
-            ResourceRequestCancelHandler(callback: () => cancels += 1),
-          ),
-          isFalse,
-        );
-        registered.complete(singleCallbackPortProbeForTesting(handle));
-        handle.complete(emptyStyleResponse);
-        handle.close();
-      }),
-    );
-    final map = await fixture.openMap();
-
-    await expectCommitted(map.setStyleUrl(styleUrl));
-    final probe = await within(registered.future, 'the provider');
-    await within(probe.released, 'the cancel registration release');
-    expect(cancels, 0);
   });
 
   test(

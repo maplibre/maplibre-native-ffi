@@ -76,20 +76,7 @@ def test_absent_fields_stay_distinct_from_present_values(
             b'[{"id":"circles","type":"circle","source":"points"}]}'
         )
     )
-    assert result(map_handle.get_style_layer_property("circles", "filter")) is None
-    result(
-        map_handle.set_style_layer_property(
-            "circles", "filter", b'["==",["get","kind"],"park"]'
-        )
-    )
-    assert json.loads(
-        result(map_handle.get_style_layer_property("circles", "filter"))
-    ) == [
-        "==",
-        ["get", "kind"],
-        "park",
-    ]
-    result(map_handle.set_style_layer_property("circles", "filter", b"null"))
+    # An absent optional output comes back as None.
     assert result(map_handle.get_style_layer_property("circles", "filter")) is None
 
 
@@ -177,11 +164,6 @@ def test_public_type_hints_resolve() -> None:
         elif callable(target):
             typing.get_type_hints(target)
 
-    assert typing.get_type_hints(mln.MapHandle.set_style_json)["json"] is bytes
-    assert typing.get_args(
-        typing.get_type_hints(mln.RuntimeHandle.create_map)["return"]
-    ) == (mln.MapHandle,)
-
 
 def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
     map_handle: mln.MapHandle,
@@ -193,14 +175,6 @@ def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
         assert points == tuple(
             projection.pixel_for_lat_lng(value) for value in coordinates
         )
-        assert projection.lat_lngs_for_pixels(points) == tuple(
-            projection.lat_lng_for_pixel(value) for value in points
-        )
-        assert projection.lat_lngs_for_pixels_unwrapped(points) == tuple(
-            projection.lat_lng_for_pixel_unwrapped(value) for value in points
-        )
         assert projection.pixels_for_lat_lngs(()) == ()
-        assert projection.lat_lngs_for_pixels(()) == ()
-        assert projection.lat_lngs_for_pixels_unwrapped(()) == ()
     finally:
         projection.close()

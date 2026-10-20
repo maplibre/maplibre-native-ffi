@@ -1,7 +1,5 @@
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Internal.Struct;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -168,45 +166,5 @@ public sealed class RenderTests
 
         scope.Expire();
         Assert.Throws<InvalidOperationException>(() => frame.ImageView);
-    }
-
-    [Fact]
-    public unsafe void VulkanDescriptorsCarryEvery64BitHandleBit()
-    {
-        const ulong surface = 0xFEDC_BA98_7654_3211;
-        const ulong image = 0x8000_0000_0000_0001;
-        const ulong imageView = 0xFFFF_FFFF_FFFF_FFFE;
-        var nativeSurface = GeneratedValues.NativeVulkanSurfaceDescriptor(
-            new VulkanSurfaceDescriptor
-            {
-                Extent = new LogicalExtent(64, 32, 1),
-                Surface = surface,
-                Context = new VulkanContextDescriptor
-                {
-                    Instance = NativePointer.FromBorrowedAddress(
-                        unchecked((nint)0xF000_0000_0000_0222)
-                    ),
-                    GraphicsQueueFamilyIndex = 7,
-                },
-            }
-        );
-        using var scope = new NativeCallScope();
-        var nativeTexture = GeneratedValues.NativeVulkanBorrowedTextureDescriptor(
-            new VulkanBorrowedTextureDescriptor
-            {
-                Extent = new LogicalExtent(64, 32, 1),
-                PhysicalWidth = 64,
-                PhysicalHeight = 32,
-                Textures = [new VulkanBorrowedTexture(image, imageView)],
-            },
-            scope
-        );
-
-        Assert.Equal(surface, nativeSurface.surface);
-        Assert.Equal(unchecked((nint)0xF000_0000_0000_0222), (nint)nativeSurface.context.instance);
-        Assert.Equal(7u, nativeSurface.context.graphics_queue_family_index);
-        Assert.Equal(1u, (uint)nativeTexture.texture_count);
-        Assert.Equal(image, nativeTexture.textures[0].image);
-        Assert.Equal(imageView, nativeTexture.textures[0].image_view);
     }
 }

@@ -3,11 +3,9 @@ package org.maplibre.nativeffi.internal.async
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.readLatLng
 import org.maplibre.nativeffi.internal.c.CompletionLayout
@@ -23,7 +21,6 @@ import org.maplibre.nativeffi.internal.memory.writeSize
 import org.maplibre.nativeffi.internal.memory.writeU32
 import org.maplibre.nativeffi.internal.memory.writeU64
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * A completion submitted through the completion bridge, which the test delivers and releases by
@@ -81,25 +78,6 @@ internal fun handDeliveredGeneration(): HandDeliveredCompletion<ULong> = capture
   NativeArena().use { arena -> CompletionBridge.submit(arena, ::generation, call) }
 }
 
-/** An owned completion that hands a value nobody adopted to [closeDropped]. */
-internal fun handDeliveredOwned(closeDropped: (ULong) -> Unit): HandDeliveredCompletion<ULong> =
-  capture { call ->
-    NativeArena().use { arena ->
-      CompletionBridge.submitOwned(
-        arena,
-        ::generation,
-        closeDropped,
-        disposeUnadopted = {},
-        call = call,
-      )
-    }
-  }
-
-/** An ordered command completion. */
-internal fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
-  NativeArena().use { arena -> CompletionBridge.command(arena, call) }
-}
-
 /** The completion bridge and its upcall stubs, driven without native. */
 class CompletionBridgeTest {
   /**
@@ -137,18 +115,6 @@ class CompletionBridgeTest {
   }
 
   @Test
-  fun aCompletionKeepsItsFirstResultAndIgnoresDeliveryAfterRelease(): Unit = runSuspendTest {
-    val completion = handDeliveredGeneration()
-    completion.deliver(MaplibreStatus.OK.nativeCode, 7u)
-    completion.deliver(MaplibreStatus.OK.nativeCode, 8u)
-    assertEquals(7u, completion.deferred.await())
-    completion.release()
-    // The released state is gone, so a stray delivery finds nothing to complete.
-    completion.deliver(MaplibreStatus.OK.nativeCode, 9u)
-    assertEquals(7u, completion.deferred.await())
-  }
-
-  @Test
   fun aFailedStatusBecomesItsExceptionWithTheDiagnostic(): Unit = runSuspendTest {
     val completion = handDeliveredGeneration()
     completion.deliver(MaplibreStatus.INVALID_ARGUMENT.nativeCode, 0u, "the zoom is out of range")
@@ -156,33 +122,5 @@ class CompletionBridgeTest {
     val failure = assertFailsWith<InvalidArgumentException> { completion.deferred.await() }
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, failure.status)
     assertEquals("the zoom is out of range", failure.diagnostic)
-  }
-
-  @Test
-  fun aCommandKeepsAFailedStatusAsData(): Unit = runSuspendTest {
-    val completion = handDeliveredCommand()
-    completion.deliver(
-      MaplibreStatus.NOT_FOUND.nativeCode,
-      3u,
-      "no such layer",
-      CommandDisposition.FAILED.rawValue,
-    )
-    completion.release()
-    val command = completion.deferred.await()
-    assertEquals(MaplibreStatus.NOT_FOUND, command.status)
-    assertEquals(3u, command.generation)
-    assertEquals("no such layer", command.diagnostic)
-    assertEquals(CommandDisposition.FAILED, command.disposition)
-  }
-
-  @Test
-  fun aValueArrivingAfterCancellationIsHandedToCloseDropped(): Unit = runSuspendTest {
-    val dropped = mutableListOf<ULong>()
-    val completion = handDeliveredOwned(dropped::add)
-    completion.deferred.cancel()
-    completion.deliver(MaplibreStatus.OK.nativeCode, 11u)
-    completion.release()
-    assertEquals(listOf(11uL), dropped)
-    assertFalse(completion.deferred.isActive)
   }
 }

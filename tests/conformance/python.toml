@@ -29,8 +29,6 @@
 "CB-08" = "bindings/python/tests/test_callbacks.py::test_a_registration_reported_as_rejected_is_not_rooted"
 "CB-09" = "bindings/python/tests/test_callbacks.py::test_a_camera_end_handler_is_rooted_until_it_runs"
 "CB-10" = "bindings/python/tests/test_callbacks.py::test_a_providers_routes_decide_which_requests_reach_it"
-"CB-11" = "bindings/python/tests/test_callbacks.py::test_transform_rules_rewrite_a_request_without_a_callback"
-"CB-12" = "bindings/python/tests/test_callbacks.py::test_a_provider_passes_a_deferred_request_to_native_loading"
 "VAL-01" = "bindings/python/tests/test_values.py::test_host_strings_use_views_and_native_lent_strings_decode"
 "VAL-02" = "bindings/python/tests/test_values.py::test_absent_fields_stay_distinct_from_present_values"
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"
@@ -38,9 +36,10 @@
 "VAL-05" = "bindings/python/tests/test_values.py::test_an_array_input_is_copied_when_it_is_submitted"
 "VAL-06" = { na = "A value's constructor takes every field, and MapOptions.default() returns a copy of the native default" }
 # The extension reads every strided array, array completions included, through
-# the reader it shares with the Rust binding, so the shared reader's test
-# covers it. The installed wheel offers no seam to deliver a synthetic result.
-"VAL-07" = "bindings/rust/crates/maplibre-native-ffi-core/src/ptr.rs::strided_records_are_read_at_their_stride_and_a_narrower_one_fails"
+# the reader it shares with the Rust binding, so the Rust array-completion test,
+# which reads through that reader, covers it. The installed wheel offers no seam
+# to deliver a synthetic result.
+"VAL-07" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::an_array_result_is_read_at_its_value_size"
 "VAL-08" = "bindings/python/tests/test_values.py::test_synchronous_calls_fill_caller_sized_outputs_in_input_order"
 "VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
 "REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
@@ -48,4 +47,3 @@
 "PLAT-01" = "bindings/python/tests/test_loader.py::test_the_package_loads_its_extension_and_finds_native_directories_once"
 "PLAT-02" = "bindings/python/tests/test_lifecycle.py::test_interpreter_shutdown_with_live_handles_and_callbacks_exits_cleanly"
 "PLAT-03" = "bindings/python/tests/test_lifecycle.py::test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it"
-"EX-01" = { na = "No example is written in Python" }

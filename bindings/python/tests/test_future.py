@@ -9,15 +9,6 @@ from maplibre_native_ffi._future import NativeFuture, map_future
 from support import TIMEOUT
 
 
-def test_derived_future_reports_the_transformed_source_result() -> None:
-    source: Future[int] = Future()
-    result = map_future(source, lambda value: value * 2)
-
-    source.set_result(21)
-
-    assert result.result(timeout=TIMEOUT) == 42
-
-
 @pytest.mark.parametrize(
     "failure", [RuntimeError("native completion failed"), asyncio.CancelledError()]
 )

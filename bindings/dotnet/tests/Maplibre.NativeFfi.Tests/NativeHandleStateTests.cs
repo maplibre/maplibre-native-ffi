@@ -45,32 +45,7 @@ public sealed unsafe class NativeHandleStateTests
     }
 
     [Fact]
-    public void HandleFailsWhileCloseIsInProgress()
-    {
-        using var destroy = new BlockingDestroy();
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            destroy.Destroy,
-            "RuntimeHandle"
-        );
-
-        var close = Task.Run(state.Close);
-        destroy.WaitUntilStarted();
-
-        var error = Assert.Throws<InvalidStateException>(() => _ = state.Handle);
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.Contains("closing", error.Message, StringComparison.OrdinalIgnoreCase);
-
-        destroy.Allow();
-        close.GetAwaiter().GetResult();
-
-        Assert.True(state.IsClosed);
-        Assert.Equal(1, destroy.Count);
-    }
-
-    [Fact]
-    public void ConcurrentCloseFailsWithoutBlockingOrDestroyingTwice()
+    public void ACloseInProgressRefusesUseAndASecondCloseWithoutDestroyingTwice()
     {
         using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(
@@ -82,13 +57,15 @@ public sealed unsafe class NativeHandleStateTests
         var firstClose = Task.Run(state.Close);
         destroy.WaitUntilStarted();
 
-        var secondClose = Task.Run(() => Assert.Throws<InvalidStateException>(state.Close));
-        secondClose.GetAwaiter().GetResult();
+        var error = Assert.Throws<InvalidStateException>(() => _ = state.Handle);
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.Contains("closing", error.Message, StringComparison.OrdinalIgnoreCase);
+        // The second close fails at once rather than waiting for the first.
+        Task.Run(() => Assert.Throws<InvalidStateException>(state.Close)).GetAwaiter().GetResult();
         Assert.Equal(1, destroy.Count);
 
         destroy.Allow();
         firstClose.GetAwaiter().GetResult();
-        secondClose.GetAwaiter().GetResult();
 
         Assert.True(state.IsClosed);
         Assert.Equal(1, destroy.Count);

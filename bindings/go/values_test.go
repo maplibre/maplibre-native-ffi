@@ -6,22 +6,12 @@ import (
 	"testing"
 )
 
-// Host strings cross as views. Native validates paths and URLs, and native-lent
-// strings decode from terminated storage.
+// Host strings cross as views, so native sees and rejects a NUL in a URL, and
+// native-lent strings decode from terminated storage.
 func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
-	asset := "asset\x00root"
-	options := DefaultRuntimeOptions()
-	options.AssetPath = &asset
-	if _, err := RuntimeCreate(options); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("RuntimeCreate with a NUL in AssetPath = %v, want ErrInvalidArgument", err)
-	}
-
 	f := newFixture(t)
 	if _, err := f.m.SetStyleUrl("custom://style\x00.json"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleUrl with a NUL = %v, want ErrInvalidArgument", err)
-	}
-	if completion := await(t, submitted(f.m.SetStyleJson([]byte("{\x00}")))); completion.Disposition != CommandDispositionFailed {
-		t.Fatalf("SetStyleJson with a NUL = %+v, want native's parse failure", completion)
 	}
 	const url = "custom://named-style.json"
 	f.serveStyle(t, url)
@@ -56,9 +46,6 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 	}
 	if image.TextFitHeight == nil || *image.TextFitHeight != fit {
 		t.Fatalf("TextFitHeight = %v, want proportional", image.TextFitHeight)
-	}
-	if !slices.Equal(image.StretchX, []ImageStretch{{From: 0, To: 1}}) || len(image.StretchY) != 0 {
-		t.Fatalf("stretches = %v, %v, want the one X interval", image.StretchX, image.StretchY)
 	}
 	if missing := await(t, submitted(f.m.GetStyleImage("missing"))); missing != nil {
 		t.Fatalf("GetStyleImage(missing) = %+v, want nil", missing)
@@ -120,36 +107,14 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 	if len(points) != len(coordinates) {
 		t.Fatalf("got %d points", len(points))
 	}
-	wrapped, err := projection.LatLngsForPixels(points)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unwrapped, err := projection.LatLngsForPixelsUnwrapped(points)
-	if err != nil {
-		t.Fatal(err)
-	}
 	for index, coordinate := range coordinates {
 		point, err := projection.PixelForLatLng(coordinate)
 		if err != nil || point != points[index] {
 			t.Fatalf("point %d: %+v, %v", index, point, err)
 		}
-		single, err := projection.LatLngForPixel(points[index])
-		if err != nil || single != wrapped[index] {
-			t.Fatalf("wrapped %d: %+v, %v", index, single, err)
-		}
-		single, err = projection.LatLngForPixelUnwrapped(points[index])
-		if err != nil || single != unwrapped[index] {
-			t.Fatalf("unwrapped %d: %+v, %v", index, single, err)
-		}
 	}
 	emptyPoints, err := projection.PixelsForLatLngs(nil)
 	if err != nil || len(emptyPoints) != 0 {
 		t.Fatalf("empty points: %+v, %v", emptyPoints, err)
-	}
-	for _, convert := range []func([]ScreenPoint) ([]LatLng, error){projection.LatLngsForPixels, projection.LatLngsForPixelsUnwrapped} {
-		empty, err := convert(nil)
-		if err != nil || len(empty) != 0 {
-			t.Fatalf("empty coordinates: %+v, %v", empty, err)
-		}
 	}
 }

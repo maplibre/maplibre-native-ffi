@@ -65,12 +65,6 @@ func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame
 	})
 }
 
-func (event runtimeEventForTest) withRenderMap(payload RuntimeEventRenderMap) runtimeEventForTest {
-	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP, C.mln_runtime_event_render_map{
-		mode: C.uint32_t(payload.Mode),
-	})
-}
-
 func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) runtimeEventForTest {
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, C.mln_runtime_event_tile_action{
 		operation: C.uint32_t(payload.Operation),
@@ -81,31 +75,6 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 			canonical_x:  C.uint32_t(payload.TileId.CanonicalX),
 			canonical_y:  C.uint32_t(payload.TileId.CanonicalY),
 		},
-	})
-}
-
-func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatus) runtimeEventForTest {
-	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, C.mln_runtime_event_offline_region_status{
-		region_id: C.mln_offline_region_id(payload.RegionId),
-		status: C.mln_offline_region_status{
-			download_state:       C.uint32_t(payload.Status.DownloadState),
-			completed_tile_count: C.uint64_t(payload.Status.CompletedTileCount),
-			complete:             C.bool(payload.Status.Complete),
-		},
-	})
-}
-
-func (event runtimeEventForTest) withOfflineRegionResponseError(payload RuntimeEventOfflineRegionResponseError) runtimeEventForTest {
-	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR, C.mln_runtime_event_offline_region_response_error{
-		region_id: C.mln_offline_region_id(payload.RegionId),
-		reason:    C.uint32_t(payload.Reason),
-	})
-}
-
-func (event runtimeEventForTest) withOfflineRegionTileCountLimit(payload RuntimeEventOfflineRegionTileCountLimit) runtimeEventForTest {
-	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT, C.mln_runtime_event_offline_region_tile_count_limit{
-		region_id: C.mln_offline_region_id(payload.RegionId),
-		limit:     C.uint64_t(payload.Limit),
 	})
 }
 

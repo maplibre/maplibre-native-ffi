@@ -135,18 +135,17 @@ func (handler leakLogHandler) Handle(_ context.Context, record slog.Record) erro
 	return nil
 }
 
-// The collector retires a map nobody closed, whether the test dropped its
-// handle or never claimed it from the creation's future: the map's cleanup
-// disposes it, and the runtime then closes.
+// The collector retires a map that the test never claimed from the creation's
+// future: the map's cleanup disposes it, and the runtime then closes. A dropped
+// handle retires the same way, which TestCollectorDisposesAndLogsALeakedHandle
+// checks.
 func TestCollectorRetiresUnclosedMaps(t *testing.T) {
 	f := newRuntimeFixture(t)
-	dropped := await(t, submitted(f.runtime.CreateMap(DefaultMapOptions())))
-	awaitCommitted(t, submitted(dropped.SetStyleJson([]byte(emptyStyle))))
 	unclaimed, err := f.runtime.CreateMap(DefaultMapOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
 	receive(t, unclaimed.Done(), "the unclaimed map's creation")
-	dropped, unclaimed = nil, nil
-	closeOnceCollected(t, f.runtime, "the disposal of both maps")
+	unclaimed = nil
+	closeOnceCollected(t, f.runtime, "the disposal of the unclaimed map")
 }

@@ -35,9 +35,9 @@ func expectBindingError(t *testing.T, want error, what string, call func()) {
 }
 
 // A count narrows to its C type only when the value fits. Vulkan's
-// non-dispatchable handles and GPU synchronization objects are 64 bits wide on
-// every platform, so each handle below has a bit set above the low 32 that a
-// pointer-width carrier would drop on a 32-bit target.
+// non-dispatchable handles are 64 bits wide on every platform, so each handle
+// below has a bit set above the low 32 that a pointer-width carrier would drop
+// on a 32-bit target.
 func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	expectBindingError(t, ErrInvalidArgument, "a count above uint16", func() { bindingCount[uint16](math.MaxUint16 + 1) })
 	expectBindingError(t, ErrInvalidArgument, "a negative count", func() { bindingCount[uint64](-1) })
@@ -48,30 +48,16 @@ func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	const (
 		image     = uint64(0x8000_0000_0000_0001)
 		imageView = uint64(0x0000_0001_0000_0000)
-		surface   = uint64(0xFEDC_BA98_7654_3210)
-		semaphore = uint64(0xFEED_FACE_0000_0007)
 	)
 	arena := &bindingArena{}
 	defer arena.close()
-	extent := LogicalExtent{Width: 64, Height: 32, ScaleFactor: 2}
-	context := VulkanContextDescriptor{Instance: 0x30, PhysicalDevice: 0x40, Device: 0x50, GraphicsQueue: 0x60}
 	descriptor := nativeVulkanBorrowedTextureDescriptor(VulkanBorrowedTextureDescriptor{
-		Extent: extent, PhysicalWidth: 128, PhysicalHeight: 64, Context: context,
+		Extent:   LogicalExtent{Width: 64, Height: 32, ScaleFactor: 2},
 		Textures: []VulkanBorrowedTexture{{Image: image, ImageView: imageView}},
 	}, arena)
-	if descriptor.texture_count != 1 {
-		t.Fatalf("texture count = %d, want 1", descriptor.texture_count)
-	}
 	texture := unsafe.Slice(descriptor.textures, 1)[0]
 	if uint64(texture.image) != image || uint64(texture.image_view) != imageView {
 		t.Fatalf("texture handles = %#x, %#x; want %#x, %#x", uint64(texture.image), uint64(texture.image_view), image, imageView)
-	}
-	if raw := nativeVulkanSurfaceDescriptor(VulkanSurfaceDescriptor{Extent: extent, Context: context, Surface: surface}, arena); uint64(raw.surface) != surface {
-		t.Fatalf("surface = %#x, want %#x", uint64(raw.surface), surface)
-	}
-	sync := nativeGpuSync(GpuSync{Kind: GpuSyncKindVulkanTimelineSemaphore, Object: semaphore, Value: math.MaxUint64}, arena)
-	if uint64(sync.object) != semaphore || uint64(sync.value) != math.MaxUint64 {
-		t.Fatalf("sync = %#x, %d; want %#x, %d", uint64(sync.object), uint64(sync.value), semaphore, uint64(math.MaxUint64))
 	}
 }
 

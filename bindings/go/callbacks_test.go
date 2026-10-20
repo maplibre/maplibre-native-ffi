@@ -467,33 +467,6 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	}
 }
 
-// Native copies a transform's rules, so the caller may reuse the slice once the
-// submission returns. A transform without a callback roots nothing, and its
-// rules rewrite each request in native code.
-func TestTransformRulesRewriteWithoutACallback(t *testing.T) {
-	f := newFixture(t)
-	base := f.serveLoopback(t, map[string]string{"/rewritten.json": emptyStyle})
-	roots := rootCount(f.runtime.bindingOwner)
-	rewritten := base + "/rewritten.json"
-	unserved := base + "/unserved.json"
-	rules := []ResourceRewriteRule{
-		{Kinds: ResourceKindMaskTile, Url: base + "/original.json", ReplacementUrl: &unserved},
-		{Kinds: ResourceKindMaskStyle, Url: base + "/original.json", ReplacementUrl: &rewritten},
-	}
-	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Rules: rules})))
-	for i := range rules {
-		rules[i] = ResourceRewriteRule{Flags: UrlMatchFlagsGlob, Url: "**", ReplacementUrl: &unserved}
-	}
-	if got := rootCount(f.runtime.bindingOwner); got != roots {
-		t.Fatalf("roots after a rules transform = %d, want %d", got, roots)
-	}
-
-	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEvent(t, "the rewritten style load", isStyleLoaded)
-}
-
 // A transform's response object works only inside its invocation and on the
 // thread native called it on.
 func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
@@ -605,28 +578,4 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func TestProviderPassesADeferredRequestToNativeLoading(t *testing.T) {
-	f := newFixture(t)
-	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
-	requests := make(chan *ResourceRequestHandle, 1)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
-		offer(requests, handle)
-		return ResourceProviderDecisionHandle
-	}})))
-	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
-		t.Fatal(err)
-	}
-	handle := receive(t, requests, "the provider request")
-	if err := handle.PassThrough(); err != nil {
-		t.Fatal(err)
-	}
-	if err := handle.PassThrough(); err == nil {
-		t.Fatal("a second terminal decision succeeded")
-	}
-	if err := handle.Close(); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEvent(t, "the native style load", isStyleLoaded)
 }

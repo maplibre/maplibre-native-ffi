@@ -70,29 +70,6 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
-    // Raw address conversion is explicitly borrowed backend interop.
-    [Fact]
-    public void NativePointerUsesBorrowedAddressFactory()
-    {
-        Assert.Null(
-            typeof(NativePointer).GetConstructor(
-                BindingFlags.Public | BindingFlags.Instance,
-                binder: null,
-                [typeof(nint)],
-                modifiers: null
-            )
-        );
-        Assert.NotNull(
-            typeof(NativePointer).GetMethod(
-                nameof(NativePointer.FromBorrowedAddress),
-                BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                [typeof(nint)],
-                modifiers: null
-            )
-        );
-    }
-
     // Optional cancellation tokens follow the .NET asynchronous API convention. Other default
     // parameter values would create shortcut workflows outside the C API shape.
     [Fact]

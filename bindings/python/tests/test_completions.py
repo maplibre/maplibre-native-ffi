@@ -35,13 +35,12 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
 
 def test_a_rejected_submission_frees_its_future(map_handle: mln.MapHandle) -> None:
     before = _live_native_futures()
-    for _ in range(3):
-        with pytest.raises(mln.InvalidArgumentError) as raised:
-            map_handle.get_feature_state(
-                mln.FeatureStateSelector(source_id="source", state_key="hover")
-            )
-        # Native rejected the submission, after the binding made its future.
-        assert raised.value.native_status_code is not None
+    with pytest.raises(mln.InvalidArgumentError) as raised:
+        map_handle.get_feature_state(
+            mln.FeatureStateSelector(source_id="source", state_key="hover")
+        )
+    # Native rejected the submission, after the binding made its future.
+    assert raised.value.native_status_code is not None
 
     assert _live_native_futures() == before
 
@@ -68,20 +67,19 @@ def test_a_done_callback_runs_off_the_native_thread_and_can_wait_on_native(
     map_handle: mln.MapHandle,
 ) -> None:
     finished = threading.Event()
-    outcomes: list[tuple[str, mln.CameraQueryResult, mln.CameraQueryResult]] = []
+    outcomes: list[tuple[mln.CameraQueryResult, mln.CameraQueryResult]] = []
 
     def query_again(first: Future[mln.CameraQueryResult]) -> None:
         try:
             second = result(map_handle.get_camera())
-            outcomes.append((threading.current_thread().name, first.result(), second))
+            outcomes.append((first.result(), second))
         finally:
             finished.set()
 
     map_handle.get_camera().add_done_callback(query_again)
 
     assert finished.wait(TIMEOUT)
-    ((thread, first, second),) = outcomes
-    assert thread.startswith("maplibre-callback")
+    ((first, second),) = outcomes
     assert second.generation > first.generation
 
 

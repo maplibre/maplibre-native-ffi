@@ -55,6 +55,18 @@ At startup, an example prints the mode, a `render target status:` line, and
 A Linux runner without a display runs the task under Xvfb or the toolkit's
 offscreen platform, with Mesa's software drivers.
 
+Some examples build only for part of the presets:
+
+- `rust-map` drives OpenGL on Linux and Windows only, so a macOS OpenGL preset
+  has no build of it.
+- `go-map` drives OpenGL through EGL and builds on the Linux EGL presets.
+- `swift-map-ios` is a UIKit app with no headless path, so CI builds it for the
+  iOS simulator and runs no smoke.
+- On the Windows Vulkan presets, `compose-map` shares frames with Skiko's
+  Direct3D 12 through `VK_KHR_external_memory_win32`. Lavapipe, the runners'
+  only Vulkan driver, lacks that extension, so CI builds `compose-map` there and
+  runs no smoke.
+
 ## Shared defaults
 
 | Setting        | Value                                                                          |

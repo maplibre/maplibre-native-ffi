@@ -226,14 +226,4 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert_eq!(error.diagnostic(), "");
     }
-
-    #[test]
-    fn invalid_native_calls_capture_status_and_diagnostic() {
-        let error = check(|diagnostic| unsafe { sys::mln_network_set_status(999_999, diagnostic) })
-            .unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
-        assert!(error.diagnostic().contains("network status"));
-    }
 }

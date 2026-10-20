@@ -10,7 +10,6 @@ import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.TestThread
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.runSuspendTest
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -101,21 +100,6 @@ class DecisionOwnerCoreTest {
     }
 
     assertEquals(1, completions)
-  }
-
-  @Test
-  fun completedHandleRejectsFurtherCompletion(): Unit = runSuspendTest {
-    var nativeCalls = 0
-    val core = DecisionOwnerCore("TestOwner") {}
-
-    core.beginComplete().use {
-      nativeCalls += 1
-      it.markCompleted()
-    }
-    val error = assertFailsWith<InvalidStateException> { core.beginComplete() }
-
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals(1, nativeCalls)
   }
 
   @Test

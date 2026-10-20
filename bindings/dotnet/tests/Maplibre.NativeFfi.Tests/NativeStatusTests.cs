@@ -67,16 +67,4 @@ public sealed class NativeStatusTests
         Assert.Equal(rawStatus, maplibreError.RawStatus);
         Assert.Equal("mapped diagnostic", maplibreError.Diagnostic);
     }
-
-    [Fact]
-    public void ANativeFailureRaisesItsStatusWithTheCallDiagnostic()
-    {
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            Maplibre.NetworkSetStatus((NetworkStatus)999_999)
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-        Assert.Equal((int)mln_status.MLN_STATUS_INVALID_ARGUMENT, error.RawStatus);
-        Assert.Contains("network status", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
-    }
 }

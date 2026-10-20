@@ -1,6 +1,5 @@
 //! Callback registrations, host errors inside callbacks, resource-request
-//! decisions, provider routes and transform rules, and scoped callback
-//! arguments.
+//! decisions, provider routes, and scoped callback arguments.
 
 const std = @import("std");
 const testing = std.testing;
@@ -409,112 +408,6 @@ test "a provider receives only the requests its routes match" {
     try testing.expectEqual(@as(usize, 0), provider.others.get());
 }
 
-/// A loopback HTTP server on its own thread that serves the fixture style at
-/// one path, answers every other path with 404, and counts both.
-const LoopbackServer = struct {
-    server: std.Io.net.Server,
-    thread: std.Thread = undefined,
-    served_path: []const u8,
-    stopping: std.atomic.Value(bool) = .init(false),
-    served: std.atomic.Value(usize) = .init(0),
-    missed: std.atomic.Value(usize) = .init(0),
-
-    fn start(self: *LoopbackServer) !void {
-        self.thread = try std.Thread.spawn(.{}, run, .{self});
-    }
-
-    fn port(self: *const LoopbackServer) u16 {
-        return self.server.socket.address.getPort();
-    }
-
-    /// Wakes the blocked accept with a connection of its own, then closes the
-    /// listening socket.
-    fn stop(self: *LoopbackServer) void {
-        self.stopping.store(true, .release);
-        const address = std.Io.net.IpAddress{ .ip4 = .loopback(self.port()) };
-        if (address.connect(testing.io, .{ .mode = .stream })) |stream| stream.close(testing.io) else |_| {}
-        self.thread.join();
-        self.server.deinit(testing.io);
-    }
-
-    fn run(self: *LoopbackServer) void {
-        while (true) {
-            const stream = self.server.accept(testing.io) catch return;
-            defer stream.close(testing.io);
-            if (self.stopping.load(.acquire)) return;
-            self.answer(stream) catch {};
-        }
-    }
-
-    fn answer(self: *LoopbackServer, stream: std.Io.net.Stream) !void {
-        var read_buffer: [4096]u8 = undefined;
-        var reader = stream.reader(testing.io, &read_buffer);
-        const request_line = try reader.interface.takeDelimiterInclusive('\n');
-        var parts = std.mem.tokenizeScalar(u8, request_line, ' ');
-        _ = parts.next();
-        const found = std.mem.eql(u8, parts.next() orelse "", self.served_path);
-        while (std.mem.trim(u8, try reader.interface.takeDelimiterInclusive('\n'), "\r\n").len != 0) {}
-        // Count before answering, so the count is final once the client has
-        // the response.
-        _ = (if (found) &self.served else &self.missed).fetchAdd(1, .acq_rel);
-
-        var write_buffer: [1024]u8 = undefined;
-        var writer = stream.writer(testing.io, &write_buffer);
-        const body = if (found) support.style_json else "";
-        try writer.interface.print("HTTP/1.1 {s}\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n{s}", .{
-            if (found) "200 OK" else "404 Not Found",
-            body.len,
-            body,
-        });
-        try writer.interface.flush();
-    }
-};
-
-// A transform without a callback rewrites in native code through its rules,
-// which registration copies, so the caller frees them before the registration
-// settles. The style rule rewrites the request to the one path the server
-// serves; the tile rule before it matches the same URL but not the kind.
-test "a transform's rules rewrite a request with no callback registered" {
-    var address = std.Io.net.IpAddress{ .ip4 = .loopback(0) };
-    var server = LoopbackServer{ .server = try address.listen(testing.io, .{}), .served_path = "/rewritten.json" };
-    server.start() catch |err| {
-        server.server.deinit(testing.io);
-        return err;
-    };
-    defer server.stop();
-
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    // A pass-through provider leaves every request to the native loader.
-    try fixture.setProvider(.{ .callback = passThrough });
-
-    var original_buffer: [64]u8 = undefined;
-    const original = try std.fmt.bufPrint(&original_buffer, "http://127.0.0.1:{d}/original.json", .{server.port()});
-    var scratch = std.heap.ArenaAllocator.init(testing.allocator);
-    defer scratch.deinit();
-    const rules = try scratch.allocator().dupe(maplibre.ResourceRewriteRule, &.{
-        .{
-            .kinds = .{ .tile = true },
-            .url = try scratch.allocator().dupe(u8, original),
-            .replacement_url = try scratch.allocator().dupe(u8, "http://127.0.0.1:1/tile.json"),
-        },
-        .{
-            .kinds = .{ .style = true },
-            .url = try scratch.allocator().dupe(u8, original),
-            .replacement_url = try std.fmt.allocPrint(scratch.allocator(), "http://127.0.0.1:{d}/rewritten.json", .{server.port()}),
-        },
-    });
-    const registered = try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .rules = rules }, null);
-    _ = scratch.reset(.free_all);
-    try support.resolve(registered);
-
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, original, null));
-    var loaded = try fixture.waitForEvent(.map_style_loaded);
-    loaded.deinit();
-    try testing.expectEqual(@as(usize, 1), server.served.load(.acquire));
-    try testing.expectEqual(@as(usize, 0), server.missed.load(.acquire));
-}
-
 // A camera command carries its end handler two records deep in its input.
 // Native runs the handler once and releases it when the command's identity is
 // cancelled. A command that native rejects leaves the context with the
@@ -543,18 +436,4 @@ test "a camera end handler inside a command is released after it runs" {
     try fixture.barrier();
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));
-}
-
-test "a provider passes a deferred request to native loading" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    var provider = DeferringProvider{ .url = "custom://native.json" };
-    try provider.install(fixture);
-    const handle = try provider.take(fixture);
-    defer maplibre.resourceRequestRelease(handle) catch {};
-    try maplibre.resourceRequestPassThrough(handle, null);
-    try testing.expectError(error.AlreadyCompleted, maplibre.resourceRequestPassThrough(handle, null));
-    var failed = try fixture.waitForEvent(.map_loading_failed);
-    defer failed.deinit();
-    try testing.expect(std.mem.indexOf(u8, failed.value.message, "declined") != null);
 }

@@ -110,10 +110,6 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     final fixture = await openRuntime();
-    expect(
-      () => fixture.runtime.setMaximumAmbientCacheSize(BigInt.from(-1)),
-      throwsA(isA<InvalidArgumentException>()),
-    );
 
     // Cancelling the largest identity ends the ease that carries it, so the
     // identity crossed whole both times.

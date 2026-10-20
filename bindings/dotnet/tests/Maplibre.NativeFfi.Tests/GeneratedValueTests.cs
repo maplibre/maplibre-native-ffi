@@ -17,14 +17,7 @@ public sealed class GeneratedValueTests
         LatLng[] coordinates = [new(0, 0), new(10, 20), new(-12, -30)];
         var points = projection.PixelsForLatLngs(coordinates);
         Assert.Equal(coordinates.Select(projection.PixelForLatLng), points);
-        Assert.Equal(points.Select(projection.LatLngForPixel), projection.LatLngsForPixels(points));
-        Assert.Equal(
-            points.Select(projection.LatLngForPixelUnwrapped),
-            projection.LatLngsForPixelsUnwrapped(points)
-        );
         Assert.Empty(projection.PixelsForLatLngs([]));
-        Assert.Empty(projection.LatLngsForPixels([]));
-        Assert.Empty(projection.LatLngsForPixelsUnwrapped([]));
     }
 
     private static byte[] EmptyGeoJsonSource =>

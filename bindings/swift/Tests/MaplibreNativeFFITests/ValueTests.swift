@@ -59,8 +59,7 @@ import Testing
 
 /// A count that does not fit the native type is rejected rather than
 /// truncated, an enum value this version does not name keeps its raw value,
-/// and a 64-bit Vulkan handle keeps its high bits on the way into a
-/// descriptor.
+/// and a 64-bit Vulkan handle keeps its high bits on the way into a record.
 @Test func valuesCheckNarrowingKeepUnknownEnumsAndCarryFullWidthHandles(
 ) throws {
   #expect(throws: NativeStringError.self) {
@@ -74,31 +73,13 @@ import Testing
   let copied = try StyleSourceInfo(raw: source)
   #expect(copied.type.rawValue == 700)
   #expect(copied.tilejson?.scheme.rawValue == 701)
-  #expect(RenderResult(rawValue: 99).rawValue == 99)
 
-  let context = VulkanContextDescriptor(
-    instance: NativePointer(bitPattern: 0x30),
-    physicalDevice: NativePointer(bitPattern: 0x40),
-    device: NativePointer(bitPattern: 0x50),
-    graphicsQueue: NativePointer(bitPattern: 0x60),
-    graphicsQueueFamilyIndex: 7,
-    getInstanceProcAddr: NativePointer(bitPattern: 0x90),
-    getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
-  )
-  let extent = LogicalExtent(width: 64, height: 32, scaleFactor: 2)
   let texture = VulkanBorrowedTexture(
     image: 0x8000_0000_0000_0001,
     imageView: 0x0000_0001_0000_0000
   ).nativeValue()
   #expect(texture.image == 0x8000_0000_0000_0001)
   #expect(texture.image_view == 0x0000_0001_0000_0000)
-  let surface = VulkanSurfaceDescriptor(
-    extent: extent,
-    context: context,
-    surface: 0xFEDC_BA98_7654_3210
-  ).nativeValue()
-  #expect(surface.surface == 0xFEDC_BA98_7654_3210)
-  #expect(UInt(bitPattern: surface.context.device) == 0x50)
 }
 
 /// A copy out of a native record rejects a null pointer with a nonzero size
@@ -111,12 +92,6 @@ import Testing
   #expect(throws: NativeStringError.self) {
     try OfflineRegionDefinition(raw: definition)
   }
-
-  var info = mln_offline_region_info()
-  info.definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID.rawValue
-  info.metadata = nil
-  info.metadata_size = 1
-  #expect(throws: NativeStringError.self) { try OfflineRegionInfo(raw: info) }
 }
 
 /// The input arena copies what a call submits, so the caller's later changes

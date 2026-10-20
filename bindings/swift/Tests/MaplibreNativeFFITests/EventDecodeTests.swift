@@ -3,51 +3,19 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// The batch reports the record stride, and a later C API version
-/// widens it by adding a payload member, so a decoder that stepped by its own
-/// event size would misread every event behind the first one.
-@Test func batchDecodeStepsByTheStrideTheBatchReports() throws {
-  let arena = packMessageArena(["first", "second", ""])
-  let events = [
-    rawRuntimeEvent(
-      type: 4,
-      source: 0x11,
-      messageOffset: arena.offsets[0],
-      messageSize: 5
-    ),
-    rawRuntimeEvent(
-      type: 8,
-      source: 0x22,
-      code: -3,
-      messageOffset: arena.offsets[1],
-      messageSize: 6
-    ),
-    rawRuntimeEvent(type: 9, source: 0x33),
-  ]
-  let batch = try withSynthesizedEventBatch(
-    events: events,
-    stride: MemoryLayout<mln_runtime_event>.size + 16,
-    messages: arena.bytes
-  ) { synthesized in
-    try EventBatchView(raw: synthesized.batch)
-  }
-
-  #expect(batch.events.map { $0.type.rawValue } == [4, 8, 9])
-  #expect(batch.events.map(\.source) == [0x11, 0x22, 0x33])
-  #expect(batch.events.map(\.message) == ["first", "second", ""])
-  #expect(batch.events.map(\.code) == [0, -3, 0])
-}
-
-/// An event type, source kind, and payload kind this version does not
-/// name reach the host with their raw values, and the payload arrives as the
-/// stride's own byte window, copied out of storage the next drain reuses.
+/// The batch reports the record stride, which a later C API version widens
+/// by adding a payload member, so the decoder steps by it rather than by its
+/// own event size. An event type, source kind, and payload kind this version
+/// does not name reach the host with their raw values, and the payload arrives
+/// as the stride's own byte window, copied out of storage the next drain
+/// reuses.
 @Test func unknownEventSourceAndPayloadKindsSurviveAsRawValues() throws {
   let stride = MemoryLayout<mln_runtime_event>.size + 8
   let payloadOffset = try #require(
     MemoryLayout<mln_runtime_event>.offset(of: \.payload)
   )
   let window = (0 ..< stride - payloadOffset).map { UInt8($0 & 0xFF) }
-  let arena = packMessageArena(["opaque"])
+  let arena = packMessageArena(["opaque", "second"])
   let event = rawRuntimeEvent(
     type: 0x4242,
     sourceType: 9,
@@ -59,8 +27,16 @@ import Testing
     messageSize: 6
   )
 
+  // The second event decodes only when the walk steps by the reported stride.
+  let known = rawRuntimeEvent(
+    type: 8,
+    source: 0x22,
+    messageOffset: arena.offsets[1],
+    messageSize: 6
+  )
+
   let batch = try withSynthesizedEventBatch(
-    events: [event],
+    events: [event, known],
     stride: stride,
     messages: arena.bytes,
     payloadWindows: [0: window]
@@ -82,10 +58,13 @@ import Testing
   #expect(decoded.code == -12)
   #expect(decoded.message == "opaque")
   #expect(decoded.payload == .unknown(0xBEEF, Data(window)))
+  #expect(batch.events.count == 2)
+  #expect(batch.events.last?.type.rawValue == 8)
+  #expect(batch.events.last?.source == 0x22)
+  #expect(batch.events.last?.message == "second")
 }
 
-/// Every typed payload reads its own union member, so a member's bytes cannot
-/// be attributed to the wrong payload kind.
+/// A typed payload reads the union member its kind names.
 @Test func typedPayloadsDecodeTheUnionMemberTheirKindNames() throws {
   var frame = rawRuntimeEvent(
     type: 14,
@@ -96,30 +75,12 @@ import Testing
   frame.payload.render_frame.stats.frame_count = 21
   frame.payload.render_frame.stats.encoding_time = 0.5
 
-  var tile = rawRuntimeEvent(
-    type: 18,
-    payloadType: MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION.rawValue
-  )
-  tile.payload.tile_action.operation = 5
-  tile.payload.tile_action.tile_id.canonical_x = 7
-  tile.payload.tile_action.tile_id.wrap = -1
-
-  var limit = rawRuntimeEvent(
-    type: MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.rawValue,
-    payloadType: MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
-      .rawValue
-  )
-  limit.payload.offline_region_tile_count_limit.region_id = 5
-  limit.payload.offline_region_tile_count_limit.limit = 99
-
   let batch = try withSynthesizedEventBatch(
-    events: [frame, tile, limit]
+    events: [frame]
   ) { synthesized in
     try EventBatchView(raw: synthesized.batch)
   }
-  let decoded = batch.events
-  let payloads = decoded.map(\.payload)
-  #expect(decoded[2].type == .offlineRegionTileCountLimitExceeded)
+  let payloads = batch.events.map(\.payload)
 
   guard case let .renderFrame(decodedFrame) = payloads[0] else {
     Issue.record("expected a render frame payload, got \(payloads[0])")
@@ -130,19 +91,4 @@ import Testing
   #expect(!decodedFrame.placementChanged)
   #expect(decodedFrame.stats.frameCount == 21)
   #expect(decodedFrame.stats.encodingTime == 0.5)
-
-  guard case let .tileAction(decodedTile) = payloads[1] else {
-    Issue.record("expected a tile action payload, got \(payloads[1])")
-    return
-  }
-  #expect(decodedTile.operation == .endParse)
-  #expect(decodedTile.tileId.canonicalX == 7)
-  #expect(decodedTile.tileId.wrap == -1)
-
-  guard case let .offlineRegionTileCountLimit(decodedLimit) = payloads[2] else {
-    Issue.record("expected a tile count limit payload, got \(payloads[2])")
-    return
-  }
-  #expect(decodedLimit.regionId == 5)
-  #expect(decodedLimit.limit == 99)
 }

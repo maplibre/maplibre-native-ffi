@@ -29,7 +29,7 @@ public sealed unsafe class RuntimeEventTests
         Marshal.OffsetOf<mln_runtime_event>(fieldName).ToInt32();
 
     [Fact]
-    public void CopiesEveryMessageAndTypedPayloadOfOneBatch()
+    public void CopiesEveryMessageAndTypedPayloadAtTheBatchStride()
     {
         var arena = new EventBatches.MessageArena();
         var renderError = arena.Add("render failed");
@@ -68,30 +68,13 @@ public sealed unsafe class RuntimeEventTests
                     },
                 },
             },
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
-                source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                payload_type = (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-                payload = new mln_runtime_event_payload
-                {
-                    render_map = new mln_runtime_event_render_map
-                    {
-                        mode = (uint)mln_render_mode.MLN_RENDER_MODE_FULL,
-                    },
-                },
-            },
         };
 
-        var copied = EventBatches.Decode(events, arena.Bytes, EventBatches.Stride);
+        // A batch from a newer library steps by a wider stride than this binding's record.
+        var copied = EventBatches.Decode(events, arena.Bytes, EventBatches.Stride + 24);
 
         Assert.Equal(
-            [
-                RuntimeEventType.MapRenderError,
-                RuntimeEventType.MapTileAction,
-                RuntimeEventType.MapRenderMapFinished,
-            ],
+            [RuntimeEventType.MapRenderError, RuntimeEventType.MapTileAction],
             copied.Select(runtimeEvent => runtimeEvent.Type)
         );
         Assert.Equal("render failed", copied[0].Message);
@@ -102,46 +85,6 @@ public sealed unsafe class RuntimeEventTests
         var tileAction = Assert.IsType<RuntimeEvent.PayloadValue.TileAction>(copied[1].Payload);
         Assert.Equal(TileOperation.EndParse, tileAction.Value.Operation);
         Assert.Equal(new TileId(4, -1, 3, 2, 1), tileAction.Value.TileId);
-
-        Assert.Equal(string.Empty, copied[2].Message);
-        var renderMap = Assert.IsType<RuntimeEvent.PayloadValue.RenderMap>(copied[2].Payload);
-        Assert.Equal(RenderMode.Full, renderMap.Value.Mode);
-    }
-
-    [Fact]
-    public void WalksEventsByTheStrideTheBatchReports()
-    {
-        var stride = EventBatches.Stride + 24;
-        var events = new[]
-        {
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-                code = 1,
-            },
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_IDLE,
-                code = 2,
-            },
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
-                code = 3,
-            },
-        };
-
-        var copied = EventBatches.Decode(events, [], stride);
-
-        Assert.Equal(
-            [
-                RuntimeEventType.MapCameraDidChange,
-                RuntimeEventType.MapIdle,
-                RuntimeEventType.MapLoadingFinished,
-            ],
-            copied.Select(runtimeEvent => runtimeEvent.Type)
-        );
-        Assert.Equal([1, 2, 3], copied.Select(runtimeEvent => runtimeEvent.Code));
     }
 
     [Fact]

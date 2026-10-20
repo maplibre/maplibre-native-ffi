@@ -22,13 +22,11 @@ import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
 
 /**
- * A JVM that has received native log records exits, with or without the callback installed, and
- * with its runtime, map, and their callbacks still live.
+ * A JVM that has received native log records exits with the callback installed, both after closing
+ * its runtime and map and with them and their callbacks still live.
  */
 class LogProcessExitTest {
   @Test fun jvmExitsWithNativeLogCallbackInstalled() = assertProcessExits("installed")
-
-  @Test fun jvmExitsAfterClearingNativeLogCallback() = assertProcessExits("cleared")
 
   @Test fun jvmExitsWithLiveHandlesAndCallbacks() = assertProcessExits("live")
 
@@ -47,7 +45,7 @@ object LogProcessExitProbe {
   @JvmStatic
   fun main(args: Array<String>) {
     val callbackState = args.single()
-    require(callbackState in setOf("installed", "cleared", "live"))
+    require(callbackState in setOf("installed", "live"))
     val received = CountDownLatch(1)
     Maplibre.loadNativeLibrary()
     GeneratedApi.logSetAsyncSeverityMask(LogSeverityMask.WARNING)
@@ -75,9 +73,6 @@ object LogProcessExitProbe {
           runtime.createMap(smallMapOptions()).await().use { map -> warnFromStyle(map, received) }
         }
       }
-    }
-    if (callbackState == "cleared") {
-      GeneratedApi.logClearCallback()
     }
     println(READY_TO_EXIT)
     exitProcess(0)

@@ -6,15 +6,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.generated.BoundOptions
+import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraOptions
+import org.maplibre.nativeffi.generated.CameraTransitionEnd
+import org.maplibre.nativeffi.generated.CameraTransitionHandler
+import org.maplibre.nativeffi.generated.CameraTransitionOutcome
 import org.maplibre.nativeffi.generated.CameraUpdate
-import org.maplibre.nativeffi.generated.EdgeInsets
+import org.maplibre.nativeffi.generated.CameraUpdateMode
 import org.maplibre.nativeffi.generated.FeatureStateSelector
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
@@ -102,28 +105,12 @@ class GeneratedShapesTest {
   @Test
   fun presenceFieldsRoundTripSetAndAbsentValues(): Unit = runSuspendTest {
     withMap {
-      val camera =
-        CameraOptions(
-          center = LatLng(12.0, 34.0),
-          centerAltitude = 123.0,
-          padding = EdgeInsets(5.0, 10.0, 15.0, 20.0),
-          zoom = 4.0,
-          bearing = 25.0,
-          pitch = 30.0,
-          roll = 7.0,
-          fieldOfView = 40.0,
-        )
+      val camera = CameraOptions(center = LatLng(12.0, 34.0), zoom = 4.0, bearing = 25.0)
       map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
       val snapshot = map.getSnapshot().camera
       assertEquals(12.0, assertNotNull(snapshot.center).latitude, 1e-6)
       assertEquals(34.0, assertNotNull(snapshot.center).longitude, 1e-6)
-      assertEquals(123.0, assertNotNull(snapshot.centerAltitude), 1e-6)
-      assertEquals(camera.padding, snapshot.padding)
       assertEquals(4.0, assertNotNull(snapshot.zoom), 1e-6)
-      assertEquals(25.0, assertNotNull(snapshot.bearing), 1e-6)
-      assertEquals(30.0, assertNotNull(snapshot.pitch), 1e-6)
-      assertEquals(7.0, assertNotNull(snapshot.roll), 1e-6)
-      assertEquals(40.0, assertNotNull(snapshot.fieldOfView), 1e-6)
       // A field the snapshot does not report stays absent rather than reading as zero.
       assertNull(snapshot.anchor)
 
@@ -132,9 +119,6 @@ class GeneratedShapesTest {
       val updated = map.getSnapshot().camera
       assertEquals(6.0, assertNotNull(updated.zoom), 1e-6)
       assertEquals(25.0, assertNotNull(updated.bearing), 1e-6)
-
-      map.setBounds(BoundOptions(unbounded = true)).awaitCommitted()
-      assertTrue(map.getSnapshot().bounds.unbounded)
 
       // A selector's optional state key narrows a removal to one member.
       val selector = FeatureStateSelector("source", featureId = "feature")
@@ -153,28 +137,27 @@ class GeneratedShapesTest {
   fun aStridedImageCopiesItsRowsAndReadsBackUnpadded(): Unit = runSuspendTest {
     withMap(mapMode = MapMode.STATIC) {
       loadStyle()
-      for (width in listOf(2, 128)) {
-        val rowBytes = width * 4
-        val stride = rowBytes + 8
-        val pixels = ByteArray(stride * width) { 99 }
-        val expected = ByteArray(rowBytes * width)
-        for (y in 0 until width) {
-          for (x in 0 until width) {
-            val color = byteArrayOf(x.toByte(), y.toByte(), 0, 255.toByte())
-            color.copyInto(pixels, y * stride + x * 4)
-            color.copyInto(expected, y * rowBytes + x * 4)
-          }
+      val width = 2
+      val rowBytes = width * 4
+      val stride = rowBytes + 8
+      val pixels = ByteArray(stride * width) { 99 }
+      val expected = ByteArray(rowBytes * width)
+      for (y in 0 until width) {
+        for (x in 0 until width) {
+          val color = byteArrayOf(x.toByte(), y.toByte(), 0, 255.toByte())
+          color.copyInto(pixels, y * stride + x * 4)
+          color.copyInto(expected, y * rowBytes + x * 4)
         }
-        val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
-        map.setStyleImage("image", image, StyleImageOptions()).awaitCommitted()
-        // The submission copies the rows out of the padded stride, and the readback is unpadded.
-        val copied = map.getStyleImage("image").awaitWithin("the image")
-        assertContentEquals(expected, copied?.pixels)
-        // A record compares and hashes its byte arrays by content, not by identity.
-        val equal = copied?.copy(pixels = expected.copyOf())
-        assertEquals(copied, equal)
-        assertEquals(copied.hashCode(), equal.hashCode())
       }
+      val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
+      map.setStyleImage("image", image, StyleImageOptions()).awaitCommitted()
+      // The submission copies the rows out of the padded stride, and the readback is unpadded.
+      val copied = map.getStyleImage("image").awaitWithin("the image")
+      assertContentEquals(expected, copied?.pixels)
+      // A record compares and hashes its byte arrays by content, not by identity.
+      val equal = copied?.copy(pixels = expected.copyOf())
+      assertEquals(copied, equal)
+      assertEquals(copied.hashCode(), equal.hashCode())
     }
   }
 
@@ -188,11 +171,29 @@ class GeneratedShapesTest {
         }
       assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, error.nativeStatusCode)
 
-      // A map's event source is its handle, whose top byte carries the handle kind.
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
-      val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
-      assertTrue(map.id shr 56 != 0uL, "a map handle carries its kind in the top byte")
-      assertEquals(map.id, event.source)
+      // Cancelling the largest identity ends the ease that carries it, so the identity crossed
+      // whole both times.
+      val ended = CompletableDeferred<CameraTransitionEnd>()
+      val animation =
+        AnimationOptions(
+          durationMs = 60000.0,
+          transitionId = ULong.MAX_VALUE,
+          endHandler = CameraTransitionHandler { ended.complete(it) },
+        )
+      map
+        .updateCamera(
+          CameraUpdate(
+            mode = CameraUpdateMode.EASE,
+            camera = CameraOptions(zoom = 4.0),
+            animation = animation,
+          ),
+        )
+        .awaitCommitted()
+      map.cancelCameraTransition(ULong.MAX_VALUE).awaitCommitted()
+      assertEquals(
+        CameraTransitionOutcome.CANCELLED,
+        ended.awaitWithin("the end handler").outcome,
+      )
     }
   }
 

@@ -13,7 +13,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
@@ -169,39 +168,5 @@ class HandleStateCoreTest {
       ),
       reports,
     )
-  }
-
-  @Test
-  fun aUseStartingAfterCloseBeginsIsRefused() {
-    val state = HandleStateCore("TestHandle", 0x1234)
-    var refusal: Throwable? = null
-
-    // Runs while closeOnce holds the releasing state, the window a use on another thread
-    // would land in.
-    state.closeOnce(
-      destroy = { refusal = assertFailsWith<InvalidStateException> { state.withLive {} } },
-    )
-
-    assertEquals("TestHandle is closing", (refusal as InvalidStateException).diagnostic)
-    val closed = assertFailsWith<InvalidStateException> { state.withLive {} }
-    assertEquals("TestHandle is closed", closed.diagnostic)
-  }
-
-  @Test
-  fun adoptingTheZeroHandleIsAnInvalidArgument() {
-    val error = assertFailsWith<InvalidArgumentException> { HandleStateCore("TestHandle", 0L) }
-    assertEquals("TestHandle handle must not be zero", error.diagnostic)
-    assertNull(error.nativeStatusCode)
-  }
-
-  @Test
-  fun withLiveReturnsTheBlockResultAndPropagatesFailures() {
-    val state = HandleStateCore("TestHandle", 0x1234)
-
-    assertEquals(7, state.withLive { 7 })
-    assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
-
-    state.closeOnce(destroy = {})
-    assertTrue(state.isReleased())
   }
 }

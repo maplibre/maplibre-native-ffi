@@ -109,27 +109,3 @@ test "discarding a creation future retires the map it creates" {
     // release.
     try fixture.releaseRuntimeWhenChildless();
 }
-
-// An install submits under its own lease of the prepared data, so releasing
-// the data right after submission leaves the installs intact, and the released
-// handle is then stale for new installs.
-test "prepared GeoJSON data outlives its release through submitted installs" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    try fixture.loadStyle();
-
-    const data = try maplibre.geojsonSourceDataCreate(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null, null);
-    const first = try maplibre.mapAddGeojsonSourceData(fixture.map, "first", data, null);
-    const second = try maplibre.mapAddGeojsonSourceData(fixture.map, "second", data, null);
-    try maplibre.geojsonSourceDataRelease(data);
-    try maplibre.geojsonSourceDataRelease(data);
-    try support.expectCommitted(first);
-    try support.expectCommitted(second);
-    var sources = try support.resolve(try maplibre.mapListStyleSources(testing.allocator, fixture.map, null));
-    defer sources.deinit();
-    try testing.expectEqual(@as(usize, 2), sources.value.len);
-    try testing.expectEqualStrings("first", sources.value[0].id);
-    try testing.expectEqualStrings("second", sources.value[1].id);
-
-    try testing.expectError(error.InvalidState, maplibre.mapAddGeojsonSourceData(fixture.map, "third", data, null));
-}

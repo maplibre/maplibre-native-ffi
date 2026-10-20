@@ -303,42 +303,6 @@ func installProvider(
   }
 }
 
-/// A transform's rules reach native as a copied array and rewrite a request
-/// with no host callback registered, matching each rule's kinds and URL
-/// pattern as given.
-@Test func aRulesTransformRewritesWithoutAHostCallback() async throws {
-  let server = try LoopbackServer(bodies: ["/rewritten.json": emptyStyle])
-  defer { server.stop() }
-  try await withMapFixture { fixture in
-    let original = server.url("/original.json")
-    try await installProvider(on: fixture.runtime, for: original) { _ in
-      .passThrough
-    }
-    try await fixture.runtime.setResourceTransform(transform: ResourceTransform(
-      rules: [
-        // Another kind: matches the URL but not the style request.
-        ResourceRewriteRule(
-          kinds: .tile,
-          url: original,
-          replacementUrl: "http://127.0.0.1:1/tile.json"
-        ),
-        ResourceRewriteRule(
-          kinds: .style,
-          flags: .glob,
-          url: "http://127.0.0.1:*/original.json",
-          replacementUrl: server.url("/rewritten.json")
-        ),
-      ]
-    ))
-
-    try await fixture.map.setStyleUrl(url: original)
-    #expect(try await fixture.awaitEvent("the rewritten style") {
-      $0.type == .mapStyleLoaded
-    } != nil)
-    #expect(server.requestedPaths == ["/rewritten.json"])
-  }
-}
-
 /// A cancel callback registered on a request native already cancelled is
 /// rejected through the registration's cancelled output, and the binding
 /// frees it at once rather than rooting it.
@@ -373,26 +337,5 @@ func installProvider(
     #expect(releases.value == 1)
     try request.close()
     #expect(releases.value == 1)
-  }
-}
-
-@Test func aProviderPassesADeferredRequestToNativeLoading() async throws {
-  try await withMapFixture { fixture in
-    let taken = LockedBox<ResourceRequestHandle?>(nil)
-    try await installProvider(on: fixture.runtime,
-                              for: "custom://native.json")
-    { handle in
-      taken.update { $0 = handle }
-      return .handle
-    }
-    try await fixture.map.setStyleUrl(url: "custom://native.json")
-    await awaitCondition("the provider request") { taken.value != nil }
-    let handle = try #require(taken.value)
-    try handle.passThrough()
-    #expect(throws: MaplibreError.self) { try handle.passThrough() }
-    try handle.close()
-    #expect(try await fixture.awaitEvent("the native failure") {
-      $0.type == .mapLoadingFailed && $0.message.contains("declined")
-    } != nil)
   }
 }

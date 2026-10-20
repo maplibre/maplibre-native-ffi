@@ -72,30 +72,17 @@ class AndroidAssetStyleTest {
     renderPmtiles("asset://range-check.pmtiles")
   }
 
-  @Test
-  fun pmtilesAssetFileUriReadsRangedMetadata(): Unit = runSuspendTest {
-    renderPmtiles("file:///android_asset/range-check.pmtiles")
-  }
-
-  @Test
-  fun pmtilesFilesystemAssetRootReadsRangedMetadata(): Unit = runSuspendTest {
-    renderPmtiles("asset://downloaded.pmtiles", downloadedAssets().absolutePath)
-  }
-
-  /** Writes a style and a PMTiles archive to app storage, for use as a filesystem asset root. */
+  /** Writes a style to app storage, for use as a filesystem asset root. */
   private fun downloadedAssets(): File {
     val instrumentation = InstrumentationRegistry.getInstrumentation()
     // A directory path is literal; only the requested URL is percent-decoded.
     val directory = File(instrumentation.targetContext.filesDir, "asset root %20")
     directory.mkdirs()
     File(directory, "style.json").writeText(CUSTOM_ROOT_STYLE)
-    instrumentation.context.assets.open("range-check.pmtiles").use { input ->
-      File(directory, "downloaded.pmtiles").outputStream().use { input.copyTo(it) }
-    }
     return directory
   }
 
-  private suspend fun renderPmtiles(archiveUrl: String, assetPath: String? = null) {
+  private suspend fun renderPmtiles(archiveUrl: String) {
     // A static map renders its still image only once every source has loaded, and a PMTiles
     // source loads only when its ranged reads of the archive's header and metadata succeed. A range
     // miss returns the whole archive, which fails the source and the still image with it.
@@ -103,7 +90,6 @@ class AndroidAssetStyleTest {
       width = 64,
       height = 64,
       provider = localFilesProvider(),
-      runtimeOptions = runtimeOptions(assetPath),
     ) {
       setStyle(
         """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://$archiveUrl"}},"layers":[]}""",

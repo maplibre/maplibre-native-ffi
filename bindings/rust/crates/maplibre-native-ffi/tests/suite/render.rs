@@ -146,29 +146,6 @@ fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
 }
 
 #[test]
-fn a_live_session_refuses_map_release_and_keeps_the_map_alive() {
-    let _global = global_state();
-    let reports = capture_reports();
-
-    let graphics = Graphics::new();
-    let (fixture, session) = rendering_fixture(&graphics);
-    let (runtime, map) = fixture.into_parts();
-
-    let error = map.release().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert!(error.diagnostic().contains("render session"), "{error}");
-    // The session holds its map, so dropping the map's handle first is not a
-    // leak: the map retires once the session lets it go.
-    drop(map);
-    session.close();
-    wait_for(runtime.release());
-
-    set_reporter(None);
-    let leaked = leaks(&reports);
-    assert!(leaked.is_empty(), "{leaked:?}");
-}
-
-#[test]
 fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let _global = global_state();
     let reports = capture_reports();

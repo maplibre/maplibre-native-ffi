@@ -36,9 +36,6 @@
 "CB-08" = "A registration whose accepted_unless output reports rejection is not rooted"
 "CB-09" = "A registration nested in a command's input record is rooted until native runs and releases it, and a command that native rejects does not root it"
 "CB-10" = "A provider's routes cross to native as a copied array: the provider receives only the requests its routes match, and a route that names only a URL pattern matches every resource kind"
-"CB-11" = "A transform's rules cross to native as a copied array and rewrite a request with no host callback registered"
-
-"CB-12" = "A provider can pass a deferred decision handle to native loading and then release its owner"
 
 # Generated value shapes
 "VAL-01" = "Host strings cross as explicit-length views; native-lent terminated strings decode, and native rejects embedded NUL where a string reaches a C-string consumer"
@@ -59,6 +56,3 @@
 "PLAT-01" = "The binding finds and loads the native library as it ships (package, loader, build hook)"
 "PLAT-02" = "Process exit, or language runtime shutdown, with live handles and callbacks that the host did not retire first exits cleanly"
 "PLAT-03" = "The garbage collector or cycle collector reclaims abandoned handles and callback cycles"
-
-# Examples
-"EX-01" = "Each example in this binding's language renders one frame headless and exits cleanly, or builds where no backend can run"

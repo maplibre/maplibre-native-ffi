@@ -61,19 +61,4 @@ class OwnedCompletionTest {
     assertEquals(2, closed)
     assertEquals(0, disposed)
   }
-
-  @Test
-  fun successfulAdoptionTransfersTheRawOwner(): Unit = runSuspendTest {
-    var disposed = 0
-    val completion =
-      ownedCompletion(
-        closeDropped = { _: String -> error("The result is observed") },
-        disposeUnadopted = { disposed++ },
-        convert = { it.toString() },
-      )
-    completion.deliver(MaplibreStatus.OK.nativeCode, 17u)
-    completion.release()
-    assertEquals("17", completion.deferred.await())
-    assertEquals(0, disposed)
-  }
 }

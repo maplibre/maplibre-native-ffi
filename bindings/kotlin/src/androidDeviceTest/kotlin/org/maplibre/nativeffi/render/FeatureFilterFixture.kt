@@ -18,15 +18,11 @@ import org.maplibre.nativeffi.runtime.awaitCommitted
  * Renders one point feature per entry of [properties], with ids `case-0`, `case-1`, and so on, and
  * asserts that both a source query and the rendered layer keep exactly the [expected] indices under
  * [filter]. The two paths evaluate the filter on different threads.
- *
- * [encode] turns the style and filter JSON into bytes, so a caller can embed bytes that a Kotlin
- * string cannot hold.
  */
 internal suspend fun assertFilterSelects(
   filter: String,
   properties: List<String>,
   expected: Set<Int> = properties.indices.toSet(),
-  encode: (String) -> ByteArray = { it.trimIndent().encodeToByteArray() },
 ) {
   val features =
     properties
@@ -43,14 +39,14 @@ internal suspend fun assertFilterSelects(
     map
       .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 0.0), zoom = 2.0)))
       .awaitCommitted()
-    assertCommitted(complete(map.setStyleJson(encode(style))))
+    assertCommitted(complete(map.setStyleJson(style.encode())))
     // The still image waits for the source to load and the layer to render.
     renderStill()
 
     val ids = expected.map { "case-$it" }.toSet()
     val source =
       complete(
-        session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = encode(filter))),
+        session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = filter.encode())),
       )
     assertEquals(ids, source.map { it.stringId() }.toSet(), "source query: $filter")
     val rendered =
@@ -72,6 +68,8 @@ internal suspend fun assertFilterSelects(
 }
 
 private const val FILTER_MAP_SIZE = 64
+
+private fun String.encode(): ByteArray = trimIndent().encodeToByteArray()
 
 private val STRING_ID = Regex("\"id\"\\s*:\\s*\"([^\"]*)\"")
 

@@ -8,12 +8,6 @@ import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
-/// Every event type but style-loaded, the type a host most plausibly clears
-/// while still expecting a source's callback root to be released.
-final _maskWithoutStyleLoaded = RuntimeEventMask.fromRawValue(
-  RuntimeEventMask.all.rawValue & ~RuntimeEventMask.mapStyleLoaded.rawValue,
-);
-
 CustomGeometrySourceOptions _geometrySource({int? tileSize}) =>
     CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: tileSize);
 
@@ -94,41 +88,6 @@ void main() {
         ),
         throwsA(isA<InvalidArgumentException>()),
       );
-      expect(singleCallbackPortProbeForTesting(map), isNull);
-    },
-  );
-
-  // The release callback the C API invokes is what tells this binding a style
-  // replacement detached a source, so a host that reads no style-loaded events
-  // still gets its callback root retired.
-  test(
-    'a style replacement releases a source root with style loads unselected',
-    () async {
-      final fixture = await openRuntime();
-      final map = await fixture.openMap(
-        MapOptions(
-          initialExtent: const LogicalExtent(
-            width: 64,
-            height: 64,
-            scaleFactor: 1,
-          ),
-          eventMask: _maskWithoutStyleLoaded,
-        ),
-      );
-      await expectCommitted(map.setStyleJson(jsonBytes(emptyStyleJson)));
-      await expectCommitted(
-        map.addCustomMvtVectorSource(
-          'source',
-          CustomMvtVectorSourceOptions(fetchTile: (_) {}),
-        ),
-      );
-      final probe = singleCallbackPortProbeForTesting(map)!;
-      // The mask reads back as the host set it, because the binding selects
-      // no events of its own.
-      expect(map.getSnapshot().eventMask, _maskWithoutStyleLoaded);
-
-      await expectCommitted(map.setStyleJson(jsonBytes(emptyStyleJson)));
-      await within(probe.released, 'the release after a style replacement');
       expect(singleCallbackPortProbeForTesting(map), isNull);
     },
   );

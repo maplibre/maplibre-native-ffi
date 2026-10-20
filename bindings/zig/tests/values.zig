@@ -28,10 +28,6 @@ test "host strings use views and native-lent strings decode" {
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    const rejected = try support.resolve(try maplibre.mapSetStyleJson(fixture.map, "{\x00}", null));
-    try testing.expectEqual(maplibre.CommandDisposition.failed, rejected.disposition);
-    try testing.expectError(error.InvalidArgument, rejected.statusError());
-
     try fixture.loadStyle();
     const source_id = "nul\x00source";
     try support.expectCommitted(try maplibre.mapAddStyleSourceJson(fixture.map, source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));

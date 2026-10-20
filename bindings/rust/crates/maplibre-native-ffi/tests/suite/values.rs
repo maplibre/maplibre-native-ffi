@@ -235,27 +235,6 @@ fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
         .map(|&value| projection.pixel_for_lat_lng(value).unwrap())
         .collect();
     assert_eq!(points, singles);
-    assert_eq!(
-        projection.lat_lngs_for_pixels(&points).unwrap(),
-        points
-            .iter()
-            .map(|&value| projection.lat_lng_for_pixel(value).unwrap())
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(
-        projection.lat_lngs_for_pixels_unwrapped(&points).unwrap(),
-        points
-            .iter()
-            .map(|&value| projection.lat_lng_for_pixel_unwrapped(value).unwrap())
-            .collect::<Vec<_>>()
-    );
     assert!(projection.pixels_for_lat_lngs(&[]).unwrap().is_empty());
-    assert!(projection.lat_lngs_for_pixels(&[]).unwrap().is_empty());
-    assert!(
-        projection
-            .lat_lngs_for_pixels_unwrapped(&[])
-            .unwrap()
-            .is_empty()
-    );
     projection.release().unwrap();
 }

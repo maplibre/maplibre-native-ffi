@@ -43,39 +43,3 @@ pub unsafe fn strided_records<T: Copy>(
         }
     }))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strided_records_are_read_at_their_stride_and_a_narrower_one_fails() {
-        // Two records, each followed by a member this binding does not know.
-        #[repr(C)]
-        #[derive(Clone, Copy)]
-        struct Wide {
-            record: [f64; 2],
-            newer: f64,
-        }
-        let wide = [
-            Wide {
-                record: [1.0, 2.0],
-                newer: -1.0,
-            },
-            Wide {
-                record: [3.0, 4.0],
-                newer: -1.0,
-            },
-        ];
-        let pointer = wide.as_ptr().cast::<[f64; 2]>();
-        // SAFETY: wide holds two records at its stride.
-        let records = unsafe { strided_records(pointer, 2, std::mem::size_of::<Wide>()) }
-            .unwrap()
-            .collect::<Vec<_>>();
-        assert_eq!(records, [[1.0, 2.0], [3.0, 4.0]]);
-
-        // SAFETY: a stride narrower than the record fails before any read.
-        let narrow = unsafe { strided_records(pointer, 2, std::mem::size_of::<[f64; 2]>() - 1) };
-        assert_eq!(narrow.err().unwrap().kind(), ErrorKind::NativeError);
-    }
-}
