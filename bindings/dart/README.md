@@ -40,8 +40,8 @@ release, which is what a consumer taking this package as a git dependency gets.
 
 Dart runs the hook for `dart run` as well as `dart test`, so regenerating the
 bindings resolves a library it never calls. Run the test task first and the
-pointer already names a local build; on its own, `mise run
-//bindings/dart:ffigen` downloads one.
+pointer already names a local build; on its own,
+`mise run //bindings/dart:ffigen` downloads one.
 
 ## Android host integration
 

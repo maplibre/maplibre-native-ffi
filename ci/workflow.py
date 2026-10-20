@@ -59,13 +59,21 @@ def backend(preset: str) -> str:
     return value
 
 
+# Blacksmith runs CI through its open source program. Windows stays on
+# GitHub-hosted runners until its jobs pass there.
+LINUX_RUNNER = "blacksmith-4vcpu-ubuntu-2404"
+LINUX_ARM_RUNNER = "blacksmith-4vcpu-ubuntu-2404-arm"
+MACOS_RUNNER = "blacksmith-6vcpu-macos-26"
+SMALL_RUNNER = "blacksmith-2vcpu-ubuntu-2404"
+
+
 def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
     if target_platform in {"linux-gnu", "linux-musl"}:
         # The Zig toolchain selects the libc. These images stay pinned so the
         # graphics headers and loaders used at build time stay reproducible.
-        return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
+        return LINUX_ARM_RUNNER if target_architecture == "arm64" else LINUX_RUNNER
     if target_platform in {
         "macos",
         "ios",
@@ -74,11 +82,11 @@ def runner(preset: str) -> str:
         "tvos",
         "tvos-simulator",
     }:
-        return "macos-26"
+        return MACOS_RUNNER
     if target_platform == "windows":
         return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
     if target_platform in {"android", "emscripten", "ohos"}:
-        return "ubuntu-latest"
+        return LINUX_RUNNER
     raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
 
 
@@ -176,7 +184,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
                 f"mise run //bindings/swift:build {preset}",
-                f"mise run //bindings/zig:build {preset}",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -186,7 +193,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
-                f"mise run //bindings/zig:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -199,7 +205,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
                 f"mise run //bindings/swift:build {preset}",
-                f"mise run //bindings/zig:build {preset}",
             ]
         )
     elif target_platform == "tvos-simulator":
@@ -207,7 +212,6 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
-                f"mise run //bindings/zig:test {preset}",
             ]
         )
     elif target_platform in DESKTOP or target_platform == "emscripten":

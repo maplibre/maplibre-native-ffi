@@ -20,74 +20,41 @@ interop or the popular MapLibre Android/iOS SDKs.
 ## Workflow
 
 ```bash
-# Install/refresh system packages, shared tools, and repository hooks.
-# On Linux this uses sudo; --yes accepts package-manager prompts. Use this on
-# Linux and macOS:
+# Install system packages, shared tools, and Git hooks. On Windows, add
+# --skip files.
 mise bootstrap --yes
-# On Windows, skip mise's unused Unix-only managed-files phase.
-mise bootstrap --yes --skip files
 
-# Project-specific tools install automatically with namespaced tasks.
-
-# List available tasks across the workspace
-mise tasks --all
-
-# Configure, build, and install the host native library
-mise run build
-
-# Build and run C API tests (also runs build)
-mise run test
-
-# Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:test
-
-# Headless smoke test — no display needed
-mise run //examples/zig-readback:run
-
-# GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
-
-# Build a different native target/backend
-mise run build linux-gnu-x64-egl
-
-# Package a native artifact with CPack
-mise run package-native linux-gnu-x64-egl
-
-# Build the Android binding for one ABI/backend
-mise run //bindings/kotlin:android-build opengl x86_64
-
-# Run formatters and linters on _all_ files
-mise run fix
-
-# Run formatters and linters on targeted files; add --stage to stage the fixes
-hk fix [FILES...]
+mise tasks --all                          # List every task
+mise run build                            # Build the host native library
+mise run build linux-gnu-x64-egl          # Build another target or backend
+mise run test                             # Build and run the C API tests
+mise run //bindings/rust:test             # Run one binding's tests
+mise run //examples/zig-readback:run      # Headless smoke test
+mise run //examples/zig-map:run           # GUI app; use a timeout or background
+mise run fix                              # Format and lint every file
+hk fix [FILES...]                         # Format and lint some files
 ```
 
-Native targets and render backends are defined in `CMakePresets.json`. Gradle
-selects the Android presets when building platform packages; OpenHarmony and
-host workflows use the presets directly.
+Project-specific tools install automatically when their tasks run. To run a
+command that is not a task, use `mise exec -- ...` so that repository tools are
+on the path. Formatters and linters also run on pre-commit.
 
-Clangd uses the compilation database selected by the last `mise run build
-<preset>` invocation; select the matching preset before trusting target-specific
-diagnostics.
+Clangd uses the compilation database of the last `mise run build <preset>`, so
+build the matching preset before trusting target-specific diagnostics.
 
-The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
-configuration environment named after its presets. A build for one of those
-targets reads `ANDROID_HOME`, `EMSDK`, or `OHOS_SDK_NATIVE` from the
-environment. To use a pinned SDK instead, pass `-E` to the install and to every
-later command that builds for the target:
+Android, Emscripten, and OpenHarmony builds need an SDK; see
+[Targets that need an SDK](docs/src/content/docs/development/overview.md#targets-that-need-an-sdk).
 
-```bash
-mise -E android install
-mise -E android run build android-arm64-vulkan
-```
+## Issue and PR organization
 
-Formatters and linters run automatically on pre-commit; you usually don't need
-to run them manually.
+Label an issue or a pull request with exactly one kind (`bug`, `feature`,
+`perf`, `chore`, or `research`) and at least one `area:*` label. Add `binding:`,
+`platform:`, and `renderer:` labels when the work is specific to one, and add
+`upstream` when the cause is in MapLibre Native. A patch we carry early still
+gets `area:upstream`. Leave GitHub's native issue type unset.
 
-The environment is managed by mise. If you need to run a command that's not
-already a mise task, use `mise exec -- ...` so repository tools and dependency
-paths are available.
+`needs-info` and `do-not-merge` are workflow state, and they do not replace a
+kind or an area.
 
 ## Pull requests
 
@@ -96,36 +63,8 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-Every PR code update runs baseline coverage: hygiene, docs, and Linux x64
-EGL/Vulkan with their binding suites. Promotion adds macOS Metal, Windows x64
-WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU in a separate ready
-workflow. Main, manual runs, Dependabot-authored PRs, and `ci:full` run complete
-coverage and packaging verification in one workflow.
-
-Use persistent PR labels to add coverage to either PR tier:
-
-| Label        | Additional coverage                                               |
-| ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
-| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
-| `ci:linux`   | Linux ARM64 and musl variants                                     |
-| `ci:windows` | Windows ARM64 variants                                            |
-| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
-| `ci:full`    | Every target and complete packaging verification, including Maven |
-
-Labels combine and persist across pushes. The extended workflow combines the
-requested platforms, including the producers needed by its packaging checks.
-Readiness and label changes reuse actual coverage for the same tested merge
-commit and coverage scope; missing evidence runs coverage again. An explicit
-workflow rerun also executes coverage again. Every job in a selected group must
-succeed.
-
-Extended CI retains `ci-required`; baseline and ready each have one additional
-required check; see
-[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
-branch protection configuration. For CI, shared toolchain, dependency, or
-publishing changes, request full coverage with `gh pr edit <number> --add-label
-'ci:full'`.
+Applicable CI jobs are selected automatically. If the selection looks wrong,
+trigger a manual run (`gh workflow run CI --ref <branch>`).
 
 ## Project Invariants
 
@@ -176,8 +115,8 @@ Read these docs before changing related code:
   for binding requirements and language binding changes.
 - [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
   for example requirements.
-- [Overview](docs/src/content/docs/development/overview.md) for project layout,
-  workflow, and tooling.
+- [Overview](docs/src/content/docs/development/overview.md) for setup, common
+  tasks, and tool ownership.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before

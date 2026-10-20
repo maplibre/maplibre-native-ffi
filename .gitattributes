@@ -11,7 +11,7 @@ gradle/wrapper/**                                           linguist-vendored=tr
 
 # Generated: refresh with the generator, never edit by hand.
 /.codex/environments/environment.toml                       linguist-generated=true
-/.github/workflows/ci.yml                                   linguist-generated=true
+/.github/workflows/ci-coverage.yml                          linguist-generated=true
 /bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart  linguist-generated=true
 /bindings/dotnet/src/Maplibre.NativeFfi/Generated/*.g.cs       linguist-generated=true
 /bindings/kotlin/src/jvmMain/generated/**/*.java            linguist-generated=true

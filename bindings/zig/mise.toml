@@ -32,10 +32,12 @@ zig build --build-file ../../build.zig \
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: an iOS or tvOS simulator preset spawns the
-# suite on a simulator, and host presets run in process.
+# Android x64 presets run on an emulator; host presets run in process.
 run = '''
 case "$usage_preset" in
+  ios-* | tvos-*)
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
+    ;;
   android-x64-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     exec zig build test --build-file ../../build.zig \
@@ -47,30 +49,6 @@ case "$usage_preset" in
     ;;
   android-*)
     echo "The Android emulator runs x64 guests only; check $usage_preset with //bindings/zig:build and test an Android x64 preset instead." >&2
-    exit 2
-    ;;
-  ios-simulator-*)
-    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
-    mise run //:ios-simulator:boot
-    exec zig build test --build-file ../../build.zig \
-      -Doptimize=ReleaseSafe \
-      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout 120s --summary all --verbose
-    ;;
-  tvos-simulator-*)
-    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
-    mise run //:tvos-simulator:boot
-    exec zig build test --build-file ../../build.zig \
-      -Doptimize=ReleaseSafe \
-      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout 120s --summary all --verbose
-    ;;
-  ios-* | tvos-*)
-    echo "The Zig binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

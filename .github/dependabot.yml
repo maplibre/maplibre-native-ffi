@@ -11,7 +11,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, github_actions]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       github-actions:
         patterns: ["*"]
@@ -21,7 +21,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, rust]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       cargo:
         patterns: ["*"]
@@ -33,7 +33,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, infra]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       gitsubmodule:
         patterns: ["*"]
@@ -43,7 +43,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, go]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       gomod:
         patterns: ["*"]
@@ -53,7 +53,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, kotlin]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       gradle:
         patterns: ["*"]
@@ -63,7 +63,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, typescript]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       npm:
         patterns: ["*"]
@@ -76,7 +76,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, dotnet]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       nuget:
         patterns: ["*"]
@@ -86,7 +86,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, dart]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       pub:
         patterns: ["*"]
@@ -106,7 +106,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, swift]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       swift:
         patterns: ["*"]
@@ -116,7 +116,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    labels: [dependencies, python]
+    labels: [chore, "area:tooling", dependencies]
     groups:
       uv:
         patterns: ["*"]

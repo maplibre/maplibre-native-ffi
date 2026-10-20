@@ -74,13 +74,10 @@ dprint_version = "0.63.0"
 emsdk_version = "6.0.12"
 go_version = "1.27.2"
 doc2go_version = "0.12.2"
-gofumpt_version = "0.12.0"
-google_java_format_version = "1.37.0"
 flutter_version = "3.47.7"
 hk_version = "2.7.0"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
-ktfmt_version = "0.65"
 libxml2_version = "2.13.9"
 node_version = "26.12.0"
 ninja_version = "1.13.2"
@@ -220,8 +217,12 @@ description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
   'case "$usage_preset" in android-*) mise run //:android-sdk-packages --ndk-only ;; esac',
-  { task = "//:build-preset", args = ["{{usage.preset}}"] },
-  { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
+  { task = "//:build-preset", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = "//:select-clangd-preset", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.build-preset]
@@ -252,7 +253,9 @@ outputs = { auto = true }
 # lets the fixtures and examples drive the API the way a host does; presets
 # whose loader comes from the platform or an SDK install nothing.
 run = [
-  { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
+  { task = "//:check-cross-sdk", args = [
+    "{{usage.preset}}",
+  ] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
 ]
@@ -318,7 +321,9 @@ description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
 run = [
   'cpack --preset "$usage_preset"',
-  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+  { task = "//:verify-native-package", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 
 [tasks.test]
@@ -422,27 +427,25 @@ description = "Stop the OpenHarmony emulator started by mise."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",
 ] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
-mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install
 hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:Kotlin/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
+tools = { "core:dart" = "{{vars.dart_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = [
   "linux",
   "macos",
   "windows/x64",
 ] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
-mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install
 hk fix --all
 '''

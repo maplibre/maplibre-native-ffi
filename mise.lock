@@ -525,35 +525,6 @@ checksum = "sha256:bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac
 url = "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip"
 url_api = "https://api.github.com/repos/Kitware/CMake/releases/assets/605998125"
 
-[[tools."aqua:Kotlin/ktfmt"]]
-version = "0.65"
-backend = "aqua:Kotlin/ktfmt"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.linux-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.linux-x64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.macos-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.windows-arm64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
-[tools."aqua:Kotlin/ktfmt"."platforms.windows-x64"]
-checksum = "sha256:aba9753b6ab387926179ab7318ba8e0c33dad483ebc72f633e79522265b15214"
-url = "https://github.com/Kotlin/ktfmt/releases/download/v0.65/ktfmt-0.65-with-dependencies.jar"
-url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/618673765"
-
 [[tools."aqua:astral-sh/uv"]]
 version = "0.13.1"
 backend = "aqua:astral-sh/uv"
@@ -622,35 +593,6 @@ url = "https://github.com/dprint/dprint/releases/download/0.63.0/dprint-x86_64-p
 url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/632125309"
 provenance = "github-attestations"
 
-[[tools."aqua:google/google-java-format"]]
-version = "1.37.0"
-backend = "aqua:google/google-java-format"
-
-[tools."aqua:google/google-java-format"."platforms.linux-arm64"]
-checksum = "sha256:e8c1c4ae92f5a86367500d78ff0d09ad12bf8ad213fa35b372468fcabf281bd3"
-url = "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format_linux-arm64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/603147101"
-
-[tools."aqua:google/google-java-format"."platforms.linux-x64"]
-checksum = "sha256:881821ffd1a52b175886c4ebeeacce2ba5b5d7326b52d32a18d384d8a783bd77"
-url = "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format_linux-x86-64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/603147019"
-
-[tools."aqua:google/google-java-format"."platforms.macos-arm64"]
-checksum = "sha256:657cf1011c8dfb7e0dac08516db02b701436e59600b961077f83b89b69cc3495"
-url = "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format_darwin-arm64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/603148240"
-
-[tools."aqua:google/google-java-format"."platforms.windows-arm64"]
-checksum = "sha256:48260bed87f6830bae44a7a27f66ce98f7d9fb245f500021bd7ae16c9e2daa06"
-url = "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format_windows-x86-64.exe"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/603148681"
-
-[tools."aqua:google/google-java-format"."platforms.windows-x64"]
-checksum = "sha256:48260bed87f6830bae44a7a27f66ce98f7d9fb245f500021bd7ae16c9e2daa06"
-url = "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format_windows-x86-64.exe"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/603148681"
-
 [[tools."aqua:jdx/hk"]]
 version = "2.7.0"
 backend = "aqua:jdx/hk"
@@ -708,35 +650,6 @@ url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/2790
 checksum = "sha256:8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e"
 url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip"
 url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056944"
-
-[[tools."aqua:mvdan/gofumpt"]]
-version = "0.12.0"
-backend = "aqua:mvdan/gofumpt"
-
-[tools."aqua:mvdan/gofumpt"."platforms.linux-arm64"]
-checksum = "sha256:4322f081241ab0618356aa5921a8c110e4c7acfc17175cc15dc57b2f4a4b652d"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_linux_arm64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473501"
-
-[tools."aqua:mvdan/gofumpt"."platforms.linux-x64"]
-checksum = "sha256:3bc4fcad497439918f5f56d4987de4709a99da0a355e6bec13a7278532b01d38"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_linux_amd64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473521"
-
-[tools."aqua:mvdan/gofumpt"."platforms.macos-arm64"]
-checksum = "sha256:1a3e325b956ed12c21031d9e13382bd51a4fabb57de8d40428819b9583c3cfb9"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_darwin_arm64"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473536"
-
-[tools."aqua:mvdan/gofumpt"."platforms.windows-arm64"]
-checksum = "sha256:66bd679908b64864fc85417e7ea01148774b477364b9a02ab1c194333a55c997"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_windows_amd64.exe"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473475"
-
-[tools."aqua:mvdan/gofumpt"."platforms.windows-x64"]
-checksum = "sha256:66bd679908b64864fc85417e7ea01148774b477364b9a02ab1c194333a55c997"
-url = "https://github.com/mvdan/gofumpt/releases/download/v0.12.0/gofumpt_v0.12.0_windows_amd64.exe"
-url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/549473475"
 
 [[tools."aqua:pnpm/pnpm"]]
 version = "12.14.0"

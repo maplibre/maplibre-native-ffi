@@ -23,7 +23,7 @@ swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
   --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-  --triple arm64-apple-ios15.5-simulator
+  --triple arm64-apple-ios15.0-simulator
 '''
 
 [tasks."build:ios"]
@@ -35,5 +35,5 @@ swift build \
   --product swift-map-ios \
   --scratch-path .build/ios \
   --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
-  --triple arm64-apple-ios15.5
+  --triple arm64-apple-ios15.0
 '''

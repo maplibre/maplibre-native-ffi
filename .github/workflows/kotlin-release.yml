@@ -43,7 +43,7 @@ jobs:
     name: Docs
     needs:
       - publish
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       actions: write
@@ -51,7 +51,5 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh workflow run publish-snapshots.yml
-          --repo "$GITHUB_REPOSITORY"
-          --ref main
-          -f components=docs
+          gh workflow run publish-snapshots.yml --repo "$GITHUB_REPOSITORY"
+          --ref main -f components=docs

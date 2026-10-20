@@ -20,6 +20,9 @@ function(mln_ffi_add_maplibre_native)
   add_subdirectory("${MLN_FFI_SOURCE_DIR}"
                    "${PROJECT_BINARY_DIR}/maplibre-native")
 
+  # Disable costly symbol guards and keep consumer struct layouts consistent.
+  target_compile_definitions(mbgl-core PUBLIC MLN_SYMBOL_GUARDS=0)
+
   if(MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(
       mbgl-compiler-options

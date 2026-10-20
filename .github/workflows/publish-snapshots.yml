@@ -32,7 +32,7 @@ concurrency:
 jobs:
   plan:
     name: plan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 240
     permissions:
       actions: read
@@ -52,7 +52,7 @@ jobs:
       publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -91,9 +91,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          mise run --no-deps ci:snapshot-state plan
-          --components "${{ inputs.components || 'all' }}"
-          --force "${{ inputs.components != '' && inputs.components != 'all' }}"
+          mise run --no-deps ci:snapshot-state plan --components "${{
+          inputs.components || 'all' }}" --force "${{ inputs.components != '' &&
+          inputs.components != 'all' }}"
       # Minutes distinguish repeated runs on one day for pip and NuGet.
       - name: Date the snapshot version
         id: version
@@ -110,7 +110,7 @@ jobs:
     name: .NET packages
     needs:
       - plan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     if: ${{ needs.plan.outputs.publish_dotnet == 'true' }}
     permissions:
@@ -120,7 +120,7 @@ jobs:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       SNAPSHOT_VERSION: ${{ needs.plan.outputs.dotnet_snapshot_version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -150,7 +150,7 @@ jobs:
     needs:
       - plan
       - stage-dotnet
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       actions: read
@@ -158,7 +158,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -197,19 +197,19 @@ jobs:
         include:
           - backend: vulkan
             preset: linux-gnu-x64-vulkan
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - backend: opengl
             preset: linux-gnu-x64-egl
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - backend: metal
             preset: macos-arm64-metal
-            runner: macos-26
+            runner: blacksmith-6vcpu-macos-26
             macos_deployment_target: "14.3"
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       SNAPSHOT_VERSION: ${{ needs.plan.outputs.snapshot_version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -224,9 +224,9 @@ jobs:
           path: build/packages/native/python-input
       - name: Install packaged native artifact
         run: >-
-          mise run install-native-package
-          ${{ matrix.preset }}
-          build/packages/native/python-input/maplibre-native-c-${{ matrix.preset }}.tar.gz
+          mise run install-native-package ${{ matrix.preset }}
+          build/packages/native/python-input/maplibre-native-c-${{ matrix.preset
+          }}.tar.gz
       # The native artifact is built for macOS 14.3, and maturin derives the
       # wheel's platform tag from this variable. Left unset, the tag would
       # promise older releases a dylib they cannot load.
@@ -258,7 +258,7 @@ jobs:
     needs:
       - plan
       - stage-python
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       actions: read
@@ -266,7 +266,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -295,7 +295,7 @@ jobs:
       - plan
       - python-index
       - dotnet-feed
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     # Preserve live feeds when either package staging job fails.
     if: >-
@@ -313,7 +313,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           # The pages quote the latest release versions from the release tags.
@@ -331,8 +331,7 @@ jobs:
           path: build/packages/native/docs-input
       - name: Install packaged native artifact
         run: >-
-          mise run install-native-package
-          linux-gnu-x64-vulkan
+          mise run install-native-package linux-gnu-x64-vulkan
           build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: mise run //docs:build
@@ -346,7 +345,8 @@ jobs:
       - if: ${{ needs.python-index.result != 'success' }}
         run: >-
           mise run --no-deps ci:prepare-python-snapshot mirror
-          https://maplibre.github.io/maplibre-native-ffi/simple/ docs/dist/simple
+          https://maplibre.github.io/maplibre-native-ffi/simple/
+          docs/dist/simple
       - if: ${{ needs.dotnet-feed.result == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -355,8 +355,7 @@ jobs:
       - if: ${{ needs.dotnet-feed.result != 'success' }}
         run: >-
           mise run --no-deps ci:prepare-dotnet-snapshot mirror
-          https://maplibre.github.io/maplibre-native-ffi/nuget/
-          docs/dist/nuget
+          https://maplibre.github.io/maplibre-native-ffi/nuget/ docs/dist/nuget
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/dist
@@ -367,7 +366,7 @@ jobs:
       - docs-pages
     # Deploy a site that preserved a failed package feed.
     if: ${{ !cancelled() && needs.docs-pages.result == 'success' }}
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       pages: write
@@ -425,14 +424,14 @@ jobs:
     # Only components that published get their state tag moved, so a failed or
     # skipped component is retried by the next run.
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       contents: write
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -474,7 +473,7 @@ jobs:
 
   required:
     name: publishing-required
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     # A skipped job is the gate doing its work, so only real failures are red.
     if: ${{ always() }}
@@ -491,7 +490,9 @@ jobs:
       - record
     steps:
       - name: Fail if required jobs failed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs.record.result != 'success' }}
+        if:
+          ${{ contains(needs.*.result, 'failure') || contains(needs.*.result,
+          'cancelled') || needs.record.result != 'success' }}
         run: |
           echo '${{ toJSON(needs) }}'
           exit 1

@@ -1,2 +1,6 @@
 # yaml-language-server: $schema=https://www.schemastore.org/github-issue-config.json
 blank_issues_enabled: false
+contact_links:
+  - name: Question
+    url: https://github.com/maplibre/maplibre-native-ffi/discussions/new?category=q-a
+    about: Ask a question about using the library.

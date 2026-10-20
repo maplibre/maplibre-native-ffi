@@ -13,7 +13,7 @@ runs='[]'
 for attempt in {1..30}; do
   runs="$(gh run list \
     --repo "$GITHUB_REPOSITORY" \
-    --workflow ci.yml \
+    --workflow ci-coverage.yml \
     --branch main \
     --commit "$1" \
     --event push \

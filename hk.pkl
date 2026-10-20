@@ -69,11 +69,6 @@ steps {
     glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
     check = "uv run --no-sync ty check --error-on-warning --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable {{files}}"
   }
-  ["gofumpt"] {
-    glob = List("bindings/go/**/*.go")
-    check = "unformatted=\"$(mise run --quiet //bindings/go:_gofumpt-check {{files}})\"; test -z \"$unformatted\" || { echo \"$unformatted\" >&2; exit 1; }"
-    fix = "mise run --quiet //bindings/go:_gofumpt-fix {{files}}"
-  }
   ["dart-format"] {
     glob = List("bindings/dart/**/*.dart")
     exclude = List("bindings/dart/**/*.g.dart")

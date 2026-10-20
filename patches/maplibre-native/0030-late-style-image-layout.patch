@@ -1,28 +1,197 @@
-diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
-index 48e3532a8c8c..6f545d55764b 100644
---- a/src/mln/renderer/render_orchestrator.cpp
-+++ b/src/mln/renderer/render_orchestrator.cpp
-@@ -254,9 +254,9 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
-     const ImageDifference imageDiff = diffImages(imageImpls, updateParameters->images);
-     imageImpls = updateParameters->images;
+diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
+index f45d750..720e73c 100644
+--- a/src/mln/renderer/image_manager.cpp
++++ b/src/mln/renderer/image_manager.cpp
+@@ -49,8 +49,14 @@ void ImageManager::addImage(Immutable<style::Image::Impl> image_) {
+     assert(!images.contains(image_->id));
  
--    // Only trigger tile reparse for changed images. Changed images only need a
--    // relayout when they have a different size.
--    bool hasImageDiff = !imageDiff.removed.empty();
-+    // Adding or removing an image changes layout for tiles that already requested it.
-+    // Updating an existing image only needs a relayout when its size changes.
-+    bool hasImageDiff = !imageDiff.added.empty() || !imageDiff.removed.empty();
+     // Increase cache size if requested image was provided.
+-    if (requestedImages.contains(image_->id)) {
++    if (const auto it = requestedImages.find(image_->id); it != requestedImages.end()) {
+         requestedImagesCacheSize += image_->image.bytes();
++        for (auto* requestor : it->second) {
++            // Pending requests receive the image through notifyIfMissingImageAdded.
++            if (!missingImageRequestors.contains(requestor)) {
++                imageRequestorsToRelayout.insert(requestor);
++            }
++        }
+     }
  
-     // Remove removed images from sprite atlas.
-     for (const auto& entry : imageDiff.removed) {
+     mutate(availableImages, [&](auto& ids) { ids.emplace(image_->id); });
+@@ -156,6 +162,7 @@ void ImageManager::getImages(ImageRequestor& requestor, ImageRequestPair&& pair)
+ void ImageManager::removeRequestor(ImageRequestor& requestor) {
+     std::scoped_lock readWriteLock(rwLock);
+ 
++    imageRequestorsToRelayout.erase(&requestor);
+     requestors.erase(&requestor);
+     missingImageRequestors.erase(&requestor);
+     for (auto& requestedImage : requestedImages) {
+@@ -166,6 +173,15 @@ void ImageManager::removeRequestor(ImageRequestor& requestor) {
+ void ImageManager::notifyIfMissingImageAdded() {
+     std::scoped_lock readWriteLock(rwLock);
+ 
++    // Relayout once all of this update's images are added. A synchronous relayout
++    // can remove requestors from the set, so take them one at a time.
++    while (!imageRequestorsToRelayout.empty()) {
++        auto it = imageRequestorsToRelayout.begin();
++        auto* requestor = *it;
++        imageRequestorsToRelayout.erase(it);
++        requestor->onRequestedImageAdded();
++    }
++
+     for (auto it = missingImageRequestors.begin(); it != missingImageRequestors.end();) {
+         ImageRequestor& requestor = *it->first;
+         if (!requestor.hasPendingRequests()) {
+diff --git a/src/mln/renderer/image_manager.hpp b/src/mln/renderer/image_manager.hpp
+index d31787d..b800363 100644
+--- a/src/mln/renderer/image_manager.hpp
++++ b/src/mln/renderer/image_manager.hpp
+@@ -68,6 +68,7 @@ private:
+     std::map<ImageRequestor*, ImageRequestPair> requestors;
+     std::map<ImageRequestor*, ImageRequestPair> missingImageRequestors;
+     std::map<std::string, std::set<ImageRequestor*>> requestedImages;
++    std::set<ImageRequestor*> imageRequestorsToRelayout;
+     std::size_t requestedImagesCacheSize = 0ul;
+     ImageMap images;
+     // Mirror of 'ImageMap images;' keys.
+@@ -82,6 +83,7 @@ class ImageRequestor {
+ public:
+     explicit ImageRequestor(std::shared_ptr<ImageManager>);
+     virtual ~ImageRequestor();
++    virtual void onRequestedImageAdded() {}
+     virtual void onImagesAvailable(ImageMap icons,
+                                    ImageMap patterns,
+                                    ImageVersionMap versionMap,
+diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
+index 999ae01..3e1ef42 100644
+--- a/src/mln/tile/geometry_tile.cpp
++++ b/src/mln/tile/geometry_tile.cpp
+@@ -331,6 +331,22 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
+                          correlationID);
+ }
+ 
++void GeometryTile::onRequestedImageAdded() {
++    MLN_TRACE_FUNC();
++
++    if (obsolete) {
++        return;
++    }
++
++    if (!pending) {
++        pending = true;
++        observer->onTileAction(id, sourceID, TileOperation::StartParse);
++    }
++
++    ++correlationID;
++    worker.self().invoke(&GeometryTileWorker::setAvailableImages, imageManager->getAvailableImages(), correlationID);
++}
++
+ void GeometryTile::setShowCollisionBoxes(const bool showCollisionBoxes_) {
+     MLN_TRACE_FUNC();
+ 
+diff --git a/src/mln/tile/geometry_tile.hpp b/src/mln/tile/geometry_tile.hpp
+index b3f3fcd..72d6142 100644
+--- a/src/mln/tile/geometry_tile.hpp
++++ b/src/mln/tile/geometry_tile.hpp
+@@ -45,6 +45,7 @@ public:
+                    std::shared_ptr<const GlobalStateMap>) override;
+     void setShowCollisionBoxes(bool showCollisionBoxes) override;
+ 
++    void onRequestedImageAdded() override;
+     void onGlyphsAvailable(GlyphMap, HBShapeRequests) override;
+     void onImagesAvailable(ImageMap, ImageMap, ImageVersionMap versionMap, uint64_t imageCorrelationID) override;
+ 
+diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
+index 885d618..963bf91 100644
+--- a/src/mln/tile/geometry_tile_worker.cpp
++++ b/src/mln/tile/geometry_tile_worker.cpp
+@@ -191,6 +191,33 @@ void GeometryTileWorker::setLayers(std::vector<Immutable<LayerProperties>> layer
+     }
+ }
+ 
++void GeometryTileWorker::setAvailableImages(Immutable<std::set<std::string>> availableImages_,
++                                            uint64_t correlationID_) {
++    MLN_TRACE_FUNC();
++
++    try {
++        availableImages = std::move(availableImages_);
++        correlationID = correlationID_;
++
++        switch (state) {
++            case Idle:
++                parse();
++                coalesce();
++                break;
++
++            case Coalescing:
++            case NeedsSymbolLayout:
++                state = NeedsParse;
++                break;
++
++            case NeedsParse:
++                break;
++        }
++    } catch (...) {
++        parent.invoke(&GeometryTile::onError, std::current_exception(), correlationID);
++    }
++}
++
+ void GeometryTileWorker::reset(uint64_t correlationID_) {
+     layers = std::nullopt;
+     data = std::nullopt;
+diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
+index d488206..079d6ff 100644
+--- a/src/mln/tile/geometry_tile_worker.hpp
++++ b/src/mln/tile/geometry_tile_worker.hpp
+@@ -59,6 +59,7 @@ public:
+     void setData(std::unique_ptr<const GeometryTileData>,
+                  Immutable<std::set<std::string>> availableImages,
+                  uint64_t correlationID);
++    void setAvailableImages(Immutable<std::set<std::string>> availableImages, uint64_t correlationID);
+     void reset(uint64_t correlationID_);
+     void setShowCollisionBoxes(bool showCollisionBoxes_, uint64_t correlationID_);
+ 
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 81bf8c6ee450..31b9f633faea 100644
+index 15575f3..3ef23f3 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2525,3 +2525,76 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
+@@ -2563,3 +2563,109 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
      check(&Map::setTileLodZoomShift, &UpdateParameters::tileLodZoomShift, 1.0);
      check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
  }
++
++TEST(Map, UnrelatedImagePreservesTileLayoutAndCache) {
++    MapTest<> test;
++    test.frontend.setSize({128, 128});
++    test.map.setSize({128, 128});
++    test.map.setPrefetchZoomDelta(0);
++    test.map.getStyle().loadJSON(R"({
++        "version": 8,
++        "sources": {"point": {"type": "geojson", "data": {"type": "Point", "coordinates": [-90, 40]}}},
++        "layers": [{"id": "symbol", "type": "symbol", "source": "point", "layout": {"icon-image": "marker"}}]
++    })");
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{40, -90}).withZoom(3));
++    size_t parses = 0;
++    test.observer.onTileActionCallback = [&](TileOperation op, const OverscaledTileID&, const std::string&) {
++        if (op == TileOperation::StartParse) {
++            ++parses;
++        }
++    };
++    test.frontend.render(test.map);
++    ASSERT_GT(parses, 0u);
++
++    // Move the original tiles into the cache and finish layout in another region.
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{40, 0}).withZoom(3));
++    test.frontend.render(test.map);
++    parses = 0;
++    test.map.getStyle().addImage(std::make_unique<style::Image>("unrelated", PremultipliedImage({16, 16}), 1.0f));
++    test.frontend.render(test.map);
++    EXPECT_EQ(parses, 0u);
++
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{40, -90}).withZoom(3));
++    test.frontend.render(test.map);
++    EXPECT_EQ(parses, 0u);
++}
 +
 +class LateStyleImageTest : public testing::TestWithParam<std::tuple<bool, bool>> {};
 +

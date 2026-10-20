@@ -15,6 +15,7 @@ const BuildOptions = struct {
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
@@ -69,23 +70,6 @@ fn nativeRuntimeDir(b: *std.Build, install_dir: std.Build.LazyPath, target: std.
     return installPath(b, install_dir, if (target.result.os.tag == .windows) "bin" else "lib");
 }
 
-fn staticIosLinkLibraries() []const []const u8 {
-    return &.{
-        "maplibre-native-c",
-        "c++",
-        "objc",
-        "sqlite3",
-        "z",
-    };
-}
-
-fn staticIosFrameworks(render_backend_: RenderBackend) []const []const u8 {
-    return if (render_backend_ == .metal)
-        &.{ "CoreFoundation", "CoreGraphics", "CoreText", "Foundation", "ImageIO", "Metal", "MetalKit", "QuartzCore" }
-    else
-        &.{ "CoreFoundation", "CoreGraphics", "CoreText", "Foundation", "ImageIO", "Metal", "MetalKit" };
-}
-
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -94,6 +78,7 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath,
     system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub const DependencyOptions = struct {
@@ -104,6 +89,7 @@ pub const DependencyOptions = struct {
     dependency_include_dirs: []const std.Build.LazyPath = &.{},
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub const RenderBackendLinkOptions = struct {
@@ -210,6 +196,7 @@ pub const TranslateCModuleOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     c_macros: []const CMacro = &.{},
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Build.Module {
@@ -218,6 +205,7 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         .c_source_file = options.root_source_file,
         .target = options.target,
         .optimize = options.optimize,
+        .libc_file = options.libc_file,
     });
     addTranslateCIncludePaths(&translator, options.include_dirs);
     addPlatformSystemHeaderPaths(b, &translator, options.target, options.system_root);
@@ -263,6 +251,7 @@ pub const RenderBackendTranslateCOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: RenderBackendTranslateCOptions) void {
@@ -273,6 +262,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
             .system_root = options.system_root,
+            .libc_file = options.libc_file,
         }));
     }
     if (options.render_backend == .opengl and (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)) {
@@ -282,6 +272,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
             .system_root = options.system_root,
+            .libc_file = options.libc_file,
         }));
     }
 }
@@ -333,18 +324,6 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
     }
 }
 
-fn linkSystemLibraries(module: *std.Build.Module, libraries: []const []const u8) void {
-    for (libraries) |library| {
-        module.linkSystemLibrary(library, .{});
-    }
-}
-
-fn linkFrameworks(module: *std.Build.Module, frameworks: []const []const u8) void {
-    for (frameworks) |framework| {
-        module.linkFramework(framework, .{});
-    }
-}
-
 fn addLibraryPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
     for (library_dirs) |library_dir| {
         module.addLibraryPath(library_dir);
@@ -362,23 +341,6 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
         .windows => "vulkan-1",
         else => "vulkan",
     };
-}
-
-pub fn isAppleMobile(target: std.Build.ResolvedTarget) bool {
-    return switch (target.result.os.tag) {
-        .ios, .tvos => true,
-        else => false,
-    };
-}
-
-pub fn isAppleSimulator(target: std.Build.ResolvedTarget) bool {
-    return isAppleMobile(target) and target.result.abi == .simulator;
-}
-
-pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
-    // Zig Debug Apple-mobile tests hit Mach-O/debug-info linker limits in this dependency graph.
-    if (isAppleMobile(target) and optimize == .debug) return .safe;
-    return optimize;
 }
 
 pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend: RenderBackend) void {
@@ -427,6 +389,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"dependency-include-dir": []const std.Build.LazyPath,
     @"dependency-library-dir": []const std.Build.LazyPath,
     @"system-root": ?std.Build.LazyPath,
+    @"target-libc": ?std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -436,6 +399,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"dependency-include-dir" = options.dependency_include_dirs,
         .@"dependency-library-dir" = options.dependency_library_dirs,
         .@"system-root" = options.system_root,
+        .@"target-libc" = options.libc_file,
     };
 }
 
@@ -456,6 +420,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     };
 }
 
@@ -464,6 +429,7 @@ pub const IncludeOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     system_root: ?std.Build.LazyPath = null,
+    libc_file: ?std.Build.LazyPath = null,
 };
 
 /// Configures the raw C declarations without linking maplibre-native-c.
@@ -476,6 +442,7 @@ pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, opti
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     }));
 }
 
@@ -492,17 +459,11 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .optimize = options.optimize,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     });
     const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
     const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
-    if (isAppleMobile(options.target) and !isAppleSimulator(options.target)) {
-        addLibraryPaths(module_, link_dirs);
-        linkSystemLibraries(module_, staticIosLinkLibraries());
-        const system_root = options.system_root orelse
-            @panic("iOS and tvOS device builds require -Dsystem-root=<path-to-SDK>");
-        module_.addObjectFile(system_root.path(b, b.pathJoin(&.{ "usr", "lib", "libc++.tbd" })));
-        linkFrameworks(module_, staticIosFrameworks(options.render_backend));
-    } else if (options.target.result.os.tag == .windows) {
+    if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(installPath(b, options.native_install_dir, "lib/maplibre-native-c.lib"));
     } else {
         addLibraryPaths(module_, link_dirs);
@@ -540,6 +501,7 @@ fn addMaplibreNativeDocs(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     include_dirs: []const std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
 ) void {
     const docs_module = b.createModule(.{
         .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
@@ -550,12 +512,14 @@ fn addMaplibreNativeDocs(
         .include_dirs = include_dirs,
         .target = target,
         .optimize = optimize,
+        .libc_file = libc_file,
     });
 
     const doc_compile = b.addObject(.{
         .name = "maplibre_native_ffi_docs",
         .root_module = docs_module,
     });
+    doc_compile.setLibCFile(libc_file);
     const install_docs = b.addInstallDirectory(.{
         .source_dir = doc_compile.getEmittedDocs(),
         .install_dir = .prefix,
@@ -572,11 +536,8 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
             .target = options.target,
             .optimize = options.optimize,
         }),
-        .use_lld = if (isAppleMobile(options.target)) false else null,
     });
-    if (isAppleMobile(options.target)) {
-        tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
-    }
+    tests.setLibCFile(options.libc_file);
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
     return tests;
 }
@@ -591,6 +552,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
         .system_root = options.system_root,
+        .libc_file = options.libc_file,
     });
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
@@ -608,38 +570,11 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
             tests.root_module.addImport("wgl_test_context", wgl_test_context);
         }
     }
-    if (options.render_backend == .metal) {
-        if (isAppleMobile(options.target)) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_ios.m") });
-            tests.root_module.linkSystemLibrary("objc", .{});
-            tests.root_module.linkFramework("Foundation", .{});
-        }
-        if (options.target.result.os.tag == .macos) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_macos.m") });
-            tests.root_module.linkFramework("AppKit", .{});
-        }
+    if (options.render_backend == .metal and options.target.result.os.tag == .macos) {
+        tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_macos.m") });
+        tests.root_module.linkFramework("AppKit", .{});
     }
     return tests;
-}
-
-pub fn addTestRunStep(
-    b: *std.Build,
-    tests: *std.Build.Step.Compile,
-    target: std.Build.ResolvedTarget,
-    simulator_runner: std.Build.LazyPath,
-) *std.Build.Step.Run {
-    if (isAppleSimulator(target)) {
-        const run_tests = b.addSystemCommand(&.{"bash"});
-        run_tests.addFileArg(simulator_runner);
-        run_tests.addArtifactArg(tests);
-        run_tests.setEnvironmentVariable(
-            "MLN_FFI_SIMULATOR_RUNTIME",
-            if (target.result.os.tag == .tvos) "tvOS" else "iOS",
-        );
-        return run_tests;
-    }
-
-    return b.addRunArtifact(tests);
 }
 
 fn addAndroidTestRunStep(
@@ -669,7 +604,14 @@ pub fn build(b: *std.Build) void {
         nativeTarget(b, install_dir)
     else
         b.standardTargetOptions(.{});
+    switch (target.result.os.tag) {
+        .ios, .tvos => @panic("The Zig binding does not support iOS or tvOS targets, including simulators"),
+        else => {},
+    }
     const optimize = b.standardOptimizeOption(.{});
+    // Zig 0.17 also passes a global --libc to the host configurer and tools.
+    // Keep the cross SDK on target compilations and C translation instead.
+    const libc_file = b.option(std.Build.LazyPath, "target-libc", "Libc paths for the target platform");
 
     const include_dirs_from_cli = b.option(
         []const std.Build.LazyPath,
@@ -682,6 +624,7 @@ pub fn build(b: *std.Build) void {
         target,
         optimize,
         include_dirs_from_cli orelse defaultDocIncludeDirs(b),
+        libc_file,
     );
 
     const required_native_install_dir = native_install_dir orelse return;
@@ -692,12 +635,13 @@ pub fn build(b: *std.Build) void {
     const backend = renderBackend(b, required_native_install_dir);
     const options = BuildOptions{
         .target = target,
-        .optimize = testOptimize(target, optimize),
+        .optimize = optimize,
         .native_install_dir = required_native_install_dir,
         .include_dirs = installedIncludeDirs(b, required_native_install_dir, dependency_include_dirs),
         .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
         .system_root = system_root,
+        .libc_file = libc_file,
     };
 
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);
@@ -734,7 +678,7 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&run_tests.step);
     } else {
         for (test_compiles) |tests| {
-            const run_tests = addTestRunStep(b, tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
+            const run_tests = b.addRunArtifact(tests);
             test_step.dependOn(&run_tests.step);
         }
     }
