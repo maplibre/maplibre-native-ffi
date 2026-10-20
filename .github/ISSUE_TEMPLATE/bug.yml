@@ -24,47 +24,18 @@ body:
       description: What did you expect to happen?
     validations:
       required: true
-  - type: checkboxes
-    id: area
-    attributes:
-      label: Area
-      description: Which part of the API does this affect?
-      options:
-        - label: Runtime
-        - label: Map, camera, or style
-        - label: Render session or render target
-        - label: Query
-        - label: Layer plugins
-        - label: Language binding
-        - label: Example app
-        - label: Documentation
-        - label: Build, CI, packaging, or release
-    validations:
-      required: false
-  - type: checkboxes
+  - type: input
     id: platform
     attributes:
       label: Platform
-      description: Where have you seen this?
-      options:
-        - label: Linux
-        - label: macOS
-        - label: Windows
-        - label: Android
-        - label: iOS
-        - label: OpenHarmony
-        - label: Browser
+      description: Operating system and version you tested on.
     validations:
       required: false
-  - type: checkboxes
-    id: renderer
+  - type: input
+    id: render-backend
     attributes:
       label: Render backend
-      options:
-        - label: OpenGL
-        - label: Vulkan
-        - label: Metal
-        - label: WebGPU
+      description: Render backend in use, such as Metal, Vulkan, or OpenGL/EGL.
     validations:
       required: false
   - type: input
