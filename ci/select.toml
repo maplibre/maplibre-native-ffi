@@ -36,7 +36,12 @@ the generated job definitions puts every unit whose jobs it changes at risk. A
 shared script, mise task, tool version, or setup step that every job runs the
 same way is covered by Linux x64, except where an operating system runs it
 differently; Windows uses an older mise without the lockfile, Git Bash, and
-MSVC. Release and publishing workflows do not run in pull request CI. Package
+MSVC. Every job installs the tools of the root mise config and of every
+binding, example, and docs mise config. A tool that a config lists only for
+some operating systems, through its `os` option or an operating system's own
+config such as `mise.windows.toml`, puts those operating systems' units at risk
+when it is added or changed. Release and publishing workflows do not run in
+pull request CI. Package
 manifests and lockfiles (Gradle, NuGet, Cargo, uv, pnpm, pub) feed the binding
 builds and tests that use them.
 

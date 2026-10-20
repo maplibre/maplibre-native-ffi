@@ -85,28 +85,36 @@ def last_passed(
     return {unit: sha for unit, sha in passed.items() if present(sha)}
 
 
+def decision(run: bool, reason: str, **details) -> dict:
+    return {"run": run, "reason": reason, **details}
+
+
 def jev_choice(config: dict, api_key: str, deadline: float):
-    def choose(base: str, head: str, message: str) -> dict[str, tuple[bool, str]]:
+    def choose(base: str, head: str, message: str) -> dict[str, dict]:
         result = select.select(
             base, head, message, config=config, api_key=api_key, deadline=deadline
         )
         if result.get("oversized"):
-            return dict.fromkeys(result["units"], (True, "change too large to judge"))
+            return dict.fromkeys(
+                result["units"], decision(True, "change too large to judge")
+            )
         forced = select.forced_units(config, select.changed_paths(base, head))
         return {
-            unit: (True, "changed path")
-            if unit in forced
-            else (p >= select.THRESHOLD, f"Jev {p:.2f}")
+            unit: decision(
+                unit in forced or p >= select.THRESHOLD,
+                "changed path" if unit in forced else f"Jev {p:.2f}",
+                probability=p,
+                model=result["model"],
+            )
             for unit, p in result["units"].items()
         }
 
     return choose
 
 
-def everything(config: dict, reason: str) -> dict[str, tuple[bool, str]]:
-    return {
-        unit: (True, reason) for unit in [HYGIENE, *(u["id"] for u in config["units"])]
-    }
+def everything(config: dict, reason: str) -> dict[str, dict]:
+    units = [HYGIENE, *(unit["id"] for unit in config["units"])]
+    return {unit: decision(True, reason) for unit in units}
 
 
 def plan(
@@ -118,8 +126,8 @@ def plan(
     *,
     api=github,
     choose=None,
-) -> dict[str, tuple[bool, str]]:
-    """Return whether each unit runs, and why."""
+) -> dict[str, dict]:
+    """Return whether each unit runs, why, and what Jev answered."""
     if event_name in {"push", "workflow_dispatch"}:
         return everything(config, "full coverage outside pull requests")
     if event_name != "pull_request":
@@ -147,24 +155,34 @@ def plan(
         for base, units in bases.items():
             since = "since the merge base" if base == fork else f"since {base[:9]}"
             if base == head:
-                decisions |= {unit: (False, f"passed at {head[:9]}") for unit in units}
+                decisions |= {
+                    unit: decision(False, f"passed at {head[:9]}", since=base)
+                    for unit in units
+                }
                 continue
-            if units != [HYGIENE]:
-                message = f"{pr['title']}\n\n{select.git('log', '--format=%B', f'{base}..{head}')[:4000]}"
-                answers = choose(base, head, message)
+            # Judge only the pull request's own changes, not main's merged ones.
+            judged = base if base == fork else select.own_changes_base(base, fork)
+            changed = bool(select.changed_paths(judged, head))
+            if changed and units != [HYGIENE]:
+                log = select.git("log", "--format=%B", f"{base}..{head}")[:4000]
+                answers = choose(judged, head, f"{pr['title']}\n\n{log}")
             for unit in units:
                 if unit == HYGIENE:
-                    decisions[unit] = (True, f"changed {since}")
+                    decisions[unit] = decision(True, f"changed {since}", since=base)
+                elif not changed:
+                    reason = f"no changes of its own {since}"
+                    decisions[unit] = decision(False, reason, since=base)
                 else:
-                    selected, reason = answers[unit]
-                    decisions[unit] = (selected, f"{reason} {since}")
+                    answer = answers[unit]
+                    answer["reason"] += f" {since}"
+                    decisions[unit] = answer | {"since": base, "judged": judged}
     # Selection is an optimization, so any failure runs every unit.
     except Exception as error:  # noqa: BLE001
         return everything(config, f"selection failed: {error}")
 
     for unit in owned:
         if f"ci:{unit}" in labels:
-            decisions[unit] = (True, f"label ci:{unit}")
+            decisions[unit] = decisions[unit] | decision(True, f"label ci:{unit}")
     return decisions
 
 
@@ -175,16 +193,35 @@ def main() -> None:
     source, presets = load_configuration(ROOT)
     owned = unit_jobs(config, source, presets)
     decisions = plan(config, owned, env["GITHUB_EVENT_NAME"], event, env)
-    units = [unit for unit, (selected, _) in decisions.items() if selected]
+    units = [unit for unit, entry in decisions.items() if entry["run"]]
     jobs = selected_jobs(owned, dependencies(source, presets), units)
     with pathlib.Path(env["GITHUB_OUTPUT"]).open("a") as output:
         print(f"jobs={json.dumps(jobs)}", file=output)
+
+    table = ["| Unit | Runs | Reason |", "| --- | --- | --- |"]
+    for unit, entry in decisions.items():
+        table.append(
+            f"| {unit} | {'yes' if entry['run'] else 'no'} | {entry['reason']} |"
+        )
+    print("\n".join(table))
     with pathlib.Path(env["GITHUB_STEP_SUMMARY"]).open("a") as summary:
-        print("| Unit | Runs | Reason |\n| --- | --- | --- |", file=summary)
-        for unit, (selected, reason) in decisions.items():
-            print(
-                f"| {unit} | {'yes' if selected else 'no'} | {reason} |", file=summary
-            )
+        print("\n".join(table), file=summary)
+
+    # The record outlives the run's logs, for tuning thresholds and prompts.
+    pull_request = event.get("pull_request") or {}
+    record = {
+        "run_id": env.get("GITHUB_RUN_ID"),
+        "event": env["GITHUB_EVENT_NAME"],
+        "pull_request": pull_request.get("number"),
+        "head": (pull_request.get("head") or {}).get("sha") or env.get("GITHUB_SHA"),
+        "fingerprint": select.fingerprint(config),
+        "threshold": select.THRESHOLD,
+        "units": decisions,
+        "jobs": jobs,
+    }
+    path = pathlib.Path(env.get("CI_PLAN_RECORD", ROOT / "build" / "ci-plan.json"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2))
 
 
 if __name__ == "__main__":

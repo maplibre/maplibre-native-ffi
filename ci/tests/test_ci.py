@@ -114,7 +114,14 @@ class CoverageTest(Fixture):
 
 class PlanTest(Fixture):
     def run_plan(
-        self, event, *, runs=(), choose=None, env=ENV, event_name="pull_request"
+        self,
+        event,
+        *,
+        runs=(),
+        choose=None,
+        env=ENV,
+        event_name="pull_request",
+        unchanged_since=(),
     ):
         """Plan with fake git history, workflow runs, and Jev answers."""
         calls = []
@@ -128,13 +135,20 @@ class PlanTest(Fixture):
 
         def default_choose(base, head, message):
             calls.append(base)
-            return {unit: (unit == "windows", "Jev") for unit in self.units}
+            return {
+                unit: {"run": unit == "windows", "reason": "Jev"} for unit in self.units
+            }
 
         def git(*args):
-            return f"{FORK}\n" if args[0] == "merge-base" else "Commit message\n"
+            if args[0] == "merge-base":
+                return f"{FORK}\n"
+            if args[0] == "diff":
+                return "" if args[-2] in unchanged_since else "src/map/map.cpp\n"
+            return "Commit message\n"
 
         with (
             patch("ci.plan.select.git", side_effect=git),
+            patch("ci.plan.select.own_changes_base", side_effect=lambda base, _: base),
             patch("ci.plan.present", return_value=True),
         ):
             decisions = plan(
@@ -146,7 +160,7 @@ class PlanTest(Fixture):
                 api=api,
                 choose=choose or default_choose,
             )
-        return {unit: selected for unit, (selected, _) in decisions.items()}, calls
+        return {unit: entry["run"] for unit, entry in decisions.items()}, calls
 
     def passing_run(self, units, *, run_id=90, head=OLD, number=7):
         # The Kotlin Maven reusable workflow reports nested job names.
@@ -178,7 +192,7 @@ class PlanTest(Fixture):
         for event_name, event, env in cases:
             with self.subTest(event_name=event_name, env=sorted(env)):
                 decisions = plan(self.config, self.owned, event_name, event, env)
-                self.assertTrue(all(selected for selected, _ in decisions.values()))
+                self.assertTrue(all(entry["run"] for entry in decisions.values()))
                 self.assertEqual(set(decisions), set(self.owned))
 
     def test_a_new_pull_request_runs_hygiene_and_what_jev_selects(self):
@@ -198,7 +212,7 @@ class PlanTest(Fixture):
 
         def choose(base, head, message):
             bases[base] = message
-            return {unit: (False, "Jev") for unit in self.units}
+            return {unit: {"run": False, "reason": "Jev"} for unit in self.units}
 
         decisions, _ = self.run_plan(pr(), runs=runs, choose=choose)
         self.assertEqual(set(bases), {FORK, OLD, "2" * 40})
@@ -211,6 +225,13 @@ class PlanTest(Fixture):
         self.assertEqual(calls, [FORK])
         self.assertFalse(decisions[HYGIENE] or decisions["linux-x64"])
         self.assertTrue(decisions["windows"])
+
+    def test_a_push_that_only_merges_main_reruns_nothing_but_hygiene(self):
+        runs = [self.passing_run([HYGIENE, *self.units])]
+        decisions, calls = self.run_plan(pr(), runs=runs, unchanged_since={OLD})
+        self.assertEqual(calls, [])
+        self.assertTrue(decisions[HYGIENE])
+        self.assertFalse(any(decisions[unit] for unit in self.units))
 
     def test_failed_or_missing_jobs_are_not_evidence(self):
         run, jobs = self.passing_run(["windows", HYGIENE], head=HEAD)
@@ -249,7 +270,9 @@ class PlanTest(Fixture):
                     "GITHUB_EVENT_PATH": str(root / "event"),
                     "GITHUB_OUTPUT": str(root / "output"),
                     "GITHUB_STEP_SUMMARY": str(root / "summary"),
+                    "CI_PLAN_RECORD": str(root / "record.json"),
                 },
+                stdout=subprocess.DEVNULL,
             )
             output = (root / "output").read_text()
             jobs = json.loads(output.removeprefix("jobs="))
@@ -258,6 +281,9 @@ class PlanTest(Fixture):
                 "required",
             }
             self.assertEqual(set(jobs), expected)
+            record = json.loads((root / "record.json").read_text())
+            self.assertEqual(set(record["units"]), set(self.owned))
+            self.assertTrue(all(entry["run"] for entry in record["units"].values()))
 
 
 class WorkflowTest(Fixture):

@@ -244,18 +244,27 @@ when Jev answers yes with a probability of at least 0.5, when a changed file
 matches one of the unit's `paths`, or when the pull request has the `ci:<unit>`
 label. The `ci:full` label selects every unit.
 
-Each unit judges only what changed since it last passed for the pull request.
-The planner reads the jobs of earlier runs on the same pull request, and a unit
-passed in a run when every one of its jobs succeeded there. A push that only
-fixes a formatting nit after broad coverage therefore reruns hygiene alone. A
-cancelled or failed unit keeps its older base and runs again once the change
-puts it at risk.
+Each unit judges only the pull request's own changes since the unit last passed
+for it. The planner reads the jobs of earlier runs on the same pull request, and
+a unit passed in a run when every one of its jobs succeeded there. Changes that
+arrive by merging main are left out, because main CI tested them: the planner
+merges the earlier commit with the main commit now in the pull request and
+compares that merge with the new head. A push that only fixes a formatting nit
+after broad coverage therefore reruns hygiene alone, and a push that only merges
+main reruns nothing else. A cancelled or failed unit keeps its older base and
+runs again once the change puts it at risk.
 
 The planner selects every unit when it cannot ask Jev. That covers fork and
 Dependabot pull requests, which receive no `TYPESAFE_API_KEY` secret, any API
 failure or timeout, and a change too large for eight requests. Main CI runs
 every unit after merge, so a selection that misses a regression surfaces on main
 rather than in a release.
+
+The plan job prints each unit's decision and uploads a `ci-plan` artifact that
+records the decision, Jev's probability, and the commits judged for every unit,
+along with a fingerprint of the questions. Download records with
+`gh run download <run-id> -n ci-plan` to inspect past decisions when tuning the
+threshold or `ci/select.toml`.
 
 Selecting a packaging job also selects the target jobs that produce its inputs.
 All native packages, the Apple XCFramework, and the verified Maven repository

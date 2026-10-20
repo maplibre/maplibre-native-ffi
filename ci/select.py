@@ -146,6 +146,31 @@ def changed_paths(base: str, head: str) -> list[str]:
     return git("diff", "--name-only", "--no-renames", base, head).split("\n")[:-1]
 
 
+def own_changes_base(base: str, fork: str) -> str:
+    """Return a tree of `base` merged with the main commit `fork`.
+
+    Diffing that tree against a head that contains `fork` shows the changes the
+    pull request made since `base`, without main's changes merged in since.
+    """
+    if (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", fork, base], cwd=ROOT, check=False
+        ).returncode
+        == 0
+    ):
+        return base
+    merged = subprocess.run(
+        ["git", "merge-tree", "--write-tree", base, fork],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # On a conflict, the tree holds conflict markers where the pull request's
+    # resolution differs, which is the interaction a reviewer would check.
+    return merged.stdout.split()[0] if merged.returncode in (0, 1) else base
+
+
 def forced_units(config: dict, paths: list[str]) -> set[str]:
     """Return the units whose path patterns match a changed file."""
     return {
