@@ -129,7 +129,8 @@ to run, such as the Windows targets or the docs build. A unit that already
 passed on the pull request runs again only if the newer changes put it at risk.
 Hygiene runs on every push, and `ci-required` is the one required check.
 
-To force a unit, add its `ci:<unit>` label, such as `ci:windows`. `ci:full`
+To force a unit, add its `ci:<unit>` label, such as `ci:windows`. Adding or
+removing a label on a closed pull request does not start a run. `ci:full`
 selects every unit. Main pushes, manual runs, and pull requests from forks or
 Dependabot also run every unit, and so does any planning failure. Because main
 runs every unit after merge, a missed selection surfaces there.

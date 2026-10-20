@@ -172,6 +172,10 @@ def plan(
     if event_name != "pull_request":
         raise ValueError(f"Unsupported CI event: {event_name}")
     pr = event["pull_request"]
+    # A label edit emits pull_request. Closed pull requests stay labeled for
+    # search, and relabeling one must not start a run.
+    if pr.get("state") != "open":
+        return {unit: decision(False, rule="pull request is closed") for unit in owned}
     labels = {label["name"] for label in pr["labels"]}
     if "ci:full" in labels:
         return everything(config, "full: label ci:full")

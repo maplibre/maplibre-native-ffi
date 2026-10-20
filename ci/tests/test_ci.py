@@ -27,6 +27,7 @@ def pr(labels=()):
         "pull_request": {
             "number": 7,
             "title": "Change",
+            "state": "open",
             "labels": [{"name": label} for label in labels],
             "head": {"sha": HEAD, "ref": "topic"},
             "base": {"sha": "b" * 40},
@@ -107,6 +108,25 @@ class PlanTest(unittest.TestCase):
                 decisions = plan(self.config, self.owned, event_name, event, env)
                 self.assertEqual(set(decisions), set(self.owned))
                 self.assertTrue(all(entry["run"] for entry in decisions.values()))
+
+    def test_a_closed_pull_request_selects_nothing(self):
+        event = pr(["ci:full"])
+        event["pull_request"]["state"] = "closed"
+        decisions = plan(
+            self.config,
+            self.owned,
+            "pull_request",
+            event,
+            ENV | {"TYPESAFE_API_KEY": "key"},
+        )
+        self.assertEqual(set(decisions), set(self.owned))
+        self.assertTrue(
+            all(
+                entry["rule"] == "pull request is closed"
+                for entry in decisions.values()
+            )
+        )
+        self.assertFalse(any(entry["run"] for entry in decisions.values()))
 
     def test_a_new_pull_request_runs_hygiene_jev_choices_and_labels(self):
         decisions, bases = self.run_plan(pr(["ci:android", "unrelated"]))
