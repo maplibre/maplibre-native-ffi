@@ -1090,8 +1090,12 @@ typedef uint32_t (*mln_resource_provider_callback)(
  *
  * handle is the cancelled request, borrowed for the callback; the provider's
  * own reference to it is unchanged.
+ *
+ * A handler in queue mode queues a copy as an
+ * mln_resource_request_cancel_delivery instead.
  */
 MLN_BINDING(
+  "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL;"
   "reentry=protocol;"
   "reentry_owner=handle;"
   "reentry_calls="
@@ -1106,22 +1110,35 @@ typedef void (*mln_resource_request_cancel_callback)(
 );
 
 /**
- * Cancel callback state for one handled resource request.
+ * Cancel callback or queue state for one handled resource request.
  *
- * The struct itself is borrowed for the registering call.
+ * The struct itself is borrowed for the registering call. Exactly one of
+ * callback and queue is set.
  */
 typedef struct mln_resource_request_cancel_handler {
   uint32_t size;
+  /** Required in callback mode; null in queue mode. */
   mln_resource_request_cancel_callback callback;
+  /** Opaque host token in queue mode; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data exactly once for an accepted registration,
    * after the callback can no longer run: when the callback returns, on the
    * thread that ran it, or when the request is released without the callback
    * having run, on the releasing thread. It never runs for a rejected
-   * registration or for a request that was already cancelled.
+   * registration or for a request that was already cancelled. Null in queue
+   * mode.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Queue delivery in place of callback: a cancel is copied into one
+   * MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL delivery carrying user_data, and
+   * one MLN_DELIVERY_TYPE_RETIRED delivery follows where callback mode runs
+   * release_user_data. The registration rejects an invalid queue handle with
+   * MLN_STATUS_INVALID_ARGUMENT and a released queue with
+   * MLN_STATUS_INVALID_STATE.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_resource_request_cancel_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -1374,10 +1391,11 @@ MLN_API mln_status mln_resource_request_is_cancelled(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, when handler
- *   or out_cancelled is null, when handler->size is too small, or when
- *   handler->callback is null.
- * - MLN_STATUS_INVALID_STATE when handle has been released, or the request
- *   already has a cancel callback.
+ *   or out_cancelled is null, when handler->size is too small, when handler
+ *   sets neither or both of callback and queue, or when handler->queue is an
+ *   invalid handle.
+ * - MLN_STATUS_INVALID_STATE when handle or handler->queue has been released,
+ *   or the request already has a cancel callback.
  */
 MLN_BINDING("accepted_unless=out_cancelled")
 MLN_API mln_status mln_resource_request_set_cancel_callback(

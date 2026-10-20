@@ -49,7 +49,7 @@ internal object Upcalls {
   @JvmStatic
   fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
     upcall<CustomGeometrySourceOptions, Unit>(
-      "mln_custom_source_tile_callback",
+      "mln_custom_source_fetch_tile_callback",
       userData,
       Unit,
       null,
@@ -61,7 +61,7 @@ internal object Upcalls {
   @JvmStatic
   fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
     upcall<CustomGeometrySourceOptions, Unit>(
-      "mln_custom_source_tile_callback",
+      "mln_custom_source_cancel_tile_callback",
       userData,
       Unit,
       null,
@@ -73,7 +73,7 @@ internal object Upcalls {
   @JvmStatic
   fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
     upcall<CustomMvtVectorSourceOptions, Unit>(
-      "mln_custom_source_tile_callback",
+      "mln_custom_source_fetch_tile_callback",
       userData,
       Unit,
       null,
@@ -85,7 +85,7 @@ internal object Upcalls {
   @JvmStatic
   fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
     upcall<CustomMvtVectorSourceOptions, Unit>(
-      "mln_custom_source_tile_callback",
+      "mln_custom_source_cancel_tile_callback",
       userData,
       Unit,
       null,

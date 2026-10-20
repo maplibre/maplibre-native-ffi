@@ -131,8 +131,8 @@ final class _NativeRegistration<T extends Struct> {
 /// Native acceptance keeps registrations rooted until native release.
 /// Every other outcome rejects them before the call returns.
 final class _NativeRegistrations {
-  _NativeRegistrations(this.ports);
-  final _NativeCallbackPorts ports;
+  _NativeRegistrations(this.roots);
+  final _CallbackRoots roots;
   final _pending = <_NativeRegistration>[];
   bool _accepted = false;
 

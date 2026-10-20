@@ -388,6 +388,61 @@ constexpr auto element_owns_handles(const mln_texture_readback_result*) noexcept
 }
 template <bool Writing>
 auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const mln_camera_transition_end_delivery& source
+) -> mln_camera_transition_end_delivery {
+  auto result = source;
+  result.end = span(
+    arena, source.end, 1, [&]([[maybe_unused]] auto& arena, auto element_1) {
+      auto copied_1 = element_1;
+      return copied_1;
+    }
+  );
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_camera_transition_end_delivery& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(
+  const mln_camera_transition_end_delivery*
+) noexcept -> bool {
+  return false;
+}
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END> {
+  using Record = mln_camera_transition_end_delivery;
+  static constexpr auto member = &mln_delivery_payload::camera_transition_end;
+};
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const mln_custom_source_tile_delivery& source
+) -> mln_custom_source_tile_delivery {
+  auto result = source;
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_custom_source_tile_delivery& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(
+  const mln_custom_source_tile_delivery*
+) noexcept -> bool {
+  return false;
+}
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE> {
+  using Record = mln_custom_source_tile_delivery;
+  static constexpr auto member =
+    &mln_delivery_payload::custom_source_cancel_tile;
+};
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE> {
+  using Record = mln_custom_source_tile_delivery;
+  static constexpr auto member =
+    &mln_delivery_payload::custom_source_fetch_tile;
+};
+template <bool Writing>
+auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_log_delivery& source
 ) -> mln_log_delivery {
   auto result = source;
@@ -404,6 +459,27 @@ template <>
 struct Delivered<MLN_DELIVERY_TYPE_LOG_RECORD> {
   using Record = mln_log_delivery;
   static constexpr auto member = &mln_delivery_payload::log_record;
+};
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena,
+  const mln_resource_request_cancel_delivery& source
+) -> mln_resource_request_cancel_delivery {
+  auto result = source;
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_resource_request_cancel_delivery& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(
+  const mln_resource_request_cancel_delivery*
+) noexcept -> bool {
+  return false;
+}
+template <>
+struct Delivered<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL> {
+  using Record = mln_resource_request_cancel_delivery;
+  static constexpr auto member = &mln_delivery_payload::resource_request_cancel;
 };
 template <bool Writing>
 auto capture_element(

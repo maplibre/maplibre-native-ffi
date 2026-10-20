@@ -283,14 +283,14 @@ def lower_function(
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
     call = native_call(function, args)
-    # The receiver roots the ports of the callbacks it registers, an adopted
-    # owner roots those of its call, and the isolate roots a global call's.
+    # The receiver roots the callbacks it registers, an adopted owner roots
+    # those of its call, and the isolate roots a global call's.
     roots = (
-        "_NativeCallbackPorts()"
+        "_CallbackRoots()"
         if plan.owned_outputs
-        else "_callbackPorts"
+        else "_callbackRoots"
         if receiver
-        else "_globalCallbackPorts"
+        else "_globalCallbackRoots"
     )
     transaction = []
     if plan.registrations:
@@ -482,7 +482,7 @@ def lower(api: Api | BoundApi):
     methods, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
     values = Values(bound)
-    port_owners = values.port_owners
+    root_owners = values.root_owners
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
@@ -506,7 +506,7 @@ def lower(api: Api | BoundApi):
                 methods[owner + "Discarding"].append(discarded)
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
-                port_owners.add(owner)
+                root_owners.add(owner)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"
     return methods, generated, unsupported, values
@@ -548,7 +548,7 @@ def render_scoped_views(bound, generated, values):
     return "\n".join(chunks)
 
 
-def render_owner(native, handle, bodies, bound, ports):
+def render_owner(native, handle, bodies, bound, roots):
     public, native_type = owner_names(handle)
     parameters, fields = [], []
     if handle.parent in bound.public_handles:
@@ -557,10 +557,10 @@ def render_owner(native, handle, bodies, bound, ports):
             "  // Keeps the parent owner reachable while this owner lives.\n"
             f"  // ignore: unused_field\n  final {owner_names(bound.handles[handle.parent])[0]} _parent;"
         )
-    if ports:
+    if roots:
         fields.append(
-            "  // Roots this owner's port registrations for as long as it lives.\n"
-            "  @override\n  final _callbackPorts = _NativeCallbackPorts();"
+            "  // Roots this owner's callback registrations for as long as it lives.\n"
+            "  @override\n  final _callbackRoots = _CallbackRoots();"
         )
     fields.append(f"  final NativeHandleState<{native_type}> _state;")
     fields.append(f"  {native_type} get _handle => _state.handle;")
@@ -581,7 +581,7 @@ def render_owner(native, handle, bodies, bound, ports):
         f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
         f"/// Owner of one native `{native}` handle.\n"
         + (f"///\n{summary}" if (summary := doc(bound, native)) else "")
-        + f"final class {public} implements Finalizable{', _CallbackPortOwner' if ports else ''} {{\n"
+        + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
         + "\n".join(fields)
         + "\n\n  /// Whether this binding object has released its native handle.\n"
@@ -666,8 +666,8 @@ def generate(api: Api | BoundApi) -> str:
                 f"extension type {public}Discarding._({public} _owner) {{\n"
                 f"  {native_type} get _handle => _owner._handle;\n"
                 + (
-                    "  _NativeCallbackPorts get _callbackPorts => _owner._callbackPorts;\n"
-                    if native in values.port_owners
+                    "  _CallbackRoots get _callbackRoots => _owner._callbackRoots;\n"
+                    if native in values.root_owners
                     else ""
                 )
                 + "".join(discarded)
@@ -679,7 +679,7 @@ def generate(api: Api | BoundApi) -> str:
                 handle,
                 methods.get(native, []),
                 bound,
-                native in values.port_owners,
+                native in values.root_owners,
             )
         )
     chunks.extend(render_attachments(bound, generated))

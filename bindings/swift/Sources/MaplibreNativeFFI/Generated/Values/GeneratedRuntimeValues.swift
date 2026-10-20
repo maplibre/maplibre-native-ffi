@@ -643,11 +643,12 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
   }
 }
 
-/// Cancel callback state for one handled resource request.
+/// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestCancelHandler: Sendable {
+  /// Required in callback mode; null in queue mode.
   public var callback: (@Sendable () throws -> Void)?
   public init(callback: (@Sendable () throws -> Void)? = nil) {
     self.callback = callback

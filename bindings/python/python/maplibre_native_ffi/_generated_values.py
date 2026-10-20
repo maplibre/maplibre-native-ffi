@@ -1465,8 +1465,8 @@ class CameraTransitionEnd:
 
 @dataclass(frozen=True, slots=True)
 class CameraTransitionHandler:
-    """Callback state that one camera command copies to report the end of its
-    transitions.
+    """Callback or queue state that one camera command copies to report the end
+    of its transitions.
 
     See `mln_camera_transition_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3458,7 +3458,7 @@ class ResourceRange:
 
 @dataclass(frozen=True, slots=True)
 class ResourceRequestCancelHandler:
-    """Cancel callback state for one handled resource request.
+    """Cancel callback or queue state for one handled resource request.
 
     See `mln_resource_request_cancel_handler` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

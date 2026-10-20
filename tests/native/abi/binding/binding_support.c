@@ -1,96 +1,45 @@
-// Binding support: Dart ports and wakes, which post through the post_cobject
-// function that the host passes, so a fake of Dart's NativeApi.postCObject
-// records the messages without a Dart VM. A message is an integer, or an array
-// of integers in the Dart_CObject layout of native API version 2.
+// Binding support: Dart wakes, which post through the post_cobject function
+// that the host passes, so a fake of Dart's NativeApi.postCObject records the
+// messages without a Dart VM. A message is an integer in the Dart_CObject
+// layout of native API version 2; and owner tokens.
 
 #include "maplibre_native_c/binding_support.h"
 
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-// The Dart_CObject types and union members that binding support posts, and
-// the native pointer member that a decoder must still step over.
-enum {
-  dart_int64 = 3,
-  dart_array = 6,
-  dart_native_pointer = 11,
-};
-
-typedef void (*dart_finalizer)(void* isolate_callback_data, void* peer);
+// The Dart_CObject integer type that a wake posts.
+enum { dart_int64 = 3 };
 
 typedef struct dart_cobject {
   int32_t type;
   union {
     int64_t as_int64;
-    struct {
-      intptr_t length;
-      struct dart_cobject** values;
-    } as_array;
-    struct {
-      intptr_t ptr;
-      intptr_t size;
-      dart_finalizer callback;
-    } as_native_pointer;
   } value;
 } dart_cobject;
-
-// One posted message, decoded. An array element is an integer, or a native
-// pointer with its finalizer.
-typedef struct posted_element {
-  int32_t type;
-  int64_t integer;
-  void* pointer;
-  dart_finalizer finalizer;
-} posted_element;
 
 typedef struct posted_message {
   int64_t port;
   int32_t type;
-  size_t length;
-  posted_element elements[4];
+  int64_t integer;
 } posted_message;
 
 enum { posted_capacity = 16 };
 
-// Posts may come from MapLibre threads. A poster claims a slot, fills it, and
-// then marks it ready.
 static posted_message posted[posted_capacity];
-static atomic_bool posted_ready[posted_capacity];
 static atomic_size_t posted_count;
 // What the fake reports: true delivers, false stands for a closed port.
 static atomic_bool delivers;
 
-static posted_element decode_element(const dart_cobject* object) {
-  posted_element element = {.type = object->type};
-  if (object->type == dart_int64) {
-    element.integer = object->value.as_int64;
-  } else if (object->type == dart_native_pointer) {
-    element.pointer = (void*)object->value.as_native_pointer.ptr;
-    element.finalizer = object->value.as_native_pointer.callback;
-  }
-  return element;
-}
-
 static bool fake_post_cobject(int64_t port, dart_cobject* message) {
   const size_t slot = atomic_fetch_add(&posted_count, 1);
   if (slot < posted_capacity) {
-    posted_message* record = &posted[slot];
-    record->port = port;
-    record->type = message->type;
-    if (message->type == dart_array) {
-      const intptr_t length = message->value.as_array.length;
-      record->length = (size_t)length;
-      for (intptr_t index = 0; index < length && index < 4; ++index) {
-        record->elements[index] =
-          decode_element(message->value.as_array.values[index]);
-      }
-    } else {
-      record->length = 1;
-      record->elements[0] = decode_element(message);
-    }
-    atomic_store(&posted_ready[slot], true);
+    posted[slot] = (posted_message){
+      .port = port,
+      .type = message->type,
+      .integer = message->value.as_int64,
+    };
   }
-  mln_test_pulse();
   return atomic_load(&delivers);
 }
 
@@ -103,33 +52,17 @@ static void* fake_post_address(void) {
 
 static void reset_posts(bool deliver) {
   memset(posted, 0, sizeof(posted));
-  for (size_t index = 0; index < posted_capacity; ++index) {
-    atomic_store(&posted_ready[index], false);
-  }
   atomic_store(&posted_count, 0);
   atomic_store(&delivers, deliver);
-}
-
-static bool message_ready(void* context) {
-  return atomic_load(&posted_ready[*(const size_t*)context]);
-}
-
-// Waits for the message in one slot and returns it.
-static const posted_message* await_message(size_t slot) {
-  TEST_ASSERT_LESS_THAN_size_t(posted_capacity, slot);
-  TEST_ASSERT_TRUE(mln_test_await(
-    message_ready, &slot, mln_test_deadline_default(), "Dart port message"
-  ));
-  return &posted[slot];
 }
 
 static void assert_integer_message(
   size_t slot, int64_t port, int64_t expected
 ) {
-  const posted_message* message = await_message(slot);
+  const posted_message* message = &posted[slot];
   TEST_ASSERT_EQUAL_INT64(port, message->port);
   TEST_ASSERT_EQUAL_INT32(dart_int64, message->type);
-  TEST_ASSERT_EQUAL_INT64(expected, message->elements[0].integer);
+  TEST_ASSERT_EQUAL_INT64(expected, message->integer);
 }
 
 // A wake posts 0 for each call and 1 when it is released. A closed port that
@@ -154,42 +87,6 @@ static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
     assert_integer_message(1, 17, 0);
     assert_integer_message(2, 17, 1);
   }
-}
-
-// A notification port posts the callback identifier and the copied arguments
-// until it is released, and release posts 0 once.
-static void dart_notification_ports_post_copied_arguments_until_released(void) {
-  reset_posts(true);
-  TEST_ASSERT_NULL(mln_binding_dart_port_create(NULL, 19));
-  TEST_ASSERT_NULL(mln_binding_dart_port_create(fake_post_address(), 0));
-  TEST_ASSERT_NULL(mln_binding_dart_port_function(0));
-  void* context = mln_binding_dart_port_create(fake_post_address(), 19);
-  TEST_ASSERT_NOT_NULL(context);
-  void* address = mln_binding_dart_port_function(
-    MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE
-  );
-  TEST_ASSERT_NOT_NULL(address);
-  mln_custom_source_tile_callback fetch_tile = NULL;
-  memcpy(&fetch_tile, &address, sizeof(fetch_tile));
-
-  fetch_tile(context, (mln_canonical_tile_id){.z = 5, .x = 7, .y = 9});
-  mln_binding_dart_port_release(context);
-  mln_binding_dart_port_release(context);
-  fetch_tile(context, (mln_canonical_tile_id){.z = 1, .x = 1, .y = 1});
-  TEST_ASSERT_EQUAL_size_t(2, atomic_load(&posted_count));
-
-  const posted_message* tile = await_message(0);
-  TEST_ASSERT_EQUAL_INT64(19, tile->port);
-  TEST_ASSERT_EQUAL_INT32(dart_array, tile->type);
-  TEST_ASSERT_EQUAL_size_t(4, tile->length);
-  const int64_t expected[] = {
-    MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE, 5, 7, 9
-  };
-  for (size_t index = 0; index < 4; ++index) {
-    TEST_ASSERT_EQUAL_INT32(dart_int64, tile->elements[index].type);
-    TEST_ASSERT_EQUAL_INT64(expected[index], tile->elements[index].integer);
-  }
-  assert_integer_message(1, 19, 0);
 }
 
 // Creates a map that the handle fixtures do not record, for a case that hands
@@ -237,6 +134,5 @@ static void an_owner_token_disposes_its_owner_only_when_finalized(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(dart_wakes_post_zero_per_wake_and_one_on_release);
-  RUN_TEST(dart_notification_ports_post_copied_arguments_until_released);
   RUN_TEST(an_owner_token_disposes_its_owner_only_when_finalized);
 }

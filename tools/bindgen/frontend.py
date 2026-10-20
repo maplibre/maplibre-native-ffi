@@ -420,14 +420,12 @@ def parse_headers(
     headers: tuple[str, ...] | None = None,
     clang_args: tuple[str, ...] = (),
     clang: str = "clang",
-    contents: dict[str, str] | None = None,
 ) -> Api:
     """Parse every public header in one C23 translation unit.
 
     `clang_args` supplies target defines and include paths, including the
     installed MapLibre Native plugin headers. Pass `headers` for fixture tests.
-    `contents` replaces the text of headers, keyed by their path under the
-    include directory, whether or not they exist. Compiler errors are fatal;
+    Compiler errors are fatal;
     partial ASTs never reach an emitter. The result carries each declaration's
     complete metadata: its annotations together with the defaults that its C
     shape implies.
@@ -438,7 +436,6 @@ def parse_headers(
             headers=headers,
             clang_args=clang_args,
             clang=clang,
-            contents=contents,
         )
     )
 
@@ -449,11 +446,9 @@ def extract_headers(
     headers: tuple[str, ...] | None = None,
     clang_args: tuple[str, ...] = (),
     clang: str = "clang",
-    contents: dict[str, str] | None = None,
 ) -> Api:
     """Parse the headers into declarations that carry only their annotations."""
     include_directory = include_directory.resolve()
-    contents = contents or {}
     classify_interfaces = (
         headers is None and (include_directory / "binding-interfaces.toml").is_file()
     )
@@ -462,10 +457,7 @@ def extract_headers(
             path.relative_to(include_directory)
             for path in include_directory.rglob("*.h")
         }
-        headers = tuple(
-            path.as_posix()
-            for path in sorted(found | {Path(path) for path in contents})
-        )
+        headers = tuple(path.as_posix() for path in sorted(found))
     if not headers:
         raise ModelError([f"no public headers in {include_directory}"])
     source = "".join(f'#include "{header}"\n' for header in headers)
@@ -480,11 +472,9 @@ def extract_headers(
         *compiler_arguments(clang),
         *clang_args,
     ]
-    unsaved = [(filename, source)]
-    unsaved.extend(
-        (str(include_directory / path), text) for path, text in contents.items()
+    unit = cindex.Index.create().parse(
+        filename, args=arguments, unsaved_files=[(filename, source)]
     )
-    unit = cindex.Index.create().parse(filename, args=arguments, unsaved_files=unsaved)
     diagnostics = [
         str(diagnostic).replace(str(include_directory) + os.sep, "")
         for diagnostic in unit.diagnostics
@@ -516,7 +506,6 @@ def extract_headers(
                 headers=tuple(entries),
                 clang_args=clang_args,
                 clang=clang,
-                contents=contents,
             )
             for name, entries in manifest.items()
         }

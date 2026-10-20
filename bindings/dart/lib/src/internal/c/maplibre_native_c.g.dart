@@ -33,9 +33,13 @@ typedef mln_completion_callbackFunction =
       Pointer<Void> user_data,
       Pointer<mln_completion_result> result,
     );
-typedef mln_custom_source_tile_callback =
-    Pointer<NativeFunction<mln_custom_source_tile_callbackFunction>>;
-typedef mln_custom_source_tile_callbackFunction =
+typedef mln_custom_source_cancel_tile_callback =
+    Pointer<NativeFunction<mln_custom_source_cancel_tile_callbackFunction>>;
+typedef mln_custom_source_cancel_tile_callbackFunction =
+    Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
+typedef mln_custom_source_fetch_tile_callback =
+    Pointer<NativeFunction<mln_custom_source_fetch_tile_callbackFunction>>;
+typedef mln_custom_source_fetch_tile_callbackFunction =
     Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
 typedef mln_http_header_transform_callback =
     Pointer<NativeFunction<mln_http_header_transform_callbackFunction>>;
@@ -192,10 +196,16 @@ final class mln_camera_transition_end extends Struct {
   external int generation;
 }
 
+final class mln_camera_transition_end_delivery extends Struct {
+  external Pointer<mln_camera_transition_end> end;
+}
+
 final class mln_camera_transition_handler extends Struct {
   external mln_camera_transition_end_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_camera_update extends Struct {
@@ -252,8 +262,8 @@ final class mln_custom_geometry_source_options extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  external mln_custom_source_tile_callback fetch_tile;
-  external mln_custom_source_tile_callback cancel_tile;
+  external mln_custom_source_fetch_tile_callback fetch_tile;
+  external mln_custom_source_cancel_tile_callback cancel_tile;
   external Pointer<Void> user_data;
   @Double()
   external double min_zoom;
@@ -270,6 +280,8 @@ final class mln_custom_geometry_source_options extends Struct {
   @Bool()
   external bool wrap;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_custom_mvt_vector_source_options extends Struct {
@@ -277,14 +289,20 @@ final class mln_custom_mvt_vector_source_options extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  external mln_custom_source_tile_callback fetch_tile;
-  external mln_custom_source_tile_callback cancel_tile;
+  external mln_custom_source_fetch_tile_callback fetch_tile;
+  external mln_custom_source_cancel_tile_callback cancel_tile;
   external Pointer<Void> user_data;
   @Double()
   external double min_zoom;
   @Double()
   external double max_zoom;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
+}
+
+final class mln_custom_source_tile_delivery extends Struct {
+  external mln_canonical_tile_id tile_id;
 }
 
 final class mln_delivery extends Struct {
@@ -310,6 +328,10 @@ final class mln_delivery_payload extends Union {
   external mln_completion_result completion;
   external mln_log_delivery log_record;
   external mln_resource_request_delivery resource_request;
+  external mln_resource_request_cancel_delivery resource_request_cancel;
+  external mln_camera_transition_end_delivery camera_transition_end;
+  external mln_custom_source_tile_delivery custom_source_fetch_tile;
+  external mln_custom_source_tile_delivery custom_source_cancel_tile;
 }
 
 final class mln_delivery_queue_options extends Struct {
@@ -1010,12 +1032,19 @@ final class mln_resource_range extends Struct {
   external int end;
 }
 
+final class mln_resource_request_cancel_delivery extends Struct {
+  @Uint64()
+  external int handle;
+}
+
 final class mln_resource_request_cancel_handler extends Struct {
   @Uint32()
   external int size;
   external mln_resource_request_cancel_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
+  @Uint64()
+  external int queue;
 }
 
 final class mln_resource_request_delivery extends Struct {
@@ -1578,15 +1607,6 @@ const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
 const MLN_ANIMATION_OPTION_EASING = 8;
 const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
 
-// mln_binding_dart_port_callback
-const MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1;
-const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE = 2;
-const MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE = 3;
-const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE = 4;
-const MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE = 5;
-const MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK = 6;
-const MLN_BINDING_DART_PORT_WAKE_CALLBACK = 7;
-
 // mln_bound_option_field
 const MLN_BOUND_OPTION_BOUNDS = 1;
 const MLN_BOUND_OPTION_MIN_ZOOM = 2;
@@ -1662,6 +1682,10 @@ const MLN_DELIVERY_TYPE_COMPLETION = 1;
 const MLN_DELIVERY_TYPE_LOG_RECORD = 2;
 const MLN_DELIVERY_TYPE_RESOURCE_REQUEST = 3;
 const MLN_DELIVERY_TYPE_RETIRED = 4;
+const MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL = 5;
+const MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END = 6;
+const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE = 7;
+const MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8;
 
 // mln_feature_state_selector_field
 const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
@@ -2232,18 +2256,6 @@ external int mln_android_init(
 
 @Native<mln_animation_options Function()>()
 external mln_animation_options mln_animation_options_default();
-
-@Native<Pointer<Void> Function(Pointer<Void>, Int64)>()
-external Pointer<Void> mln_binding_dart_port_create(
-  Pointer<Void> post_cobject,
-  int port,
-);
-
-@Native<Pointer<Void> Function(Uint32)>()
-external Pointer<Void> mln_binding_dart_port_function(int id);
-
-@Native<Void Function(Pointer<Void>)>()
-external void mln_binding_dart_port_release(Pointer<Void> context);
 
 @Native<
   Int32 Function(

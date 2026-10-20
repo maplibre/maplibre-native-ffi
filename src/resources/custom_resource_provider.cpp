@@ -22,6 +22,7 @@
 
 #include "resources/custom_resource_provider.hpp"
 
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
@@ -367,6 +368,18 @@ void fail_locked(
   }
   object.loader->schedule(ProviderRequest::Decision::Failure, failure);
   object.completed = true;
+}
+
+// The cancel callback of a queue cancel handler, which queues the cancel.
+void queue_request_cancel(
+  void* registration, mln_resource_request handle
+) noexcept {
+  static_cast<void>(
+    static_cast<const mln::delivery::QueuedRegistration*>(registration)
+      ->push<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
+        mln_resource_request_cancel_delivery{.handle = handle}
+      )
+  );
 }
 
 // Runs the registered cancel callback, if any, for a request that has not been
@@ -748,16 +761,26 @@ auto set_resource_request_cancel_callback(
     set_thread_error("mln_resource_request_cancel_handler.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (handler->callback == nullptr) {
-    set_thread_error("cancel handler callback must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_cancelled == nullptr) {
     set_thread_error("out_cancelled must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "cancel handler", handler->queue, handler->callback != nullptr,
+    handler->release_user_data != nullptr, queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
   if (live == nullptr) return recorded_handle_fault_status();
+  // A queue handler's registration stands in for user_data. One the request
+  // does not store is freed without retiring.
+  auto registration = std::unique_ptr<mln::delivery::QueuedRegistration>{};
+  if (queue != nullptr) {
+    registration = std::make_unique<mln::delivery::QueuedRegistration>(
+      std::move(queue), handler->user_data
+    );
+  }
   const std::scoped_lock lock(live->mutex);
   if (live->retired) {
     return report_handle_fault(
@@ -770,7 +793,12 @@ auto set_resource_request_cancel_callback(
   }
   live->cancel_callback_registered = true;
   *out_cancelled = live->cancelled && !live->completed;
-  if (!*out_cancelled) {
+  if (*out_cancelled) return MLN_STATUS_OK;
+  if (registration != nullptr) {
+    live->cancel_callback = &queue_request_cancel;
+    live->cancel_release = &mln::delivery::QueuedRegistration::retire;
+    live->cancel_user_data = registration.release();
+  } else {
     live->cancel_callback = handler->callback;
     live->cancel_release = handler->release_user_data;
     live->cancel_user_data = handler->user_data;

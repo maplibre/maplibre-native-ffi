@@ -1,5 +1,5 @@
-// Port-delivered callback registrations: each one roots its callback for as
-// long as native holds it, and retires when native releases it.
+// Queue-delivered callback registrations: each one roots its callbacks for as
+// long as native holds it, and retires when native retires it.
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -21,11 +21,11 @@ void main() {
       await expectCommitted(
         map.addCustomGeometrySource('source', _geometrySource()),
       );
-      final removed = singleCallbackPortProbeForTesting(map)!;
+      final removed = singleRegistrationProbeForTesting(map)!;
       expect(removed.closed, isFalse);
       await expectCommitted(map.removeStyleSource('source'));
       await within(removed.released, 'the release after a removal');
-      expect(singleCallbackPortProbeForTesting(map), isNull);
+      expect(singleRegistrationProbeForTesting(map), isNull);
 
       // A registration that never reaches native is released at once.
       expect(
@@ -35,12 +35,12 @@ void main() {
         ),
         throwsA(isA<InvalidArgumentException>()),
       );
-      expect(singleCallbackPortProbeForTesting(map), isNull);
+      expect(singleRegistrationProbeForTesting(map), isNull);
 
       await expectCommitted(
         map.addCustomGeometrySource('source', _geometrySource()),
       );
-      final closed = singleCallbackPortProbeForTesting(map)!;
+      final closed = singleRegistrationProbeForTesting(map)!;
       await within(map.close(), 'map close');
       await within(closed.released, 'the release after a map close');
     },
@@ -68,14 +68,14 @@ void main() {
           ),
         ),
       );
-      final probe = singleCallbackPortProbeForTesting(map)!;
+      final probe = singleRegistrationProbeForTesting(map)!;
       expect(probe.closed, isFalse);
       await expectCommitted(map.cancelCameraTransition(BigInt.from(3)));
       final end = await within(ended.future, 'the end handler');
       expect(end.outcome, CameraTransitionOutcome.cancelled);
       expect(end.generation, isNot(BigInt.zero));
       await within(probe.released, 'the release after the end');
-      expect(singleCallbackPortProbeForTesting(map), isNull);
+      expect(singleRegistrationProbeForTesting(map), isNull);
 
       expect(
         () => map.applyCameraDelta(
@@ -88,7 +88,7 @@ void main() {
         ),
         throwsA(isA<InvalidArgumentException>()),
       );
-      expect(singleCallbackPortProbeForTesting(map), isNull);
+      expect(singleRegistrationProbeForTesting(map), isNull);
     },
   );
 }

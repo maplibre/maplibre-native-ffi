@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "c_api/boundary.hpp"
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "diagnostics/string_view.hpp"
 #include "execution/process_exit.hpp"
@@ -76,6 +77,32 @@ struct OwnedTileOptions {
   }
 };
 
+auto queue_tile_fetch(
+  void* registration, mln_canonical_tile_id tile_id
+) noexcept -> void {
+  static_cast<void>(
+    static_cast<const mln::delivery::QueuedRegistration*>(registration)
+      ->push<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE>(
+        mln_custom_source_tile_delivery{.tile_id = tile_id}
+      )
+  );
+}
+
+auto queue_tile_cancel(
+  void* registration, mln_canonical_tile_id tile_id
+) noexcept -> void {
+  static_cast<void>(
+    static_cast<const mln::delivery::QueuedRegistration*>(registration)
+      ->push<MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE>(
+        mln_custom_source_tile_delivery{.tile_id = tile_id}
+      )
+  );
+}
+
+// The copied options of one callback source command. A queue source's copy
+// carries queue trampolines, with its registration as user_data and the
+// registration's retirement as release_user_data; a rejected command frees
+// the registration without retiring it.
 template <typename Options>
 struct OwnedCallbackSourceOptions {
   enum class Ownership : std::uint8_t {
@@ -87,13 +114,32 @@ struct OwnedCallbackSourceOptions {
   Options value{};
   std::atomic<Ownership> ownership = Ownership::pending;
 
-  explicit OwnedCallbackSourceOptions(const Options& options)
-      : value(options) {}
+  OwnedCallbackSourceOptions(
+    const Options& options,
+    std::shared_ptr<mln::delivery::DeliveryQueueState> queue
+  )
+      : value(options) {
+    if (queue == nullptr) return;
+    auto registration = std::make_unique<mln::delivery::QueuedRegistration>(
+      std::move(queue), options.user_data
+    );
+    value.fetch_tile = &queue_tile_fetch;
+    value.cancel_tile = &queue_tile_cancel;
+    value.user_data = registration.release();
+    value.release_user_data = &mln::delivery::QueuedRegistration::retire;
+    value.queue = MLN_HANDLE_NULL;
+    queued = true;
+  }
 
   ~OwnedCallbackSourceOptions() {
+    const auto state = ownership.load(std::memory_order_acquire);
+    if (queued && state == Ownership::pending) {
+      delete static_cast<mln::delivery::QueuedRegistration*>(value.user_data);
+      return;
+    }
     if (
-      ownership.load(std::memory_order_acquire) == Ownership::accepted &&
-      value.release_user_data != nullptr && !mln::core::process_exiting()
+      state == Ownership::accepted && value.release_user_data != nullptr &&
+      !mln::core::process_exiting()
     ) {
       try {
         value.release_user_data(value.user_data);
@@ -101,6 +147,9 @@ struct OwnedCallbackSourceOptions {
       }
     }
   }
+
+ private:
+  bool queued = false;
 };
 
 auto valid_view(mln_buffer_view view, const char* name) -> bool {
@@ -160,8 +209,18 @@ auto add_callback_source(
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  if (options->queue != MLN_HANDLE_NULL && options->cancel_tile != nullptr) {
+    mln::core::set_thread_error("a queue source must not carry cancel_tile");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "custom source", options->queue, options->fetch_tile != nullptr,
+    options->release_user_data != nullptr, queue
+  );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
   auto id = OwnedView{source_id};
-  auto owned = std::make_shared<Owned>(*options);
+  auto owned = std::make_shared<Owned>(*options, std::move(queue));
   const auto status = mln::core::submit_map_command(
     map,
     [id = std::move(id), owned, add](mln::core::MapObject& live) -> mln_status {

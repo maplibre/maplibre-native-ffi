@@ -320,14 +320,12 @@
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift",
     "bindings/zig/src/maplibre_native_ffi.zig",
-    "include/maplibre_native_c/binding_support_generated.h",
-    "src/c_api/binding_port_generated.inc",
     "src/completion/completion_result_generated.inc",
     "src/delivery/capture_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc",
     "tests/native/internal/delivery_copy_cases_generated.inc"
   ],
-  "function_count": 249,
+  "function_count": 246,
   "languages": {
     "dart": {
       "discarding": [
@@ -2878,9 +2876,6 @@
   },
   "public_function_count": 236,
   "runtime_exports": [
-    "mln_binding_dart_port_create",
-    "mln_binding_dart_port_function",
-    "mln_binding_dart_port_release",
     "mln_binding_dart_wake_create",
     "mln_binding_owner_finalize",
     "mln_binding_owner_token_create",
@@ -2894,7 +2889,7 @@
   ],
   "schema_version": 1,
   "semantic": {
-    "resolved_callbacks": 11,
+    "resolved_callbacks": 12,
     "resolved_operations": 234,
     "support_relations": {
       "mln_acquired_frame_dispose": {

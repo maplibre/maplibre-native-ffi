@@ -597,9 +597,9 @@ auto to_c_canonical_tile_id(const mln::CanonicalTileID& tile_id)
   return mln_canonical_tile_id{.z = tile_id.z, .x = tile_id.x, .y = tile_id.y};
 }
 
-auto to_native_tile_function(
-  mln_custom_source_tile_callback callback, void* user_data
-) -> mln::style::TileFunction {
+template <typename Callback>
+auto to_native_tile_function(Callback callback, void* user_data)
+  -> mln::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;
   }
@@ -1159,7 +1159,8 @@ auto custom_geometry_source_options_default() noexcept
     .buffer = 128,
     .clip = false,
     .wrap = false,
-    .release_user_data = nullptr
+    .release_user_data = nullptr,
+    .queue = MLN_HANDLE_NULL
   };
 }
 
@@ -1173,7 +1174,8 @@ auto custom_mvt_vector_source_options_default() noexcept
     .user_data = nullptr,
     .min_zoom = 0,
     .max_zoom = 18,
-    .release_user_data = nullptr
+    .release_user_data = nullptr,
+    .queue = MLN_HANDLE_NULL
   };
 }
 
@@ -1267,10 +1269,6 @@ auto validate_custom_geometry_source_options(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (options->fetch_tile == nullptr) {
-    mln::core::set_thread_error("fetch_tile must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     has_custom_geometry_source_option(
       *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
@@ -1335,10 +1333,6 @@ auto validate_custom_mvt_vector_source_options(
     mln::core::set_thread_error(
       "mln_custom_mvt_vector_source_options.fields contains unknown bits"
     );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (options->fetch_tile == nullptr) {
-    mln::core::set_thread_error("fetch_tile must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (

@@ -571,8 +571,8 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   }
 }
 
-/// Callback state that one camera command copies to report the end of its
-/// transitions.
+/// Callback or queue state that one camera command copies to report the end of
+/// its transitions.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

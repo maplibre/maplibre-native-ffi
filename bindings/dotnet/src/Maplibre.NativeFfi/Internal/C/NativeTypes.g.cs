@@ -109,6 +109,7 @@ internal unsafe struct mln_camera_transition_handler
     public delegate* unmanaged[Cdecl]<void*, mln_camera_transition_end*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_camera_update
@@ -164,6 +165,7 @@ internal unsafe struct mln_custom_geometry_source_options
     public byte clip;
     public byte wrap;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_custom_mvt_vector_source_options
@@ -176,6 +178,7 @@ internal unsafe struct mln_custom_mvt_vector_source_options
     public double min_zoom;
     public double max_zoom;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_diagnostic
@@ -752,6 +755,7 @@ internal unsafe struct mln_resource_request_cancel_handler
     public delegate* unmanaged[Cdecl]<void*, MlnResourceRequest, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    public MlnDeliveryQueue queue;
 }
 
 internal unsafe struct mln_resource_request_info

@@ -12,12 +12,12 @@ namespace Maplibre.NativeFfi;
 public sealed record CustomGeometrySourceOptions
 {
     /// <summary>
-    /// Required tile fetch callback.
+    /// Tile fetch callback. Required in callback mode; null in queue mode.
     /// </summary>
     public Action<CanonicalTileId>? FetchTile { get; set; }
 
     /// <summary>
-    /// Optional best-effort tile cancel callback.
+    /// Optional best-effort tile cancel callback. Null in queue mode.
     /// </summary>
     public Action<CanonicalTileId>? CancelTile { get; set; }
     public double? MinZoom { get; set; }

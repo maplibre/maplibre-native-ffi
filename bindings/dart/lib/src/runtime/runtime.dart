@@ -22,21 +22,21 @@ import '../values.dart';
 part 'generated_operations.dart';
 part 'native_calls.dart';
 
-/// Port roots for process-global registrations. The log callback arrives
-/// through the isolate's delivery queue instead, which needs no port roots.
-final _globalCallbackPorts = _NativeCallbackPorts();
+/// Roots for process-global registrations, such as the log handler.
+final _globalCallbackRoots = _CallbackRoots();
 
-/// An owner that roots the ports of its callback registrations.
-abstract interface class _CallbackPortOwner {
+/// An owner that roots its callback registrations.
+abstract interface class _CallbackRootOwner {
   // ignore: unused_element
-  _NativeCallbackPorts get _callbackPorts;
+  _CallbackRoots get _callbackRoots;
 }
 
-final class _NativeCallbackPorts {
-  final pending = <_NativeCallbackPort>{};
-
-  /// Queued registrations, which this owner keeps until they retire.
+/// The callback registrations of one owner, which it keeps until native code
+/// retires them: queued registrations through the isolate's delivery queue,
+/// and wakes through their ports.
+final class _CallbackRoots {
   final queued = <DeliveryRegistration>{};
+  final wakes = <void Function()>{};
 
   DeliveryRegistration registerQueued(Map<int, DeliveryHandler> handlers) {
     final registration = isolateDeliveryQueue.register(handlers);
@@ -45,92 +45,71 @@ final class _NativeCallbackPorts {
     return registration;
   }
 
-  _NativeCallbackPort register(
-    Map<int, void Function(List<dynamic>)> callbacks,
-  ) {
-    final port = _NativeCallbackPort(
-      callbacks,
-      (port) => pending.remove(port),
-      (nativePort) => raw.mln_binding_dart_port_create(
-        NativeApi.postCObject.cast(),
-        nativePort,
-      ),
-      raw.mln_binding_dart_port_release,
+  /// Prepares a wake that posts to a port of this isolate, which runs
+  /// [callback] for each wake and closes when native releases the wake.
+  ///
+  /// The port holds the callback weakly, and this owner holds it until the
+  /// port closes, so a callback that captures its owner leaves the two
+  /// collectible together. Like a registration, the port leaves the isolate
+  /// free to finish.
+  _NativeRegistration<raw.mln_wake> wake(void Function()? callback) {
+    final arena = Arena();
+    final result = arena<raw.mln_wake>();
+    if (callback == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    wakes.add(callback);
+    final port = _wakePort(
+      Zone.current,
+      WeakReference(callback),
+      WeakReference(this),
     );
-    pending.add(port);
-    return port;
-  }
-}
-
-final class _NativeCallbackPort {
-  _NativeCallbackPort(
-    Map<int, void Function(List<dynamic>)> callbacks,
-    this._onReleased,
-    Pointer<Void> Function(int nativePort) create,
-    this._release,
-  ) {
-    _callbacks = callbacks;
-    // A registration lives as long as its owner, so its port leaves the
-    // isolate free to finish. Only pending completions keep it alive.
-    _port = RawReceivePort()..keepIsolateAlive = false;
-    _port.handler = _callbackPortHandler(WeakReference(this), _port);
     try {
-      context = create(_port.sendPort.nativePort);
+      checkNativeCall(
+        raw.mln_binding_dart_wake_create(
+          NativeApi.postCObject.cast(),
+          port.sendPort.nativePort,
+          result,
+          nativeDiagnostic,
+        ),
+      );
     } catch (_) {
-      _port.close();
+      port.close();
+      wakes.remove(callback);
+      arena.releaseAll();
       rethrow;
     }
-    if (context == nullptr) {
-      _port.close();
-      throw StateError('native callback port allocation failed');
-    }
-  }
-  final void Function(_NativeCallbackPort) _onReleased;
-  final void Function(Pointer<Void>) _release;
-  final _zone = Zone.current;
-  late final Map<int, void Function(List<dynamic>)> _callbacks;
-  void _deliver(dynamic message) {
-    _zone.runGuarded(() {
-      if (message == 0) {
-        _finish();
-        return;
-      }
-      final values = message as List<dynamic>;
-      _callbacks[values[0]]?.call(values);
-    });
-  }
-
-  var _closed = false;
-  final _released = Completer<void>();
-  late final RawReceivePort _port;
-  late final Pointer<Void> context;
-  bool get closed => _closed;
-  void _finish() {
-    if (closed) return;
-    _closed = true;
-    _port.close();
-    _callbacks.clear();
-    _onReleased(this);
-    _released.complete();
-  }
-
-  void reject() {
-    _release(context);
-    _finish();
+    // A rejected call leaves the wake with the caller, whose release posts the
+    // message that closes the port.
+    return _NativeRegistration(
+      result,
+      () => result.ref.release_user_data
+          .asFunction<void Function(Pointer<Void>)>()(result.ref.user_data),
+      arena.releaseAll,
+    );
   }
 }
 
-void Function(dynamic) _callbackPortHandler(
-  WeakReference<_NativeCallbackPort> reference,
-  RawReceivePort port,
-) => (dynamic message) {
-  final state = reference.target;
-  if (state == null) {
-    if (message == 0) port.close();
-    return;
-  }
-  state._deliver(message);
-};
+/// The port of one wake. An open port is a root, so its handler reaches the
+/// callback and its owner only weakly, and drops the owner's root once native
+/// releases the wake.
+RawReceivePort _wakePort(
+  Zone zone,
+  WeakReference<void Function()> callback,
+  WeakReference<_CallbackRoots> owner,
+) {
+  final port = RawReceivePort()..keepIsolateAlive = false;
+  port.handler = (dynamic message) {
+    final target = callback.target;
+    if (message != 0) {
+      port.close();
+      if (target != null) owner.target?.wakes.remove(target);
+    } else if (target != null) {
+      zone.runGuarded(target);
+    }
+  };
+  return port;
+}
 
 /// Starts a command and decodes its receipt, including failed dispositions.
 Future<CommandCompletion> _startCommand(

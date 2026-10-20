@@ -155,17 +155,17 @@ void main() {
     final map = await fixture.openMap();
     await expectCommitted(map.setStyleUrl(styleUrl));
     final handle = await within(handed.future, 'the provider');
-    final probe = singleCallbackPortProbeForTesting(handle)!;
+    final probe = singleRegistrationProbeForTesting(handle)!;
     expect(probe.closed, isFalse);
 
     await within(map.close(), 'map close');
     await within(fixture.runtime.close(), 'runtime close');
     expect(await within(cancelled.future, 'the cancel callback'), isTrue);
-    // The release that follows the one delivery closes the port, so no
-    // second delivery can arrive.
+    // The retirement that follows the one delivery unroots the registration,
+    // so no second delivery can arrive.
     await within(probe.released, 'the cancel registration release');
     expect(zoneErrors, [isA<StateError>()]);
-    expect(singleCallbackPortProbeForTesting(handle), isNull);
+    expect(singleRegistrationProbeForTesting(handle), isNull);
     handle.close();
     handle.waitUntilRetired();
   });
@@ -195,7 +195,7 @@ void main() {
         handle.setCancelCallback(ResourceRequestCancelHandler(callback: () {})),
         isTrue,
       );
-      expect(singleCallbackPortProbeForTesting(handle), isNull);
+      expect(singleRegistrationProbeForTesting(handle), isNull);
     },
   );
 }

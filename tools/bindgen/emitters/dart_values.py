@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .. import docs, native_ports
+from .. import docs
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix
@@ -67,7 +67,8 @@ def identifier(native: str) -> str:
 class Values:
     def __init__(self, bound: BoundApi):
         self.bound = bound
-        self.port_owners: set[str] = set()
+        # The owners whose calls root callback registrations.
+        self.root_owners: set[str] = set()
         self.used: dict[str, ValuePlan] = {
             name: value
             for name, value in bound.public_values.items()
@@ -104,24 +105,14 @@ class Values:
                 self.check_delivery(callback)
                 self.used[value.native] = value
                 return
-            if callback.result.native != "void" or not callback.context:
+            if not self.wake_callback(callback):
                 raise Unsupported(
                     "callback must answer on its native thread, which Dart cannot run"
                 )
-            if callback.synchronous:
-                raise Unsupported("callback must finish on its native thread")
-            for parameter in callback.arguments:
-                if native_ports.flattened(parameter.value, parameter.name) is None:
-                    raise Unsupported(
-                        "callback payload needs another native port copy rule"
-                    )
-                self.check(parameter.value)
             self.used[value.native] = value
             return
         if value.registration and (
-            self.port_callbacks(value)
-            or self.queue_callback(value)
-            or self.rules_only(value)
+            self.wake(value) or self.queue_callbacks(value) or self.rules_only(value)
         ):
             for field in self.fields(value):
                 self.check(field.value)
@@ -129,7 +120,7 @@ class Values:
             return
         if value.registration:
             raise Unsupported(
-                f"{value.native}: registration requires queue delivery, Dart ports, "
+                f"{value.native}: registration requires queue delivery, a wake, "
                 "or native rules"
             )
         if value.kind != "record":
@@ -156,28 +147,38 @@ class Values:
                 self.check(field.value)
         self.used[value.native] = value
 
-    def port_callbacks(self, value):
-        if not value.registration:
-            return []
-        entries = [
-            entry
-            for entry in native_ports.callbacks(self.bound)
-            if entry[0].native == value.native
-        ]
-        return entries if len(entries) == len(value.registration.callbacks) else []
+    def wake_callback(self, callback):
+        """Whether a callback only asks to be called again, which a Dart wake
+        posts to the isolate: it takes nothing but its context, returns
+        nothing, and native does not wait for it."""
+        return (
+            bool(callback.context)
+            and not callback.parameters[1:]
+            and callback.result.native == "void"
+            and not callback.synchronous
+            and not callback.delivery
+        )
 
-    def queue_callback(self, value):
-        """The one callback of a registration that a delivery queue carries,
-        or None. Dart sets the registration's queue in place of the callback.
-        """
-        if (
-            not value.registration
-            or not value.registration.queue
-            or len(value.registration.callbacks) != 1
-        ):
-            return None
-        field = next(f for f in value.fields if f.name in value.registration.callbacks)
-        return field if self.bound.callbacks[field.value.native].delivery else None
+    def wake(self, value):
+        """Whether a registration is a wake: its one callback is a wake
+        callback, and it carries no queue."""
+        if not value.registration or value.registration.queue:
+            return False
+        callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+        return len(callbacks) == 1 and self.wake_callback(
+            self.bound.callbacks[callbacks[0].value.native]
+        )
+
+    def queue_callbacks(self, value):
+        """The callbacks of a registration that a delivery queue carries, or
+        none. Dart sets the registration's queue in place of every callback,
+        so every callback must have a delivery."""
+        if not value.registration or not value.registration.queue:
+            return []
+        fields = [f for f in value.fields if f.name in value.registration.callbacks]
+        if not all(self.bound.callbacks[f.value.native].delivery for f in fields):
+            return []
+        return fields
 
     def omitted(self, field):
         """Whether Dart leaves a callback field unset: an optional callback that
@@ -202,9 +203,7 @@ class Values:
 
     def check_delivery(self, callback):
         """Accept a delivered callback whose copied arguments Dart can decode."""
-        for parameter in callback.parameters:
-            if parameter.name == callback.context:
-                continue
+        for parameter in callback.arguments:
             if callback.decision and parameter.name == callback.decision.parameter:
                 if parameter.value.native not in self.bound.public_handles:
                     raise Unsupported("delivered decision requires a generated owner")
@@ -312,11 +311,12 @@ class Values:
 
     def prepared(self, value, expression):
         """A registration descriptor added to the call's transaction."""
-        roots = (
-            ", registrations.ports"
-            if self.port_callbacks(value) or self.queue_callback(value)
-            else ""
-        )
+        if self.wake(value):
+            field = next(
+                f for f in value.fields if f.name in value.registration.callbacks
+            )
+            return f"registrations.add(registrations.roots.wake({expression}.{identifier(field.name)}))"
+        roots = ", registrations.roots" if self.queue_callbacks(value) else ""
         # A callback that calls back only into its registering receiver
         # arrives after the call, so it is dropped once that receiver closes.
         closed = ", () => isClosed" if value.registration.receiver_owned else ""
@@ -436,7 +436,11 @@ class Values:
                 return f"_read{public}({expression})"
             if value.nullable:
                 return "null"
-            if self.port_callbacks(value) or self.rules_only(value):
+            if (
+                self.wake(value)
+                or self.rules_only(value)
+                or self.queue_callbacks(value)
+            ):
                 return f"const {public}()"
             raise Unsupported(f"{value.native}: copied registration needs a default")
         if value.kind == "native_pointer":
@@ -584,13 +588,15 @@ class Values:
         member = callback.delivery.payload_member
         lines = [
             f"void _deliver{public}({public} callback, int batch, int index, Pointer<raw.mln_delivery> delivery) {{",
-            f"  final payload = delivery.ref.payload.{member};",
+            *(
+                [f"  final payload = delivery.ref.payload.{member};"]
+                if callback.arguments
+                else []
+            ),
         ]
         decoded = []
         body = []
-        for parameter in callback.parameters:
-            if parameter.name == callback.context:
-                continue
+        for parameter in callback.arguments:
             if decision and parameter.name == decision.parameter:
                 owner, native = owner_names(decision.handle)
                 body += [
@@ -616,127 +622,6 @@ class Values:
             lines.append(f"  callback({', '.join(decoded)});")
         lines.append("}")
         return "\n".join(lines) + "\n"
-
-    def port_copy(self, value, offset):
-        if value.kind == "reference":
-            return self.port_copy(value.element, offset)
-        if value.kind == "record":
-            args = []
-            for field in self.fields(value):
-                expression, offset = self.port_copy(field.value, offset)
-                args.append(
-                    ("" if value.ordered else identifier(field.name) + ": ")
-                    + expression
-                )
-            return public_name(value.native) + "(" + ", ".join(args) + ")", offset
-        expression = f"message[{offset}] as int"
-        if value.kind == "enum":
-            expression = f"{public_name(value.native)}.fromRawValue({expression})"
-        elif self.scalar(value)[0] == "BigInt":
-            expression = f"uint64FromNative({expression})"
-        elif self.scalar(value)[0] == "bool":
-            expression = f"message[{offset}] != 0"
-        return expression, offset + 1
-
-    def render_port_registration(self, value):
-        public = public_name(value.native)
-        fields, args, writes, handlers = [], [], [], []
-        ports = {
-            field.name: (callback, payload)
-            for _, field, callback, payload in self.port_callbacks(value)
-        }
-        for name, typ, field in self.members(value):
-            fields.append(f"  final {typ} {name};")
-            default = self.field_default(field)
-            args.append(
-                f"this.{name}"
-                if typ.endswith("?")
-                else f"this.{name} = {default}"
-                if default
-                else f"required this.{name}"
-            )
-            if field.name in ports:
-                callback, _ = ports[field.name]
-                key = f"(raw.{native_ports.constant(value.native, field.name)} & 0xffffffff)"
-                decoded, offset = [], 1
-                for parameter in callback.arguments:
-                    expression, offset = self.port_copy(parameter.value, offset)
-                    decoded.append(expression)
-                invoke = f"value.{name}{'!' if field.value.nullable else ''}({', '.join(decoded)})"
-                delivery = (
-                    f"(message) {{ if (!receiverClosed()) {{ {invoke}; }} }}"
-                    if value.registration.receiver_owned
-                    else f"(message) => {invoke}"
-                )
-                handlers.append(
-                    f"      {'if (value.' + name + ' != null) ' if field.value.nullable else ''}{key}: {delivery},"
-                )
-                pointer = f"raw.mln_binding_dart_port_function({key}).cast()"
-                writes.append(
-                    f"    result.ref.{field.name} = "
-                    + (
-                        f"value.{name} == null ? nullptr : "
-                        if field.value.nullable
-                        else ""
-                    )
-                    + pointer
-                    + ";"
-                )
-            else:
-                expression = "value." + name
-                if field.presence and field.presence.mask:
-                    writes.append(
-                        f"    if ({expression} != null) {{ {self.set_present(field.presence.mask, field.presence.bit)} result.ref.{field.name} = {self.native(field.value, expression + '!')}; }}"
-                    )
-                else:
-                    writes.append(
-                        f"    result.ref.{field.name} = {self.native(field.value, expression)};"
-                    )
-        disabled = (
-            " && ".join(f"value.{identifier(name)} == null" for name in ports)
-            if all(
-                next(f for f in value.fields if f.name == name).value.nullable
-                for name in ports
-            )
-            else None
-        )
-        disabled_code = (
-            f"if ({disabled}) {{ return _NativeRegistration(result, () {{}}, arena.releaseAll); }}"
-            if disabled
-            else ""
-        )
-        read_args = ", ".join(
-            f"{name}: null"
-            if field.name in ports
-            else f"{name}: {self.copy(field.value, 'source.' + field.name)}"
-            for name, _, field in self.members(value)
-        )
-        reader = (
-            f"{public} _read{public}(raw.{value.native} source) => {public}({read_args});\n"
-            if disabled and value.native in self.bound.returned
-            else ""
-        )
-        declaration = (
-            f"final class {public} {{\n  const {public}({{{', '.join(args)}}});\n"
-            + "\n".join(fields)
-            + "\n}"
-        )
-        initialize = (
-            f"result.ref = raw.{value.default}();"
-            if value.default
-            else f"result.ref.size = sizeOf<raw.{value.native}>();"
-            if any(f.role == "size" for f in value.fields)
-            else ""
-        )
-        initialize = f"    {initialize}\n" if initialize else ""
-        conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots{', bool Function() receiverClosed' if value.registration.receiver_owned else ''}) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n{initialize}    {disabled_code}\n    port = roots.register({{\n"
-            + "\n".join(handlers)
-            + "\n    });\n"
-            + "\n".join(writes)
-            + f"\n    result.ref.{value.registration.user_data} = port.context;\n    result.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_binding_dart_port_release).cast();\n    return _NativeRegistration(result, port.reject, arena.releaseAll);\n  }} catch (_) {{ port?.reject(); arena.releaseAll(); rethrow; }}\n}}\n"
-        )
-        return declaration, conversion + reader
 
     def registration_members(self, value, skip=()):
         """The declaration fields, constructor arguments, initializers, and
@@ -799,35 +684,82 @@ class Values:
         return f"    {initialize}\n" if initialize else ""
 
     def render_queue_registration(self, value):
-        """A registration whose one callback a delivery queue carries.
+        """A registration whose callbacks a delivery queue carries.
 
-        Dart sets the isolate's delivery queue in place of the callback, with a
-        token as user_data. Native code answers each call and queues a copy,
-        which the queue's wake delivers to this isolate. The registering owner
-        roots the registration until native code retires it, and a
-        registration that native code rejects retires at once.
+        Dart sets the isolate's delivery queue in place of the callbacks, with
+        a token as user_data. Native code answers each call and queues a copy,
+        which the queue's wake delivers to this isolate, where an unset
+        callback drops it. A registration without any callback stays
+        disabled. The registering owner roots the registration until native
+        code retires it, and a registration that native code rejects retires
+        at once.
         """
         public = public_name(value.native)
-        field = self.queue_callback(value)
-        callback = self.bound.callbacks[field.value.native]
-        if field.value.nullable:
-            raise Unsupported(f"{value.native}: a delivered callback must be set")
-        fields, args, initializers, writes = self.registration_members(
-            value, skip={field.name}
+        fields = self.queue_callbacks(value)
+        names = {field.name for field in fields}
+        members, args, initializers, writes = self.registration_members(
+            value, skip=names
         )
-        name = identifier(field.name)
-        constant = callback.delivery.constant
+        # A callback that calls back only into its registering receiver
+        # arrives after the call, so it is dropped once that receiver closes.
+        receiver_owned = value.registration.receiver_owned
+        handlers = []
+        for field in fields:
+            callback = self.bound.callbacks[field.value.native]
+            name = identifier(field.name)
+            invoke = f"_deliver{public_name(callback.native)}(value.{name}{'!' if field.value.nullable else ''}, batch, index, delivery)"
+            if receiver_owned:
+                invoke = f"{{ if (!receiverClosed()) {{ {invoke}; }} }}"
+            else:
+                invoke = f"=> {invoke}"
+            handlers.append(
+                ("if (value." + name + " != null) " if field.value.nullable else "")
+                + f"raw.{callback.delivery.constant}: (batch, index, delivery) {invoke},"
+            )
+        disabled = (
+            "    if ("
+            + " && ".join(f"value.{identifier(f.name)} == null" for f in fields)
+            + ") { return _NativeRegistration(result, () {}, arena.releaseAll); }\n"
+            if all(field.value.nullable for field in fields)
+            else ""
+        )
+        closed = ", bool Function() receiverClosed" if receiver_owned else ""
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _CallbackRoots roots{closed}) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
             + self.registration_initializer(value)
             + "".join(line + "\n" for line in writes)
-            + f"    final registered = registration = roots.registerQueued({{raw.{constant}: (batch, index, delivery) => _deliver{public_name(callback.native)}(value.{name}, batch, index, delivery)}});\n"
+            + disabled
+            + "    final registered = registration = roots.registerQueued({"
+            + " ".join(handlers)
+            + "});\n"
             + f"    result.ref.{value.registration.queue} = isolateDeliveryQueue.handle;\n"
             + f"    result.ref.{value.registration.user_data} = Pointer.fromAddress(registered.token);\n"
             + "    return _NativeRegistration(result, registered.reject, arena.releaseAll);\n"
             + "  } catch (_) {\n    registration?.reject();\n    arena.releaseAll();\n    rethrow;\n  }\n}\n"
         )
-        return self.registration_class(value, fields, args, initializers), conversion
+        reader = (
+            f"{public} _read{public}(raw.{value.native} source) => {public}("
+            + ", ".join(
+                f"{name}: {self.copy(field.value, 'source.' + field.name)}"
+                for name, _, field in self.members(value)
+                if field.name not in names
+            )
+            + ");\n"
+            if value.native in self.bound.returned
+            else ""
+        )
+        return (
+            self.registration_class(value, members, args, initializers),
+            conversion + reader,
+        )
+
+    def render_wake(self, value):
+        """The declaration of a wake, which _CallbackRoots.wake
+        materializes."""
+        members, args, initializers, _writes = self.registration_members(
+            value, skip=set(value.registration.callbacks)
+        )
+        return self.registration_class(value, members, args, initializers)
 
     def render_rules_registration(self, value):
         """A registration whose callbacks Dart leaves unset, so the native
@@ -1033,12 +965,10 @@ class Values:
                 if callback.delivery:
                     conversions.append(self.render_delivery(callback))
                 continue
-            if value.registration and self.port_callbacks(value):
-                declaration, conversion = self.render_port_registration(value)
-                declarations.append(declaration)
-                conversions.append(conversion)
+            if value.registration and self.wake(value):
+                declarations.append(self.render_wake(value))
                 continue
-            if value.registration and self.queue_callback(value):
+            if value.registration and self.queue_callbacks(value):
                 declaration, conversion = self.render_queue_registration(value)
                 declarations.append(declaration)
                 conversions.append(conversion)

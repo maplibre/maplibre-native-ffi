@@ -8,7 +8,6 @@ import re
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable
 from pathlib import Path
 
 from . import copy_cases, default_cases, native_capture
@@ -303,18 +302,6 @@ def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -
     )
 
 
-def parse_with_generated_header(load: Callable[[dict[str, str]], Api]) -> Api:
-    """Parse the headers with the generated header as this run writes it.
-
-    `load` parses the headers with the given texts in place of theirs. The
-    generated header declares only what the other headers imply, so a parse
-    that leaves it empty derives it, whatever it held before.
-    """
-    derived = native_capture.generate(load({native_capture.HEADER: ""}))
-    header = dprint_format(derived["include/" + native_capture.HEADER], "h")
-    return load({native_capture.HEADER: header})
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("inventory", "validate", "generate"))
@@ -331,12 +318,11 @@ def main() -> int:
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
 
-    def load(contents: dict[str, str] | None = None) -> Api:
+    def load() -> Api:
         api = parse_headers(
             args.include,
             clang=args.clang,
             clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
-            contents=contents,
         )
         if args.command != "inventory":
             validate(api)
@@ -346,10 +332,9 @@ def main() -> int:
         return api
 
     try:
-        if args.command == "generate":
-            api = parse_with_generated_header(load)
-            return generate(api, args.check, args.require_complete)
         api = load()
+        if args.command == "generate":
+            return generate(api, args.check, args.require_complete)
         if args.output:
             args.output.write_text(api.to_json())
         elif args.command == "inventory":

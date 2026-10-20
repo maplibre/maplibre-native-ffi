@@ -29,6 +29,10 @@ static void mln_animation_options_default_holds_its_annotated_values(void) {
     value.end_handler.release_user_data == NULL,
     "mln_animation_options.end_handler.release_user_data"
   );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.end_handler.queue,
+    "mln_animation_options.end_handler.queue"
+  );
 }
 
 static void mln_bound_options_default_holds_its_annotated_values(void) {
@@ -66,6 +70,10 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
   TEST_ASSERT_TRUE_MESSAGE(
     value.animation.end_handler.release_user_data == NULL,
     "mln_camera_delta.animation.end_handler.release_user_data"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.animation.end_handler.queue,
+    "mln_camera_delta.animation.end_handler.queue"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.gesture_phase, "mln_camera_delta.gesture_phase"
@@ -131,6 +139,10 @@ static void mln_camera_update_default_holds_its_annotated_values(void) {
     "mln_camera_update.animation.end_handler.release_user_data"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.animation.end_handler.queue,
+    "mln_camera_update.animation.end_handler.queue"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.gesture_phase,
     "mln_camera_update.gesture_phase"
   );
@@ -164,6 +176,10 @@ mln_custom_geometry_source_options_default_holds_its_annotated_values(void) {
     value.release_user_data == NULL,
     "mln_custom_geometry_source_options.release_user_data"
   );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.queue,
+    "mln_custom_geometry_source_options.queue"
+  );
 }
 
 static void
@@ -191,6 +207,10 @@ mln_custom_mvt_vector_source_options_default_holds_its_annotated_values(void) {
   TEST_ASSERT_TRUE_MESSAGE(
     value.release_user_data == NULL,
     "mln_custom_mvt_vector_source_options.release_user_data"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.queue,
+    "mln_custom_mvt_vector_source_options.queue"
   );
 }
 

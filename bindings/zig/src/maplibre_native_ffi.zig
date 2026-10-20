@@ -500,8 +500,8 @@ pub const CameraTransitionEnd = struct {
     }
 };
 
-/// Callback state that one camera command copies to report the end of its
-/// transitions.
+/// Callback or queue state that one camera command copies to report the end of
+/// its transitions.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -712,37 +712,37 @@ pub const CustomGeometrySourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_fetch_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_source_tile_callback", err);
+            callback.reportError("mln_custom_source_fetch_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_cancel_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_source_tile_callback", err);
+            callback.reportError("mln_custom_source_cancel_tile_callback", err);
             return;
         };
     }
@@ -808,37 +808,37 @@ pub const CustomMvtVectorSourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_fetch_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_source_tile_callback", err);
+            callback.reportError("mln_custom_source_fetch_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_cancel_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_source_tile_callback", err);
+            callback.reportError("mln_custom_source_cancel_tile_callback", err);
             return;
         };
     }
@@ -3614,7 +3614,7 @@ pub const ResourceRange = struct {
     }
 };
 
-/// Cancel callback state for one handled resource request.
+/// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

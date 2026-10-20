@@ -209,7 +209,7 @@ mln_status mln_probe_settings_check(
 #ifdef MLN_PROTOCOL_DEFAULT_REGISTRATION
 // A record default that holds a callback registration with its callback null.
 // A copy of the default keeps the limit and leaves the registration unset.
-typedef void (*mln_probe_notify)(void* user_data, uint32_t count);
+typedef void (*mln_probe_notify)(void* user_data);
 typedef void (*mln_probe_notify_release)(void* user_data);
 typedef struct mln_probe_signal {
   mln_probe_notify callback BIND("nullable=true");

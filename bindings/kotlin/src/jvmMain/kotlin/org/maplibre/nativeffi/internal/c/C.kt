@@ -3566,6 +3566,7 @@ internal val mln_camera_transition_handler: GroupLayout =
     ADDRESS.withName("callback"),
     ADDRESS.withName("user_data"),
     ADDRESS.withName("release_user_data"),
+    JAVA_LONG.withName("queue"),
   )
 internal val mln_animation_options: GroupLayout =
   Ffm.struct(
@@ -3661,6 +3662,7 @@ internal val mln_custom_geometry_source_options: GroupLayout =
     JAVA_BOOLEAN.withName("wrap"),
     Ffm.pad(6),
     ADDRESS.withName("release_user_data"),
+    JAVA_LONG.withName("queue"),
   )
 internal val mln_custom_mvt_vector_source_options: GroupLayout =
   Ffm.struct(
@@ -3672,6 +3674,7 @@ internal val mln_custom_mvt_vector_source_options: GroupLayout =
     JAVA_DOUBLE.withName("min_zoom"),
     JAVA_DOUBLE.withName("max_zoom"),
     ADDRESS.withName("release_user_data"),
+    JAVA_LONG.withName("queue"),
   )
 internal val mln_frame_demand: GroupLayout =
   Ffm.struct(

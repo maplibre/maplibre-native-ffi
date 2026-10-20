@@ -28,7 +28,7 @@ public object GeneratedApi {
    */
   public fun animationOptionsDefault(): AnimationOptions =
     nativeCall(null, null, "mln_animation_options_default") {
-      val out = allocate(w(88, 96), 8)
+      val out = allocate(w(96, 104), 8)
       C.mln_animation_options_default(out)
       readAnimationOptions(out)
     }
@@ -67,7 +67,7 @@ public object GeneratedApi {
    */
   public fun cameraDeltaDefault(): CameraDelta =
     nativeCall(null, null, "mln_camera_delta_default") {
-      val out = sized(w(160, 168), 8)
+      val out = sized(w(168, 176), 8)
       C.mln_camera_delta_default(out)
       readCameraDelta(out)
     }
@@ -106,7 +106,7 @@ public object GeneratedApi {
    */
   public fun cameraUpdateDefault(): CameraUpdate =
     nativeCall(null, null, "mln_camera_update_default") {
-      val out = sized(w(224, 232), 8)
+      val out = sized(w(232, 240), 8)
       C.mln_camera_update_default(out)
       readCameraUpdate(out)
     }
@@ -119,7 +119,7 @@ public object GeneratedApi {
    */
   public fun customGeometrySourceOptionsDefault(): CustomGeometrySourceOptions =
     nativeCall(null, null, "mln_custom_geometry_source_options_default") {
-      val out = sized(w(64, 80), 8)
+      val out = sized(w(72, 88), 8)
       C.mln_custom_geometry_source_options_default(out)
       readCustomGeometrySourceOptions(out)
     }
@@ -132,7 +132,7 @@ public object GeneratedApi {
    */
   public fun customMvtVectorSourceOptionsDefault(): CustomMvtVectorSourceOptions =
     nativeCall(null, null, "mln_custom_mvt_vector_source_options_default") {
-      val out = sized(w(48, 56), 8)
+      val out = sized(w(56, 64), 8)
       C.mln_custom_mvt_vector_source_options_default(out)
       readCustomMvtVectorSourceOptions(out)
     }

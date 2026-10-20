@@ -98,44 +98,50 @@ Pointer<raw.mln_unit_bezier> _writeUnitBezier(UnitBezier value, Arena arena) {
 UnitBezier _readUnitBezier(raw.mln_unit_bezier source) =>
     UnitBezier(source.x1, source.y1, source.x2, source.y2);
 
+CameraTransitionEnd _readCameraTransitionEnd(
+  raw.mln_camera_transition_end source,
+) => CameraTransitionEnd(
+  outcome: CameraTransitionOutcome.fromRawValue(source.outcome),
+  generation: uint64FromNative(source.generation),
+);
+
+void _deliverCameraTransitionEndCallback(
+  CameraTransitionEndCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.camera_transition_end;
+  callback(_readCameraTransitionEnd(payload.end.ref));
+}
+
 _NativeRegistration<raw.mln_camera_transition_handler>
 _prepareCameraTransitionHandler(
   CameraTransitionHandler value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
-  _NativeCallbackPort? port;
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_camera_transition_handler>();
     if (value.callback == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
-    port = roots.register({
+    final registered = registration = roots.registerQueued({
       if (value.callback != null)
-        (raw.MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
-            0xffffffff): (message) => value.callback!(
-          CameraTransitionEnd(
-            outcome: CameraTransitionOutcome.fromRawValue(message[1] as int),
-            generation: uint64FromNative(message[2] as int),
-          ),
-        ),
+        raw.MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: (batch, index, delivery) =>
+            _deliverCameraTransitionEndCallback(
+              value.callback!,
+              batch,
+              index,
+              delivery,
+            ),
     });
-    result.ref.callback = value.callback == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
-                    0xffffffff),
-              )
-              .cast();
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_binding_dart_port_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    port?.reject();
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -170,7 +176,7 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
   }
   result.ref.end_handler = registrations
       .add(
-        _prepareCameraTransitionHandler(value.endHandler, registrations.ports),
+        _prepareCameraTransitionHandler(value.endHandler, registrations.roots),
       )
       .ref;
   return result;
@@ -501,55 +507,39 @@ Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
   return result;
 }
 
+CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
+    CanonicalTileId(z: source.z, x: source.x, y: source.y);
+
+void _deliverCustomSourceFetchTileCallback(
+  CustomSourceFetchTileCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.custom_source_fetch_tile;
+  callback(_readCanonicalTileId(payload.tile_id));
+}
+
+void _deliverCustomSourceCancelTileCallback(
+  CustomSourceCancelTileCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.custom_source_cancel_tile;
+  callback(_readCanonicalTileId(payload.tile_id));
+}
+
 _NativeRegistration<raw.mln_custom_geometry_source_options>
 _prepareCustomGeometrySourceOptions(
   CustomGeometrySourceOptions value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
-  _NativeCallbackPort? port;
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_custom_geometry_source_options>();
     result.ref = raw.mln_custom_geometry_source_options_default();
-    if (value.fetchTile == null && value.cancelTile == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
-    port = roots.register({
-      if (value.fetchTile != null)
-        (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
-            0xffffffff): (message) => value.fetchTile!(
-          CanonicalTileId(
-            z: message[1] as int,
-            x: message[2] as int,
-            y: message[3] as int,
-          ),
-        ),
-      if (value.cancelTile != null)
-        (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
-            0xffffffff): (message) => value.cancelTile!(
-          CanonicalTileId(
-            z: message[1] as int,
-            x: message[2] as int,
-            y: message[3] as int,
-          ),
-        ),
-    });
-    result.ref.fetch_tile = value.fetchTile == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
-                    0xffffffff),
-              )
-              .cast();
-    result.ref.cancel_tile = value.cancelTile == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
-                    0xffffffff),
-              )
-              .cast();
     if (value.minZoom != null) {
       result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
       result.ref.min_zoom = value.minZoom!;
@@ -578,14 +568,32 @@ _prepareCustomGeometrySourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
       result.ref.wrap = value.wrap!;
     }
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_binding_dart_port_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
+    if (value.fetchTile == null && value.cancelTile == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    final registered = registration = roots.registerQueued({
+      if (value.fetchTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+            (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+              value.fetchTile!,
+              batch,
+              index,
+              delivery,
+            ),
+      if (value.cancelTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
+            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
+              value.cancelTile!,
+              batch,
+              index,
+              delivery,
+            ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    port?.reject();
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -594,8 +602,6 @@ _prepareCustomGeometrySourceOptions(
 CustomGeometrySourceOptions _readCustomGeometrySourceOptions(
   raw.mln_custom_geometry_source_options source,
 ) => CustomGeometrySourceOptions(
-  fetchTile: null,
-  cancelTile: null,
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
   tolerance: source.tolerance,
@@ -608,52 +614,13 @@ CustomGeometrySourceOptions _readCustomGeometrySourceOptions(
 _NativeRegistration<raw.mln_custom_mvt_vector_source_options>
 _prepareCustomMvtVectorSourceOptions(
   CustomMvtVectorSourceOptions value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
-  _NativeCallbackPort? port;
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_custom_mvt_vector_source_options>();
     result.ref = raw.mln_custom_mvt_vector_source_options_default();
-    if (value.fetchTile == null && value.cancelTile == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
-    port = roots.register({
-      if (value.fetchTile != null)
-        (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
-            0xffffffff): (message) => value.fetchTile!(
-          CanonicalTileId(
-            z: message[1] as int,
-            x: message[2] as int,
-            y: message[3] as int,
-          ),
-        ),
-      if (value.cancelTile != null)
-        (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
-            0xffffffff): (message) => value.cancelTile!(
-          CanonicalTileId(
-            z: message[1] as int,
-            x: message[2] as int,
-            y: message[3] as int,
-          ),
-        ),
-    });
-    result.ref.fetch_tile = value.fetchTile == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
-                    0xffffffff),
-              )
-              .cast();
-    result.ref.cancel_tile = value.cancelTile == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
-                    0xffffffff),
-              )
-              .cast();
     if (value.minZoom != null) {
       result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
       result.ref.min_zoom = value.minZoom!;
@@ -662,14 +629,32 @@ _prepareCustomMvtVectorSourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_binding_dart_port_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
+    if (value.fetchTile == null && value.cancelTile == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    final registered = registration = roots.registerQueued({
+      if (value.fetchTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+            (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+              value.fetchTile!,
+              batch,
+              index,
+              delivery,
+            ),
+      if (value.cancelTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
+            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
+              value.cancelTile!,
+              batch,
+              index,
+              delivery,
+            ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    port?.reject();
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -678,8 +663,6 @@ _prepareCustomMvtVectorSourceOptions(
 CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
   raw.mln_custom_mvt_vector_source_options source,
 ) => CustomMvtVectorSourceOptions(
-  fetchTile: null,
-  cancelTile: null,
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
 );
@@ -1055,7 +1038,7 @@ void _deliverLogCallback(
 
 _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
   LogHandler value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
@@ -1251,42 +1234,6 @@ MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
   ),
 );
 
-_NativeRegistration<raw.mln_wake> _prepareWake(
-  Wake value,
-  _NativeCallbackPorts roots,
-) {
-  final arena = Arena();
-  _NativeCallbackPort? port;
-  try {
-    final result = arena<raw.mln_wake>();
-    if (value.callback == null) {
-      return _NativeRegistration(result, () {}, arena.releaseAll);
-    }
-    port = roots.register({
-      if (value.callback != null)
-        (raw.MLN_BINDING_DART_PORT_WAKE_CALLBACK & 0xffffffff): (message) =>
-            value.callback!(),
-    });
-    result.ref.callback = value.callback == null
-        ? nullptr
-        : raw
-              .mln_binding_dart_port_function(
-                (raw.MLN_BINDING_DART_PORT_WAKE_CALLBACK & 0xffffffff),
-              )
-              .cast();
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_binding_dart_port_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
-  } catch (_) {
-    port?.reject();
-    arena.releaseAll();
-    rethrow;
-  }
-}
-
 Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   RenderSessionAttachOptions value,
   Arena arena,
@@ -1302,10 +1249,10 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   );
   result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
   result.ref.frame_wake = registrations
-      .add(_prepareWake(value.frameWake, registrations.ports))
+      .add(registrations.roots.wake(value.frameWake.callback))
       .ref;
   result.ref.driver_work_wake = registrations
-      .add(_prepareWake(value.driverWorkWake, registrations.ports))
+      .add(registrations.roots.wake(value.driverWorkWake.callback))
       .ref;
   return result;
 }
@@ -2640,40 +2587,43 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
   return result;
 }
 
+void _deliverResourceRequestCancelCallback(
+  ResourceRequestCancelCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  callback();
+}
+
 _NativeRegistration<raw.mln_resource_request_cancel_handler>
 _prepareResourceRequestCancelHandler(
   ResourceRequestCancelHandler value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
   bool Function() receiverClosed,
 ) {
   final arena = Arena();
-  _NativeCallbackPort? port;
+  DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_resource_request_cancel_handler>();
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
-
-    port = roots.register({
-      (raw.MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
-          0xffffffff): (message) {
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: (batch, index, delivery) {
         if (!receiverClosed()) {
-          value.callback();
+          _deliverResourceRequestCancelCallback(
+            value.callback,
+            batch,
+            index,
+            delivery,
+          );
         }
       },
     });
-    result.ref.callback = raw
-        .mln_binding_dart_port_function(
-          (raw.MLN_BINDING_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
-              0xffffffff),
-        )
-        .cast();
-    result.ref.user_data = port.context;
-    result.ref.release_user_data =
-        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
-          raw.mln_binding_dart_port_release,
-        ).cast();
-    return _NativeRegistration(result, port.reject, arena.releaseAll);
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
   } catch (_) {
-    port?.reject();
+    registration?.reject();
     arena.releaseAll();
     rethrow;
   }
@@ -2696,7 +2646,7 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   ).value;
   result.ref.event_mask = value.eventMask.rawValue;
   result.ref.event_wake = registrations
-      .add(_prepareWake(value.eventWake, registrations.ports))
+      .add(registrations.roots.wake(value.eventWake.callback))
       .ref;
   return result;
 }
@@ -2931,7 +2881,7 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
 
 _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
   ResourceProvider value,
-  _NativeCallbackPorts roots,
+  _CallbackRoots roots,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
@@ -3298,11 +3248,11 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 void logSetCallback(LogHandler handler) {
   ensureAbiVersion();
-  final registrations = _NativeRegistrations(_globalCallbackPorts);
+  final registrations = _NativeRegistrations(_globalCallbackRoots);
   _check(
     registrations.run(
       () => raw.mln_log_set_callback(
-        registrations.add(_prepareLogHandler(handler, registrations.ports)),
+        registrations.add(_prepareLogHandler(handler, registrations.roots)),
         nativeDiagnostic,
       ),
     ),
@@ -3574,7 +3524,7 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   ensureAbiVersion();
   final outRuntime = arena<Uint64>();
-  final registrations = _NativeRegistrations(_NativeCallbackPorts());
+  final registrations = _NativeRegistrations(_CallbackRoots());
   _check(
     registrations.run(
       () => raw.mln_runtime_create(
@@ -3962,18 +3912,18 @@ final class GeojsonSourceDataHandle implements Finalizable {
 
 extension type MapHandleDiscarding._(MapHandle _owner) {
   NativeMap get _handle => _owner._handle;
-  _NativeCallbackPorts get _callbackPorts => _owner._callbackPorts;
+  _CallbackRoots get _callbackRoots => _owner._callbackRoots;
   void addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
   ) => _discard((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_add_custom_geometry_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomGeometrySourceOptions(options, registrations.ports),
+          _prepareCustomGeometrySourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -3984,13 +3934,13 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
     String sourceId,
     CustomMvtVectorSourceOptions options,
   ) => _discard((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_add_custom_mvt_vector_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomMvtVectorSourceOptions(options, registrations.ports),
+          _prepareCustomMvtVectorSourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -4188,7 +4138,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
     ),
   );
   void applyCameraDelta(CameraDelta delta) => _discard((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_apply_camera_delta(
         _handle.raw,
@@ -4593,7 +4543,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
     ),
   );
   void updateCamera(CameraUpdate update) => _discard((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_update_camera(
         _handle.raw,
@@ -4614,15 +4564,15 @@ extension type const NativeMap(int raw) implements NativeHandle {}
 ///
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class MapHandle implements Finalizable, _CallbackPortOwner {
+final class MapHandle implements Finalizable, _CallbackRootOwner {
   MapHandle._(this._parent, NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
   // Keeps the parent owner reachable while this owner lives.
   // ignore: unused_field
   final RuntimeHandle _parent;
-  // Roots this owner's port registrations for as long as it lives.
+  // Roots this owner's callback registrations for as long as it lives.
   @override
-  final _callbackPorts = _NativeCallbackPorts();
+  final _callbackRoots = _CallbackRoots();
   final NativeHandleState<NativeMap> _state;
   NativeMap get _handle => _state.handle;
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);
@@ -4644,13 +4594,13 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     String sourceId,
     CustomGeometrySourceOptions options,
   ) => _command((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_add_custom_geometry_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomGeometrySourceOptions(options, registrations.ports),
+          _prepareCustomGeometrySourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -4666,13 +4616,13 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     String sourceId,
     CustomMvtVectorSourceOptions options,
   ) => _command((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackPorts);
+    final registrations = _NativeRegistrations(_callbackRoots);
     return registrations.run(
       () => raw.mln_map_add_custom_mvt_vector_source(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         registrations.add(
-          _prepareCustomMvtVectorSourceOptions(options, registrations.ports),
+          _prepareCustomMvtVectorSourceOptions(options, registrations.roots),
         ),
         completion,
         nativeDiagnostic,
@@ -4943,7 +4893,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> applyCameraDelta(CameraDelta delta) =>
       _command((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_map_apply_camera_delta(
             _handle.raw,
@@ -4962,7 +4912,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     MetalBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_metal_borrowed_texture(
@@ -4995,7 +4945,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     MetalOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_metal_owned_texture(
@@ -5028,7 +4978,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     MetalSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_metal_surface(
@@ -5061,7 +5011,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     OpenglBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_borrowed_texture(
@@ -5094,7 +5044,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     OpenglOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_owned_texture(
@@ -5127,7 +5077,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     OpenglSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_opengl_surface(
@@ -5160,7 +5110,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     VulkanBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_vulkan_borrowed_texture(
@@ -5193,7 +5143,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     VulkanOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_vulkan_owned_texture(
@@ -5226,7 +5176,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     VulkanSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_vulkan_surface(
@@ -5259,7 +5209,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     WebgpuBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_webgpu_borrowed_texture(
@@ -5292,7 +5242,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     WebgpuOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_webgpu_owned_texture(
@@ -5325,7 +5275,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     WebgpuSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    final registrations = _NativeRegistrations(_CallbackRoots());
     return _attach(
       (arena, completion, outSession) => registrations.run(
         () => raw.mln_map_attach_webgpu_surface(
@@ -6346,7 +6296,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> updateCamera(CameraUpdate update) =>
       _command((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_map_update_camera(
             _handle.raw,
@@ -7199,12 +7149,12 @@ extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 ///
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
+final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   ResourceRequestHandle._(NativeResourceRequest handle)
     : _state = NativeHandleState(handle, 'ResourceRequestHandle');
-  // Roots this owner's port registrations for as long as it lives.
+  // Roots this owner's callback registrations for as long as it lives.
   @override
-  final _callbackPorts = _NativeCallbackPorts();
+  final _callbackRoots = _CallbackRoots();
   final NativeHandleState<NativeResourceRequest> _state;
   NativeResourceRequest get _handle => _state.handle;
 
@@ -7272,7 +7222,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   bool setCancelCallback(ResourceRequestCancelHandler handler) =>
       withNativeArena((arena) {
         final outCancelled = arena<Bool>();
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         _check(
           registrations.run(
             () => raw.mln_resource_request_set_cancel_callback(
@@ -7280,7 +7230,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
               registrations.add(
                 _prepareResourceRequestCancelHandler(
                   handler,
-                  registrations.ports,
+                  registrations.roots,
                   () => isClosed,
                 ),
               ),
@@ -7316,12 +7266,12 @@ extension type const NativeRuntime(int raw) implements NativeHandle {}
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
+final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   RuntimeHandle._(NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
-  // Roots this owner's port registrations for as long as it lives.
+  // Roots this owner's callback registrations for as long as it lives.
   @override
-  final _callbackPorts = _NativeCallbackPorts();
+  final _callbackRoots = _CallbackRoots();
   final NativeHandleState<NativeRuntime> _state;
   NativeRuntime get _handle => _state.handle;
 
@@ -7576,7 +7526,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
       _run((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_http_header_transform(
             _handle.raw,
@@ -7637,12 +7587,12 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setResourceProvider(ResourceProvider provider) =>
       _run((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_resource_provider(
             _handle.raw,
             registrations.add(
-              _prepareResourceProvider(provider, registrations.ports),
+              _prepareResourceProvider(provider, registrations.roots),
             ),
             completion,
             nativeDiagnostic,
@@ -7656,7 +7606,7 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setResourceTransform(ResourceTransform transform) =>
       _run((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackPorts);
+        final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_resource_transform(
             _handle.raw,

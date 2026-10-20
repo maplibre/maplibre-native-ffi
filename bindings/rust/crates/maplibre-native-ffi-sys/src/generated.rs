@@ -544,6 +544,7 @@ pub struct mln_camera_transition_handler {
     pub callback: mln_camera_transition_end_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -588,8 +589,8 @@ pub struct mln_completion_result {
 pub struct mln_custom_geometry_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_source_tile_callback,
-    pub cancel_tile: mln_custom_source_tile_callback,
+    pub fetch_tile: mln_custom_source_fetch_tile_callback,
+    pub cancel_tile: mln_custom_source_cancel_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -599,18 +600,20 @@ pub struct mln_custom_geometry_source_options {
     pub clip: bool,
     pub wrap: bool,
     pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_custom_mvt_vector_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_source_tile_callback,
-    pub cancel_tile: mln_custom_source_tile_callback,
+    pub fetch_tile: mln_custom_source_fetch_tile_callback,
+    pub cancel_tile: mln_custom_source_cancel_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1156,6 +1159,7 @@ pub struct mln_resource_request_cancel_handler {
     pub callback: mln_resource_request_cancel_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
+    pub queue: mln_delivery_queue,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1597,7 +1601,9 @@ pub type mln_camera_transition_end_callback = Option<
 pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
-pub type mln_custom_source_tile_callback =
+pub type mln_custom_source_cancel_tile_callback =
+    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
+pub type mln_custom_source_fetch_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

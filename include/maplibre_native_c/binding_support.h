@@ -3,10 +3,10 @@
  * Binding-internal C declarations for this repository's generated bindings.
  *
  * Finalizer tokens and shutdown abandonment tie native handles to a host
- * runtime's memory management. Dart ports post void callbacks with by-value
- * payloads, such as wakes and custom source fetches, to a Dart isolate. Hosts
- * that write their own integration use the public headers, including queue
- * delivery in delivery.h for completions, log records, and resource requests.
+ * runtime's memory management. A Dart wake posts to a Dart isolate, which then
+ * drains its delivery queue or services the woken session. Hosts that write
+ * their own integration use the public headers, including queue delivery in
+ * delivery.h for every callback a host need not answer on a native thread.
  *
  * This header is not installed and carries no compatibility promise. Bindings
  * may resolve its exported functions from the shipped library.
@@ -29,8 +29,6 @@ extern "C" {
 #endif
 
 // NOLINTBEGIN(modernize-use-using,modernize-use-trailing-return-type)
-
-#include "binding_support_generated.h"
 
 /**
  * Creates a finalizer token for one owned native handle.
@@ -74,27 +72,6 @@ MLN_API mln_status mln_binding_render_session_abandon_at_exit(
   mln_render_session session,
   mln_render_abandon_result* out_result MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Creates a native notification port context for generated void callbacks.
- *
- * post_cobject is NativeApi.postCObject and port is a Dart SendPort.nativePort.
- * Each callback posts an array of its mln_binding_dart_port_callback value and
- * its flattened arguments. Returns null when the context cannot be allocated.
- */
-MLN_BINDING("ownership=owned")
-MLN_API void* mln_binding_dart_port_create(
-  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port
-) MLN_NOEXCEPT;
-
-/** Returns the generated callback for an mln_binding_dart_port_callback value.
- */
-MLN_API void* mln_binding_dart_port_function(uint32_t id) MLN_NOEXCEPT;
-
-/** Retires the context once and posts zero after its queued notifications. */
-MLN_API void mln_binding_dart_port_release(
-  void* context MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**

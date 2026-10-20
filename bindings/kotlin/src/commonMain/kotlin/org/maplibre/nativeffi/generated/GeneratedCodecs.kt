@@ -138,7 +138,7 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
   value: CustomGeometrySourceOptions,
 ) {
   var fields = 0u
-  writeU32(target, w(64, 80).toUInt())
+  writeU32(target, w(72, 88).toUInt())
   value.minZoom?.let {
     fields = fields or 1u
     writeF64(target + w(24, 32), it)
@@ -182,14 +182,14 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
 }
 
 internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
-  allocate(w(64, 80), 8).also { putCustomGeometrySourceOptions(it, value) }
+  allocate(w(72, 88), 8).also { putCustomGeometrySourceOptions(it, value) }
 
 internal fun NativeCall.putCustomMvtVectorSourceOptions(
   target: Long,
   value: CustomMvtVectorSourceOptions,
 ) {
   var fields = 0u
-  writeU32(target, w(48, 56).toUInt())
+  writeU32(target, w(56, 64).toUInt())
   value.minZoom?.let {
     fields = fields or 1u
     writeF64(target + w(24, 32), it)
@@ -214,7 +214,7 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
 
 internal fun NativeCall.writeCustomMvtVectorSourceOptions(
   value: CustomMvtVectorSourceOptions,
-): Long = allocate(w(48, 56), 8).also { putCustomMvtVectorSourceOptions(it, value) }
+): Long = allocate(w(56, 64), 8).also { putCustomMvtVectorSourceOptions(it, value) }
 
 internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {
   writeU32(target, w(24, 32).toUInt())
@@ -270,7 +270,7 @@ internal fun NativeArena.writeStyleTileSourceOptions(value: StyleTileSourceOptio
   allocate(w(88, 96), 8).also { putStyleTileSourceOptions(it, value) }
 
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
-  writeU32(target, w(160, 168).toUInt())
+  writeU32(target, w(168, 176).toUInt())
   var fields = 0u
   value.offset?.let {
     fields = fields or 1u
@@ -293,12 +293,12 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
     putScreenPoint(target + 48, it)
   }
   putAnimationOptions(target + 64, value.animation)
-  writeU32(target + w(152, 160), value.gesturePhase.rawValue)
+  writeU32(target + w(160, 168), value.gesturePhase.rawValue)
   writeU32(target + 4, fields)
 }
 
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
-  allocate(w(160, 168), 8).also { putCameraDelta(it, value) }
+  allocate(w(168, 176), 8).also { putCameraDelta(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
@@ -785,15 +785,15 @@ internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Lon
   allocate(56, 8).also { putMapViewportOptions(it, value) }
 
 internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
-  writeU32(target, w(224, 232).toUInt())
+  writeU32(target, w(232, 240).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraOptions(target + 8, value.camera)
   putAnimationOptions(target + 128, value.animation)
-  writeU32(target + w(216, 224), value.gesturePhase.rawValue)
+  writeU32(target + w(224, 232), value.gesturePhase.rawValue)
 }
 
 internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
-  allocate(w(224, 232), 8).also { putCameraUpdate(it, value) }
+  allocate(w(232, 240), 8).also { putCameraUpdate(it, value) }
 
 internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
   writeF64(target, value.top)
@@ -924,7 +924,7 @@ internal fun NativeCall.putResourceRequestCancelHandler(
   target: Long,
   value: ResourceRequestCancelHandler,
 ) {
-  writeU32(target, w(16, 32).toUInt())
+  writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
@@ -932,7 +932,7 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 
 internal fun NativeCall.writeResourceRequestCancelHandler(
   value: ResourceRequestCancelHandler,
-): Long = allocate(w(16, 32), w(4, 8)).also { putResourceRequestCancelHandler(it, value) }
+): Long = allocate(w(24, 40), 8).also { putResourceRequestCancelHandler(it, value) }
 
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
   writeU32(target, 40.toUInt())
@@ -1141,7 +1141,7 @@ internal fun readCameraDelta(source: Long): CameraDelta {
     pitch = if ((fields and 8u) != 0u) readF64(source + 40) else null,
     anchor = if ((fields and 16u) != 0u) readScreenPoint(source + 48) else null,
     animation = readAnimationOptions(source + 64),
-    gesturePhase = GesturePhase(readU32(source + w(152, 160))),
+    gesturePhase = GesturePhase(readU32(source + w(160, 168))),
   )
 }
 
@@ -1174,7 +1174,7 @@ internal fun readCameraUpdate(source: Long): CameraUpdate =
     mode = CameraUpdateMode(readU32(source + 4)),
     camera = readCameraOptions(source + 8),
     animation = readAnimationOptions(source + 128),
-    gesturePhase = GesturePhase(readU32(source + w(216, 224))),
+    gesturePhase = GesturePhase(readU32(source + w(224, 232))),
   )
 
 internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySourceOptions {
@@ -1725,7 +1725,7 @@ internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOption
 }
 
 internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long =
-  allocate(w(88, 96), 8).also { putAnimationOptions(it, value) }
+  allocate(w(96, 104), 8).also { putAnimationOptions(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
   writeAddress(target, value.texture.address)
@@ -2148,7 +2148,7 @@ internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTr
 }
 
 internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =
-  allocate(w(12, 24), w(4, 8)).also { putCameraTransitionHandler(it, value) }
+  allocate(w(24, 32), 8).also { putCameraTransitionHandler(it, value) }
 
 internal fun NativeArena.putWglContextDescriptor(target: Long, value: WglContextDescriptor) {
   writeAddress(target, value.deviceContext.address)

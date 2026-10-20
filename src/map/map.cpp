@@ -85,6 +85,7 @@
 #include "map/map.hpp"
 
 #include "completion/completion.hpp"
+#include "delivery/queued_registration.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
@@ -385,13 +386,25 @@ namespace mln::core {
 // once, and release_user_data runs after it. The submission transfers the
 // handler before it commits and takes it back when the submission fails, so
 // a rejected command runs neither. An accepted command that the runtime drops
-// without ending reports itself closed when its last owner lets go.
+// without ending reports itself closed when its last owner lets go. A queue
+// handler's registration stands in for user_data, and a rejected command
+// frees it without retiring it.
 class CameraTransitionEnd final {
  public:
   explicit CameraTransitionEnd(
     const mln_camera_transition_handler& handler
   ) noexcept
       : handler_(handler) {}
+  explicit CameraTransitionEnd(
+    std::unique_ptr<mln::delivery::QueuedRegistration> registration
+  ) noexcept
+      : handler_{
+          .callback = &queue_end,
+          .user_data = registration.get(),
+          .release_user_data = nullptr,
+          .queue = MLN_HANDLE_NULL,
+        },
+        registration_(std::move(registration)) {}
   CameraTransitionEnd(const CameraTransitionEnd&) = delete;
   CameraTransitionEnd(CameraTransitionEnd&&) = delete;
   auto operator=(const CameraTransitionEnd&) -> CameraTransitionEnd& = delete;
@@ -418,6 +431,10 @@ class CameraTransitionEnd final {
     } catch (...) {
       // Host callbacks must not unwind through the C boundary.
     }
+    if (registration_ != nullptr) {
+      mln::delivery::QueuedRegistration::retire(registration_.release());
+      return;
+    }
     if (handler_.release_user_data == nullptr || process_exiting()) return;
     try {
       handler_.release_user_data(handler_.user_data);
@@ -426,7 +443,19 @@ class CameraTransitionEnd final {
   }
 
  private:
+  static auto queue_end(
+    void* registration, const mln_camera_transition_end* end
+  ) noexcept -> void {
+    static_cast<void>(
+      static_cast<const mln::delivery::QueuedRegistration*>(registration)
+        ->push<MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END>(
+          mln_camera_transition_end_delivery{.end = end}
+        )
+    );
+  }
+
   mln_camera_transition_handler handler_;
+  std::unique_ptr<mln::delivery::QueuedRegistration> registration_;
   std::atomic_bool owned_{false};
 };
 
@@ -1444,7 +1473,8 @@ auto validate_animation_options(const mln_animation_options* animation)
   }
   const auto& end_handler = animation->end_handler;
   if (
-    end_handler.callback == nullptr && end_handler.release_user_data != nullptr
+    end_handler.callback == nullptr && end_handler.queue == MLN_HANDLE_NULL &&
+    end_handler.release_user_data != nullptr
   ) {
     mln::core::set_thread_error(
       "a disabled camera transition handler must not retain user data"
@@ -2080,12 +2110,29 @@ struct CommandTransitionFinish {
   auto operator()() const -> void { command->finish(); }
 };
 
-auto camera_transition_end(const mln_animation_options& animation)
-  -> std::shared_ptr<mln::core::CameraTransitionEnd> {
-  if (animation.end_handler.callback == nullptr) return nullptr;
-  return std::make_shared<mln::core::CameraTransitionEnd>(
-    animation.end_handler
+// Copies the command's end handler, or leaves out a disabled one.
+auto camera_transition_end(
+  const mln_animation_options& animation,
+  std::shared_ptr<mln::core::CameraTransitionEnd>& out
+) -> mln_status {
+  const auto& handler = animation.end_handler;
+  if (handler.callback == nullptr && handler.queue == MLN_HANDLE_NULL) {
+    return MLN_STATUS_OK;
+  }
+  auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
+  const auto queue_status = mln::delivery::resolve_registration_queue(
+    "camera transition handler", handler.queue, handler.callback != nullptr,
+    handler.release_user_data != nullptr, queue
   );
+  if (queue_status != MLN_STATUS_OK) return queue_status;
+  out = queue == nullptr
+          ? std::make_shared<mln::core::CameraTransitionEnd>(handler)
+          : std::make_shared<mln::core::CameraTransitionEnd>(
+              std::make_unique<mln::delivery::QueuedRegistration>(
+                std::move(queue), handler.user_data
+              )
+            );
+  return MLN_STATUS_OK;
 }
 
 template <typename Submit>
@@ -2901,7 +2948,10 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
     .transition_id = 0,
     .end_handler = {
-      .callback = nullptr, .user_data = nullptr, .release_user_data = nullptr
+      .callback = nullptr,
+      .user_data = nullptr,
+      .release_user_data = nullptr,
+      .queue = MLN_HANDLE_NULL
     }
   };
 }
@@ -4166,7 +4216,9 @@ auto map_update_camera(
     return animation_status;
   }
   const auto copied = *update;
-  const auto end = camera_transition_end(copied.animation);
+  auto end = std::shared_ptr<mln::core::CameraTransitionEnd>{};
+  const auto end_status = camera_transition_end(copied.animation, end);
+  if (end_status != MLN_STATUS_OK) return end_status;
   return submit_with_transition_end(end, [&]() -> mln_status {
     return submit_camera_command(
       map,
@@ -4302,7 +4354,9 @@ auto map_apply_camera_delta(
   const auto delta_status = validate_camera_delta(delta);
   if (delta_status != MLN_STATUS_OK) return delta_status;
   const auto copied = *delta;
-  const auto end = camera_transition_end(copied.animation);
+  auto end = std::shared_ptr<mln::core::CameraTransitionEnd>{};
+  const auto end_status = camera_transition_end(copied.animation, end);
+  if (end_status != MLN_STATUS_OK) return end_status;
   return submit_with_transition_end(end, [&]() -> mln_status {
     return submit_camera_command(
       map,

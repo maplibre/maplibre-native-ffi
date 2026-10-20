@@ -201,15 +201,17 @@ Eight keys state what a C shape cannot:
   `mln_delivery_payload` variant carries a copy of the callback's arguments. The
   variant's record mirrors the arguments other than the context, in order, by
   name and C type: a pointer becomes a `lifetime=owner` pointer that the
-  delivery owns, and a handle stays the same handle. A registration whose
-  callback declares a delivery can name a queue in place of the callback, so a
-  host that cannot run code on a native thread receives the copy after draining.
-  The schema rejects the key on a `synchronous=true` callback.
+  delivery owns, and a handle stays the same handle. Callbacks of the same shape
+  may share a record, as a custom source's fetch and cancel do. A registration
+  whose callbacks all declare a delivery can name a queue in place of them, so a
+  host that cannot run code on a native thread receives the copies after
+  draining. The schema rejects the key on a `synchronous=true` callback.
 - `synchronous=true` on a callback typedef says that native code relies on the
   callback's work being done when it returns, as with the queue lock's
   callbacks. A binding runs the callback on the calling thread and never
-  delivers it later through a port. Dart can only deliver later, so a record
-  with a native default keeps such a registration at its disabled default.
+  delivers it later through a queue or a wake. Dart can only deliver later, so a
+  record with a native default keeps such a registration at its disabled
+  default.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
   for `mln_render_session_acquire_frame` when no frame has rendered. A drain is
@@ -243,16 +245,21 @@ Eight keys state what a C shape cannot:
   custom source options. Every registration shares the release typedef
   `mln_user_data_release`, so the registration carries this rule.
 - `reentry_owner=` on a protocol callback names the parameter whose operations
-  the callback may call. A callback without such a parameter names the handle
-  type instead, as `mln_resource_request_cancel_callback` does, and may call
-  back only into the receiver of the call that registers it. A binding records
-  that receiver with the registration.
+  the callback may call. A handle parameter that is not a decision handle only
+  names the owner, as `mln_resource_request_cancel_callback`'s `handle` does:
+  the host's callback already holds that owner, so a binding keeps the parameter
+  for its reentry scope and leaves it out of the host's callback. Such a
+  callback may call back only into the receiver of the call that registers it.
 
 Every callback registration is a struct with `kind=callback_registration`, which
 a function takes by pointer. A registration may hold one `mln_delivery_queue`
 member marked `kind=delivery_queue`, which a binding runtime sets in place of
-the callback; it is a control role, so no binding exposes it. The registration's
-callback must be the protocol completion callback or declare `delivery=`.
+its callbacks; it is a control role, so no binding exposes it. Each of the
+registration's callbacks must be the protocol completion callback or declare
+`delivery=`, and one `MLN_DELIVERY_TYPE_RETIRED` delivery follows the last of
+them. Dart, whose host code runs only on its isolate, uses the queue for every
+such registration, and a wake for a registration whose one callback takes
+nothing but its context.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment

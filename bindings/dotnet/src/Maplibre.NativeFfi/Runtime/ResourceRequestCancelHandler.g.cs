@@ -3,10 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Cancel callback state for one handled resource request.
+/// Cancel callback or queue state for one handled resource request.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_request_cancel_handler</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Callback">
+/// Required in callback mode; null in queue mode.
+/// </param>
 public readonly partial record struct ResourceRequestCancelHandler(Action? Callback);

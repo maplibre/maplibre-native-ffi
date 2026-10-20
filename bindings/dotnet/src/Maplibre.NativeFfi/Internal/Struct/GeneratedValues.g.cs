@@ -349,7 +349,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_fetch_tile_callback", error);
         }
     }
 
@@ -367,7 +367,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_cancel_tile_callback", error);
         }
     }
 
@@ -459,7 +459,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_fetch_tile_callback", error);
         }
     }
 
@@ -477,7 +477,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_cancel_tile_callback", error);
         }
     }
 

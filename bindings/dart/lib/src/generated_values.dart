@@ -1649,8 +1649,8 @@ final class CameraTransitionEnd extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd);
 
-/// Callback state that one camera command copies to report the end of its
-/// transitions.
+/// Callback or queue state that one camera command copies to report the end of
+/// its transitions.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1949,12 +1949,18 @@ final class CanonicalTileId extends _Value {
   List<Object?> get _members => [z, x, y];
 }
 
-/// Callback invoked for custom geometry and custom MVT vector source tile
-/// requests and cancels.
+/// Requests one tile of a custom geometry or custom MVT vector source.
 ///
-/// See `mln_custom_source_tile_callback` in the
+/// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceTileCallback = void Function(CanonicalTileId);
+typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId);
+
+/// Cancels a request for one tile of a custom geometry or custom MVT vector
+/// source, best effort.
+///
+/// See `mln_custom_source_cancel_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId);
 
 /// Options for custom geometry sources.
 ///
@@ -1972,8 +1978,12 @@ final class CustomGeometrySourceOptions {
     this.clip,
     this.wrap,
   });
-  final CustomSourceTileCallback? fetchTile;
-  final CustomSourceTileCallback? cancelTile;
+
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  final CustomSourceFetchTileCallback? fetchTile;
+
+  /// Optional best-effort tile cancel callback. Null in queue mode.
+  final CustomSourceCancelTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
   final double? tolerance;
@@ -1994,8 +2004,12 @@ final class CustomMvtVectorSourceOptions {
     this.minZoom,
     this.maxZoom,
   });
-  final CustomSourceTileCallback? fetchTile;
-  final CustomSourceTileCallback? cancelTile;
+
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  final CustomSourceFetchTileCallback? fetchTile;
+
+  /// Optional best-effort tile cancel callback. Null in queue mode.
+  final CustomSourceCancelTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
 }
@@ -4312,12 +4326,14 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
-/// Cancel callback state for one handled resource request.
+/// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRequestCancelHandler {
   const ResourceRequestCancelHandler({required this.callback});
+
+  /// Required in callback mode; null in queue mode.
   final ResourceRequestCancelCallback callback;
 }
 

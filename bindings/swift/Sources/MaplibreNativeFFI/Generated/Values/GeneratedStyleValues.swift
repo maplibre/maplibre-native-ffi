@@ -72,9 +72,9 @@ public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
 /// See `mln_custom_geometry_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
-  /// Required tile fetch callback.
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
   public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
-  /// Optional best-effort tile cancel callback.
+  /// Optional best-effort tile cancel callback. Null in queue mode.
   public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -184,7 +184,7 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_tile_callback",
+      callback: "mln_custom_source_fetch_tile_callback",
       error: error
     ))
   }
@@ -199,7 +199,7 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_tile_callback",
+      callback: "mln_custom_source_cancel_tile_callback",
       error: error
     ))
   }
@@ -228,9 +228,9 @@ public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
 /// See `mln_custom_mvt_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
-  /// Required tile fetch callback.
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
   public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
-  /// Optional best-effort tile cancel callback.
+  /// Optional best-effort tile cancel callback. Null in queue mode.
   public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -295,7 +295,7 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_tile_callback",
+      callback: "mln_custom_source_fetch_tile_callback",
       error: error
     ))
   }
@@ -310,7 +310,7 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_tile_callback",
+      callback: "mln_custom_source_cancel_tile_callback",
       error: error
     ))
   }

@@ -5,7 +5,7 @@ import unittest
 
 from support import parse, parse_sources, protocol_header
 
-from tools.bindgen import default_cases, native_ports
+from tools.bindgen import default_cases
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
@@ -1064,12 +1064,6 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
         model = bind(api, require_complete=True)
         self.assertTrue(model.callbacks["gate"].synchronous)
         self.assertFalse(model.callbacks["notify"].synchronous)
-        # A port message arrives after the call returns, so only the
-        # notification has one.
-        self.assertEqual(
-            [entry[0].native for entry in native_ports.callbacks(model)],
-            ["signals"],
-        )
         # Dart keeps the synchronous registration at its disabled default and
         # still lowers the call.
         self.assertIn("attach", dart.coverage(api)["generated"])

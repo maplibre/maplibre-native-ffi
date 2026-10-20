@@ -1,7 +1,7 @@
 /**
  * @file maplibre_native_c/delivery.h
- * Public C API declarations for queue delivery of completions, log records,
- * and resource provider requests.
+ * Public C API declarations for queue delivery of completions and host
+ * callbacks.
  *
  * A host that cannot run code on a native thread, such as a Dart isolate or a
  * JavaScript engine, sets a delivery queue on a registration in place of its
@@ -10,9 +10,11 @@
  * goes from empty to nonempty. The host drains owned batches on its own
  * thread, takes the handles it keeps, and releases each batch.
  *
- * Three registrations accept a queue: mln_completion, mln_log_handler, and
- * mln_resource_provider. Runtime events keep their own queue and wake; see
- * mln_runtime_drain_events().
+ * Every registration whose callbacks a host need not answer on a native thread
+ * accepts a queue: mln_completion, mln_log_handler, mln_resource_provider,
+ * mln_resource_request_cancel_handler, mln_camera_transition_handler, and the
+ * custom geometry and custom MVT vector source options. Runtime events keep
+ * their own queue and wake; see mln_runtime_drain_events().
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. The host chooses when to drain each
@@ -36,7 +38,9 @@
 #include "base.h"        // IWYU pragma: export
 #include "completion.h"  // IWYU pragma: export
 #include "logging.h"     // IWYU pragma: export
+#include "map.h"         // IWYU pragma: export
 #include "runtime.h"     // IWYU pragma: export
+#include "style.h"       // IWYU pragma: export
 #include "wake.h"        // IWYU pragma: export
 
 #ifdef __cplusplus
@@ -54,10 +58,18 @@ typedef enum mln_delivery_type : uint32_t {
   /** One request for a queue-mode mln_resource_provider. */
   MLN_DELIVERY_TYPE_RESOURCE_REQUEST = 3,
   /**
-   * Last delivery of a log handler or resource provider registration; replaces
-   * release_user_data in queue mode. No payload.
+   * Last delivery of a callback registration in queue mode; replaces
+   * release_user_data. No payload.
    */
   MLN_DELIVERY_TYPE_RETIRED = 4,
+  /** One cancel for a queue-mode mln_resource_request_cancel_handler. */
+  MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL = 5,
+  /** The end for a queue-mode mln_camera_transition_handler. */
+  MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END = 6,
+  /** One tile fetch for a queue-mode custom source. */
+  MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE = 7,
+  /** One tile cancel for a queue-mode custom source. */
+  MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE = 8,
 } mln_delivery_type;
 
 /** Copied mln_log_callback arguments; fields mirror the callback parameters. */
@@ -82,6 +94,29 @@ typedef struct mln_resource_request_delivery {
   mln_resource_request handle;
 } mln_resource_request_delivery;
 
+/** Copied mln_resource_request_cancel_callback arguments. */
+typedef struct mln_resource_request_cancel_delivery {
+  /**
+   * The cancelled request. The provider still holds its own reference, so the
+   * batch owns nothing here.
+   */
+  mln_resource_request handle;
+} mln_resource_request_cancel_delivery;
+
+/** Copied mln_camera_transition_end_callback arguments. */
+typedef struct mln_camera_transition_end_delivery {
+  /** The copied end, owned by the batch. */
+  const mln_camera_transition_end* end MLN_BINDING("lifetime=owner");
+} mln_camera_transition_end_delivery;
+
+/**
+ * Copied mln_custom_source_fetch_tile_callback or
+ * mln_custom_source_cancel_tile_callback arguments.
+ */
+typedef struct mln_custom_source_tile_delivery {
+  mln_canonical_tile_id tile_id;
+} mln_custom_source_tile_delivery;
+
 /** Payload of one delivery, selected by mln_delivery.type. */
 typedef union mln_delivery_payload {
   /**
@@ -94,6 +129,14 @@ typedef union mln_delivery_payload {
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_LOG_RECORD");
   mln_resource_request_delivery resource_request
     MLN_BINDING("variant=MLN_DELIVERY_TYPE_RESOURCE_REQUEST");
+  mln_resource_request_cancel_delivery resource_request_cancel
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL");
+  mln_camera_transition_end_delivery camera_transition_end
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END");
+  mln_custom_source_tile_delivery custom_source_fetch_tile
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE");
+  mln_custom_source_tile_delivery custom_source_cancel_tile
+    MLN_BINDING("variant=MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE");
 } mln_delivery_payload;
 
 /**

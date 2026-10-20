@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:mirrors';
 
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
@@ -19,18 +18,11 @@ Object? _field(Object target, String name, [LibraryMirror? library]) =>
     reflect(target).getField(_symbol(name, library ?? _runtime)).reflectee
         as Object?;
 
-final class CallbackPortLifecycleProbe {
-  CallbackPortLifecycleProbe(this._port);
-  final Object _port;
-  bool get closed => _field(_port, 'closed') as bool;
-  Future<void> get released =>
-      (_field(_port, '_released') as Completer<void>).future;
-}
-
-CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
-  final ports = _field(owner, '_callbackPorts')!;
-  final pending = _field(ports, 'pending') as Set<Object>;
-  return pending.isEmpty ? null : CallbackPortLifecycleProbe(pending.single);
+/// The one callback registration that owner still roots, or null.
+DeliveryRegistration? singleRegistrationProbeForTesting(Object owner) {
+  final ports = _field(owner, '_callbackRoots')!;
+  final queued = _field(ports, 'queued') as Set<DeliveryRegistration>;
+  return queued.isEmpty ? null : queued.single;
 }
 
 DeliveryRegistration? logRegistrationProbeForTesting() {

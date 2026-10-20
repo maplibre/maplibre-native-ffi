@@ -290,28 +290,44 @@ typedef struct mln_camera_transition_end {
   uint64_t generation;
 } mln_camera_transition_end;
 
-/** Receives the end of one camera command's transitions. */
+/**
+ * Receives the end of one camera command's transitions.
+ *
+ * A handler in queue mode queues a copy as an
+ * mln_camera_transition_end_delivery instead.
+ */
+MLN_BINDING("delivery=MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END")
 typedef void (*mln_camera_transition_end_callback)(
   void* user_data, const mln_camera_transition_end* end
 );
 
 /**
- * Callback state that one camera command copies to report the end of its
- * transitions.
+ * Callback or queue state that one camera command copies to report the end of
+ * its transitions.
  *
- * A null callback disables the handler, and a disabled handler must not carry
- * release_user_data. See mln_animation_options.end_handler for when the
- * callback runs.
+ * A handler with neither a callback nor a queue is disabled, and a disabled
+ * handler must not carry release_user_data. See
+ * mln_animation_options.end_handler for when the callback runs.
  */
 typedef struct mln_camera_transition_handler {
   mln_camera_transition_end_callback callback MLN_BINDING("nullable=true");
+  /** Opaque host token in queue mode; native code never dereferences it. */
   void* user_data MLN_BINDING("kind=context");
   /**
    * Optional. Releases user_data on the runtime worker after the callback
    * returns. A rejected command runs neither callback, and the caller keeps
-   * user_data.
+   * user_data. Null in queue mode.
    */
   mln_user_data_release release_user_data;
+  /**
+   * Optional. Queue delivery in place of callback: the end is copied into one
+   * MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END delivery carrying user_data,
+   * followed by one MLN_DELIVERY_TYPE_RETIRED delivery where callback mode
+   * runs release_user_data. A command rejects an invalid queue handle with
+   * MLN_STATUS_INVALID_ARGUMENT and a released queue with
+   * MLN_STATUS_INVALID_STATE.
+   */
+  mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_camera_transition_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

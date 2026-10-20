@@ -1720,8 +1720,8 @@ func copyCameraTransitionEnd(raw C.mln_camera_transition_end) CameraTransitionEn
 }
 
 // CameraTransitionHandler corresponds to mln_camera_transition_handler.
-// Callback state that one camera command copies to report the end of its
-// transitions.
+// Callback or queue state that one camera command copies to report the end of
+// its transitions.
 //
 // See mln_camera_transition_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -1812,9 +1812,9 @@ type CustomGeometrySourceOptions struct {
 	Buffer    *uint32
 	Clip      *bool
 	Wrap      *bool
-	// Required tile fetch callback.
+	// Tile fetch callback. Required in callback mode; null in queue mode.
 	FetchTile func(CanonicalTileId)
-	// Optional best-effort tile cancel callback.
+	// Optional best-effort tile cancel callback. Null in queue mode.
 	CancelTile func(CanonicalTileId)
 }
 
@@ -1845,10 +1845,10 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_cancel_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -1866,9 +1866,9 @@ func DefaultCustomGeometrySourceOptions() CustomGeometrySourceOptions {
 type CustomMvtVectorSourceOptions struct {
 	MinZoom *float64
 	MaxZoom *float64
-	// Required tile fetch callback.
+	// Tile fetch callback. Required in callback mode; null in queue mode.
 	FetchTile func(CanonicalTileId)
-	// Optional best-effort tile cancel callback.
+	// Optional best-effort tile cancel callback. Null in queue mode.
 	CancelTile func(CanonicalTileId)
 }
 
@@ -1889,10 +1889,10 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_cancel_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -3869,12 +3869,15 @@ func copyResourceRange(raw C.mln_resource_range) ResourceRange {
 }
 
 // ResourceRequestCancelHandler corresponds to
-// mln_resource_request_cancel_handler. Cancel callback state for one handled
-// resource request.
+// mln_resource_request_cancel_handler. Cancel callback or queue state for one
+// handled resource request.
 //
 // See mln_resource_request_cancel_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceRequestCancelHandler struct{ Callback func() }
+type ResourceRequestCancelHandler struct {
+	// Required in callback mode; null in queue mode.
+	Callback func()
+}
 
 func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, arena *bindingArena) C.mln_resource_request_cancel_handler {
 	raw := C.mln_resource_request_cancel_handler{}
@@ -8929,7 +8932,7 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8946,7 +8949,7 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8963,7 +8966,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8980,7 +8983,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)

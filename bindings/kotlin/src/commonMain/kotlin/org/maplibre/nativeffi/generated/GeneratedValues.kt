@@ -4125,7 +4125,7 @@ public data class LogicalExtentPhysicalSizeResult(
 )
 
 /**
- * Callback state that one camera command copies to report the end of its transitions.
+ * Callback or queue state that one camera command copies to report the end of its transitions.
  *
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4149,10 +4149,10 @@ public typealias CameraTransitionEndCallback = (end: CameraTransitionEnd) -> Uni
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class CustomGeometrySourceOptions(
-  /** Required tile fetch callback. */
-  public val fetchTile: CustomSourceTileCallback? = null,
-  /** Optional best-effort tile cancel callback. */
-  public val cancelTile: CustomSourceTileCallback? = null,
+  /** Tile fetch callback. Required in callback mode; null in queue mode. */
+  public val fetchTile: CustomSourceFetchTileCallback? = null,
+  /** Optional best-effort tile cancel callback. Null in queue mode. */
+  public val cancelTile: CustomSourceCancelTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val tolerance: Double? = null,
@@ -4163,12 +4163,20 @@ public data class CustomGeometrySourceOptions(
 )
 
 /**
- * Callback invoked for custom geometry and custom MVT vector source tile requests and cancels.
+ * Requests one tile of a custom geometry or custom MVT vector source.
  *
- * See `mln_custom_source_tile_callback` in the
+ * See `mln_custom_source_fetch_tile_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public typealias CustomSourceTileCallback = (tileId: CanonicalTileId) -> Unit
+public typealias CustomSourceFetchTileCallback = (tileId: CanonicalTileId) -> Unit
+
+/**
+ * Cancels a request for one tile of a custom geometry or custom MVT vector source, best effort.
+ *
+ * See `mln_custom_source_cancel_tile_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public typealias CustomSourceCancelTileCallback = (tileId: CanonicalTileId) -> Unit
 
 /**
  * Options for custom MVT vector sources.
@@ -4177,10 +4185,10 @@ public typealias CustomSourceTileCallback = (tileId: CanonicalTileId) -> Unit
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class CustomMvtVectorSourceOptions(
-  /** Required tile fetch callback. */
-  public val fetchTile: CustomSourceTileCallback? = null,
-  /** Optional best-effort tile cancel callback. */
-  public val cancelTile: CustomSourceTileCallback? = null,
+  /** Tile fetch callback. Required in callback mode; null in queue mode. */
+  public val fetchTile: CustomSourceFetchTileCallback? = null,
+  /** Optional best-effort tile cancel callback. Null in queue mode. */
+  public val cancelTile: CustomSourceCancelTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
 )
@@ -4258,12 +4266,13 @@ internal constructor(
 )
 
 /**
- * Cancel callback state for one handled resource request.
+ * Cancel callback or queue state for one handled resource request.
  *
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRequestCancelHandler(
+  /** Required in callback mode; null in queue mode. */
   public val callback: ResourceRequestCancelCallback,
 )
 

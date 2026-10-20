@@ -517,8 +517,8 @@ impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
     }
 }
 
-/// Callback state that one camera command copies to report the end of its
-/// transitions.
+/// Callback or queue state that one camera command copies to report the end of
+/// its transitions.
 ///
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -726,9 +726,9 @@ pub struct CustomGeometrySourceOptionField: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomGeometrySourceOptions {
-    /// Required tile fetch callback.
+    /// Tile fetch callback. Required in callback mode; null in queue mode.
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
-    /// Optional best-effort tile cancel callback.
+    /// Optional best-effort tile cancel callback. Null in queue mode.
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -777,7 +777,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_fetch_tile_callback", None, (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -789,7 +789,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_cancel_tile_callback", None, (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -886,9 +886,9 @@ pub struct CustomMvtVectorSourceOptionField: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomMvtVectorSourceOptions {
-    /// Required tile fetch callback.
+    /// Tile fetch callback. Required in callback mode; null in queue mode.
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
-    /// Optional best-effort tile cancel callback.
+    /// Optional best-effort tile cancel callback. Null in queue mode.
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -932,7 +932,7 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_fetch_tile_callback", None, (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -944,7 +944,7 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_cancel_tile_callback", None, (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -4585,12 +4585,13 @@ impl ResourceRequest {
     }
 }
 
-/// Cancel callback state for one handled resource request.
+/// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Default)]
 pub struct ResourceRequestCancelHandler {
+    /// Required in callback mode; null in queue mode.
     pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
 }
 impl std::fmt::Debug for ResourceRequestCancelHandler {
