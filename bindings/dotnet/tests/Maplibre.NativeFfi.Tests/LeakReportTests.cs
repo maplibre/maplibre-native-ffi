@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -42,10 +43,7 @@ public sealed class LeakReportTests
         RuntimeHandle runtime
     )
     {
-        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
-        // The creation's completion roots its result until native releases it. A barrier fences
-        // that release before collection can queue the map's finalizer.
-        runtime.BarrierAsync().GetAwaiter().GetResult();
+        var map = CreateMapReleased(runtime);
         // A state whose disposal throws stands in for a native disposal that fails.
         var undisposable = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(5678),
@@ -89,9 +87,27 @@ public sealed class LeakReportTests
     ) CreateUnreachableRuntimeAndMap()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
-        runtime.BarrierAsync().GetAwaiter().GetResult();
+        var map = CreateMapReleased(runtime);
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
+    }
+
+    // The creation's completion roots its result until native releases it, so the map can be
+    // collected only after that release. This collection runs alone, so the release is the
+    // creation's.
+    private static MapHandle CreateMapReleased(RuntimeHandle runtime)
+    {
+        using var released = new SemaphoreSlim(0);
+        NativeCompletion.ReleasedForTesting = () => released.Release();
+        try
+        {
+            var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+            TestWaits.Wait(released, Stopwatch.StartNew(), "the creation's completion release");
+            return map;
+        }
+        finally
+        {
+            NativeCompletion.ReleasedForTesting = null;
+        }
     }
 
     private static int Occurrences(string text, string value)

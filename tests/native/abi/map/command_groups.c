@@ -15,7 +15,7 @@ static uint64_t render_update_generation(mln_map map) {
 
 static mln_map create_loaded_map(mln_runtime runtime) {
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   return map;
 }
 
@@ -84,7 +84,7 @@ static void a_style_command_publishes_one_render_update(void) {
   mln_map map = create_loaded_map(runtime);
   add_background_layer(map, "{\"id\":\"a\",\"type\":\"background\"}");
   add_background_layer(map, "{\"id\":\"b\",\"type\":\"background\"}");
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_drain_all(runtime);
   const uint64_t before = render_update_generation(map);
 
@@ -97,7 +97,7 @@ static void a_style_command_publishes_one_render_update(void) {
   mln_test_completion_destroy(&moved);
   TEST_ASSERT_EQUAL_UINT64(before + 1, render_update_generation(map));
 
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   update_order order = {.map = map};
   TEST_ASSERT_EQUAL_size_t(
     1, mln_test_drain_counting_matching(runtime, track_update_order, &order)

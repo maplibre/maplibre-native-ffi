@@ -2197,16 +2197,6 @@ static jint mln_resource_transform_response_set_url_jni(
   );
 }
 
-static jint mln_runtime_barrier_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_runtime_barrier(
-    (mln_runtime)runtime, MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_runtime_clear_http_header_transform_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong completion,
   jlong out_diagnostic
@@ -2973,7 +2963,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_wait_until_retired_jni},
   {"mln_resource_transform_response_set_url", "(JJJ)I",
    (void*)mln_resource_transform_response_set_url_jni},
-  {"mln_runtime_barrier", "(JJJ)I", (void*)mln_runtime_barrier_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
    (void*)mln_runtime_clear_http_header_transform_jni},
   {"mln_runtime_clear_resource_provider", "(JJJ)I",
@@ -3412,7 +3401,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_wait_until_retired_jni},
   {"mln_resource_transform_response_set_url", "(JJJ)I",
    (void*)mln_resource_transform_response_set_url_jni},
-  {"mln_runtime_barrier", "(JJJ)I", (void*)mln_runtime_barrier_jni},
   {"mln_runtime_clear_http_header_transform", "(JJJ)I",
    (void*)mln_runtime_clear_http_header_transform_jni},
   {"mln_runtime_clear_resource_provider", "(JJJ)I",

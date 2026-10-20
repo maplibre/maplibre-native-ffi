@@ -7,7 +7,8 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try fixture.map.discarding().setDebugOptions(.{ .tile_borders = true }, null);
-    try support.resolve(try maplibre.runtimeBarrier(fixture.runtime, null));
+    // A later command on the same map completes after the discarded one.
+    _ = try support.resolve(try maplibre.mapRequestRepaint(fixture.map, null));
     const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
     try testing.expect(snapshot.debug_options.tile_borders);
     try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8, .scale_factor = 1 }, null));
@@ -21,7 +22,7 @@ const ProviderProbe = struct {
         const self: *@This() = @ptrCast(@alignCast(context.?));
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
-        if (maplibre.runtimeBarrier(self.runtime, null)) |unexpected| {
+        if (maplibre.runtimeClearResourceTransform(self.runtime, null)) |unexpected| {
             var future = unexpected;
             future.deinit();
             return error.NativeError;

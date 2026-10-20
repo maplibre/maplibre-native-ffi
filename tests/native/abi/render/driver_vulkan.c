@@ -275,8 +275,8 @@ static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first_map = mln_test_create_map(runtime);
   mln_map second_map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, first_map);
-  mln_test_render_prepare_map(runtime, second_map);
+  mln_test_render_prepare_map(first_map);
+  mln_test_render_prepare_map(second_map);
   mln_test_render_fixture first = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
@@ -406,7 +406,7 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   const mln_queue_lock queue_lock = reset_shared_lock();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
@@ -825,7 +825,7 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   const mln_queue_lock queue_lock = reset_shared_lock();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
@@ -868,7 +868,7 @@ static void abandon_destroys_an_owned_texture_ring(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_owned_texture(
@@ -893,7 +893,7 @@ static void abandon_destroys_a_surface_swapchain(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_surface(map, &fixture, counting_wrap),
@@ -916,7 +916,7 @@ static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(

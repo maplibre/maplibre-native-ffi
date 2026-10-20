@@ -9730,18 +9730,6 @@ impl ResourceTransformResponseScope {
 #[pymethods]
 impl RuntimeHandle {
     #[pyo3(signature = ())]
-    fn barrier(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_barrier", self.admission())?;
-        let handle = self.live()?;
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| sys::mln_runtime_barrier(handle, completion, diagnostic),
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = ())]
     fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(
             py,

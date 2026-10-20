@@ -25,7 +25,8 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
     assert (
         map_handle.discarding.set_debug_options(mln.MapDebugOption.TILE_BORDERS) is None
     )
-    result(harness.runtime.barrier())
+    # A later command on the same map completes after the discarded one.
+    result(map_handle.request_repaint())
     assert map_handle.get_snapshot().debug_options == mln.MapDebugOption.TILE_BORDERS
     with pytest.raises(mln.InvalidArgumentError):
         map_handle.discarding.resize(
@@ -50,9 +51,9 @@ def test_a_dropped_creation_result_retires_the_map_it_created(
 ) -> None:
     creation = harness.runtime.create_map()
     result(creation)
-    # The barrier's call releases native's reference to the creation future,
+    # A later runtime call releases native's reference to the creation future,
     # so the result below holds the last reference to the map.
-    result(harness.runtime.barrier())
+    result(harness.runtime.clear_resource_transform())
 
     with leak_reports() as reports:
         del creation
@@ -143,10 +144,11 @@ def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
         release.set()
         assert result(closing) is None
         handle.close()
-        # The barrier resolves once both creations have delivered their maps
-        # to the cancelled futures. Runtime retirement waits for every map,
-        # so the close resolves only once both late maps have retired.
-        result(harness.runtime.barrier())
+        # A later runtime command resolves once both creations have delivered
+        # their maps to the cancelled futures. Runtime retirement waits for
+        # every map, so the close resolves only once both late maps have
+        # retired.
+        result(harness.runtime.clear_resource_transform())
         assert result(harness.runtime.close()) is None
         gc.collect()
     assert reports == []

@@ -2594,8 +2594,7 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
     release();
   }
   // The event is queued before the completion runs, so a host that sees the
-  // completion and then drains events, or orders a barrier after it, finds
-  // the event. A barrier completes as soon as the request is terminal.
+  // completion and then drains events finds the event.
   // MapLibre usually finishes a request from renderStill() or from a renderer
   // callback, but a style error inside a map command finishes it too. That
   // command's transaction holds the event, so the completion waits until the
@@ -3459,15 +3458,6 @@ auto submit_map_resize(
             return;
           }
         }
-        const auto latest = self.from_session
-                              ? live.latest_session_resize_submission.load()
-                              : live.latest_resize_submission.load();
-        if (self.sequence != latest) {
-          complete_command(
-            self.completion, MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK
-          );
-          return;
-        }
         complete_map_command(
           self.completion,
           run_map_transaction(
@@ -3506,10 +3496,8 @@ auto submit_map_resize(
     set_thread_error("scale factor is fixed at map creation");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* slot = from_session ? &task->map->latest_session_resize_submission
-                            : &task->map->latest_resize_submission;
   const auto runtime = task->map->runtime_state;
-  const auto status = submit_runtime_command_task(runtime, *task, slot);
+  const auto status = submit_runtime_command_task(runtime, *task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }
@@ -3544,7 +3532,6 @@ auto finish_map_retirement(RetirementTask* task) noexcept -> void {
   }
   if (auto completion = std::move(map.release_completion)) {
     valueless_completion<&mln_map_release>().complete(completion);
-    finish_runtime_submission(map.runtime_state, map.release_sequence);
   }
   task->run = [](RetirementTask* node) noexcept {
     auto* retiring = static_cast<MapObject*>(node->context);
@@ -3615,11 +3602,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   }
   auto owned = handle_table<MapObject>().lease(map);
   if (owned == nullptr) return recorded_handle_fault_status();
-  auto sequence = uint64_t{0};
-  auto close_status = MLN_STATUS_OK;
   {
-    const auto commit_lock =
-      std::scoped_lock{owned->runtime_state->submission_mutex};
     const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
     if (handle_table<MapObject>().resolve_locked(map) != owned.get()) {
       release_completion->reject();
@@ -3630,23 +3613,12 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
-    try {
-      sequence = track_runtime_submission(*owned->runtime_state);
-    } catch (...) {
+    const auto close_status = owned->control.begin_close();
+    if (close_status != MLN_STATUS_OK) {
       release_completion->reject();
-      set_thread_error("map release could not reserve its submission");
-      return MLN_STATUS_NATIVE_ERROR;
+      return close_status;
     }
-    close_status = owned->control.begin_close();
-    if (close_status == MLN_STATUS_OK) {
-      owned->release_sequence = sequence;
-      owned->disposal_requested = true;
-    }
-  }
-  if (close_status != MLN_STATUS_OK) {
-    release_completion->reject();
-    finish_runtime_submission(owned->runtime_state, sequence);
-    return close_status;
+    owned->disposal_requested = true;
   }
   release_completion->accept();
   retire_map(std::move(owned), std::move(release_completion));

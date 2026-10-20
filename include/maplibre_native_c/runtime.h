@@ -1599,26 +1599,6 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered runtime barrier.
- *
- * The completion runs after every earlier accepted runtime submission has
- * reached a terminal disposition, and after native code has released the state
- * that each earlier command captured. It carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the barrier is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- */
-MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_barrier(
-  mln_runtime runtime, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Starts release of a runtime after checking its children.
  *
  * The call rejects a runtime that has live or pending children and leaves it

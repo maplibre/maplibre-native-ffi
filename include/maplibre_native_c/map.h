@@ -364,9 +364,9 @@ typedef struct mln_animation_options {
    * transitions are queued, and never from inside a MapLibre Native call. A
    * transition that a command ends reports before that command's completion
    * runs. A transition that ends outside a command, as rendered frames advance
-   * it, reports from a later task on the runtime worker. A runtime barrier does
-   * not wait for the callback. When the map closes first, the callback runs
-   * with MLN_CAMERA_TRANSITION_OUTCOME_CLOSED before the release completes.
+   * it, reports from a later task on the runtime worker. When the map closes
+   * first, the callback runs with MLN_CAMERA_TRANSITION_OUTCOME_CLOSED before
+   * the release completes.
    *
    * The callback may call any C API that a completion callback may call,
    * including camera commands, but must return promptly. A rejected command
@@ -1078,9 +1078,9 @@ MLN_API mln_status mln_map_get_snapshot(
  * render session is attached, a direct map resize completes with
  * MLN_STATUS_INVALID_STATE; size the map through the session instead.
  * The completion reports terminal disposition and the snapshot generation
- * that the resize published. A resize that a later direct resize replaces
- * before it runs completes as superseded. A resize to the map's current
- * width and height changes nothing and publishes no render update.
+ * that the resize published. Resizes apply in acceptance order, so the last
+ * one accepted sets the size. A resize to the map's current width and height
+ * changes nothing and publishes no render update.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.

@@ -103,7 +103,7 @@ static void select_then_clear_renderer_data(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
   set_selected(map, "{\"selected\":true}");
-  (void)mln_test_render_until_idle(runtime, fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, fixture, NULL);
   expect_center_pixel(fixture, green, "the selected point");
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
@@ -218,10 +218,10 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
     if (row->prepare != NULL) {
       row->prepare(map);
     }
-    (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+    (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
     expect_center_pixel(&fixture, row->before, row->label);
     row->mutate(runtime, map, &fixture);
-    (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+    (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
     expect_center_pixel(&fixture, row->after, row->label);
     mln_test_render_fixture_destroy(&fixture);
     mln_test_destroy_map(map);
@@ -244,7 +244,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
            "\"paint\":{\"background-color\":\"#ff0000\"}}]}"
          )
   ));
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   expect_center_pixel(&fixture, red, "before the group");
 
   MLN_TEST_AWAIT_OK(
@@ -260,7 +260,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_end_command_group(map, &completion.descriptor, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   expect_center_pixel(&fixture, green, "after the group");
 
   mln_test_render_fixture_destroy(&fixture);
@@ -286,7 +286,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
       "ff0000\"]}}]}"
     )
   ));
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   expect_center_pixel(&fixture, red, "before the feature-state group");
   mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
@@ -304,7 +304,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_end_command_group(map, &completion.descriptor, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   uint8_t after[4];
   read_center_pixel(&fixture, after);
   mln_test_render_fixture_destroy(&fixture);
@@ -322,9 +322,9 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
 }
 
 // How many render updates the map published for the commands before the
-// barrier.
-static size_t take_updates(mln_runtime runtime) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+// fence.
+static size_t take_updates(mln_runtime runtime, mln_map map) {
+  MLN_TEST_OK(mln_test_map_fence(map));
   return mln_test_drain_counting(
     runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
   );
@@ -440,12 +440,12 @@ typedef struct update_row {
 // Each row runs after the ones before it on one map, so a repeated row
 // measures a command that changes nothing.
 //
-// The runtime barrier after each row fences the updates its command publishes,
-// which is what lets a row assert none. That holds only while no row starts
-// work that finishes on a worker: the style's GeoJSON is inline, the added
-// source takes data parsed before the call, and the image source takes pixels,
-// so nothing loads and publishes an update into a later row. A row that
-// fetched or parsed data asynchronously would need its own fence.
+// The map fence after each row orders the updates that its command publishes
+// before the count, which is what lets a row assert none. That holds only while
+// no row starts work that finishes on a worker: the style's GeoJSON is inline,
+// the added source takes data parsed before the call, and the image source
+// takes pixels, so nothing loads and publishes an update into a later row. A
+// row that fetched or parsed data asynchronously would need its own fence.
 static const update_row update_rows[] = {
   {"inline GeoJSON added", add_empty_geojson, true},
   {"a source removed", remove_geojson, true},
@@ -476,7 +476,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
            "\"layers\":[{\"id\":\"background\",\"type\":\"background\"}]}"
          )
   ));
-  (void)take_updates(runtime);
+  (void)take_updates(runtime, map);
   update_state state = {0};
   MLN_TEST_OK(mln_geojson_source_data_create(
     MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
@@ -490,7 +490,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
        index += 1) {
     const update_row* row = &update_rows[index];
     row->mutate(map, &state);
-    const size_t updates = take_updates(runtime);
+    const size_t updates = take_updates(runtime, map);
     if (row->publishes) {
       TEST_ASSERT_GREATER_THAN_size_t_MESSAGE(0, updates, row->label);
     } else {
@@ -615,11 +615,11 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
 
 #ifdef COUNTS_DRAWS_PER_FRAME
 static mln_rendering_stats render_stats_to_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
   mln_rendering_stats stats = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_until_idle(runtime, fixture, &stats),
+    mln_test_render_until_idle(runtime, map, fixture, &stats),
     "rendering to idle finished no frame"
   );
   return stats;
@@ -642,7 +642,8 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
          )
   ));
 
-  const mln_rendering_stats first = render_stats_to_idle(runtime, &fixture);
+  const mln_rendering_stats first =
+    render_stats_to_idle(runtime, map, &fixture);
   TEST_ASSERT_GREATER_THAN_INT64(0, first.frame_count);
   TEST_ASSERT_GREATER_THAN_INT64(0, first.draw_call_count);
   TEST_ASSERT_GREATER_OR_EQUAL_INT64(
@@ -650,7 +651,8 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
   );
 
   MLN_TEST_OK(mln_test_map_request_repaint(map));
-  const mln_rendering_stats second = render_stats_to_idle(runtime, &fixture);
+  const mln_rendering_stats second =
+    render_stats_to_idle(runtime, map, &fixture);
   TEST_ASSERT_GREATER_THAN_INT64(0, second.draw_call_count);
   TEST_ASSERT_EQUAL_INT64(first.frame_count + 1, second.frame_count);
   TEST_ASSERT_EQUAL_INT64(
@@ -662,7 +664,8 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
     map, MLN_BUFFER_LITERAL("circle"), MLN_BUFFER_LITERAL("visibility"),
     MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
   ));
-  const mln_rendering_stats empty = render_stats_to_idle(runtime, &fixture);
+  const mln_rendering_stats empty =
+    render_stats_to_idle(runtime, map, &fixture);
   // Source fading can request several empty frames after the layer hides.
   TEST_ASSERT_GREATER_THAN_INT64(second.frame_count, empty.frame_count);
   TEST_ASSERT_EQUAL_INT64(0, empty.draw_call_count);

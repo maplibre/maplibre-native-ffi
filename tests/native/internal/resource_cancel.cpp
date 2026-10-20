@@ -92,7 +92,7 @@ void cancel_callback_skips_a_completed_request() {
   const auto handle = probe.handle.load();
 
   // Let the response reach the style before the map goes away.
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(
     sync_points.wait_for_hits(SyncPoint::ResourceRequestCancelled, 1)

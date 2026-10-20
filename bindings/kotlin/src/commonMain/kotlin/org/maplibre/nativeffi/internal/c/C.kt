@@ -973,8 +973,6 @@ internal expect object C {
 
   fun mln_resource_transform_response_set_url(response: Long, url: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_barrier(runtime: Long, completion: Long, outDiagnostic: Long): Int
-
   fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,

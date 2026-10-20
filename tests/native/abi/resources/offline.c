@@ -913,7 +913,7 @@ static void occupy_until_offline_accepted(
   const mln_completion discard = mln_test_discard_completion();
   atomic_store(
     &probe->reentrant_status,
-    mln_runtime_barrier(probe->runtime, &discard, NULL)
+    mln_runtime_clear_resource_transform(probe->runtime, &discard, NULL)
   );
   mln_test_flag_set(&probe->finished);
 }

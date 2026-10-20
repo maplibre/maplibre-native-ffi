@@ -215,22 +215,13 @@ auto Completion::reject() noexcept -> void {
 auto Completion::revoke() noexcept -> void {
   auto expected = State::Accepted;
   if (state_.compare_exchange_strong(expected, State::Rejected)) {
-    retirement_callback_ = {};
+    submission_lease_.reset();
   }
 }
 
-auto Completion::set_retirement_callback(CompletionRetirement callback) noexcept
-  -> void {
+auto Completion::set_submission_lease(ControlLease lease) noexcept -> void {
   assert(state_.load() == State::Created);
-  retirement_callback_ = std::move(callback);
-}
-
-auto Completion::retire_work() noexcept -> void { retire_part(); }
-
-auto Completion::retire_part() noexcept -> void {
-  if (retirement_parts_.fetch_sub(1) != 1) return;
-  auto callback = std::exchange(retirement_callback_, {});
-  if (callback.run) callback.run(callback.owner, callback.sequence);
+  submission_lease_ = std::move(lease);
 }
 
 auto Completion::deliver_undelivered() noexcept -> void {
@@ -242,8 +233,8 @@ auto Completion::deliver_undelivered() noexcept -> void {
 
 auto Completion::release() noexcept -> void {
   {
-    // The sink's queue reference and unused fallback item go before
-    // retirement, so an observer of retirement sees the delivery finished.
+    // The sink's queue reference and unused fallback item go before the
+    // lease, so a handle that drains sees the delivery finished.
     auto sink = std::move(sink_);
     sink_ = CompletionSink{};
     fallback_.reset();
@@ -259,7 +250,7 @@ auto Completion::release() noexcept -> void {
       }
     }
   }
-  retire_part();
+  submission_lease_.reset();
 }
 
 auto make_completion_sink(

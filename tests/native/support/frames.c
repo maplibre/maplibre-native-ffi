@@ -11,9 +11,9 @@
 #include "unity.h"
 #include "wait.h"
 
-void mln_test_render_prepare_map(mln_runtime runtime, mln_map map) {
+void mln_test_render_prepare_map(mln_map map) {
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
 }
 
 void mln_test_render_request_forced(
@@ -151,10 +151,10 @@ static bool update_or_idle_arrived(void* context) {
 }
 
 bool mln_test_render_until_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture,
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture,
   mln_rendering_stats* latest_stats
 ) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   idle_wait wait = {.runtime = runtime, .fixture = fixture};
   const mln_test_deadline deadline = mln_test_deadline_default();
   for (;;) {

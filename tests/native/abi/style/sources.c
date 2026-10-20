@@ -575,7 +575,7 @@ static void sources_list_in_style_order_with_their_info(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
   mln_test_load_style_and_wait(
-    runtime, map,
+    map,
     MLN_BUFFER_LITERAL(
       "{\"version\":8,\"sources\":{\"first\":" MLN_TEST_EMPTY_GEOJSON_SOURCE
       ",\"second\":" MLN_TEST_EMPTY_GEOJSON_SOURCE "},\"layers\":[]}"

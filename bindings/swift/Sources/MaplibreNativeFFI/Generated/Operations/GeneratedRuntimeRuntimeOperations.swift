@@ -4,20 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  /// Starts an ordered runtime barrier.
-  ///
-  /// See `mln_runtime_barrier` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func barrier() async throws {
-    try await nativeUnit("mln_runtime_barrier") { raw, _, completion, diagnostic in
-      mln_runtime_barrier(
-        raw,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Clears the runtime-scoped outgoing HTTP header transform.
   ///
   /// See `mln_runtime_clear_http_header_transform` in the

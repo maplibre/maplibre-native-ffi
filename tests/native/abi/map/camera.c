@@ -514,7 +514,7 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   const mln_lat_lng dragged = coordinate_at(
     map, (mln_screen_point){.x = anchor.x - offset.x, .y = anchor.y - offset.y}
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_drain_all(runtime);
   mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
@@ -551,7 +551,7 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT64(
@@ -807,7 +807,7 @@ static double jumped_longitude(mln_map map, double longitude) {
 }
 
 static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot.bounds;

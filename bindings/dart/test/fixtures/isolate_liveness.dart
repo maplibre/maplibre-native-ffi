@@ -48,7 +48,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
 /// then closes everything, so that the exit rests on nothing else.
 Future<void> _awaitCompletions() async {
   final (runtime, map) = await _register();
-  await runtime.barrier();
+  await runtime.clearResourceTransform();
   print('COMPLETIONS_RESOLVED');
   await map.close();
   await runtime.close();

@@ -247,9 +247,10 @@ class Host {
   std::thread thread_;
 };
 
-void barrier(mln_runtime runtime) {
+// A query on the same map runs after every earlier command on it.
+void fence(mln_map map) {
   auto done = Done{};
-  check(mln_runtime_barrier(runtime, &done.descriptor, nullptr));
+  check(mln_map_get_style_url(map, &done.descriptor, nullptr));
   done.wait();
 }
 auto percentile(std::vector<double> values, double fraction) -> double {
@@ -306,9 +307,9 @@ void measure(
     gate.open();
     if (awaited)
       for (size_t i = 0; i < burst; ++i) done[i].wait();
-    // A discarded command has no terminal callback; the barrier fences the
+    // A discarded command has no terminal callback; a later query fences the
     // burst.
-    barrier(runtime);
+    fence(map);
     const auto fenced = Clock::now();
     counting.store(false);
     const auto allocated = allocations.load();

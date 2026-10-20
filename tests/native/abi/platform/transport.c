@@ -119,7 +119,7 @@ static mln_status render_pmtiles(mln_runtime runtime, const char* archive_url) {
   TEST_ASSERT_TRUE(written > 0 && (size_t)written < sizeof(style));
   mln_map map = create_static_map(runtime);
   mln_test_load_style_and_wait(
-    runtime, map, mln_test_buffer_view(style, (size_t)written)
+    map, mln_test_buffer_view(style, (size_t)written)
   );
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));

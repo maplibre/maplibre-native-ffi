@@ -6,7 +6,7 @@
 
 typedef struct callback_probe {
   atomic_uint calls;
-  atomic_uint releases;
+  atomic_int releases;
   atomic_int status;
   atomic_uint_fast64_t value;
 } callback_probe;
@@ -44,9 +44,8 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
 
   const mln_map_options options = mln_map_options_default();
   MLN_TEST_OK(mln_runtime_create_map(runtime, &options, &completion, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.releases, 1));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
-  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
   MLN_TEST_OK(atomic_load(&probe.status));
 
   const mln_map map = (mln_map)atomic_load(&probe.value);
@@ -64,7 +63,7 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
     mln_runtime_create_map(MLN_HANDLE_NULL, &options, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
-  TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.releases));
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.releases));
 }
 
 static void record_wake(void* user_data) {
@@ -84,18 +83,20 @@ static void runtime_events_wake_the_receiver_directly(void) {
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_GREATER_THAN_UINT32(0, atomic_load(&wakes));
   TEST_ASSERT_GREATER_THAN_size_t(0, mln_test_drain_all(runtime));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void discarded_commands_publish_state_and_events_before_a_barrier(void) {
+static void discarded_commands_publish_state_and_events_before_a_later_query(
+  void
+) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_drain_all(runtime);
 
   mln_map_snapshot before = {.size = sizeof(before)};
@@ -117,7 +118,7 @@ static void discarded_commands_publish_state_and_events_before_a_barrier(void) {
   MLN_TEST_OK(mln_map_update_camera(map, &camera, NULL, NULL));
   MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
   MLN_TEST_OK(mln_map_request_repaint(map, NULL, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
 
   TEST_ASSERT_TRUE(mln_test_wait_transition_end(&end));
   mln_map_snapshot after = {.size = sizeof(after)};
@@ -172,7 +173,6 @@ static void queries_operations_and_lifecycle_require_a_completion(void) {
   MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
   MLN_TEST_INVALID(mln_map_request_still_image(map, NULL, NULL));
   MLN_TEST_INVALID(mln_runtime_clear_resource_provider(runtime, NULL, NULL));
-  MLN_TEST_INVALID(mln_runtime_barrier(runtime, NULL, NULL));
   MLN_TEST_INVALID(mln_runtime_create_map(runtime, NULL, NULL, NULL));
   MLN_TEST_INVALID(mln_map_release(map, NULL, NULL));
   MLN_TEST_INVALID(mln_runtime_release(runtime, NULL, NULL));
@@ -183,7 +183,7 @@ static void queries_operations_and_lifecycle_require_a_completion(void) {
 static void a_session_barrier_fences_a_discarded_resize(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_render_session_snapshot before = {.size = sizeof(before)};
@@ -214,7 +214,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_accepted_completion_runs_and_releases_exactly_once);
   RUN_TEST(a_rejected_submission_leaves_callback_state_with_the_caller);
   RUN_TEST(runtime_events_wake_the_receiver_directly);
-  RUN_TEST(discarded_commands_publish_state_and_events_before_a_barrier);
+  RUN_TEST(discarded_commands_publish_state_and_events_before_a_later_query);
   RUN_TEST(a_later_command_completion_fences_discarded_commands);
   RUN_TEST(discarded_commands_keep_synchronous_validation);
   RUN_TEST(queries_operations_and_lifecycle_require_a_completion);

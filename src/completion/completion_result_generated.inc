@@ -279,10 +279,6 @@ struct CompletionResult<&mln_render_session_set_webgpu_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_runtime_barrier> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_runtime_clear_http_header_transform> {
   static constexpr bool has_value = false;
 };

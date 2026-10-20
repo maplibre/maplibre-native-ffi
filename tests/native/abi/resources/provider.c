@@ -833,9 +833,7 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
       (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
     options.map_mode = MLN_MAP_MODE_STATIC;
     mln_map map = mln_test_create_map_with_options(runtime, &options);
-    mln_test_load_style_and_wait(
-      runtime, map, MLN_BUFFER_LITERAL(tiled_style_json)
-    );
+    mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(tiled_style_json));
     mln_test_render_fixture fixture = {0};
     TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 

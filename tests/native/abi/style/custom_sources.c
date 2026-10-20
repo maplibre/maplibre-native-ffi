@@ -252,13 +252,13 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
     custom_probe probe;
     init_probe(&probe);
 
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
     add_source(kind, map, &probe);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       0, atomic_load(&probe.release_count), kind->name
     );
 
-    mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+    mln_test_load_style_and_wait(map, mln_test_empty_style_json);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       1, atomic_load(&probe.release_count), kind->name
     );
@@ -282,7 +282,7 @@ static void an_explicit_removal_releases_once(void) {
     custom_probe probe;
     init_probe(&probe);
 
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
     add_source(kind, map, &probe);
 
     mln_test_completion removal = mln_test_completion_default(0);
@@ -300,7 +300,7 @@ static void an_explicit_removal_releases_once(void) {
     );
 
     // A style load after the removal has nothing left to reconcile.
-    mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+    mln_test_load_style_and_wait(map, mln_test_empty_style_json);
     mln_test_destroy_map(map);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       1, atomic_load(&probe.release_count), kind->name
@@ -318,7 +318,7 @@ static void accepted_adds_release_their_callback_state(void) {
     mln_map map = mln_test_create_map(runtime);
     custom_probe probe;
     init_probe(&probe);
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
 
     static const enum add_variant rejected_variants[] = {
       ADD_NEGATIVE_MIN_ZOOM,
@@ -347,13 +347,12 @@ static void accepted_adds_release_their_callback_state(void) {
       MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_settle(&duplicate),
       kind->name
     );
-    MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+    MLN_TEST_OK(mln_test_map_fence(map));
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       1, atomic_load(&probe.release_count), kind->name
     );
 
-    mln_test_destroy_map(map);
-    MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+    MLN_TEST_OK(mln_test_map_close(map));
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       2, atomic_load(&probe.release_count), kind->name
     );
@@ -393,7 +392,7 @@ static void start_rendering(
   custom_probe* probe, mln_test_render_fixture* fixture
 ) {
   init_probe(probe);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   add_source(kind, map, probe);
   draw_source(kind, map);
   TEST_ASSERT_TRUE_MESSAGE(
@@ -502,7 +501,7 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
   custom_probe mvt_probe;
   init_probe(&geometry_probe);
   init_probe(&mvt_probe);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   add_source(&kinds[0], map, &geometry_probe);
   add_source(&kinds[1], map, &mvt_probe);
   TEST_ASSERT_EQUAL_UINT32(
@@ -578,8 +577,7 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
     )
   );
 
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_close(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -648,7 +646,7 @@ static const struct {
 static void custom_sources_take_and_validate_every_option(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   custom_probe geometry_probe;
   init_probe(&geometry_probe);
   custom_probe mvt_probe;
@@ -716,8 +714,7 @@ static void custom_sources_take_and_validate_every_option(void) {
     )
   );
 
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_close(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
   mln_test_destroy_runtime(runtime);

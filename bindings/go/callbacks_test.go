@@ -104,8 +104,8 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 		t.Fatalf("add with a taken ID = %+v, want failed", completion)
 	}
 	// Native releases a failed command's registration after its completion
-	// returns, and before the runtime's next barrier.
-	await(t, submitted(f.runtime.Barrier()))
+	// returns, and before a later command on the map completes.
+	await(t, submitted(f.m.RequestRepaint()))
 	if roots := rootCount(f.m.bindingOwner); roots != 1 {
 		t.Fatalf("roots after a failed add = %d, want 1", roots)
 	}
@@ -191,10 +191,10 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 	invoked := make(chan struct{}, 1)
 	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, url string, response *ResourceTransformResponseScope) Status {
 		offer(invoked, struct{}{})
-		_, err := f.runtime.Barrier()
+		_, err := f.runtime.ClearHttpHeaderTransform()
 		var native *Error
 		if !errors.As(err, &native) || !strings.Contains(native.Diagnostic(), "unavailable in this native callback") {
-			failures.add("Barrier inside the transform = %v, want the admission error", err)
+			failures.add("ClearHttpHeaderTransform inside the transform = %v, want the admission error", err)
 		}
 		if _, ok := native.RawStatus(); ok {
 			failures.add("the admission error came from native")
@@ -220,27 +220,27 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
-	type barrier struct {
+	type submission struct {
 		future *Future[struct{}]
 		err    error
 	}
-	barriers := make(chan barrier, 1)
+	submissions := make(chan submission, 1)
 	var spawn sync.Once
 	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, _ *ResourceTransformResponseScope) Status {
 		spawn.Do(func() {
-			if _, err := f.runtime.Barrier(); !errors.Is(err, ErrInvalidState) {
-				failures.add("Barrier inside the transform = %v, want ErrInvalidState", err)
+			if _, err := f.runtime.ClearHttpHeaderTransform(); !errors.Is(err, ErrInvalidState) {
+				failures.add("ClearHttpHeaderTransform inside the transform = %v, want ErrInvalidState", err)
 			}
-			accepted := make(chan barrier, 1)
+			accepted := make(chan submission, 1)
 			go func() {
-				future, err := f.runtime.Barrier()
-				accepted <- barrier{future, err}
+				future, err := f.runtime.ClearHttpHeaderTransform()
+				accepted <- submission{future, err}
 			}()
 			select {
 			case result := <-accepted:
-				barriers <- result
+				submissions <- result
 			case <-time.After(testTimeout()):
-				failures.add("the goroutine's Barrier did not return while the transform ran")
+				failures.add("the goroutine's ClearHttpHeaderTransform did not return while the transform ran")
 			}
 		})
 		return StatusOk
@@ -251,9 +251,9 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
 	failures.check(t)
-	result := receive(t, barriers, "the goroutine's barrier")
+	result := receive(t, submissions, "the goroutine's submission")
 	if result.err != nil {
-		t.Fatalf("Barrier from the goroutine: %v", result.err)
+		t.Fatalf("ClearHttpHeaderTransform from the goroutine: %v", result.err)
 	}
 	await(t, result.future)
 }

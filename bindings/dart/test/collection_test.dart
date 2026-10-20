@@ -71,8 +71,9 @@ Future<WeakReference<MapHandle>> _droppedMapCreation(
         .createMap(mapOptionsDefault())
         .then((map) => delivered = WeakReference(map)),
   );
-  // The creation's completion reaches the shared port before the barrier's.
-  await within(runtime.barrier(), 'a barrier');
+  // The creation's completion reaches the shared port before a later
+  // runtime command's.
+  await within(runtime.clearResourceTransform(), 'a later runtime command');
   return delivered!;
 }
 
@@ -178,7 +179,7 @@ void main() {
     // Collecting the map runs its native finalizer, which disposes the map
     // outside any callback, and then the runtime releases.
     await collectGarbageUntil(() => map.target == null, 'the dropped map');
-    await within(runtime.barrier(), 'a barrier');
+    await within(runtime.clearResourceTransform(), 'a later runtime command');
     await within(runtime.close(), 'runtime close');
   });
 }

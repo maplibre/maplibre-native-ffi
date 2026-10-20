@@ -22,7 +22,8 @@ void main() {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
       map.discarding.setDebugOptions(MapDebugOption.tileBorders);
-      await within(fixture.runtime.barrier(), 'discard barrier');
+      // A later command on the same map completes after the discarded one.
+      await within(map.requestRepaint(), 'a later command on the map');
       expect(map.getSnapshot().debugOptions, MapDebugOption.tileBorders);
       expect(
         () => map.discarding.resize(
@@ -55,7 +56,10 @@ void main() {
         },
       );
       await expectLater(within(creation, 'map creation'), throwsStateError);
-      await within(fixture.runtime.barrier(), 'a barrier');
+      await within(
+        fixture.runtime.clearResourceTransform(),
+        'a later runtime command',
+      );
       expect(decodes, 1);
 
       // The runtime closes only once no map remains, so the batch that held
@@ -102,9 +106,12 @@ void main() {
     var rejections = 0;
     expect(
       () => startNativeCompletion<void>(
-        // The null runtime is never live, so native refuses the barrier.
-        start: (completion) =>
-            raw.mln_runtime_barrier(0, completion, nativeDiagnostic),
+        // The null runtime is never live, so native refuses the command.
+        start: (completion) => raw.mln_runtime_clear_resource_transform(
+          0,
+          completion,
+          nativeDiagnostic,
+        ),
         decode: (_) {},
         onRejected: () => rejections += 1,
       ),
@@ -114,7 +121,10 @@ void main() {
 
     // A later submission still completes through the shared port.
     final fixture = await openRuntime();
-    await within(fixture.runtime.barrier(), 'a barrier');
+    await within(
+      fixture.runtime.clearResourceTransform(),
+      'a later runtime command',
+    );
   });
 
   test('a failed command reports its disposition as data', () async {

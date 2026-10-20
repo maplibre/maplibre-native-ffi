@@ -4684,15 +4684,6 @@ external int mln_resource_transform_response_set_url(
 @Native<
   Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_runtime_barrier(
-  int runtime,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
 external int mln_runtime_clear_http_header_transform(
   int runtime,
   Pointer<mln_completion> completion,

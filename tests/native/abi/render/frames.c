@@ -20,7 +20,7 @@ static void attach(
 ) {
   *runtime = mln_test_create_runtime();
   *map = mln_test_create_map(*runtime);
-  mln_test_load_style_and_wait(*runtime, *map, style);
+  mln_test_load_style_and_wait(*map, style);
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(*map, fixture));
 }
 
@@ -66,9 +66,7 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   );
   mln_test_completion_destroy(&readback);
 
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 260);
   mln_texture_image_info info = {0};
   uint8_t pixel[4] = {0};
@@ -720,8 +718,9 @@ static void set_zoom(mln_map map, uint32_t mode, double zoom) {
 // Renders one forced frame and waits until the map has handled it. The map
 // queues the frame-finished event while it handles the frame on the runtime
 // worker, so a map command submitted once the event arrives runs after that
-// handling, and after any update the handling published. A runtime barrier
-// would not do: it waits only for earlier submissions, not for the worker.
+// handling, and after any update the handling published. A fence submitted
+// before the event would not do: it waits only for earlier submissions, not
+// for the worker.
 static mln_render_frame_result render_and_settle(
   const mln_test_render_fixture* fixture, mln_runtime runtime, mln_map map,
   uint64_t token

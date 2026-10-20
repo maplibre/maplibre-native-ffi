@@ -20,7 +20,7 @@ Future<void> closeRuntimes() async {
         } on InvalidStateException {
           // A rejected close leaves the runtime available for later work.
         }
-        await runtime.barrier();
+        await runtime.clearResourceTransform();
         await map.close();
         await runtime.close();
       }),

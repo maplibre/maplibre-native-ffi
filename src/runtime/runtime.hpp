@@ -5,13 +5,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <set>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -337,23 +334,7 @@ struct RuntimeObject {
   // dispose.
   std::shared_ptr<Completion> release_completion;
   std::atomic_bool disposal_requested = false;
-  bool disposal_drained = false;
-  bool disposal_scheduled = false;
   RuntimeExecutor executor;
-  // The single commit point for commands, operations, barriers, and close.
-  std::mutex submission_mutex;
-  std::mutex terminal_mutex;
-  uint64_t next_submission_sequence = 1;
-  // Commands normally retire from the front. Rejected publication and
-  // abandonment can retire a later entry while an earlier delivery is pending.
-  struct PendingCommand {
-    uint64_t sequence;
-    bool retired = false;
-  };
-  std::deque<PendingCommand> pending_commands;
-  std::set<uint64_t> pending_submissions;
-  std::map<uint64_t, std::shared_ptr<mln::core::OperationObject>>
-    pending_barriers;
   std::string asset_path;
   std::string cache_path;
   std::shared_ptr<mln::DatabaseFileSource> database_source;
@@ -374,9 +355,6 @@ struct HandleTraits<RuntimeObject> {
 
 auto create_runtime(
   const mln_runtime_options* options, mln_runtime* out_runtime
-) -> mln_status;
-auto runtime_barrier_start(
-  mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
 auto dispose_runtime(mln_runtime runtime) -> mln_status;
 auto release_runtime(mln_runtime runtime, const mln_completion* completion)
@@ -483,32 +461,26 @@ auto retain_runtime_map(mln_runtime runtime) -> mln_status;
 auto release_runtime_map(mln_runtime runtime) noexcept -> void;
 [[nodiscard]] auto lease_runtime(mln_runtime runtime)
   -> std::shared_ptr<RuntimeObject>;
-// The caller holds submission_mutex and a lease that keeps the executor live.
-auto track_runtime_submission(RuntimeObject& runtime) -> uint64_t;
-auto finish_runtime_submission(
-  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
-) noexcept -> void;
+// A command with a completion moves its submission lease into the
+// completion, which holds it until delivery and release. A discarded command
+// holds it until its work has run.
 struct RuntimeCommandTask : ExecutorTask {
-  std::shared_ptr<RuntimeObject> runtime;
   ControlLease lease;
   Completion* completion = nullptr;
   std::shared_ptr<Completion> retained_completion;
-  uint64_t sequence = 0;
   void (*work)(RuntimeCommandTask&) = nullptr;
   void (*clear_work)(RuntimeCommandTask&) noexcept = nullptr;
 };
 
 auto run_runtime_command_task(RuntimeCommandTask& task) noexcept -> void;
 auto submit_runtime_command_task(
-  const std::shared_ptr<RuntimeObject>& runtime, RuntimeCommandTask& task,
-  std::atomic<uint64_t>* latest_submission = nullptr
+  const std::shared_ptr<RuntimeObject>& runtime, RuntimeCommandTask& task
 ) -> mln_status;
 
 template <typename Function>
 auto submit_runtime_command(
   const std::shared_ptr<RuntimeObject>& runtime, Function function,
-  const std::shared_ptr<Completion>& completion,
-  std::atomic<uint64_t>* latest_submission = nullptr
+  const std::shared_ptr<Completion>& completion
 ) -> mln_status {
   struct Task final : RuntimeCommandTask {
     explicit Task(Function function) : function(std::move(function)) {
@@ -519,7 +491,7 @@ auto submit_runtime_command(
       };
       work = [](RuntimeCommandTask& base) {
         auto& self = static_cast<Task&>(base);
-        std::invoke(std::move(*self.function), self.sequence);
+        std::invoke(std::move(*self.function));
       };
       clear_work = [](RuntimeCommandTask& base) noexcept {
         static_cast<Task&>(base).function.reset();
@@ -530,16 +502,14 @@ auto submit_runtime_command(
   auto task = std::make_unique<Task>(std::move(function));
   task->retained_completion = completion;
   task->completion = completion.get();
-  const auto status =
-    submit_runtime_command_task(runtime, *task, latest_submission);
+  const auto status = submit_runtime_command_task(runtime, *task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
   const std::shared_ptr<OperationObject>& operation,
-  std::function<void()> function,
-  const std::shared_ptr<Completion>& completion = nullptr
+  std::function<void()> function, const std::shared_ptr<Completion>& completion
 ) -> mln_status;
 
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;

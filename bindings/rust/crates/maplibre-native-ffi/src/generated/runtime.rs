@@ -12,20 +12,6 @@ native_owner! {
 }
 
 impl RuntimeHandle {
-    /// Starts an ordered runtime barrier.
-    ///
-    /// See `mln_runtime_barrier` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn barrier(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_barrier")?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_barrier(runtime, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
-    }
-
     /// Clears the runtime-scoped outgoing HTTP header transform.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the

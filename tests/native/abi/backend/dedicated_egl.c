@@ -24,7 +24,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = MLN_FRAME_DEMAND_PRESENT;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
@@ -79,7 +79,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   demand.token = 41;

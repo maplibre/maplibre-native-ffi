@@ -158,7 +158,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
   mln_map_options options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed_ring(
     map, &fixture, 1, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -290,25 +290,20 @@ static void a_reloaded_style_renders_a_layer_added_again(void) {
     (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(reload_base_style)
-  );
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(reload_base_style));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   add_composed_circle(map);
   expect_green_center(&fixture, map);
 
   mln_test_load_style_and_wait(
-    runtime, map,
-    MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":"
-      "\"alternate\",\"type\":\"background\",\"paint\":"
-      "{\"background-color\":\"#0000ff\"}}]}"
-    )
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":"
+           "\"alternate\",\"type\":\"background\",\"paint\":"
+           "{\"background-color\":\"#0000ff\"}}]}"
+         )
   );
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(reload_base_style)
-  );
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(reload_base_style));
   add_composed_circle(map);
   expect_green_center(&fixture, map);
 

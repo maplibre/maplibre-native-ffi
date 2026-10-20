@@ -50,7 +50,7 @@ def test_a_refused_close_leaves_the_handle_usable(
     assert raised.value.native_status_code == mln.Status.INVALID_STATE.native_code
 
     assert not harness.runtime.closed
-    assert result(harness.runtime.barrier()) is None
+    assert result(harness.runtime.clear_resource_transform()) is None
     result(map_handle.close())
     result(harness.runtime.close())
     assert harness.runtime.closed

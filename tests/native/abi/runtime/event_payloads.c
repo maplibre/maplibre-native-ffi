@@ -658,7 +658,7 @@ static void a_still_image_reports_that_it_finished(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_MASK_ALL);
   const scenario_context context = {.runtime = runtime, .map = map};
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_drain_all(runtime);
@@ -668,7 +668,7 @@ static void a_still_image_reports_that_it_finished(void) {
   MLN_TEST_OK(render_still_image(
     &fixture, runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, NULL, 0
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE, log, &context);
 
@@ -749,7 +749,7 @@ static void failed_loads_report_their_text(void) {
       still_diagnostic, sizeof(still_diagnostic)
     )
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE_FAILURE, log, &context);
   const recorded_event* failed =
@@ -815,7 +815,7 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_fence(runtime));
   log_drain(runtime, &scenario_log);
   check_scenario_rows(SCENARIO_OFFLINE, &scenario_log, &context);
 
@@ -912,7 +912,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(render_still_image(&fixture, runtime, map, 0, NULL, 0));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
 
   event_log* log = &scenario_log;
   log_reset(log);

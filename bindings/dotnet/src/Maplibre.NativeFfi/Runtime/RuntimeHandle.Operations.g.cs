@@ -46,23 +46,6 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Starts an ordered runtime barrier.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_runtime_barrier</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task BarrierAsync(CancellationToken cancellationToken = default)
-    {
-        using var scope = new NativeCallScope(this, "mln_runtime_barrier");
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_barrier(Handle, completion, diagnostic),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Clears the runtime-scoped outgoing HTTP header transform.
     /// </summary>
     /// <remarks>

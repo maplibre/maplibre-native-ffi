@@ -12,7 +12,6 @@
 #include "completion/completion_result.hpp"
 #include "internal/support/allocation_faults.hpp"
 #include "maplibre_native_c.h"
-#include "operation/operation.hpp"
 #include "support/harness.h"
 #include "support/status.h"
 #include "support/test_support.h"
@@ -119,10 +118,18 @@ auto drain_completions(mln_delivery_queue queue) -> QueuedCompletions {
   return drained;
 }
 
-// Resolves completion with a success that carries no value, as the runtime
-// barrier's does.
+// Resolves completion with a success that carries no value, as a runtime
+// resource configuration command's does.
 void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
-  mln::core::valueless_completion<&mln_runtime_barrier>().complete(completion);
+  mln::core::valueless_completion<&mln_runtime_clear_resource_transform>()
+    .complete(completion);
+}
+
+// Whether the submission lease that a completion held has been released: a
+// closing handle reports drained only once every lease is gone.
+auto released_lease(mln::core::ControlState& control) -> bool {
+  MLN_TEST_OK(control.begin_close());
+  return control.notify_when_drained([](void*) noexcept {}, nullptr);
 }
 
 // Two terminal paths racing still deliver once, on one of their workers.
@@ -142,27 +149,6 @@ void racing_resolutions_deliver_once() {
   }
 }
 
-void terminal_observation_waits_for_result_delivery() {
-  auto delivery = mln_test_gate{};
-  mln_test_gate_init(&delivery);
-  auto observed = std::atomic_bool{false};
-  auto operation = std::make_shared<mln::core::OperationObject>(
-    [&delivery](mln_status, std::string, std::any) {
-      mln_test_gate_park(&delivery);
-    }
-  );
-  auto resolver =
-    std::thread{[operation] { operation->complete(MLN_STATUS_OK, {}, {}); }};
-  const auto delivering = mln_test_gate_wait_entered(&delivery);
-  operation->set_terminal_callback([&observed] { observed = true; });
-  const auto observed_early = observed.load();
-  mln_test_gate_release(&delivery);
-  resolver.join();
-  TEST_ASSERT_TRUE(delivering);
-  TEST_ASSERT_FALSE(observed_early);
-  TEST_ASSERT_TRUE(observed.load());
-}
-
 // A delivery that throws before it reaches the sink still reports one result,
 // a native error, and then releases the user data.
 void a_throwing_delivery_reports_a_native_error() {
@@ -179,20 +165,16 @@ void a_throwing_delivery_reports_a_native_error() {
 }
 
 // A queue item that cannot be allocated falls back to the one reserved at
-// submission, which reports a native error, and the completion still retires.
+// submission, which reports a native error, and the completion still releases
+// its submission lease.
 void queue_resolution_falls_back_without_allocation() {
   const auto queue = create_queue();
   auto tag = 0;
-  auto retired = false;
+  auto control = mln::core::ControlState{};
+  TEST_ASSERT_TRUE(control.acquire());
   auto completion = created(queued_descriptor(queue, &tag));
-  completion->set_retirement_callback({
-    .owner = std::shared_ptr<void>{std::shared_ptr<void>{}, &retired},
-    .run = [](const std::shared_ptr<void>& owner, uint64_t) noexcept {
-      *static_cast<bool*>(owner.get()) = true;
-    },
-  });
+  completion->set_submission_lease(mln::core::ControlLease{&control});
   completion->accept();
-  completion->retire_work();
   auto text = std::string(1024, 'x');
   {
     const auto faults = mln::native_tests::AllocationFaults{};
@@ -200,7 +182,7 @@ void queue_resolution_falls_back_without_allocation() {
       completion, mln_buffer_view{.data = text.data(), .size = text.size()}
     );
   }
-  TEST_ASSERT_TRUE(retired);
+  TEST_ASSERT_TRUE(released_lease(control));
   const auto drained = drain_completions(queue);
   TEST_ASSERT_EQUAL_size_t(1, drained.count);
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, drained.status);
@@ -213,7 +195,8 @@ void a_delivery_that_throws_after_the_sink_reports_once() {
   auto completion = created(descriptor_for(probe));
   completion->accept();
   completion->resolve([](const mln::core::CompletionSink& sink) {
-    mln::core::valueless_completion<&mln_runtime_barrier>().deliver(sink);
+    mln::core::valueless_completion<&mln_runtime_clear_resource_transform>()
+      .deliver(sink);
     throw std::runtime_error{"delivery failed after the sink"};
   });
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
@@ -221,22 +204,18 @@ void a_delivery_that_throws_after_the_sink_reports_once() {
   MLN_TEST_OK(probe.status.load());
 }
 
-// An abandoned queue completion pushes one cancellation before it retires.
+// An abandoned queue completion pushes one cancellation before it releases its
+// submission lease.
 void abandoned_queue_completion_pushes_cancelled() {
   const auto queue = create_queue();
-  auto retired = false;
+  auto control = mln::core::ControlState{};
+  TEST_ASSERT_TRUE(control.acquire());
   {
     auto completion = created(queued_descriptor(queue, nullptr));
-    completion->set_retirement_callback({
-      .owner = std::shared_ptr<void>{std::shared_ptr<void>{}, &retired},
-      .run = [](const std::shared_ptr<void>& owner, uint64_t) noexcept {
-        *static_cast<bool*>(owner.get()) = true;
-      },
-    });
+    completion->set_submission_lease(mln::core::ControlLease{&control});
     completion->accept();
-    completion->retire_work();
   }
-  TEST_ASSERT_TRUE(retired);
+  TEST_ASSERT_TRUE(released_lease(control));
   const auto drained = drain_completions(queue);
   TEST_ASSERT_EQUAL_size_t(1, drained.count);
   MLN_TEST_STATUS(MLN_STATUS_CANCELLED, drained.status);
@@ -246,7 +225,6 @@ void abandoned_queue_completion_pushes_cancelled() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(terminal_observation_waits_for_result_delivery);
   RUN_TEST(racing_resolutions_deliver_once);
   RUN_TEST(a_throwing_delivery_reports_a_native_error);
   RUN_TEST(queue_resolution_falls_back_without_allocation);

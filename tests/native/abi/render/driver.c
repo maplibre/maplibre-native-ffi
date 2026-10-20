@@ -43,7 +43,7 @@ static void service_from_foreign_thread(void* argument) {
 static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -152,7 +152,7 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
 static void a_detached_session_frees_its_map_and_refuses_work(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_RENDER_AWAIT(
@@ -321,7 +321,7 @@ static bool maintenance_settled(void* context) {
 static void maintenance_commands_run_in_order_with_frames(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -417,7 +417,7 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
 static void abandon_at_exit_keeps_every_graphics_object(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_render_request_forced(&fixture, 1);
@@ -494,7 +494,7 @@ static const maintenance_case driver_run_commands[] = {
 static void abandon_from_a_driver_completion_is_busy(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   // A rendered frame gives the maintenance command a renderer to act on.
@@ -676,7 +676,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
 ) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   atomic_bool released;
   atomic_init(&released, false);
   mln_render_session_attach_options options =
@@ -916,7 +916,7 @@ static void disarm_reentrant_host(void) {
 static void wakes_may_call_back_into_the_session(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   attach_reentrant_host(map, &fixture);
 

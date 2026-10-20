@@ -363,9 +363,10 @@ impl Fixture {
         (self.runtime.take().unwrap(), self.map.take().unwrap())
     }
 
-    /// Blocks until every runtime submission accepted so far has finished.
-    pub fn barrier(&self) {
-        wait_for(self.runtime().barrier());
+    /// Blocks until a query on the map completes, which follows every
+    /// submission to the runtime's worker accepted so far.
+    pub fn fence(&self) {
+        wait_for(self.map().get_style_url());
     }
 
     /// Drains events until one from this fixture's map matches, and returns it.
@@ -403,7 +404,7 @@ impl Fixture {
     /// Publishes a new map update for the next frame to render.
     pub fn repaint(&self) {
         wait_for(self.map().request_repaint());
-        self.barrier();
+        self.fence();
     }
 
     /// Loads a style document and waits until it has loaded.

@@ -92,7 +92,7 @@ static layer_probe take_layer_result(
   MLN_TEST_OK(
     mln_map_get_style_layer(map, mln_test_view_of(id), &completion, NULL)
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
   MLN_TEST_OK(probe.status);
   return probe;

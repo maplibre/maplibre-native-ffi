@@ -228,13 +228,13 @@ func awaitUnreachable[T any](t *testing.T, pointer weak.Pointer[T], what string)
 
 // closeOnceCollected runs the collector until runtime closes, which it refuses
 // while a map is live, and so shows that cleanup disposed every map the test
-// dropped. The barrier orders a map's retirement, which disposal only
+// dropped. A runtime command orders a map's retirement, which disposal only
 // schedules.
 func closeOnceCollected(t *testing.T, runtime *RuntimeHandle, what string) {
 	t.Helper()
 	awaitCondition(t, what, func() bool {
 		stdruntime.GC()
-		await(t, submitted(runtime.Barrier()))
+		await(t, submitted(runtime.ClearResourceTransform()))
 		teardown, err := runtime.Close()
 		if errors.Is(err, ErrInvalidState) {
 			return false

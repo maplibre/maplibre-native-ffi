@@ -56,7 +56,7 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.runtimeRelease(fixture.runtime, &diagnostic));
     try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
-    try fixture.barrier();
+    try fixture.fence();
     try fixture.closeMap();
 }
 
@@ -99,11 +99,11 @@ test "discarding a creation future retires the map it creates" {
     try fixture.closeMap();
 
     var completed = try maplibre.runtimeCreateMap(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
-    while (!try completed.poll()) try fixture.barrier();
+    while (!try completed.poll()) try fixture.fence();
     completed.deinit();
     var pending = try maplibre.runtimeCreateMap(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
     pending.deinit();
-    try fixture.barrier();
+    try fixture.fence();
 
     // Both maps retire, so the runtime is left with no child to refuse its
     // release.

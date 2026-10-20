@@ -42,7 +42,7 @@ static void render_style(
   mln_runtime runtime, mln_map map, mln_buffer_view style, size_t rendered,
   mln_test_render_fixture* fixture
 ) {
-  mln_test_load_style_and_wait(runtime, map, style);
+  mln_test_load_style_and_wait(map, style);
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, fixture));
   rendered_count wait = {.fixture = fixture, .count = rendered};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
@@ -323,7 +323,7 @@ static void source_queries_read_the_named_source_layers(void) {
   atomic_store(&fetches, 0);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_custom_mvt_vector_source_options options =
     mln_custom_mvt_vector_source_options_default();
   options.fetch_tile = count_fetch;
@@ -594,7 +594,7 @@ static mln_status submit_extension(
 static void malformed_queries_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 

@@ -11,17 +11,12 @@
 #include <utility>
 
 #include "delivery/delivery_queue.hpp"
+#include "execution/control_state.hpp"
 #include "maplibre_native_c/completion.h"
 
 namespace mln::core {
 
 class Completion;
-
-struct CompletionRetirement {
-  std::shared_ptr<void> owner;
-  std::uint64_t sequence = 0;
-  void (*run)(const std::shared_ptr<void>&, std::uint64_t) noexcept = nullptr;
-};
 
 // Where one completion's terminal result goes: the host's callback, or a
 // delivery queue. make_completion() makes the only sinks that deliver, so a
@@ -82,10 +77,10 @@ class Completion final {
   auto accept() noexcept -> void;
   auto reject() noexcept -> void;
   auto revoke() noexcept -> void;
-  // Installed before acceptance. Retirement covers both native work and the
-  // delivery to the sink plus release, including cancellation on abandonment.
-  auto set_retirement_callback(CompletionRetirement callback) noexcept -> void;
-  auto retire_work() noexcept -> void;
+  // Installed before acceptance. The completion holds its submission's lease
+  // until the sink has its result and release_user_data has run, including
+  // the cancellation an abandoned completion delivers.
+  auto set_submission_lease(ControlLease lease) noexcept -> void;
   template <typename Function>
   auto resolve(Function&& delivery) noexcept -> void {
     auto expected = State::Accepted;
@@ -109,15 +104,13 @@ class Completion final {
   }
   auto deliver_undelivered() noexcept -> void;
   auto release() noexcept -> void;
-  auto retire_part() noexcept -> void;
 
   friend class CompletionSink;
   CompletionSink sink_;
   delivery::ItemPtr fallback_;
   bool delivered_ = false;
   std::atomic<State> state_ = State::Created;
-  std::atomic_uint retirement_parts_ = 2;
-  CompletionRetirement retirement_callback_;
+  ControlLease submission_lease_;
 };
 
 // Validates a completion descriptor and constructs the Completion that

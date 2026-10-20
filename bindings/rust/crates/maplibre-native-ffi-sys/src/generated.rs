@@ -2710,11 +2710,6 @@ unsafe extern "C" {
         url: mln_buffer_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_barrier(
-        runtime: mln_runtime,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_runtime_clear_http_header_transform(
         runtime: mln_runtime,
         completion: *const mln_completion,

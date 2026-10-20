@@ -164,7 +164,7 @@ def test_a_callback_can_make_only_the_calls_its_policy_allows(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> None:
         try:
-            harness.runtime.barrier()
+            harness.runtime.clear_resource_transform()
         except mln.InvalidStateError as error:
             refusals.append(error)
         # Answering its own request is what a provider callback may do.

@@ -75,7 +75,7 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
     assert_eq!(error.kind(), ErrorKind::InvalidState);
     assert!(error.raw_status().is_some());
     assert!(!runtime.is_closed());
-    wait_for(runtime.barrier());
+    wait_for(runtime.clear_resource_transform());
 
     wait_for(map.release());
     wait_for(runtime.release());
@@ -109,9 +109,9 @@ fn a_dropped_map_creation_future_retires_the_map() {
         .runtime()
         .create_map(&MapOptions::default())
         .unwrap();
-    // The barrier fences the creation, so the map exists when its future
+    // A later query fences the creation, so the map exists when its future
     // drops, and dropping the future is what retires it.
-    fixture.barrier();
+    fixture.fence();
     drop(created);
 
     // A runtime closes only once all of its maps have retired.

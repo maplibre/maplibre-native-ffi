@@ -111,7 +111,7 @@ static void expect_malformed_requests_rejected(
 static void a_session_projection_copies_the_last_rendered_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   expect_no_projection(&fixture);
@@ -206,7 +206,7 @@ static void render_through_update(
 static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   render_one_frame(&fixture);

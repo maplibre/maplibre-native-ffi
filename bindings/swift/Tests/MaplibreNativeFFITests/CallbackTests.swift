@@ -21,7 +21,7 @@ private func addCustomSource(
 
 /// An accepted registration stays rooted while native holds it and is freed
 /// when native releases it; a registration native rejects is freed by the
-/// time a later barrier completes.
+/// time a later command on the map completes.
 @Test func aRegistrationIsRootedUntilNativeReleasesIt() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(json: emptyStyle)
@@ -41,7 +41,7 @@ private func addCustomSource(
       releases: rejected
     )
     #expect(duplicate.disposition == .failed)
-    try await fixture.runtime.barrier()
+    _ = try await fixture.map.requestRepaint()
     #expect(rejected.value == 1)
     #expect(accepted.value == 0)
 

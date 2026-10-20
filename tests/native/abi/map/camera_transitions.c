@@ -64,7 +64,7 @@ static void with_transition_id(
 static mln_map_snapshot read_settled_snapshot(
   mln_runtime runtime, mln_map map
 ) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot;
@@ -228,7 +228,7 @@ static bool settled_result(void* context) {
 static void a_rendered_ease_completes_at_its_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_drain_all(runtime);
@@ -262,7 +262,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
     &fixture, settled_result, (void*)&fixture, mln_test_deadline_default(),
     "a fence frame"
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
 
   mln_test_render_fixture_destroy(&fixture);
@@ -520,7 +520,7 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   gesture.camera.bearing = 20.0;
   gesture.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   update_camera(map, &gesture);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
 
   gesture.gesture_phase = MLN_GESTURE_PHASE_CANCEL;
@@ -559,7 +559,7 @@ static void apply_delta(mln_map map, const mln_camera_delta* delta) {
 static void an_animated_delta_reports_its_end_once(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   const mln_camera_options start = query_camera(map);
@@ -577,7 +577,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   const mln_camera_options camera = query_camera(map);
   TEST_ASSERT_DOUBLE_WITHIN(1e-4, start.zoom + 1.0, camera.zoom);
   TEST_ASSERT_TRUE(camera.center.longitude < start.center.longitude);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&rendered.calls));
 
   mln_test_transition_end cancelled;
@@ -594,7 +594,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   jump.camera.zoom = start.zoom;
   update_camera(map, &jump);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&cancelled.calls));
   MLN_TEST_AWAIT_OK(
     mln_map_cancel_transitions(map, &completion.descriptor, NULL)
@@ -613,7 +613,7 @@ static void an_animated_delta_reports_its_end_once(void) {
 static void an_animated_delta_replaces_the_running_one(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_transition_end replaced;
@@ -821,7 +821,7 @@ static void a_rejected_command_runs_no_handler(void) {
   );
   update.animation.end_handler.callback = NULL;
   MLN_TEST_INVALID(mln_map_update_camera(map, &update, &rejected, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.releases));
 

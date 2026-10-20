@@ -1373,9 +1373,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_runtime_barrier(runtime: Long, completion: Long, outDiagnostic: Long): Int
-
-  @JvmStatic
   actual external fun mln_runtime_clear_http_header_transform(
     runtime: Long,
     completion: Long,

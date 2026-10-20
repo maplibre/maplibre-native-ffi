@@ -289,15 +289,6 @@ auto mln_runtime_delete_offline_region(
   });
 }
 
-auto mln_runtime_barrier(
-  mln_runtime runtime, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::runtime_barrier_start(runtime, completion);
-  });
-}
-
 auto mln_runtime_release(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

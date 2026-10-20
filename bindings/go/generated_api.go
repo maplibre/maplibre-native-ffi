@@ -8216,16 +8216,6 @@ func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
 	})
 }
 
-// Barrier starts an ordered runtime barrier.
-//
-// See mln_runtime_barrier in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) Barrier() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_barrier), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_barrier(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
-}
-
 // ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header
 // transform.
 //

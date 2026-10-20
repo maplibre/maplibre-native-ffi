@@ -14,17 +14,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Starts an ordered runtime barrier.
-   *
-   * See `mln_runtime_barrier` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun barrier(): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_barrier") {
-      check(C.mln_runtime_barrier(handle, completion, diagnostic))
-    }
-
-  /**
    * Clears the runtime-scoped outgoing HTTP header transform.
    *
    * See `mln_runtime_clear_http_header_transform` in the

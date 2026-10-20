@@ -7,7 +7,7 @@
 static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_transferred_webgl_surface_create(map, &fixture));
 

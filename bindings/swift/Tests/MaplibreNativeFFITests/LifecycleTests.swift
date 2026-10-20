@@ -46,7 +46,7 @@ import Testing
   }
   #expect(refusal?.rawStatus == MLN_STATUS_INVALID_STATE.rawValue)
   #expect(!fixture.runtime.isClosed)
-  try await fixture.runtime.barrier()
+  try await fixture.runtime.clearResourceTransform()
 
   try await fixture.map.close()
   try await fixture.runtime.close()

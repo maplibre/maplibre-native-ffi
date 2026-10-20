@@ -40,7 +40,7 @@ class HandleLifecycleTest {
     // A second release reports the same native teardown instead of starting another.
     assertSame(teardown, runtime.release())
     teardown.awaitWithin("the runtime teardown")
-    val failure = assertFailsWith<InvalidStateException> { runtime.barrier() }
+    val failure = assertFailsWith<InvalidStateException> { runtime.clearResourceTransform() }
     assertEquals("RuntimeHandle is closed", failure.diagnostic)
     assertNull(failure.nativeStatusCode)
   }
@@ -54,7 +54,7 @@ class HandleLifecycleTest {
     // back to live.
     assertFailsWith<InvalidStateException> { runtime.release() }
     assertFalse(runtime.isClosed)
-    runtime.barrier().awaitWithin("a barrier on the refused runtime")
+    runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")

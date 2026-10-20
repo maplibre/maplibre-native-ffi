@@ -53,7 +53,7 @@ public sealed class HandleLifecycleTests
         Assert.Equal((int)MaplibreStatus.InvalidState, error.RawStatus);
         Assert.Contains("live or pending children", error.Diagnostic, StringComparison.Ordinal);
         Assert.False(runtime.IsClosed);
-        await runtime.BarrierAsync(TestWaits.Token);
+        await runtime.ClearResourceTransformAsync(TestWaits.Token);
 
         await map.CloseAsync();
         await runtime.CloseAsync();
@@ -104,8 +104,9 @@ public sealed class HandleLifecycleTests
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var creation = DropCreation(runtime);
-        // The creation completes before the barrier, so the dropped task holds the map.
-        await runtime.BarrierAsync(TestWaits.Token);
+        // The creation completes before a later runtime command, so the dropped task holds the
+        // map.
+        await runtime.ClearResourceTransformAsync(TestWaits.Token);
 
         Gc.Collect();
 

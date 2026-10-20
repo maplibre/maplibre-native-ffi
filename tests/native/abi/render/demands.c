@@ -19,7 +19,7 @@ static void attach(
 ) {
   *runtime = mln_test_create_runtime();
   *map = mln_test_create_map(*runtime);
-  mln_test_render_prepare_map(*runtime, *map);
+  mln_test_render_prepare_map(*map);
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(*map, fixture));
 }
 
@@ -346,7 +346,7 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   mln_map_options options = mln_map_options_default();
   options.initial_extent.scale_factor = 3.0;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   const uint64_t old_generation =
@@ -388,11 +388,11 @@ static void attaching_sizes_the_map_to_the_target(void) {
   options.initial_extent =
     (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0};
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  // The barrier completes after the resize that the attach submitted.
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  // A later query completes after the resize that the attach submitted.
+  MLN_TEST_OK(mln_test_map_fence(map));
   expect_map_size(map, 64, 64);
 
   mln_test_render_request_forced(&fixture, 701);
@@ -490,7 +490,7 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -556,7 +556,7 @@ static void a_waiting_demand_renders_the_next_map_update(void) {
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   const uint64_t idle_generation =
     read_snapshot(fixture.session).rendered_update_generation;
 
@@ -593,10 +593,10 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   MLN_TEST_OK(
     mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(eight_layer_style_json))
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
   request_waiting(&fixture, 621);
   expect_waiting(&fixture);
 
@@ -651,7 +651,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   MLN_TEST_INVALID(
     mln_render_session_request_frame(fixture.session, &forced_wait, NULL)
   );
-  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  (void)mln_test_render_until_idle(runtime, map, &fixture, NULL);
 
   request_waiting(&fixture, 611);
   expect_waiting(&fixture);

@@ -46,7 +46,7 @@ static void a_value_that_names_no_batch_is_rejected_without_effect(void) {
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_view"));
 
   mln_event_batch_release(runtime);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_fence(runtime));
   mln_test_destroy_runtime(runtime);
 }
 

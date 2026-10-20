@@ -12,7 +12,8 @@ public sealed class CompletionTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         fixture.Map.Discarding.SetDebugOptions(MapDebugOption.TileBorders);
-        await fixture.Runtime.BarrierAsync(TestWaits.Token);
+        // A later command on the same map completes after the discarded one.
+        await fixture.Map.RequestRepaintAsync(TestWaits.Token);
         Assert.Equal(MapDebugOption.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
         Assert.Throws<InvalidArgumentException>(() =>
             fixture.Map.Discarding.Resize(
@@ -180,9 +181,10 @@ public sealed class CompletionTests
         // Native creates this map although its wait ended before submission.
         var created = fixture.Runtime.CreateMapAsync(NativeFixture.SmallMap, cancellation.Token);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
-        await fixture.Runtime.BarrierAsync(TestWaits.Token);
         // Runtime release refuses a runtime that still owns a map, so it succeeds only because
-        // the binding disposed the map that arrived after the wait.
+        // the binding disposed the map that arrived after the wait. The creation runs on the
+        // worker before a later runtime command completes.
+        await fixture.Runtime.ClearResourceTransformAsync(TestWaits.Token);
         await fixture.Runtime.CloseAsync().WaitAsync(TestWaits.Deadline, TestWaits.Token);
     }
 

@@ -327,7 +327,7 @@
     "tests/native/abi/base/default_cases_generated.inc",
     "tests/native/internal/delivery_copy_cases_generated.inc"
   ],
-  "function_count": 251,
+  "function_count": 250,
   "languages": {
     "dart": {
       "discarding": [
@@ -587,7 +587,6 @@
         "mln_resource_request_release",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -900,7 +899,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -1209,7 +1207,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -1518,7 +1515,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -1799,7 +1795,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -2216,7 +2211,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -2525,7 +2519,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -2834,7 +2827,6 @@
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_resource_transform_response_set_url",
-        "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
         "mln_runtime_clear_resource_provider",
         "mln_runtime_clear_resource_transform",
@@ -2884,7 +2876,7 @@
       "unsupported": {}
     }
   },
-  "public_function_count": 237,
+  "public_function_count": 236,
   "runtime_exports": [
     "mln_binding_dart_port_create",
     "mln_binding_dart_port_function",
@@ -2904,7 +2896,7 @@
   "schema_version": 1,
   "semantic": {
     "resolved_callbacks": 11,
-    "resolved_operations": 235,
+    "resolved_operations": 234,
     "support_relations": {
       "mln_acquired_frame_dispose": {
         "dispose": "mln_acquired_frame"

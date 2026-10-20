@@ -50,9 +50,7 @@ auto index_of(mln_geojson_source_data data)
 void add_drawn_source(
   mln_runtime runtime, mln_map map, mln_geojson_source_data data
 ) {
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(empty_style_json)
-  );
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(empty_style_json));
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
   ));

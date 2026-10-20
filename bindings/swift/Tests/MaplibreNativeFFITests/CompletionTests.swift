@@ -40,7 +40,8 @@ private struct ConversionFailure: Error {}
 ) async throws {
   try await withMapFixture { fixture in
     try fixture.map.discarding.setDebugOptions(options: .tileBorders)
-    try await fixture.runtime.barrier()
+    // A later command on the same map completes after the discarded one.
+    _ = try await fixture.map.requestRepaint()
     #expect(try fixture.map.getSnapshot().debugOptions == .tileBorders)
     #expect(throws: MaplibreError.self) {
       try fixture.map.discarding.resize(extent: LogicalExtent(

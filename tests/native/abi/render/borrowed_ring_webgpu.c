@@ -17,9 +17,7 @@ static const uint8_t red[4] = {255, 0, 0, 255};
 static void a_borrowed_ring_frame_is_ordered_before_the_hosts_reads(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_webgpu_borrowed_ring_create(map, &fixture, 2));
 

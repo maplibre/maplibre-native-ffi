@@ -7517,14 +7517,6 @@ pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url:
     return call.invoke("mln_resource_transform_response_set_url", .scoped, response, null, diagnostic, .{url});
 }
 
-/// Starts an ordered runtime barrier.
-///
-/// See `mln_runtime_barrier` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeBarrier(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_barrier", .lease, runtime, call.unit, null, diagnostic, .{});
-}
-
 /// Clears the runtime-scoped outgoing HTTP header transform.
 ///
 /// See `mln_runtime_clear_http_header_transform` in the

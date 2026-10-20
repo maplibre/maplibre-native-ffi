@@ -272,9 +272,7 @@ static bool feature_rendered(void* context) {
 static void rendered_features_carry_state_from_the_last_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(point_style_json)
-  );
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(point_style_json));
   const mln_feature_state_selector feature =
     selector_for("points", NULL, "feature-1");
   // Set before the source ever renders, so its first frame carries the state.

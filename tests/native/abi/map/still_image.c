@@ -42,9 +42,7 @@ static void read_center_pixel(
 static void a_static_map_renders_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -60,7 +58,7 @@ static void a_static_map_renders_still_images(void) {
     "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"bg\","
     "\"type\":\"background\",\"paint\":{\"background-color\":\"#00ff00\"}}]}";
   mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(green_background_style_json)
+    map, MLN_BUFFER_LITERAL(green_background_style_json)
   );
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   read_center_pixel(&fixture, 64, 64, rgba);
@@ -80,9 +78,7 @@ static void a_static_map_renders_still_images(void) {
 static void a_tile_map_session_resizes_between_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_TILE);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));

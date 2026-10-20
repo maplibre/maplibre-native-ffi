@@ -101,9 +101,7 @@ static void render_recorded_tile(
   options.map_mode = MLN_MAP_MODE_STATIC;
   options.fast_pfor_enabled = fast_pfor_enabled;
   out->map = mln_test_create_map_with_options(out->runtime, &options);
-  mln_test_load_style_and_wait(
-    out->runtime, out->map, MLN_BUFFER_LITERAL(mlt_style_json)
-  );
+  mln_test_load_style_and_wait(out->map, MLN_BUFFER_LITERAL(mlt_style_json));
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(out->map, &out->fixture));
   MLN_TEST_OK(mln_test_render_still_image(&out->fixture, out->map));
 }

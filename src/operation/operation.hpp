@@ -14,7 +14,6 @@ namespace mln::core {
 /** Internal terminal state shared by queued native work. */
 class OperationObject final {
  public:
-  using TerminalCallback = std::function<void()>;
   using ResultCallback = std::function<void(mln_status, std::string, std::any)>;
 
   explicit OperationObject(ResultCallback result = {});
@@ -24,10 +23,6 @@ class OperationObject final {
   auto operator=(OperationObject&&) -> OperationObject& = delete;
   ~OperationObject();
 
-  auto set_terminal_callback(
-    TerminalCallback callback, bool work_pending = false
-  ) noexcept -> void;
-  auto retire_work() noexcept -> void;
   auto complete(
     mln_status status, std::string diagnostic, std::any result
   ) noexcept -> void;
@@ -35,9 +30,6 @@ class OperationObject final {
  private:
   std::mutex mutex_;
   bool completed_ = false;
-  bool delivery_finished_ = false;
-  bool work_pending_ = false;
-  TerminalCallback terminal_callback_;
   ResultCallback result_callback_;
 };
 

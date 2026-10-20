@@ -75,7 +75,7 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   ));
   mln_test_drain_all(runtime);
 
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -84,7 +84,7 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
 
   MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
   MLN_TEST_OK(mln_test_map_request_repaint(map));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_GREATER_THAN_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -100,7 +100,7 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
 static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_destroy_map(map);
 
   mln_event_batch batch = MLN_HANDLE_NULL;
@@ -143,7 +143,7 @@ static void the_message_arena_carries_one_range_per_event(void) {
   MLN_TEST_OK(
     mln_test_map_set_style_json(second, MLN_BUFFER_LITERAL("not json at all"))
   );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(second));
 
   mln_test_event_batch batch = mln_test_event_batch_default();
   MLN_TEST_OK(mln_test_drain_events(runtime, &batch));
@@ -188,7 +188,7 @@ static void the_message_arena_carries_one_range_per_event(void) {
 static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_drain_all(runtime);
   {
     foreign_thread_probe probe = {.runtime = runtime, .map = map};
@@ -253,7 +253,7 @@ static void an_empty_drain_publishes_no_batch(void) {
   }
 
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_event_batch batch = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
@@ -277,7 +277,7 @@ static void a_drained_batch_is_an_owned_handle(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   {
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
 
     mln_event_batch first = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_runtime_drain_events(runtime, &first, NULL));
@@ -288,7 +288,7 @@ static void a_drained_batch_is_an_owned_handle(void) {
     const size_t first_count = first_view.event_count;
     const mln_runtime_event first_event = first_view.events[0];
 
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
     mln_event_batch second = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_runtime_drain_events(runtime, &second, NULL));
     mln_event_batch_view second_view = {.size = sizeof(mln_event_batch_view)};
@@ -303,7 +303,7 @@ static void a_drained_batch_is_an_owned_handle(void) {
   // A drained batch is an owned handle: releasing it twice is a no-op,
   // releasing the null handle is a no-op, and a released handle is stale.
   {
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
 
     mln_event_batch batch = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));

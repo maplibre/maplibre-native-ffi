@@ -355,7 +355,7 @@ static void geojson_sources_take_and_validate_their_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://points.geojson");
 
   mln_geojson_source_options options = mln_geojson_source_options_default();
@@ -400,7 +400,7 @@ static void geojson_sources_take_and_validate_their_options(void) {
 static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   static const char* const sources[] = {"first", "second", "third"};
   mln_geojson_source_data data = prepare(POINT_COLLECTION("shared"), NULL);
   for (size_t index = 0; index < 3; index += 1) {
@@ -573,7 +573,7 @@ static void render_points(
 ) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_geojson_source_data data = prepare(points, options);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
@@ -638,7 +638,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
     {.url = "fixture://second.geojson", .body = POINT_COLLECTION("second")},
   };
   mln_test_style_serve(runtime, routes, 2);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
     map, MLN_BUFFER_LITERAL("points"),
     MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,

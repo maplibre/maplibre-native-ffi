@@ -15,11 +15,10 @@ static void expect_formatted(const char* options, const char* formatted) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(
-    runtime, map,
-    MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\","
-      "\"type\":\"background\"}]}"
-    )
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\","
+           "\"type\":\"background\"}]}"
+         )
   );
   char expression[256];
   const int size = snprintf(
@@ -100,7 +99,7 @@ static uint32_t selected_names(
   options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_load_style_and_wait(
-    runtime, map, mln_test_buffer_view(style, (size_t)style_size)
+    map, mln_test_buffer_view(style, (size_t)style_size)
   );
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));

@@ -1859,14 +1859,6 @@ class _ResourceTransformResponseScopeOperations(GeneratedOperations):
 class _RuntimeHandleOperations(GeneratedOperations):
     _native: _native._RuntimeHandle
 
-    def barrier(self) -> Future[None]:
-        """Starts an ordered runtime barrier.
-
-        See `mln_runtime_barrier` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.barrier()
-
     def clear_http_header_transform(self) -> Future[None]:
         """Clears the runtime-scoped outgoing HTTP header transform.
 

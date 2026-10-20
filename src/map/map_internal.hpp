@@ -35,7 +35,6 @@ struct MapObject {
   RetirementTask disposal_task;
   std::shared_ptr<MapObject> disposal_owner;
   std::shared_ptr<Completion> release_completion;
-  uint64_t release_sequence = 0;
   std::atomic_bool disposal_requested = false;
   // This map's own handle, so worker-side code that already holds the object
   // can name it in an event without resolving the table again.
@@ -59,9 +58,6 @@ struct MapObject {
   // Worker-owned invalidation; every command still publishes a generation.
   bool snapshot_config_dirty = true;
   bool snapshot_camera_dirty = true;
-  std::atomic<uint64_t> latest_resize_submission{0};
-  // A rejected direct resize cannot supersede the session's extent command.
-  std::atomic<uint64_t> latest_session_resize_submission{0};
   bool still_image_request_pending = false;
   // Any-thread map-owned feature state; render sessions pull coalesced
   // snapshots and push diffs into their renderer.

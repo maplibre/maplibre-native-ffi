@@ -439,7 +439,7 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   );
 
   // A rejected command publishes nothing, so the snapshot keeps the defaults.
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   const mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(0, snapshot.debug_options);
   TEST_ASSERT_EQUAL_UINT32(
@@ -468,7 +468,7 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
     map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_THAN_UINT64(initial_generation, snapshot.generation);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
@@ -481,7 +481,7 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
     map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT64(
     render_update, snapshot.latest_render_update_generation
@@ -501,7 +501,7 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
     map, (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.1},
     &rejected, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
@@ -514,50 +514,37 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A resize a later resize replaces never reaches the map: it completes
-// MLN_STATUS_OK with MLN_COMMAND_DISPOSITION_SUPERSEDED and no generation,
-// while the newest one commits and publishes the extent.
-static void a_replaced_resize_completes_superseded(void) {
+// Resizes apply in acceptance order: each commits and publishes its own
+// generation, and the last one accepted sets the extent.
+static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  // Holds the runtime worker inside a completion callback, so the two resizes
-  // queue behind it and the worker reaches them together.
-  mln_test_gate gate;
-  mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &hold, NULL));
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
-  );
-
-  mln_test_completion replaced = mln_test_completion_default(0);
-  mln_test_completion newest = mln_test_completion_default(0);
+  mln_test_completion first = mln_test_completion_default(0);
+  mln_test_completion last = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_resize(
     map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
-    &replaced.descriptor, NULL
+    &first.descriptor, NULL
   ));
   MLN_TEST_OK(mln_map_resize(
     map, (mln_logical_extent){.width = 64, .height = 32, .scale_factor = 1.0},
-    &newest.descriptor, NULL
+    &last.descriptor, NULL
   ));
-  mln_test_gate_release(&gate);
 
-  MLN_TEST_OK(mln_test_completion_finish(&replaced));
+  MLN_TEST_OK(mln_test_completion_finish(&first));
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_SUPERSEDED,
-    mln_test_completion_disposition(&replaced)
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&first)
   );
-  TEST_ASSERT_EQUAL_UINT64(0, mln_test_completion_generation(&replaced));
-  mln_test_completion_destroy(&replaced);
+  const uint64_t earlier = mln_test_completion_generation(&first);
+  mln_test_completion_destroy(&first);
 
-  MLN_TEST_OK(mln_test_completion_finish(&newest));
+  MLN_TEST_OK(mln_test_completion_finish(&last));
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&newest)
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&last)
   );
-  const uint64_t committed = mln_test_completion_generation(&newest);
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, committed);
-  mln_test_completion_destroy(&newest);
+  const uint64_t committed = mln_test_completion_generation(&last);
+  mln_test_completion_destroy(&last);
+  TEST_ASSERT_GREATER_THAN_UINT64(earlier, committed);
 
   const mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(committed, snapshot.generation);
@@ -681,6 +668,6 @@ MLN_TEST_GROUP {
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
   RUN_TEST(map_creation_rejects_a_degenerate_extent);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_fixes_scale_factor);
-  RUN_TEST(a_replaced_resize_completes_superseded);
+  RUN_TEST(resizes_apply_in_order_and_the_last_sets_the_extent);
   RUN_TEST(generations_increase_across_submitting_threads);
 }

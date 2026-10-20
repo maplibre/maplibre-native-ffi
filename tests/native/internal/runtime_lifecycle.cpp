@@ -1,14 +1,10 @@
 // Runtime release against a map's physical cleanup, which runs on a teardown
 // lane after the map's own release has completed.
 
-#include <cstdio>
 #include <thread>
-#include <vector>
 
 #include "completion/completion.hpp"
-#include "internal/support/allocation_faults.hpp"
 #include "internal/support/sync_points.hpp"
-#include "internal/support/windows_crash.hpp"
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
@@ -16,8 +12,6 @@
 #include "runtime/runtime.hpp"
 #include "support/camera.h"
 #include "support/test_support.h"
-
-using mln::native_tests::AllocationFaults;
 
 namespace {
 
@@ -39,66 +33,26 @@ auto create_runtime() -> mln_runtime {
 }
 
 // An unstarted executor rejects queueing deterministically, without requiring
-// allocation failure in a public submission.
+// allocation failure in a public submission. A rejected submission's callbacks
+// run before it returns, and they can submit again.
 void submission_failure_callbacks_can_submit_again() {
   using mln::core::OperationObject;
   using mln::core::RuntimeObject;
   auto runtime = std::make_shared<RuntimeObject>();
   const auto descriptor = mln_test_discard_completion();
   auto reentrant_status = MLN_STATUS_OK;
-  const auto submit_again = [&]() {
-    auto completion = created(descriptor);
-    reentrant_status =
-      mln::core::submit_runtime_command(runtime, [](uint64_t) {}, completion);
-  };
-  auto barrier =
-    std::make_shared<OperationObject>([&](mln_status, std::string, std::any) {
-      runtime->pending_submissions.erase(2);
-      runtime->next_submission_sequence = 3;
-      submit_again();
-    });
-  runtime->pending_submissions.insert(2);
-  runtime->pending_barriers.emplace(2, barrier);
-  auto completion = created(descriptor);
-  MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR,
-    mln::core::submit_runtime_command(runtime, [](uint64_t) {}, completion)
-  );
-  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, reentrant_status);
-  TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
-  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
-
-  reentrant_status = MLN_STATUS_OK;
   auto operation =
     std::make_shared<OperationObject>([&](mln_status, std::string, std::any) {
-      submit_again();
+      auto completion = created(descriptor);
+      reentrant_status =
+        mln::core::submit_runtime_command(runtime, [] {}, completion);
     });
   MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR,
-    mln::core::submit_runtime_operation(runtime, operation, [] {})
-  );
-  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, reentrant_status);
-  TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
-  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
-
-  auto rejected = mln_test_completion_default(0);
-  auto pair = mln::core::CompletionOperation{};
-  MLN_TEST_OK(
-    mln::core::create_completion_operation(
-      &rejected.descriptor,
-      mln::core::valueless_completion<&mln_runtime_barrier>(), pair
-    )
-  );
-  MLN_TEST_STATUS(
     MLN_STATUS_NATIVE_ERROR, mln::core::submit_runtime_operation(
-                               runtime, pair.operation, [] {}, pair.completion
+                               runtime, operation, [] {}, created(descriptor)
                              )
   );
-  pair = {};
-  mln_test_completion_reject(&rejected);
-  mln_test_completion_destroy(&rejected);
-  TEST_ASSERT_TRUE(runtime->pending_submissions.empty());
-  TEST_ASSERT_TRUE(runtime->pending_commands.empty());
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, reentrant_status);
 }
 
 // A released map completes before its worker pool shuts down, and the runtime
@@ -186,9 +140,6 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   MLN_TEST_OK(mln_map_release(map, &closed.descriptor, nullptr));
   TEST_ASSERT_TRUE(mln_test_wait_transition_end(&transition));
   TEST_ASSERT_FALSE(mln_test_completion_poll(&closed));
-  auto barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_runtime_barrier(runtime, &barrier.descriptor, nullptr));
-  TEST_ASSERT_FALSE(mln_test_completion_poll(&barrier));
   MLN_TEST_INVALID_STATE(mln_map_dispose(map, nullptr));
   // Runtime disposal must preserve the worker for the already-leased command.
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
@@ -207,7 +158,6 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   });
   MLN_TEST_OK(mln_test_completion_settle(&command));
   MLN_TEST_OK(mln_test_completion_settle(&closed));
-  MLN_TEST_OK(mln_test_completion_settle(&barrier));
   TEST_ASSERT_TRUE(mln_test_await(
     [](void* context) {
       return static_cast<std::weak_ptr<mln::core::RuntimeObject>*>(context)
@@ -217,100 +167,35 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   ));
 }
 
-void barrier_admission_failure_retires_its_sequence() {
-  auto failures_with_pending = unsigned{0};
-  for (auto index = std::size_t{0}; index != 12; ++index) {
-#if defined(_WIN32)
-    std::fprintf(
-      stderr, "barrier fault index=%zu begin thread=%lu\n", index,
-      GetCurrentThreadId()
-    );
-    std::fflush(stderr);
-#endif
+// Runtime release waits until each accepted completion has been delivered and
+// has released its user data, and reports that it deferred retirement for it.
+// A command and an operation each park their completion's release, and the
+// operation's result arrives from another thread after its worker task
+// returned, the way an offline database result does.
+void accepted_completions_hold_runtime_release() {
+  for (auto is_operation : {false, true}) {
+    auto sync_points = SyncPointScope{};
     const auto runtime = create_runtime();
     auto live = mln::core::lease_runtime(runtime);
-    auto completion = mln_test_completion_default(0);
-    auto status = MLN_STATUS_OK;
-    {
-      const auto fault = AllocationFaults{index};
-      status = mln_runtime_barrier(runtime, &completion.descriptor, nullptr);
-    }
-#if defined(_WIN32)
-    std::fprintf(
-      stderr, "barrier fault index=%zu returned status=%d\n", index,
-      static_cast<int>(status)
-    );
-    std::fflush(stderr);
-#endif
-    auto pending = std::vector<uint64_t>{};
-    {
-      const auto lock = std::scoped_lock{live->terminal_mutex};
-      pending.assign(
-        live->pending_submissions.begin(), live->pending_submissions.end()
-      );
-    }
-    if (status != MLN_STATUS_OK && !pending.empty()) {
-      ++failures_with_pending;
-      std::fprintf(
-        stderr, "barrier: allocation %zu failed; %zu sequence remains\n", index,
-        pending.size()
-      );
-      // Repair only the test's orphaned admission, so cleanup can finish.
-      for (const auto sequence : pending)
-        mln::core::finish_runtime_submission(live, sequence);
-    }
-    if (status == MLN_STATUS_OK)
-      MLN_TEST_OK(mln_test_completion_settle(&completion));
-    else {
-      mln_test_completion_reject(&completion);
-      mln_test_completion_destroy(&completion);
-    }
-    live.reset();
-    MLN_TEST_OK(mln_test_runtime_close(runtime));
-  }
-  TEST_ASSERT_EQUAL_UINT_MESSAGE(
-    0, failures_with_pending, "a rejected barrier stranded its runtime sequence"
-  );
-}
-
-struct SubmissionProbe {
-  mln_test_gate release;
-};
-
-void accepted_completions_keep_runtime_submissions_pending() {
-  for (auto kind = 0; kind != 3; ++kind) {
-    const auto runtime = create_runtime();
-    auto live = mln::core::lease_runtime(runtime);
-    auto probe = SubmissionProbe{};
-    mln_test_gate_init(&probe.release);
+    auto release = mln_test_gate{};
+    mln_test_gate_init(&release);
     const auto descriptor = mln_completion{
       .size = sizeof(mln_completion),
       .callback = [](void*, const mln_completion_result*) {},
-      .user_data = &probe,
+      .user_data = &release,
       .release_user_data =
         [](void* context) {
-          mln_test_gate_park(&static_cast<SubmissionProbe*>(context)->release);
+          mln_test_gate_park(static_cast<mln_test_gate*>(context));
         },
     };
     auto resolver = std::thread{};
-    if (kind == 0) {
-      auto completion = created(descriptor);
-      MLN_TEST_OK(
-        mln::core::submit_runtime_command(
-          live,
-          [completion](uint64_t) {
-            mln::core::complete_command(
-              completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
-            );
-          },
-          completion
-        )
-      );
-    } else if (kind == 1) {
+    if (is_operation) {
       auto pair = mln::core::CompletionOperation{};
       MLN_TEST_OK(
         mln::core::create_completion_operation(
-          &descriptor, mln::core::valueless_completion<&mln_runtime_barrier>(),
+          &descriptor,
+          mln::core::valueless_completion<
+            &mln_runtime_clear_resource_transform>(),
           pair
         )
       );
@@ -319,82 +204,44 @@ void accepted_completions_keep_runtime_submissions_pending() {
           live, pair.operation, [] {}, pair.completion
         )
       );
-      auto work_retired = std::atomic_bool{false};
-      live->executor.invoke([&work_retired] {
-        mln_test_flag_set(&work_retired);
-      });
-      TEST_ASSERT_TRUE(mln_test_wait_for_flag(&work_retired));
+      auto work_ran = std::atomic_bool{false};
+      live->executor.invoke([&work_ran] { mln_test_flag_set(&work_ran); });
+      TEST_ASSERT_TRUE(mln_test_wait_for_flag(&work_ran));
       resolver = std::thread{[operation = pair.operation] {
         operation->complete(MLN_STATUS_OK, {}, {});
       }};
     } else {
-      MLN_TEST_OK(mln_runtime_barrier(runtime, &descriptor, nullptr));
+      auto completion = created(descriptor);
+      MLN_TEST_OK(
+        mln::core::submit_runtime_command(
+          live,
+          [completion] {
+            mln::core::complete_command(
+              completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
+            );
+          },
+          completion
+        )
+      );
     }
-    const auto release_entered = mln_test_gate_wait_entered(&probe.release);
-    auto tracked = false;
-    {
-      const auto lock = std::scoped_lock{live->terminal_mutex};
-      tracked =
-        live->pending_submissions.size() + live->pending_commands.size() == 1;
-    }
-    auto barrier = mln_test_completion_default(0);
-    const auto barrier_status =
-      mln_runtime_barrier(runtime, &barrier.descriptor, nullptr);
+    const auto release_entered = mln_test_gate_wait_entered(&release);
+    live.reset();
     auto closed = mln_test_completion_default(0);
     const auto close_status =
       mln_runtime_release(runtime, &closed.descriptor, nullptr);
-    const auto barrier_early = mln_test_completion_poll(&barrier);
-    const auto close_early = mln_test_completion_poll(&closed);
-    mln_test_gate_release(&probe.release);
+    const auto deferred =
+      sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
+    const auto closed_early = mln_test_completion_poll(&closed);
+    mln_test_gate_release(&release);
     if (resolver.joinable()) resolver.join();
-    MLN_TEST_OK(mln_test_completion_settle(&barrier));
     MLN_TEST_OK(mln_test_completion_settle(&closed));
     TEST_ASSERT_TRUE(release_entered);
-    TEST_ASSERT_TRUE(tracked);
-    MLN_TEST_OK(barrier_status);
     MLN_TEST_OK(close_status);
-    TEST_ASSERT_FALSE(barrier_early);
-    TEST_ASSERT_FALSE(close_early);
+    TEST_ASSERT_TRUE_MESSAGE(
+      deferred, "runtime release did not wait for a completion's release"
+    );
+    TEST_ASSERT_FALSE(closed_early);
   }
-}
-
-void operation_submission_waits_for_native_work_to_retire() {
-  const auto runtime = create_runtime();
-  auto live = mln::core::lease_runtime(runtime);
-  auto work = mln_test_gate{};
-  mln_test_gate_init(&work);
-  auto completed = mln_test_completion_default(0);
-  auto pair = mln::core::CompletionOperation{};
-  MLN_TEST_OK(
-    mln::core::create_completion_operation(
-      &completed.descriptor,
-      mln::core::valueless_completion<&mln_runtime_barrier>(), pair
-    )
-  );
-  MLN_TEST_OK(
-    mln::core::submit_runtime_operation(
-      live, pair.operation,
-      [operation = pair.operation, &work] {
-        operation->complete(MLN_STATUS_OK, {}, {});
-        mln_test_gate_park(&work);
-      },
-      pair.completion
-    )
-  );
-  const auto work_running = mln_test_gate_wait_entered(&work);
-  auto tracked = false;
-  {
-    const auto lock = std::scoped_lock{live->terminal_mutex};
-    tracked =
-      live->pending_submissions.size() + live->pending_commands.size() == 1;
-  }
-  mln_test_gate_release(&work);
-  MLN_TEST_OK(mln_test_completion_settle(&completed));
-  MLN_TEST_OK(mln_test_runtime_close(runtime));
-  TEST_ASSERT_TRUE(work_running);
-  TEST_ASSERT_TRUE_MESSAGE(
-    tracked, "operation retired its sequence while native work was running"
-  );
 }
 
 struct ThreadExitProbe {
@@ -450,8 +297,12 @@ void a_blocked_worker_exit_does_not_hold_other_retirements() {
   MLN_TEST_OK(other_status);
 }
 
-void abandoned_completion_keeps_its_submission_pending_until_delivery() {
+// A completion that native work abandons without resolving it still holds
+// runtime release until it delivers its cancellation, whether the command's
+// task dropped it or an operation's result delivery threw.
+void an_abandoned_completion_holds_runtime_release_until_it_cancels() {
   for (auto is_operation : {false, true}) {
+    auto sync_points = SyncPointScope{};
     const auto runtime = create_runtime();
     auto live = mln::core::lease_runtime(runtime);
     auto result = mln_test_completion_default(0);
@@ -468,26 +319,23 @@ void abandoned_completion_keeps_its_submission_pending_until_delivery() {
         )
       );
     } else {
-      MLN_TEST_OK(
-        mln::core::submit_runtime_command(live, [](uint64_t) {}, completion)
-      );
+      MLN_TEST_OK(mln::core::submit_runtime_command(live, [] {}, completion));
     }
-    auto work_retired = std::atomic_bool{false};
-    live->executor.invoke([&work_retired] {
-      mln_test_flag_set(&work_retired);
-    });
-    const auto retired = mln_test_wait_for_flag(&work_retired);
-    auto tracked = false;
-    {
-      const auto lock = std::scoped_lock{live->terminal_mutex};
-      tracked =
-        live->pending_submissions.size() + live->pending_commands.size() == 1;
-    }
+    auto work_ran = std::atomic_bool{false};
+    live->executor.invoke([&work_ran] { mln_test_flag_set(&work_ran); });
+    const auto ran = mln_test_wait_for_flag(&work_ran);
+    live.reset();
+    auto closed = mln_test_completion_default(0);
+    const auto close_status =
+      mln_runtime_release(runtime, &closed.descriptor, nullptr);
+    const auto deferred =
+      sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
     completion.reset();
     const auto status = mln_test_completion_settle(&result);
-    MLN_TEST_OK(mln_test_runtime_close(runtime));
-    TEST_ASSERT_TRUE(retired);
-    TEST_ASSERT_TRUE(tracked);
+    MLN_TEST_OK(mln_test_completion_settle(&closed));
+    TEST_ASSERT_TRUE(ran);
+    MLN_TEST_OK(close_status);
+    TEST_ASSERT_TRUE(deferred);
     MLN_TEST_STATUS(MLN_STATUS_CANCELLED, status);
   }
 }
@@ -531,14 +379,9 @@ void runtime_release_waits_for_worker_thread_destruction() {
 }  // namespace
 
 MLN_TEST_GROUP {
-#if defined(_WIN32)
-  mln::native_tests::install_access_violation_reporter();
-#endif
   RUN_TEST(a_blocked_worker_exit_does_not_hold_other_retirements);
-  RUN_TEST(abandoned_completion_keeps_its_submission_pending_until_delivery);
-  RUN_TEST(accepted_completions_keep_runtime_submissions_pending);
-  RUN_TEST(operation_submission_waits_for_native_work_to_retire);
-  RUN_TEST(barrier_admission_failure_retires_its_sequence);
+  RUN_TEST(an_abandoned_completion_holds_runtime_release_until_it_cancels);
+  RUN_TEST(accepted_completions_hold_runtime_release);
   RUN_TEST(runtime_release_waits_for_worker_thread_destruction);
 
   RUN_TEST(submission_failure_callbacks_can_submit_again);

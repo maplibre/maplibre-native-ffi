@@ -29,28 +29,25 @@ cleanup while public calls report that the parent is closed.
 Each map and runtime embeds a retirement node and retains itself while that node
 is reachable. Creation reserves the executor wake, a finalizer for each runtime,
 and the shared map pool shutdown lane. Disposal admission and scheduling use
-those reserved objects; release also allocates completion state and a tracked
-runtime submission for a map. Native destruction and host callbacks may
-allocate.
+those reserved objects; release also allocates completion state. Native
+destruction and host callbacks may allocate.
 
 Map retirement first cancels pending still images and closes camera transitions
 on the runtime worker. It waits for children and submission leases, including a
 command that leased the map before close and queued afterwards. A final worker
 stage closes any transitions that those commands started, destroys the native
 map, and releases map-owned callback state before reporting release completion.
-Map release retains its submission sequence until that completion returns, so
-later runtime barriers cover it. Pool shutdown then runs on the map cleanup
-lane. The map retains a runtime cleanup lease until its resources and pool have
-retired.
+Pool shutdown then runs on the map cleanup lane. The map retains a runtime
+cleanup lease until its resources and pool have retired.
 
-Runtime submissions remain pending until native work retires and the completion
-and its release callback return. A queue-mode completion retires once its result
-is pushed to the queue, or discarded because the queue was released or the
-process is exiting; the host's drain is outside the submission. Completion
-acceptance precedes worker publication. Resolution allocates no storage in the
-completion: a callback runs inline, and a queue item that cannot be allocated
-falls back to one reserved at submission. An operation destroyed without an
-outcome completes as cancelled. Terminal observers run outside locks.
+A runtime submission holds its runtime lease until its completion and release
+callback return, and a discarded command holds it until its work has run. A
+queue-mode completion retires once its result is pushed to the queue, or
+discarded because the queue was released or the process is exiting; the host's
+drain is outside the submission. Completion acceptance precedes worker
+publication. Resolution allocates no storage in the completion: a callback runs
+inline, and a queue item that cannot be allocated falls back to one reserved at
+submission. An operation destroyed without an outcome completes as cancelled.
 
 Runtime retirement waits for children and pending submissions. The worker
 removes the private registry entry, releases reachable callback and resource

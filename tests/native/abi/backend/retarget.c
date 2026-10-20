@@ -208,9 +208,7 @@ enum target_kind { TARGET_OWNED, TARGET_BORROWED, TARGET_SURFACE };
 static void open_map(enum target_kind kind, retarget_map* out) {
   out->runtime = mln_test_create_runtime();
   out->map = mln_test_create_map(out->runtime);
-  mln_test_load_style_and_wait(
-    out->runtime, out->map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(out->map, mln_test_red_background_style_json);
   bool attached = false;
   switch (kind) {
     case TARGET_OWNED:
@@ -259,7 +257,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
 
   // The frame after the swap lands in the replacement alone.
   paint_background_blue(map.map);
-  MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
+  MLN_TEST_OK(mln_test_map_fence(map.map));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
   );
@@ -309,9 +307,7 @@ static bool service_until_published(void* context) {
 static void open_borrowed_ring(retarget_map* out, uint32_t driver) {
   out->runtime = mln_test_create_runtime();
   out->map = mln_test_create_map(out->runtime);
-  mln_test_load_style_and_wait(
-    out->runtime, out->map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(out->map, mln_test_red_background_style_json);
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_borrowed_ring(
       out->map, &out->fixture, 2, driver
@@ -483,7 +479,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
 
   // The first frame after the replacement lands in a new texture.
   paint_background_blue(map.map);
-  MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
+  MLN_TEST_OK(mln_test_map_fence(map.map));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
   );
@@ -505,7 +501,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   retarget_map map = {0};
   open_map(TARGET_BORROWED, &map);
   const mln_test_render_fixture* fixture = &map.fixture;
-  (void)mln_test_render_until_idle(map.runtime, fixture, NULL);
+  (void)mln_test_render_until_idle(map.runtime, map.map, fixture, NULL);
   mln_test_graphics_texture* replacement =
     mln_test_render_fixture_new_texture(fixture);
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
@@ -591,8 +587,8 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   if (surface != NULL) {
     expect_surface_configured(surface, width, height);
   }
-  // The barrier completes after the resize that the replacement submitted.
-  MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
+  // A later query completes after the resize that the replacement submitted.
+  MLN_TEST_OK(mln_test_map_fence(map.map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map.map, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT32(width, snapshot.logical_extent.width);
@@ -759,7 +755,7 @@ static void expect_old_target_rendering(
 ) {
   const mln_test_render_fixture* fixture = &map->fixture;
   paint_background_blue(map->map);
-  MLN_TEST_OK(mln_test_runtime_barrier(map->runtime));
+  MLN_TEST_OK(mln_test_map_fence(map->map));
   const uint32_t flags =
     row->session == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
   TEST_ASSERT_EQUAL_UINT32_MESSAGE(

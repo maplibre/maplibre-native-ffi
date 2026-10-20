@@ -96,7 +96,7 @@ static void paint_background_blue(mln_runtime runtime, mln_map map) {
     map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
     MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
 }
 
 // Acquires the frame that a demand just rendered, and checks that it names the
@@ -131,9 +131,7 @@ static uint32_t acquire_ring_frame(
 static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_borrowed_ring(
@@ -238,9 +236,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
 ) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_opengl_fence_texture(
@@ -360,9 +356,7 @@ static void owned_opengl_frames_support_gpu_fences(void) {
 static void a_surface_presents_frames_and_takes_a_resize(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_surface(map, &fixture),
@@ -404,7 +398,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
 static void a_surface_replacement_can_change_the_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_surface(map, &fixture),

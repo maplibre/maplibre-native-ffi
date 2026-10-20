@@ -3930,7 +3930,7 @@ auto render_session_resize_start(
     return submit_runtime_command(
       runtime,
       [operation = async.operation, status,
-       diagnostic = std::move(diagnostic)](uint64_t) mutable {
+       diagnostic = std::move(diagnostic)]() mutable {
         operation->complete(status, std::move(diagnostic), {});
       },
       async.completion

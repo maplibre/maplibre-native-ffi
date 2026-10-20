@@ -159,6 +159,7 @@ mln_status mln_test_map_close(mln_map map) {
     mln_test_completion_destroy(&teardown);
     return status;
   }
+  untrack_map(map);
   const bool completed = mln_test_completion_wait(&teardown, -1);
   const mln_status teardown_status = mln_test_completion_status(&teardown);
   mln_test_completion_destroy(&teardown);
@@ -260,22 +261,33 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
   }
 }
 
-mln_status mln_test_runtime_barrier(mln_runtime runtime) {
-  mln_test_completion completion = mln_test_completion_default(0);
-  mln_status status =
-    mln_runtime_barrier(runtime, &completion.descriptor, MLN_TEST_DIAGNOSTIC);
+static mln_status settle_fence(
+  mln_status status, mln_test_completion* completion
+) {
   if (status != MLN_STATUS_OK) {
-    completion.descriptor.release_user_data(completion.descriptor.user_data);
-    mln_test_completion_destroy(&completion);
+    mln_test_completion_reject(completion);
+    mln_test_completion_destroy(completion);
     return status;
   }
-  if (!mln_test_completion_wait(&completion, -1)) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  } else {
-    status = mln_test_completion_status(&completion);
-  }
-  mln_test_completion_destroy(&completion);
-  return status;
+  return mln_test_completion_settle(completion);
+}
+
+mln_status mln_test_map_fence(mln_map map) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  return settle_fence(
+    mln_map_get_style_url(map, &completion.descriptor, MLN_TEST_DIAGNOSTIC),
+    &completion
+  );
+}
+
+mln_status mln_test_runtime_fence(mln_runtime runtime) {
+  mln_test_completion completion = mln_test_completion_default(0);
+  return settle_fence(
+    mln_runtime_clear_resource_transform(
+      runtime, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    ),
+    &completion
+  );
 }
 
 void mln_test_destroy_map(mln_map map) {
@@ -651,9 +663,7 @@ void mln_test_release_drained_batch(void) {
   drained_batch = MLN_HANDLE_NULL;
 }
 
-void mln_test_load_style_and_wait(
-  mln_runtime runtime, mln_map map, mln_buffer_view json
-) {
+void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json) {
   mln_test_completion applied = mln_test_completion_default(0);
   MLN_TEST_OK(
     mln_map_set_style_json(map, json, &applied.descriptor, MLN_TEST_DIAGNOSTIC)
@@ -661,9 +671,9 @@ void mln_test_load_style_and_wait(
   MLN_TEST_OK(mln_test_completion_settle(&applied));
   // MapLibre parses an inline document and notifies its observer inside the
   // command, so the events the load produces are queued once it commits. The
-  // barrier only orders this thread behind the runtime worker's own follow-up
+  // fence only orders this thread behind the runtime worker's own follow-up
   // work.
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
 }
 
 bool mln_test_reclaim_thread_resources(void) {

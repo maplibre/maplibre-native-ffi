@@ -146,68 +146,6 @@ void discarded_commands_keep_the_graph_alive_until_the_worker_drains() {
   TEST_ASSERT_TRUE(expired(weak));
 }
 
-void runtime_barriers_observe_retired_command_captures() {
-  struct Probe {
-    std::atomic_bool retired = false;
-    std::atomic_bool observed_retirement = false;
-    std::atomic_bool barrier_released = false;
-    std::atomic_int nested_status = MLN_STATUS_NATIVE_ERROR;
-  } probe;
-  struct Capture {
-    Probe& probe;
-    ~Capture() { probe.retired.store(true); }
-  };
-  auto runtime = create_runtime();
-  auto live = mln::core::lease_runtime(runtime);
-  auto result = Result{};
-  const auto descriptor_value = descriptor(result);
-  auto completion = std::shared_ptr<mln::core::Completion>{};
-  MLN_TEST_OK(mln::core::make_completion(&descriptor_value, completion));
-  auto capture = std::shared_ptr<Capture>(new Capture{probe});
-  MLN_TEST_OK(
-    mln::core::submit_runtime_command(
-      live,
-      [runtime, completion, capture = std::move(capture), &probe](uint64_t) {
-        const mln_completion barrier = {
-          .size = sizeof(mln_completion),
-          .callback =
-            [](void* context, const mln_completion_result* value) {
-              auto& probe = *static_cast<Probe*>(context);
-              probe.observed_retirement.store(
-                value->status == MLN_STATUS_OK && probe.retired.load()
-              );
-            },
-          .user_data = &probe,
-          .release_user_data =
-            [](void* context) {
-              static_cast<Probe*>(context)->barrier_released.store(true);
-              mln_test_pulse();
-            },
-        };
-        probe.nested_status = mln_runtime_barrier(runtime, &barrier, nullptr);
-        mln::core::complete_command(
-          completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
-        );
-      },
-      completion
-    )
-  );
-  TEST_ASSERT_TRUE(
-    await([&] { return probe.barrier_released.load(); }, "the barrier")
-  );
-  MLN_TEST_OK(probe.nested_status.load());
-  TEST_ASSERT_TRUE_MESSAGE(
-    probe.observed_retirement.load(),
-    "the runtime barrier completed before the command's captures retired"
-  );
-  TEST_ASSERT_TRUE(released(result));
-  live.reset();
-  auto closed = Result{};
-  const auto close = descriptor(closed);
-  MLN_TEST_OK(mln_runtime_release(runtime, &close, nullptr));
-  TEST_ASSERT_TRUE(released(closed));
-}
-
 struct UnclaimedCreation {
   Result result;
   BackgroundChecks checks;
@@ -380,7 +318,8 @@ auto submit_pending_operation(
   auto live = mln::core::lease_runtime(runtime);
   auto pending = mln::core::CompletionOperation{};
   const auto created = mln::core::create_completion_operation(
-    &completion, mln::core::valueless_completion<&mln_runtime_barrier>(),
+    &completion,
+    mln::core::valueless_completion<&mln_runtime_clear_resource_transform>(),
     pending
   );
   if (created != MLN_STATUS_OK) return created;
@@ -561,7 +500,7 @@ void disposal_detaches_an_attached_core_worker_session() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
@@ -603,7 +542,7 @@ void a_destroy_that_races_dispose_finds_the_handle_released() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
@@ -646,7 +585,7 @@ void disposal_abandons_a_session_with_an_acquired_frame() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
@@ -673,7 +612,7 @@ void finalization_abandons_an_attached_session() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_prepare_map(map);
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
@@ -1046,7 +985,6 @@ MLN_TEST_GROUP {
   RUN_TEST(map_query_admission_failure_releases_its_map_lease);
 
   RUN_TEST(discarded_commands_keep_the_graph_alive_until_the_worker_drains);
-  RUN_TEST(runtime_barriers_observe_retired_command_captures);
   RUN_TEST(a_view_and_its_own_abandonment_keep_a_session_busy);
   RUN_TEST(a_held_view_parks_its_retirements_without_stalling_others);
   RUN_TEST(a_running_driver_call_parks_its_retirement_without_stalling_others);

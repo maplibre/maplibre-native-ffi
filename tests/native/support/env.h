@@ -72,12 +72,17 @@ mln_runtime mln_test_create_runtime(void);
 // The same, from options the case fills in. The fixture's event wake replaces
 // options->event_wake.
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
-// Submits a runtime barrier and waits for its terminal status. A barrier
-// completes once every earlier submission has a terminal result. It cannot
+// Fences the runtime worker: each helper submits a call that runs on the
+// worker after every earlier submission to it and waits for its completion.
+// A snapshot read after it observes earlier discarded commands. Neither can
 // fence work that the runtime worker starts on its own, such as handling a
-// frame that a render session finished; a map command queued after that work
-// can, because its completion runs after the work.
-mln_status mln_test_runtime_barrier(mln_runtime runtime);
+// frame that a render session finished.
+//
+// The map fence queries the map's style URL, which publishes nothing.
+mln_status mln_test_map_fence(mln_map map);
+// The runtime fence clears the runtime's resource transform, for a case that
+// has no map and sets no transform.
+mln_status mln_test_runtime_fence(mln_runtime runtime);
 mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(
@@ -86,6 +91,8 @@ mln_map mln_test_create_map_with_options(
 mln_status mln_test_map_create_status(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 );
+// Releases the map and waits for its release completion, after which the map's
+// callbacks have released their user data.
 mln_status mln_test_map_close(mln_map map);
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
 mln_status mln_test_map_get_camera(mln_map map, mln_camera_options* out_camera);
@@ -99,9 +106,7 @@ void mln_test_destroy_map(mln_map map);
 // Applies an inline style and waits for the map to finish loading it, so a test
 // that needs a loaded style depends on neither the network nor a fixed barrier
 // count. Fails the test when the style never loads.
-void mln_test_load_style_and_wait(
-  mln_runtime runtime, mln_map map, mln_buffer_view json
-);
+void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json);
 
 // Destroys everything this thread still has tracked, render session first, then
 // map, then runtime, and reports whether it reclaimed anything. Reports through

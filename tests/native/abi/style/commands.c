@@ -249,9 +249,7 @@ static void global_state_reads_back_defaults_and_set_properties(void) {
   static const char stateful_style[] =
     "{\"version\":8,\"sources\":{},\"layers\":[],"
     "\"state\":{\"theme\":{\"default\":\"light\"}}}";
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(stateful_style)
-  );
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(stateful_style));
   EXPECT_GLOBAL_STATE("{\"theme\":\"light\"}", map);
   set_global_state(map, "[\"dark\",{\"enabled\":true}]");
   EXPECT_GLOBAL_STATE("{\"theme\":[\"dark\",{\"enabled\":true}]}", map);
@@ -289,7 +287,7 @@ static void the_loaded_style_document_reads_back_as_loaded(void) {
 
   static const char named_style[] =
     "{\"version\":8,\"name\":\"loaded\",\"sources\":{},\"layers\":[]}";
-  mln_test_load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(named_style));
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(named_style));
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
     map, MLN_BUFFER_LITERAL("added-later"),
     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
@@ -334,17 +332,16 @@ static void a_loaded_style_reports_the_300_ms_transition_default(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_UINT32(0, read_transition_options(map).fields & timing);
 
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_style_transition_options read = read_transition_options(map);
   TEST_ASSERT_BITS_HIGH(MLN_STYLE_TRANSITION_OPTION_DURATION, read.fields);
   TEST_ASSERT_EQUAL_DOUBLE(300.0, read.duration_ms);
 
   mln_test_load_style_and_wait(
-    runtime, map,
-    MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"transition\":{\"delay\":50},\"sources\":{},"
-      "\"layers\":[]}"
-    )
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"transition\":{\"delay\":50},\"sources\":{},"
+           "\"layers\":[]}"
+         )
   );
   read = read_transition_options(map);
   TEST_ASSERT_EQUAL_UINT32(
@@ -453,7 +450,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
 static void the_style_light_round_trips_through_json(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   const mln_buffer_view intensity = MLN_BUFFER_LITERAL("intensity");
 
   MLN_TEST_AWAIT_OK(mln_map_set_style_light_json(

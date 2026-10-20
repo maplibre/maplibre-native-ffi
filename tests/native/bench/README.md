@@ -22,7 +22,7 @@ transport of a queued burst without worker scheduling races between its
 commands. Submission latency covers each C call on the submitting thread.
 Completion latency starts at that call and ends at its callback, including the
 time behind the gate and earlier commands. A discarded command has no callback;
-its completion column ends at the runtime barrier that fences the burst.
+its completion column ends at the later map query that fences the burst.
 
 The image case replaces 64 warm image IDs with 8 × 8 RGBA images. The image-256
 case replaces one warm ID with a 256 × 256 RGBA image. These cases measure
@@ -30,8 +30,8 @@ submission copies and command transport, without tile layout or image loading.
 
 The executable replaces `operator new` and `operator new[]`. Submission counts
 cover the submitting thread during the C calls. Total counts cover that thread
-and the runtime worker until the burst's barrier completes, including the
-barrier's allocation cost. The graphics host, GPU driver, aligned allocation,
-and direct C or Rust allocator calls are outside these counts. Frame counts
-cover each burst through a driver fence after completion. Compare runs built
-with the same toolchain; allocator and scheduler differences affect the results.
+and the runtime worker until the burst's fencing query completes, including the
+query's allocation cost. The graphics host, GPU driver, aligned allocation, and
+direct C or Rust allocator calls are outside these counts. Frame counts cover
+each burst through a driver fence after completion. Compare runs built with the
+same toolchain; allocator and scheduler differences affect the results.

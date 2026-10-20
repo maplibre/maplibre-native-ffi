@@ -250,8 +250,10 @@ pub const Fixture = struct {
         self.runtime_open = false;
     }
 
-    pub fn barrier(self: *Fixture) !void {
-        try resolve(try maplibre.runtimeBarrier(self.runtime, null));
+    /// Waits for a runtime command, which follows every submission to the
+    /// runtime's worker accepted so far.
+    pub fn fence(self: *Fixture) !void {
+        try resolve(try maplibre.runtimeClearResourceTransform(self.runtime, null));
     }
 
     pub fn setProvider(self: *Fixture, provider: maplibre.ResourceProvider) !void {

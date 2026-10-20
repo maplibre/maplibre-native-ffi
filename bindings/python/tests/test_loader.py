@@ -14,7 +14,7 @@ def test_the_package_loads_its_extension_and_finds_native_directories_once(
     # The wheel carries the extension, which links the native library in.
     assert Path(_native.__file__).resolve().parent == package
     with mln.runtime_create() as runtime:
-        assert result(runtime.barrier()) is None
+        assert result(runtime.clear_resource_transform()) is None
 
     # On Windows the loader also registers these directories for the native
     # library's dependencies: each existing one once, in this order.

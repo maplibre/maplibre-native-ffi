@@ -4,18 +4,19 @@
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-// Submits a barrier whose completion goes to queue with user_data.
-static void submit_queue_barrier(
+// Submits a runtime command whose completion goes to queue with user_data.
+static void submit_queued_command(
   mln_runtime runtime, mln_delivery_queue queue, void* user_data
 ) {
   const mln_completion completion = mln_test_queue_completion(queue, user_data);
-  MLN_TEST_OK(mln_runtime_barrier(runtime, &completion, NULL));
+  MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &completion, NULL));
 }
 
-// The runtime orders barriers, so a callback barrier that completes after
-// queue barriers proves that they pushed.
+// The runtime worker runs commands in order and delivers each completion
+// before the next command, so a callback command that completes after queued
+// ones proves that they pushed.
 static void sync_runtime(mln_runtime runtime) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_fence(runtime));
 }
 
 static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
@@ -23,8 +24,8 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
 
-  submit_queue_barrier(runtime, queue.handle, (void*)1);
-  submit_queue_barrier(runtime, queue.handle, (void*)2);
+  submit_queued_command(runtime, queue.handle, (void*)1);
+  submit_queued_command(runtime, queue.handle, (void*)2);
   sync_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&queue.wakes));
 
@@ -44,7 +45,7 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
 
   // The drain re-armed the wake.
-  submit_queue_barrier(runtime, queue.handle, (void*)3);
+  submit_queued_command(runtime, queue.handle, (void*)3);
   sync_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(2, atomic_load(&queue.wakes));
 
@@ -102,7 +103,7 @@ static void concurrent_drains_deliver_each_item_exactly_once(void) {
     threads[index] = mln_test_thread_start(drain_until_all_seen, &drain);
   }
   for (uintptr_t index = 0; index < concurrent_completions; index += 1) {
-    submit_queue_barrier(runtime, queue.handle, (void*)(index + 1));
+    submit_queued_command(runtime, queue.handle, (void*)(index + 1));
   }
   for (size_t index = 0; index < concurrent_drainers; index += 1) {
     mln_test_thread_join(threads[index]);
@@ -122,7 +123,7 @@ static void a_batch_outlives_its_queue_and_runtime(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
-  submit_queue_barrier(runtime, queue.handle, (void*)7);
+  submit_queued_command(runtime, queue.handle, (void*)7);
   const mln_delivery* delivery = NULL;
   const mln_delivery_batch batch =
     mln_test_delivery_await_single(queue.handle, &delivery);
@@ -178,7 +179,7 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   MLN_TEST_OK(mln_delivery_queue_create(&options, &wake.queue, NULL));
   mln_runtime runtime = mln_test_create_runtime();
 
-  submit_queue_barrier(runtime, wake.queue, NULL);
+  submit_queued_command(runtime, wake.queue, NULL);
   sync_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&wake.releases, 1));
@@ -186,7 +187,7 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   // A submission that names the released queue is rejected.
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_runtime_barrier(
+    mln_runtime_clear_resource_transform(
       runtime,
       &(mln_completion){.size = sizeof(mln_completion), .queue = wake.queue},
       NULL
@@ -253,7 +254,7 @@ static void take_reports_its_status(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
-  submit_queue_barrier(runtime, queue.handle, NULL);
+  submit_queued_command(runtime, queue.handle, NULL);
   const mln_delivery* delivery = NULL;
   mln_delivery_batch batch =
     mln_test_delivery_await_single(queue.handle, &delivery);

@@ -91,9 +91,9 @@ typedef void (*mln_completion_callback)(
  * a completion.
  *
  * A later completion fences discarded commands. The completion of a later
- * command on the same map, or of mln_runtime_barrier(), follows every earlier
- * discarded command, and a snapshot read after it observes them;
- * mln_render_session_barrier() fences a discarded mln_render_session_resize().
+ * command or query on the same map follows every earlier discarded command,
+ * and a snapshot read after it observes them; mln_render_session_barrier()
+ * fences a discarded mln_render_session_resize().
  * A snapshot generation alone does not, because other work also publishes
  * generations.
  *

@@ -149,7 +149,10 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
                     )
                 };
                 let outcome = (
-                    runtime.barrier().map(drop).map_err(refusal),
+                    runtime
+                        .clear_resource_transform()
+                        .map(drop)
+                        .map_err(refusal),
                     runtime.release().map(drop).map_err(refusal),
                     handle
                         .complete(&ok_response(BACKGROUND_STYLE_JSON))
@@ -162,7 +165,7 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
 
     fixture.map().set_style_url("custom://style.json").unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    let (barrier, release, completed) = outcomes.recv_timeout(timeout()).unwrap();
+    let (command, release, completed) = outcomes.recv_timeout(timeout()).unwrap();
     // The binding's callback policy refuses both calls before they reach
     // native, so neither carries a native status. Native would refuse the
     // release too, because the fixture's map is live, but with a status.
@@ -171,7 +174,7 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
         None,
         "native operation is unavailable from this callback".to_owned(),
     ));
-    assert_eq!(barrier, refused_by_policy);
+    assert_eq!(command, refused_by_policy);
     assert_eq!(release, refused_by_policy);
     assert_eq!(completed, Ok(()));
 }
@@ -241,7 +244,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     // The runtime keeps working.
     wait_for(fixture.runtime().clear_resource_transform());
     wait_for(fixture.runtime().set_resource_provider(denying_provider()));
-    fixture.barrier();
+    fixture.fence();
 }
 
 #[test]

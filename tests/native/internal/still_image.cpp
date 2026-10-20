@@ -73,19 +73,16 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
     mln_logical_extent{.width = 64, .height = 64, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
   const auto map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_load_style_and_wait(
-    runtime, map, mln_test_red_background_style_json
-  );
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   auto fixture = mln_test_render_fixture{};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   // A static map publishes no update for the new style until a still image
   // requests one, so the session's latest update still shows red.
   mln_test_load_style_and_wait(
-    runtime, map,
-    mln_buffer_view{
-      green_background_style_json, sizeof(green_background_style_json) - 1
-    }
+    map, mln_buffer_view{
+           green_background_style_json, sizeof(green_background_style_json) - 1
+         }
   );
 
   auto points = SyncPointScope{};

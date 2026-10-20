@@ -42,7 +42,7 @@ test "a callback registration is rooted until native releases it" {
 
     try support.expectCommitted(try maplibre.mapRemoveStyleSource(fixture.map, "removed", null));
     try removed.waitFor(1);
-    try fixture.barrier();
+    try fixture.fence();
     try testing.expectEqual(@as(usize, 0), retained.get());
     try fixture.closeMap();
     try retained.waitFor(1);
@@ -433,7 +433,7 @@ test "a camera end handler inside a command is released after it runs" {
         .scale = -1,
         .animation = .{ .end_handler = rejected.handler() },
     }, null));
-    try fixture.barrier();
+    try fixture.fence();
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));
 }

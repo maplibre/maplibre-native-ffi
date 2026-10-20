@@ -256,7 +256,7 @@ static void assert_range_carries_generation(
 static void a_command_queues_its_events_before_it_completes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   recorder_reset(runtime, false);
   recorder_drain();
   const size_t creation_end = recorder_count();
@@ -293,7 +293,7 @@ static void a_command_queues_its_events_before_it_completes(void) {
   );
   assert_range_carries_generation(&jump, map);
 
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   recorder_drain();
   assert_recorder_complete();
   assert_map_generations_never_decrease(map);
@@ -307,7 +307,7 @@ static void a_command_queues_its_events_before_it_completes(void) {
 static void a_failed_command_reports_the_generation_of_its_events(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   recorder_reset(runtime, false);
   recorder_drain();
 
@@ -333,7 +333,7 @@ static void a_command_that_fails_a_still_image_queues_its_event_first(void) {
   mln_map_options options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   recorder_reset(runtime, false);
   recorder_drain();
 
@@ -495,8 +495,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   const size_t live_events = recorder.count;
   recorder_unlock();
   mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_close(map));
   assert_recorder_complete();
 
   size_t loading_finished = 0;

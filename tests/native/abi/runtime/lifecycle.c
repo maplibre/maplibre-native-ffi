@@ -1,5 +1,5 @@
 // Runtime and map lifecycle through the public ABI: creation and its
-// validation, stale and foreign handles, ordered barriers, and release.
+// validation, stale and foreign handles, and release.
 
 #include "support/test_support.h"
 
@@ -75,7 +75,6 @@ static void expect_runtime_calls_reject(
   mln_event_batch batch = MLN_HANDLE_NULL;
   uint64_t mask = 0;
   MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
-  MLN_TEST_STATUS(expected, mln_runtime_barrier(handle, &discard, NULL));
   MLN_TEST_STATUS(expected, mln_runtime_dispose(handle, NULL));
   MLN_TEST_STATUS(expected, mln_runtime_drain_events(handle, &batch, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
@@ -209,34 +208,6 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A barrier waits for earlier work that is still pending. A static map with no
-// render session holds a still image until the map closes, and the resize
-// after the barrier is the fence: once it completes, the barrier has been
-// admitted and would have completed already if it ignored the still image.
-static void a_barrier_completes_after_preceding_work(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
-  options.map_mode = MLN_MAP_MODE_STATIC;
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_completion still = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
-  mln_test_completion barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_runtime_barrier(runtime, &barrier.descriptor, NULL));
-  MLN_TEST_AWAIT_OK(mln_map_resize(
-    map, (mln_logical_extent){128, 128, 1.0}, &completion.descriptor, NULL
-  ));
-  TEST_ASSERT_FALSE(mln_test_completion_poll(&barrier));
-
-  // Closing the map cancels the still image, which lets the barrier finish.
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_completion_finish(&barrier));
-  TEST_ASSERT_TRUE(mln_test_completion_poll(&still));
-  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, mln_test_completion_status(&still));
-  mln_test_completion_destroy(&barrier);
-  mln_test_completion_destroy(&still);
-  mln_test_destroy_runtime(runtime);
-}
-
 typedef struct creator_thread_probe {
   mln_runtime runtime;
   mln_map map;
@@ -282,7 +253,6 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
     mln_test_completion_reject(&resize);
     mln_test_completion_destroy(&resize);
   }
-  const mln_status barrier_status = mln_test_runtime_barrier(probe.runtime);
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   const mln_status snapshot_status =
     mln_map_get_snapshot(probe.map, &snapshot, NULL);
@@ -290,7 +260,6 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   const mln_status runtime_close_status = mln_test_runtime_close(probe.runtime);
 
   MLN_TEST_OK(resize_status);
-  MLN_TEST_OK(barrier_status);
   MLN_TEST_OK(snapshot_status);
   TEST_ASSERT_EQUAL_UINT32(extent.width, snapshot.logical_extent.width);
   TEST_ASSERT_EQUAL_UINT32(extent.height, snapshot.logical_extent.height);
@@ -488,7 +457,6 @@ MLN_TEST_GROUP {
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(disposal_waits_for_children_and_retires_callback_state);
   RUN_TEST(close_preflight_leaves_a_runtime_with_a_live_child_open);
-  RUN_TEST(a_barrier_completes_after_preceding_work);
   RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);
   RUN_TEST(runtime_and_map_outlive_the_creating_host_thread);
   RUN_TEST(runtime_state_release_can_wait_for_another_runtime);

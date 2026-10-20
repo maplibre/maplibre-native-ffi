@@ -100,7 +100,7 @@ class ResourceCallbackTest {
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       val results =
         listOf(
-          runCatching { fixtureRuntime.barrier() }.exceptionOrNull(),
+          runCatching { fixtureRuntime.clearResourceTransform() }.exceptionOrNull(),
           runCatching { fixtureRuntime.release() }.exceptionOrNull(),
           runCatching {
             handle.complete(
@@ -119,8 +119,8 @@ class ResourceCallbackTest {
     withMap(provider = provider) {
       fixtureRuntime = runtime
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      val (barrier, release, completion) = outcome.awaitWithin("the provider callback")
-      assertTrue(barrier is InvalidStateException, "barrier inside the provider: $barrier")
+      val (command, release, completion) = outcome.awaitWithin("the provider callback")
+      assertTrue(command is InvalidStateException, "command inside the provider: $command")
       assertTrue(release is InvalidStateException, "release inside the provider: $release")
       assertEquals(null, completion, "completing the provided request is allowed")
       assertFalse(runtime.isClosed)

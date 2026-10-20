@@ -52,7 +52,7 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 	if native.Diagnostic() == "" {
 		t.Fatal("the refusal carried no diagnostic")
 	}
-	await(t, submitted(f.runtime.Barrier()))
+	await(t, submitted(f.runtime.ClearResourceTransform()))
 	await(t, submitted(f.m.Close()))
 	await(t, submitted(f.runtime.Close()))
 }

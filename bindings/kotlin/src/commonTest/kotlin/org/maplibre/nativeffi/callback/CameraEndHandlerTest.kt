@@ -46,7 +46,8 @@ class CameraEndHandlerTest {
       val end = ended.awaitWithin("the end handler")
       assertEquals(CameraTransitionOutcome.CANCELLED, end.outcome)
       assertNotEquals(0uL, end.generation)
-      runtime.barrier().awaitWithin("the barrier after the end")
+      // The handler's release runs on the worker before a later command on the map.
+      map.requestRepaint().awaitWithin("a command after the end")
       assertEquals(base, roots.rootCountForTesting())
 
       // A command that native rejects on the calling thread roots nothing.

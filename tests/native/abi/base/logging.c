@@ -171,7 +171,7 @@ LOG_STATE_CASE(a_failed_discarded_command_logs_one_warning) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_fence(map));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.warnings));
   TEST_ASSERT_EQUAL_UINT32(MLN_LOG_SEVERITY_WARNING, probe.severity);

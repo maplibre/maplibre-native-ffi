@@ -68,7 +68,10 @@ void main() {
     // The live map makes native refuse the release before teardown starts.
     expect(runtime.close, throwsA(isA<InvalidStateException>()));
     expect(runtime.isClosed, isFalse);
-    await within(runtime.barrier(), 'a barrier on the refused runtime');
+    await within(
+      runtime.clearResourceTransform(),
+      'a command on the refused runtime',
+    );
 
     await within(map.close(), 'map close');
     await within(runtime.close(), 'runtime close');

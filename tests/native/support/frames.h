@@ -24,7 +24,7 @@ extern "C" {
 
 // Loads the empty style and waits for the runtime to apply it, so a demand
 // has an update to render.
-void mln_test_render_prepare_map(mln_runtime runtime, mln_map map);
+void mln_test_render_prepare_map(mln_map map);
 
 // Requests a forced frame, which renders the latest update whether or not it
 // is new, with `token` as both its token and its coalescing boundary so it
@@ -61,7 +61,7 @@ mln_render_frame_result mln_test_render_batch_result(
 // Returns whether a frame finished on the way, and copies the statistics of
 // the latest one to `latest_stats` unless it is null.
 bool mln_test_render_until_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture,
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture,
   mln_rendering_stats* latest_stats
 );
 

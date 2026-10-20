@@ -1193,8 +1193,6 @@ internal actual object C {
       mln_buffer_view,
       JAVA_LONG,
     )
-  private val mln_runtime_barrier =
-    Ffm.downcall("mln_runtime_barrier", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_clear_http_header_transform =
     Ffm.downcall(
       "mln_runtime_clear_http_header_transform",
@@ -3273,9 +3271,6 @@ internal actual object C {
       Ffm.value(url, mln_buffer_view),
       outDiagnostic,
     ) as Int
-
-  actual fun mln_runtime_barrier(runtime: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_runtime_barrier.invokeExact(runtime, completion, outDiagnostic) as Int
 
   actual fun mln_runtime_clear_http_header_transform(
     runtime: Long,

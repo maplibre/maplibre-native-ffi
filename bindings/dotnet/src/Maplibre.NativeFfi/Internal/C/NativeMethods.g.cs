@@ -1440,13 +1440,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_barrier(
-        MlnRuntime runtime,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_clear_http_header_transform(
         MlnRuntime runtime,
         mln_completion* completion,

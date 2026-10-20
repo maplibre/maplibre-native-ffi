@@ -87,7 +87,7 @@ static void style_commands_reject_invalid_inputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_style_serve(runtime, NULL, 0);
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_premultiplied_rgba8_image no_pixels =
     mln_premultiplied_rgba8_image_default();
   no_pixels.width = 1;
@@ -118,7 +118,7 @@ static void style_commands_reject_invalid_inputs(void) {
 static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   static mln_test_style_route routes[] = {
     {.url = "fixture://taken.geojson", .body = "{}"},
   };

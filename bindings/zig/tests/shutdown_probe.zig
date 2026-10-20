@@ -35,5 +35,5 @@ pub fn main() !void {
     const map = try resolve(try maplibre.runtimeCreateMap(allocator, runtime, try maplibre.mapOptionsDefault(), null));
     const style = try resolve(try maplibre.mapSetStyleJson(map, "{\"version\":8,\"sources\":{},\"layers\":[]}", null));
     try style.statusError();
-    try resolve(try maplibre.runtimeBarrier(runtime, null));
+    try resolve(try maplibre.runtimeClearResourceTransform(runtime, null));
 }

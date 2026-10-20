@@ -7334,15 +7334,6 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// this handle.
   BigInt get id => uint64FromNative(_state.handleId);
 
-  /// Starts an ordered runtime barrier.
-  ///
-  /// See `mln_runtime_barrier` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> barrier() => _run(
-    (arena, completion) =>
-        raw.mln_runtime_barrier(_handle.raw, completion, nativeDiagnostic),
-  );
-
   /// Clears the runtime-scoped outgoing HTTP header transform.
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
