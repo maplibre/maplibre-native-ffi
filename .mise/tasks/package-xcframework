@@ -24,7 +24,6 @@ trap 'rm -rf "$work"' EXIT
 # Catalyst slices also run.
 cat >"$work/consumer.m" <<'EOF'
 @import MaplibreNativeC;
-@import MaplibreNativeC.CallbackAdapter;
 @import MaplibreNativeC.Plugin;
 
 int main(void) { return mln_plugin_get_register_function_v1() == NULL; }
