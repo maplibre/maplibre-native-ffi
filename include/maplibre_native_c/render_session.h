@@ -96,9 +96,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
    * MLN_RENDER_RESULT_NO_UPDATE waits instead, and runs again after the map's
    * next update, a target replacement, or an applied resize. A waiting demand
    * holds no ring slot. A later demand with the same flags supersedes it, a
-   * barrier ends its wait
-   * with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon, or the quarantine of
-   * the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY.
+   * barrier ends its wait with MLN_RENDER_RESULT_NO_UPDATE, and detach,
+   * abandon, or the quarantine of the ring's last usable slot end it with
+   * MLN_RENDER_RESULT_TARGET_NOT_READY.
    * A waiting demand's result can follow the results of demands accepted after
    * it. The flag does not pace: a host that re-arms a waiting demand as each
    * result arrives renders every update the map publishes. The map publishes
@@ -471,8 +471,9 @@ MLN_API void mln_acquired_frame_view_end(
 
 /**
  * Starts an ordered logical resize of the driver and the map. The driver
- * applies the extent as soon as its work reaches the queue. The completion
- * runs after both have applied it and the map has published its snapshot.
+ * applies the extent in order with its other work, and later driver work does
+ * not wait for the map. The completion runs after both have applied it and the
+ * map has published its snapshot.
  * Frames render once a map update matches the applied extent; static and
  * tile maps publish that update for their next still image.
  *

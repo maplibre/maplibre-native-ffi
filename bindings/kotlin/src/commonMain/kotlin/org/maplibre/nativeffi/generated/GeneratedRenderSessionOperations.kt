@@ -320,10 +320,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Starts an ordered logical resize of the driver and the map. The driver applies the extent as
-   * soon as its work reaches the queue. The completion runs after both have applied it and the map
-   * has published its snapshot. Frames render once a map update matches the applied extent; static
-   * and tile maps publish that update for their next still image.
+   * Starts an ordered logical resize of the driver and the map. The driver applies the extent in
+   * order with its other work, and later driver work does not wait for the map. The completion runs
+   * after both have applied it and the map has published its snapshot. Frames render once a map
+   * update matches the applied extent; static and tile maps publish that update for their next
+   * still image.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

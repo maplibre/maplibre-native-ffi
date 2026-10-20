@@ -56,9 +56,11 @@ log a warning. Cancelling a binding's wait ends the wait, while native work
 continues.
 
 A later command or query completion on the same map fences discarded commands. A
-snapshot read after that completion observes their changes. A render session
-barrier fences its discarded resizes. A snapshot generation alone does not fence
-a command, because other work also publishes generations.
+map snapshot read after that completion observes their changes. After a
+discarded resize, a render session barrier fences only the session's applied
+extent; the resize completion fences both the session and the map. A snapshot
+generation alone does not fence a command, because other work also publishes
+generations.
 
 Published snapshots give UI and display threads a synchronous copy of map state.
 Their generations connect commands, events, and rendered frames when a host

@@ -503,6 +503,53 @@ void if_needed_demands_supersede_and_forced_demands_render() {
   destroy_fixture(fixture);
 }
 
+// Superseding a demand before a resize leaves the later forced demand ordered
+// after that resize, even when the map has already published the new extent.
+void supersession_preserves_a_forced_demand_after_a_resize() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  static_cast<void>(mln_test_render_until_idle(
+    fixture.runtime, fixture.map, &fixture.render, nullptr
+  ));
+  auto before = mln_render_session_snapshot{};
+  before.size = sizeof(before);
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.render.session, &before, nullptr)
+  );
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  auto demand = mln_frame_demand_default();
+  demand.token = 101;
+  MLN_TEST_OK(request_frame(fixture, demand));
+  auto resize = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.render.session, mln_logical_extent{32, 48, 1.0}, &resize.descriptor,
+    nullptr
+  ));
+  mln_test_render_request_forced(&fixture.render, 102);
+  demand.token = 103;
+  MLN_TEST_OK(request_frame(fixture, demand));
+  MLN_TEST_OK(mln_test_map_fence(fixture.map));
+  MLN_TEST_OK(blocker.finish(fixture.render));
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &resize)
+  );
+  mln_test_completion_destroy(&resize);
+  const auto batch = wait_for_results(fixture, 3);
+  const auto superseded = batch_result(batch, 0);
+  const auto forced = batch_result(batch, 1);
+  TEST_ASSERT_EQUAL_UINT64(101, superseded.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT64(102, forced.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, forced.disposition);
+  TEST_ASSERT_EQUAL_UINT64(before.generation + 1, forced.generation);
+  TEST_ASSERT_EQUAL_UINT64(103, batch_result(batch, 2).token);
+  mln_render_frame_batch_release(batch);
+  destroy_fixture(fixture);
+}
+
 // Requests a forced frame for a case that holds the call that renders it
 // after the call publishes its result: the window in which a host that acted
 // on the result reaches abandon before the call ends, which no public fence
@@ -1281,6 +1328,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(if_needed_demands_supersede_and_forced_demands_render);
+  RUN_TEST(supersession_preserves_a_forced_demand_after_a_resize);
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);

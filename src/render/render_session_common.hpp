@@ -727,9 +727,9 @@ struct mln_render_session_object
   bool destruction_started = false;
   bool attached = false;
   std::vector<mln_render_frame_result> frame_results;
-  std::deque<mln_frame_demand> demands;
+  std::deque<std::shared_ptr<const mln_frame_demand>> demands;
   // Waiting demands hold no work item until an update or target change.
-  std::deque<mln_frame_demand> update_waiting_demands;
+  std::deque<std::shared_ptr<const mln_frame_demand>> update_waiting_demands;
   std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
   mln::core::WorkerThread worker;

@@ -128,10 +128,9 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   detach(runtime, map, &fixture);
 }
 
-// With every ring slot acquired, a demand waits for a CPU release instead of
-// rendering over an acquired frame, and detach refuses while frames are out.
-// A barrier ends the parked demand while the host still owns both frames.
-static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
+// A barrier ends a parked demand while the host still owns both frames.
+// Detach refuses until the host releases the frames.
+static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
@@ -148,6 +147,10 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
     mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
   );
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
+  const mln_render_frame_result cancelled = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(203, cancelled.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, cancelled.disposition);
+  mln_test_completion_destroy(&barrier);
   mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(2, snapshot.acquired_frame_count);
   mln_completion rejected_detach = mln_test_discard_completion();
@@ -157,15 +160,10 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   );
 
   mln_test_render_release_frame(&first);
-  const mln_render_frame_result cancelled = take_one_result(&fixture);
-  TEST_ASSERT_EQUAL_UINT64(203, cancelled.token);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, cancelled.disposition);
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
-  mln_test_completion_destroy(&barrier);
-
-  // Park another demand behind a full ring, then release both frames, which
-  // leaves the demand with no work item, and detach.
   first = mln_test_render_and_acquire(&fixture, 204);
+
+  // Park another demand behind a full ring, then release the frames and
+  // detach. The demand gets a result whichever operation reaches it first.
   mln_test_render_request_forced(&fixture, 503);
   fence_driver(&fixture);
   mln_test_render_release_frame(&first);
@@ -659,7 +657,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(frame_results_wake_the_host_and_drain_into_an_owned_batch);
-  RUN_TEST(a_full_ring_parks_demands_until_a_release_or_detach);
+  RUN_TEST(a_barrier_ends_a_demand_while_the_ring_stays_acquired);
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
   RUN_TEST(resizes_apply_in_order_and_publish_generations);
   RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);

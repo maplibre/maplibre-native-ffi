@@ -196,8 +196,9 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * the fence to the session. The driver queues glWaitSync before reusing the
    * slot and deletes the fence after queueing the wait.
    *
-   * Target loss invalidates frame access. Abandon performs no graphics
-   * cleanup and may retain producer and consumer fences until process exit.
+   * Target loss invalidates frame access and may retain consumer fences until
+   * process exit. Abandon performs no graphics cleanup and may retain producer
+   * and consumer fences until process exit.
    * The host finishes its GPU reads before destroying borrowed textures.
    */
   MLN_GPU_SYNC_OPENGL_FENCE = 3U,
