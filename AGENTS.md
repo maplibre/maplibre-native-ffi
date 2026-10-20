@@ -51,12 +51,10 @@ Label an issue or a pull request with exactly one kind (`bug`, `feature`,
 `perf`, `chore`, or `research`) and at least one `area:*` label. Add `binding:`,
 `platform:`, and `renderer:` labels when the work is specific to one, and add
 `upstream` when the cause is in MapLibre Native. A patch we carry early still
-gets `area:upstream`. Leave GitHub's native issue type unset. When an item
-opens, the Label workflow fills each of these groups that has no label yet; see
-[Labels](docs/src/content/docs/development/overview.md#labels).
+gets `area:upstream`. Leave GitHub's native issue type unset.
 
-`ci:*` labels are CI instructions, separate from that scheme. `needs-info` and
-`do-not-merge` are workflow state, and they do not replace a kind or an area.
+`needs-info` and `do-not-merge` are workflow state, and they do not replace a
+kind or an area.
 
 ## Pull requests
 
@@ -65,11 +63,8 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-CI runs the coverage that each push puts at risk; see
-[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage). To
-force a unit, run `gh pr edit <number> --add-label 'ci:<unit>'` with a unit ID
-from `ci/select.toml`, or `ci:full` for every unit. A label change on a closed
-pull request runs no jobs.
+Applicable CI jobs are selected automatically. If the selection looks wrong,
+trigger a manual run (`gh workflow run CI --ref <branch>`).
 
 ## Project Invariants
 
@@ -121,7 +116,7 @@ Read these docs before changing related code:
 - [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
   for example requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for setup, common
-  tasks, tool ownership, and CI.
+  tasks, and tool ownership.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before

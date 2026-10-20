@@ -22,12 +22,11 @@ ENV = {"GITHUB_REPOSITORY": "maplibre/maplibre-native-ffi", "GITHUB_RUN_ID": "10
 FORK, OLD, NEWER, HEAD = "f" * 40, "0" * 40, "2" * 40, "1" * 40
 
 
-def pr(labels=()):
+def pr():
     return {
         "pull_request": {
             "number": 7,
             "title": "Change",
-            "labels": [{"name": label} for label in labels],
             "head": {"sha": HEAD, "ref": "topic"},
             "base": {"sha": "b" * 40},
         }
@@ -96,11 +95,10 @@ class PlanTest(unittest.TestCase):
             )
         return {unit: entry["run"] for unit, entry in decisions.items()}, bases
 
-    def test_main_ci_full_and_missing_keys_run_everything(self):
+    def test_main_manual_and_missing_keys_run_everything(self):
         for event_name, event, env in [
             ("push", {}, ENV),
             ("workflow_dispatch", {}, ENV),
-            ("pull_request", pr(["ci:full"]), ENV | {"TYPESAFE_API_KEY": "key"}),
             ("pull_request", pr(), ENV),
         ]:
             with self.subTest(event_name=event_name, env=sorted(env)):
@@ -108,11 +106,22 @@ class PlanTest(unittest.TestCase):
                 self.assertEqual(set(decisions), set(self.owned))
                 self.assertTrue(all(entry["run"] for entry in decisions.values()))
 
-    def test_a_new_pull_request_runs_hygiene_jev_choices_and_labels(self):
-        decisions, bases = self.run_plan(pr(["ci:android", "unrelated"]))
+    def test_a_new_pull_request_runs_hygiene_and_jev_choices(self):
+        decisions, bases = self.run_plan(pr())
         self.assertEqual(bases, [FORK])
         selected = {unit for unit, run in decisions.items() if run}
-        self.assertEqual(selected, {HYGIENE, "windows", "android"})
+        self.assertEqual(selected, {HYGIENE, "windows"})
+
+    def test_pull_request_labels_do_not_select_coverage(self):
+        event = pr()
+        event["pull_request"]["labels"] = [
+            {"name": "ci:full"},
+            {"name": "ci:android"},
+        ]
+        decisions, bases = self.run_plan(event)
+        self.assertEqual(bases, [FORK])
+        selected = {unit for unit, run in decisions.items() if run}
+        self.assertEqual(selected, {HYGIENE, "windows"})
 
     def test_each_unit_judges_changes_since_it_last_passed(self):
         failed, failed_jobs = self.passing_run(["windows"], run_id=94, head=NEWER)
