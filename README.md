@@ -57,6 +57,9 @@ platform status.
 
 ## Sponsors
 
+CI is provided by [Blacksmith](https://www.blacksmith.sh/) under its open source
+program.
+
 <a href="https://www.blacksmith.sh/">
   <img
     alt="CI powered by Blacksmith"
