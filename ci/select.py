@@ -74,12 +74,22 @@ def truncate(path: str, text: str) -> str:
 
 def submodule_commits(base: str, head: str, path: str) -> list[str]:
     """List upstream commit subjects between two submodule pins."""
+
+    def quiet(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=ROOT, capture_output=True, text=True, check=False
+        ).stdout.strip()
+
+    # An added or removed submodule has a pin on only one side.
     old, new = (
-        git("rev-parse", f"{rev}:{path}").strip() if rev else "" for rev in (base, head)
+        quiet("rev-parse", "--verify", "--quiet", f"{rev}:{path}")
+        for rev in (base, head)
     )
-    url = git("config", "-f", ".gitmodules", f"submodule.{path}.url").strip()
+    if not (old and new):
+        return []
+    url = quiet("config", "-f", ".gitmodules", f"submodule.{path}.url")
     match = re.search(r"github\.com[:/](.+?)(\.git)?$", url)
-    if not (old and new and match):
+    if not match:
         return []
     try:
         output = subprocess.check_output(

@@ -210,6 +210,33 @@ class PlanTest(unittest.TestCase):
                 self.assertIn(f"| ✅ | {unit} | full: no Jev API key |", summary)
 
 
+class DescribeTest(unittest.TestCase):
+    def test_an_added_submodule_has_no_upstream_commits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+
+            git("init", "--quiet")
+            git("commit", "--quiet", "--allow-empty", "-m", "base")
+            base = git("rev-parse", "HEAD")
+            git("update-index", "--add", "--cacheinfo", f"160000,{base},vendor/lib")
+            git("commit", "--quiet", "-m", "add submodule")
+            with patch.object(select, "ROOT", root):
+                change = select.describe_change(base, "HEAD", "")["change"]
+        self.assertEqual(
+            change["submodule_updates"],
+            [{"path": "vendor/lib", "upstream_commits": []}],
+        )
+
+
 class GateTest(unittest.TestCase):
     def test_required_check_accepts_only_selected_successes_and_other_skips(self):
         source, presets = load_configuration(ROOT)
