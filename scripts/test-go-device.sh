@@ -23,12 +23,12 @@ esac
 
 platform=${preset%%-*}
 cd "$MISE_MONOREPO_ROOT/bindings/go"
-native_install_dir="$MISE_MONOREPO_ROOT/build/$preset/install"
+# shellcheck source=scripts/go-native-env.sh
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$preset"
 test_dir="$MISE_MONOREPO_ROOT/build/$platform-emulator/$preset/go"
 mkdir -p "$test_dir"
 find "$test_dir" -maxdepth 1 -type f -name '*.test' -delete
 
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 # shellcheck source=scripts/go-cross-env.sh
 source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$preset"
 go test -c -o "$test_dir/" ./...

@@ -33,8 +33,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 [tasks.build]
 extends = "ffi:preset"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 
 # A host build runs the suite; a cross build proves the package compiles and
 # links for the target.
@@ -42,13 +41,14 @@ source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$usage_preset"
 if [[ -n "$goos" ]]; then
   exec go test -c -o /dev/null .
 fi
-exec go test ./...
+# Go's test cache cannot see the native library, so always rerun the suite.
+exec go test -count=1 ./...
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  go test ./...
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 ./...
 '''
 
 [tasks.test]
@@ -62,15 +62,15 @@ case "$usage_preset" in
     ;;
 esac
 
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-go test ./...
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 ./...
 go vet ./...
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-go test ./...
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 ./...
 go vet ./...
 '''
