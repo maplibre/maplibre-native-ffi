@@ -5,6 +5,8 @@ the labels in `ci/select_cases.toml`. `prs` replays the pushes of merged pull
 requests through the CI planner and compares the runner time of the jobs it
 selects with full coverage. It treats each commit of a pull request's final
 history as a push, so it approximates force pushes and multi-commit pushes. Both cache Jev's answers under `build/ci-select/`.
+
+Before changing `ci/select.toml`, run `uv run python -m ci.select_eval commits`.
 """
 
 from __future__ import annotations
@@ -205,7 +207,6 @@ def replay(pr: dict, config: dict, owned: dict, needs: dict, choose) -> list[dic
             "pull_request": {
                 "number": pr["number"],
                 "title": pr["title"],
-                "labels": [],
                 "head": {"sha": head, "ref": pr["headRefName"]},
                 "base": {"sha": pr["baseRefOid"]},
             }

@@ -3,6 +3,10 @@
 Main pushes and manual runs execute every unit. A pull request push asks Jev
 which units the change puts at risk, judging each unit only on what changed
 since that unit last passed for the pull request.
+
+A pull request without TYPESAFE_API_KEY runs every unit. Dependabot
+pull_request jobs do not receive Actions secrets. Store the same key as a
+Dependabot secret so those jobs get normal selection.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from ci.coverage import HYGIENE, dependencies, selected_jobs, unit_jobs, unit_ou
 from ci.workflow import load_configuration
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-WORKFLOW = "ci.yml"
+WORKFLOW = "ci-coverage.yml"
 # Leave room within the plan job's timeout to fall back to every unit.
 SELECTION_SECONDS = 300
 LOOKBACK_RUNS = 30
@@ -158,9 +162,6 @@ def plan(
     if event_name != "pull_request":
         raise ValueError(f"Unsupported CI event: {event_name}")
     pr = event["pull_request"]
-    labels = {label["name"] for label in pr["labels"]}
-    if "ci:full" in labels:
-        return everything(config, "full: label ci:full")
     if not env.get("TYPESAFE_API_KEY") and choose is None:
         return everything(config, "full: no Jev API key")
     choose = choose or jev_choice(
@@ -210,12 +211,6 @@ def plan(
     # A unit runs until it passes again, whatever Jev answers for the new change.
     for unit in failed:
         decisions[unit] = decisions[unit] | {"run": True, "rule": "failed last run"}
-    for unit in owned:
-        if f"ci:{unit}" in labels:
-            decisions[unit] = decisions[unit] | {
-                "run": True,
-                "rule": f"label ci:{unit}",
-            }
     return decisions
 
 
