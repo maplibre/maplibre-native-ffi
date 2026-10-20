@@ -158,9 +158,6 @@ def plan(
     if event_name != "pull_request":
         raise ValueError(f"Unsupported CI event: {event_name}")
     pr = event["pull_request"]
-    labels = {label["name"] for label in pr["labels"]}
-    if "ci:full" in labels:
-        return everything(config, "full: label ci:full")
     if not env.get("TYPESAFE_API_KEY") and choose is None:
         return everything(config, "full: no Jev API key")
     choose = choose or jev_choice(
@@ -210,12 +207,6 @@ def plan(
     # A unit runs until it passes again, whatever Jev answers for the new change.
     for unit in failed:
         decisions[unit] = decisions[unit] | {"run": True, "rule": "failed last run"}
-    for unit in owned:
-        if f"ci:{unit}" in labels:
-            decisions[unit] = decisions[unit] | {
-                "run": True,
-                "rule": f"label ci:{unit}",
-            }
     return decisions
 
 
