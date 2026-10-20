@@ -6,6 +6,9 @@
 #include <stdexcept>
 #include <string>
 
+#include <mln/gl/defines.hpp>
+#include <mln/platform/gl_functions.hpp>
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -37,6 +40,16 @@ inline auto get_opengl32_proc_address(const char* name) -> PROC {
   return reinterpret_cast<PROC>(GetProcAddress(module, name));
 }
 
+// Called with a current context, before any session uses the platform table.
+// Upstream publishes its module handle before filling the table, so every
+// session waits for this initialization to finish before making a GL call.
+inline auto initialize_wgl_functions() -> void {
+  [[maybe_unused]] static const auto initialized = [] {
+    static_cast<void>(mln::platform::glGetString(GL_VERSION));
+    return true;
+  }();
+}
+
 template <typename ResolveProc>
 inline void validate_required_wgl_proc_addresses(ResolveProc resolve_proc) {
   const char* required_functions[] = {
@@ -55,6 +68,7 @@ inline void validate_required_wgl_proc_addresses(ResolveProc resolve_proc) {
       );
     }
   }
+  initialize_wgl_functions();
 }
 
 inline auto create_shared_wgl_context(
