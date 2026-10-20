@@ -132,46 +132,28 @@ static void assert_integer_message(
   TEST_ASSERT_EQUAL_INT64(expected, message->elements[0].integer);
 }
 
-// A wake posts 0 for each call and 1 when it is released.
+// A wake posts 0 for each call and 1 when it is released. A closed port that
+// rejects every post changes nothing: the wake still posts, and its release
+// still frees the context.
 static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
-  reset_posts(true);
   mln_wake wake = {0};
   MLN_TEST_INVALID(mln_binding_dart_wake_create(NULL, 17, &wake, NULL));
   MLN_TEST_INVALID(
     mln_binding_dart_wake_create(fake_post_address(), 0, &wake, NULL)
   );
-  MLN_TEST_OK(
-    mln_binding_dart_wake_create(fake_post_address(), 17, &wake, NULL)
-  );
-  wake.callback(wake.user_data);
-  wake.callback(wake.user_data);
-  wake.release_user_data(wake.user_data);
-  TEST_ASSERT_EQUAL_size_t(3, atomic_load(&posted_count));
-  assert_integer_message(0, 17, 0);
-  assert_integer_message(1, 17, 0);
-  assert_integer_message(2, 17, 1);
-}
-
-// A Dart wake serves a delivery queue: a push into the empty queue posts 0,
-// and releasing the queue posts 1 once the wake is gone.
-static void a_dart_wake_serves_a_delivery_queue(void) {
-  reset_posts(true);
-  mln_delivery_queue_options options = {
-    .size = sizeof(mln_delivery_queue_options)
-  };
-  MLN_TEST_OK(
-    mln_binding_dart_wake_create(fake_post_address(), 41, &options.wake, NULL)
-  );
-  mln_delivery_queue queue = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, NULL));
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_completion completion = mln_test_queue_completion(queue, NULL);
-  MLN_TEST_OK(mln_runtime_barrier(runtime, &completion, NULL));
-  assert_integer_message(0, 41, 0);
-
-  mln_delivery_queue_release(queue);
-  assert_integer_message(1, 41, 1);
-  mln_test_destroy_runtime(runtime);
+  for (int open = 1; open >= 0; open -= 1) {
+    reset_posts(open == 1);
+    MLN_TEST_OK(
+      mln_binding_dart_wake_create(fake_post_address(), 17, &wake, NULL)
+    );
+    wake.callback(wake.user_data);
+    wake.callback(wake.user_data);
+    wake.release_user_data(wake.user_data);
+    TEST_ASSERT_EQUAL_size_t(3, atomic_load(&posted_count));
+    assert_integer_message(0, 17, 0);
+    assert_integer_message(1, 17, 0);
+    assert_integer_message(2, 17, 1);
+  }
 }
 
 // A notification port posts the callback identifier and the copied arguments
@@ -255,7 +237,6 @@ static void an_owner_token_disposes_its_owner_only_when_finalized(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(dart_wakes_post_zero_per_wake_and_one_on_release);
-  RUN_TEST(a_dart_wake_serves_a_delivery_queue);
   RUN_TEST(dart_notification_ports_post_copied_arguments_until_released);
   RUN_TEST(an_owner_token_disposes_its_owner_only_when_finalized);
 }

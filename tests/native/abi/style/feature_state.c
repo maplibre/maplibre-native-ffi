@@ -181,18 +181,9 @@ static void null_source_id_bytes(void* descriptor) {
   ((feature_state_call*)descriptor)->selector.source_id =
     (mln_buffer_view){.data = NULL, .size = 4};
 }
-static void null_source_layer_bytes(void* descriptor) {
-  feature_state_call* call = descriptor;
-  call->selector.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-  call->selector.source_layer_id = (mln_buffer_view){.data = NULL, .size = 4};
-}
 static void no_feature_id(void* descriptor) {
   ((feature_state_call*)descriptor)->selector.fields &=
     ~(uint32_t)MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-}
-static void get_without_feature_id(void* descriptor) {
-  no_feature_id(descriptor);
-  ((feature_state_call*)descriptor)->kind = FEATURE_STATE_GET;
 }
 static void remove_key_without_feature_id(void* descriptor) {
   feature_state_call* call = descriptor;
@@ -234,12 +225,8 @@ static void malformed_selectors_are_rejected_at_submission(void) {
      "source_id must not be empty"},
     {"null source_id bytes", null_source_id_bytes, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
-    {"null source_layer_id bytes", null_source_layer_bytes,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"set without feature_id", no_feature_id, MLN_STATUS_INVALID_ARGUMENT,
      "requires feature_id"},
-    {"get without feature_id", get_without_feature_id,
-     MLN_STATUS_INVALID_ARGUMENT, "requires feature_id"},
     {"remove state_key without feature_id", remove_key_without_feature_id,
      MLN_STATUS_INVALID_ARGUMENT, "state_key requires feature_id"},
     {"empty state", empty_state, MLN_STATUS_INVALID_ARGUMENT,

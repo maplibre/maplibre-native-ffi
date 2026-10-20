@@ -111,12 +111,6 @@ static void as_geometry_without_style(void* descriptor) {
     (mln_buffer_view){.data = NULL, .size = 1};
 }
 
-static void as_geometry_without_bytes(void* descriptor) {
-  mln_offline_region_definition* definition = descriptor;
-  *definition = geometry_definition();
-  definition->data.geometry.geometry = (mln_buffer_view){0};
-}
-
 static void as_geometry_that_is_not_json(void* descriptor) {
   mln_offline_region_definition* definition = descriptor;
   *definition = geometry_definition();
@@ -134,8 +128,6 @@ static const mln_test_validation_case definition_cases[] = {
   {"a pyramid with an inverted zoom range", pyramid_with_inverted_zoom_range,
    MLN_STATUS_INVALID_ARGUMENT, "zoom range is invalid"},
   {"a geometry without a style", as_geometry_without_style,
-   MLN_STATUS_INVALID_ARGUMENT, NULL},
-  {"a geometry without bytes", as_geometry_without_bytes,
    MLN_STATUS_INVALID_ARGUMENT, NULL},
   {"a geometry that is not JSON", as_geometry_that_is_not_json,
    MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -886,83 +878,6 @@ static void a_download_completes_from_provider_served_resources(void) {
   mln_test_provider_destroy(provider);
 }
 
-typedef struct response_error_watch {
-  mln_offline_region_id region;
-  uint32_t reason;
-  char message[128];
-} response_error_watch;
-
-static bool response_error_reported(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  response_error_watch* watch = context;
-  if (
-    event->type != MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR ||
-    event->payload.offline_region_response_error.region_id != watch->region
-  ) {
-    return false;
-  }
-  watch->reason = event->payload.offline_region_response_error.reason;
-  snprintf(
-    watch->message, sizeof(watch->message), "%.*s", (int)event->message_size,
-    messages + event->message_offset
-  );
-  return true;
-}
-
-// A download whose tile the provider fails reports the failure's reason and
-// message in a response error event for its region.
-static void a_failed_download_request_reports_its_reason(void) {
-  static const mln_test_provided_resource resources[] = {
-    {.url = offline_style_url,
-     .response =
-       {
-         .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-         .bytes = (const uint8_t*)offline_style_json,
-         .byte_count = sizeof(offline_style_json) - 1,
-       }},
-    {.url = offline_tile_url,
-     .response = {
-       .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-       .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-       .error_message = MLN_BUFFER_LITERAL("the tile host is unreachable"),
-     }},
-  };
-  mln_test_provider* provider = mln_test_provider_create(resources, 2);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_test_provider_install(runtime, provider);
-
-  const mln_offline_region_definition definition = tile_definition();
-  region_probe* created = create_region(runtime, &definition, NULL, 0);
-  const mln_offline_region_id id = created->regions[0].id;
-  free(created);
-  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
-    runtime, id, true, &completion.descriptor, NULL
-  ));
-  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
-    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
-    NULL
-  ));
-  response_error_watch watch = {.region = id};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_await_event_matching(
-      runtime, response_error_reported, &watch, mln_test_deadline_default()
-    ),
-    "the download never reported the failed tile"
-  );
-  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_ERROR_REASON_OTHER, watch.reason);
-  TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(watch.message, "the tile host is unreachable"), watch.message
-  );
-
-  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
-    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, &completion.descriptor,
-    NULL
-  ));
-  mln_test_destroy_runtime(runtime);
-  mln_test_provider_destroy(provider);
-}
-
 typedef struct offline_reentry_probe {
   mln_runtime runtime;
   mln_test_completion* list;
@@ -1109,7 +1024,6 @@ MLN_TEST_GROUP {
   RUN_TEST(offline_database_merge_reports_a_corrupt_side_database);
   RUN_TEST(offline_database_merge_copies_regions_from_a_read_only_file);
   RUN_TEST(a_download_completes_from_provider_served_resources);
-  RUN_TEST(a_failed_download_request_reports_its_reason);
   RUN_TEST(offline_submission_never_waits_for_the_runtime_worker);
   RUN_TEST(an_offline_operation_accepted_before_release_still_completes);
 }

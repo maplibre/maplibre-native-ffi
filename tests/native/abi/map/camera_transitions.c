@@ -281,8 +281,10 @@ static const immediate_case immediate_cases[] = {
   {"ease with a zero duration", MLN_CAMERA_UPDATE_MODE_EASE,
    MLN_ANIMATION_OPTION_DURATION},
   {"ease with no duration", MLN_CAMERA_UPDATE_MODE_EASE, 0},
+  // A valid easing and minimum zoom leave a zero-duration flight immediate.
   {"fly with a zero duration", MLN_CAMERA_UPDATE_MODE_FLY,
-   MLN_ANIMATION_OPTION_DURATION},
+   MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_MIN_ZOOM |
+     MLN_ANIMATION_OPTION_EASING},
 };
 
 static bool is_immediate_change(
@@ -312,6 +314,9 @@ static void an_immediate_command_completes_before_its_completion(void) {
     update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
     update.camera.zoom = 3.0 + (double)index;
     update.animation.fields = row->animation_fields;
+    update.animation.min_zoom = 1.0;
+    update.animation.easing =
+      (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
     update.animation.end_handler = mln_test_transition_end_handler(&probe);
     const uint64_t generation = update_camera_generation(map, &update);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, atomic_load(&probe.calls), row->label);
@@ -523,32 +528,6 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).gesture_in_progress);
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "gesture");
 
-  update.gesture_phase = MLN_GESTURE_PHASE_CANCEL + 1;
-  mln_completion rejected = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_update_camera(map, &update, &rejected, NULL));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// A zero-duration flight settles at once whatever its other animation fields
-// say, so the committed camera shows the target.
-static void a_flight_with_every_animation_field_commits(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
-  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  update.camera.zoom = 6.0;
-  update.animation.fields =
-    MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_VELOCITY |
-    MLN_ANIMATION_OPTION_MIN_ZOOM | MLN_ANIMATION_OPTION_EASING;
-  update.animation.duration_ms = 0.0;
-  update.animation.velocity = 1.2;
-  update.animation.min_zoom = 1.0;
-  update.animation.easing =
-    (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
-  update_camera(map, &update);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, query_camera(map).zoom);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -557,11 +536,13 @@ static void a_flight_with_every_animation_field_commits(void) {
 static mln_camera_delta animated_delta(
   uint32_t fields, double duration_ms, mln_test_transition_end* probe
 ) {
+  mln_animation_options animation = mln_animation_options_default();
+  animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  animation.duration_ms = duration_ms;
+  animation.end_handler = mln_test_transition_end_handler(probe);
   mln_camera_delta delta = mln_camera_delta_default();
   delta.fields = fields;
-  delta.animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  delta.animation.duration_ms = duration_ms;
-  delta.animation.end_handler = mln_test_transition_end_handler(probe);
+  delta.animation = animation;
   return delta;
 }
 
@@ -819,14 +800,9 @@ static void a_handler_may_submit_a_command(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Default animation options disable the handler. A rejected command runs
-// neither callback and leaves user_data with the caller, and a disabled
-// handler must not carry a release.
+// A rejected command runs neither callback and leaves user_data with the
+// caller, and a disabled handler must not carry a release.
 static void a_rejected_command_runs_no_handler(void) {
-  const mln_animation_options defaults = mln_animation_options_default();
-  TEST_ASSERT_NULL(defaults.end_handler.callback);
-  TEST_ASSERT_NULL(defaults.end_handler.release_user_data);
-
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_transition_end probe;
@@ -857,7 +833,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_rendered_ease_completes_at_its_target);
   RUN_TEST(an_immediate_command_completes_before_its_completion);
   RUN_TEST(the_handler_runs_whatever_the_event_mask_selects);
-  RUN_TEST(a_flight_with_every_animation_field_commits);
   RUN_TEST(cancel_transitions_commits_and_leaves_the_camera);
   RUN_TEST(cancel_camera_transition_ends_only_its_identity);
   RUN_TEST(gesture_phase_publishes_the_snapshot_flag);

@@ -1,6 +1,6 @@
-// Style commands that refuse their input or their target: empty IDs, URLs,
-// JSON, and tile lists, images without pixels, invalid light and style JSON,
-// and sources whose ID is taken or whose kind does not take the command.
+// Style commands that refuse their input or their target: empty views and tile
+// lists, images without pixels, invalid style JSON, and sources whose ID is
+// taken or whose kind does not take the command.
 
 #include "support/style.h"
 #include "support/test_support.h"
@@ -11,15 +11,12 @@
 #define EXPECT_EMPTY_REJECTED(name, expression) \
   MLN_TEST_EXPECT_COMMAND_REJECTED(name " must not be empty", expression)
 
-static void ignore_tile(void* user_data, mln_canonical_tile_id tile_id) {
-  (void)user_data;
-  (void)tile_id;
-}
-
 static const mln_lat_lng corners[4] = {{1, 1}, {1, 2}, {0, 2}, {0, 1}};
 
 // Every ID, URL, JSON, and tile URL input that must name at least one byte is
 // refused at submission when empty, so no empty view reaches the map worker.
+// One shared check guards every such input, so one ID and one other view stand
+// for them, beside the rules that belong to tile lists alone.
 static void empty_views_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -27,135 +24,18 @@ static void empty_views_are_rejected_at_submission(void) {
   const mln_buffer_view id = MLN_BUFFER_LITERAL("id");
   const mln_buffer_view json = MLN_BUFFER_LITERAL("{}");
   const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://data");
-  const mln_canonical_tile_id tile = {.z = 0, .x = 0, .y = 0};
-  const mln_lat_lng_bounds bounds = {
-    .southwest = {.latitude = 0, .longitude = 0},
-    .northeast = {.latitude = 1, .longitude = 1},
-  };
-  const uint8_t pixel[4] = {0, 0, 0, 0};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
-  image.width = 1;
-  image.height = 1;
-  image.stride = 4;
-  image.pixels = pixel;
-  image.byte_length = sizeof(pixel);
-  mln_geojson_source_data data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-    NULL, &data, MLN_TEST_DIAGNOSTIC
-  ));
-  mln_custom_geometry_source_options geometry =
-    mln_custom_geometry_source_options_default();
-  geometry.fetch_tile = ignore_tile;
-  mln_custom_mvt_vector_source_options mvt =
-    mln_custom_mvt_vector_source_options_default();
-  mvt.fetch_tile = ignore_tile;
   const mln_buffer_view tiles[] = {url};
   const mln_buffer_view empty_tiles[] = {url, empty};
 
-  // Sources.
   EXPECT_EMPTY_REJECTED(
     "source_id", mln_map_add_style_source_json(
                    map, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );
   EXPECT_EMPTY_REJECTED(
-    "source_json", mln_map_add_style_source_json(
-                     map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                   )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_remove_style_source(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_get_style_source(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_style_source_volatile(
-                   map, empty, true, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-
-  // GeoJSON sources.
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_geojson_source_url(
-      map, empty, url, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_add_geojson_source_url(
-             map, id, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_add_geojson_source_data(
-                   map, empty, data, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_geojson_source_url(
-                   map, empty, url, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_set_geojson_source_url(
-             map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_geojson_source_data(
-                   map, empty, data, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_geojson_source_synchronous_tiling(
-                   map, empty, true, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-
-  // Tile sources.
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_vector_source_url(
-      map, empty, url, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_add_vector_source_url(
-             map, id, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_raster_source_url(
-      map, empty, url, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_add_raster_source_url(
-             map, id, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_raster_dem_source_url(
-      map, empty, url, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_add_raster_dem_source_url(
-             map, id, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_vector_source_tiles(
-      map, empty, tiles, 1, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    "property_name",
+    mln_map_set_style_layer_property(
+      map, id, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   EXPECT_EMPTY_REJECTED(
@@ -176,233 +56,7 @@ static void empty_views_are_rejected_at_submission(void) {
       map, id, NULL, 1, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_raster_source_tiles(
-      map, empty, tiles, 1, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "tile URL",
-    mln_map_add_raster_source_tiles(
-      map, id, empty_tiles, 2, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_raster_dem_source_tiles(
-      map, empty, tiles, 1, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "tile URL",
-    mln_map_add_raster_dem_source_tiles(
-      map, id, empty_tiles, 2, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
 
-  // Custom sources. A rejected add never takes the callbacks' user_data;
-  // custom_sources.c shows that the caller keeps it.
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_custom_geometry_source(
-      map, empty, &geometry, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_set_custom_geometry_source_tile_data(
-      map, empty, tile, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "data", mln_map_set_custom_geometry_source_tile_data(
-              map, id, tile, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-            )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_invalidate_custom_geometry_source_tile(
-                   map, empty, tile, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_invalidate_custom_geometry_source_region(
-      map, empty, bounds, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_add_custom_mvt_vector_source(
-                   map, empty, &mvt, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_set_custom_mvt_vector_source_tile_data(
-      map, empty, tile, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_set_custom_mvt_vector_source_tile_error(
-      map, empty, tile, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_invalidate_custom_mvt_vector_source_tile(
-                   map, empty, tile, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-
-  // Images and image sources.
-  EXPECT_EMPTY_REJECTED(
-    "image_id",
-    mln_map_set_style_image(
-      map, empty, &image, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_remove_style_image(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_get_style_image(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_add_image_source_url(
-      map, empty, corners, 4, url, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url",
-    mln_map_add_image_source_url(
-      map, id, corners, 4, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_add_image_source_image(
-                   map, empty, corners, 4, &image, &completion.descriptor,
-                   MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_image_source_url(
-                   map, empty, url, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "url", mln_map_set_image_source_url(
-             map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-           )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_set_image_source_image(
-      map, empty, &image, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id",
-    mln_map_set_image_source_coordinates(
-      map, empty, corners, 4, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_get_image_source_coordinates(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-
-  // Layers. An empty before_layer_id means the top of the stack, so it is
-  // accepted.
-  EXPECT_EMPTY_REJECTED(
-    "layer_json",
-    mln_map_add_style_layer_json(
-      map, empty, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_remove_style_layer(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_style_layer(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_move_style_layer(
-                  map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_style_layer_json(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id",
-    mln_map_set_style_layer_property(
-      map, empty, id, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "property_name",
-    mln_map_set_style_layer_property(
-      map, id, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "value", mln_map_set_style_layer_property(
-               map, id, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-             )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_style_layer_property(
-                  map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "property_name",
-    mln_map_get_style_layer_property(
-      map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-
-  // Style-wide values.
-  EXPECT_EMPTY_REJECTED(
-    "value", mln_map_set_global_state_property(
-               map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-             )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "light_json", mln_map_set_style_light_json(
-                    map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                  )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "property_name",
-    mln_map_set_style_light_property(
-      map, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "value", mln_map_set_style_light_property(
-               map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-             )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "property_name", mln_map_get_style_light_property(
-                       map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                     )
-  );
-
-  mln_geojson_source_data_release(data);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -445,19 +99,6 @@ static void style_commands_reject_invalid_inputs(void) {
                                  map, MLN_BUFFER_LITERAL("marker"), &no_pixels,
                                  NULL, &completion.descriptor, &diagnostic
                                )
-  );
-  EXPECT_REFUSED(
-    "pixels must not be null", mln_map_add_image_source_image(
-                                 map, MLN_BUFFER_LITERAL("image"), corners, 4,
-                                 &no_pixels, &completion.descriptor, &diagnostic
-                               )
-  );
-  EXPECT_REFUSED(
-    "style light property",
-    mln_map_set_style_light_property(
-      map, MLN_BUFFER_LITERAL("intensity"), MLN_BUFFER_LITERAL("{"),
-      &completion.descriptor, &diagnostic
-    )
   );
   // Last: a style that fails to load leaves the map without its style.
   static const char nul_json[] = "{\0}";

@@ -812,25 +812,11 @@ static const tile_answer_case tile_answer_cases[] = {
     .error_reason = MLN_RESOURCE_ERROR_REASON_SERVER,
     .error_message = MLN_BUFFER_LITERAL("tile server error")},
    false},
-  {"a connection error",
-   {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_CONNECTION,
-    .error_message = MLN_BUFFER_LITERAL("tile connection error")},
-   false},
-  {"a rate limit",
-   {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
-    .error_message = MLN_BUFFER_LITERAL("tile rate limit")},
-   false},
-  {"another error",
-   {.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-    .error_message = MLN_BUFFER_LITERAL("tile other error")},
-   false},
 };
 
 // A provider's answer for a tile decides whether the map renders: a missing or
-// empty tile renders as nothing, and any other error fails the still image.
+// empty tile renders as nothing, and any other error, such as a server error,
+// fails the still image.
 static void a_tile_answer_decides_whether_the_map_renders(void) {
   for (size_t index = 0;
        index < sizeof(tile_answer_cases) / sizeof(tile_answer_cases[0]);

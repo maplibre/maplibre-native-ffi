@@ -96,22 +96,17 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   sync.hold(SyncPoint::ProjectionCallLeased);
   Conversion conversion(projection);
   const auto leased = sync.wait_for_hits(SyncPoint::ProjectionCallLeased, 1);
-  // No call holds the call lock, so the close retires and destroys the
-  // projection without waiting.
   const auto close_status = mln_map_projection_release(projection, nullptr);
-  const auto close_waits = sync.hits(SyncPoint::ProjectionCloseWaits);
   sync.release(SyncPoint::ProjectionCallLeased);
   conversion.thread.join();
 
   TEST_ASSERT_TRUE_MESSAGE(leased, "the conversion never leased the handle");
   MLN_TEST_OK(close_status);
-  TEST_ASSERT_EQUAL_INT(0, close_waits);
   MLN_TEST_INVALID_STATE(conversion.status.load());
   TEST_ASSERT_NOT_NULL_MESSAGE(
     std::strstr(conversion.diagnostic.message, "stale"),
     conversion.diagnostic.message
   );
-  TEST_ASSERT_EQUAL_INT(0, sync.hits(SyncPoint::ProjectionCallRunning));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

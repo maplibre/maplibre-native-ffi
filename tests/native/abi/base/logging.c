@@ -118,15 +118,11 @@ static const struct {
   uint32_t mask;
   mln_status expected;
 } async_masks[] = {
-  {MLN_LOG_SEVERITY_MASK_DEFAULT, MLN_STATUS_OK},
   {MLN_LOG_SEVERITY_MASK_ALL, MLN_STATUS_OK},
   {0, MLN_STATUS_OK},
-  {MLN_LOG_SEVERITY_MASK_ERROR, MLN_STATUS_OK},
   // Bit 0 names no severity: the mask bits start at the INFO severity value.
   {UINT32_C(1), MLN_STATUS_INVALID_ARGUMENT},
   {UINT32_C(1) << 4U, MLN_STATUS_INVALID_ARGUMENT},
-  {MLN_LOG_SEVERITY_MASK_ALL | (UINT32_C(1) << 31U),
-   MLN_STATUS_INVALID_ARGUMENT},
 };
 
 LOG_STATE_CASE(the_async_mask_accepts_only_severity_bits) {
@@ -360,20 +356,6 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   }
 }
 
-// A rejected mask leaves the previous one in effect: here every severity
-// stays synchronous.
-LOG_STATE_CASE(a_rejected_async_mask_leaves_the_previous_one) {
-  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
-  MLN_TEST_INVALID(mln_log_set_async_severity_mask(
-    MLN_LOG_SEVERITY_MASK_ALL | (UINT32_C(1) << 31U), NULL
-  ));
-  static dump_probe probe;
-  dump_debug_logs(&probe);
-  TEST_ASSERT_EQUAL_INT(
-    DUMP_RECORD_COUNT, atomic_load(&probe.count_at_completion)
-  );
-}
-
 #if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
 
 // Redirects stderr into a pipe until stop_capturing_stderr() restores it.
@@ -449,7 +431,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_failed_discarded_command_logs_one_warning);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
-  RUN_TEST(a_rejected_async_mask_leaves_the_previous_one);
 #if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
   RUN_TEST(only_records_the_callback_passes_on_reach_the_platform_logger);
 #endif

@@ -1,6 +1,8 @@
 // WebGPU target descriptors: what attach and set_target reject before they
 // reach a device. Every build validates a WebGPU descriptor before it reports
 // that it carries no WebGPU backend, so these tables run on every preset.
+// Every backend's descriptors share the extent and ring rules, so this file
+// alone checks each of those rules in full.
 
 #include "support/attach_table.h"
 #include "support/test_support.h"
@@ -10,6 +12,7 @@
 enum { some_texture_format = 18 };
 
 MLN_TEST_DESCRIPTOR_EDITS(webgpu_surface, mln_webgpu_surface_descriptor)
+MLN_TEST_EXTENT_RULE_EDITS(webgpu_surface)
 MLN_TEST_OVERFLOW_EDIT(webgpu_surface)
 MLN_TEST_DESCRIPTOR_EDITS(webgpu_owned, mln_webgpu_owned_texture_descriptor)
 MLN_TEST_OVERFLOW_EDIT(webgpu_owned)
@@ -17,6 +20,7 @@ MLN_TEST_DESCRIPTOR_EDITS(
   webgpu_borrowed, mln_webgpu_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(webgpu_borrowed, webgpu)
+MLN_TEST_RING_RULE_EDITS(webgpu_borrowed, webgpu)
 
 static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_surface.surface = NULL;
@@ -99,6 +103,7 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   // rather than leaving the browser to report it.
   static const mln_test_validation_case surface_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(webgpu_surface),
+    MLN_TEST_EXTENT_RULE_CASES(webgpu_surface),
     MLN_TEST_OVERFLOW_CASE(webgpu_surface),
     {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
@@ -135,6 +140,7 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(webgpu_borrowed),
     MLN_TEST_BORROWED_CASES(webgpu_borrowed),
+    MLN_TEST_RING_RULE_CASES(webgpu_borrowed),
     {"null device", borrowed_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null texture view", borrowed_without_texture_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -158,7 +164,9 @@ static void webgpu_attach_rejects_malformed_calls(void) {
 
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 // A build without WebGPU checks a replacement descriptor before it reports the
-// missing backend, whatever the session.
+// missing backend, whatever the session. set_target runs its attach's
+// descriptor check, so beyond a row for each pointer and handle it reads,
+// these rows cover only its own steps.
 static void webgpu_set_target_checks_its_descriptor_first(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -167,11 +175,9 @@ static void webgpu_set_target_checks_its_descriptor_first(void) {
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(webgpu_surface),
+    MLN_TEST_UNDERSIZED_CASE(webgpu_surface),
     MLN_TEST_OVERFLOW_CASE(webgpu_surface),
     {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-    {"unspecified format", surface_without_format, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
@@ -185,8 +191,9 @@ static void webgpu_set_target_checks_its_descriptor_first(void) {
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(webgpu_borrowed),
-    MLN_TEST_BORROWED_CASES(webgpu_borrowed),
+    MLN_TEST_UNDERSIZED_CASE(webgpu_borrowed),
+    {"null textures array", webgpu_borrowed_without_textures,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null texture view", borrowed_without_texture_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,

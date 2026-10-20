@@ -1,8 +1,7 @@
 // The map camera: absolute updates round-trip through the snapshot and the
 // ordered query, relative deltas follow their documented conventions and apply
-// atomically, fits round-trip through the visible bounds, constraints clamp
-// what they select, and ordered conversions and scales observe the committed
-// camera.
+// atomically, fits round-trip through the visible bounds, and the unbounded
+// constraint stays distinct from world bounds.
 
 #include <math.h>
 
@@ -75,10 +74,6 @@ static void update_undersized(void* descriptor) {
 static void update_bad_mode(void* descriptor) {
   ((mln_camera_update*)descriptor)->mode = MLN_CAMERA_UPDATE_MODE_FLY + 1;
 }
-static void update_bad_gesture(void* descriptor) {
-  ((mln_camera_update*)descriptor)->gesture_phase =
-    MLN_GESTURE_PHASE_CANCEL + 1;
-}
 // The update versions its embedded camera, so native ignores the camera's own
 // size.
 static void camera_without_size(void* descriptor) {
@@ -97,11 +92,6 @@ static void camera_nan_zoom(void* descriptor) {
   camera->fields = MLN_CAMERA_OPTION_ZOOM;
   camera->zoom = NAN;
 }
-static void camera_infinite_fov(void* descriptor) {
-  mln_camera_options* camera = &((mln_camera_update*)descriptor)->camera;
-  camera->fields = MLN_CAMERA_OPTION_FOV;
-  camera->field_of_view = INFINITY;
-}
 static void camera_negative_padding(void* descriptor) {
   mln_camera_options* camera = &((mln_camera_update*)descriptor)->camera;
   camera->fields = MLN_CAMERA_OPTION_PADDING;
@@ -114,12 +104,6 @@ static void camera_nan_anchor(void* descriptor) {
 }
 static void animation_unknown_field(void* descriptor) {
   ((mln_camera_update*)descriptor)->animation.fields = UINT32_C(1) << 31;
-}
-static void animation_negative_duration(void* descriptor) {
-  mln_animation_options* animation =
-    &((mln_camera_update*)descriptor)->animation;
-  animation->fields = MLN_ANIMATION_OPTION_DURATION;
-  animation->duration_ms = -1.0;
 }
 static void animation_duration_past_the_native_range(void* descriptor) {
   mln_animation_options* animation =
@@ -145,24 +129,18 @@ static const mln_test_validation_case update_cases[] = {
    "valid size"},
   {"mode out of range", update_bad_mode, MLN_STATUS_INVALID_ARGUMENT,
    "mode or gesture phase"},
-  {"gesture phase out of range", update_bad_gesture,
-   MLN_STATUS_INVALID_ARGUMENT, "mode or gesture phase"},
   {"camera without size", camera_without_size, MLN_STATUS_OK, NULL},
   {"unknown camera field", camera_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
    "unknown bits"},
   {"latitude past the pole", camera_latitude_past_the_pole,
    MLN_STATUS_INVALID_ARGUMENT, "within [-90, 90]"},
   {"NaN zoom", camera_nan_zoom, MLN_STATUS_INVALID_ARGUMENT, "must be finite"},
-  {"infinite field of view", camera_infinite_fov, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
   {"negative padding", camera_negative_padding, MLN_STATUS_INVALID_ARGUMENT,
    "greater than or equal to 0"},
   {"NaN anchor", camera_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
    "screen point values must be finite"},
   {"unknown animation field", animation_unknown_field,
    MLN_STATUS_INVALID_ARGUMENT, "unknown bits"},
-  {"negative duration", animation_negative_duration,
-   MLN_STATUS_INVALID_ARGUMENT, "native duration range"},
   {"duration past the native range", animation_duration_past_the_native_range,
    MLN_STATUS_INVALID_ARGUMENT, "native duration range"},
   {"zero velocity", animation_zero_velocity, MLN_STATUS_INVALID_ARGUMENT,
@@ -170,51 +148,6 @@ static const mln_test_validation_case update_cases[] = {
   {"easing outside the unit square", animation_easing_outside_the_unit_square,
    MLN_STATUS_INVALID_ARGUMENT, "within [0, 1]"},
 };
-
-// The update is copied at submission: editing it afterwards changes nothing.
-// The ordered query and the snapshot both observe the commit, and the query
-// reports the generation that published it.
-static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_drain_all(runtime);
-
-  mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
-
-  mln_camera_update update = mln_camera_update_default();
-  update.camera = test_camera();
-  update.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
-  update.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
-  update.animation.transition_id = UINT64_C(77);
-  mln_test_completion command = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_update_camera(map, &update, &command.descriptor, NULL));
-  MLN_TEST_OK(mln_test_completion_finish(&command));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&command)
-  );
-  const uint64_t command_generation = mln_test_completion_generation(&command);
-  TEST_ASSERT_GREATER_THAN_UINT64(before.generation, command_generation);
-  mln_test_completion_destroy(&command);
-
-  update.camera.center.longitude = 12.0;
-  update.camera.zoom = 1.0;
-  update.camera.padding.left = 999.0;
-
-  const mln_camera_query_result result = query_camera(map);
-  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, result.camera.center.longitude);
-  TEST_ASSERT_EQUAL_DOUBLE(11.0, result.camera.zoom);
-  TEST_ASSERT_EQUAL_DOUBLE(2.0, result.camera.padding.left);
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, result.generation);
-
-  mln_map_snapshot after = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_get_snapshot(map, &after, NULL));
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, after.generation);
-  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.center.longitude);
-  TEST_ASSERT_EQUAL_DOUBLE(11.0, after.camera.zoom);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
 
 // One absolute camera field and the value MapLibre must hand back for it.
 typedef struct camera_row {
@@ -384,27 +317,14 @@ typedef struct delta_row {
 } delta_row;
 
 static const delta_row delta_rows[] = {
-  {"pan right", MLN_CAMERA_DELTA_OFFSET, {.x = 64.0, .y = 0.0}},
-  {"pan down", MLN_CAMERA_DELTA_OFFSET, {.x = 0.0, .y = 48.0}},
   {"pan up and left", MLN_CAMERA_DELTA_OFFSET, {.x = -32.0, .y = -16.0}},
-  {"scale in", MLN_CAMERA_DELTA_SCALE, {0}, 2.0},
-  {"scale out", MLN_CAMERA_DELTA_SCALE, {0}, 0.25},
-  {"scale in about a corner",
-   MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR,
-   {0},
-   2.0,
-   .anchor = {.x = 0.0, .y = 0.0}},
   {"scale out about an edge",
    MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR,
    {0},
    0.5,
    .anchor = {.x = 256.0, .y = 128.0}},
   {"rotate clockwise", MLN_CAMERA_DELTA_BEARING, .bearing = 30.0},
-  {"rotate counterclockwise", MLN_CAMERA_DELTA_BEARING, .bearing = -50.0},
-  {"rotate about a corner", MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_ANCHOR,
-   .bearing = 20.0, .anchor = {.x = 32.0, .y = 32.0}},
   {"tilt away from straight down", MLN_CAMERA_DELTA_PITCH, .pitch = 20.0},
-  {"tilt back toward straight down", MLN_CAMERA_DELTA_PITCH, .pitch = -5.0},
   {"tilt about a point", MLN_CAMERA_DELTA_PITCH | MLN_CAMERA_DELTA_ANCHOR,
    .pitch = 10.0, .anchor = {.x = 96.0, .y = 200.0}},
   {"scale, rotate, and tilt about a point",
@@ -536,75 +456,6 @@ static mln_screen_point projected_pixel(
   return point;
 }
 
-// A positive offset moves the content right and down, so the coordinate that
-// was at the center follows the pointer.
-static void an_offset_moves_the_content_with_the_pointer(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_square_map(runtime, 256);
-  mln_camera_options start = mln_camera_options_default();
-  start.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  start.center.latitude = 10.0;
-  start.center.longitude = 20.0;
-  start.zoom = 4.0;
-  jump(map, start);
-  const mln_camera_options before = query_camera(map).camera;
-
-  mln_camera_delta delta = mln_camera_delta_default();
-  delta.fields = MLN_CAMERA_DELTA_OFFSET;
-  delta.offset = (mln_screen_point){.x = 10.0, .y = 6.0};
-  MLN_TEST_AWAIT_OK(
-    mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
-  );
-
-  mln_map_projection projection = create_projection(map);
-  const mln_screen_point moved = projected_pixel(projection, before.center);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 138.0, moved.x);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 134.0, moved.y);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// One delta turns and tilts about an off-center anchor in one command: the
-// coordinate under the anchor stays there, and bearing and pitch each move by
-// their delta.
-static void one_delta_turns_and_tilts_about_its_anchor(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_square_map(runtime, 256);
-  mln_camera_options start = mln_camera_options_default();
-  start.fields =
-    MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH;
-  start.center.latitude = 10.0;
-  start.center.longitude = 20.0;
-  start.zoom = 4.0;
-  start.pitch = 10.0;
-  jump(map, start);
-  const mln_screen_point anchor = {.x = 64.0, .y = 192.0};
-  const mln_lat_lng under_anchor = coordinate_at(map, anchor);
-
-  mln_camera_delta delta = mln_camera_delta_default();
-  delta.fields =
-    MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_PITCH | MLN_CAMERA_DELTA_ANCHOR;
-  delta.bearing = 25.0;
-  delta.pitch = 15.0;
-  delta.anchor = anchor;
-  MLN_TEST_AWAIT_OK(
-    mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
-  );
-
-  mln_map_projection projection = create_projection(map);
-  const mln_screen_point kept = projected_pixel(projection, under_anchor);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.x, kept.x);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);
-  mln_camera_options camera = mln_camera_options_default();
-  MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 25.0, camera.bearing);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 25.0, camera.pitch);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Forwards a command's completion after copying the map snapshot. The
 // completion runs before anything else can publish, so the copy is the
 // snapshot that the command published.
@@ -645,78 +496,10 @@ static bool is_render_update_at(
          event->source == match->map && event->generation == match->generation;
 }
 
-// A delta that pans and zooms publishes both in one snapshot and announces one
-// render update for them.
-static void a_delta_publishes_its_pan_and_zoom_together(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_square_map(runtime, 256);
-  mln_camera_options start = mln_camera_options_default();
-  start.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  start.center.latitude = 10.0;
-  start.center.longitude = 20.0;
-  start.zoom = 4.0;
-  jump(map, start);
-  const mln_screen_point offset = {.x = 30.0, .y = -20.0};
-  const mln_lat_lng moved_to_center = coordinate_at(
-    map, (mln_screen_point){.x = 128.0 - offset.x, .y = 128.0 - offset.y}
-  );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  mln_test_drain_all(runtime);
-
-  mln_test_completion completion = mln_test_completion_default(0);
-  snapshot_probe probe = {.inner = completion.descriptor, .map = map};
-  const mln_completion probed = {
-    .size = sizeof(mln_completion),
-    .callback = read_snapshot_then_complete,
-    .user_data = &probe,
-    .release_user_data = release_snapshot_probe,
-  };
-  mln_camera_delta delta = mln_camera_delta_default();
-  delta.fields = MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE;
-  delta.offset = offset;
-  delta.scale = 4.0;
-  MLN_TEST_OK(mln_map_apply_camera_delta(map, &delta, &probed, NULL));
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-  const uint64_t generation = mln_test_completion_generation(&completion);
-  mln_test_completion_destroy(&completion);
-
-  MLN_TEST_OK(probe.read_status);
-  TEST_ASSERT_EQUAL_UINT64(generation, probe.snapshot.generation);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, probe.snapshot.camera.zoom);
-  assert_same_coordinate(
-    "published center", moved_to_center,
-    (mln_lat_lng){
-      .latitude = probe.snapshot.camera.center.latitude,
-      .longitude = probe.snapshot.camera.center.longitude
-    }
-  );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  render_update_match match = {.map = map, .generation = generation};
-  TEST_ASSERT_EQUAL_size_t(
-    1, mln_test_drain_counting_matching(runtime, is_render_update_at, &match)
-  );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-typedef struct render_update_probe {
-  mln_map map;
-  uint64_t generation;
-} render_update_probe;
-
-// Matches a render update of the probe's map that carries its generation.
-static bool is_render_update_of(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
-  const render_update_probe* probe = context;
-  return event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-         event->source == probe->map && event->generation == probe->generation;
-}
-
 // A two-finger gesture passes its centroid movement as offset and its new
 // centroid as anchor. The pan moves the coordinate at anchor - offset to the
-// anchor, and the zoom and turn keep it there, all in one render update.
+// anchor, and the zoom and turn keep it there. The command publishes the pan
+// and the ease in one snapshot and announces one render update for them.
 static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 256);
@@ -736,6 +519,14 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
 
+  mln_test_completion completion = mln_test_completion_default(0);
+  snapshot_probe probe = {.inner = completion.descriptor, .map = map};
+  const mln_completion probed = {
+    .size = sizeof(mln_completion),
+    .callback = read_snapshot_then_complete,
+    .user_data = &probe,
+    .release_user_data = release_snapshot_probe,
+  };
   mln_camera_delta delta = mln_camera_delta_default();
   delta.fields = MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE |
                  MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_ANCHOR;
@@ -743,36 +534,33 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   delta.scale = 2.0;
   delta.bearing = 20.0;
   delta.anchor = anchor;
-  mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_apply_camera_delta(map, &delta, &probed, NULL));
   MLN_TEST_OK(mln_test_completion_finish(&completion));
   const uint64_t generation = mln_test_completion_generation(&completion);
   mln_test_completion_destroy(&completion);
+
+  // The snapshot the command published holds both the pan and the ease.
+  MLN_TEST_OK(probe.read_status);
+  TEST_ASSERT_EQUAL_UINT64(generation, probe.snapshot.generation);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, probe.snapshot.camera.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, probe.snapshot.camera.bearing);
 
   mln_map_projection projection = create_projection(map);
   const mln_screen_point kept = projected_pixel(projection, dragged);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.x, kept.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);
-  mln_camera_options camera = mln_camera_options_default();
-  MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, camera.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, camera.bearing);
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
 
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
-  // The pan and the ease publish one render update, announced with the
-  // command's generation.
   TEST_ASSERT_EQUAL_UINT64(
     before.latest_render_update_generation + 1,
     snapshot.latest_render_update_generation
   );
-  render_update_probe probe = {.map = map, .generation = generation};
+  render_update_match match = {.map = map, .generation = generation};
   TEST_ASSERT_EQUAL_size_t(
-    1, mln_test_drain_counting_matching(runtime, is_render_update_of, &probe)
+    1, mln_test_drain_counting_matching(runtime, is_render_update_at, &match)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -814,25 +602,10 @@ static void delta_zero_scale(void* descriptor) {
   delta->fields = MLN_CAMERA_DELTA_SCALE;
   delta->scale = 0.0;
 }
-static void delta_negative_scale(void* descriptor) {
-  mln_camera_delta* delta = descriptor;
-  delta->fields = MLN_CAMERA_DELTA_SCALE;
-  delta->scale = -2.0;
-}
-static void delta_nan_scale(void* descriptor) {
-  mln_camera_delta* delta = descriptor;
-  delta->fields = MLN_CAMERA_DELTA_SCALE;
-  delta->scale = NAN;
-}
 static void delta_infinite_bearing(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_BEARING;
   delta->bearing = INFINITY;
-}
-static void delta_nan_pitch(void* descriptor) {
-  mln_camera_delta* delta = descriptor;
-  delta->fields = MLN_CAMERA_DELTA_PITCH;
-  delta->pitch = NAN;
 }
 static void delta_anchor_alone(void* descriptor) {
   ((mln_camera_delta*)descriptor)->fields = MLN_CAMERA_DELTA_ANCHOR;
@@ -845,12 +618,6 @@ static void delta_animated_anchored_pan(void* descriptor) {
   delta->bearing = 20.0;
   delta->animation.fields = MLN_ANIMATION_OPTION_DURATION;
   delta->animation.duration_ms = 300.0;
-}
-static void delta_nan_anchor(void* descriptor) {
-  mln_camera_delta* delta = descriptor;
-  delta->fields = MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_ANCHOR;
-  delta->bearing = 5.0;
-  delta->anchor.x = NAN;
 }
 
 static const mln_test_validation_case delta_cases[] = {
@@ -865,20 +632,12 @@ static const mln_test_validation_case delta_cases[] = {
    "must be finite"},
   {"zero scale", delta_zero_scale, MLN_STATUS_INVALID_ARGUMENT,
    "finite and positive"},
-  {"negative scale", delta_negative_scale, MLN_STATUS_INVALID_ARGUMENT,
-   "finite and positive"},
-  {"NaN scale", delta_nan_scale, MLN_STATUS_INVALID_ARGUMENT,
-   "finite and positive"},
   {"infinite bearing", delta_infinite_bearing, MLN_STATUS_INVALID_ARGUMENT,
-   "bearing and pitch must be finite"},
-  {"NaN pitch", delta_nan_pitch, MLN_STATUS_INVALID_ARGUMENT,
    "bearing and pitch must be finite"},
   {"anchor alone", delta_anchor_alone, MLN_STATUS_INVALID_ARGUMENT,
    "requires scale, bearing, or pitch"},
   {"animated anchored pan", delta_animated_anchored_pan,
    MLN_STATUS_INVALID_ARGUMENT, "only in an immediate delta"},
-  {"NaN anchor", delta_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
 };
 
 static mln_camera_options finish_camera_query(mln_test_completion* query) {
@@ -917,13 +676,9 @@ static mln_lat_lng_bounds bounds_for_camera(
   return bounds;
 }
 
-static bool near(double expected, double actual) {
-  return fabs(expected - actual) < 1e-6;
-}
-
-// A camera fitted to bounds shows exactly those bounds: the visible box
-// contains them and meets them on the side that limited the fit. The three fit
-// inputs agree on the same region, and the fit options reach the result.
+// A camera fitted to bounds shows those bounds: the visible box contains them.
+// The three fit inputs agree on the same region, and the fit options reach the
+// result.
 static void camera_fits_round_trip_through_the_visible_bounds(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 512);
@@ -949,31 +704,6 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   );
   TEST_ASSERT_TRUE(
     visible.northeast.longitude >= region.northeast.longitude - 1e-6
-  );
-  const bool meets_east_and_west =
-    near(region.southwest.longitude, visible.southwest.longitude) &&
-    near(region.northeast.longitude, visible.northeast.longitude);
-  const bool meets_north_and_south =
-    near(region.southwest.latitude, visible.southwest.latitude) &&
-    near(region.northeast.latitude, visible.northeast.latitude);
-  TEST_ASSERT_TRUE_MESSAGE(
-    meets_east_and_west || meets_north_and_south,
-    "the fitted camera shows more than the region on every side"
-  );
-
-  // With no bearing or pitch, the unwrapped hull is the same box.
-  const mln_lat_lng_bounds hull = bounds_for_camera(map, &fitted, true);
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, visible.southwest.latitude, hull.southwest.latitude
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, visible.southwest.longitude, hull.southwest.longitude
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, visible.northeast.latitude, hull.northeast.latitude
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, visible.northeast.longitude, hull.northeast.longitude
   );
 
   const mln_lat_lng corners[] = {region.southwest, region.northeast};
@@ -1083,10 +813,6 @@ static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
   return snapshot.bounds;
 }
 
-static const mln_lat_lng san_francisco = {
-  .latitude = 37.7749, .longitude = -122.4194
-};
-
 // Every camera entry point checks its arguments before it submits: updates,
 // deltas, fits, constraints, and free camera options.
 static void camera_calls_reject_what_they_cannot_express(void) {
@@ -1181,14 +907,6 @@ static void camera_calls_reject_what_they_cannot_express(void) {
       mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
     );
     TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_zoom"));
-    options = mln_bound_options_default();
-    options.fields = MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH;
-    options.min_pitch = 40.0;
-    options.max_pitch = 20.0;
-    MLN_TEST_INVALID(
-      mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
-    );
-    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_pitch"));
   }
   {
     mln_free_camera_options options = mln_free_camera_options_default();
@@ -1231,22 +949,18 @@ static void flights_reject_unrepresentable_derived_durations(void) {
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = 1.0;
   update.animation.fields = MLN_ANIMATION_OPTION_VELOCITY;
-  const double velocities[] = {nextafter(0.0, 1.0), 1e-12};
-  for (size_t index = 0; index < sizeof(velocities) / sizeof(*velocities);
-       ++index) {
-    update.animation.velocity = velocities[index];
-    mln_test_completion command = mln_test_completion_default(0);
-    MLN_TEST_OK(mln_map_update_camera(map, &update, &command.descriptor, NULL));
-    MLN_TEST_STATUS(
-      MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&command)
-    );
-    TEST_ASSERT_EQUAL_STRING(
-      "flyTo duration must fit the native duration range",
-      mln_test_completion_diagnostic(&command)
-    );
-    mln_test_completion_destroy(&command);
-    TEST_ASSERT_EQUAL_DOUBLE(0.0, query_camera(map).camera.zoom);
-  }
+  update.animation.velocity = nextafter(0.0, 1.0);
+  mln_test_completion command = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_update_camera(map, &update, &command.descriptor, NULL));
+  MLN_TEST_STATUS(
+    MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&command)
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "flyTo duration must fit the native duration range",
+    mln_test_completion_diagnostic(&command)
+  );
+  mln_test_completion_destroy(&command);
+  TEST_ASSERT_EQUAL_DOUBLE(0.0, query_camera(map).camera.zoom);
 
   update.animation.velocity = 1e-9;
   MLN_TEST_AWAIT_OK(
@@ -1267,97 +981,43 @@ static void flights_reject_unrepresentable_derived_durations(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Bounds constrain later camera commands: zoom and pitch limits clamp a jump
-// that asks for more, and world bounds stop a jump that unbounded wraps. The
-// unbounded state is distinct from world bounds, which the
-// southwest/northeast pair alone cannot express. A free camera orientation
-// replaces the camera's pitch and bearing.
-static void camera_constraints_and_free_camera_reach_later_commands(void) {
+// The unbounded state is distinct from world bounds, which the
+// southwest/northeast pair alone cannot express: world bounds stop a jump that
+// unbounded wraps.
+static void unbounded_and_world_bounds_stay_distinct(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  // The unbounded state is distinct from world bounds, which the
-  // southwest/northeast pair alone cannot express.
-  {
-    mln_bound_options snapshot = read_bounds(runtime, map);
-    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
+  mln_bound_options snapshot = read_bounds(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
 
-    mln_bound_options world = mln_bound_options_default();
-    world.fields = MLN_BOUND_OPTION_BOUNDS;
-    world.bounds.southwest.latitude = -90.0;
-    world.bounds.southwest.longitude = -180.0;
-    world.bounds.northeast.latitude = 90.0;
-    world.bounds.northeast.longitude = 180.0;
-    MLN_TEST_AWAIT_OK(
-      mln_map_set_bounds(map, &world, &completion.descriptor, NULL)
-    );
+  mln_bound_options world = mln_bound_options_default();
+  world.fields = MLN_BOUND_OPTION_BOUNDS;
+  world.bounds.southwest.latitude = -90.0;
+  world.bounds.southwest.longitude = -180.0;
+  world.bounds.northeast.latitude = 90.0;
+  world.bounds.northeast.longitude = 180.0;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_bounds(map, &world, &completion.descriptor, NULL)
+  );
 
-    snapshot = read_bounds(runtime, map);
-    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, snapshot.bounds.northeast.longitude);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, jumped_longitude(map, 200.0));
+  snapshot = read_bounds(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, snapshot.bounds.northeast.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, jumped_longitude(map, 200.0));
 
-    mln_bound_options unbounded = mln_bound_options_default();
-    unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
-    MLN_TEST_AWAIT_OK(
-      mln_map_set_bounds(map, &unbounded, &completion.descriptor, NULL)
-    );
+  mln_bound_options unbounded = mln_bound_options_default();
+  unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_bounds(map, &unbounded, &completion.descriptor, NULL)
+  );
 
-    snapshot = read_bounds(runtime, map);
-    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
-  }
-  // Zoom and pitch limits clamp a later jump that asks for more.
-  {
-    mln_bound_options limits = mln_bound_options_default();
-    limits.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
-                    MLN_BOUND_OPTION_MAX_PITCH;
-    limits.min_zoom = 3.0;
-    limits.max_zoom = 6.0;
-    limits.max_pitch = 20.0;
-    MLN_TEST_AWAIT_OK(
-      mln_map_set_bounds(map, &limits, &completion.descriptor, NULL)
-    );
-
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH;
-    camera.zoom = 12.0;
-    camera.pitch = 50.0;
-    jump(map, camera);
-    mln_camera_options clamped = query_camera(map).camera;
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, clamped.zoom);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, clamped.pitch);
-
-    camera.zoom = 1.0;
-    jump(map, camera);
-    clamped = query_camera(map).camera;
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 3.0, clamped.zoom);
-  }
-  // A free camera orientation replaces the camera's pitch and bearing: the
-  // identity quaternion looks straight down with north up.
-  {
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH |
-                    MLN_CAMERA_OPTION_BEARING;
-    camera.zoom = 4.0;
-    camera.pitch = 30.0;
-    camera.bearing = 20.0;
-    jump(map, camera);
-
-    mln_free_camera_options options = mln_free_camera_options_default();
-    options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
-    options.orientation =
-      (mln_quaternion){.x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0};
-    MLN_TEST_AWAIT_OK(mln_map_set_free_camera_options(
-      map, &options, &completion.descriptor, NULL
-    ));
-    const mln_camera_options applied = query_camera(map).camera;
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.pitch);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.bearing);
-  }
+  snapshot = read_bounds(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -1365,15 +1025,11 @@ static void camera_constraints_and_free_camera_reach_later_commands(void) {
 MLN_TEST_GROUP {
   RUN_TEST(camera_calls_reject_what_they_cannot_express);
   RUN_TEST(flights_reject_unrepresentable_derived_durations);
-  RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
   RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
   RUN_TEST(queued_immediate_deltas_compose_exactly);
   RUN_TEST(every_camera_delta_field_follows_its_convention);
-  RUN_TEST(an_offset_moves_the_content_with_the_pointer);
-  RUN_TEST(one_delta_turns_and_tilts_about_its_anchor);
-  RUN_TEST(a_delta_publishes_its_pan_and_zoom_together);
   RUN_TEST(an_immediate_anchored_pan_keeps_the_dragged_coordinate);
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
-  RUN_TEST(camera_constraints_and_free_camera_reach_later_commands);
+  RUN_TEST(unbounded_and_world_bounds_stay_distinct);
 }

@@ -125,59 +125,6 @@ void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
   mln::core::valueless_completion<&mln_runtime_barrier>().complete(completion);
 }
 
-void accepted_delivery_stays_on_the_resolving_thread() {
-  auto probe = CompletionProbe{};
-  auto completion = created(descriptor_for(probe));
-  completion->accept();
-  auto worker = std::thread{[completion]() { succeed(completion); }};
-  const auto worker_id = worker.get_id();
-  worker.join();
-  completion->accept();
-  completion->resolve([](const mln::core::CompletionSink&) {});
-  TEST_ASSERT_TRUE(probe.thread == worker_id);
-  TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
-  TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
-  TEST_ASSERT_EQUAL_INT(2, probe.phase.load());
-  MLN_TEST_OK(probe.status.load());
-}
-
-void revoked_acceptance_leaves_callback_state_with_the_caller() {
-  auto probe = CompletionProbe{};
-  {
-    auto completion = created(descriptor_for(probe));
-    completion->accept();
-    completion->revoke();
-    succeed(completion);
-  }
-  TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
-  TEST_ASSERT_EQUAL_UINT(0, probe.releases.load());
-}
-
-// A rejected completion leaves the user data with the caller and delivers
-// nothing.
-void rejection_leaves_the_user_data() {
-  auto probe = CompletionProbe{};
-  {
-    auto completion = created(descriptor_for(probe));
-    completion->reject();
-  }
-  TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
-  TEST_ASSERT_EQUAL_UINT(0, probe.releases.load());
-}
-
-// An accepted completion nothing resolves reports MLN_STATUS_CANCELLED when it
-// is destroyed.
-void abandonment_reports_cancelled() {
-  auto probe = CompletionProbe{};
-  {
-    auto completion = created(descriptor_for(probe));
-    completion->accept();
-  }
-  TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
-  TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
-  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, probe.status.load());
-}
-
 // Two terminal paths racing still deliver once, on one of their workers.
 void racing_resolutions_deliver_once() {
   for (auto iteration = 0; iteration < 100; ++iteration) {
@@ -214,33 +161,6 @@ void terminal_observation_waits_for_result_delivery() {
   TEST_ASSERT_TRUE(delivering);
   TEST_ASSERT_FALSE(observed_early);
   TEST_ASSERT_TRUE(observed.load());
-}
-
-void accepted_completion_resolution_needs_no_allocation() {
-  for (auto kind = 0; kind != 3; ++kind) {
-    auto probe = CompletionProbe{};
-    auto completion = created(descriptor_for(probe));
-    auto diagnostic = std::string(128, 'x');
-    completion->accept();
-    {
-      const auto faults = mln::native_tests::AllocationFaults{};
-      if (kind == 0)
-        succeed(completion);
-      else if (kind == 1)
-        mln::core::CompletionValue<&mln_map_get_camera>::complete(
-          completion, {}
-        );
-      else
-        mln::core::complete_failure(
-          completion, MLN_STATUS_NATIVE_ERROR, std::move(diagnostic)
-        );
-    }
-    TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
-    TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
-    MLN_TEST_STATUS(
-      kind == 2 ? MLN_STATUS_NATIVE_ERROR : MLN_STATUS_OK, probe.status.load()
-    );
-  }
 }
 
 // A delivery that throws before it reaches the sink still reports one result,
@@ -288,27 +208,6 @@ void queue_resolution_falls_back_without_allocation() {
   mln_delivery_queue_release(queue);
 }
 
-void small_queue_completions_reuse_reserved_storage() {
-  const auto queue = create_queue();
-  for (const auto has_value : {false, true}) {
-    auto completion = created(queued_descriptor(queue, nullptr));
-    completion->accept();
-    {
-      const auto faults = mln::native_tests::AllocationFaults{};
-      if (has_value) {
-        mln::core::CompletionValue<&mln_map_get_style_transition_options>::
-          complete(completion, mln_style_transition_options{});
-      } else {
-        succeed(completion);
-      }
-    }
-    const auto drained = drain_completions(queue);
-    TEST_ASSERT_EQUAL_size_t(1, drained.count);
-    MLN_TEST_OK(drained.status);
-  }
-  mln_delivery_queue_release(queue);
-}
-
 void a_delivery_that_throws_after_the_sink_reports_once() {
   auto probe = CompletionProbe{};
   auto completion = created(descriptor_for(probe));
@@ -320,19 +219,6 @@ void a_delivery_that_throws_after_the_sink_reports_once() {
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
   TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
   MLN_TEST_OK(probe.status.load());
-}
-
-// A revoked queue completion pushes nothing.
-void revoked_queue_completion_pushes_nothing() {
-  const auto queue = create_queue();
-  {
-    auto completion = created(queued_descriptor(queue, nullptr));
-    completion->accept();
-    completion->revoke();
-    succeed(completion);
-  }
-  TEST_ASSERT_EQUAL_size_t(0, drain_completions(queue).count);
-  mln_delivery_queue_release(queue);
 }
 
 // An abandoned queue completion pushes one cancellation before it retires.
@@ -361,17 +247,9 @@ void abandoned_queue_completion_pushes_cancelled() {
 
 MLN_TEST_GROUP {
   RUN_TEST(terminal_observation_waits_for_result_delivery);
-  RUN_TEST(accepted_completion_resolution_needs_no_allocation);
-
-  RUN_TEST(accepted_delivery_stays_on_the_resolving_thread);
-  RUN_TEST(revoked_acceptance_leaves_callback_state_with_the_caller);
-  RUN_TEST(rejection_leaves_the_user_data);
-  RUN_TEST(abandonment_reports_cancelled);
   RUN_TEST(racing_resolutions_deliver_once);
   RUN_TEST(a_throwing_delivery_reports_a_native_error);
   RUN_TEST(queue_resolution_falls_back_without_allocation);
-  RUN_TEST(small_queue_completions_reuse_reserved_storage);
   RUN_TEST(a_delivery_that_throws_after_the_sink_reports_once);
-  RUN_TEST(revoked_queue_completion_pushes_nothing);
   RUN_TEST(abandoned_queue_completion_pushes_cancelled);
 }

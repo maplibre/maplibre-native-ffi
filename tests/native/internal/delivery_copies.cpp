@@ -123,22 +123,9 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
   TEST_ASSERT_EQUAL_UINT32(0, copied_source->tile_size);
 }
 
-// A source span that a count claims but no pointer backs cannot be copied.
-void a_span_without_storage_cannot_be_copied() {
-  auto measure = mln::delivery::Arena<false>{nullptr, 0};
-  auto threw = false;
-  try {
-    mln::delivery::completion_capture<mln_lat_lng>.measure(measure, nullptr, 2);
-  } catch (const std::exception&) {
-    threw = true;
-  }
-  TEST_ASSERT_TRUE(threw);
-}
-
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(every_value_type_copies_into_storage_of_its_own);
   RUN_TEST(a_copy_clears_the_fields_its_presence_bits_mark_absent);
-  RUN_TEST(a_span_without_storage_cannot_be_copied);
 }

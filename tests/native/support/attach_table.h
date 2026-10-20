@@ -138,8 +138,9 @@ static inline void mln_test_call_without_completion(void* call) {
   ((mln_test_target_call*)call)->null_completion = true;
 }
 
-// Runs the rows every attach shares, then the backend's `rows`, from the
-// defaults in `call`, which must name a live map.
+// Runs the rows every attach checks itself, then the backend's `rows`, from
+// the defaults in `call`, which must name a live map. Each attach checks every
+// pointer and handle it reads, so each gets a row for every one of them.
 static inline void mln_test_run_attach_table(
   mln_test_validation_call submit, const mln_test_target_call* call,
   const mln_test_validation_case* rows, size_t row_count
@@ -168,16 +169,32 @@ static inline void mln_test_run_attach_table(
   );
 }
 
-// Defines the edits every descriptor shares, for the union member `member` of
-// type `type`: undersized, and with an extent that breaks the positivity rule
-// in each way. MLN_TEST_DESCRIPTOR_CASES(member) names their rows.
+// Defines the edits every descriptor checks itself, for the union member
+// `member` of type `type`: undersized, and with an extent of zero width.
+// MLN_TEST_DESCRIPTOR_CASES(member) names their rows, and
+// MLN_TEST_UNDERSIZED_CASE(member) names the first alone, for a set_target,
+// whose descriptor check is its attach's.
 #define MLN_TEST_DESCRIPTOR_EDITS(member, type)                               \
   static void member##_undersized(void* call) {                               \
     ((mln_test_target_call*)call)->descriptor.member.size = sizeof(type) - 1; \
   }                                                                           \
   static void member##_zero_width(void* call) {                               \
     ((mln_test_target_call*)call)->descriptor.member.extent.width = 0;        \
-  }                                                                           \
+  }
+
+#define MLN_TEST_UNDERSIZED_CASE(member)                                      \
+  {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
+   "size is too small"}
+
+#define MLN_TEST_DESCRIPTOR_CASES(member)                                   \
+  MLN_TEST_UNDERSIZED_CASE(member),                                         \
+    {"zero extent width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT, \
+     "must be positive"}
+
+// Defines the remaining ways an extent breaks the positivity rule that every
+// descriptor shares, for one union member. MLN_TEST_EXTENT_RULE_CASES(member)
+// names their rows.
+#define MLN_TEST_EXTENT_RULE_EDITS(member)                                    \
   static void member##_zero_height(void* call) {                              \
     ((mln_test_target_call*)call)->descriptor.member.extent.height = 0;       \
   }                                                                           \
@@ -189,35 +206,42 @@ static inline void mln_test_run_attach_table(
       (double)INFINITY;                                                       \
   }
 
-#define MLN_TEST_DESCRIPTOR_CASES(member)                                     \
-  {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
-   "size is too small"},                                                      \
-    {"zero extent width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT,   \
-     "must be positive"},                                                     \
-    {"zero extent height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
-     "must be positive"},                                                     \
-    {"zero scale factor", member##_zero_scale, MLN_STATUS_INVALID_ARGUMENT,   \
-     "must be positive"},                                                     \
-    {"infinite scale factor", member##_infinite_scale,                        \
+#define MLN_TEST_EXTENT_RULE_CASES(member)                                  \
+  {"zero extent height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
+   "must be positive"},                                                     \
+    {"zero scale factor", member##_zero_scale, MLN_STATUS_INVALID_ARGUMENT, \
+     "must be positive"},                                                   \
+    {"infinite scale factor", member##_infinite_scale,                      \
      MLN_STATUS_INVALID_ARGUMENT, "must be positive"}
 
-// Defines the edits every borrowed descriptor shares, for the union member
-// `member` whose entries live in the call's `textures.entries`: no textures
-// array, a zero count, one texture named twice, and a ring deeper than three.
-// Each starts from a ring of one texture. MLN_TEST_BORROWED_CASES(member)
-// names their rows.
-#define MLN_TEST_BORROWED_EDITS(member, entries)                        \
-  static void member##_without_textures(void* call) {                   \
-    ((mln_test_target_call*)call)->descriptor.member.textures = NULL;   \
-  }                                                                     \
+// Defines the edits every borrowed descriptor checks itself, for the union
+// member `member` whose entries live in the call's `textures.entries`: no
+// textures array for a count of one, and one texture named twice, which each
+// descriptor's texture identity decides. Each starts from a ring of one
+// texture. MLN_TEST_BORROWED_CASES(member) names their rows.
+#define MLN_TEST_BORROWED_EDITS(member, entries)                      \
+  static void member##_without_textures(void* call) {                 \
+    ((mln_test_target_call*)call)->descriptor.member.textures = NULL; \
+  }                                                                   \
+  static void member##_with_a_texture_twice(void* call) {             \
+    mln_test_target_call* edited = call;                              \
+    edited->textures.entries[1] = edited->textures.entries[0];        \
+    edited->descriptor.member.textures = edited->textures.entries;    \
+    edited->descriptor.member.texture_count = 2;                      \
+  }
+
+#define MLN_TEST_BORROWED_CASES(member)                      \
+  {"null textures array", member##_without_textures,         \
+   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},     \
+    {"a texture named twice", member##_with_a_texture_twice, \
+     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"}
+
+// Defines the remaining ways a ring breaks the rules every borrowed descriptor
+// shares, for one union member: a zero count, and a ring deeper than three.
+// MLN_TEST_RING_RULE_CASES(member) names their rows.
+#define MLN_TEST_RING_RULE_EDITS(member, entries)                       \
   static void member##_without_texture_count(void* call) {              \
     ((mln_test_target_call*)call)->descriptor.member.texture_count = 0; \
-  }                                                                     \
-  static void member##_with_a_texture_twice(void* call) {               \
-    mln_test_target_call* edited = call;                                \
-    edited->textures.entries[1] = edited->textures.entries[0];          \
-    edited->descriptor.member.textures = edited->textures.entries;      \
-    edited->descriptor.member.texture_count = 2;                        \
   }                                                                     \
   static void member##_four_deep(void* call) {                          \
     mln_test_target_call* edited = call;                                \
@@ -228,14 +252,10 @@ static inline void mln_test_run_attach_table(
     edited->descriptor.member.texture_count = 4;                        \
   }
 
-#define MLN_TEST_BORROWED_CASES(member)                      \
-  {"null textures array", member##_without_textures,         \
-   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},     \
-    {"zero texture count", member##_without_texture_count,   \
-     MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},   \
-    {"a texture named twice", member##_with_a_texture_twice, \
-     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"},      \
-    {"a ring four textures deep", member##_four_deep,        \
+#define MLN_TEST_RING_RULE_CASES(member)                 \
+  {"zero texture count", member##_without_texture_count, \
+   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"}, \
+    {"a ring four textures deep", member##_four_deep,    \
      MLN_STATUS_INVALID_ARGUMENT, "at most 3"}
 
 // For a target whose physical size follows from its extent: an extent that

@@ -649,7 +649,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
 /// A glob accepts at most 4096 tokens. Each literal byte, escaped byte, `?`,
 /// or consecutive run of `*` bytes counts as one token. Registering a longer
 /// glob returns MLN_STATUS_INVALID_ARGUMENT. Exact URL matches have no token
-/// limit. Matching uses bounded stack storage and never allocates.
+/// limit. Matching uses bounded stack storage.
 ///
 /// Confining `*` to one path segment is what makes a host pattern hold:
 /// `https://*.example.com/**` matches every subdomain of example.com and never
@@ -1602,7 +1602,8 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * Starts an ordered runtime barrier.
  *
  * The completion runs after every earlier accepted runtime submission has
- * reached a terminal disposition. It carries no value.
+ * reached a terminal disposition, and after native code has released the state
+ * that each earlier command captured. It carries no value.
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.

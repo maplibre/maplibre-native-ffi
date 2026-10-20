@@ -379,6 +379,35 @@ static void invalid_routes_are_rejected(void) {
   MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
   MLN_TEST_INVALID(submit_routes(runtime, NULL, 1, NULL));
   MLN_TEST_OK(submit_routes(runtime, routes, 1, NULL));
+
+  // A glob may hold 4096 tokens, and each ? is one. An exact URL has no limit.
+  static char long_url[4097];
+  memset(long_url, '?', sizeof(long_url));
+  mln_resource_route long_route = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = {.data = long_url, .size = 4096},
+  };
+  MLN_TEST_OK(submit_routes(runtime, &long_route, 1, NULL));
+  long_route.url.size = 4097;
+  MLN_TEST_INVALID(submit_routes(runtime, &long_route, 1, NULL));
+  long_route.flags = MLN_URL_MATCH_EXACT;
+  MLN_TEST_OK(submit_routes(runtime, &long_route, 1, NULL));
+
+  // An escaped byte and a run of * each count as one token, so 4095 escapes
+  // and one long run make exactly 4096.
+  static char escapes_and_run[4095 * 2 + 8192];
+  for (size_t index = 0; index < 4095; index += 1) {
+    escapes_and_run[index * 2] = '\\';
+    escapes_and_run[index * 2 + 1] = '?';
+  }
+  memset(escapes_and_run + 4095 * 2, '*', 8192);
+  const mln_resource_route boundary_route = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = {.data = escapes_and_run, .size = sizeof(escapes_and_run)},
+  };
+  MLN_TEST_OK(submit_routes(runtime, &boundary_route, 1, NULL));
   mln_test_destroy_runtime(runtime);
 }
 

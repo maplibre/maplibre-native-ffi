@@ -80,6 +80,16 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   // An empty registration must use the explicit clear command.
   MLN_TEST_INVALID(submit_rewrite_rules(runtime, NULL, 0, NULL));
 
+  // A glob longer than 4096 tokens is rejected here as it is for routes.
+  static char long_glob[4097];
+  memset(long_glob, '?', sizeof(long_glob));
+  const mln_resource_rewrite_rule long_rewrite = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = {.data = long_glob, .size = sizeof(long_glob)},
+  };
+  MLN_TEST_INVALID(submit_rewrite_rules(runtime, &long_rewrite, 1, NULL));
+
   // A rules transform owns no host user data.
   const mln_resource_transform with_user_data = {
     .size = sizeof(mln_resource_transform),
@@ -125,6 +135,26 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   };
   MLN_TEST_INVALID(
     mln_test_set_http_header_transform(runtime, &null_headers_transform)
+  );
+
+  const mln_http_header token_header = {
+    .name = MLN_BUFFER_LITERAL("X-Token"),
+    .value = MLN_BUFFER_LITERAL("token"),
+  };
+  const mln_http_header_rule long_header_rule = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = {.data = long_glob, .size = sizeof(long_glob)},
+    .headers = &token_header,
+    .header_count = 1,
+  };
+  const mln_http_header_transform long_header_transform = {
+    .size = sizeof(mln_http_header_transform),
+    .rules = &long_header_rule,
+    .rule_count = 1,
+  };
+  MLN_TEST_INVALID(
+    mln_test_set_http_header_transform(runtime, &long_header_transform)
   );
 #endif
   mln_test_destroy_runtime(runtime);
@@ -282,6 +312,74 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
   mln_test_http_server_stop(server);
 }
 
+// Header rules compare the URL the resource transform produced, so a rule for
+// the original URL adds nothing to a rewritten request, and a rule for the
+// rewritten URL applies even though the style names the original.
+static void header_rules_match_the_rewritten_url(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/rewritten.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  char original[256];
+  char rewritten[256];
+  mln_test_http_server_url(
+    server, "/original.json", original, sizeof(original)
+  );
+  mln_test_http_server_url(
+    server, "/rewritten.json", rewritten, sizeof(rewritten)
+  );
+
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_rewrite_rule rewrite = {
+    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .url = {.data = original, .size = strlen(original)},
+    .replacement_url = {.data = rewritten, .size = strlen(rewritten)},
+  };
+  MLN_TEST_OK(submit_rewrite_rules(runtime, &rewrite, 1, NULL));
+  const mln_http_header original_header = {
+    .name = MLN_BUFFER_LITERAL("X-Original"),
+    .value = MLN_BUFFER_LITERAL("yes"),
+  };
+  const mln_http_header rewritten_header = {
+    .name = MLN_BUFFER_LITERAL("X-Rewritten"),
+    .value = MLN_BUFFER_LITERAL("yes"),
+  };
+  // The rule for the original URL comes first, so it would decide if header
+  // rules compared the URL before rewriting.
+  const mln_http_header_rule header_rules[] = {
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+     .url = {.data = original, .size = strlen(original)},
+     .headers = &original_header,
+     .header_count = 1},
+    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+     .url = {.data = rewritten, .size = strlen(rewritten)},
+     .headers = &rewritten_header,
+     .header_count = 1},
+  };
+  const mln_http_header_transform headers = {
+    .size = sizeof(mln_http_header_transform),
+    .rules = header_rules,
+    .rule_count = 2,
+  };
+  MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &headers));
+
+  load_style(runtime, original);
+  char value[64];
+  TEST_ASSERT_TRUE(mln_test_http_server_request_header(
+    server, "/rewritten.json", 0, "X-Rewritten", value, sizeof(value)
+  ));
+  TEST_ASSERT_FALSE(mln_test_http_server_request_header(
+    server, "/rewritten.json", 0, "X-Original", value, sizeof(value)
+  ));
+
+  MLN_TEST_OK(mln_test_clear_http_header_transform(runtime));
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
 #endif
 
 MLN_TEST_GROUP {
@@ -291,5 +389,6 @@ MLN_TEST_GROUP {
 #endif
 #if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(the_first_matching_header_rule_supplies_its_headers);
+  RUN_TEST(header_rules_match_the_rewritten_url);
 #endif
 }

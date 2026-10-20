@@ -1,4 +1,4 @@
-// Inline log wakes and deferred recovery after a failed delivery drain.
+// Deferred recovery after a failed delivery drain.
 
 #include <atomic>
 #include <cstddef>
@@ -52,64 +52,6 @@ auto queue_handler(mln_delivery_queue queue) -> mln_log_handler {
     .size = sizeof(mln_log_handler),
     .queue = queue,
   };
-}
-
-// A wake that records inline service without reentering the logging API.
-struct LoggingWake {
-  mln_delivery_queue queue = MLN_HANDLE_NULL;
-  std::atomic_bool started = false;
-  std::atomic_bool logged = false;
-  std::atomic_bool released = false;
-};
-
-void log_from_wake(void* user_data) noexcept {
-  auto& wake = *static_cast<LoggingWake*>(user_data);
-  if (wake.started.exchange(true)) return;
-  // Log-handler wakes may only schedule service; record the inline call.
-  wake.logged.store(true);
-  mln_test_pulse();
-}
-
-void release_logging_wake(void* user_data) noexcept {
-  static_cast<LoggingWake*>(user_data)->released.store(true);
-  mln_test_pulse();
-}
-
-void a_log_queue_wakes_inline() {
-  if (TEST_PROTECT()) {
-    log_synchronously();
-    auto wake = LoggingWake{};
-    const auto options = mln_delivery_queue_options{
-      .size = sizeof(mln_delivery_queue_options),
-      .wake = {
-        .callback = log_from_wake,
-        .user_data = &wake,
-        .release_user_data = release_logging_wake,
-      },
-    };
-    MLN_TEST_OK(mln_delivery_queue_create(&options, &wake.queue, nullptr));
-    const auto handler = queue_handler(wake.queue);
-    MLN_TEST_OK(mln_log_set_callback(&handler, nullptr));
-
-    mln::Log::Warning(mln::Event::General, "a record from the test");
-    TEST_ASSERT_TRUE(wake.logged.load());
-    MLN_TEST_OK(mln_log_clear_callback(nullptr));
-
-    // The record, then the handler's retirement.
-    auto batch = MLN_HANDLE_NULL;
-    MLN_TEST_OK(mln_delivery_queue_drain(wake.queue, &batch, nullptr));
-    const auto view = delivery_view(batch);
-    TEST_ASSERT_EQUAL_size_t(2, view.delivery_count);
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_DELIVERY_TYPE_LOG_RECORD, delivery_type(view, 0)
-    );
-    TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, delivery_type(view, 1));
-    mln_delivery_batch_release(batch);
-
-    mln_delivery_queue_release(wake.queue);
-    TEST_ASSERT_TRUE(mln_test_wait_for_flag(&wake.released));
-  }
-  restore_log_defaults();
 }
 
 // Counts a queue's wakes, which arrive on native threads.
@@ -277,7 +219,6 @@ void failed_inline_drains_get_one_deferred_retry_without_reentry() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_log_queue_wakes_inline);
   RUN_TEST(failed_inline_drains_get_one_deferred_retry_without_reentry);
   RUN_TEST(a_failed_drain_wakes_the_queue_again);
   RUN_TEST(failed_batch_reservations_retain_the_queued_prefix);

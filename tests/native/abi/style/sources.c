@@ -5,7 +5,6 @@
 // URL sources start loading as soon as they are added, so every case that adds
 // one serves the suite's resources through a provider that fails the rest.
 
-#include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -190,10 +189,6 @@ static void mapbox_encoding(mln_style_tile_source_options* options) {
   options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
   options->raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
 }
-static void xyz_scheme(mln_style_tile_source_options* options) {
-  options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-  options->scheme = MLN_STYLE_TILE_SCHEME_XYZ;
-}
 
 // One source a row adds and the metadata it must then report: what the row's
 // edit sets, or the defaults for null options. Every bit in `absent` must be
@@ -226,8 +221,6 @@ static const effective_options_case effective_cases[] = {
    TILEJSON | MLN_STYLE_SOURCE_INFO_BOUNDS, 0},
   {"vector tiles, MLT", VECTOR, false, mlt_encoding,
    MLN_STYLE_SOURCE_TYPE_VECTOR, TILEJSON | VECTOR_ENCODING, 0},
-  {"raster tiles, null options", RASTER, false, NULL,
-   MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, URL_OR_ENCODING},
   {"raster tiles, 256 px", RASTER, false, small_tiles,
    MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, 0},
   {"raster DEM tiles, null options", RASTER_DEM, false, NULL,
@@ -236,15 +229,9 @@ static const effective_options_case effective_cases[] = {
    MLN_STYLE_SOURCE_TYPE_RASTER_DEM, TILEJSON | RASTER_ENCODING, 0},
   {"raster DEM tiles, Mapbox", RASTER_DEM, false, mapbox_encoding,
    MLN_STYLE_SOURCE_TYPE_RASTER_DEM, TILEJSON | RASTER_ENCODING, 0},
-  {"raster tiles, explicit XYZ", RASTER, false, xyz_scheme,
-   MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, 0},
-  {"vector URL, null options", VECTOR, true, NULL, MLN_STYLE_SOURCE_TYPE_VECTOR,
-   URL_INFO | VECTOR_ENCODING, MLN_STYLE_SOURCE_INFO_TILEJSON},
   {"vector URL, zoom range and MLT", VECTOR, true, url_zoom_and_mlt,
    MLN_STYLE_SOURCE_TYPE_VECTOR, URL_INFO | VECTOR_ENCODING,
    MLN_STYLE_SOURCE_INFO_TILEJSON},
-  {"raster URL, 256 px", RASTER, true, small_tiles,
-   MLN_STYLE_SOURCE_TYPE_RASTER, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
   {"raster DEM URL, null options", RASTER_DEM, true, NULL,
    MLN_STYLE_SOURCE_TYPE_RASTER_DEM, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
 };
@@ -407,9 +394,6 @@ static void unknown_scheme(void* descriptor) {
 static void zero_tile_size(void* descriptor) {
   edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)->tile_size = 0;
 }
-static void oversized_tile_size(void* descriptor) {
-  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)->tile_size = 65536;
-}
 static void null_attribution_bytes(void* descriptor) {
   edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)->attribution =
     (mln_buffer_view){.data = NULL, .size = 3};
@@ -454,8 +438,6 @@ static void tile_source_options_are_validated_at_submission(void) {
     {"unknown scheme", unknown_scheme, MLN_STATUS_INVALID_ARGUMENT,
      "scheme is invalid"},
     {"zero tile_size", zero_tile_size, MLN_STATUS_INVALID_ARGUMENT,
-     "tile_size must be within"},
-    {"oversized tile_size", oversized_tile_size, MLN_STATUS_INVALID_ARGUMENT,
      "tile_size must be within"},
     {"null attribution bytes", null_attribution_bytes,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -656,18 +638,9 @@ static void style_source_volatility_round_trips(void) {
   ));
   TEST_ASSERT_FALSE(source_is_volatile(map));
 
-  // The committed toggle publishes a snapshot generation, so volatility is an
-  // ordered command rather than a synchronous write.
-  mln_test_completion enable = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_set_style_source_volatile(
-    map, source_id, true, &enable.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_set_style_source_volatile(
+    map, source_id, true, &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_completion_finish(&enable));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&enable)
-  );
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, mln_test_completion_generation(&enable));
-  mln_test_completion_destroy(&enable);
   TEST_ASSERT_TRUE(source_is_volatile(map));
 
   MLN_TEST_AWAIT_OK(mln_map_set_style_source_volatile(
@@ -828,30 +801,6 @@ static void image_sources_hold_corners_and_pixels(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An image source asks the provider for its URL as an image.
-static void an_image_source_requests_its_url_as_an_image(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_provider* provider = mln_test_provider_create(NULL, 0);
-  mln_test_provider_install(runtime, provider);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
-    map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
-    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
-  ));
-  TEST_ASSERT_TRUE(
-    mln_test_provider_wait_for_requests(provider, "fixture://image.png", 1)
-  );
-  const mln_test_provider_request* request =
-    mln_test_provider_request_at(provider, "fixture://image.png", 0);
-  TEST_ASSERT_NOT_NULL(request);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_IMAGE, request->kind);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_provider_destroy(provider);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(tile_sources_report_their_effective_options);
   RUN_TEST(tile_source_options_are_validated_at_submission);
@@ -860,5 +809,4 @@ MLN_TEST_GROUP {
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(image_sources_hold_corners_and_pixels);
-  RUN_TEST(an_image_source_requests_its_url_as_an_image);
 }

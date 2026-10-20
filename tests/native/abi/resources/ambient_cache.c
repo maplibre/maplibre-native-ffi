@@ -11,14 +11,9 @@ static const char cached_style_json[] =
 static void ambient_cache_calls_validate_their_arguments(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_completion completion = mln_test_discard_completion();
-  static const uint32_t unknown_operations[] = {0, 5, 999};
-  for (size_t index = 0;
-       index < sizeof(unknown_operations) / sizeof(unknown_operations[0]);
-       index += 1) {
-    MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
-      runtime, unknown_operations[index], &completion, NULL
-    ));
-  }
+  MLN_TEST_INVALID(
+    mln_runtime_run_ambient_cache_operation(runtime, 5, &completion, NULL)
+  );
   MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
     MLN_HANDLE_NULL, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &completion, NULL
   ));

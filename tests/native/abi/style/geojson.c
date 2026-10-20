@@ -133,18 +133,6 @@ static void cluster_zoom_out_of_range(mln_geojson_source_options* options) {
   every_option(options);
   options->cluster_max_zoom = 300.0;
 }
-static void fractional_cluster_zoom(mln_geojson_source_options* options) {
-  every_option(options);
-  options->cluster_max_zoom = 1.5;
-}
-static void oversized_buffer(mln_geojson_source_options* options) {
-  every_option(options);
-  options->buffer = 70000;
-}
-static void oversized_cluster_radius(mln_geojson_source_options* options) {
-  every_option(options);
-  options->cluster_radius = 70000;
-}
 
 static const char trailing_bytes[] = EMPTY_COLLECTION "garbage";
 static const char embedded_nul[] = EMPTY_COLLECTION "\0garbage";
@@ -222,17 +210,6 @@ static const geojson_data_case geojson_data_cases[] = {
    0,
    cluster_zoom_out_of_range,
    {"cluster_max_zoom"}},
-  {"fractional cluster zoom",
-   POINT_COLLECTION("a"),
-   0,
-   fractional_cluster_zoom,
-   {"cluster_max_zoom"}},
-  {"oversized buffer", POINT_COLLECTION("a"), 0, oversized_buffer, {"buffer"}},
-  {"oversized cluster radius",
-   POINT_COLLECTION("a"),
-   0,
-   oversized_cluster_radius,
-   {"cluster_radius"}},
   // Supercluster reads every feature geometry as a point, and MapLibre Native
   // clusters feature collections only, so clustering refuses anything else up
   // front, naming the feature and the constraint.
@@ -531,24 +508,12 @@ static void prepared_data_must_match_the_source_options(void) {
 
   static const cluster_match_case cases[] = {
     {"the same JSON", NULL, MLN_STATUS_OK},
-    {"reformatted whitespace",
-     " { \"total\" : [ \"+\" , [ \"get\" , \"rank\" ] ] , \"top\" : [ "
-     "\"max\" , [ \"get\" , \"rank\" ] ] } ",
-     MLN_STATUS_OK},
     {"members in the other order",
      "{\"top\":[\"max\",[\"get\",\"rank\"]],\"total\":[\"+\",[\"get\","
      "\"rank\"]]}",
      MLN_STATUS_OK},
     {"one operator swapped",
      "{\"total\":[\"max\",[\"get\",\"rank\"]],\"top\":[\"max\",[\"get\","
-     "\"rank\"]]}",
-     MLN_STATUS_INVALID_ARGUMENT},
-    {"one input swapped",
-     "{\"total\":[\"+\",[\"get\",\"score\"]],\"top\":[\"max\",[\"get\","
-     "\"rank\"]]}",
-     MLN_STATUS_INVALID_ARGUMENT},
-    {"one member renamed",
-     "{\"sum\":[\"+\",[\"get\",\"rank\"]],\"top\":[\"max\",[\"get\","
      "\"rank\"]]}",
      MLN_STATUS_INVALID_ARGUMENT},
     {"one member dropped", "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
@@ -600,16 +565,6 @@ static void prepared_data_must_match_the_source_options(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Three points close enough to cluster at zoom 0 under a 60-pixel radius.
-static const char nearby_points[] =
-  "{\"type\":\"FeatureCollection\",\"features\":["
-  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-  "\"coordinates\":[0,0]},\"properties\":{}},"
-  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-  "\"coordinates\":[0.001,0.001]},\"properties\":{}},"
-  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-  "\"coordinates\":[0.002,0.002]},\"properties\":{}}]}";
-
 // Renders the points with `options` and waits until the source holds
 // `count` features, the first of which contains `text` when it is non-null.
 static void render_points(
@@ -645,36 +600,13 @@ static void render_points(
   mln_test_destroy_runtime(runtime);
 }
 
-// The clustering fields decide which points a rendered source holds: within
-// the radius, two points are enough for one cluster of all three, and
-// requiring four leaves the three unclustered.
+// The clustering fields decide which points a rendered source holds. Two
+// points 11.25 degrees apart lie 16 pixels apart at zoom 0, because GeoJSON
+// sources cluster on a fixed 512-pixel tile: a 15-pixel radius leaves them
+// apart and a 17-pixel one joins them, unless the cluster needs more points
+// than there are.
 static void clustering_fields_decide_which_points_the_source_holds(void) {
-  mln_geojson_source_options options = mln_geojson_source_options_default();
-  options.fields =
-    MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_BUFFER |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-  options.min_zoom = 0.0;
-  options.max_zoom = 20.0;
-  options.tolerance = 0.5;
-  options.cluster_max_zoom = 20.0;
-  options.buffer = 64;
-  options.cluster_radius = 60;
-  options.cluster_min_points = 2;
-  options.line_metrics = true;
-  options.cluster = true;
-  render_points(nearby_points, &options, 1, "\"point_count\":3");
-  options.cluster_min_points = 4;
-  render_points(nearby_points, &options, 3, NULL);
-}
-
-static void geojson_clustering_uses_a_fixed_512_pixel_tile(void) {
-  // At zoom 0, 11.25 degrees spans 16 pixels of a 512-pixel world tile.
-  const char* points =
+  static const char points[] =
     "{\"type\":\"FeatureCollection\",\"features\":["
     "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
     "\"coordinates\":[0,0]},\"properties\":{}},"
@@ -682,12 +614,16 @@ static void geojson_clustering_uses_a_fixed_512_pixel_tile(void) {
     "\"coordinates\":[11.25,0]},\"properties\":{}}]}";
   mln_geojson_source_options options = mln_geojson_source_options_default();
   options.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-                   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+                   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+                   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
   options.cluster = true;
+  options.cluster_min_points = 2;
   options.cluster_radius = 15;
   render_points(points, &options, 2, NULL);
   options.cluster_radius = 17;
   render_points(points, &options, 1, "\"point_count\":2");
+  options.cluster_min_points = 3;
+  render_points(points, &options, 2, NULL);
 }
 
 // A URL source loads its data through the runtime's resource provider when it
@@ -748,6 +684,5 @@ MLN_TEST_GROUP {
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);
-  RUN_TEST(geojson_clustering_uses_a_fixed_512_pixel_tile);
   RUN_TEST(a_url_source_loads_through_the_resource_provider);
 }

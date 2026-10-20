@@ -44,10 +44,6 @@ enum class SyncPoint : std::uint8_t {
   // MapLibre's cancel hook for a custom provider request has returned, having
   // run the request's cancel callback when one applied.
   ResourceRequestCancelled,
-  // A render session's driver thread has marked a driver call in flight and is
-  // about to run its first work item: the core worker for each item it takes,
-  // or the host's thread inside a caller-driver service call.
-  RenderDriverEntered,
   // A render session's driver call has run its work, including any frame
   // result or completion that work published, and is about to end. The call
   // stays in flight until the handler returns.

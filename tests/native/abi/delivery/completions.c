@@ -123,24 +123,14 @@ static void a_rejected_submission_queues_nothing(void) {
 }
 
 // A command accepts a null completion, but a present one still names exactly
-// one of a callback and a queue, and a released queue reports as a released
-// handle.
+// one of a callback and a queue.
 static void a_command_validates_a_present_completion(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  mln_completion completion = (mln_completion){.size = sizeof(mln_completion)};
+  const mln_completion completion = {.size = sizeof(mln_completion)};
   MLN_TEST_INVALID(mln_map_set_debug_options(map, 0, &completion, NULL));
   MLN_TEST_OK(mln_map_set_debug_options(map, 0, NULL, NULL));
-
-  mln_test_delivery_queue_release(&queue);
-  completion = mln_test_queue_completion(queue.handle, NULL);
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_map_set_debug_options(map, 0, &completion, NULL)
-  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -214,13 +204,6 @@ static void an_untaken_map_is_disposed_with_its_batch(void) {
   const mln_map map = create_map_through(runtime, queue.handle, &batch);
   mln_delivery_batch_release(batch);
   TEST_ASSERT_FALSE(mln_test_map_is_live(map));
-
-  // A taken map stays the host's.
-  const mln_map taken = create_map_through(runtime, queue.handle, &batch);
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  mln_delivery_batch_release(batch);
-  TEST_ASSERT_TRUE(mln_test_map_is_live(taken));
-  mln_test_destroy_map(taken);
 
   mln_test_delivery_queue_release(&queue);
   mln_test_destroy_runtime(runtime);

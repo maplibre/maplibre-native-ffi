@@ -61,7 +61,7 @@ typedef struct projection_call {
   bool null_output;
 } projection_call;
 
-static void stale_session(void* call) {
+static void null_session(void* call) {
   ((projection_call*)call)->session = MLN_HANDLE_NULL;
 }
 static void null_output(void* call) {
@@ -86,19 +86,12 @@ static mln_status submit_projection(
   return status;
 }
 
-// Argument errors take precedence over whether the session has rendered.
 static void expect_malformed_requests_rejected(
-  const mln_test_render_fixture* fixture, bool rendered
+  const mln_test_render_fixture* fixture
 ) {
-  const mln_test_validation_case cases[] = {
-    rendered ? (
-                 mln_test_validation_case
-               ){"a rendered frame", NULL, MLN_STATUS_OK, NULL}
-             : (
-                 mln_test_validation_case
-               ){"no frame yet", NULL, MLN_STATUS_INVALID_STATE,
-                 "no rendered projection"},
-    {"null session", stale_session, MLN_STATUS_INVALID_ARGUMENT, NULL},
+  static const mln_test_validation_case cases[] = {
+    {"a rendered frame", NULL, MLN_STATUS_OK, NULL},
+    {"null session", null_session, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null output", null_output, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"occupied output", occupied_output, MLN_STATUS_INVALID_ARGUMENT, NULL},
   };
@@ -122,10 +115,9 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   expect_no_projection(&fixture);
-  expect_malformed_requests_rejected(&fixture, false);
 
   render_one_frame(&fixture);
-  expect_malformed_requests_rejected(&fixture, true);
+  expect_malformed_requests_rejected(&fixture);
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   update.camera.center.latitude = 12.0;

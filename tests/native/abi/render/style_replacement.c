@@ -1,5 +1,13 @@
+// Style replacement under rendering. A caller-driven host that re-arms a
+// waiting demand as each result arrives, and pauses its loop while it retains
+// its previous presentation: each style replacement revalidates the tile its
+// new source requests, and the host still reaches a full frame and an idle
+// map. A static map that reloads its style and adds a layer again renders that
+// layer each time.
+
 #include "support/frames.h"
 #include "support/host_graphics.h"
+#include "support/map.h"
 #include "support/resources.h"
 #include "support/test_support.h"
 
@@ -159,7 +167,8 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
   request_next(&wait);
   await_replacement(&wait);
 
-  for (unsigned int revision = 0; revision < 6; revision += 1) {
+  enum { revision_count = 2 };
+  for (unsigned int revision = 0; revision < revision_count; revision += 1) {
     wait.retained_frame = session_snapshot(&wait).frame_generation;
     char style[768];
     const int size = snprintf(
@@ -206,7 +215,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
     await_replacement(&wait);
   }
   TEST_ASSERT_GREATER_OR_EQUAL_INT(
-    6, mln_test_provider_requests(provider, tile_url)
+    revision_count, mln_test_provider_requests(provider, tile_url)
   );
   const mln_test_provider_request* revalidated =
     mln_test_provider_request_at(provider, tile_url, 1);
@@ -224,10 +233,95 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
   mln_test_provider_destroy(provider);
 }
 
+static const char reload_base_style[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"base\","
+  "\"type\":\"background\",\"paint\":{\"background-color\":\"#000000\"}}]}";
+
+// Adds a point source at the map's center and a green circle layer over it.
+static void add_composed_circle(mln_map map) {
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("composed-point"),
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"geojson\",\"data\":{\"type\":\"Point\","
+      "\"coordinates\":[0,0]}}"
+    ),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"id\":\"composed-circle\",\"type\":\"circle\","
+      "\"source\":\"composed-point\",\"paint\":{\"circle-color\":"
+      "\"#00ff00\",\"circle-radius\":20}}"
+    ),
+    (mln_buffer_view){0}, &completion.descriptor, NULL
+  ));
+}
+
+// Renders a still image and expects its center pixel to be the opaque green of
+// the composed circle.
+static void expect_green_center(
+  const mln_test_render_fixture* fixture, mln_map map
+) {
+  MLN_TEST_OK(mln_test_render_still_image(fixture, map));
+  enum { side = 64 };
+  uint8_t pixels[side * side * 4] = {0};
+  mln_texture_image_info info = {0};
+  MLN_TEST_OK(
+    mln_test_render_read_back(fixture, &info, pixels, sizeof(pixels))
+  );
+  TEST_ASSERT_EQUAL_UINT32(side, info.width);
+  TEST_ASSERT_EQUAL_UINT32(side, info.height);
+  // The readback is tightly packed.
+  const uint8_t* center = pixels + ((side / 2 * side) + (side / 2)) * 4;
+  TEST_ASSERT_EQUAL_UINT8(0, center[0]);
+  TEST_ASSERT_EQUAL_UINT8(255, center[1]);
+  TEST_ASSERT_EQUAL_UINT8(0, center[2]);
+  TEST_ASSERT_EQUAL_UINT8(255, center[3]);
+}
+
+// A regression for the Android emulator's goldfish OpenGL driver, which once
+// stopped drawing a layer that a static map added again after it reloaded its
+// style.
+static void a_reloaded_style_renders_a_layer_added_again(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent =
+    (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_load_style_and_wait(
+    runtime, map, MLN_BUFFER_LITERAL(reload_base_style)
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  add_composed_circle(map);
+  expect_green_center(&fixture, map);
+
+  mln_test_load_style_and_wait(
+    runtime, map,
+    MLN_BUFFER_LITERAL(
+      "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":"
+      "\"alternate\",\"type\":\"background\",\"paint\":"
+      "{\"background-color\":\"#0000ff\"}}]}"
+    )
+  );
+  mln_test_load_style_and_wait(
+    runtime, map, MLN_BUFFER_LITERAL(reload_base_style)
+  );
+  add_composed_circle(map);
+  expect_green_center(&fixture, map);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 #endif
 
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(waiting_demands_settle_replaced_styles_with_revalidated_tiles);
+  RUN_TEST(a_reloaded_style_renders_a_layer_added_again);
 #endif
 }

@@ -22,9 +22,7 @@ class CompiledGlob {
   [[nodiscard]] static auto token_count(std::string_view pattern) noexcept
     -> std::size_t;
   explicit CompiledGlob(std::string_view pattern);
-  [[nodiscard]] auto matches(
-    std::string_view candidate, std::size_t* steps = nullptr
-  ) const noexcept -> bool;
+  [[nodiscard]] auto matches(std::string_view candidate) const noexcept -> bool;
 
  private:
   enum class Kind : std::uint8_t { Literal, Any, Segment, Spanning };

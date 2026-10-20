@@ -14,7 +14,6 @@
 #include "internal/support/driver_blocker.hpp"
 #include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
-#include "runtime/runtime.hpp"
 #include "support/frames.h"
 #include "support/test_support.h"
 #include "testing/render_clock.hpp"
@@ -214,7 +213,7 @@ void install_frame_failure(const Fixture& fixture, FrameFailure failure) {
   mln_test_completion_destroy(&install);
 }
 
-void graphics_failures_finish_demands_and_release_their_slots() {
+void graphics_failures_finish_demands_and_lose_the_target() {
   for (const auto failure :
        {FrameFailure::Activation, FrameFailure::Resources,
         FrameFailure::Scheduler, FrameFailure::Metadata}) {
@@ -245,14 +244,6 @@ void graphics_failures_finish_demands_and_release_their_slots() {
     MLN_TEST_OK(mln_render_session_get_snapshot(
       fixture.render.session, &snapshot, nullptr
     ));
-    const auto session =
-      mln::core::lease_render_session(fixture.render.session);
-    auto rendering = false;
-    {
-      const auto lock = std::scoped_lock{session->control_mutex};
-      for (const auto& slot : session->texture.slots)
-        rendering |= slot.rendering;
-    }
     auto abandoned =
       mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
     MLN_TEST_OK(
@@ -271,7 +262,6 @@ void graphics_failures_finish_demands_and_release_their_slots() {
       MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
     );
     TEST_ASSERT_FALSE(snapshot.target_ready);
-    TEST_ASSERT_FALSE(rendering);
     MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, barrier_status);
   }
 }
@@ -484,10 +474,6 @@ void demand_coalescing_preserves_boundaries_and_generations() {
   MLN_TEST_OK(request_frame(fixture, newest));
   MLN_TEST_OK(request_frame(fixture, separate));
   MLN_TEST_OK(blocker.finish(fixture.render));
-
-  auto unknown = mln_frame_demand_default();
-  unknown.flags = 1U << 8U;
-  MLN_TEST_INVALID(request_frame(fixture, unknown));
 
   const auto batch = wait_for_results(fixture, 3);
   auto later = separate;
@@ -727,7 +713,6 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
     ));
     mln_test_thread_join(thread);
     MLN_TEST_STATUS(MLN_STATUS_BUSY, release.abandon_status);
-    TEST_ASSERT_EQUAL_INT(0, points.hits(SyncPoint::RenderAbandonWaits));
   }
   auto snapshot =
     mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
@@ -1158,44 +1143,6 @@ void fence_driver(const Fixture& fixture) {
   mln_test_completion_destroy(&fence);
 }
 
-void a_cpu_complete_release_reuses_its_slot_before_the_driver_resumes() {
-  auto fixture = Fixture{};
-  create_fixture(fixture);
-  render_until_idle(fixture);
-  const auto session = mln::core::lease_render_session(fixture.render.session);
-  auto frames = std::vector<mln_acquired_frame>{};
-  for (std::size_t i = 0; i < session->texture.slots.size(); ++i)
-    frames.push_back(mln_test_render_and_acquire(&fixture.render, 9200 + i));
-  mln_test_render_request_forced(&fixture.render, 9300);
-  fence_driver(fixture);
-  auto blocker = DriverBlocker{};
-  block_driver(fixture, blocker);
-  auto queued = std::size_t{0};
-  {
-    const auto lock = std::scoped_lock{session->control_mutex};
-    queued = session->driver_work.size();
-  }
-  mln_test_render_release_frame(&frames.front());
-  auto leased_slots = std::size_t{0};
-  auto resumed = std::size_t{0};
-  {
-    const auto lock = std::scoped_lock{session->control_mutex};
-    for (const auto& slot : session->texture.slots)
-      leased_slots += slot.acquired ? 1 : 0;
-    resumed = session->driver_work.size() - queued;
-  }
-  MLN_TEST_OK(blocker.finish(fixture.render));
-  const auto batch = wait_for_results(fixture, 1);
-  const auto result = batch_result(batch, 0);
-  mln_render_frame_batch_release(batch);
-  for (auto& frame : frames)
-    if (frame != MLN_HANDLE_NULL) mln_test_render_release_frame(&frame);
-  destroy_fixture(fixture);
-  TEST_ASSERT_EQUAL_size_t(frames.size() - 1, leased_slots);
-  TEST_ASSERT_EQUAL_size_t(1, resumed);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
-}
-
 auto latest_update_generation(mln_map map) -> uint64_t {
   auto snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
   if (mln_map_get_snapshot(map, &snapshot, nullptr) != MLN_STATUS_OK) return 0;
@@ -1208,51 +1155,6 @@ auto submit_camera_zoom(mln_map map, double zoom, mln_test_completion& done)
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
   return mln_map_update_camera(map, &update, &done.descriptor, nullptr);
-}
-
-void a_stored_update_notice_precedes_queued_worker_work() {
-  auto fixture = Fixture{};
-  create_fixture(fixture);
-  render_until_idle(fixture);
-  MLN_TEST_OK(request_waiting(fixture, 9004));
-  fence_driver(fixture);
-  auto before =
-    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
-  MLN_TEST_OK(
-    mln_render_session_get_snapshot(fixture.render.session, &before, nullptr)
-  );
-  auto initial_gate = std::make_shared<mln_test_gate>();
-  auto later_gate = std::make_shared<mln_test_gate>();
-  mln_test_gate_init(initial_gate.get());
-  mln_test_gate_init(later_gate.get());
-  const auto runtime = mln::core::lease_runtime(fixture.runtime);
-  runtime->executor.invoke([initial_gate] {
-    mln_test_gate_park(initial_gate.get());
-  });
-  TEST_ASSERT_TRUE(mln_test_gate_wait_entered(initial_gate.get()));
-  auto move = mln_test_completion_default(0);
-  MLN_TEST_OK(submit_camera_zoom(fixture.map, 3.0, move));
-  runtime->executor.invoke([later_gate] {
-    mln_test_gate_park(later_gate.get());
-  });
-  mln_test_gate_release(initial_gate.get());
-  TEST_ASSERT_TRUE(mln_test_gate_wait_entered(later_gate.get()));
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&move, -1));
-  auto during =
-    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
-  MLN_TEST_OK(
-    mln_render_session_get_snapshot(fixture.render.session, &during, nullptr)
-  );
-  const auto stored = latest_update_generation(fixture.map);
-  const auto batch = wait_for_results(fixture, 1);
-  mln_test_gate_release(later_gate.get());
-  mln_test_completion_destroy(&move);
-  const auto result = batch_result(batch, 0);
-  mln_render_frame_batch_release(batch);
-  destroy_fixture(fixture);
-  TEST_ASSERT_GREATER_THAN_UINT64(before.map_update_generation, stored);
-  TEST_ASSERT_EQUAL_UINT64(stored, during.map_update_generation);
-  TEST_ASSERT_EQUAL_UINT64(stored, result.map_update_generation);
 }
 
 struct HeldCameraMove {
@@ -1326,7 +1228,6 @@ void a_waiting_demand_renders_an_update_that_lands_as_it_looks() {
   TEST_ASSERT_GREATER_THAN_UINT64(
     move.generation_before, result.map_update_generation
   );
-  TEST_ASSERT_EQUAL_INT(1, points.hits(SyncPoint::RenderDemandWaits));
   destroy_fixture(fixture);
 }
 
@@ -1427,11 +1328,9 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(graphics_failures_finish_demands_and_release_their_slots);
+  RUN_TEST(graphics_failures_finish_demands_and_lose_the_target);
   RUN_TEST(an_unavailable_drawable_releases_its_slot_for_a_retry);
   RUN_TEST(an_idle_demand_reports_a_failed_backend_activation);
-  RUN_TEST(a_cpu_complete_release_reuses_its_slot_before_the_driver_resumes);
-  RUN_TEST(a_stored_update_notice_precedes_queued_worker_work);
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);

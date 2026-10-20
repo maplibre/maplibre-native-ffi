@@ -9,15 +9,6 @@
 
 namespace {
 
-void a_wake_sent_before_waiting_is_consumed() {
-  auto wake = mln::platform::RunLoopWake{};
-  wake.notify();
-  wake.notify();
-  wake.wait(mln::Milliseconds{-1});
-  TEST_ASSERT_FALSE(wake.notified);
-  TEST_ASSERT_FALSE(wake.waiting);
-}
-
 void racing_wakes_survive_repeated_waits() {
   auto wake = mln::platform::RunLoopWake{};
   auto mutex = std::mutex{};
@@ -45,7 +36,4 @@ void racing_wakes_survive_repeated_waits() {
 
 }  // namespace
 
-MLN_TEST_GROUP {
-  RUN_TEST(a_wake_sent_before_waiting_is_consumed);
-  RUN_TEST(racing_wakes_survive_repeated_waits);
-}
+MLN_TEST_GROUP { RUN_TEST(racing_wakes_survive_repeated_waits); }

@@ -178,9 +178,11 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// set_target checks the session before the descriptor, and a build without
-// Vulkan reports the missing backend last, so there the rows name no session.
-// A Vulkan build submits them for a live session of the replacement's kind.
+// set_target runs its attach's descriptor check, so beyond a row for each
+// pointer and handle it reads, these rows cover only its own steps. It checks
+// the session before the descriptor, and a build without Vulkan reports the
+// missing backend last, so there the rows name no session. A Vulkan build
+// submits them for a live session of the replacement's kind.
 static void vulkan_set_target_rejects_malformed_descriptors(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
@@ -199,7 +201,7 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(vulkan_surface),
+    MLN_TEST_UNDERSIZED_CASE(vulkan_surface),
     MLN_TEST_OVERFLOW_CASE(vulkan_surface),
     {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
@@ -225,8 +227,9 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed),
-    MLN_TEST_BORROWED_CASES(vulkan_borrowed),
+    MLN_TEST_UNDERSIZED_CASE(vulkan_borrowed),
+    {"null textures array", vulkan_borrowed_without_textures,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image view", borrowed_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},

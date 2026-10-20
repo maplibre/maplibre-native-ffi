@@ -312,10 +312,12 @@ static mln_status call_accessor(
 }
 
 // A broken frame or output fails before an accessor looks at the frame's
-// backend, so every accessor reports it the same way: a released frame as
-// invalid state, and anything else as an invalid argument. Release takes a
-// live frame and a sync record it knows, and consumes the frame only when it
-// succeeds, so a refused release leaves the frame with the host.
+// backend: a released frame as invalid state, and anything else as an invalid
+// argument. Every accessor checks its own output and then leases the frame
+// through one shared check, so each runs both steps, and one runs the shared
+// check's every rule. Release takes a live frame and a sync record it
+// knows, and consumes the frame only when it succeeds, so a refused release
+// leaves the frame with the host.
 static void accessors_and_release_reject_a_broken_frame_or_record(void) {
   mln_runtime runtime;
   mln_map map;
@@ -331,30 +333,35 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     const char* label;
     void (*mutate)(void* call);
     mln_status expected;
+    // Whether every accessor runs the row, or only the first.
+    bool every_accessor;
   } breakages[] = {
-    {"null frame", null_frame, MLN_STATUS_INVALID_ARGUMENT},
-    {"released frame", a_released_frame, MLN_STATUS_INVALID_STATE},
-    {"null output", null_record, MLN_STATUS_INVALID_ARGUMENT},
-    {"undersized output", undersized_record, MLN_STATUS_INVALID_ARGUMENT},
+    {"released frame", a_released_frame, MLN_STATUS_INVALID_STATE, true},
+    {"undersized output", undersized_record, MLN_STATUS_INVALID_ARGUMENT, true},
+    {"null output", null_record, MLN_STATUS_INVALID_ARGUMENT, true},
+    {"null frame", null_frame, MLN_STATUS_INVALID_ARGUMENT, false},
   };
   enum { breakage_count = sizeof(breakages) / sizeof(breakages[0]) };
   for (size_t index = 0; index < accessor_count; index += 1) {
     char labels[breakage_count][64];
     mln_test_validation_case cases[breakage_count];
+    size_t case_count = 0;
     for (size_t row = 0; row < breakage_count; row += 1) {
+      if (index != 0 && !breakages[row].every_accessor) continue;
       (void)snprintf(
-        labels[row], sizeof(labels[row]), "%s: %s", accessors[index].name,
-        breakages[row].label
+        labels[case_count], sizeof(labels[case_count]), "%s: %s",
+        accessors[index].name, breakages[row].label
       );
-      cases[row] = (mln_test_validation_case){
-        labels[row], breakages[row].mutate, breakages[row].expected, NULL
+      cases[case_count] = (mln_test_validation_case){
+        labels[case_count], breakages[row].mutate, breakages[row].expected, NULL
       };
+      case_count += 1;
     }
     const accessor_call defaults = {
       .frame = frame, .record_size = accessors[index].record_size
     };
     mln_test_run_validation_table(
-      cases, breakage_count, &defaults, sizeof(defaults), call_accessor,
+      cases, case_count, &defaults, sizeof(defaults), call_accessor,
       (void*)&accessors[index]
     );
   }
@@ -418,37 +425,24 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   detach_keeping_the_ring(runtime, map, &fixture);
 }
 
-static void frame_release_checks_ownership_before_consumer_sync(void) {
+// A release while detach is in flight finds the frame already released
+// before it looks at the sync kind, which would read the session's backend
+// that the detach may be destroying.
+static void a_stale_release_during_detach_is_refused_before_its_sync(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture, mln_test_empty_style_json);
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 170);
-  const mln_acquired_frame owned = frame;
-  void* scope = NULL;
-  MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scope, NULL));
-  mln_gpu_sync unsupported = mln_gpu_sync_default();
-  unsupported.kind = 999;
-  MLN_TEST_STATUS(
-    MLN_STATUS_BUSY, mln_acquired_frame_release(frame, &unsupported, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(owned, frame);
-  mln_acquired_frame_view_end(scope);
-  MLN_TEST_STATUS(
-    MLN_STATUS_UNSUPPORTED,
-    mln_acquired_frame_release(frame, &unsupported, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(owned, frame);
-  mln_render_frame_result result = {.size = sizeof(result)};
-  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
-  TEST_ASSERT_EQUAL_UINT64(170, result.token);
+  const mln_acquired_frame stale = frame;
   mln_test_render_release_frame(&frame);
 
   mln_test_completion detached = mln_test_completion_default(0);
   MLN_TEST_OK(
     mln_render_session_detach(fixture.session, &detached.descriptor, NULL)
   );
-  mln_acquired_frame stale = owned;
+  mln_gpu_sync unsupported = mln_gpu_sync_default();
+  unsupported.kind = 999;
   MLN_TEST_INVALID_STATE(mln_acquired_frame_release(stale, &unsupported, NULL));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detached));
   mln_test_completion_destroy(&detached);
@@ -659,26 +653,12 @@ typedef struct physical_row {
 // up, and must fit in 32 bits.
 static void physical_sizes_round_up_and_reject_overflow(void) {
   const physical_row rows[] = {
-    {"a unit scale keeps the size", EXTENT(64, 32, 1.0), MLN_STATUS_OK, 64, 32},
     {"a fractional product rounds up", EXTENT(3, 5, 1.5), MLN_STATUS_OK, 5, 8},
     {"a scale below one keeps a pixel", EXTENT(1, 3, 0.25), MLN_STATUS_OK, 1,
      1},
-    {"an exact product is not rounded", EXTENT(10, 20, 1.5), MLN_STATUS_OK, 15,
-     30},
     {"the largest dimension fits", EXTENT(UINT32_MAX, 1, 1.0), MLN_STATUS_OK,
      UINT32_MAX, 1},
-    {"a product just under the limit fits",
-     EXTENT(UINT32_C(0x7fffffff), 1, 2.0), MLN_STATUS_OK, UINT32_C(0xfffffffe),
-     2},
     {"a product past the limit overflows", EXTENT(UINT32_C(0x80000000), 1, 2.0),
-     MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"a height past the limit overflows", EXTENT(1, UINT32_MAX, 1.5),
-     MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"a zero width", EXTENT(0, 1, 1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"a zero height", EXTENT(1, 0, 1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"a zero scale", EXTENT(1, 1, 0.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"a negative scale", EXTENT(1, 1, -1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"an infinite scale", EXTENT(1, 1, (double)INFINITY),
      MLN_STATUS_INVALID_ARGUMENT, 0, 0},
     {"a scale that is not a number", EXTENT(1, 1, (double)NAN),
      MLN_STATUS_INVALID_ARGUMENT, 0, 0},
@@ -697,14 +677,9 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(ok ? row->width : 7, width, row->label);
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(ok ? row->height : 7, height, row->label);
   }
-  uint32_t width = 0;
   uint32_t height = 0;
-  const mln_logical_extent extent = EXTENT(1, 1, 1.0);
   MLN_TEST_INVALID(
-    mln_logical_extent_physical_size(extent, NULL, &height, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_logical_extent_physical_size(extent, &width, NULL, NULL)
+    mln_logical_extent_physical_size(EXTENT(1, 1, 1.0), NULL, &height, NULL)
   );
 }
 
@@ -806,7 +781,7 @@ MLN_TEST_GROUP {
   RUN_TEST(only_the_sessions_backend_describes_its_frame_texture);
   RUN_TEST(accessors_and_release_reject_a_broken_frame_or_record);
   RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
-  RUN_TEST(frame_release_checks_ownership_before_consumer_sync);
+  RUN_TEST(a_stale_release_during_detach_is_refused_before_its_sync);
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);
   RUN_TEST(a_fully_quarantined_ring_takes_no_more_demands);

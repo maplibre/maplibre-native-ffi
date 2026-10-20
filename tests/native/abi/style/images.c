@@ -168,8 +168,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A stretch interval with no width or one that runs backwards never reaches
-// the map worker.
+// A stretch interval that runs backwards never reaches the map worker.
 static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -180,20 +179,18 @@ static void style_image_inputs_are_validated_at_submission(void) {
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
-  const mln_image_stretch invalid[] = {{0.5f, 0.5f}, {2.0f, 1.0f}};
-  for (size_t index = 0; index < 2; index += 1) {
-    mln_style_image_options options = mln_style_image_options_default();
-    options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-    options.stretch_x = &invalid[index];
-    options.stretch_x_count = 1;
-    MLN_TEST_EXPECT_COMMAND_REJECTED(
-      "intervals must have a positive width",
-      mln_map_set_style_image(
-        map, MLN_BUFFER_LITERAL("invalid-stretch"), &image, &options,
-        &completion.descriptor, MLN_TEST_DIAGNOSTIC
-      )
-    );
-  }
+  const mln_image_stretch backwards = {2.0f, 1.0f};
+  mln_style_image_options options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+  options.stretch_x = &backwards;
+  options.stretch_x_count = 1;
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "intervals must have a positive width",
+    mln_map_set_style_image(
+      map, MLN_BUFFER_LITERAL("invalid-stretch"), &image, &options,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

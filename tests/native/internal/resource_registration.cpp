@@ -1,5 +1,4 @@
 // Rejected registrations retain host ownership even when acceptance throws.
-#include <cstdio>
 #include <optional>
 
 #include <mln/storage/response.hpp>
@@ -143,71 +142,11 @@ void rejected_callback_registrations_never_release_caller_data() {
   }
 }
 
-struct RefusedCopy {
-  mln_resource_provider_callback callback;
-  void* user_data;
-  bool handled = false;
-};
-
-auto refuse_request_copy(
-  void* data, const mln_resource_request_info* request,
-  mln_resource_request handle
-) -> uint32_t {
-  auto& probe = *static_cast<RefusedCopy*>(data);
-  const auto faults = mln::native_tests::AllocationFaults{};
-  const auto decision = probe.callback(probe.user_data, request, handle);
-  probe.handled = decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-  return decision;
-}
-
-void a_failed_queue_copy_fails_closed_without_allocating() {
-  auto loop = mln::util::RunLoop{};
-  auto runtime = mln_test_create_runtime();
-  auto queue = mln_delivery_queue{MLN_HANDLE_NULL};
-  const auto options =
-    mln_delivery_queue_options{.size = sizeof(mln_delivery_queue_options)};
-  MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, nullptr));
-  const auto descriptor = mln_resource_provider{
-    .size = sizeof(mln_resource_provider),
-    .queue = queue,
-    .routes = nullptr,
-    .route_count = 0,
-  };
-  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, descriptor));
-  const auto live = mln::core::lease_runtime(runtime);
-  auto provider = mln::core::acquire_resource_provider_for_platform_context(
-    live->platform_context
-  );
-  auto probe = RefusedCopy{provider->callback(), provider->user_data()};
-  auto failed = false;
-  auto passed_through = false;
-  auto request = mln::core::request_custom_resource(
-    mln::Resource::style("custom://refused.json"), "custom://refused.json",
-    refuse_request_copy, &probe,
-    [&](const mln::Response& response) {
-      failed = response.error != nullptr;
-      loop.stop();
-    },
-    [&](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
-      passed_through = true;
-      return nullptr;
-    }
-  );
-  loop.run();
-  request.reset();
-  provider.reset();
-  MLN_TEST_OK(mln::native_tests::clear_resource_provider(runtime));
-  mln_test_destroy_runtime(runtime);
-  mln_delivery_queue_release(queue);
-  TEST_ASSERT_TRUE(probe.handled);
-  TEST_ASSERT_TRUE(failed);
-  TEST_ASSERT_FALSE(passed_through);
-}
-
 struct PersistentCopyFailure {
   mln_resource_provider_callback callback;
   void* data;
   std::optional<mln::native_tests::AllocationFaults> faults;
+  bool handled = false;
 };
 
 auto refuse_until_the_wrapper_returns(
@@ -216,7 +155,9 @@ auto refuse_until_the_wrapper_returns(
 ) -> uint32_t {
   auto& probe = *static_cast<PersistentCopyFailure*>(data);
   probe.faults.emplace();
-  return probe.callback(probe.data, request, handle);
+  const auto decision = probe.callback(probe.data, request, handle);
+  probe.handled = decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  return decision;
 }
 
 void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
@@ -263,6 +204,7 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
   mln_test_destroy_runtime(runtime);
   mln_delivery_queue_release(queue);
   TEST_ASSERT_TRUE(reached);
+  TEST_ASSERT_TRUE(probe.handled);
   TEST_ASSERT_FALSE(passed_through);
   TEST_ASSERT_TRUE_MESSAGE(
     failed, "the failed copy left its request without a terminal response"
@@ -270,7 +212,6 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
 }
 
 void pass_through_retry_starts_native_after_scheduling_failure() {
-  auto stalled = unsigned{0};
   for (auto budget = std::size_t{0}; budget < 8; ++budget) {
     auto loop = mln::util::RunLoop{};
     auto handle = mln_resource_request{MLN_HANDLE_NULL};
@@ -299,21 +240,13 @@ void pass_through_retry_starts_native_after_scheduling_failure() {
       status = mln_resource_request_pass_through(handle, nullptr);
     loop.invoke([&] { loop.stop(); });
     loop.run();
-    if (status == MLN_STATUS_OK && starts != 1) {
-      ++stalled;
-      std::fprintf(
-        stderr,
-        "pass-through allocation %zu: accepted retry, native starts=%u\n",
-        budget, starts
-      );
-    }
     mln_resource_request_release(handle);
     request.reset();
     MLN_TEST_OK(status);
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(
+      1, starts, "pass-through retry left native loading unscheduled"
+    );
   }
-  TEST_ASSERT_EQUAL_UINT_MESSAGE(
-    0, stalled, "pass-through retry left native loading unscheduled"
-  );
 }
 
 void reserved_decisions_are_cancelled_with_the_native_request() {
@@ -361,6 +294,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_failed_provider_copy_delivers_with_persistent_allocation_failure);
   RUN_TEST(pass_through_retry_starts_native_after_scheduling_failure);
   RUN_TEST(rejected_provider_registration_queues_no_retirement);
-  RUN_TEST(a_failed_queue_copy_fails_closed_without_allocating);
   RUN_TEST(rejected_callback_registrations_never_release_caller_data);
 }

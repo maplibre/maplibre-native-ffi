@@ -1242,7 +1242,6 @@ auto run_core_worker(
       session->driver_call_in_flight = true;
       session->driver_call_thread = current_owner_thread();
     }
-    mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
     try {
       auto execute = [&]() -> mln_status {
         if (work.execute) work.execute();
@@ -3343,7 +3342,6 @@ auto render_session_service_driver_work(
       resubmit_parked_retirements(parked);
     }
   } guard{live};
-  mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
   while (max_work == 0 || *out_serviced < max_work) {
     auto item = RenderDriverWork{};
     {

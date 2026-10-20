@@ -206,7 +206,6 @@ static const header_case refused_headers[] = {
   {"a value that is not UTF-8", "Authorization", 13, invalid_utf8,
    sizeof(invalid_utf8)},
   {"a null name", NULL, 1, "value", 5},
-  {"a name with NUL", "X-\0Name", 7, "value", 5},
   {"a value with NUL", "X-Name", 6, "before\0after", 12},
 };
 

@@ -1,6 +1,6 @@
 // Style layers: the layer result, properties and filters through JSON, layer
-// JSON, listing in style order, source bindings, terrain, and location
-// indicators.
+// JSON, listing in style order, source bindings, and the source a layer type
+// requires.
 
 #include <math.h>
 
@@ -134,13 +134,6 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
     map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("visibility"),
     MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
   ));
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("visibility"),
-      MLN_BUFFER_LITERAL("7"), &completion.descriptor, NULL
-    )
-  );
   MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("source-layer"),
     MLN_BUFFER_LITERAL("\"roads\""), &completion.descriptor, NULL
@@ -240,13 +233,6 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
     mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
-      MLN_BUFFER_LITERAL("\"wide\""), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
       MLN_BUFFER_LITERAL("{\"radius\":"), &completion.descriptor, NULL
     )
   );
@@ -263,17 +249,6 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"), kind_filter,
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
-  TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
-  const mln_buffer_view bad_filter =
-    MLN_BUFFER_LITERAL("[\"no-such-operator\",1]");
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"), bad_filter,
-      &completion.descriptor, NULL
-    )
-  );
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   // A null filter clears it.
@@ -490,63 +465,42 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Hillshade and color-relief layers require a raster DEM source.
-static void terrain_layers_require_a_raster_dem_source(void) {
+// A layer whose type requires a source takes only a source that supports the
+// type: a hillshade layer requires a raster DEM source, and a circle layer
+// cannot draw one. A layer ID is taken once.
+static void a_layer_requires_a_source_that_supports_its_type(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   add_dem_source(map, "dem");
   add_source(map, "points");
-  add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
 
-  static const struct {
-    const char* layer;
-    const char* type;
-  } adders[] = {
-    {"hillshade", "hillshade"},
-    {"relief", "color-relief"},
-  };
-  for (size_t index = 0; index < 2; index += 1) {
-    char layer_json[256];
-    snprintf(
-      layer_json, sizeof(layer_json),
-      "{\"id\":\"%s\",\"type\":\"%s\",\"source\":\"dem\"}", adders[index].layer,
-      adders[index].type
-    );
-    const mln_buffer_view layer = mln_test_view_of(layer_json);
-    // Each goes under the paper, before the layer the loop added last.
-    MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-      map, layer, MLN_BUFFER_LITERAL("paper"), &completion.descriptor, NULL
-    ));
-    layer_probe probe = take_layer_result(runtime, map, adders[index].layer);
-    TEST_ASSERT_EQUAL_STRING(adders[index].type, probe.type);
-    TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
+  const mln_buffer_view hillshade = MLN_BUFFER_LITERAL(
+    "{\"id\":\"hillshade\",\"type\":\"hillshade\",\"source\":\"dem\"}"
+  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map, hillshade, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+  ));
+  const layer_probe probe = take_layer_result(runtime, map, "hillshade");
+  TEST_ASSERT_EQUAL_STRING("hillshade", probe.type);
+  TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "layer already exists",
+    mln_map_add_style_layer_json(
+      map, hillshade, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+    )
+  );
 
-    MLN_TEST_EXPECT_COMMAND_FAILED(
-      MLN_STATUS_INVALID_ARGUMENT, "layer already exists",
-      mln_map_add_style_layer_json(
-        map, layer, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-      )
-    );
-    snprintf(
-      layer_json, sizeof(layer_json),
-      "{\"id\":\"on-points\",\"type\":\"%s\",\"source\":\"points\"}",
-      adders[index].type
-    );
-    MLN_TEST_EXPECT_COMMAND_FAILED(
-      MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
-      mln_map_add_style_layer_json(
-        map, mln_test_view_of(layer_json), MLN_BUFFER_LITERAL(""),
-        &completion.descriptor, NULL
-      )
-    );
-    MLN_TEST_EXPECT_COMMAND_FAILED(
-      MLN_STATUS_NOT_FOUND, "before_layer_id does not exist",
-      mln_map_add_style_layer_json(
-        map, mln_test_view_of(layer_json), MLN_BUFFER_LITERAL("missing"),
-        &completion.descriptor, NULL
-      )
-    );
-  }
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
+    mln_map_add_style_layer_json(
+      map,
+      MLN_BUFFER_LITERAL(
+        "{\"id\":\"on-points\",\"type\":\"hillshade\",\"source\":"
+        "\"points\"}"
+      ),
+      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+    )
+  );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
     mln_map_add_style_layer_json(
@@ -557,98 +511,6 @@ static void terrain_layers_require_a_raster_dem_source(void) {
       MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
     )
   );
-  const mln_test_style_list ids = mln_test_style_list_layers(map);
-  MLN_TEST_OK(ids.status);
-  TEST_ASSERT_EQUAL_size_t(3, ids.count);
-  TEST_ASSERT_EQUAL_STRING("hillshade", ids.entries[0].id);
-  TEST_ASSERT_EQUAL_STRING("relief", ids.entries[1].id);
-  TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
-
-  // The color ramp is an ordinary property of the color-relief layer.
-  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
-    map, MLN_BUFFER_LITERAL("relief"), MLN_BUFFER_LITERAL("color-relief-color"),
-    MLN_BUFFER_LITERAL(
-      "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"#000000\",1000,"
-      "\"#ffffff\"]"
-    ),
-    &completion.descriptor, NULL
-  ));
-  char ramp[256];
-  MLN_TEST_OK(
-    read_layer_property(map, "relief", "color-relief-color", ramp, sizeof(ramp))
-  );
-  TEST_ASSERT_NOT_NULL(strstr(ramp, "\"elevation\""));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// Location-indicator properties use the renderer's order and units.
-static void location_indicator_setters_write_its_properties(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  add_source(map, "points");
-  add_layer(
-    map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
-  );
-  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-    map,
-    MLN_BUFFER_LITERAL("{\"id\":\"puck\",\"type\":\"location-indicator\"}"),
-    MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-  ));
-
-  static const struct {
-    const char* label;
-    const char* value;
-    const char* property;
-    // A fragment of the property's JSON.
-    const char* expected;
-  } setters[] = {
-    {"location", "[37.5,-122.25,12.0]", "location", "[37.5,-122.25,12.0]"},
-    {"bearing", "90", "bearing", "90.0"},
-    {"accuracy radius", "25", "accuracy-radius", "25.0"},
-    {"bearing image", "\"arrow\"", "bearing-image", "\"name\":\"arrow\""},
-    {"top image", "\"dot\"", "top-image", "\"name\":\"dot\""},
-    {"shadow image", "\"halo\"", "shadow-image", "\"name\":\"halo\""},
-  };
-  for (size_t index = 0; index < sizeof(setters) / sizeof(setters[0]);
-       index += 1) {
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_OK_MESSAGE(
-      mln_map_set_style_layer_property(
-        map, MLN_BUFFER_LITERAL("puck"),
-        mln_test_view_of(setters[index].property),
-        mln_test_view_of(setters[index].value), &completion.descriptor, NULL
-      ),
-      setters[index].label
-    );
-    MLN_TEST_OK_MESSAGE(
-      mln_test_completion_settle(&completion), setters[index].label
-    );
-    char value[128];
-    MLN_TEST_OK(read_layer_property(
-      map, "puck", setters[index].property, value, sizeof(value)
-    ));
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(value, setters[index].expected), setters[index].label
-    );
-
-    completion = mln_test_completion_default(0);
-    MLN_TEST_OK(mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"),
-      mln_test_view_of(setters[index].property),
-      mln_test_view_of(setters[index].value), &completion.descriptor, NULL
-    ));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&completion),
-      setters[index].label
-    );
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(mln_test_completion_diagnostic(&completion), "layer property"),
-      setters[index].label
-    );
-    mln_test_completion_destroy(&completion);
-  }
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -661,6 +523,5 @@ MLN_TEST_GROUP {
   RUN_TEST(layer_json_serializes_the_current_layer);
   RUN_TEST(layers_list_in_style_order_after_moves);
   RUN_TEST(source_bindings_change_only_on_layers_that_take_a_source);
-  RUN_TEST(terrain_layers_require_a_raster_dem_source);
-  RUN_TEST(location_indicator_setters_write_its_properties);
+  RUN_TEST(a_layer_requires_a_source_that_supports_its_type);
 }

@@ -85,10 +85,17 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
+  // A demand with an unknown flag is rejected and queues no result.
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = 1U << 8U;
+  demand.token = 200;
+  MLN_TEST_INVALID(
+    mln_render_session_request_frame(fixture.session, &demand, NULL)
+  );
   frame_wake_wait wake = {
     .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
   };
-  mln_frame_demand demand = mln_frame_demand_default();
+  demand = mln_frame_demand_default();
   demand.token = 201;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   MLN_TEST_OK(mln_test_render_step_until(
@@ -104,6 +111,12 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   const mln_render_frame_result* result = mln_test_render_view_result(&view, 0);
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), result->size);
   TEST_ASSERT_EQUAL_UINT64(201, result->token);
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, NULL, NULL));
+  mln_render_frame_batch_view small = {
+    .size = sizeof(small) - 1, .result_count = 99
+  };
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, &small, NULL));
+  TEST_ASSERT_EQUAL_size_t(99, small.result_count);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(MLN_HANDLE_NULL);
@@ -111,16 +124,7 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
     .size = sizeof(mln_render_frame_batch_view), .result_count = 99
   };
   MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, &stale, NULL));
-  MLN_TEST_INVALID(mln_render_frame_batch_get(MLN_HANDLE_NULL, &stale, NULL));
   TEST_ASSERT_EQUAL_size_t(99, stale.result_count);
-  // The view check runs before the lease, so the stale handle reports the
-  // invalid view rather than its state.
-  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, NULL, NULL));
-  mln_render_frame_batch_view small = {
-    .size = sizeof(small) - 1, .result_count = 99
-  };
-  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, &small, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, small.result_count);
   detach(runtime, map, &fixture);
 }
 

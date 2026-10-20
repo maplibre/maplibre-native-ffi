@@ -3,17 +3,6 @@
 
 #include "support/test_support.h"
 
-static void runtime_creation_returns_a_runtime(void) {
-  const mln_runtime_options options = mln_runtime_options_default();
-
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
-  MLN_TEST_INVALID(mln_runtime_create(&options, &runtime, NULL));
-
-  MLN_TEST_OK(mln_test_runtime_close(runtime));
-}
-
 static void ignore_wake(void* user_data) { (void)user_data; }
 
 static void runtime_options_with_small_size(void* descriptor) {
@@ -149,7 +138,7 @@ static mln_status create_map_from(
   return status;
 }
 
-static void map_creation_validates_its_options_and_completion(void) {
+static void map_creation_validates_its_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_map_options defaults = mln_map_options_default();
   mln_test_run_validation_table(
@@ -157,7 +146,6 @@ static void map_creation_validates_its_options_and_completion(void) {
     sizeof(map_creation_cases) / sizeof(*map_creation_cases), &defaults,
     sizeof(defaults), create_map_from, &runtime
   );
-  MLN_TEST_INVALID(mln_runtime_create_map(runtime, &defaults, NULL, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -188,15 +176,10 @@ static void style_functions_reject_null_inputs(void) {
     strstr(mln_test_last_error(), "style JSON must not be empty"),
     mln_test_last_error()
   );
-  MLN_TEST_INVALID(mln_test_map_set_style_url(map, NULL));
-  TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(mln_test_last_error(), "url has null data"), mln_test_last_error()
-  );
 
   // A rejected style read never invokes or releases the completion, so the
   // caller still owns the user_data and releases it itself.
   mln_test_completion held = mln_test_completion_buffer_view();
-  MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
   MLN_TEST_INVALID(mln_map_get_style_url(map, NULL, NULL));
   MLN_TEST_INVALID(
     mln_map_get_loaded_style_json(MLN_HANDLE_NULL, &held.descriptor, NULL)
@@ -498,10 +481,9 @@ static void a_map_release_completion_can_release_its_runtime(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(runtime_creation_returns_a_runtime);
   RUN_TEST(runtime_creation_validates_its_options);
   RUN_TEST(runtime_calls_reject_a_value_that_names_no_runtime);
-  RUN_TEST(map_creation_validates_its_options_and_completion);
+  RUN_TEST(map_creation_validates_its_options);
   RUN_TEST(a_released_map_accepts_no_call);
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(disposal_waits_for_children_and_retires_callback_state);

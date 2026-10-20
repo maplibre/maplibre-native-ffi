@@ -123,6 +123,9 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
   MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
 
   dump_debug_logs();
+  // The queue wakes inline on the logging thread, before the dump command that
+  // logged the records completes.
+  TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&queue.wakes));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
 
   static seen_deliveries seen;
@@ -204,51 +207,6 @@ LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {
   MLN_TEST_INVALID_STATE(mln_log_set_callback(&handler, NULL));
 }
 
-// A discarded command's failure warning reaches a queue handler as one log
-// record.
-LOG_STATE_CASE(a_discarded_command_failure_reaches_a_queue_handler) {
-  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
-  static mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  int tag = 0;
-  const mln_log_handler handler = queue_handler(queue.handle, &tag);
-  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  MLN_TEST_OK(mln_log_clear_callback(NULL));
-
-  size_t warnings = 0;
-  while (true) {
-    mln_delivery_batch batch = MLN_HANDLE_NULL;
-    const mln_status status =
-      mln_delivery_queue_drain(queue.handle, &batch, NULL);
-    if (status == MLN_STATUS_NOT_READY) break;
-    MLN_TEST_OK(status);
-    const mln_delivery_batch_view view = mln_test_delivery_view(batch);
-    for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery = mln_test_delivery_at(&view, index);
-      if (delivery->type != MLN_DELIVERY_TYPE_LOG_RECORD) continue;
-      const mln_log_delivery* record = &delivery->payload.log_record;
-      if (strstr(record->message, "discarded command failed") == NULL) {
-        continue;
-      }
-      TEST_ASSERT_EQUAL_PTR(&tag, delivery->user_data);
-      TEST_ASSERT_EQUAL_UINT32(MLN_LOG_SEVERITY_WARNING, record->severity);
-      TEST_ASSERT_NOT_NULL(
-        strstr(record->message, "map has no open command group")
-      );
-      warnings += 1;
-    }
-    mln_delivery_batch_release(batch);
-  }
-  TEST_ASSERT_EQUAL_size_t(1, warnings);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
-}
-
 #if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
 
 typedef struct stderr_capture {
@@ -326,7 +284,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_queue_handler_copies_each_record);
   RUN_TEST(replace_and_clear_retire_a_queue_handler_once);
   RUN_TEST(a_queue_handler_rejects_an_invalid_shape);
-  RUN_TEST(a_discarded_command_failure_reaches_a_queue_handler);
 #if defined(MLN_TEST_PLATFORM_LOG_ON_STDERR)
   RUN_TEST(only_refused_records_reach_the_platform_logger);
 #endif

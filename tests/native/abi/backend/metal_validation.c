@@ -219,9 +219,11 @@ static void metal_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// set_target checks the session before the descriptor, and a build without
-// Metal reports the missing backend last, so there the rows name no session.
-// A Metal build submits them for a live session of the replacement's kind.
+// set_target runs its attach's descriptor check, so beyond a row for each
+// pointer and handle it reads, these rows cover only its own steps. It checks
+// the session before the descriptor, and a build without Metal reports the
+// missing backend last, so there the rows name no session. A Metal build
+// submits them for a live session of the replacement's kind.
 static void metal_set_target_rejects_malformed_descriptors(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
@@ -240,7 +242,7 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(metal_surface),
+    MLN_TEST_UNDERSIZED_CASE(metal_surface),
     MLN_TEST_OVERFLOW_CASE(metal_surface),
     {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
@@ -282,16 +284,14 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(metal_borrowed),
-    MLN_TEST_BORROWED_CASES(metal_borrowed),
+    MLN_TEST_UNDERSIZED_CASE(metal_borrowed),
+    {"null textures array", metal_borrowed_without_textures,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-    {"a physical size the texture does not have",
-     borrowed_with_another_physical_size, MLN_STATUS_INVALID_ARGUMENT,
-     "must match descriptor physical size"},
     {"more textures than the session's ring has slots",
      borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
 #else

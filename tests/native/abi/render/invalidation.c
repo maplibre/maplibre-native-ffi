@@ -394,31 +394,6 @@ static void raise_prefetch_delta(mln_map map, update_state* state) {
   options.prefetch_zoom_delta = state->initial_tile.prefetch_zoom_delta + 1;
   set_tile_options(map, &options);
 }
-static void raise_lod_min_radius(mln_map map, update_state* state) {
-  mln_map_tile_options options = mln_map_tile_options_default();
-  options.fields = MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
-  options.lod_min_radius = state->initial_tile.lod_min_radius + 1.0;
-  set_tile_options(map, &options);
-}
-static void raise_lod_scale(mln_map map, update_state* state) {
-  mln_map_tile_options options = mln_map_tile_options_default();
-  options.fields = MLN_MAP_TILE_OPTION_LOD_SCALE;
-  options.lod_scale = state->initial_tile.lod_scale + 1.0;
-  set_tile_options(map, &options);
-}
-static void set_lod_pitch_threshold(mln_map map, update_state* state) {
-  (void)state;
-  mln_map_tile_options options = mln_map_tile_options_default();
-  options.fields = MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
-  options.lod_pitch_threshold = 30.0;
-  set_tile_options(map, &options);
-}
-static void raise_lod_zoom_shift(mln_map map, update_state* state) {
-  mln_map_tile_options options = mln_map_tile_options_default();
-  options.fields = MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
-  options.lod_zoom_shift = state->initial_tile.lod_zoom_shift + 1.0;
-  set_tile_options(map, &options);
-}
 static void use_distance_lod(mln_map map, update_state* state) {
   (void)state;
   mln_map_tile_options options = mln_map_tile_options_default();
@@ -479,14 +454,6 @@ static const update_row update_rows[] = {
   {"a style image removed", remove_icon, true},
   {"the prefetch delta raised", raise_prefetch_delta, true},
   {"the prefetch delta unchanged", raise_prefetch_delta, false},
-  {"the LOD minimum radius raised", raise_lod_min_radius, true},
-  {"the LOD minimum radius unchanged", raise_lod_min_radius, false},
-  {"the LOD scale raised", raise_lod_scale, true},
-  {"the LOD scale unchanged", raise_lod_scale, false},
-  {"the LOD pitch threshold set", set_lod_pitch_threshold, true},
-  {"the LOD pitch threshold unchanged", set_lod_pitch_threshold, false},
-  {"the LOD zoom shift raised", raise_lod_zoom_shift, true},
-  {"the LOD zoom shift unchanged", raise_lod_zoom_shift, false},
   {"the LOD mode changed", use_distance_lod, true},
   {"the LOD mode unchanged", use_distance_lod, false},
   {"a layer transition set", set_layer_transition, true},

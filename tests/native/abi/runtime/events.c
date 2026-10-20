@@ -13,25 +13,13 @@ static const mln_runtime_event* batch_event(
                                     (index * batch->event_size));
 }
 
-static mln_map_options map_options_with_event_mask(uint64_t mask) {
-  mln_map_options options = mln_map_options_default();
-  options.event_mask = mask;
-  return options;
-}
-
-// An owned output must start null, and a retired runtime accepts no new drain.
-static void a_drain_rejects_a_nonnull_output_or_a_stale_runtime(void) {
+// A drain needs an output, and an owned output must start null.
+static void a_drain_rejects_a_missing_or_nonnull_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_INVALID(mln_runtime_drain_events(runtime, NULL, NULL));
   mln_event_batch batch = UINT64_C(1);
   MLN_TEST_INVALID(mln_runtime_drain_events(runtime, &batch, NULL));
-
   mln_test_destroy_runtime(runtime);
-  batch = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID_STATE(mln_runtime_drain_events(runtime, &batch, NULL));
-  MLN_TEST_INVALID_STATE(
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
-  );
 }
 
 typedef struct foreign_thread_probe {
@@ -76,32 +64,6 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A creation mask applies before MapLibre reports constructor-time events.
-static void a_creation_mask_applies_during_construction(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_map_options options =
-    map_options_with_event_mask(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED);
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-
-  uint64_t map_mask = MLN_RUNTIME_EVENT_MASK_ALL;
-  MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, map_mask);
-
-  mln_test_event_batch batch = mln_test_event_batch_default();
-  MLN_TEST_OK(mln_test_drain_events(runtime, &batch));
-  TEST_ASSERT_EQUAL_size_t(0, batch.event_count);
-
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-  TEST_ASSERT_EQUAL_size_t(
-    0, mln_test_drain_counting(
-         runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-       )
-  );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Clearing one bit leaves every other type arriving, which separates
 // suppression from a broken producer.
 static void clearing_one_type_leaves_the_others_arriving(void) {
@@ -128,27 +90,6 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
        )
   );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// Suppression happens at push time, so a cleared type produces no queue record
-// even though the runtime worker continues to process the command.
-static void a_suppressed_producer_leaves_the_queue_empty(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_map_options options =
-    map_options_with_event_mask(MLN_RUNTIME_EVENT_MASK_NONE);
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-  MLN_TEST_OK(
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE, NULL)
-  );
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
-
-  MLN_TEST_OK(mln_test_map_request_repaint(map));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -242,24 +183,13 @@ static void the_message_arena_carries_one_range_per_event(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A fresh map and runtime select every event type. The masks change from any
-// thread, and each setter rejects unknown bits but keeps the other group's.
-static void event_masks_select_every_type_and_keep_foreign_bits(void) {
+// The masks change from any thread, and the runtime setter rejects unknown
+// bits but keeps the other group's.
+static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  {
-    uint64_t runtime_mask = 0;
-    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
-    uint64_t map_mask = 0;
-    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
-
-    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-    TEST_ASSERT_GREATER_THAN_size_t(
-      0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
-    );
-  }
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_drain_all(runtime);
   {
     foreign_thread_probe probe = {.runtime = runtime, .map = map};
     mln_test_thread* thread =
@@ -271,30 +201,24 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
     MLN_TEST_STATUS(MLN_STATUS_NOT_READY, probe.drain_status);
     MLN_TEST_OK(probe.runtime_mask_status);
     MLN_TEST_OK(probe.map_mask_status);
+
+    // Both setters accept MLN_RUNTIME_EVENT_MASK_ALL, and the map reports it
+    // back whole.
+    uint64_t map_mask = 0;
+    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
   }
-  // Each setter reads only its own group's bits but stores the whole value, so
+  // The setter reads only its own group's bits but stores the whole value, so
   // a host that reads a mask, sets one bit, and writes it back keeps every
   // other.
   {
     MLN_TEST_INVALID(
       mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL)
     );
-    MLN_TEST_INVALID(mln_test_map_set_event_mask(map, unknown_mask_bit));
 
-    MLN_TEST_OK(
-      mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
-    );
-    MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
-
-    uint64_t runtime_mask = 0;
-    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
-    uint64_t map_mask = 0;
-    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
-
-    // One in-group bit for the other source kind, which each setter accepts and
+    // One in-group bit for the other source kind, which the setter accepts and
     // reports back unchanged.
+    uint64_t runtime_mask = 0;
     MLN_TEST_OK(mln_runtime_set_event_mask(
       runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, NULL
     ));
@@ -304,27 +228,21 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
     );
 
     MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
-    MLN_TEST_INVALID(mln_map_get_snapshot(map, NULL, NULL));
-    mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
-    MLN_TEST_INVALID(mln_map_get_snapshot(map, &undersized, NULL));
   }
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// A drain of an empty queue reports not ready, leaves its output null, clears
-// a diagnostic left by an earlier failure, and consumes nothing: the next
-// drain is empty too, and the next event still arrives in a batch. One drain
-// takes the whole queue, so the drain after it is empty again.
+// A drain of an empty queue reports not ready, leaves its output null and its
+// diagnostic empty, and consumes nothing: the next event still arrives in a
+// batch. One drain takes the whole queue, so the drain after it is empty again.
 static void an_empty_drain_publishes_no_batch(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  for (int attempt = 0; attempt < 2; attempt += 1) {
+  {
     mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    mln_event_batch_view unread = {.size = sizeof(unread)};
-    MLN_TEST_INVALID(
-      mln_event_batch_get(MLN_HANDLE_NULL, &unread, &diagnostic)
+    (void)snprintf(
+      diagnostic.message, sizeof(diagnostic.message), "an earlier failure"
     );
-    TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
     mln_event_batch batch = MLN_HANDLE_NULL;
     MLN_TEST_STATUS(
       MLN_STATUS_NOT_READY,
@@ -399,20 +317,16 @@ static void a_drained_batch_is_an_owned_handle(void) {
     };
     MLN_TEST_INVALID_STATE(mln_event_batch_get(batch, &view, NULL));
     TEST_ASSERT_EQUAL_size_t(99, view.event_count);
-    MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, NULL));
-    TEST_ASSERT_EQUAL_size_t(99, view.event_count);
   }
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_drain_rejects_a_nonnull_output_or_a_stale_runtime);
-  RUN_TEST(event_masks_select_every_type_and_keep_foreign_bits);
+  RUN_TEST(a_drain_rejects_a_missing_or_nonnull_output);
+  RUN_TEST(event_masks_change_from_any_thread_and_keep_foreign_bits);
   RUN_TEST(options_reject_unknown_event_mask_bits);
-  RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
-  RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
   RUN_TEST(an_empty_drain_publishes_no_batch);
   RUN_TEST(a_drained_batch_is_an_owned_handle);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);

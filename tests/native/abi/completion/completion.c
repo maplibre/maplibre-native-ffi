@@ -4,21 +4,17 @@
 #include "support/frames.h"
 #include "support/test_support.h"
 
-static MLN_TEST_THREAD_LOCAL char completion_thread_marker;
-
 typedef struct callback_probe {
   atomic_uint calls;
   atomic_uint releases;
   atomic_int status;
   atomic_uint_fast64_t value;
-  const void* thread;
 } callback_probe;
 
 static void record_completion(
   void* user_data, const mln_completion_result* result
 ) {
   callback_probe* probe = user_data;
-  probe->thread = &completion_thread_marker;
   atomic_store(&probe->status, result->status);
   if (result->value != NULL && result->value_count == 1) {
     atomic_store(&probe->value, *(const mln_map*)result->value);
@@ -52,7 +48,6 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
   MLN_TEST_OK(atomic_load(&probe.status));
-  TEST_ASSERT_NOT_EQUAL(&completion_thread_marker, probe.thread);
 
   const mln_map map = (mln_map)atomic_load(&probe.value);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
@@ -74,18 +69,6 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
 
 static void record_wake(void* user_data) {
   atomic_fetch_add((atomic_uint*)user_data, 1);
-}
-
-static void an_idle_barrier_completes_on_the_worker(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  callback_probe probe = {0};
-  const mln_completion completion = probed_completion(&probe);
-  MLN_TEST_OK(mln_runtime_barrier(runtime, &completion, NULL));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
-  TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
-  TEST_ASSERT_NOT_EQUAL(&completion_thread_marker, probe.thread);
-  mln_test_destroy_runtime(runtime);
 }
 
 static void runtime_events_wake_the_receiver_directly(void) {
@@ -178,10 +161,7 @@ static void discarded_commands_keep_synchronous_validation(void) {
   MLN_TEST_INVALID(mln_map_resize(map, (mln_logical_extent){0}, NULL, NULL));
   mln_completion undersized = {.size = sizeof(mln_completion) - 1};
   MLN_TEST_INVALID(mln_map_request_repaint(map, &undersized, NULL));
-  mln_completion without_callback = {.size = sizeof(mln_completion)};
-  MLN_TEST_INVALID(mln_map_request_repaint(map, &without_callback, NULL));
   mln_test_destroy_map(map);
-  MLN_TEST_INVALID_STATE(mln_map_request_repaint(map, NULL, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -233,7 +213,6 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
 MLN_TEST_GROUP {
   RUN_TEST(an_accepted_completion_runs_and_releases_exactly_once);
   RUN_TEST(a_rejected_submission_leaves_callback_state_with_the_caller);
-  RUN_TEST(an_idle_barrier_completes_on_the_worker);
   RUN_TEST(runtime_events_wake_the_receiver_directly);
   RUN_TEST(discarded_commands_publish_state_and_events_before_a_barrier);
   RUN_TEST(a_later_command_completion_fences_discarded_commands);

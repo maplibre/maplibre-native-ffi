@@ -45,8 +45,8 @@ static void restore_fixture_context(const mln_test_render_fixture* fixture) {
 
 // A surface replacement leaves the new surface configured for the session. A
 // Metal layer reports the drawable size the session gave it, so the case first
-// shrinks the layer tests/graphics sized to the target; the other backends'
-// surfaces report nothing a host can read.
+// shrinks the layer tests/graphics sized; the other backends' surfaces report
+// nothing a host can read.
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 typedef struct layer_size {
   double width;
@@ -79,14 +79,16 @@ static void unconfigure_surface(const mln_test_graphics_surface* surface) {
 }
 
 static void expect_surface_configured(
-  const mln_test_graphics_surface* surface
+  const mln_test_graphics_surface* surface, int width, int height
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const layer_size size = drawable_size(surface);
-  TEST_ASSERT_EQUAL_INT(MLN_TEST_HOST_TARGET_SIZE, (int)size.width);
-  TEST_ASSERT_EQUAL_INT(MLN_TEST_HOST_TARGET_SIZE, (int)size.height);
+  TEST_ASSERT_EQUAL_INT(width, (int)size.width);
+  TEST_ASSERT_EQUAL_INT(height, (int)size.height);
 #else
   (void)surface;
+  (void)width;
+  (void)height;
 #endif
 }
 
@@ -546,36 +548,9 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   close_map(&map);
 }
 
-static void a_surface_retarget_presents_through_the_new_surface(void) {
-  retarget_map map = {0};
-  open_map(TARGET_SURFACE, &map);
-  const mln_test_render_fixture* fixture = &map.fixture;
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, MLN_FRAME_DEMAND_PRESENT)
-  );
-
-  mln_test_graphics_surface* replacement =
-    mln_test_render_fixture_new_surface(fixture);
-  TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
-  unconfigure_surface(replacement);
-  mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK_MESSAGE(
-    mln_test_render_fixture_set_surface(
-      fixture, mln_test_render_fixture_graphics(fixture), replacement,
-      &completion.descriptor
-    ),
-    mln_test_last_error()
-  );
-  finish(fixture, &completion, MLN_STATUS_OK, "the surface replacement");
-  expect_surface_configured(replacement);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, MLN_FRAME_DEMAND_PRESENT)
-  );
-  close_map(&map);
-}
-
 // A replacement sizes the map to its own extent, so the first frame after it
-// renders without the host resizing the map.
+// renders, or presents through a new surface, without the host resizing the
+// map.
 static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   enum { width = 48, height = 40 };
   retarget_map map = {0};
@@ -588,10 +563,11 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
 
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
   mln_test_completion completion = mln_test_completion_default(0);
+  mln_test_graphics_surface* surface = NULL;
   if (kind == TARGET_SURFACE) {
-    mln_test_graphics_surface* surface =
-      mln_test_render_fixture_new_sized_surface(fixture, width, height);
+    surface = mln_test_render_fixture_new_sized_surface(fixture, width, height);
     TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
+    unconfigure_surface(surface);
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_surface(
@@ -612,6 +588,9 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
     );
   }
   finish(fixture, &completion, MLN_STATUS_OK, "the replacement");
+  if (surface != NULL) {
+    expect_surface_configured(surface, width, height);
+  }
   // The barrier completes after the resize that the replacement submitted.
   MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
@@ -661,8 +640,6 @@ static const refusal_row refusal_rows[] = {
   {"a session-owned texture takes no borrowed texture", TARGET_OWNED,
    TARGET_BORROWED, ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK,
    "session-owned texture"},
-  {"a session-owned texture takes no surface", TARGET_OWNED, TARGET_SURFACE,
-   ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK, "native surface"},
   {"a borrowed texture takes no surface", TARGET_BORROWED, TARGET_SURFACE,
    ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK, "native surface"},
   {"a surface takes no texture", TARGET_SURFACE, TARGET_BORROWED,
@@ -882,7 +859,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
   RUN_TEST(frames_published_before_a_retarget_cannot_be_acquired);
   RUN_TEST(a_borrowed_retarget_renders_a_waiting_demand);
-  RUN_TEST(a_surface_retarget_presents_through_the_new_surface);
   RUN_TEST(a_borrowed_retarget_sizes_the_map);
   RUN_TEST(a_surface_retarget_sizes_the_map);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);

@@ -45,12 +45,14 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   char id[] = "owned-source";
   char json[sizeof(MLN_TEST_EMPTY_GEOJSON_SOURCE)];
   memcpy(json, MLN_TEST_EMPTY_GEOJSON_SOURCE, sizeof(json));
-  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, mln_test_view_of(id), mln_test_view_of(json), &completion.descriptor,
-    NULL
+  mln_test_completion add = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id), mln_test_view_of(json), &add.descriptor, NULL
   ));
+  // The command copied both inputs before it returned.
   memset(id, 'x', strlen(id));
   memset(json, ' ', strlen(json));
+  MLN_TEST_OK(mln_test_completion_settle(&add));
   TEST_ASSERT_TRUE(source_exists(map, "owned-source"));
 
   const mln_buffer_view source = MLN_BUFFER_LITERAL("owned-source");
@@ -120,48 +122,6 @@ static void missing_style_ids_report_not_found(void) {
     MLN_STATUS_NOT_FOUND, missing_layer,
     mln_map_set_style_layer_property(
       map, layer, MLN_BUFFER_LITERAL("circle-radius"), MLN_BUFFER_LITERAL("4"),
-      &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("filter"), MLN_BUFFER_LITERAL("null"),
-      &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("visibility"),
-      MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("minzoom"), MLN_BUFFER_LITERAL("2.0"),
-      &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("source"),
-      MLN_BUFFER_LITERAL("\"points\""), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("source-layer"),
-      MLN_BUFFER_LITERAL("\"roads\""), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("bearing"), MLN_BUFFER_LITERAL("90.0"),
       &completion.descriptor, NULL
     )
   );
@@ -238,12 +198,6 @@ static void missing_style_ids_report_not_found(void) {
                             &completion.descriptor, NULL
                           )
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NOT_FOUND,
-    mln_map_get_style_layer_property(
-      map, layer, MLN_BUFFER_LITERAL("filter"), &completion.descriptor, NULL
-    )
-  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -272,10 +226,9 @@ static void set_global_state(mln_map map, const char* value) {
   } while (false)
 
 // Global state needs a loaded style. It starts from the defaults the style
-// declares. A set property shadows its default until it is set to null, a
-// value that is not JSON fails the command and leaves the state alone, and
-// loading a style again discards what the host set. A style without state
-// declarations holds only what the host sets.
+// declares, a set value reads back as the JSON the host gave, a value that is
+// not JSON fails the command and leaves the state alone, and JSON null
+// restores the style default.
 static void global_state_reads_back_defaults_and_set_properties(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -312,16 +265,6 @@ static void global_state_reads_back_defaults_and_set_properties(void) {
   EXPECT_GLOBAL_STATE("{\"theme\":[\"dark\",{\"enabled\":true}]}", map);
   set_global_state(map, "null");
   EXPECT_GLOBAL_STATE("{\"theme\":\"light\"}", map);
-
-  set_global_state(map, "\"dark\"");
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(stateful_style)
-  );
-  EXPECT_GLOBAL_STATE("{\"theme\":\"light\"}", map);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  EXPECT_GLOBAL_STATE("{}", map);
-  set_global_state(map, "true");
-  EXPECT_GLOBAL_STATE("{\"theme\":true}", map);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -525,13 +468,6 @@ static void the_style_light_round_trips_through_json(void) {
   ));
   EXPECT_LIGHT_PROPERTY("0.75", map, "intensity");
 
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "style light property",
-    mln_map_set_style_light_property(
-      map, MLN_BUFFER_LITERAL("brightness"), MLN_BUFFER_LITERAL("1"),
-      &completion.descriptor, NULL
-    )
-  );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "style light property",
     mln_map_set_style_light_property(

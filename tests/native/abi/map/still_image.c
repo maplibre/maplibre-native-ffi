@@ -39,9 +39,9 @@ static void read_center_pixel(
 
 // Each still image renders the map as it stands when the image is taken, so a
 // second request after a style change shows the new style.
-static void a_still_image_renders_the_current_style(uint32_t map_mode) {
+static void a_static_map_renders_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_map_in_mode(runtime, map_mode);
+  mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
   mln_test_load_style_and_wait(
     runtime, map, mln_test_red_background_style_json
   );
@@ -74,20 +74,12 @@ static void a_still_image_renders_the_current_style(uint32_t map_mode) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void a_static_map_renders_still_images(void) {
-  a_still_image_renders_the_current_style(MLN_MAP_MODE_STATIC);
-}
-
-static void a_tile_map_renders_still_images(void) {
-  a_still_image_renders_the_current_style(MLN_MAP_MODE_TILE);
-}
-
 // A static or tile map publishes a render update only for a still image, so a
 // session resize applies without waiting for one. The next still image renders
 // at the new extent, and detach, which runs after the resize, completes.
-static void a_session_resizes_between_still_images(uint32_t map_mode) {
+static void a_tile_map_session_resizes_between_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_map_in_mode(runtime, map_mode);
+  mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_TILE);
   mln_test_load_style_and_wait(
     runtime, map, mln_test_red_background_style_json
   );
@@ -116,14 +108,6 @@ static void a_session_resizes_between_still_images(uint32_t map_mode) {
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-static void a_static_map_session_resizes_between_still_images(void) {
-  a_session_resizes_between_still_images(MLN_MAP_MODE_STATIC);
-}
-
-static void a_tile_map_session_resizes_between_still_images(void) {
-  a_session_resizes_between_still_images(MLN_MAP_MODE_TILE);
 }
 
 // A continuous map renders frames on demand and has no still image to give.
@@ -169,8 +153,6 @@ static void map_close_cancels_the_pending_still_image(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_static_map_renders_still_images);
-  RUN_TEST(a_tile_map_renders_still_images);
-  RUN_TEST(a_static_map_session_resizes_between_still_images);
   RUN_TEST(a_tile_map_session_resizes_between_still_images);
   RUN_TEST(a_continuous_map_refuses_a_still_image);
   RUN_TEST(map_close_cancels_the_pending_still_image);

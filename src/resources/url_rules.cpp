@@ -82,11 +82,8 @@ CompiledGlob::CompiledGlob(std::string_view pattern) {
   }
 }
 
-auto CompiledGlob::matches(
-  std::string_view candidate, std::size_t* steps
-) const noexcept -> bool {
+auto CompiledGlob::matches(std::string_view candidate) const noexcept -> bool {
   auto states = std::bitset<max_tokens + 1>{};
-  if (steps != nullptr) *steps = 0;
   states[0] = 1;
   for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
     const auto kind = tokens_[index].kind;
@@ -97,7 +94,6 @@ auto CompiledGlob::matches(
     auto previous = static_cast<bool>(states[0]);
     states[0] = 0;
     for (auto index = std::size_t{0}; index < tokens_.size(); ++index) {
-      if (steps != nullptr) ++*steps;
       const auto old = static_cast<bool>(states[index + 1]);
       const auto token = tokens_[index];
       switch (token.kind) {

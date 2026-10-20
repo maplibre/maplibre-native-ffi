@@ -312,10 +312,12 @@ static void only_the_builds_providers_attach(void) {
 }
 
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// set_target checks the session before the descriptor, and a build without
-// OpenGL reports the missing backend last, so there the rows name no session.
-// An OpenGL build submits them for a live session of the replacement's kind;
-// a WebGL build has no host graphics for one.
+// set_target runs its attach's descriptor check, so beyond a row for each
+// pointer and handle it reads, these rows cover only its own steps. It checks
+// the session before the descriptor, and a build without OpenGL reports the
+// missing backend last, so there the rows name no session. An OpenGL build
+// submits them for a live session of the replacement's kind; a WebGL build has
+// no host graphics for one.
 static void opengl_set_target_rejects_malformed_descriptors(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -334,7 +336,7 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(opengl_surface),
+    MLN_TEST_UNDERSIZED_CASE(opengl_surface),
     MLN_TEST_OVERFLOW_CASE(opengl_surface),
     {"no drawable", surface_without_its_drawable, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
@@ -360,8 +362,9 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
-    MLN_TEST_BORROWED_CASES(opengl_borrowed),
+    MLN_TEST_UNDERSIZED_CASE(opengl_borrowed),
+    {"null textures array", opengl_borrowed_without_textures,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},

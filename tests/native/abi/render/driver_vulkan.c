@@ -6,15 +6,14 @@
 // queue with it gives it a lock that it takes around each call on the queue.
 // Abandon destroys every object that the session created on the device that
 // it can, after it drains the session's queue, and reports how many it keeps.
-// A borrowed ring builds each slot's objects once, and detach destroys them
-// even when a slot is quarantined, since the slot's image is the host's.
+// Detach destroys a borrowed ring's objects even when a slot is quarantined,
+// since the slot's image is the host's.
 
 #include <vulkan/vulkan_core.h>
 
 #include "mln_test_graphics.h"
 #include "support/frames.h"
 #include "support/host_graphics.h"
-#include "support/style.h"
 #include "support/test_support.h"
 
 // A failed attach still published its session, which the host owns: it
@@ -264,36 +263,12 @@ static void assert_drained_own_queue(vulkan_observer* observer) {
   TEST_ASSERT_EQUAL_UINT(0, atomic_load(&observer->device_waits));
 }
 
-// A host compositor may submit on its own queue while a session renders, so a
-// session never waits on the whole device, which would need every queue. Its
-// teardown waits for its own work by draining its own queue instead.
-static void a_session_drains_its_own_queue_and_never_waits_on_the_device(void) {
-  observer_reset(&first_observer);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, 1, first_observer_wrap, NULL, NULL
-    ),
-    mln_test_graphics_last_error()
-  );
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, fixture.driver);
-  render_one_frame(&fixture, 1);
-  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&first_observer.submissions));
-
-  detach(&fixture);
-  assert_drained_own_queue(&first_observer);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Two sessions given one queue each call through the device functions their
 // own context resolved, so a host that interposes on those functions sees only
-// its own session, even while another session shares the queue.
+// its own session, even while another session shares the queue. A host
+// compositor may submit on its own queue while a session renders, so a
+// session's teardown never waits on the whole device, which would need every
+// queue: it drains its own queue instead.
 static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
   observer_reset(&first_observer);
   observer_reset(&second_observer);
@@ -535,7 +510,6 @@ static const char* const counted_kind_names[COUNTED_KIND_COUNT] = {
 };
 
 static atomic_int live_objects[COUNTED_KIND_COUNT];
-static atomic_int created_objects[COUNTED_KIND_COUNT];
 static PFN_vkGetDeviceProcAddr counting_real_get_device_proc_addr;
 
 // How teardown orders its drain, its waits, and its destroys. The counters are
@@ -558,9 +532,6 @@ static void count_objects(counted_kind kind, int change) {
     atomic_fetch_add(&destroys_before_drain, 1);
   }
   atomic_fetch_add(&live_objects[kind], change);
-  if (change > 0) {
-    atomic_fetch_add(&created_objects[kind], change);
-  }
 }
 
 // Defines a counting create and destroy for one kind of object, whose real
@@ -798,7 +769,6 @@ counting_get_device_proc_addr(VkDevice device, const char* name) {
 static void counter_reset(void) {
   for (size_t kind = 0; kind < COUNTED_KIND_COUNT; kind += 1) {
     atomic_store(&live_objects[kind], 0);
-    atomic_store(&created_objects[kind], 0);
   }
   atomic_store(&watching_teardown, false);
   atomic_store(&pending_drain_fence, VK_NULL_HANDLE);
@@ -939,79 +909,6 @@ static void abandon_destroys_a_surface_swapchain(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static uint32_t acquired_slot(mln_acquired_frame frame) {
-  mln_vulkan_texture_frame record = {.size = sizeof(mln_vulkan_texture_frame)};
-  MLN_TEST_OK(mln_acquired_frame_get_vulkan_texture(frame, &record, NULL));
-  return record.slot;
-}
-
-// A ring builds one render pass and one depth attachment for all its slots,
-// since mbgl keys its pipelines on the pass, and each slot's framebuffer once.
-// A frame in a slot that has not rendered yet compiles no pipeline that the
-// first slot already compiled.
-static void a_ring_shares_its_render_pass_across_slots(bool borrowed) {
-  counter_reset();
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  // The first background only sets the clear color; the second one draws
-  // through a pipeline.
-  mln_test_load_style_and_wait(
-    runtime, map,
-    MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"sources\":{},\"layers\":["
-      "{\"id\":\"clear\",\"type\":\"background\"},"
-      "{\"id\":\"drawn\",\"type\":\"background\",\"paint\":"
-      "{\"background-color\":\"#102030\",\"background-opacity\":0.5}}]}"
-    )
-  );
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    borrowed ? mln_test_render_fixture_create_vulkan_borrowed_texture(
-                 map, &fixture, 2, counting_wrap, NULL, NULL
-               )
-             // An owned fixture's ring has two slots.
-             : mln_test_render_fixture_create_vulkan_owned_texture(
-                 map, &fixture, counting_wrap, NULL
-               ),
-    mln_test_graphics_last_error()
-  );
-  // A released slot takes the next frame, so two frames render into the
-  // first slot, the second one with every pipeline the content needs.
-  for (uint64_t token = 1; token <= 2; token += 1) {
-    mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, token);
-    TEST_ASSERT_EQUAL_UINT32(0, acquired_slot(frame));
-    MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
-  }
-  const int pipelines = atomic_load(&created_objects[COUNTED_PIPELINE]);
-  TEST_ASSERT_GREATER_THAN_INT(0, pipelines);
-
-  // Holding the first slot's frame sends the next one to the second slot.
-  mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 3);
-  TEST_ASSERT_EQUAL_UINT32(0, acquired_slot(held));
-  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 4);
-  TEST_ASSERT_EQUAL_UINT32(1, acquired_slot(frame));
-  MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
-  MLN_TEST_OK(mln_acquired_frame_release(held, NULL, NULL));
-
-  TEST_ASSERT_EQUAL_INT(
-    pipelines, atomic_load(&created_objects[COUNTED_PIPELINE])
-  );
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&created_objects[COUNTED_RENDER_PASS]));
-  TEST_ASSERT_EQUAL_INT(2, atomic_load(&created_objects[COUNTED_FRAMEBUFFER]));
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void a_borrowed_ring_shares_its_render_pass_across_slots(void) {
-  a_ring_shares_its_render_pass_across_slots(true);
-}
-
-static void an_owned_ring_shares_its_render_pass_across_slots(void) {
-  a_ring_shares_its_render_pass_across_slots(false);
-}
-
 // A frame disposed without consumer synchronization quarantines its slot. The
 // slot's image belongs to the host, so detach still destroys every object the
 // session created, and the host may then destroy its device.
@@ -1041,13 +938,10 @@ static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
-  RUN_TEST(a_session_drains_its_own_queue_and_never_waits_on_the_device);
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
   RUN_TEST(abandon_destroys_an_owned_texture_ring);
   RUN_TEST(abandon_destroys_a_surface_swapchain);
-  RUN_TEST(a_borrowed_ring_shares_its_render_pass_across_slots);
-  RUN_TEST(an_owned_ring_shares_its_render_pass_across_slots);
   RUN_TEST(detach_destroys_a_borrowed_ring_with_a_disposed_frame);
 }

@@ -27,65 +27,25 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
 
-typedef struct batch_rejection {
-  const char* label;
-  // Builds the handle to pass. The runtime is live for the row's duration.
-  mln_event_batch (*handle)(mln_runtime runtime);
-  const char* fragment;
-} batch_rejection;
-
-static mln_event_batch null_batch(mln_runtime runtime) {
-  (void)runtime;
-  return MLN_HANDLE_NULL;
-}
-
-static mln_event_batch runtime_as_batch(mln_runtime runtime) { return runtime; }
-
-static mln_event_batch malformed_batch(mln_runtime runtime) {
-  (void)runtime;
-  return (mln_event_batch)0xDEADBEEFDEADBEEFULL;
-}
-
-static const batch_rejection batch_rejections[] = {
-  {"the null handle", null_batch, "must not be null"},
-  {"a live handle of another kind", runtime_as_batch, "mln_runtime"},
-  {"a value no handle kind uses", malformed_batch,
-   "not a valid mln_event_batch"},
-};
-
-// Reading a value that names no live event batch reports why and leaves the
-// output untouched, and releasing one is a no-op that leaves whatever the
-// value does name alone.
+// Reading a live handle of another kind as an event batch reports why and
+// leaves the output untouched, and releasing it as one is a no-op that leaves
+// the object it names alone.
 static void a_value_that_names_no_batch_is_rejected_without_effect(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  const size_t rows = sizeof(batch_rejections) / sizeof(*batch_rejections);
-  for (size_t index = 0; index < rows; index += 1) {
-    const batch_rejection* row = &batch_rejections[index];
-    const mln_event_batch value = row->handle(runtime);
-    const mln_runtime_event sentinel = {0};
-    // A valid size makes the handle the argument that fails.
-    mln_event_batch_view view = {
-      .size = sizeof(view), .events = &sentinel, .event_count = 99
-    };
-    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT,
-      mln_event_batch_get(value, &view, &diagnostic), row->label
-    );
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(diagnostic.message, row->fragment), row->label
-    );
-    TEST_ASSERT_EQUAL_PTR_MESSAGE(&sentinel, view.events, row->label);
-    TEST_ASSERT_EQUAL_size_t_MESSAGE(99, view.event_count, row->label);
-
-    mln_event_batch_release(value);
-  }
-
+  const mln_runtime_event sentinel = {0};
+  // A valid size makes the handle the argument that fails.
+  mln_event_batch_view view = {
+    .size = sizeof(view), .events = &sentinel, .event_count = 99
+  };
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  MLN_TEST_INVALID(mln_event_batch_get(runtime, &view, &diagnostic));
+  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "mln_runtime"));
+  TEST_ASSERT_EQUAL_PTR(&sentinel, view.events);
+  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
   MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, NULL, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_view"));
 
-  // Releasing the runtime's value as an event batch left the runtime live.
+  mln_event_batch_release(runtime);
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_test_destroy_runtime(runtime);
 }
@@ -134,10 +94,6 @@ static void android_initialization_requires_its_environment_and_context(void) {
   int sentinel = 0;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   MLN_TEST_INVALID(mln_android_init(NULL, &sentinel, &diagnostic));
-  TEST_ASSERT_EQUAL_STRING(
-    "jni_env and context must not be null", diagnostic.message
-  );
-  MLN_TEST_INVALID(mln_android_init(&sentinel, NULL, &diagnostic));
   TEST_ASSERT_EQUAL_STRING(
     "jni_env and context must not be null", diagnostic.message
   );

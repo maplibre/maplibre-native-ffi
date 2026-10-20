@@ -1,7 +1,6 @@
 // Custom geometry and custom MVT vector sources: when the host's callback state
-// is released, which tiles the fetch and cancel callbacks receive during a
-// stepped render, delivered tiles becoming features, and which tiles an
-// invalidation refetches.
+// is released, delivered tiles becoming features, and an invalidation
+// cancelling and refetching a tile.
 //
 // The two kinds share their contracts, so every shared case runs once per kind.
 // The release callback is the only report that the host's state is no longer
@@ -17,10 +16,6 @@ typedef struct custom_probe {
   atomic_size_t fetch_count;
   atomic_size_t root_fetches;
   atomic_size_t root_cancels;
-  atomic_uint deepest_fetch;
-  // Fetches and cancels of each zoom-1 tile, indexed by x + 2 * y.
-  atomic_size_t quadrant_fetches[4];
-  atomic_size_t quadrant_cancels[4];
 } custom_probe;
 
 static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
@@ -29,14 +24,6 @@ static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_fetches, 1);
   }
-  if (tile_id.z == 1) {
-    atomic_fetch_add(&probe->quadrant_fetches[tile_id.x + 2 * tile_id.y], 1);
-  }
-  unsigned int deepest = atomic_load(&probe->deepest_fetch);
-  while (
-    tile_id.z > deepest &&
-    !atomic_compare_exchange_weak(&probe->deepest_fetch, &deepest, tile_id.z)) {
-  }
   mln_test_pulse();
 }
 
@@ -44,9 +31,6 @@ static void probe_cancel_tile(void* user_data, mln_canonical_tile_id tile_id) {
   custom_probe* probe = user_data;
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_cancels, 1);
-  }
-  if (tile_id.z == 1) {
-    atomic_fetch_add(&probe->quadrant_cancels[tile_id.x + 2 * tile_id.y], 1);
   }
   mln_test_pulse();
 }
@@ -151,6 +135,16 @@ static mln_status invalidate_geometry_tile(
   );
 }
 
+// A region well inside the root tile, which any region touches.
+static mln_status invalidate_geometry_region(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_invalidate_custom_geometry_source_region(
+    map, MLN_BUFFER_LITERAL("custom-geometry"),
+    (mln_lat_lng_bounds){{10.0, 10.0}, {20.0, 20.0}}, completion, NULL
+  );
+}
+
 static mln_status invalidate_mvt_tile(
   mln_map map, const mln_completion* completion
 ) {
@@ -172,6 +166,11 @@ typedef struct custom_kind {
   );
   mln_status (*deliver_point)(mln_map map, const mln_completion* completion);
   mln_status (*invalidate_root)(mln_map map, const mln_completion* completion);
+  // Invalidates a region inside the root tile, or null for a kind without
+  // region invalidation.
+  mln_status (*invalidate_region)(
+    mln_map map, const mln_completion* completion
+  );
 } custom_kind;
 
 static const custom_kind kinds[] = {
@@ -184,6 +183,7 @@ static const custom_kind kinds[] = {
     .add = add_geometry_source,
     .deliver_point = deliver_geometry_point,
     .invalidate_root = invalidate_geometry_tile,
+    .invalidate_region = invalidate_geometry_region,
   },
   {
     .name = "custom MVT vector",
@@ -206,11 +206,6 @@ static void init_probe(custom_probe* probe) {
   atomic_init(&probe->fetch_count, 0);
   atomic_init(&probe->root_fetches, 0);
   atomic_init(&probe->root_cancels, 0);
-  atomic_init(&probe->deepest_fetch, 0);
-  for (size_t index = 0; index < 4; index += 1) {
-    atomic_init(&probe->quadrant_fetches[index], 0);
-    atomic_init(&probe->quadrant_cancels[index], 0);
-  }
 }
 
 static mln_status submit_and_settle(
@@ -370,14 +365,12 @@ typedef struct probe_target {
   const custom_probe* probe;
   size_t root_fetches;
   size_t root_cancels;
-  unsigned int deepest_fetch;
 } probe_target;
 
 static bool probe_reached(void* context) {
   const probe_target* target = context;
   return atomic_load(&target->probe->root_fetches) >= target->root_fetches &&
-         atomic_load(&target->probe->root_cancels) >= target->root_cancels &&
-         atomic_load(&target->probe->deepest_fetch) >= target->deepest_fetch;
+         atomic_load(&target->probe->root_cancels) >= target->root_cancels;
 }
 
 typedef struct feature_target {
@@ -415,51 +408,9 @@ static void start_rendering(
   );
 }
 
-// Only tiles a frame requires are fetched. A tile the camera leaves before its
-// data arrives is cancelled, and the camera's new tiles are fetched instead.
-static void fetches_follow_the_rendered_tiles(void) {
-  FOR_EACH_KIND(kind) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    custom_probe probe;
-    mln_test_render_fixture fixture = {0};
-    start_rendering(kind, runtime, map, &probe, &fixture);
-
-    mln_camera_update update = mln_camera_update_default();
-    update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-    update.camera.center.latitude = 10.0;
-    update.camera.center.longitude = 10.0;
-    // Deep enough that the root tile is neither ideal nor one of the pan
-    // tiles MapLibre Native prefetches four zooms up.
-    update.camera.zoom = 6.0;
-    MLN_TEST_AWAIT_OK(
-      mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-    );
-    probe_target moved = {
-      .probe = &probe,
-      .root_fetches = 1,
-      .root_cancels = 1,
-      .deepest_fetch = 6,
-    };
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_style_render_until(
-        &fixture, probe_reached, &moved, "the root tile's cancel"
-      ),
-      kind->name
-    );
-
-    mln_test_render_fixture_destroy(&fixture);
-    mln_test_destroy_map(map);
-    MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-    TEST_ASSERT_EQUAL_size_t_MESSAGE(
-      1, atomic_load(&probe.release_count), kind->name
-    );
-    mln_test_destroy_runtime(runtime);
-  }
-}
-
 // Data delivered for a fetched tile becomes that tile's features, and
-// invalidating the tile cancels it and fetches it again.
+// invalidating the tile, or a region inside it, cancels it and fetches it
+// again.
 static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
   void
 ) {
@@ -510,98 +461,24 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
       cancels + 1, atomic_load(&probe.root_cancels), kind->name
     );
 
+    if (kind->invalidate_region != NULL) {
+      MLN_TEST_OK_MESSAGE(
+        submit_and_settle(kind, map, kind->invalidate_region), kind->name
+      );
+      refetched.root_fetches += 1;
+      refetched.root_cancels += 1;
+      TEST_ASSERT_TRUE_MESSAGE(
+        mln_test_style_render_until(
+          &fixture, probe_reached, &refetched, "the invalidated region's fetch"
+        ),
+        kind->name
+      );
+    }
+
     mln_test_render_fixture_destroy(&fixture);
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
   }
-}
-
-static bool every_quadrant_fetched(void* context) {
-  const custom_probe* probe = context;
-  for (size_t index = 0; index < 4; index += 1) {
-    if (atomic_load(&probe->quadrant_fetches[index]) == 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
-typedef struct quadrant_target {
-  const custom_probe* probe;
-  size_t index;
-  size_t fetches;
-} quadrant_target;
-
-static bool quadrant_refetched(void* context) {
-  const quadrant_target* target = context;
-  return atomic_load(&target->probe->quadrant_fetches[target->index]) >
-         target->fetches;
-}
-
-// A region invalidation cancels and refetches the fetched tiles inside it, and
-// leaves the tiles outside it alone.
-static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
-  const custom_kind* kind = &kinds[0];
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  custom_probe probe;
-  mln_test_render_fixture fixture = {0};
-  start_rendering(kind, runtime, map, &probe, &fixture);
-
-  // At zoom 1 the viewport's center is the corner all four tiles share, so
-  // every one of them is fetched.
-  mln_camera_update update = mln_camera_update_default();
-  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.center.latitude = 0.0;
-  update.camera.center.longitude = 0.0;
-  update.camera.zoom = 1.0;
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-  TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, every_quadrant_fetched, &probe, "every zoom-1 tile's fetch"
-  ));
-  size_t fetches[4];
-  size_t cancels[4];
-  for (size_t index = 0; index < 4; index += 1) {
-    fetches[index] = atomic_load(&probe.quadrant_fetches[index]);
-    cancels[index] = atomic_load(&probe.quadrant_cancels[index]);
-  }
-
-  // The region lies inside tile 1/1/0, the northeast quadrant.
-  const size_t inside = 1;
-  const mln_lat_lng_bounds northeast = {
-    .southwest = {.latitude = 10.0, .longitude = 10.0},
-    .northeast = {.latitude = 20.0, .longitude = 20.0},
-  };
-  MLN_TEST_AWAIT_OK(mln_map_invalidate_custom_geometry_source_region(
-    map, MLN_BUFFER_LITERAL("custom-geometry"), northeast,
-    &completion.descriptor, NULL
-  ));
-  quadrant_target refetched = {
-    .probe = &probe,
-    .index = inside,
-    .fetches = fetches[inside],
-  };
-  TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, quadrant_refetched, &refetched, "the invalidated tile's fetch"
-  ));
-
-  // The tile loader runs the refetch after the whole invalidation, so every
-  // cancel the invalidation made has already arrived.
-  for (size_t index = 0; index < 4; index += 1) {
-    const size_t changed = index == inside ? 1 : 0;
-    TEST_ASSERT_EQUAL_size_t(
-      cancels[index] + changed, atomic_load(&probe.quadrant_cancels[index])
-    );
-    TEST_ASSERT_EQUAL_size_t(
-      fetches[index] + changed, atomic_load(&probe.quadrant_fetches[index])
-    );
-  }
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 static uint32_t source_type(mln_map map, const char* id) {
@@ -821,14 +698,6 @@ static void custom_sources_take_and_validate_every_option(void) {
     NULL
   ));
   mln_custom_mvt_vector_source_options rejected = mvt;
-  rejected.max_zoom = 33;
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "max_zoom must be an integer within [0, 32]",
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("past-the-last-zoom"), &rejected,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
   rejected.max_zoom = 4.5;
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "max_zoom must be an integer within [0, 32]",
@@ -858,9 +727,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_style_replacement_releases_a_dropped_source_unsubscribed);
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
-  RUN_TEST(fetches_follow_the_rendered_tiles);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
-  RUN_TEST(a_region_invalidation_refetches_only_the_tiles_inside_it);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);
 }

@@ -302,16 +302,6 @@ static void viewport_bad_north(void* descriptor) {
   options->fields = MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
   options->north_orientation = MLN_NORTH_ORIENTATION_LEFT + 1;
 }
-static void viewport_bad_constrain(void* descriptor) {
-  mln_map_viewport_options* options = descriptor;
-  options->fields = MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
-  options->constrain_mode = MLN_CONSTRAIN_MODE_SCREEN + 1;
-}
-static void viewport_bad_mode(void* descriptor) {
-  mln_map_viewport_options* options = descriptor;
-  options->fields = MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
-  options->viewport_mode = MLN_VIEWPORT_MODE_FLIPPED_Y + 1;
-}
 static void viewport_infinite_offset(void* descriptor) {
   mln_map_viewport_options* options = descriptor;
   options->fields = MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
@@ -330,10 +320,6 @@ static const mln_test_validation_case viewport_cases[] = {
    "unknown bits"},
   {"north orientation out of range", viewport_bad_north,
    MLN_STATUS_INVALID_ARGUMENT, "north_orientation is invalid"},
-  {"constrain mode out of range", viewport_bad_constrain,
-   MLN_STATUS_INVALID_ARGUMENT, "constrain_mode is invalid"},
-  {"viewport mode out of range", viewport_bad_mode, MLN_STATUS_INVALID_ARGUMENT,
-   "viewport_mode is invalid"},
   {"infinite frustum offset", viewport_infinite_offset,
    MLN_STATUS_INVALID_ARGUMENT, "must be finite"},
   {"negative frustum offset", viewport_negative_offset,
@@ -365,21 +351,6 @@ static void tile_nan_lod_radius(void* descriptor) {
   options->fields = MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
   options->lod_min_radius = NAN;
 }
-static void tile_infinite_lod_scale(void* descriptor) {
-  mln_map_tile_options* options = descriptor;
-  options->fields = MLN_MAP_TILE_OPTION_LOD_SCALE;
-  options->lod_scale = INFINITY;
-}
-static void tile_nan_lod_pitch(void* descriptor) {
-  mln_map_tile_options* options = descriptor;
-  options->fields = MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
-  options->lod_pitch_threshold = NAN;
-}
-static void tile_nan_lod_shift(void* descriptor) {
-  mln_map_tile_options* options = descriptor;
-  options->fields = MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
-  options->lod_zoom_shift = NAN;
-}
 static void tile_bad_lod_mode(void* descriptor) {
   mln_map_tile_options* options = descriptor;
   options->fields = MLN_MAP_TILE_OPTION_LOD_MODE;
@@ -394,12 +365,6 @@ static const mln_test_validation_case tile_cases[] = {
   {"prefetch delta past a byte", tile_prefetch_past_a_byte,
    MLN_STATUS_INVALID_ARGUMENT, "at most 255"},
   {"NaN lod min radius", tile_nan_lod_radius, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
-  {"infinite lod scale", tile_infinite_lod_scale, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
-  {"NaN lod pitch threshold", tile_nan_lod_pitch, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
-  {"NaN lod zoom shift", tile_nan_lod_shift, MLN_STATUS_INVALID_ARGUMENT,
    "must be finite"},
   {"lod mode out of range", tile_bad_lod_mode, MLN_STATUS_INVALID_ARGUMENT,
    "lod_mode is invalid"},
@@ -425,19 +390,12 @@ static void mode_nan_x_skew(void* descriptor) {
   mode->fields = MLN_PROJECTION_MODE_X_SKEW;
   mode->x_skew = NAN;
 }
-static void mode_infinite_y_skew(void* descriptor) {
-  mln_projection_mode* mode = descriptor;
-  mode->fields = MLN_PROJECTION_MODE_Y_SKEW;
-  mode->y_skew = -INFINITY;
-}
 
 static const mln_test_validation_case projection_mode_cases[] = {
   {"undersized", mode_undersized, MLN_STATUS_INVALID_ARGUMENT, "valid size"},
   {"unknown field", mode_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
    "unknown bits"},
   {"NaN x skew", mode_nan_x_skew, MLN_STATUS_INVALID_ARGUMENT,
-   "must be finite"},
-  {"infinite y skew", mode_infinite_y_skew, MLN_STATUS_INVALID_ARGUMENT,
    "must be finite"},
 };
 

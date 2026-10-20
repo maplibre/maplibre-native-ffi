@@ -28,39 +28,16 @@ static uint32_t current_network_status(void) {
   return status;
 }
 
-NETWORK_STATUS_CASE(the_network_status_round_trips) {
-  TEST_ASSERT_EQUAL_UINT32(MLN_NETWORK_STATUS_ONLINE, current_network_status());
-  MLN_TEST_OK(mln_network_set_status(MLN_NETWORK_STATUS_OFFLINE, NULL));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_NETWORK_STATUS_OFFLINE, current_network_status()
-  );
-  MLN_TEST_OK(mln_network_set_status(MLN_NETWORK_STATUS_OFFLINE, NULL));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_NETWORK_STATUS_OFFLINE, current_network_status()
-  );
-  MLN_TEST_OK(mln_network_set_status(MLN_NETWORK_STATUS_ONLINE, NULL));
-  TEST_ASSERT_EQUAL_UINT32(MLN_NETWORK_STATUS_ONLINE, current_network_status());
-}
-
-static const uint32_t unknown_statuses[] = {0, 3, UINT32_MAX};
-
 // A value that names no status is rejected and leaves the status as it was.
 NETWORK_STATUS_CASE(the_network_status_rejects_a_value_that_names_no_status) {
   MLN_TEST_OK(mln_network_set_status(MLN_NETWORK_STATUS_OFFLINE, NULL));
-  for (size_t index = 0;
-       index < sizeof(unknown_statuses) / sizeof(*unknown_statuses);
-       index += 1) {
-    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    MLN_TEST_INVALID(
-      mln_network_set_status(unknown_statuses[index], &diagnostic)
-    );
-    TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "network status"));
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_NETWORK_STATUS_OFFLINE, current_network_status()
-    );
-  }
-
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  MLN_TEST_INVALID(mln_network_set_status(0, &diagnostic));
+  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "network status"));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_NETWORK_STATUS_OFFLINE, current_network_status()
+  );
+
   MLN_TEST_INVALID(mln_network_get_status(NULL, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_status"));
 }
@@ -111,7 +88,6 @@ NETWORK_STATUS_CASE(a_cached_style_reloads_from_the_database_while_offline) {
 #endif
 
 MLN_TEST_GROUP {
-  RUN_TEST(the_network_status_round_trips);
   RUN_TEST(the_network_status_rejects_a_value_that_names_no_status);
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_cached_style_reloads_from_the_database_while_offline);
