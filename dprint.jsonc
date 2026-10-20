@@ -9,7 +9,6 @@
   "newLineKind": "lf",
   "excludes": [
     "third_party/**",
-    ".github/workflows/ci.yml",
     ".github/workflows/ci-*.yml",
     ".github/workflows/_ci-*.yml",
     "**/*-lock.yaml",

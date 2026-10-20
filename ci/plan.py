@@ -23,7 +23,7 @@ from ci.coverage import HYGIENE, dependencies, selected_jobs, unit_jobs, unit_ou
 from ci.workflow import load_configuration
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-WORKFLOW = "ci.yml"
+WORKFLOW = "ci-coverage.yml"
 # Leave room within the plan job's timeout to fall back to every unit.
 SELECTION_SECONDS = 300
 LOOKBACK_RUNS = 30

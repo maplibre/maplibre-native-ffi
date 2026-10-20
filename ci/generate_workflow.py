@@ -432,7 +432,9 @@ def label_workflow() -> dict:
 
 def workflows(source: dict, presets: dict) -> dict[str, dict]:
     return {
-        "ci.yml": ci_workflow(source, presets),
+        # A closed pull request runs the workflow file in its frozen merge ref,
+        # so the old ci.yml path stays disabled in the repository settings.
+        "ci-coverage.yml": ci_workflow(source, presets),
         "ci-retry.yml": retry_workflow(),
         "label.yml": label_workflow(),
     }
