@@ -4866,17 +4866,22 @@ final class mln_plugin_attribute_binding_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int byte_offset;
 
+  @ffi.Uint32()
+  external int element_offset;
+
   static ffi.Pointer<mln_plugin_attribute_binding_v1> $allocate(
     ffi.Allocator $allocator, {
     required int struct_size,
     required int attribute_id,
     required int stream_id,
     required int byte_offset,
+    required int element_offset,
   }) => $allocator<mln_plugin_attribute_binding_v1>()
     ..ref.struct_size = struct_size
     ..ref.attribute_id = attribute_id
     ..ref.stream_id = stream_id
-    ..ref.byte_offset = byte_offset;
+    ..ref.byte_offset = byte_offset
+    ..ref.element_offset = element_offset;
 }
 
 enum mln_plugin_backend {
@@ -4988,6 +4993,22 @@ typedef Dartmln_plugin_create_layout_fnFunction =
       ffi.Pointer<ffi.Pointer<ffi.Void>> layout_instance,
     );
 
+enum mln_plugin_cull_mode_v1 {
+  MLN_PLUGIN_CULL_NONE(0),
+  MLN_PLUGIN_CULL_BACK_CCW(1);
+
+  final int value;
+  const mln_plugin_cull_mode_v1(this.value);
+
+  static mln_plugin_cull_mode_v1 fromValue(int value) => switch (value) {
+    0 => MLN_PLUGIN_CULL_NONE,
+    1 => MLN_PLUGIN_CULL_BACK_CCW,
+    _ => throw ArgumentError(
+      'Unknown value for mln_plugin_cull_mode_v1: $value',
+    ),
+  };
+}
+
 final class mln_plugin_descriptor_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int struct_size;
@@ -5017,6 +5038,51 @@ typedef mln_plugin_destroy_layout_fnFunction =
     ffi.Void Function(ffi.Pointer<ffi.Void> layout_instance);
 typedef Dartmln_plugin_destroy_layout_fnFunction =
     void Function(ffi.Pointer<ffi.Void> layout_instance);
+
+final class mln_plugin_draw_pass_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint8()
+  external int depth_test;
+
+  @ffi.Uint8()
+  external int depth_write;
+
+  @ffi.Uint8()
+  external int color_write;
+
+  @ffi.Uint8()
+  external int blend;
+
+  @ffi.Uint8()
+  external int stencil_dedup;
+
+  @ffi.UnsignedInt()
+  external int cullAsInt;
+
+  mln_plugin_cull_mode_v1 get cull =>
+      mln_plugin_cull_mode_v1.fromValue(cullAsInt);
+  set cull(mln_plugin_cull_mode_v1 value) => cullAsInt = value.value;
+
+  static ffi.Pointer<mln_plugin_draw_pass_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required int depth_test,
+    required int depth_write,
+    required int color_write,
+    required int blend,
+    required int stencil_dedup,
+    required mln_plugin_cull_mode_v1 cull,
+  }) => $allocator<mln_plugin_draw_pass_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.depth_test = depth_test
+    ..ref.depth_write = depth_write
+    ..ref.color_write = color_write
+    ..ref.blend = blend
+    ..ref.stencil_dedup = stencil_dedup
+    ..ref.cull = cull;
+}
 
 final class mln_plugin_drawable_descriptor_v1 extends ffi.Struct {
   @ffi.Uint32()
@@ -5052,6 +5118,21 @@ final class mln_plugin_drawable_descriptor_v1 extends ffi.Struct {
   @ffi.Uint8()
   external int reserved;
 }
+
+typedef mln_plugin_evaluate_layer_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_evaluate_layer_fnFunction>>;
+typedef mln_plugin_evaluate_layer_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<mln_plugin_property_value_v1> camera_properties,
+      ffi.Size property_count,
+      ffi.Pointer<mln_plugin_layer_evaluation_v1> output,
+    );
+typedef Dartmln_plugin_evaluate_layer_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<mln_plugin_property_value_v1> camera_properties,
+      int property_count,
+      ffi.Pointer<mln_plugin_layer_evaluation_v1> output,
+    );
 
 final class mln_plugin_feature_v1 extends ffi.Struct {
   @ffi.Uint32()
@@ -5175,6 +5256,19 @@ enum mln_plugin_geometry_type {
   };
 }
 
+final class mln_plugin_layer_evaluation_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int enabled_passes;
+
+  external mln_plugin_float2 translation;
+
+  @ffi.Uint8()
+  external int translation_anchor_viewport;
+}
+
 final class mln_plugin_layer_type_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int struct_size;
@@ -5212,7 +5306,17 @@ final class mln_plugin_layer_type_v1 extends ffi.Struct {
   external mln_plugin_query_radius_fn get_query_radius;
 
   @ffi.Uint8()
-  external int enable_stencil_overlap_dedup;
+  external int replace_builtin;
+
+  @ffi.Uint8()
+  external int is_3d;
+
+  external ffi.Pointer<mln_plugin_draw_pass_v1> draw_passes;
+
+  @ffi.Size()
+  external int draw_pass_count;
+
+  external mln_plugin_evaluate_layer_fn evaluate_layer;
 
   @ffi.Uint8()
   external int enable_near_clipped_matrix;
@@ -5230,15 +5334,24 @@ final class mln_plugin_layout_context_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int extent;
 
+  external ffi.Pointer<mln_plugin_property_value_v1> properties;
+
+  @ffi.Size()
+  external int property_count;
+
   static ffi.Pointer<mln_plugin_layout_context_v1> $allocate(
     ffi.Allocator $allocator, {
     required int struct_size,
     required double zoom,
     required int extent,
+    required ffi.Pointer<mln_plugin_property_value_v1> properties,
+    required int property_count,
   }) => $allocator<mln_plugin_layout_context_v1>()
     ..ref.struct_size = struct_size
     ..ref.zoom = zoom
-    ..ref.extent = extent;
+    ..ref.extent = extent
+    ..ref.properties = properties
+    ..ref.property_count = property_count;
 }
 
 typedef mln_plugin_layout_feature_fn =
@@ -5290,13 +5403,20 @@ final class mln_plugin_property_descriptor_v1 extends ffi.Struct {
 
   @ffi.Size()
   external int enum_value_count;
+
+  @ffi.Uint8()
+  external int is_layout;
 }
 
 enum mln_plugin_property_encoding_v1 {
   MLN_PLUGIN_PROPERTY_ENCODING_FLOAT(1),
   MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2(2),
   MLN_PLUGIN_PROPERTY_ENCODING_COLOR(3),
-  MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT(4);
+  MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT(4),
+  MLN_PLUGIN_PROPERTY_ENCODING_BOOLEAN_FLOAT(5),
+  MLN_PLUGIN_PROPERTY_ENCODING_IMAGE_FROM(6),
+  MLN_PLUGIN_PROPERTY_ENCODING_IMAGE_TO(7),
+  MLN_PLUGIN_PROPERTY_ENCODING_COLOR_RGBA8(8);
 
   final int value;
   const mln_plugin_property_encoding_v1(this.value);
@@ -5307,6 +5427,10 @@ enum mln_plugin_property_encoding_v1 {
         2 => MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2,
         3 => MLN_PLUGIN_PROPERTY_ENCODING_COLOR,
         4 => MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT,
+        5 => MLN_PLUGIN_PROPERTY_ENCODING_BOOLEAN_FLOAT,
+        6 => MLN_PLUGIN_PROPERTY_ENCODING_IMAGE_FROM,
+        7 => MLN_PLUGIN_PROPERTY_ENCODING_IMAGE_TO,
+        8 => MLN_PLUGIN_PROPERTY_ENCODING_COLOR_RGBA8,
         _ => throw ArgumentError(
           'Unknown value for mln_plugin_property_encoding_v1: $value',
         ),
@@ -5426,6 +5550,12 @@ final class mln_plugin_segment_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int index_length;
 
+  @ffi.Uint32()
+  external int first_instance;
+
+  @ffi.Uint32()
+  external int instance_count;
+
   static ffi.Pointer<mln_plugin_segment_v1> $allocate(
     ffi.Allocator $allocator, {
     required int struct_size,
@@ -5433,12 +5563,16 @@ final class mln_plugin_segment_v1 extends ffi.Struct {
     required int index_offset,
     required int vertex_length,
     required int index_length,
+    required int first_instance,
+    required int instance_count,
   }) => $allocator<mln_plugin_segment_v1>()
     ..ref.struct_size = struct_size
     ..ref.vertex_offset = vertex_offset
     ..ref.index_offset = index_offset
     ..ref.vertex_length = vertex_length
-    ..ref.index_length = index_length;
+    ..ref.index_length = index_length
+    ..ref.first_instance = first_instance
+    ..ref.instance_count = instance_count;
 }
 
 final class mln_plugin_shader_attribute_v1 extends ffi.Struct {
@@ -5486,6 +5620,12 @@ final class mln_plugin_shader_descriptor_v1 extends ffi.Struct {
 
   @ffi.Size()
   external int property_binding_count;
+
+  @ffi.Uint8()
+  external int tile_pattern_texture;
+
+  @ffi.Uint8()
+  external int instanced;
 }
 
 final class mln_plugin_shader_property_binding_v1 extends ffi.Struct {
@@ -5658,6 +5798,42 @@ final class mln_plugin_uniform_context_v1 extends ffi.Struct {
 
   @ffi.Float()
   external double pixel_ratio;
+
+  @ffi.Array.multi([3])
+  external ffi.Array<ffi.Float> light_color;
+
+  @ffi.Float()
+  external double light_intensity;
+
+  @ffi.Array.multi([3])
+  external ffi.Array<ffi.Float> light_direction;
+
+  @ffi.Float()
+  external double zoom;
+
+  @ffi.Uint32()
+  external int tile_x;
+
+  @ffi.Uint32()
+  external int tile_y;
+
+  @ffi.Uint8()
+  external int tile_z;
+
+  @ffi.Int32()
+  external int tile_wrap;
+
+  @ffi.Float()
+  external double crossfade_from_scale;
+
+  @ffi.Float()
+  external double crossfade_to_scale;
+
+  @ffi.Float()
+  external double crossfade_t;
+
+  @ffi.Array.multi([2])
+  external ffi.Array<ffi.Float> pattern_texture_size;
 }
 
 enum mln_plugin_uniform_scope_v1 {
@@ -5712,6 +5888,9 @@ final class mln_plugin_value_data extends ffi.Union {
   @ffi.Float()
   external double float_value;
 
+  @ffi.Uint8()
+  external int boolean_value;
+
   external mln_plugin_float2 float2_value;
 
   external mln_plugin_color color_value;
@@ -5723,7 +5902,9 @@ enum mln_plugin_value_type {
   MLN_PLUGIN_VALUE_FLOAT(1),
   MLN_PLUGIN_VALUE_FLOAT2(2),
   MLN_PLUGIN_VALUE_COLOR(3),
-  MLN_PLUGIN_VALUE_STRING(4);
+  MLN_PLUGIN_VALUE_STRING(4),
+  MLN_PLUGIN_VALUE_BOOLEAN(5),
+  MLN_PLUGIN_VALUE_IMAGE(6);
 
   final int value;
   const mln_plugin_value_type(this.value);
@@ -5733,6 +5914,8 @@ enum mln_plugin_value_type {
     2 => MLN_PLUGIN_VALUE_FLOAT2,
     3 => MLN_PLUGIN_VALUE_COLOR,
     4 => MLN_PLUGIN_VALUE_STRING,
+    5 => MLN_PLUGIN_VALUE_BOOLEAN,
+    6 => MLN_PLUGIN_VALUE_IMAGE,
     _ => throw ArgumentError('Unknown value for mln_plugin_value_type: $value'),
   };
 }
