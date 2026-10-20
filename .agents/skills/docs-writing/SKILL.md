@@ -1,6 +1,10 @@
 ---
 name: docs-writing
-description: Writing style, structure, and terminology for prose in this repository — documentation site pages, contributor docs, specifications, header comments, and repository markdown. Use when writing or editing any prose, and when adding snippets under docs/snippets.
+description:
+  Writing style, structure, and terminology for prose in this repository —
+  documentation site pages, contributor docs, specifications, header comments,
+  and repository markdown. Use when writing or editing any prose, and when
+  adding snippets under docs/snippets.
 ---
 
 # Writing

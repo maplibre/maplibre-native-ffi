@@ -76,8 +76,12 @@ arg "[preset]" {
 }
 '''
 depends = [
-  { task = "//:build", args = ["{{usage.preset}}"] },
-  { task = ":_native-prefix", args = ["{{usage.preset}}"] },
+  { task = "//:build", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = ":_native-prefix", args = [
+    "{{usage.preset}}",
+  ] },
 ]
 run = '''
 app=.dart_tool/flutter_smoke
@@ -130,8 +134,12 @@ printf '%s\n' "$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [
-  { task = "//:build", args = ["{{usage.preset}}"] },
-  { task = ":_native-prefix", args = ["{{usage.preset}}"] },
+  { task = "//:build", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = ":_native-prefix", args = [
+    "{{usage.preset}}",
+  ] },
   ":analyze",
 ]
 run = "dart test"

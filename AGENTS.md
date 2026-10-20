@@ -67,9 +67,9 @@ Native targets and render backends are defined in `CMakePresets.json`. Gradle
 selects the Android presets when building platform packages; OpenHarmony and
 host workflows use the presets directly.
 
-Clangd uses the compilation database selected by the last `mise run build
-<preset>` invocation; select the matching preset before trusting target-specific
-diagnostics.
+Clangd uses the compilation database selected by the last
+`mise run build <preset>` invocation; select the matching preset before trusting
+target-specific diagnostics.
 
 The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
 configuration environment named after its presets. A build for one of those
@@ -124,8 +124,8 @@ Extended CI retains `ci-required`; baseline and ready each have one additional
 required check; see
 [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
 branch protection configuration. For CI, shared toolchain, dependency, or
-publishing changes, request full coverage with `gh pr edit <number> --add-label
-'ci:full'`.
+publishing changes, request full coverage with
+`gh pr edit <number> --add-label 'ci:full'`.
 
 ## Project Invariants
 
