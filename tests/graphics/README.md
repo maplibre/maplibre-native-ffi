@@ -27,13 +27,14 @@ library beside its test executables.
 
 ## Load it from a binding
 
-| Binding | Where it loads the library                                        |
-| ------- | ----------------------------------------------------------------- |
-| Go      | `internal/testsupport/graphics.go`, through pkg-config            |
-| Swift   | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` |
-| Kotlin  | `TestGraphicsLibrary.<target>.kt`: FFM, cinterop, or a JNI shim   |
-| Rust    | `tests/suite/support/graphics.rs`, through `libloading`           |
-| Zig     | The root `build.zig`, which translates the header                 |
-| Python  | `tests/graphics.py`, through `ctypes`                             |
-| .NET    | `Support/TestGraphics.cs`, through `LibraryImport`                |
-| Dart    | `test/support/graphics.dart`, through `DynamicLibrary`            |
+| Binding    | Where it loads the library                                        |
+| ---------- | ----------------------------------------------------------------- |
+| Go         | `internal/testsupport/graphics.go`, through pkg-config            |
+| Swift      | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` |
+| Kotlin     | `TestGraphicsLibrary.<target>.kt`: FFM, cinterop, or a JNI shim   |
+| Rust       | `tests/suite/support/graphics.rs`, through `libloading`           |
+| Zig        | The root `build.zig`, which translates the header                 |
+| Python     | `tests/graphics.py`, through `ctypes`                             |
+| .NET       | `Support/TestGraphics.cs`, through `LibraryImport`                |
+| Dart       | `test/support/graphics.dart`, through `DynamicLibrary`            |
+| TypeScript | `test/support/graphics_addon.c`, a test-only Node-API addon       |

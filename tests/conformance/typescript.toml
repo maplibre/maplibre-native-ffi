@@ -1,0 +1,84 @@
+# Maps each case in cases.toml to the typescript test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+#
+# Every case file registers through bindings/typescript/test/support/harness.ts,
+# and each host entry in bindings/typescript/test/run runs them in one process.
+# The ArkTS entry, bindings/typescript/test/arkts/TestRunner.ts, registers them
+# with hypium on the OpenHarmony emulator.
+
+[cases]
+"ERR-01" = "bindings/typescript/test/errors.test.ts::a failed call carries its status, an unknown status code, and its own diagnostic"
+# The facade and the addon ship as separate packages, so the facade compares
+# the addon's header digest with its own. The addon links the native archive in
+# when it is built, so no other library can load in its place, and no
+# mln_c_version() check runs. The case binds an addon object that has abiDigest
+# alone, so the check fails before the loader could make any other call, which
+# would throw a TypeError instead.
+"ERR-02" = "bindings/typescript/test/errors.test.ts::an addon generated from other headers fails to load before any other call"
+"ERR-03" = "bindings/typescript/test/render.test.ts::a drain before any demand returns no batch"
+"LIFE-01" = "bindings/typescript/test/lifecycle.test.ts::repeated asynchronous release reaches native"
+"LIFE-02" = "bindings/typescript/test/lifecycle.test.ts::a refused close leaves the handle usable for a later close"
+"LIFE-03" = { na = "A realm runs on one thread and shares no objects with another realm, so no borrow of a handle can be in progress on another thread; the borrow within a realm is VIEW-01" }
+# An owner-token finalizer disposes the runtime and its map at collection,
+# with no JavaScript on the stack. The leak report reaches the realm through its
+# wake shim, as a ResourceWarning process warning on Node, Bun, and Deno, and
+# through console.warn on ArkTS.
+"LIFE-04" = "bindings/typescript/test/platform.test.ts::an abandoned runtime with a live map is disposed and reported when collected"
+"LIFE-05" = "bindings/typescript/test/lifecycle.test.ts::a map keeps its runtime reachable"
+"LIFE-06" = "bindings/typescript/test/lifecycle.test.ts::a handle id names its events and outlives close"
+"COMP-01" = "bindings/typescript/test/completions.test.ts::a completion delivers once and disposes a value that fails to convert"
+"COMP-02" = "bindings/typescript/test/completions.test.ts::a submission native rejects frees its completion state"
+"COMP-03" = "bindings/typescript/test/completions.test.ts::a dropped map creation is disposed once collected"
+"COMP-04" = "bindings/typescript/test/completions.test.ts::a failed command reports its disposition as data"
+# A Promise cannot be cancelled. A waiter races it against an AbortSignal, and
+# AwaitableWake.next() takes the signal itself.
+"COMP-05" = "bindings/typescript/test/completions.test.ts::a wait that is abandoned leaves its completion to arrive later"
+"COMP-06" = "bindings/typescript/test/completions.test.ts::discarded commands are fenced and synchronous rejection throws"
+"CB-01" = "bindings/typescript/test/callbacks.test.ts::a callback root is released by a removal, a map close, or a refusal"
+"CB-02" = "bindings/typescript/test/platform.test.ts::callback registrations do not keep their owners reachable"
+# Node defines no reportError, so the error reaches console.error; Bun and
+# Deno report it through reportError.
+"CB-04" = "bindings/typescript/test/resource-provider.test.ts::a provider callback error is reported and fails the request"
+"CB-05" = "bindings/typescript/test/resource-provider.test.ts::a provider answers the requests its routes match after its callback returns"
+"CB-06" = { na = "The binding exposes no scoped response object: the header transform is a native rule table, and providers and resource transforms answer through transferable handles (CB-05, CB-11)" }
+"CB-07" = "bindings/typescript/test/log.test.ts::replacing the log callback releases the previous registration"
+"CB-08" = "bindings/typescript/test/resource-provider.test.ts::a cancel registration on a cancelled request is refused and not rooted"
+"CB-09" = "bindings/typescript/test/callbacks.test.ts::a camera end handler root is released after the handler runs"
+# The route names only a URL pattern, so it matches the style request's kind
+# too, and a request that it does not match passes through to the network.
+"CB-10" = "bindings/typescript/test/resource-provider.test.ts::a provider answers the requests its routes match after its callback returns"
+"CB-11" = "bindings/typescript/test/resource-provider.test.ts::a transform answers its request after its callback returns"
+"VAL-01" = "bindings/typescript/test/values.test.ts::host strings use views and native-lent strings decode"
+"VAL-02" = "bindings/typescript/test/values.test.ts::presence fields keep a present zero apart from an absent one"
+# The addon's generated C decoders read completions, batches, and unions. The
+# addon has no handwritten decoder, so its decoders are what the TypeScript
+# native emitter writes for each value plan. The generator's probe compiles that
+# emitter's output for a protocol header with the addon runtime and a stub
+# delivery queue, embeds no core, and drives it with records that this core
+# never produces: an unknown union tag, elements wider and narrower than the
+# binding's, and a drained batch whose stride is wider than its deliveries.
+"VAL-03" = "tests/bindgen/test_typescript_emitter.py::test_generated_decoders_keep_unknown_arms_and_read_at_the_reported_stride"
+"VAL-04" = "bindings/typescript/test/values.test.ts::integer narrowing is checked and 64-bit carriers round-trip"
+"VAL-05" = "bindings/typescript/test/values.test.ts::an array input is copied when the call submits it"
+"VAL-06" = "bindings/typescript/test/values.test.ts::a record with omitted members equals the native default"
+"VAL-07" = "tests/bindgen/test_typescript_emitter.py::test_generated_decoders_keep_unknown_arms_and_read_at_the_reported_stride"
+# An EGL core-worker session keeps its frames in its own context, so EGL builds
+# view the frames of a caller-driven session, and Vulkan builds those of a
+# core-worker session.
+"VIEW-01" = "bindings/typescript/test/render.test.ts::a frame view expires with its scope and holds off release inside it"
+"REND-01" = "bindings/typescript/test/render.test.ts::an owned texture renders a frame that reads back as pixels"
+"REND-02" = "bindings/typescript/test/render.test.ts::a caller-driven session is serviced from the event loop"
+# On ArkTS the application is the installed package, so a fresh realm loads
+# the binding through its ArkTS entry and the addon packed into it.
+"PLAT-01" = "bindings/typescript/test/platform.test.ts::loads the addon from its installed package"
+# A child process calls process.exit(0), or Deno.exit(0) on Deno, with a
+# mid-frame core-worker session, a pending provider request, and live
+# registrations, and its own exit listener finds the session abandoned.
+# ArkTS has no process exit, so there a worker realm with the same work is
+# terminated.
+"PLAT-02" = "bindings/typescript/test/platform.test.ts::process exit with a mid-frame session, a pending provider request, and live registrations exits cleanly"
+# Each runtime is held only by a callback that captures it, a cycle through its
+# registration, and the test checks that native disposed both.
+"PLAT-03" = "bindings/typescript/test/platform.test.ts::callback registrations do not keep their owners reachable"

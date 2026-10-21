@@ -18,7 +18,17 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-BINDINGS = ("dart", "dotnet", "go", "kotlin", "python", "rust", "swift", "zig")
+BINDINGS = (
+    "dart",
+    "dotnet",
+    "go",
+    "kotlin",
+    "python",
+    "rust",
+    "swift",
+    "typescript",
+    "zig",
+)
 # Test sources under src/, such as the C suite before it moves to tests/native.
 # The report names sources by absolute path, so the pattern starts at the
 # checkout and a `tests` directory above it excludes nothing. llvm-cov reads

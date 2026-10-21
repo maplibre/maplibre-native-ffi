@@ -14,7 +14,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFORMANCE = ROOT / "tests" / "conformance"
-BINDINGS = ("rust", "python", "go", "zig", "kotlin", "swift", "dotnet", "dart")
+BINDINGS = (
+    "rust",
+    "python",
+    "go",
+    "zig",
+    "kotlin",
+    "swift",
+    "dotnet",
+    "dart",
+    "typescript",
+)
 
 
 def check_binding(binding: str, ids: list[str], strict: bool) -> list[str]:

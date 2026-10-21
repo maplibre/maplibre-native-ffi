@@ -1,0 +1,14 @@
+{
+  // Checks the consumers against the packed declarations alone: no host
+  // types, and every declaration file checked.
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "es2024",
+    "lib": ["es2024", "esnext.disposable"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": ["esm.mts", "cjs.cts"]
+}
