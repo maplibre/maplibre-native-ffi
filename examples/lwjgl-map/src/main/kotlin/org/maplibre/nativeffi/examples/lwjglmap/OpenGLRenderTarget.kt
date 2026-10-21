@@ -79,7 +79,7 @@ internal object OpenGLRenderTarget {
         AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
           map.attachOpenglBorrowedTexture(borrowedDescriptor(context, viewport, ring), options)
         }
-      return BorrowedTexture(attached, map, context, compositor, ring)
+      return BorrowedTexture(attached, context, compositor, ring)
     } catch (error: RuntimeException) {
       runCatching { compositor?.close() }.onFailure(error::addSuppressed)
       ring.forEach(AutoCloseable::close)
@@ -162,11 +162,10 @@ internal object OpenGLRenderTarget {
 
   private class BorrowedTexture(
     attached: AttachedSession,
-    map: MapHandle,
     private val context: OpenGLContext,
     private val compositor: OpenGLTextureCompositor,
     ring: List<OpenGLBorrowedTexture>,
-  ) : BorrowedTextureTarget<OpenGLBorrowedTexture>(attached, map, ring) {
+  ) : BorrowedTextureTarget<OpenGLBorrowedTexture>(attached, ring) {
     override fun allocate(viewport: Viewport): OpenGLBorrowedTexture =
       OpenGLBorrowedTexture(context, viewport)
 

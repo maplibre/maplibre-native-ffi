@@ -157,13 +157,8 @@ internal class AndroidMapView(
       graphics = nextGraphics
       Log.i(TAG, "graphics context: ${nextGraphics.backendName}")
     }
-    val state = mapState
-    if (state == null) {
+    if (mapState == null) {
       mapState = MapState(nextViewport, styleJson)
-    } else if (renderTarget == null) {
-      // With no session attached the map is the only extent authority; a live session carries the
-      // extent through followSurface below.
-      state.resize(nextViewport)
     }
     if (renderTarget == null) attachSurface() else followSurface("surface available")
     requestRedraw()
@@ -234,9 +229,8 @@ internal class AndroidMapView(
     val currentGraphics = graphics ?: return null
     val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
     val target = renderTarget?.takeIf { it.attached } ?: return null
-    val state = mapState ?: return null
     val handover =
-      target.follow(state, currentGraphics, currentViewport) { error ->
+      target.follow(currentGraphics, currentViewport) { error ->
         // A failed handover may leave the session naming a destroyed surface, so close it; the next
         // surface attaches a new one.
         handler.post {

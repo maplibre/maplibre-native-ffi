@@ -30,7 +30,7 @@ fn isSmokeRun(init_args: std.process.Init) bool {
 const smoke_timeout_ms = 60_000;
 
 /// How long the loop waits before it retries a frame that did not reach the
-/// window, about one display refresh. No map-update event prompts that retry.
+/// window, about one display refresh. No map update prompts that retry.
 const frame_retry_ms = 16;
 
 /// How long the render loop waits before SDL checks for a quit signal. SDL
@@ -145,9 +145,7 @@ const App = struct {
                 if (resized.eql(self.viewport)) return;
                 self.viewport = resized;
                 viewport.log("resized viewport", resized);
-                // The session resize carries the new logical extent to the
-                // map, and a later resize supersedes an earlier one that has
-                // not applied yet.
+                // The session carries the new logical extent to the map.
                 try self.target.resize(resized);
             },
             else => try self.input.handleEvent(event, &self.map, self.viewport),

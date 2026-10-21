@@ -93,8 +93,7 @@ final class RenderLoop {
       do {
         try await target.resize(
           graphics: graphics,
-          viewport: viewport,
-          map: mapState.map
+          viewport: viewport
         )
       } catch {
         fail(error)

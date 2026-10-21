@@ -44,7 +44,6 @@ final class MetalGraphicsContext {
 struct FrameResults {
   /// A demand rendered a frame.
   var rendered = false
-  /// The map asked for another frame while it rendered one.
   /// The target could not produce a frame, so the loop retries later.
   var targetNotReady = false
 }
@@ -166,8 +165,6 @@ final class MetalRenderTarget {
     defer { try? batch.close() }
     let view = try batch.get()
     var results = FrameResults()
-    // No update and size pending wait for the map's next update, superseded
-    // demands have a newer one behind them, and no demand carries a timeout.
     for result in view.results {
       if result.disposition == .rendered {
         results.rendered = true
@@ -192,13 +189,11 @@ final class MetalRenderTarget {
     }
   }
 
-  /// Carries a new viewport to the session. A borrowed texture is replaced
-  /// instead, which changes only the graphics resource, so the extent goes to
-  /// `map` directly.
+  /// Carries a new viewport to the session, replacing a borrowed texture ring.
+  /// The session carries the extent to the map.
   func resize(
     graphics: MetalGraphicsContext,
-    viewport: Viewport,
-    map: MapHandle
+    viewport: Viewport
   ) async throws {
     guard case .borrowedTexture = kind else {
       // The session rejects a resize submitted while the host holds a frame.
@@ -223,10 +218,9 @@ final class MetalRenderTarget {
       descriptor: MetalBorrowedTexture.descriptor(ring, viewport)
     )
     borrowedRing = ring
-    // A replacement publishes no map update, and a frame rendered before it
-    // can no longer be acquired, so the new ring needs a forced frame.
+    // Frames of the old ring can no longer be acquired, so demand a frame
+    // for the new ring.
     try requestFrame(force: true)
-    try await map.resize(extent: viewport.extent)
   }
 
   func close() async throws {
@@ -460,7 +454,7 @@ private func nativePointer(_ object: AnyObject) -> NativePointer {
 }
 
 private func metalError(_ message: String) -> MaplibreError {
-  MaplibreError(kind: .nativeError, rawStatus: nil, diagnostic: message)
+  MaplibreError(status: .nativeError, diagnostic: message)
 }
 
 private let metalCompositorShader = """

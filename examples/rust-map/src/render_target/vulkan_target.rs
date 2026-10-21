@@ -6,7 +6,6 @@ use maplibre_native_ffi::{
 };
 
 use crate::graphics::GraphicsContext;
-use crate::map_state::MapState;
 use crate::render_target::{
     Mode, RING_DEPTH, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
@@ -115,7 +114,6 @@ impl RenderTarget {
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
-        map: &MapState,
         viewport: Viewport,
         wakes: &Wakes,
     ) -> Result<(), Box<dyn StdError>> {
@@ -151,9 +149,7 @@ impl RenderTarget {
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
-                // Target replacement changes only the graphics resource, so
-                // the map takes the new extent directly.
-                map.resize(viewport)
+                Ok(())
             }
             Self::Surface { session } => {
                 session.resize(viewport)?;

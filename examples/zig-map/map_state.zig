@@ -21,12 +21,11 @@ pub const MapState = struct {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
-        errdefer runtime.deinit();
         errdefer if (maplibre.runtimeRelease(runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
-        } else |_| {};
+        } else |_| runtime.deinit();
 
         var map_options = try maplibre.mapOptionsDefault();
         map_options.initial_extent = render_target.extent(viewport);
@@ -41,11 +40,10 @@ pub const MapState = struct {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
-        errdefer map.deinit();
         errdefer if (maplibre.mapRelease(map, null)) |future| {
             var teardown = future;
             teardown.deinit();
-        } else |_| {};
+        } else |_| map.deinit();
 
         try loadStyle(&map, &diagnostic, smoke);
         try setCamera(allocator, &map, &diagnostic);
@@ -63,14 +61,12 @@ pub const MapState = struct {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
-        } else |_| {}
+        } else |_| self.map.deinit();
         if (maplibre.runtimeRelease(self.runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
-        } else |_| {}
-        self.map.deinit();
-        self.runtime.deinit();
+        } else |_| self.runtime.deinit();
     }
 
     pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase) !void {

@@ -79,7 +79,6 @@ impl Mode {
 pub struct FrameResults {
     /// A demand rendered a frame.
     pub rendered: bool,
-    /// The map asked for another frame while it rendered one.
     /// The target could not produce a frame, so the loop retries later.
     pub target_not_ready: bool,
 }
@@ -201,9 +200,6 @@ impl Session {
         let view = batch.get()?;
         let mut results = FrameResults::default();
         for result in view.results {
-            // No update and size pending wait for the map's next update,
-            // superseded demands have a newer one behind them, and no demand
-            // carries a timeout.
             match result.disposition {
                 RenderResult::Rendered => {
                     results.rendered = true;
@@ -216,8 +212,7 @@ impl Session {
     }
 
     /// Starts the session resize that carries the new logical extent to the
-    /// map. A later resize supersedes this one, so a live resize needs no
-    /// pacing. A session resizes only while the host holds none of its frames.
+    /// map. A session resizes only while the host holds none of its frames.
     pub fn resize(&mut self, viewport: Viewport) -> maplibre_native_ffi::Result<()> {
         self.release_held()?;
         self.session.resize(extent(viewport))?;
@@ -351,12 +346,10 @@ impl<T> Replacements<T> {
     }
 
     /// Takes the oldest retired ring whose replacement has completed, or
-    /// `None` when none has. A replacement publishes no map update, and a
-    /// frame rendered before it can no longer be acquired, so taking one
-    /// demands a forced frame for the new ring. A failed replacement reports
-    /// its error and stays queued: the session may still render into the
-    /// retired ring or the new one, so neither is released before the session
-    /// detaches.
+    /// `None` when none has. Frames of the old ring can no longer be acquired,
+    /// so taking one demands a forced frame for the new ring. A failed
+    /// replacement reports its error and stays queued: the session may still
+    /// render into either ring, so both stay alive until the session detaches.
     pub fn take_completed(
         &mut self,
         session: &mut Session,

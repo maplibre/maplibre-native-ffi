@@ -104,10 +104,6 @@ internal class MapState(initialViewport: Viewport, styleJson: String? = null) : 
     )
   }
 
-  fun resize(viewport: Viewport) {
-    submit("map resize") { map.resize(viewport.extent) }
-  }
-
   private fun delta(delta: CameraDelta) {
     submit("camera delta") { map.applyCameraDelta(delta) }
   }

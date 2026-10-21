@@ -12,7 +12,6 @@ const types = @import("types.zig");
 pub const FrameResults = struct {
     /// A demand rendered a frame.
     rendered: bool = false,
-    /// The map asked for another frame while it rendered one.
     /// The target could not produce a frame, so the loop retries later.
     target_not_ready: bool = false,
 };
@@ -44,9 +43,6 @@ pub fn attachOptions(mode: types.RenderTargetMode, driver: maplibre.RenderDriver
 /// frame result back to the demand that produced it.
 pub const Session = struct {
     handle: ?maplibre.RenderSession = null,
-    /// The map this session renders. Target replacement changes only the
-    /// graphics resource, so those paths carry the extent to the map directly.
-    map: ?*maplibre.Map = null,
     driver: maplibre.RenderDriverKind = .core_worker,
     /// Whether demands ask the driver to present, as a surface target does.
     presents: bool = false,
@@ -55,7 +51,6 @@ pub const Session = struct {
     /// Awaits the attachment, servicing a caller driver meanwhile, and
     /// abandons the session when it fails.
     pub fn attach(
-        map: *maplibre.Map,
         attachment: anytype,
         options: maplibre.RenderSessionAttachOptions,
         mode: types.RenderTargetMode,
@@ -64,7 +59,6 @@ pub const Session = struct {
         defer owned.ready.deinit();
         const session = Session{
             .handle = owned.session,
-            .map = map,
             .driver = options.driver,
             .presents = mode == .native_surface,
         };
@@ -123,9 +117,6 @@ pub const Session = struct {
         var view = try maplibre.renderFrameBatchGet(std.heap.smp_allocator, batch, null);
         defer view.deinit();
         for (view.value.results) |result| {
-            // No update and size pending wait for the map's next update,
-            // superseded demands have a newer one behind them, and no demand
-            // carries a timeout.
             switch (result.disposition) {
                 .rendered => {
                     results.rendered = true;
@@ -138,24 +129,11 @@ pub const Session = struct {
     }
 
     /// Starts the session resize that carries the new logical extent to the
-    /// map. A later resize supersedes this one, so a live resize needs no
-    /// pacing.
+    /// map.
     pub fn resize(self: *Session, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         var completion = maplibre.renderSessionResize(self.handle.?, extent(viewport), &diagnostic) catch |err| {
             diagnostics.logError("render session resize failed", err, &diagnostic);
-            return types.AppError.ResizeFailed;
-        };
-        completion.deinit();
-    }
-
-    /// Carries the new logical extent to the map on the paths where the
-    /// session cannot: a caller-owned texture the host sizes, and a replaced
-    /// surface target. Both change only the graphics resource.
-    pub fn resizeMap(self: *Session, viewport: types.Viewport) !void {
-        var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.mapResize(self.map.?.*, .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor }, &diagnostic) catch |err| {
-            diagnostics.logError("map resize failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
         completion.deinit();
@@ -269,12 +247,11 @@ pub fn Replacements(comptime Ring: type) type {
         }
 
         /// Takes the oldest retired ring whose replacement has completed, or
-        /// null when none has. A replacement publishes no map update, and a
-        /// frame rendered before it can no longer be acquired, so taking one
-        /// demands a forced frame for the new ring. A failed replacement
-        /// reports its error and stays queued: the session may still render
-        /// into the retired ring or the new one, so neither is released
-        /// before the session detaches.
+        /// null when none has. Frames of the old ring can no longer be acquired,
+        /// so taking one demands a forced frame for the new ring. A failed
+        /// replacement reports its error and stays queued: the session may
+        /// still render into either ring, so both stay alive until the session
+        /// detaches.
         pub fn takeCompleted(self: *Self, session: *Session) !?Ring {
             if (self.entries.items.len == 0) return null;
             const oldest = &self.entries.items[0];

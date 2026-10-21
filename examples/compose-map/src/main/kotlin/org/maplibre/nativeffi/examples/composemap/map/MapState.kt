@@ -23,7 +23,6 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 /** The runtime and its map. Commands run on the runtime's scheduler thread. */
 internal class MapState(initialExtent: SurfaceExtent, styleJson: String? = null) : AutoCloseable {
   private var closed = false
-  private var currentSize = initialExtent.toLogicalExtent()
   private val initialCamera =
     CameraOptions(center = LatLng(37.7749, -122.4194), zoom = 13.0, bearing = 12.0, pitch = 30.0)
 
@@ -42,7 +41,7 @@ internal class MapState(initialExtent: SurfaceExtent, styleJson: String? = null)
           .createMap(
             GeneratedApi.mapOptionsDefault()
               .copy(
-                initialExtent = currentSize,
+                initialExtent = initialExtent.toLogicalExtent(),
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.NONE,
               ),
@@ -111,18 +110,6 @@ internal class MapState(initialExtent: SurfaceExtent, styleJson: String? = null)
 
   fun resetOrientation() {
     update(CameraOptions(bearing = 0.0, pitch = 0.0), RESET_ANIMATION_MS)
-  }
-
-  /**
-   * Submits the map's extent. Skiko owns the texture this session borrows, so target replacement
-   * carries only the graphics resource and the map resize is the sole extent authority here.
-   */
-  fun resize(extent: SurfaceExtent) {
-    val size = extent.toLogicalExtent()
-    if (size != currentSize) {
-      currentSize = size
-      submit("map resize") { map.resize(size) }
-    }
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {

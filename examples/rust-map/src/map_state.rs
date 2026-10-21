@@ -69,14 +69,6 @@ impl MapState {
         &self.map
     }
 
-    /// Carries a new logical extent to the map on the paths where the attached
-    /// session cannot: a caller-owned texture the host sizes. Target
-    /// replacement changes only the graphics resource.
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.map.resize(extent(viewport))?;
-        Ok(())
-    }
-
     /// Ends any running camera transition, so a starting gesture takes over
     /// from it rather than fighting it.
     pub fn cancel_transitions(&self) -> Result<(), Box<dyn Error>> {

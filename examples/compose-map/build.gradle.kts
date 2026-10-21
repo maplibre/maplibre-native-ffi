@@ -80,6 +80,11 @@ tasks.withType<JavaExec>().configureEach {
   providers.environmentVariable("MLN_EXAMPLE_SMOKE").orNull?.let {
     environment("MLN_EXAMPLE_SMOKE", it)
   }
+  // A smoke run's temporary display must be an input of the configuration cache.
+  for (name in listOf("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "EGL_PLATFORM")) {
+    val value = providers.environmentVariable(name).orNull
+    if (value == null) environment.remove(name) else environment(name, value)
+  }
   if (!usePublishedKotlin) {
     systemProperty("org.lwjgl.librarypath", nativeHostLibraryPath)
     systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)

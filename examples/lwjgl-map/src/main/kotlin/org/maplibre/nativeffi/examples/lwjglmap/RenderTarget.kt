@@ -118,10 +118,9 @@ internal open class RenderTarget(
 
   /**
    * Drains every frame result and shows the newest rendered frame, reporting whether it reached the
-   * window. A rendered frame that asks for another, as during a paint transition, demands it.
-   * Neither a target that was not ready nor a frame that missed the window causes a map-update
-   * event, so a retry follows after about one refresh. The retry is forced, because a frame that
-   * missed the window consumed its update.
+   * window, then re-arms a demand that waits for an update. Neither a target that was not ready nor
+   * a frame that missed the window causes a map update, so a retry follows after about one refresh.
+   * The retry is forced, because a frame that missed the window consumed its update.
    */
   protected fun drainFrameResults(): Boolean {
     val batch = session.drainFrameResults() ?: return false
@@ -334,7 +333,6 @@ internal abstract class OwnedTextureTarget(attached: AttachedSession) : TextureT
  */
 internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
   attached: AttachedSession,
-  private val map: MapHandle,
   protected var ring: List<T>,
 ) : TextureTarget(attached) {
   /** Allocates a texture at the viewport's physical size. */
@@ -361,8 +359,6 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
         replacement.forEach(AutoCloseable::close)
         throw error
       }
-    // A target replacement leaves the map's extent unchanged.
-    submit("map resize") { map.resize(extent(viewport)) }
     try {
       await(handover)
     } catch (error: RuntimeException) {
@@ -372,8 +368,8 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
     }
     ring.forEach(AutoCloseable::close)
     ring = replacement
-    // A replacement publishes no map update, and a frame rendered before it can no longer be
-    // acquired, so the new ring needs a forced frame.
+    // Frames of the old ring can no longer be acquired, so demand a frame
+    // for the new ring.
     requestFrame(force = true)
   }
 

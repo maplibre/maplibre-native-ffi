@@ -522,7 +522,7 @@ const OpenGLOwnedTextureBackend = struct {
             diagnostics.logError("OpenGL texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
+        self.session = try render_target.Session.attach(attachment, options, .owned_texture);
     }
 
     fn resize(self: *OpenGLOwnedTextureBackend, viewport: types.Viewport) !void {
@@ -656,7 +656,7 @@ const OpenGLBorrowedTextureBackend = struct {
             diagnostics.logError("OpenGL borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
+        self.session = try render_target.Session.attach(attachment, options, .borrowed_texture);
     }
 
     /// Follows a resized window: allocates a ring at the new size and hands it
@@ -667,7 +667,6 @@ const OpenGLBorrowedTextureBackend = struct {
         self.compositor.resize(viewport);
         render_target.releaseFrame(&self.held);
         try self.replaceRing(viewport);
-        try self.session.resizeMap(viewport);
     }
 
     fn replaceRing(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
@@ -721,7 +720,7 @@ const OpenGLSurfaceBackend = struct {
             diagnostics.logError("OpenGL surface attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .native_surface);
+        self.session = try render_target.Session.attach(attachment, options, .native_surface);
     }
 
     /// Follows a resized window. When SDL hands back a different EGL window
@@ -745,7 +744,6 @@ const OpenGLSurfaceBackend = struct {
             return types.AppError.ResizeFailed;
         };
         completion.deinit();
-        try self.session.resizeMap(viewport);
     }
 };
 

@@ -17,7 +17,7 @@ use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
 /// How long the loop waits before it retries a frame that did not reach the
-/// window, about one display refresh. No map-update event prompts that retry.
+/// window, about one display refresh. No map update prompts that retry.
 const FRAME_RETRY: Duration = Duration::from_millis(16);
 
 pub struct App {
@@ -190,17 +190,10 @@ impl App {
         if next.is_empty() {
             return Ok(());
         }
-        // The attached session's resize is the extent authority, except on the
-        // paths that hand over a graphics resource instead; the render target
-        // resizes the map itself there. A later resize supersedes an earlier
-        // one that has not applied yet.
+        // The session carries the extent to the map for both a resize and a
+        // target replacement.
         let target = self.target.as_mut().expect("render target is open");
-        target.resize(
-            &self.graphics,
-            self.map.as_ref().expect("map is open"),
-            next,
-            &self.wakes,
-        )
+        target.resize(&self.graphics, next, &self.wakes)
     }
 
     pub fn close_or_abort(&mut self) {

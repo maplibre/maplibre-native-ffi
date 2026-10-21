@@ -42,7 +42,6 @@ final class MetalGraphicsContext {
 struct FrameResults {
   /// A demand rendered and presented a frame.
   var rendered = false
-  /// The map asked for another frame while it rendered one.
   /// The target could not produce a frame, so the loop retries later.
   var targetNotReady = false
 }
@@ -97,7 +96,7 @@ final class MetalRenderTarget {
   func requestFrame(force: Bool = false) throws {
     nextToken += 1
     try session.requestFrame(demand: FrameDemand(
-      flags: force ? [.present] : [.ifNeeded, .present],
+      flags: force ? [.present] : [.ifNeeded, .waitForUpdate, .present],
       token: nextToken
     ))
   }
@@ -115,8 +114,6 @@ final class MetalRenderTarget {
     }
     defer { try? batch.close() }
     var results = FrameResults()
-    // No update and size pending wait for the map's next update, superseded
-    // demands have a newer one behind them, and no demand carries a timeout.
     for result in try batch.get().results {
       if result.disposition == .rendered {
         results.rendered = true
@@ -150,5 +147,5 @@ private func nativePointer(_ object: AnyObject) -> NativePointer {
 }
 
 private func metalError(_ message: String) -> MaplibreError {
-  MaplibreError(kind: .nativeError, rawStatus: nil, diagnostic: message)
+  MaplibreError(status: .nativeError, diagnostic: message)
 }

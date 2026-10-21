@@ -275,11 +275,10 @@ internal abstract class RenderTarget : IDisposable
     }
 
     /// <summary>
-    /// Drains every frame result and shows the newest rendered frame. A rendered frame that asks
-    /// for another, as during a paint transition, demands it. Neither a target that was not ready
-    /// nor a frame that missed the window causes a map-update event, so a retry follows after about
-    /// one refresh. The retry is forced, because a frame that missed the window consumed its
-    /// update.
+    /// Drains every frame result, shows the newest rendered frame, and re-arms a demand that waits
+    /// for an update. Neither a target that was not ready nor a frame that missed the window causes
+    /// a map update, so a retry follows after about one refresh. The retry is forced, because a
+    /// frame that missed the window consumed its update.
     /// </summary>
     /// <returns>Whether a frame reached the window.</returns>
     protected bool DrainFrameResults()
@@ -513,7 +512,6 @@ internal sealed class OwnedTextureRenderTarget : TextureRenderTarget
 /// </summary>
 internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
 {
-    private readonly MapHandle map;
     private IDisposable[] ring;
 
     private BorrowedTextureRenderTarget(
@@ -521,13 +519,11 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
         SessionDriver driver,
         ITextureCompositor compositor,
         IDisposable[] ring,
-        MapHandle map,
         Func<RenderSessionAttachOptions, RenderSessionHandle> attach
     )
         : base(graphics, driver, compositor, attach)
     {
         this.ring = ring;
-        this.map = map;
     }
 
     public static BorrowedTextureRenderTarget Attach(
@@ -548,7 +544,6 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
                     driver,
                     compositor,
                     ring,
-                    map,
                     options =>
                         graphics switch
                         {
@@ -619,8 +614,6 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
             Dispose(replacement);
             throw;
         }
-        // A target replacement leaves the map's extent unchanged.
-        map.ResizeAsync(viewport.LogicalExtent).ReportFailure("map resize");
         try
         {
             Await(handover);
@@ -633,8 +626,8 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
         }
         Dispose(ring);
         ring = replacement;
-        // A replacement publishes no map update, and a frame rendered before it can no longer be
-        // acquired, so the new ring needs a forced frame.
+        // Frames of the old ring can no longer be acquired, so demand a frame
+        // for the new ring.
         RequestFrame(force: true);
     }
 

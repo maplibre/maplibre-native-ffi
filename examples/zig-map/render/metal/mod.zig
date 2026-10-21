@@ -240,7 +240,7 @@ const MetalOwnedTextureBackend = struct {
             diagnostics.logError("Metal texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
+        self.session = try render_target.Session.attach(attachment, options, .owned_texture);
     }
 
     fn resize(self: *MetalOwnedTextureBackend, viewport: types.Viewport) !void {
@@ -337,7 +337,7 @@ const MetalBorrowedTextureBackend = struct {
             diagnostics.logError("Metal borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
+        self.session = try render_target.Session.attach(attachment, options, .borrowed_texture);
     }
 
     /// Follows a resized window: allocates a ring at the new size and hands it
@@ -348,7 +348,6 @@ const MetalBorrowedTextureBackend = struct {
         self.compositor.resize(viewport);
         render_target.releaseFrame(&self.held);
         try self.replaceRing(viewport);
-        try self.session.resizeMap(viewport);
     }
 
     fn replaceRing(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
@@ -397,7 +396,7 @@ const MetalSurfaceBackend = struct {
             diagnostics.logError("Metal surface attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .native_surface);
+        self.session = try render_target.Session.attach(attachment, options, .native_surface);
     }
 
     fn resize(self: *MetalSurfaceBackend, viewport: types.Viewport) !void {

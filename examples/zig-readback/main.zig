@@ -104,12 +104,11 @@ pub fn main(init_args: std.process.Init) !void {
 
     var signal = WakeSignal{ .io = init_args.io };
     var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic);
-    defer runtime.deinit();
     defer if (maplibre.runtimeRelease(runtime, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
-    } else |_| {};
+    } else |_| runtime.deinit();
 
     var options = try maplibre.mapOptionsDefault();
     options.map_mode = .static;
@@ -117,12 +116,11 @@ pub fn main(init_args: std.process.Init) !void {
     var map_future = try maplibre.runtimeCreateMap(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
-    defer map.deinit();
     defer if (maplibre.mapRelease(map, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
-    } else |_| {};
+    } else |_| map.deinit();
 
     var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
@@ -420,6 +418,9 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
                 egl.EGL_NONE,
             };
             return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
+        }
+        if (builtin.os.tag == .linux) {
+            return initializeDisplay(egl.eglGetPlatformDisplay(egl.EGL_PLATFORM_SURFACELESS_MESA, null, null));
         }
         return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
     }

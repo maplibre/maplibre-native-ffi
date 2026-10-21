@@ -41,7 +41,7 @@ if [[ "$(uname -s)" == Linux ]]; then
   # Compose draws only into a window on a display server. A Linux host without
   # one runs the example on a virtual X server, where Mesa renders in software.
   if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
-    exec xvfb-run -a ./gradlew "${args[@]}"
+    exec xvfb-run -a env EGL_PLATFORM=x11 ./gradlew "${args[@]}"
   fi
 fi
 exec ./gradlew "${args[@]}"

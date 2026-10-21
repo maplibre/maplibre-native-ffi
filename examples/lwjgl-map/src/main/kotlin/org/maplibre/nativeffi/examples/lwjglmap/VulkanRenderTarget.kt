@@ -80,7 +80,7 @@ internal object VulkanRenderTarget {
         AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
           map.attachVulkanBorrowedTexture(borrowedDescriptor(session, viewport, ring), options)
         }
-      return BorrowedTexture(attached, map, context, session, compositor, ring)
+      return BorrowedTexture(attached, context, session, compositor, ring)
     } catch (error: RuntimeException) {
       runCatching { compositor?.close() }.onFailure(error::addSuppressed)
       ring.forEach(AutoCloseable::close)
@@ -150,12 +150,11 @@ internal object VulkanRenderTarget {
 
   private class BorrowedTexture(
     attached: AttachedSession,
-    map: MapHandle,
     private val context: VulkanContext,
     private val sessionContext: VulkanContextDescriptor,
     private val compositor: VulkanTextureCompositor,
     ring: List<VulkanBorrowedImage>,
-  ) : BorrowedTextureTarget<VulkanBorrowedImage>(attached, map, ring) {
+  ) : BorrowedTextureTarget<VulkanBorrowedImage>(attached, ring) {
     override fun allocate(viewport: Viewport): VulkanBorrowedImage =
       VulkanBorrowedImage.create(context, viewport)
 

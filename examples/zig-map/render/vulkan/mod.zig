@@ -306,7 +306,7 @@ const VulkanOwnedTextureBackend = struct {
             diagnostics.logError("Vulkan texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
+        self.session = try render_target.Session.attach(attachment, options, .owned_texture);
     }
 };
 
@@ -489,7 +489,7 @@ const VulkanBorrowedTextureBackend = struct {
             diagnostics.logError("Vulkan borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
+        self.session = try render_target.Session.attach(attachment, options, .borrowed_texture);
     }
 
     /// Follows a resized window: allocates a ring at the new size and hands it
@@ -500,7 +500,6 @@ const VulkanBorrowedTextureBackend = struct {
         self.compositor.resize(viewport);
         render_target.releaseFrame(&self.held);
         try self.replaceRing(viewport);
-        try self.session.resizeMap(viewport);
     }
 
     fn replaceRing(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
@@ -564,7 +563,7 @@ const VulkanSurfaceBackend = struct {
             diagnostics.logError("Vulkan surface attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, options, .native_surface);
+        self.session = try render_target.Session.attach(attachment, options, .native_surface);
     }
 };
 

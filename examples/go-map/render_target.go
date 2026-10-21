@@ -18,7 +18,7 @@ const glTexture2D = 0x0DE1
 const textureRingDepth = 2
 
 // retryDelay is how long the loop waits before it retries a frame that did not
-// reach the window, about one display refresh. No map-update event prompts
+// reach the window, about one display refresh. No map update prompts
 // that retry.
 const retryDelay = 16 * time.Millisecond
 
@@ -148,12 +148,11 @@ func (driver *callerDriver) HandleWakes() (bool, error) {
 	return driver.drainFrameResults()
 }
 
-// drainFrameResults drains every frame result and shows the newest rendered
-// frame. A rendered frame that asks for another, as during a paint
-// transition, demands it. Neither a target that was not ready nor a frame that
-// missed the window causes a map-update event, so a retry follows after about
-// one refresh. The retry is forced, because a frame that missed the window
-// consumed its update.
+// drainFrameResults drains every frame result, shows the newest rendered
+// frame, and re-arms a demand that waits for an update. Neither a target that
+// was not ready nor a frame that missed the window causes a map update, so a
+// retry follows after about one refresh. The retry is forced, because a frame
+// that missed the window consumed its update.
 func (driver *callerDriver) drainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()
 	if err != nil || batch == nil {
@@ -242,13 +241,6 @@ func (driver *callerDriver) Close() error {
 	err = errors.Join(err, driver.session.Close())
 	driver.session = nil
 	return err
-}
-
-// resizeMap carries the new logical extent to the map when the session
-// cannot: a replaced target changes only the graphics resource.
-func resizeMap(m *maplibre.MapHandle, v viewport) {
-	future, err := m.Resize(v.extent())
-	reportFailure(future, err, "map resize")
 }
 
 // reportFailure logs a command that fails. Nothing waits on its completion.
@@ -403,8 +395,7 @@ func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
 // owns, and composes its frames as a session-owned ring's.
 type openGLBorrowedTextureTarget struct {
 	*openGLFrameTarget
-	mapRef *maplibre.MapHandle
-	ring   [textureRingDepth]uint32
+	ring [textureRingDepth]uint32
 }
 
 func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLBorrowedTextureTarget, error) {
@@ -412,7 +403,7 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLBorrowedTextureTarget{openGLFrameTarget: newOpenGLFrameTarget(compositor, driver), mapRef: m}
+	target := &openGLBorrowedTextureTarget{openGLFrameTarget: newOpenGLFrameTarget(compositor, driver)}
 	ring, descriptor, err := target.describe(v)
 	if err == nil {
 		target.ring = ring
@@ -494,8 +485,6 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 		target.deleteRing(ring)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
-	// A target replacement leaves the map's extent unchanged.
-	resizeMap(target.mapRef, v)
 	if err := target.await(future); err != nil {
 		err = errors.Join(err, target.callerDriver.Close())
 		target.deleteRing(ring)
@@ -503,8 +492,8 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	}
 	target.deleteRing(target.ring)
 	target.ring = ring
-	// A replacement publishes no map update, and a frame rendered before it
-	// can no longer be acquired, so the new ring needs a forced frame.
+	// Frames of the old ring can no longer be acquired, so demand a frame
+	// for the new ring.
 	return target.RequestFrame(true)
 }
 
@@ -513,7 +502,6 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 type openGLSurfaceTarget struct {
 	callerDriver
 	context *openGLContext
-	mapRef  *maplibre.MapHandle
 }
 
 func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLSurfaceTarget, error) {
@@ -524,7 +512,7 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLSurfaceTarget{callerDriver: driver, context: context, mapRef: m}
+	target := &openGLSurfaceTarget{callerDriver: driver, context: context}
 	target.presents = true
 	attachment, err := m.AttachOpenglSurface(
 		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
@@ -562,6 +550,5 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	})); err != nil {
 		return fmt.Errorf("OpenGL surface set target failed: %w", err)
 	}
-	resizeMap(target.mapRef, v)
 	return target.RequestFrame(true)
 }

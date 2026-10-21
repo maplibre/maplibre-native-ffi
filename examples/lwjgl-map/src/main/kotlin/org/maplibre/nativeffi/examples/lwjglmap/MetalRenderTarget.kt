@@ -75,7 +75,7 @@ internal object MetalRenderTarget {
         AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
           map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, ring), options)
         }
-      return BorrowedTexture(attached, map, context, compositor, ring)
+      return BorrowedTexture(attached, context, compositor, ring)
     } catch (error: RuntimeException) {
       runCatching { compositor?.close() }.onFailure(error::addSuppressed)
       ring.forEach(AutoCloseable::close)
@@ -129,11 +129,10 @@ internal object MetalRenderTarget {
 
   private class BorrowedTexture(
     attached: AttachedSession,
-    map: MapHandle,
     private val context: MetalContext,
     private val compositor: MetalTextureCompositor,
     ring: List<MetalBorrowedTexture>,
-  ) : BorrowedTextureTarget<MetalBorrowedTexture>(attached, map, ring) {
+  ) : BorrowedTextureTarget<MetalBorrowedTexture>(attached, ring) {
     override fun allocate(viewport: Viewport): MetalBorrowedTexture =
       MetalBorrowedTexture(context, viewport)
 

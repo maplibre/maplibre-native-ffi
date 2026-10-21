@@ -659,7 +659,7 @@ app_error render_target_attach(
     }
   }
   return render_session_finish_attach(
-    &target->session, session, map, &options, target->mode, &attached, status,
+    &target->session, session, &options, target->mode, &attached, status,
     &diagnostic
   );
 }
@@ -746,7 +746,7 @@ static app_error resize_borrowed(
     return APP_ERROR_RESIZE_FAILED;
   }
   target->as.borrowed.ring = replacement;
-  return render_session_resize_map(&target->session, current_viewport);
+  return APP_OK;
 }
 
 /// Follows a resized window in native-surface mode. When SDL hands back a
@@ -779,7 +779,7 @@ static app_error resize_surface(
     );
     return APP_ERROR_RESIZE_FAILED;
   }
-  return render_session_resize_map(&target->session, current_viewport);
+  return APP_OK;
 }
 
 app_error render_target_resize(

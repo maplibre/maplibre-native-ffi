@@ -24,7 +24,7 @@
 static const Uint32 smoke_timeout_milliseconds = 60000;
 
 /// How long the loop waits before it retries a frame that did not reach the
-/// window, about one display refresh. No map-update event prompts that retry.
+/// window, about one display refresh. No map update prompts that retry.
 static const Uint32 frame_retry_milliseconds = 16;
 
 /// How long the render loop waits before SDL checks for a quit signal.
@@ -107,8 +107,7 @@ static app_error handle_event(app* app, const SDL_Event* event) {
       if (viewport_equal(resized, app->viewport)) return APP_OK;
       app->viewport = resized;
       viewport_log("resized viewport", resized);
-      // The session resize carries the new logical extent to the map, and a
-      // later resize supersedes an earlier one that has not applied yet.
+      // The session carries the new logical extent to the map.
       return render_target_resize(app->target, resized);
     }
     default:

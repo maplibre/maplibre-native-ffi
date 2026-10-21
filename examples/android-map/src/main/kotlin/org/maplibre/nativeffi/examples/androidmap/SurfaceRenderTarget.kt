@@ -59,8 +59,8 @@ private constructor(
   }
 
   /**
-   * What one frame-result drain saw. A target that was not ready does not cause a map-update event,
-   * so the view retries on its next frame.
+   * What one frame-result drain saw. A target that was not ready does not cause a map update, so
+   * the view retries on its next frame.
    */
   data class Drained(val rendered: Boolean, val targetNotReady: Boolean)
 
@@ -83,16 +83,13 @@ private constructor(
 
   /**
    * Points the session at the surface the graphics context presents through now, and at the
-   * viewport. A session resize carries the map's extent itself. An EGL surface replacement changes
-   * only the graphics resource, so that path submits the map resize alongside it, and the map logs
-   * that resize's own rejection or failure.
+   * viewport. Both a session resize and a surface replacement carry the extent to the map.
    *
    * The returned handover fails when native rejects the session's command or the command fails. A
    * caller whose outgoing surface is about to go passes the handover to [await], and a failure
    * otherwise reaches [onFailure].
    */
   fun follow(
-    state: MapState,
     graphics: GraphicsContext,
     viewport: Viewport,
     onFailure: (Throwable) -> Unit,
@@ -112,7 +109,6 @@ private constructor(
               ),
             )
             .invokeOnCompletion(handover::settle)
-          state.resize(viewport)
         }
         is VulkanGraphicsContext -> {
           val resize = session.resize(viewport.extent)

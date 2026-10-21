@@ -85,14 +85,13 @@ These rules hold in every example, and the code alone does not show why:
 
 - A wake can run on a native or submitting thread. It schedules a drain or
   driver service on the host loop and returns without blocking.
-- After a frame result of no-update or size-pending, the host waits for the next
-  map-update event. The map publishes one when it has something new, including
-  after a resize.
+- After a rendered frame, the host re-arms a demand with the wait-for-update
+  flag. The demand waits until the map has another update, including after a
+  resize.
 - After a frame result of target-not-ready, or a rendered frame that the host
   could not show, the host demands again after about one display refresh,
-  because neither causes a map-update event. The demand omits the
-  render-if-needed flag, because a frame that the host could not show consumed
-  its update.
+  because neither causes a map update. The demand omits the render-if-needed
+  flag, because a frame that the host could not show consumed its update.
 - A Vulkan core worker submits to the host's one graphics queue and takes the
   host's queue lock around each call on it, because the host compositor submits
   to that queue too and Vulkan requires the calls on one queue to be externally

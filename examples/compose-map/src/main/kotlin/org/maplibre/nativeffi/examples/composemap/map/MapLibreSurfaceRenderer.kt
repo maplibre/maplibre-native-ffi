@@ -108,7 +108,6 @@ internal class MapLibreSurfaceRenderer(
     }
 
     val state = ensureMapState(frame.extent)
-    state.resize(frame.extent)
     drawing.set(true)
     val result =
       try {
@@ -370,7 +369,7 @@ internal class MapLibreSurfaceRenderer(
         }
         val retargeted = existing.copy(targetKey = borrowed.targetKey)
         renderSession = retargeted
-        // A replacement publishes no map update, so the new texture needs a forced frame.
+        // Demand a frame for the replacement texture.
         frameForced.set(true)
         return retargeted
       }

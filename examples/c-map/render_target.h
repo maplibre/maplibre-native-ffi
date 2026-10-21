@@ -12,9 +12,6 @@
 
 typedef struct render_session {
   mln_render_session handle;
-  /// The map this session renders. Target replacement changes only the
-  /// graphics resource, so those paths carry the extent to the map directly.
-  mln_map map;
   mln_render_driver_kind driver;
   /// Whether demands ask the driver to present, as a surface target does.
   bool presents;
@@ -25,9 +22,8 @@ typedef struct render_session {
 typedef struct frame_results {
   /// A demand rendered a frame.
   bool rendered;
-  /// The map asked for another frame while it rendered one.
   /// The target could not produce a frame. The loop retries later, because
-  /// this result does not cause a map-update event.
+  /// this result does not cause a map update.
   bool target_not_ready;
 } frame_results;
 
@@ -49,7 +45,7 @@ mln_render_session_attach_options render_session_attach_options(
 /// meanwhile, and abandons the session when it fails. Pass the options and
 /// completion the call took, and the status and diagnostic it returned.
 [[nodiscard]] app_error render_session_finish_attach(
-  render_session* session, mln_render_session handle, mln_map map,
+  render_session* session, mln_render_session handle,
   const mln_render_session_attach_options* options, render_target_mode mode,
   awaited_completion* attached, mln_status status,
   const mln_diagnostic* diagnostic
@@ -80,13 +76,6 @@ bool render_session_graphics_kept(void);
 
 /// Starts the session resize that carries the new logical extent to the map.
 [[nodiscard]] app_error render_session_resize(
-  render_session* session, viewport current_viewport
-);
-
-/// Carries the new logical extent to the map on the paths where the session
-/// cannot: a caller-owned texture the host sizes, and a replaced surface
-/// target. Both change only the graphics resource.
-[[nodiscard]] app_error render_session_resize_map(
   render_session* session, viewport current_viewport
 );
 
@@ -132,9 +121,9 @@ void texture_replacements_queue(
 );
 
 /// Takes the oldest retired ring whose replacement has completed, writing it,
-/// or null when none has. A replacement publishes no map update, and a frame
-/// rendered before it can no longer be acquired, so taking one demands a
-/// forced frame for the new ring. A failed replacement reports its error.
+/// or null when none has. Frames of the old ring can no longer be acquired,
+/// so taking one demands a forced frame for the new ring. A failed replacement
+/// reports its error.
 [[nodiscard]] app_error texture_replacements_take_completed(
   texture_replacements* replacements, render_session* session,
   void** out_retired

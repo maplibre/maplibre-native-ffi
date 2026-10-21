@@ -99,14 +99,13 @@ static mln_status wait_for_lifecycle(
 }
 
 app_error render_session_finish_attach(
-  render_session* session, mln_render_session handle, mln_map map,
+  render_session* session, mln_render_session handle,
   const mln_render_session_attach_options* options, render_target_mode mode,
   awaited_completion* attached, mln_status status,
   const mln_diagnostic* diagnostic
 ) {
   *session = (render_session){
     .handle = handle,
-    .map = map,
     .driver = options->driver,
     .presents = mode == RENDER_TARGET_MODE_NATIVE_SURFACE,
   };
@@ -194,8 +193,6 @@ app_error render_session_drain_results(
     const mln_render_frame_result* result =
       (const mln_render_frame_result*)((const char*)view.results +
                                        i * view.result_size);
-    // No update and size pending wait for the map's next update, superseded
-    // demands have a newer one behind them, and no demand carries a timeout.
     switch (result->disposition) {
       case MLN_RENDER_RESULT_RENDERED:
         out_results->rendered = true;
@@ -220,7 +217,6 @@ app_error render_session_resize(
   render_session* session, viewport current_viewport
 ) {
   const mln_logical_extent extent = render_target_extent(current_viewport);
-  // A later resize supersedes this one, so a live resize needs no pacing.
   const mln_completion completion =
     diagnostics_completion("render session resize failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
@@ -231,22 +227,6 @@ app_error render_session_resize(
     return log_failure(
       APP_ERROR_RESIZE_FAILED, "render session resize failed", status,
       &diagnostic
-    );
-  }
-  return APP_OK;
-}
-
-app_error render_session_resize_map(
-  render_session* session, viewport current_viewport
-) {
-  const mln_logical_extent extent = render_target_extent(current_viewport);
-  const mln_completion completion = diagnostics_completion("map resize failed");
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status =
-    mln_map_resize(session->map, extent, &completion, &diagnostic);
-  if (status != MLN_STATUS_OK) {
-    return log_failure(
-      APP_ERROR_RESIZE_FAILED, "map resize failed", status, &diagnostic
     );
   }
   return APP_OK;
