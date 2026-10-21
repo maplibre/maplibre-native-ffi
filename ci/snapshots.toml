@@ -88,7 +88,6 @@ shared = [
   "!scripts/check-exports.py",
   "!scripts/coverage.py",
   "!scripts/coverage-diff.py",
-  "!plans/**",
   "!dprint.jsonc",
   "!hk.pkl",
   "!vite.config.ts",
