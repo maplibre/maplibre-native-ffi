@@ -1343,6 +1343,9 @@ static bool vulkan_surface_create(
     surface->window =
       wgl_create_window(surface->info.width, surface->info.height);
     if (surface->window == NULL) return false;
+    // Mesa presents through StretchBlt, which needs a visible destination.
+    ShowWindow(surface->window, SW_SHOWNOACTIVATE);
+    UpdateWindow(surface->window);
     const vulkan_win32_surface_info info = {
       .sType = (VkStructureType)1000009000,
       .hinstance = GetModuleHandleA(NULL),

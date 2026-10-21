@@ -535,6 +535,19 @@ def windows_probe_workflow(source: dict, presets: dict) -> dict:
                 **{"if": "always()"},
             ),
         )
+        job["steps"].insert(
+            -1,
+            action(
+                "actions/upload-artifact",
+                {
+                    "name": f"console-logs-{name}",
+                    "path": "build/windows-console-logs/",
+                    "if-no-files-found": "warn",
+                },
+                name="Upload Windows console logs",
+                **{"if": "always()"},
+            ),
+        )
     return workflow
 
 

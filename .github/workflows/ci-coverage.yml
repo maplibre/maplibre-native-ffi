@@ -2616,6 +2616,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload Windows console logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: console-logs-target-windows-x64-wgl
+          path: build/windows-console-logs/
+          if-no-files-found: warn
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
@@ -2776,6 +2783,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload Windows console logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: console-logs-target-windows-x64-vulkan
+          path: build/windows-console-logs/
+          if-no-files-found: warn
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}

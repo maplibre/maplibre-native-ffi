@@ -65,7 +65,7 @@ internal object Main {
     )
   }
 
-  /** Set to `1`, renders one frame of an inline style in a hidden window, then exits. */
+  /** Set to `1`, renders one frame of an inline style, then exits. */
   private const val SMOKE_VARIABLE = "MLN_EXAMPLE_SMOKE"
 
   private fun supportsUsableBackend(backends: RenderBackendFlag): Boolean =

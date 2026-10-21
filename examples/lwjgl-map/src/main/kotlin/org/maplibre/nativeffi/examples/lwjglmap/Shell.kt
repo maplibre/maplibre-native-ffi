@@ -24,17 +24,21 @@ internal object Shell {
   private const val SMOKE_TIMEOUT_NANOS = 60_000_000_000L
 
   /**
-   * Runs the example until its window closes. A smoke run instead renders an inline style in a
-   * hidden window, so it needs neither the network nor a user, and returns after the first frame
-   * that reaches the window.
+   * Runs the example until its window closes. A smoke run renders an inline style and returns after
+   * the first frame that reaches the window.
    */
   fun run(mode: RenderTargetMode, backends: RenderBackendFlag, smoke: Boolean = false) {
+    // Mesa's Windows Vulkan presenter uses StretchBlt, which needs a visible window.
+    val visible =
+      !smoke ||
+        (System.getProperty("os.name").startsWith("Windows") &&
+          RenderBackendFlag.VULKAN in backends)
     GraphicsContext.create(
         "MapLibre LWJGL Map",
         INITIAL_WIDTH,
         INITIAL_HEIGHT,
         backends,
-        visible = !smoke,
+        visible = visible,
       )
       .use { graphics ->
         val viewport = ViewportHolder(Viewport.read(graphics.window()))

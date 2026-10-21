@@ -38,10 +38,14 @@ if (-not $environment.ContainsKey("GRADLE_USER_HOME")) {
 }
 $payload = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).json"
 $launcher = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).ps1"
+$logDirectory = Join-Path $env:GITHUB_WORKSPACE "build/windows-console-logs"
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+$log = Join-Path $logDirectory "console-$([Guid]::NewGuid()).log"
 @{
   environment = $environment
   directory = (Get-Location).Path
   command = $Command
+  output = $log
 } | ConvertTo-Json -Depth 4 | Set-Content $payload
 @'
 param([string] $Payload)
@@ -51,9 +55,10 @@ foreach ($entry in $data.environment.GetEnumerator()) {
   [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
 }
 Set-Location $data.directory
-Write-Output "Console command process session: $((Get-Process -Id $PID).SessionId)"
+"Console command process session: $((Get-Process -Id $PID).SessionId)" |
+  Set-Content $data.output
 $executable, $arguments = $data.command
-& $executable @arguments
+& $executable @arguments *>> $data.output
 exit $LASTEXITCODE
 '@ | Set-Content $launcher
 
@@ -63,6 +68,7 @@ try {
     $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $launcher $payload
   $result = $LASTEXITCODE
 } finally {
+  if (Test-Path $log) { Get-Content $log }
   Remove-Item $payload, $launcher -Force
 }
 exit $result

@@ -21,7 +21,7 @@ run = '''
 '''
 
 [tasks.smoke]
-description = "Render one frame of an inline style in each mode in a hidden window, then exit."
+description = "Render one frame of an inline style in each mode, then exit."
 extends = "ffi:preset"
 dir = "../.."
 run = '''

@@ -30,7 +30,7 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 '''
 
 [tasks.smoke]
-description = "Render one frame in each mode in a hidden window, then exit."
+description = "Render one frame in each mode, then exit."
 extends = "ffi:preset"
 dir = "../.."
 run = '''

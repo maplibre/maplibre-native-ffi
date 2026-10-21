@@ -27,6 +27,10 @@ public static class DesktopProbe {
     [DllImport("user32.dll")]
     private static extern bool DestroyWindow(IntPtr window);
     [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll")]
+    private static extern bool UpdateWindow(IntPtr window);
+    [DllImport("user32.dll")]
     private static extern IntPtr GetDC(IntPtr window);
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(IntPtr window, IntPtr dc);
@@ -64,6 +68,13 @@ public static class DesktopProbe {
         bool copied = StretchBlt(destination, 0, 0, 8, 8, source, 0, 0, 8, 8, 0x00CC0020);
         int error = Marshal.GetLastWin32Error();
         Console.WriteLine("GDI StretchBlt: " + copied + ", last error: " + error);
+        ReleaseDC(window, destination);
+        ShowWindow(window, 4);
+        UpdateWindow(window);
+        destination = GetDC(window);
+        copied = StretchBlt(destination, 0, 0, 8, 8, source, 0, 0, 8, 8, 0x00CC0020);
+        error = Marshal.GetLastWin32Error();
+        Console.WriteLine("Visible window GDI StretchBlt: " + copied + ", last error: " + error);
         SelectObject(source, previous);
         DeleteObject(bitmap);
         DeleteDC(source);
