@@ -253,10 +253,10 @@ ci:
       covers: >-
         iOS, iOS simulator, Mac Catalyst, tvOS, and tvOS simulator with Metal.
         Builds the native library and the Kotlin, Swift, and Dart bindings for
-        each, runs tests on the simulators, and packages the XCFramework.
-        Catches mobile Apple SDK, cross-compilation, and framework packaging
-        problems. Platform-independent code that Linux x64 already tests does
-        not need it.
+        each, builds the Swift example for iOS and the iOS simulator, runs tests
+        on the simulators, and packages the XCFramework. Catches mobile Apple
+        SDK, cross-compilation, and framework packaging problems.
+        Platform-independent code that Linux x64 already tests does not need it.
       paths:
         - src/platform/apple/*
         - src/render/metal/*
@@ -267,6 +267,7 @@ ci:
         - .mise/tasks/package-xcframework
         - bindings/kotlin/src/iosTest/*
         - bindings/kotlin/src/tvosTest/*
+        - examples/swift-map/*
     windows:
       covers: >-
         Windows x64 and ARM64 with OpenGL (WGL) and Vulkan, built with MSVC.

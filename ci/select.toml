@@ -117,9 +117,10 @@ targets = ["macos-*"]
 id = "apple-mobile"
 covers = """
 iOS, iOS simulator, Mac Catalyst, tvOS, and tvOS simulator with Metal. Builds
-the native library and the Kotlin, Swift, and Dart bindings for each, runs
-tests on the simulators, and packages the XCFramework. Catches mobile Apple
-SDK, cross-compilation, and framework packaging problems.
+the native library and the Kotlin, Swift, and Dart bindings for each, builds the
+Swift example for iOS and the iOS simulator, runs tests on the simulators, and
+packages the XCFramework. Catches mobile Apple SDK, cross-compilation, and
+framework packaging problems.
 """
 paths = [
   "src/platform/apple/*",
@@ -131,6 +132,7 @@ paths = [
   ".mise/tasks/package-xcframework",
   "bindings/kotlin/src/iosTest/*",
   "bindings/kotlin/src/tvosTest/*",
+  "examples/swift-map/*",
 ]
 targets = ["ios-*", "tvos-*"]
 jobs = ["apple-xcframework"]
