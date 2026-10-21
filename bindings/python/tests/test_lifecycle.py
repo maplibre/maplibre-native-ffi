@@ -20,7 +20,10 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
             assert not map_handle.closed
         assert map_handle.closed
         assert result(map_handle.close()) is None
-        with pytest.raises(mln.InvalidStateError):
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
             map_handle.get_snapshot()
     assert runtime.closed
     runtime.close()
@@ -45,9 +48,9 @@ def test_a_handle_id_names_its_events_and_outlives_close(
 def test_a_refused_close_leaves_the_handle_usable(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    with pytest.raises(mln.InvalidStateError) as raised:
+    with pytest.raises(mln.MaplibreError) as raised:
         harness.runtime.close()
-    assert raised.value.native_status_code == int(mln.Status.INVALID_STATE)
+    assert raised.value.status == mln.Status.INVALID_STATE
 
     assert not harness.runtime.closed
     assert result(harness.runtime.clear_resource_transform()) is None

@@ -45,8 +45,7 @@ fn a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released
         .map()
         .add_custom_geometry_source("rejected", options.clone())
         .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
+    assert_eq!(error.status(), Status::InvalidArgument);
     assert!(error.diagnostic().contains("min_zoom"), "{error}");
     drop(options);
     released
@@ -102,7 +101,7 @@ fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
         ..Default::default()
     };
     let error = fixture.map().apply_camera_delta(&delta).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(error.status(), Status::InvalidArgument);
     drop(delta);
     released
         .try_recv()

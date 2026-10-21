@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error, Status};
 
 use crate::viewport::Viewport;
 use crate::vulkan::{QueueMutex, VulkanContext};
@@ -709,5 +709,5 @@ impl Drop for ShaderModuleGuard<'_> {
 }
 
 fn compositor_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorKind::NativeError, None, message)
+    Error::new(Status::NativeError, message)
 }

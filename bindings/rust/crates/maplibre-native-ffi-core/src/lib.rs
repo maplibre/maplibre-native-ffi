@@ -10,4 +10,6 @@ pub mod ptr;
 pub mod report;
 pub mod string;
 pub use abi::{EXPECTED_C_ABI_VERSION, validate_abi_version};
-pub use error::{Error, ErrorKind, Result, check};
+pub mod status;
+pub use error::{Error, Result, check};
+pub use status::Status;

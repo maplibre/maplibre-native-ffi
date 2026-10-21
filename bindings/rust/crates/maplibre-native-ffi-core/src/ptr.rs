@@ -1,4 +1,4 @@
-use crate::error::{Error, ErrorKind, Result};
+use crate::{Error, Result, Status};
 
 /// Reads `count` records that native lays out `stride` bytes apart.
 ///
@@ -22,8 +22,7 @@ pub unsafe fn strided_records<T: Copy>(
             || count > isize::MAX as usize / stride)
     {
         return Err(Error::new(
-            ErrorKind::NativeError,
-            None,
+            Status::NativeError,
             "invalid native record stride",
         ));
     }

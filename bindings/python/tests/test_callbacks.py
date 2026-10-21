@@ -45,7 +45,10 @@ def test_a_registration_is_rooted_until_native_releases_it(
     # returns.
     rejected = _Retiring()
     rejected_retired = rejected.retired
-    with pytest.raises(mln.InvalidArgumentError):
+    with pytest.raises(
+        mln.MaplibreError,
+        check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
+    ):
         map_handle.add_custom_geometry_source(
             "rejected",
             mln.CustomGeometrySourceOptions(fetch_tile=rejected, min_zoom=-1),
@@ -120,7 +123,10 @@ def test_a_camera_end_handler_is_rooted_until_it_runs(
             end_handler=mln.CameraTransitionHandler(rejected)
         ),
     )
-    with pytest.raises(mln.InvalidArgumentError):
+    with pytest.raises(
+        mln.MaplibreError,
+        check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
+    ):
         map_handle.apply_camera_delta(delta)
     del delta, rejected
     assert rejected_retired.is_set()
@@ -201,7 +207,9 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
     assert not answer.is_alive()
     harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
 
-    with pytest.raises(mln.InvalidStateError):
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
         handle.complete(ok_response())
     handle.close()
 
@@ -219,7 +227,8 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     def refused(use: Callable[[], object]) -> None:
         try:
             use()
-        except mln.InvalidStateError as error:
+        except mln.MaplibreError as error:
+            assert error.status == mln.Status.INVALID_STATE
             refusals.append(error.diagnostic)
 
     def transform(
@@ -262,7 +271,9 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     # A request handle passed through with its callback closes with it.
     assert len(passed_through) == 1
     assert passed_through[0].closed
-    with pytest.raises(mln.InvalidStateError):
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
         passed_through[0].complete(ok_response())
 
 

@@ -1,4 +1,4 @@
-use maplibre_native_ffi::{AcquiredFrameHandle, Error as MaplibreError, ErrorKind};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error as MaplibreError, Status};
 use objc2::ClassType;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
@@ -236,5 +236,5 @@ fn drawable_size(viewport: Viewport) -> CGSize {
 }
 
 fn metal_error(message: impl Into<String>) -> MaplibreError {
-    MaplibreError::new(ErrorKind::NativeError, None, message)
+    MaplibreError::new(Status::NativeError, message)
 }

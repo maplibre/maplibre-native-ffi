@@ -274,8 +274,6 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
     user_data: *mut std::ffi::c_void,
     end: *const sys::mln_camera_transition_end,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -331,8 +329,6 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -353,8 +349,6 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -439,8 +433,6 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_fet
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -461,8 +453,6 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_can
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -737,8 +727,6 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
     url: *const std::ffi::c_char,
     out_response: *mut sys::mln_http_header_transform_response,
 ) -> sys::mln_status {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || sys::MLN_STATUS_NATIVE_ERROR,
         |py| {
@@ -816,8 +804,6 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     code: i64,
     message: *const std::ffi::c_char,
 ) -> u32 {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || 0,
         |py| {
@@ -1454,8 +1440,6 @@ fn generated_copy_mln_queried_feature(
 }
 
 unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std::ffi::c_void) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -1471,8 +1455,6 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std:
 }
 
 unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut std::ffi::c_void) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -1715,8 +1697,6 @@ unsafe extern "C" fn generated_callback_mln_resource_request_cancel_handler_call
     user_data: *mut std::ffi::c_void,
     _handle: sys::mln_resource_request,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -1797,8 +1777,6 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
     url: *const std::ffi::c_char,
     request: sys::mln_resource_transform_request,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let request_adopted = std::cell::Cell::new(false);
     let outcome = generated_invoke(
         || {
@@ -1897,8 +1875,6 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
     user_data: *mut std::ffi::c_void,
     events: *const sys::mln_event_batch_view,
 ) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -2505,8 +2481,6 @@ fn generated_copy_mln_vulkan_texture_frame(
 }
 
 unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::ffi::c_void) {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-
     let outcome = generated_invoke(
         || (),
         |py| {
@@ -8149,7 +8123,7 @@ impl RenderFrameBatchHandle {
     fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let read = self.read()?;
-        let handle = read.handle;
+        let handle = read.native;
         let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
         out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         unsafe {
@@ -9383,8 +9357,7 @@ generated_owner!(
     mln_geojson_source_data,
     Some(generated_dispose_mln_geojson_source_data),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_geojson_source_data>(Arc::clone(&owner.state))
+    false
 );
 generated_owner!(
     MapHandle,
@@ -9392,8 +9365,7 @@ generated_owner!(
     mln_map,
     Some(generated_dispose_mln_map),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_map>(Arc::clone(&owner.state))
+    false
 );
 generated_owner!(
     MapProjectionHandle,
@@ -9401,8 +9373,7 @@ generated_owner!(
     mln_map_projection,
     Some(generated_dispose_mln_map_projection),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_map_projection>(Arc::clone(&owner.state))
+    false
 );
 generated_owner!(
     RenderFrameBatchHandle,
@@ -9410,8 +9381,7 @@ generated_owner!(
     mln_render_frame_batch,
     Some(generated_dispose_mln_render_frame_batch),
     None,
-    true,
-    |_, owner| GeneratedReadScope::new::<sys::mln_render_frame_batch>(Arc::clone(&owner.state))
+    true
 );
 generated_owner!(
     RenderSessionHandle,
@@ -9419,8 +9389,7 @@ generated_owner!(
     mln_render_session,
     Some(generated_dispose_mln_render_session),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_render_session>(Arc::clone(&owner.state))
+    false
 );
 generated_owner!(
     ResourceRequestHandle,
@@ -9428,8 +9397,7 @@ generated_owner!(
     mln_resource_request,
     Some(generated_dispose_mln_resource_request),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_resource_request>(Arc::clone(&owner.state))
+    false
 );
 generated_owner!(
     ResourceTransformRequestHandle,
@@ -9437,10 +9405,7 @@ generated_owner!(
     mln_resource_transform_request,
     Some(generated_dispose_mln_resource_transform_request),
     None,
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_resource_transform_request>(Arc::clone(
-        &owner.state
-    ))
+    false
 );
 unsafe extern "C" fn generated_exit_release_mln_runtime(
     handle: sys::mln_runtime,
@@ -9454,8 +9419,7 @@ generated_owner!(
     mln_runtime,
     Some(generated_dispose_mln_runtime),
     Some(generated_exit_release_mln_runtime),
-    false,
-    |_, owner| GeneratedReadScope::new::<sys::mln_runtime>(Arc::clone(&owner.state))
+    false
 );
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]

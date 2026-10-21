@@ -47,9 +47,9 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
     assert stored is not None
     assert json.loads(stored)["id"] == layer_id
 
-    with pytest.raises(mln.InvalidArgumentError) as raised:
+    with pytest.raises(mln.MaplibreError) as raised:
         map_handle.set_style_url("custom://bad\0url")
-    assert raised.value.native_status_code is not None
+    assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert "embedded NUL" in raised.value.diagnostic
     with pytest.raises(TypeError, match="instance of 'bytes'"):
         map_handle.add_style_layer_json(typing.cast(typing.Any, layer))
@@ -96,10 +96,10 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     assert events[-1].generation == loaded.generation
 
     unknown = mln.OfflineRegionDefinition(mln.UnknownVariant(999))
-    with pytest.raises(mln.InvalidArgumentError) as raised:
+    with pytest.raises(mln.MaplibreError) as raised:
         harness.runtime.create_offline_region(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.
-    assert raised.value.native_status_code == int(mln.Status.INVALID_ARGUMENT)
+    assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert "definition type is invalid" in raised.value.diagnostic
 
 

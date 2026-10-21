@@ -10,7 +10,11 @@ from textwrap import dedent
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call, reads_receiver
+from tools.bindgen.emitters.rust import (
+    RUST_KEYWORDS,
+    counted_owner,
+    native_call,
+)
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.semantic import (
     BoundApi,
@@ -311,7 +315,7 @@ def operation(
     ):
         setup += [
             "        let read = self.read()?;",
-            "        let handle = read.handle;",
+            "        let handle = read.native;",
         ]
     elif receiver:
         setup += [
@@ -696,17 +700,11 @@ def compact(body: list[str]) -> list[str]:
 def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
     """Declare the PyO3 class for a handle whose ownership NativeHandleState tracks."""
     native = handle.native
-    counted = any(
-        reads_receiver(plan)
-        and any(
-            p.name == plan.receiver and p.value.native == native for p in plan.inputs
-        )
-        for plan in bound.operations
-    )
+    counted = counted_owner(bound, native)
     read_scope = (
-        f"|py, owner| GeneratedReadScope::with_native::<sys::{native}>(py, Arc::clone(&owner.state), sys::{handle.view_begin}, sys::{handle.view_end})"
+        f", |py, owner| GeneratedReadScope::with_native::<sys::{native}>(py, Arc::clone(&owner.state), sys::{handle.view_begin}, sys::{handle.view_end})"
         if handle.view_begin
-        else f"|_, owner| GeneratedReadScope::new::<sys::{native}>(Arc::clone(&owner.state))"
+        else ""
     )
     dispose = (
         f"Some(generated_dispose_{native})"
@@ -726,7 +724,7 @@ def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
         definitions = ""
     return (
         definitions
-        + f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {exit_release}, {str(counted).lower()}, {read_scope});\n'
+        + f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {exit_release}, {str(counted).lower()}{read_scope});\n'
     )
 
 
@@ -809,7 +807,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         default_native.append(
             f"#[pyfunction]\nfn {name}(py: Python<'_>) -> PyResult<Py<PyAny>> {{ let value = unsafe {{ sys::{plan.name}() }}; {ok(values.copy(plan.result, 'value'))} }}\n"
         )
-    files = error_sources(bound)
+    files = error_sources()
     rust_values, public_values = values.sources()
     rust_values += "\n".join(default_native)
     for handle in bound.handles.values():
@@ -1026,44 +1024,19 @@ def coverage(api: Api | BoundApi) -> dict:
     }
 
 
-def error_sources(bound):
-    statuses = [
-        key
-        for key, _ in bound.values["mln_status"].enum_values
-        if key != "MLN_STATUS_OK"
-    ]
-
-    def exception(key):
-        name = key.removeprefix("MLN_STATUS_")
-        return {
-            "UNSUPPORTED": "UnsupportedFeatureError",
-            "NATIVE_ERROR": "NativeError",
-        }.get(name, pascal(name.lower()) + "Error")
-
-    names = {key: exception(key) for key in statuses}
-    python = '"""Generated from C headers by tools/bindgen. Do not edit."""\n\nfrom ._error import MaplibreError\nfrom ._generated_values import Status\n'
-    for key, name in names.items():
-        python += f'\n\nclass {name}(MaplibreError):\n    """Error for the {key.removeprefix("MLN_STATUS_").lower().replace("_", " ")} status."""\n\n    status = Status.{key.removeprefix("MLN_STATUS_")}\n'
-    python += '\n\nclass UnknownStatusError(MaplibreError):\n    """Error for an unknown native status."""\n'
-    python += (
-        "\n\n__all__ = "
-        + repr(sorted(["MaplibreError", "UnknownStatusError", *names.values()]))
-        + "\n"
-    )
-    rust = (
-        "// Generated from C headers by tools/bindgen. Do not edit.\nmod py_errors {\n"
-    )
-    rust += "".join(
-        f"    pyo3::import_exception!(maplibre_native_ffi.errors, {name});\n"
-        for name in [*names.values(), "UnknownStatusError"]
-    )
-    rust += "}\nfn map_error(error: Error) -> PyErr {\n    let diagnostic = error.diagnostic().to_owned();\n    let raw_status = error.raw_status();\n    match error.kind() {\n"
-    rust += "".join(
-        f"        ErrorKind::{pascal(key.removeprefix('MLN_STATUS_').lower())} => py_errors::{name}::new_err((diagnostic, raw_status)),\n"
-        for key, name in names.items()
-    )
-    rust += "        ErrorKind::UnknownStatus => py_errors::UnknownStatusError::new_err((diagnostic, raw_status.unwrap_or_default())),\n        ErrorKind::AbiVersionMismatch => py_errors::UnsupportedFeatureError::new_err((diagnostic, raw_status)),\n        _ => py_errors::NativeError::new_err((diagnostic, raw_status)),\n    }\n}\n"
+def error_sources():
     return {
-        "python/maplibre_native_ffi/errors.py": python,
-        "src/generated_errors.rs": rust,
+        "python/maplibre_native_ffi/errors.py": '"""Generated from C headers by tools/bindgen. Do not edit."""\n\nfrom ._error import AbiVersionMismatchError, MaplibreError\n\n__all__ = ["AbiVersionMismatchError", "MaplibreError"]\n',
+        "src/generated_errors.rs": """// Generated from C headers by tools/bindgen. Do not edit.
+mod py_errors {
+    pyo3::import_exception!(maplibre_native_ffi.errors, MaplibreError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, AbiVersionMismatchError);
+}
+fn map_error(error: Error) -> PyErr {
+    match error {
+        Error::Status { status, diagnostic } => py_errors::MaplibreError::new_err((status.as_raw(), diagnostic)),
+        Error::AbiVersionMismatch { expected, actual } => py_errors::AbiVersionMismatchError::new_err((expected, actual)),
+    }
+}
+""",
     }

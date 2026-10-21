@@ -41,8 +41,7 @@ impl MapState {
         let map = match runtime.create_map(&map_options).and_then(|future| {
             if !future.wait(Duration::from_secs(30))? {
                 return Err(maplibre_native_ffi::Error::new(
-                    maplibre_native_ffi::ErrorKind::NotReady,
-                    None,
+                    maplibre_native_ffi::Status::NotReady,
                     "map creation timed out",
                 ));
             }

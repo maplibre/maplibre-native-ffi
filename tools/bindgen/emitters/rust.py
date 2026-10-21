@@ -231,7 +231,7 @@ def _map(rule: str, copied: str) -> str:
 
 
 def reads_receiver(plan: OperationPlan) -> bool:
-    """A counted read keeps a borrowed view or copied storage live for the call."""
+    """An immediate receiver call copies borrowed output without a native view scope."""
     from .rust_dynamic_values import dynamic
 
     def borrowed(value):
@@ -244,6 +244,17 @@ def reads_receiver(plan: OperationPlan) -> bool:
         and not plan.view
         and plan.execution == "immediate"
         and any(borrowed(output.value) for output in plan.outputs)
+    )
+
+
+def counted_owner(bound: BoundApi, native: str) -> bool:
+    """A release must not overlap a copy from this owner's borrowed output."""
+    return any(
+        reads_receiver(plan)
+        and any(
+            p.name == plan.receiver and p.value.native == native for p in plan.inputs
+        )
+        for plan in bound.operations
     )
 
 
@@ -620,10 +631,9 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             raise Unsupported("consumption with outputs requires an owner transaction")
         if ending[0].startswith("call.status("):
             ending = [ending[0].removesuffix("?;")]
-        consume = "release" if plan.completion else "close"
         body = [
             *prelude,
-            f"self.inner.{consume}(|{target}| {{",
+            f"self.inner.close(|{target}| {{",
             f"    let {mutable}call = Call::new({target}, None);",
             *("    " + line for line in [*setup, *ending]),
             "})",
@@ -753,7 +763,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     )
     from . import rust_sys
 
-    files["crates/maplibre-native-ffi-core/src/error_kind.rs"] = error_kinds(bound)
+    files["crates/maplibre-native-ffi-core/src/status.rs"] = status_source(bound)
     sys_declarations = rust_sys.declarations(bound)
     files[rust_sys.PATH] = sys_declarations.render()
     for name, reason in sys_declarations.unsupported.items():
@@ -776,27 +786,40 @@ def coverage(api: Api | BoundApi) -> dict:
     }
 
 
-def error_kinds(bound):
-    statuses = [
-        key
-        for key, _ in bound.values["mln_status"].enum_values
-        if key != "MLN_STATUS_OK"
+def status_source(bound):
+    values = bound.values["mln_status"].enum_values
+    variants = [
+        (
+            pascal(key.removeprefix("MLN_STATUS_").lower()),
+            number,
+            key.removeprefix("MLN_STATUS_"),
+        )
+        for key, number in values
     ]
-    names = {key: pascal(key.removeprefix("MLN_STATUS_").lower()) for key in statuses}
     return (
         "// Generated from C headers by tools/bindgen. Do not edit.\n"
-        "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\n#[non_exhaustive]\npub enum ErrorKind {\n"
-        + "".join(f"    {name},\n" for name in names.values())
-        + "    AbiVersionMismatch,\n    UnknownStatus,\n}\n"
-        + "fn kind_for_status(status: i32) -> ErrorKind { match status {\n"
+        + doc(bound, "mln_status")
+        + "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\npub enum Status {\n"
         + "".join(
-            f"    sys::{key} => ErrorKind::{name},\n" for key, name in names.items()
+            f"{doc(bound, 'MLN_STATUS_' + label, '    ')}    {name},\n"
+            for name, _, label in variants
         )
-        + "    _ => ErrorKind::UnknownStatus,\n} }\n"
-        + "pub fn status_for_error(error: &Error) -> sys::mln_status {\n"
-        + "    if let Some(status) = error.raw_status() { return status; }\n    match error.kind() {\n"
+        + "    Unknown(i32),\n}\nimpl Status {\n"
+        + "    pub fn from_raw(raw: i32) -> Self { match raw {\n"
         + "".join(
-            f"        ErrorKind::{name} => sys::{key},\n" for key, name in names.items()
+            f"        {number} => Self::{name},\n" for name, number, _ in variants
         )
-        + "        _ => sys::MLN_STATUS_NATIVE_ERROR,\n    }\n}\n"
+        + "        value => Self::Unknown(value),\n    } }\n"
+        + "    pub fn as_raw(self) -> i32 { match self {\n"
+        + "".join(
+            f"        Self::{name} => {number},\n" for name, number, _ in variants
+        )
+        + "        Self::Unknown(value) => value,\n    } }\n}\n"
+        + "impl Default for Status { fn default() -> Self { Self::from_raw(0) } }\n"
+        + "impl std::fmt::Display for Status { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self {\n"
+        + "".join(
+            f'        Self::{name} => f.write_str("{label}"),\n'
+            for name, _, label in variants
+        )
+        + '        Self::Unknown(value) => write!(f, "UNKNOWN({value})"),\n    } } }\n'
     )

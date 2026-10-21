@@ -76,8 +76,7 @@ impl<T> NativeFuture<T> {
         let mut result = lock(&self.state.result);
         result.take().ok_or_else(|| {
             Error::new(
-                crate::ErrorKind::InvalidState,
-                None,
+                crate::Status::InvalidState,
                 "native future has not completed",
             )
         })?
@@ -116,15 +115,13 @@ unsafe extern "C" fn complete<T>(
                 Err(payload) => {
                     std::mem::forget(payload);
                     Err(Error::new(
-                        crate::ErrorKind::NativeError,
-                        None,
+                        crate::Status::NativeError,
                         "completion conversion panicked",
                     ))
                 }
             },
             None => Err(Error::new(
-                crate::ErrorKind::InvalidState,
-                None,
+                crate::Status::InvalidState,
                 "native completion ran more than once",
             )),
         }
@@ -211,8 +208,7 @@ where
 pub(crate) fn unit(result: &sys::mln_completion_result) -> Result<()> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(Error::new(
-            crate::ErrorKind::NativeError,
-            None,
+            crate::Status::NativeError,
             "unit completion returned a value",
         ));
     }
@@ -243,8 +239,7 @@ fn copy_diagnostic(result: &sys::mln_completion_result) -> String {
 pub(crate) fn copy_value<T: Copy>(result: &sys::mln_completion_result) -> Result<T> {
     if result.value.is_null() || result.value_count != 1 {
         return Err(Error::new(
-            crate::ErrorKind::NativeError,
-            None,
+            crate::Status::NativeError,
             "native completion returned no value",
         ));
     }
@@ -258,8 +253,7 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
     }
     if result.value.is_null() {
         return Err(Error::new(
-            crate::ErrorKind::NativeError,
-            None,
+            crate::Status::NativeError,
             "native completion returned a null slice",
         ));
     }
@@ -439,8 +433,10 @@ mod tests {
 
         result.value_size = std::mem::size_of::<sys::mln_lat_lng>() as u32 - 1;
         assert_eq!(
-            copy_slice::<sys::mln_lat_lng>(&result).unwrap_err().kind(),
-            crate::ErrorKind::NativeError
+            copy_slice::<sys::mln_lat_lng>(&result)
+                .unwrap_err()
+                .status(),
+            crate::Status::NativeError
         );
     }
 
@@ -457,8 +453,8 @@ mod tests {
         );
         accepted.deliver(sys::MLN_STATUS_OK);
         assert_eq!(
-            future.take().unwrap_err().kind(),
-            crate::ErrorKind::NativeError
+            future.take().unwrap_err().status(),
+            crate::Status::NativeError
         );
         assert!(dropped.load(Ordering::Acquire));
         accepted.release();
@@ -470,14 +466,14 @@ mod tests {
 
         // Nothing has completed, so there is no result to take yet.
         let error = future.take().unwrap_err();
-        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.status(), crate::Status::InvalidState);
 
         accepted.deliver(sys::MLN_STATUS_OK);
         future.take().unwrap();
 
         // The result moves out of the future, so a second take finds none.
         let error = future.take().unwrap_err();
-        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.status(), crate::Status::InvalidState);
         accepted.release();
     }
 
@@ -496,8 +492,7 @@ mod tests {
         let (operation, accepted) = accept(unit, false);
         accepted.deliver(sys::MLN_STATUS_INVALID_ARGUMENT);
         let error = operation.take().unwrap_err();
-        assert_eq!(error.kind(), crate::ErrorKind::InvalidArgument);
-        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+        assert_eq!(error.status(), crate::Status::InvalidArgument);
         accepted.release();
     }
 
@@ -534,7 +529,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.status(), crate::Status::InvalidState);
         assert!(dropped.load(Ordering::Acquire));
     }
 }

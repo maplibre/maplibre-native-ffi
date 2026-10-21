@@ -87,7 +87,7 @@ mod tests {
     fn c_strings_reject_embedded_nul() {
         let error = c_string("a\0b").unwrap_err();
 
-        assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
+        assert_eq!(error.status(), crate::Status::InvalidArgument);
         assert_eq!(
             error.diagnostic(),
             "C string inputs must not contain embedded NUL characters"
@@ -102,7 +102,7 @@ mod tests {
         };
 
         let error = unsafe { copy_string_view(view) }.unwrap_err();
-        assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
+        assert_eq!(error.status(), crate::Status::InvalidArgument);
         assert!(error.diagnostic().contains("must not be null"));
     }
 }

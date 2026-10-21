@@ -11,36 +11,13 @@ from . import _loader as _loader
 from ._completion import CommandCompletion, CommandDisposition
 from .api import *
 from .api import __all__ as _api_exports
-from .errors import (
-    BusyError,
-    CancelledError,
-    InvalidArgumentError,
-    InvalidStateError,
-    MaplibreError,
-    NativeError,
-    NotFoundError,
-    NotReadyError,
-    TargetLostError,
-    UnknownStatusError,
-    UnsupportedFeatureError,
-    WrongThreadError,
-)
+from .errors import AbiVersionMismatchError, MaplibreError
 
 __all__ = [
-    "BusyError",
-    "CancelledError",
+    "AbiVersionMismatchError",
     "CommandCompletion",
     "CommandDisposition",
-    "InvalidArgumentError",
-    "InvalidStateError",
     "MaplibreError",
-    "NativeError",
-    "NotFoundError",
-    "NotReadyError",
-    "TargetLostError",
-    "UnknownStatusError",
-    "UnsupportedFeatureError",
-    "WrongThreadError",
 ]
 
 __all__.extend(_api_exports)

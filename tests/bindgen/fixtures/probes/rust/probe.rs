@@ -32,8 +32,8 @@ pub fn run() {
     parcel.release().unwrap();
     let error = probe_take_parcel().unwrap_err();
     assert_eq!(
-        (error.kind(), error.diagnostic()),
-        (ErrorKind::InvalidArgument, "exhausted")
+        (error.status(), error.diagnostic()),
+        (Status::InvalidArgument, "exhausted")
     );
     assert_eq!(probe_read_level().unwrap(), None);
     assert_eq!(probe_read_level().unwrap(), Some(0.5));

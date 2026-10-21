@@ -140,8 +140,8 @@ impl<'py> GeneratedCall<'py> {
     }
 }
 
-type GeneratedOwnerReservation<'a, O> =
-    GeneratedHandleReservation<'a, <O as GeneratedOwner>::Native>;
+type GeneratedOwnerReservation<O> =
+    maplibre_core::handle::ReleaseReservation<<O as GeneratedOwner>::Native>;
 
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
@@ -165,13 +165,17 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     }
 
     /// Hold off close until borrowed result storage has been copied.
-    fn read(&self) -> PyResult<GeneratedReadReservation<'_, Self::Native>> {
-        GeneratedReadReservation::new(self.shared())
+    fn read(&self) -> PyResult<maplibre_core::handle::NativeRead<Self::Native>> {
+        self.state().handle.read().map_err(map_error)
     }
 
     /// Takes the handle for a call that consumes it, or `None` once closed.
-    fn reserve(&self) -> PyResult<Option<GeneratedOwnerReservation<'_, Self>>> {
-        GeneratedHandleReservation::new(self.shared())
+    fn reserve(&self) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
+        let state = self.state();
+        if state.handle.is_released() {
+            return Ok(None);
+        }
+        state.handle.reserve().map(Some).map_err(map_error)
     }
 
     /// Wraps a handle that an accepted call transferred, with the callback
@@ -200,7 +204,7 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
 }
 
 macro_rules! generated_owner {
-    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $counted:expr, $read_scope:expr) => {
+    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $counted:expr $(, $read_scope:expr)?) => {
         #[pyclass(name = $name)]
         struct $owner {
             state: Arc<Mutex<NativeHandleState<sys::$native>>>,
@@ -252,16 +256,15 @@ macro_rules! generated_owner {
             /// that a completion delivered and nothing adopted.
             fn _dispose(&self) -> PyResult<()> {
                 let mut state = self.state();
-                state.handle.begin_release().map_err(map_error)?;
+                let _reservation = state.handle.reserve().map_err(map_error)?;
                 state.dispose_abandoned();
-                state.handle.end_release(false);
                 Ok(())
             }
 
-            fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+            $(fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
                 let read_scope: fn(Python<'_>, &Self) -> PyResult<GeneratedReadScope> = $read_scope;
                 read_scope(py, self)
-            }
+            })?
         }
     };
 }

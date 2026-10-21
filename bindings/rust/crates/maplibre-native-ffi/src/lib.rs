@@ -30,5 +30,5 @@ pub use completion::{CommandCompletion, NativeFuture};
 pub use generated::*;
 pub use maplibre_core::handle::NativeHandleLeak;
 pub use maplibre_core::report::{Report, Reporter, set_reporter};
-pub use maplibre_core::{Error, ErrorKind, Result};
+pub use maplibre_core::{Error, Result};
 use maplibre_native_ffi_core as maplibre_core;

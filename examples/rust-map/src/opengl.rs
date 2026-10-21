@@ -443,7 +443,7 @@ fn check_gl_error(gl: &glow::Context, operation: &str) -> Result<(), Box<dyn Err
 }
 
 fn compositor_error(message: impl Into<String>) -> maplibre_native_ffi::Error {
-    maplibre_native_ffi::Error::new(maplibre_native_ffi::ErrorKind::NativeError, None, message)
+    maplibre_native_ffi::Error::new(maplibre_native_ffi::Status::NativeError, message)
 }
 
 struct GlCleanupGuard<T> {

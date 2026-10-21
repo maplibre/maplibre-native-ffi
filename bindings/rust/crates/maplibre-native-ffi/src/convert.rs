@@ -30,8 +30,7 @@ pub(crate) trait FromNative<N>: Sized {
     unsafe fn from_native(native: N) -> Result<Self>;
 }
 
-/// Converts `value` for one call. A function rather than a method, since enum
-/// types also have an inherent `to_native`.
+/// Converts `value` for one call.
 pub(crate) fn to_native<N, T: ToNative<N> + ?Sized>(
     value: &T,
     arena: &mut InputArena,

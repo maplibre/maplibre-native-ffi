@@ -2,7 +2,6 @@
 //! unions, open enums and wide integers, and copied arrays.
 
 use maplibre_native_ffi::*;
-use maplibre_native_ffi_sys as sys;
 
 use crate::support::*;
 
@@ -29,8 +28,7 @@ fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
             scale_factor: 1.0,
         })
         .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
+    assert_eq!(error.status(), Status::InvalidArgument);
 }
 
 #[test]
@@ -66,8 +64,7 @@ fn host_strings_use_views_and_native_lent_strings_decode() {
         .map()
         .set_style_url("custom://style\0.json")
         .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+    assert_eq!(error.status(), Status::InvalidArgument);
     assert!(error.diagnostic().contains("embedded NUL"), "{error}");
 }
 
@@ -94,8 +91,7 @@ fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // An enum value this binding predates reaches native unchanged, and native
     // is what rejects it.
     let error = network_set_status(NetworkStatus::Unknown(900)).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+    assert_eq!(error.status(), Status::InvalidArgument);
     assert!(error.diagnostic().contains("network status"), "{error}");
 
     let fixture = Fixture::new();
@@ -105,8 +101,7 @@ fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
         .runtime()
         .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))
         .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+    assert_eq!(error.status(), Status::InvalidArgument);
     assert_eq!(
         fixture.runtime().get_event_mask().unwrap(),
         RuntimeEventMask::ALL

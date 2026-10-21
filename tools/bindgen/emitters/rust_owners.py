@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tools.bindgen.semantic import BoundApi, HandlePlan
 
-from .rust import doc, pascal, reads_receiver
+from .rust import counted_owner, doc, pascal
 
 
 def owner_name(native: str) -> str:
@@ -51,13 +51,7 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
         finalize = f"|raw| {{ unsafe {{ sys::{dispose.name}(raw) }}; Ok(()) }}"
     else:
         finalize = f"|raw| maplibre_core::check(|out_diagnostic| unsafe {{ sys::{dispose.name}(raw, out_diagnostic) }})"
-    counted = any(
-        reads_receiver(plan)
-        and any(
-            p.name == plan.receiver and p.value.native == native for p in plan.inputs
-        )
-        for plan in bound.operations
-    )
+    counted = counted_owner(bound, native)
     must_use = ""
     if handle.release_inputs:
         release = handle.release.removeprefix(native + "_")

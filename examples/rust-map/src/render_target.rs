@@ -21,8 +21,8 @@ use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 use maplibre_native_ffi::{
-    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDemandFlag, GpuSync, LogicalExtent,
-    NativeFuture, RenderDriverKind, RenderResult, RenderSessionAttachOptions, RenderSessionHandle,
+    AcquiredFrameHandle, Error, FrameDemand, FrameDemandFlag, GpuSync, LogicalExtent, NativeFuture,
+    RenderDriverKind, RenderResult, RenderSessionAttachOptions, RenderSessionHandle, Status,
 };
 
 use crate::shell::{AppEvent, DriverWait, Wakes};
@@ -276,7 +276,7 @@ impl Session {
             Ok(_) => {}
             // A session that already released its target reports invalid
             // state.
-            Err(error) if error.kind() == ErrorKind::InvalidState => {}
+            Err(error) if error.status() == Status::InvalidState => {}
             Err(error) => eprintln!("render session abandon failed: {error}"),
         }
     }
@@ -392,13 +392,12 @@ pub fn require_cpu_complete_producer(
             return Ok(());
         }
         Err(Error::new(
-            ErrorKind::InvalidState,
-            None,
+            Status::InvalidState,
             format!("rust-map cannot consume a {producer:?} producer synchronization payload"),
         ))
     })?
 }
 
 pub fn compositor_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorKind::NativeError, None, message)
+    Error::new(Status::NativeError, message)
 }

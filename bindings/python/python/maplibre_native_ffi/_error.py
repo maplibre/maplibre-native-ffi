@@ -4,27 +4,21 @@ from ._generated_values import Status
 
 
 class MaplibreError(Exception):
-    """Base class for MapLibre Native binding errors.
+    """A failed call's status and diagnostic."""
 
-    ``native_status_code`` is the C ABI status the native library reported, and
-    None for a failure this binding raised on its own.
-    """
-
-    status: Status | None = None
-    """Status category every instance of this exception type carries."""
-
-    def __init__(
-        self, diagnostic: str = "", native_status_code: int | None = None
-    ) -> None:
+    def __init__(self, status: Status | int, diagnostic: str = "") -> None:
+        self.status = Status(status)
         self.diagnostic = diagnostic
-        self.native_status_code = native_status_code
-        if native_status_code is not None:
-            self.status = Status(native_status_code)
+        super().__init__(f"{self.status.name}: {diagnostic}")
+
+
+class AbiVersionMismatchError(MaplibreError):
+    """The linked library's ABI version differs from the binding's version."""
+
+    def __init__(self, expected: int, actual: int) -> None:
+        self.expected = expected
+        self.actual = actual
         super().__init__(
-            diagnostic
-            or (
-                self.status.name.lower().replace("_", " ")
-                if self.status is not None
-                else "native error"
-            )
+            Status.UNSUPPORTED,
+            f"unsupported MapLibre Native C ABI version {actual}; expected {expected}",
         )

@@ -5,58 +5,57 @@ use maplibre_native_ffi_sys as sys;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-include!("error_kind.rs");
+use crate::Status;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Error {
-    kind: ErrorKind,
-    raw_status: Option<i32>,
-    diagnostic: String,
+pub enum Error {
+    Status { status: Status, diagnostic: String },
+    AbiVersionMismatch { expected: u32, actual: u32 },
 }
 
 impl Error {
-    pub fn new(kind: ErrorKind, raw_status: Option<i32>, diagnostic: impl Into<String>) -> Self {
-        Self {
-            kind,
-            raw_status,
+    pub fn new(status: Status, diagnostic: impl Into<String>) -> Self {
+        Self::Status {
+            status,
             diagnostic: diagnostic.into(),
         }
     }
 
     pub fn from_status_and_diagnostic(status: i32, diagnostic: impl Into<String>) -> Self {
-        Self::new(kind_for_status(status), Some(status), diagnostic)
+        Self::new(Status::from_raw(status), diagnostic)
     }
 
     pub fn invalid_argument(diagnostic: impl Into<String>) -> Self {
-        Self::new(ErrorKind::InvalidArgument, None, diagnostic)
+        Self::new(Status::InvalidArgument, diagnostic)
     }
 
     pub fn abi_version_mismatch(expected: u32, actual: u32) -> Self {
-        Self::new(
-            ErrorKind::AbiVersionMismatch,
-            None,
-            format!("unsupported MapLibre Native C ABI version {actual}; expected {expected}"),
-        )
+        Self::AbiVersionMismatch { expected, actual }
     }
 
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
-    }
-
-    pub fn raw_status(&self) -> Option<i32> {
-        self.raw_status
+    pub fn status(&self) -> Status {
+        match self {
+            Self::Status { status, .. } => *status,
+            Self::AbiVersionMismatch { .. } => Status::Unsupported,
+        }
     }
 
     pub fn diagnostic(&self) -> &str {
-        &self.diagnostic
+        match self {
+            Self::Status { diagnostic, .. } => diagnostic,
+            Self::AbiVersionMismatch { .. } => "C ABI version mismatch",
+        }
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.raw_status {
-            Some(status) => write!(f, "MapLibre Native status {status}: {}", self.diagnostic),
-            None => f.write_str(&self.diagnostic),
+        match self {
+            Self::Status { status, diagnostic } => write!(f, "{status}: {diagnostic}"),
+            Self::AbiVersionMismatch { expected, actual } => write!(
+                f,
+                "unsupported MapLibre Native C ABI version {actual}; expected {expected}"
+            ),
         }
     }
 }
@@ -131,30 +130,32 @@ mod tests {
     #[test]
     fn a_failed_call_maps_its_status_and_keeps_an_unknown_code() {
         let statuses = [
-            (sys::MLN_STATUS_INVALID_ARGUMENT, ErrorKind::InvalidArgument),
-            (sys::MLN_STATUS_INVALID_STATE, ErrorKind::InvalidState),
-            (sys::MLN_STATUS_WRONG_THREAD, ErrorKind::WrongThread),
-            (sys::MLN_STATUS_UNSUPPORTED, ErrorKind::Unsupported),
-            (sys::MLN_STATUS_CANCELLED, ErrorKind::Cancelled),
-            (sys::MLN_STATUS_BUSY, ErrorKind::Busy),
-            (sys::MLN_STATUS_TARGET_LOST, ErrorKind::TargetLost),
-            (sys::MLN_STATUS_NOT_READY, ErrorKind::NotReady),
-            (sys::MLN_STATUS_NOT_FOUND, ErrorKind::NotFound),
-            (sys::MLN_STATUS_NATIVE_ERROR, ErrorKind::NativeError),
+            (sys::MLN_STATUS_INVALID_ARGUMENT, Status::InvalidArgument),
+            (sys::MLN_STATUS_INVALID_STATE, Status::InvalidState),
+            (sys::MLN_STATUS_WRONG_THREAD, Status::WrongThread),
+            (sys::MLN_STATUS_UNSUPPORTED, Status::Unsupported),
+            (sys::MLN_STATUS_CANCELLED, Status::Cancelled),
+            (sys::MLN_STATUS_BUSY, Status::Busy),
+            (sys::MLN_STATUS_TARGET_LOST, Status::TargetLost),
+            (sys::MLN_STATUS_NOT_READY, Status::NotReady),
+            (sys::MLN_STATUS_NOT_FOUND, Status::NotFound),
+            (sys::MLN_STATUS_NATIVE_ERROR, Status::NativeError),
         ];
-        for (status, kind) in statuses {
+        for (status, expected) in statuses {
             let error = failing_call(status, b"failed\0");
-            assert_eq!(error.kind(), kind);
-            assert_eq!(error.raw_status(), Some(status));
+            assert_eq!(error.status(), expected);
+            assert_eq!(error.to_string(), format!("{expected}: failed"));
+            assert_eq!(error.status().as_raw(), status);
             assert_eq!(error.diagnostic(), "failed");
         }
 
         // A status this binding predates keeps its code rather than folding
         // into a known one.
         let error = failing_call(-123_456, b"future status\0");
-        assert_eq!(error.kind(), ErrorKind::UnknownStatus);
-        assert_eq!(error.raw_status(), Some(-123_456));
+        assert_eq!(error.status(), Status::Unknown(-123_456));
+        assert_eq!(error.status().as_raw(), -123_456);
         assert_eq!(error.diagnostic(), "future status");
+        assert_eq!(error.to_string(), "UNKNOWN(-123456): future status");
     }
 
     #[test]
@@ -171,7 +172,7 @@ mod tests {
         // Each call starts from an empty message, so a call that fails without
         // writing one carries none, not the previous call's.
         let error = check(|_| sys::MLN_STATUS_INVALID_ARGUMENT).unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.status(), Status::InvalidArgument);
         assert_eq!(error.diagnostic(), "");
     }
 }

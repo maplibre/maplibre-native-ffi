@@ -1185,7 +1185,7 @@ impl MapHandle {
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn release(&self) -> Result<NativeFuture<()>> {
-        self.inner.release(|map| {
+        self.inner.close(|map| {
             let call = Call::new(map, None);
             call.complete(
                 |map, completion, out_diagnostic| unsafe {

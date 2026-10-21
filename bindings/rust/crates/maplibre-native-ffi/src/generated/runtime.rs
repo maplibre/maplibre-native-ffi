@@ -257,7 +257,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn release(&self) -> Result<NativeFuture<()>> {
-        self.inner.release(|runtime| {
+        self.inner.close(|runtime| {
             let call = Call::new(runtime, None);
             call.complete(
                 |runtime, completion, out_diagnostic| unsafe {

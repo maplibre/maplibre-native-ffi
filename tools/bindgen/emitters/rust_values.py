@@ -167,6 +167,8 @@ class Values:
         return declaration(self, value)
 
     def enum(self, value: ValuePlan) -> str:
+        if value.native == "mln_status":
+            return "pub use maplibre_core::Status;\nimpl ToNative<i32> for Status { fn to_native(&self, _: &mut InputArena) -> Result<i32> { Ok(self.as_raw()) } }\nimpl FromNative<i32> for Status { unsafe fn from_native(raw: i32) -> Result<Self> { Ok(Self::from_raw(raw)) } }\n"
         public = pascal(value.native)
         raw = self.scalar(value) or "u32"
         prefix = enum_member_prefix(key for key, _ in value.enum_values)

@@ -10,7 +10,6 @@ use std::ffi::c_void;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use maplibre_native_ffi_core::callback::CallbackScope;
-use maplibre_native_ffi_core::error::status_for_error;
 use maplibre_native_ffi_core::report::{Report, report};
 use maplibre_native_ffi_sys as sys;
 
@@ -77,7 +76,7 @@ pub(crate) fn invoke_status(
     match run(body) {
         Ok(Ok(())) => sys::MLN_STATUS_OK,
         Ok(Err(error)) => {
-            let status = status_for_error(&error);
+            let status = error.status().as_raw();
             report_error(callback, error);
             status
         }

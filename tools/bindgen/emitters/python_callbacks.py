@@ -206,7 +206,7 @@ def sources(values, plan):
             else f" -> {ffi_type(callback.result)}"
         )
         rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}){returns} {{
-    let _scope = maplibre_core::callback::CallbackScope::enter();
+    {"let _scope = maplibre_core::callback::CallbackScope::enter();" if callback.decision else ""}
     {decision_setup}
     {adoption_flags}
     let outcome = generated_invoke(|| {{ {unadopted}{"" if unadopted and failure == "()" else failure} }}, |py| {{

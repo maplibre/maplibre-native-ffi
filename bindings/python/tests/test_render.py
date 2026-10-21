@@ -390,16 +390,19 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
 
         def inspect(view: object) -> int:
             for release in (frame.close, target.session.abandon):
-                with pytest.raises(mln.BusyError) as raised:
+                with pytest.raises(mln.MaplibreError) as raised:
                     release()
-                assert raised.value.native_status_code == int(mln.Status.BUSY)
+                assert raised.value.status == mln.Status.BUSY
             return _texture_name(backend, view)
 
         assert target.with_texture(frame, inspect) != 0
         with frame:
             assert not frame.closed
         assert frame.closed
-        with pytest.raises(mln.InvalidStateError):
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
             target.with_texture(frame, inspect)
 
 
@@ -428,7 +431,9 @@ def test_a_borrow_on_another_thread_holds_off_close(
         borrower.start()
         try:
             assert entered.wait(TIMEOUT)
-            with pytest.raises(mln.BusyError):
+            with pytest.raises(
+                mln.MaplibreError, check=lambda error: error.status == mln.Status.BUSY
+            ):
                 frame.close()
             assert not frame.closed
         finally:

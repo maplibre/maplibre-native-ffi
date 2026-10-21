@@ -28,7 +28,10 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
     # A later command on the same map completes after the discarded one.
     result(map_handle.request_repaint())
     assert map_handle.get_snapshot().debug_options == mln.MapDebugOption.TILE_BORDERS
-    with pytest.raises(mln.InvalidArgumentError):
+    with pytest.raises(
+        mln.MaplibreError,
+        check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
+    ):
         map_handle.discarding.resize(
             mln.LogicalExtent(width=0, height=8, scale_factor=1)
         )
@@ -36,12 +39,12 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
 
 def test_a_rejected_submission_frees_its_future(map_handle: mln.MapHandle) -> None:
     before = _live_native_futures()
-    with pytest.raises(mln.InvalidArgumentError) as raised:
+    with pytest.raises(mln.MaplibreError) as raised:
         map_handle.get_feature_state(
             mln.FeatureStateSelector(source_id="source", state_key="hover")
         )
     # Native rejected the submission, after the binding made its future.
-    assert raised.value.native_status_code is not None
+    assert raised.value.status == mln.Status.INVALID_ARGUMENT
 
     assert _live_native_futures() == before
 

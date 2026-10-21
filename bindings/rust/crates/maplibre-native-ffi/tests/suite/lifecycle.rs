@@ -13,11 +13,10 @@ fn releasing_a_handle_twice_reaches_native() {
     let projection = fixture.map().create_projection().unwrap();
     projection.release().unwrap();
     let error = projection.release().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert_eq!(error.raw_status(), Some(Status::InvalidState.as_raw()));
+    assert_eq!(error.status(), Status::InvalidState);
     let (runtime, map) = fixture.into_parts();
     wait_for(map.release());
-    assert_eq!(map.release().unwrap_err().kind(), ErrorKind::InvalidState);
+    assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
     wait_for(runtime.release());
 }
 
@@ -43,8 +42,7 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
 
     // A runtime refuses to close while one of its maps is live.
     let error = runtime.release().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert!(error.raw_status().is_some());
+    assert_eq!(error.status(), Status::InvalidState);
     wait_for(runtime.clear_resource_transform());
 
     wait_for(map.release());

@@ -5264,34 +5264,16 @@ impl FromNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOpt
     }
 }
 
-native_enum! {
-/// Status values returned by status-returning functions.
-///
-/// See `mln_status` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub enum Status: i32 {
-    Ok = 0,
-    /// A pointer, size field, mask, or handle argument was invalid.
-    InvalidArgument = -1,
-    /// The object is valid but not currently in a state that permits the call.
-    InvalidState = -2,
-    /// The handle is thread-affine and the call came from the wrong thread.
-    WrongThread = -3,
-    /// The entry point or requested behavior is unavailable in this build.
-    Unsupported = -4,
-    /// A native MapLibre error or C++ exception was converted to status.
-    NativeError = -5,
-    /// The operation reached its terminal cancelled disposition.
-    Cancelled = -6,
-    /// A conflicting driver call or lifecycle transition is in flight.
-    Busy = -7,
-    /// The render target or graphics receiver was irreversibly lost.
-    TargetLost = -8,
-    /// A nonblocking drain or acquisition has nothing to return yet.
-    NotReady = -9,
-    /// A call named an ID with no live object behind it.
-    NotFound = -10,
-} Unknown
+pub use maplibre_core::Status;
+impl ToNative<i32> for Status {
+    fn to_native(&self, _: &mut InputArena) -> Result<i32> {
+        Ok(self.as_raw())
+    }
+}
+impl FromNative<i32> for Status {
+    unsafe fn from_native(raw: i32) -> Result<Self> {
+        Ok(Self::from_raw(raw))
+    }
 }
 
 /// One complete runtime style image, borrowed for a completion callback.

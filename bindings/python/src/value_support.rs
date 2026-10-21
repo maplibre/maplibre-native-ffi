@@ -66,66 +66,6 @@ fn generated_completion_values<T: Copy>(
     }
 }
 
-struct GeneratedHandleReservation<'a, T: maplibre_core::handle::NativeHandle> {
-    state: &'a Mutex<NativeHandleState<T>>,
-    handle: T,
-    accepted: bool,
-}
-impl<'a, T: maplibre_core::handle::NativeHandle> GeneratedHandleReservation<'a, T> {
-    fn new(state: &'a Mutex<NativeHandleState<T>>) -> PyResult<Option<Self>> {
-        let mut owner = state.lock().unwrap_or_else(|p| p.into_inner());
-        if owner.handle.is_released() {
-            return Ok(None);
-        }
-        let handle = owner.handle.begin_release().map_err(map_error)?;
-        Ok(Some(Self {
-            state,
-            handle,
-            accepted: false,
-        }))
-    }
-    fn handle(&self) -> T {
-        self.handle
-    }
-    fn commit(&mut self) {
-        self.accepted = true;
-    }
-}
-impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedHandleReservation<'_, T> {
-    fn drop(&mut self) {
-        self.state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .handle
-            .end_release(self.accepted);
-    }
-}
-
-struct GeneratedReadReservation<'a, T: maplibre_core::handle::NativeHandle> {
-    state: &'a Mutex<NativeHandleState<T>>,
-    handle: T,
-}
-impl<'a, T: maplibre_core::handle::NativeHandle> GeneratedReadReservation<'a, T> {
-    fn new(state: &'a Mutex<NativeHandleState<T>>) -> PyResult<Self> {
-        let handle = state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .handle
-            .begin_read()
-            .map_err(map_error)?;
-        Ok(Self { state, handle })
-    }
-}
-impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedReadReservation<'_, T> {
-    fn drop(&mut self) {
-        self.state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .handle
-            .end_read();
-    }
-}
-
 /// Owns every immediate output before converting any of them to Python objects.
 struct GeneratedOwnedOutput<T: maplibre_core::handle::NativeHandle> {
     handle: T,
@@ -261,27 +201,15 @@ where
     py.detach(move || call.invoke()).0
 }
 
-struct GeneratedOwnedRead<T: maplibre_core::handle::NativeHandle> {
-    state: Arc<Mutex<NativeHandleState<T>>>,
-}
-impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedOwnedRead<T> {
-    fn drop(&mut self) {
-        self.state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .handle
-            .end_read();
-    }
-}
-
 #[pyclass]
 struct GeneratedReadScope {
-    lease: Mutex<Option<Box<dyn Send>>>,
+    lease: Mutex<Option<GeneratedNativeRead>>,
 }
 
 struct GeneratedNativeRead {
     token: usize,
     end: unsafe extern "C" fn(*mut c_void),
+    _owner: Arc<dyn Send + Sync>,
 }
 
 impl Drop for GeneratedNativeRead {
@@ -310,26 +238,11 @@ impl GeneratedReadScope {
         })
         .map_err(map_error)?;
         Ok(Self {
-            lease: Mutex::new(Some(Box::new((
-                GeneratedNativeRead {
-                    token: token as usize,
-                    end,
-                },
-                state,
-            )))),
-        })
-    }
-    fn new<T: maplibre_core::handle::NativeHandle>(
-        state: Arc<Mutex<NativeHandleState<T>>>,
-    ) -> PyResult<Self> {
-        state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .handle
-            .begin_read()
-            .map_err(map_error)?;
-        Ok(Self {
-            lease: Mutex::new(Some(Box::new(GeneratedOwnedRead { state }))),
+            lease: Mutex::new(Some(GeneratedNativeRead {
+                token: token as usize,
+                end,
+                _owner: state,
+            })),
         })
     }
 }

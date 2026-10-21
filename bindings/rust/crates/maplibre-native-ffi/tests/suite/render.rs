@@ -85,15 +85,15 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
         // Releasing a sibling frame leaves this view's texture alone.
         sibling.release(&no_sync).unwrap();
         (
-            frame.release(&no_sync).unwrap_err().kind(),
-            session.handle.abandon().unwrap_err().kind(),
+            frame.release(&no_sync).unwrap_err().status(),
+            session.handle.abandon().unwrap_err().status(),
         )
     })
     .unwrap();
     assert_eq!(size, (32, 16));
     // Native keeps the frame and its session busy while the view is open.
-    assert_eq!(frame_release, ErrorKind::Busy);
-    assert_eq!(session_abandon, ErrorKind::Busy);
+    assert_eq!(frame_release, Status::Busy);
+    assert_eq!(session_abandon, Status::Busy);
 
     // Once the view's scope ends, both close.
     frame.release(&no_sync).unwrap();
@@ -137,7 +137,7 @@ fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
             RenderSessionState::Attached
         );
         let error = session.service_driver_work().unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::WrongThread);
+        assert_eq!(error.status(), Status::WrongThread);
         drop(session);
         finish.send(()).unwrap();
         graphics_thread.join().unwrap();
