@@ -361,45 +361,6 @@ static void accepted_adds_release_their_callback_state(void) {
   }
 }
 
-static void queue_sources_reject_a_cancel_callback_without_fetch(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  custom_probe probe;
-  init_probe(&probe);
-
-  mln_custom_geometry_source_options geometry =
-    mln_custom_geometry_source_options_default();
-  geometry.queue = queue.handle;
-  geometry.cancel_tile = probe_cancel_tile;
-  geometry.user_data = &probe;
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "a queue source must not carry cancel_tile",
-    mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL("cancel-only-geometry"), &geometry,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-
-  mln_custom_mvt_vector_source_options mvt =
-    mln_custom_mvt_vector_source_options_default();
-  mvt.queue = queue.handle;
-  mvt.cancel_tile = probe_cancel_tile;
-  mvt.user_data = &probe;
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "a queue source must not carry cancel_tile",
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("cancel-only-mvt"), &mvt, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
-    )
-  );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
-}
-
 typedef struct probe_target {
   const custom_probe* probe;
   size_t root_fetches;
@@ -764,7 +725,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_style_replacement_releases_a_dropped_source_unsubscribed);
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
-  RUN_TEST(queue_sources_reject_a_cancel_callback_without_fetch);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);

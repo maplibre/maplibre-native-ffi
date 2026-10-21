@@ -221,6 +221,19 @@ static void a_custom_source_delivers_its_fetches_and_cancels_then_retires(
   MLN_TEST_INVALID(mln_map_add_custom_geometry_source(
     map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
   ));
+  options.fetch_tile = NULL;
+  options.cancel_tile = unused_tile;
+  MLN_TEST_INVALID(mln_map_add_custom_geometry_source(
+    map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
+  ));
+
+  mln_custom_mvt_vector_source_options mvt =
+    mln_custom_mvt_vector_source_options_default();
+  mvt.queue = queue.handle;
+  mvt.cancel_tile = unused_tile;
+  MLN_TEST_INVALID(mln_map_add_custom_mvt_vector_source(
+    map, MLN_BUFFER_LITERAL("refused"), &mvt, NULL, NULL
+  ));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

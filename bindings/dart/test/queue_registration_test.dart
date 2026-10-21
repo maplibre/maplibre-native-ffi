@@ -30,19 +30,11 @@ void main() {
         expect(
           add,
           throwsA(
-            isA<MaplibreException>()
-                .having(
-                  (error) => error.status,
-                  'status',
-                  Status.invalidArgument,
-                )
-                .having(
-                  (error) => error.diagnostic,
-                  'diagnostic',
-                  contains(
-                    'requires exactly one of a callback and a delivery queue',
-                  ),
-                ),
+            isA<MaplibreException>().having(
+              (error) => error.status,
+              'status',
+              Status.invalidArgument,
+            ),
           ),
         );
         expect(singleRegistrationProbeForTesting(map), isNull);

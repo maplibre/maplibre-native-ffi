@@ -126,14 +126,13 @@ _prepareCameraTransitionHandler(
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      if (value.callback != null)
-        raw.MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: (batch, index, delivery) =>
-            _deliverCameraTransitionEndCallback(
-              value.callback!,
-              batch,
-              index,
-              delivery,
-            ),
+      raw.MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: (batch, index, delivery) =>
+          _deliverCameraTransitionEndCallback(
+            value.callback!,
+            batch,
+            index,
+            delivery,
+          ),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -570,14 +569,13 @@ _prepareCustomGeometrySourceOptions(
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      if (value.fetchTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-            (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-              value.fetchTile!,
-              batch,
-              index,
-              delivery,
-            ),
+      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+            value.fetchTile!,
+            batch,
+            index,
+            delivery,
+          ),
       if (value.cancelTile != null)
         raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
             (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
@@ -631,14 +629,13 @@ _prepareCustomMvtVectorSourceOptions(
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      if (value.fetchTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-            (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-              value.fetchTile!,
-              batch,
-              index,
-              delivery,
-            ),
+      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+            value.fetchTile!,
+            batch,
+            index,
+            delivery,
+          ),
       if (value.cancelTile != null)
         raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
             (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
@@ -2710,14 +2707,8 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      if (value.callback != null)
-        raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
-            _deliverRuntimeEventCallback(
-              value.callback!,
-              batch,
-              index,
-              delivery,
-            ),
+      raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
+          _deliverRuntimeEventCallback(value.callback!, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);

@@ -698,13 +698,17 @@ class Values:
             value, skip=names
         )
         handlers = []
-        for field in fields:
+        for index, field in enumerate(fields):
             callback = self.bound.callbacks[field.value.native]
             name = identifier(field.name)
             invoke = f"_deliver{public_name(callback.native)}(value.{name}{'!' if field.value.nullable else ''}, batch, index, delivery)"
             invoke = f"=> {invoke}"
             handlers.append(
-                ("if (value." + name + " != null) " if field.value.nullable else "")
+                (
+                    "if (value." + name + " != null) "
+                    if field.value.nullable and index > 0
+                    else ""
+                )
                 + f"raw.{callback.delivery.constant}: (batch, index, delivery) {invoke},"
             )
         disabled = (
