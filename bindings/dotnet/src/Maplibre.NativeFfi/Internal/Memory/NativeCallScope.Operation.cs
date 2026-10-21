@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Loader;
 using Maplibre.NativeFfi.Internal.Pointer;
 
 namespace Maplibre.NativeFfi.Internal.Memory;
@@ -15,9 +16,10 @@ internal sealed unsafe partial class NativeCallScope
     private readonly INativeOwner? owner;
     private List<object>? arguments;
 
-    internal NativeCallScope(INativeOwner? owner, string operation)
+    internal NativeCallScope(INativeOwner? owner)
     {
-        NativeCall.Enter(owner, operation).Dispose();
+        if (owner is null)
+            NativeLibraryLoader.EnsureLoaded();
         this.owner = owner;
     }
 

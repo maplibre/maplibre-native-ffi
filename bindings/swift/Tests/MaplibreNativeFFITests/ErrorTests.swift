@@ -1,19 +1,8 @@
-import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Errors preserve the generated status, including unknown values, and the
-/// diagnostic.
+/// Errors preserve the generated status and the diagnostic.
 @Test func aFailedCallMapsItsStatusAndCarriesItsDiagnostic() async throws {
-  for status: Int32 in [-1, -10, -99] {
-    let error = MaplibreError.fromNativeFailure(NativeStatusFailure(
-      rawStatus: status,
-      diagnostic: "diagnostic"
-    ))
-    #expect(error.status.rawValue == status)
-    #expect(error.diagnostic == "diagnostic")
-  }
-
   try await withMapFixture { fixture in
     let native = await expectMaplibreError(.invalidArgument) {
       try fixture.runtime

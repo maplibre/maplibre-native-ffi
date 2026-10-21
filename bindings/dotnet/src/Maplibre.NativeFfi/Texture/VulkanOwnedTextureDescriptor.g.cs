@@ -31,7 +31,7 @@ public readonly partial record struct VulkanOwnedTextureDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_vulkan_owned_texture_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyVulkanOwnedTextureDescriptor(
                 NativeMethods.mln_vulkan_owned_texture_descriptor_default()
             );

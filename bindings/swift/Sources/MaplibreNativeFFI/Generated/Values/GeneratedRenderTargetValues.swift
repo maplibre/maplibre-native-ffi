@@ -253,9 +253,8 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
       .rawValue; raw.data.egl = item.nativeValue()
     case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
       .rawValue; raw.data.webgl = try item.nativeValue(arena: arena)
-    case .unknown: throw NativeStringError(
-        "unknown union variant cannot be submitted"
-      )
+    case .unknown: throw MaplibreError
+      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
   }

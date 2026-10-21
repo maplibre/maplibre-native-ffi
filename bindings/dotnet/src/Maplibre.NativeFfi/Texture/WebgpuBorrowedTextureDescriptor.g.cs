@@ -76,10 +76,7 @@ public readonly record struct WebgpuBorrowedTextureDescriptor
     {
         get
         {
-            using var call = NativeCall.Enter(
-                null,
-                "mln_webgpu_borrowed_texture_descriptor_default"
-            );
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyWebgpuBorrowedTextureDescriptor(
                 NativeMethods.mln_webgpu_borrowed_texture_descriptor_default()
             );

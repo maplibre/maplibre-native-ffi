@@ -18,7 +18,7 @@ public sealed record CameraFitOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_camera_fit_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyCameraFitOptions(
                 NativeMethods.mln_camera_fit_options_default()
             );

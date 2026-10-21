@@ -101,10 +101,11 @@ private func invokeLogHandlerCallback(
     LogEvent(rawValue: event),
     code,
     NativeString.copyCString(message)
-  ) ?? 0 } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_log_callback",
-    error: error
-  )); return 0 }
+  ) ?? 0 } catch {
+    reportToStandardError(
+      "mln_log_callback failed and native received its fallback: \(error)\n"
+    ); return 0
+  }
 }
 
 /// Log severity values emitted by MapLibre Native.

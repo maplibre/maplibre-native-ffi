@@ -11,7 +11,7 @@ public extension RenderSessionHandle {
   func setMetalSurfaceTarget(
     descriptor bindingArg0: MetalSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_render_session_set_metal_surface_target") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       mln_render_session_set_metal_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -28,7 +28,7 @@ public extension RenderSessionHandle {
   func setOpenglSurfaceTarget(
     descriptor bindingArg0: OpenglSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_render_session_set_opengl_surface_target") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_opengl_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -45,7 +45,7 @@ public extension RenderSessionHandle {
   func setVulkanSurfaceTarget(
     descriptor bindingArg0: VulkanSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_render_session_set_vulkan_surface_target") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       mln_render_session_set_vulkan_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -62,7 +62,7 @@ public extension RenderSessionHandle {
   func setWebgpuSurfaceTarget(
     descriptor bindingArg0: WebgpuSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_render_session_set_webgpu_surface_target") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       mln_render_session_set_webgpu_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),

@@ -27,7 +27,7 @@ public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Object)
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_gpu_sync_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyGpuSync(NativeMethods.mln_gpu_sync_default());
         }
     }

@@ -9,7 +9,7 @@ public extension Maplibre {
   /// See `mln_metal_surface_descriptor_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   static func metalSurfaceDescriptorDefault() throws -> MetalSurfaceDescriptor {
-    try nativeDirect("mln_metal_surface_descriptor_default") { _ in
+    try nativeDirect { _ in
       MetalSurfaceDescriptor(raw: mln_metal_surface_descriptor_default())
     }
   }
@@ -21,7 +21,7 @@ public extension Maplibre {
   static func openglSurfaceDescriptorDefault() throws
     -> OpenglSurfaceDescriptor
   {
-    try nativeDirect("mln_opengl_surface_descriptor_default") { _ in
+    try nativeDirect { _ in
       try OpenglSurfaceDescriptor(raw: mln_opengl_surface_descriptor_default())
     }
   }
@@ -33,7 +33,7 @@ public extension Maplibre {
   static func vulkanSurfaceDescriptorDefault() throws
     -> VulkanSurfaceDescriptor
   {
-    try nativeDirect("mln_vulkan_surface_descriptor_default") { _ in
+    try nativeDirect { _ in
       VulkanSurfaceDescriptor(raw: mln_vulkan_surface_descriptor_default())
     }
   }
@@ -45,7 +45,7 @@ public extension Maplibre {
   static func webgpuSurfaceDescriptorDefault() throws
     -> WebgpuSurfaceDescriptor
   {
-    try nativeDirect("mln_webgpu_surface_descriptor_default") { _ in
+    try nativeDirect { _ in
       WebgpuSurfaceDescriptor(raw: mln_webgpu_surface_descriptor_default())
     }
   }

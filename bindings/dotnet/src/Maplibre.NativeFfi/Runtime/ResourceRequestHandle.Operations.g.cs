@@ -40,7 +40,7 @@ public sealed unsafe partial class ResourceRequestHandle
     internal MlnResourceRequest Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -56,7 +56,7 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void Complete(ResourceResponse response)
     {
-        using var scope = new NativeCallScope(this, "mln_resource_request_complete");
+        using var scope = new NativeCallScope(this);
         var nativeResponse = NativeResourceResponse(response, scope);
         Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse, Diagnostic));
         scope.Accept();
@@ -72,11 +72,9 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public bool IsCancelled()
     {
-        using var read = state.Read(this, "mln_resource_request_is_cancelled");
+        using var call = Enter(this);
         bool outCancelled = default;
-        Check(
-            NativeMethods.mln_resource_request_is_cancelled(read.Handle, &outCancelled, Diagnostic)
-        );
+        Check(NativeMethods.mln_resource_request_is_cancelled(Handle, &outCancelled, Diagnostic));
         return outCancelled;
     }
 
@@ -89,7 +87,7 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void PassThrough()
     {
-        using var call = Enter(this, "mln_resource_request_pass_through");
+        using var call = Enter(this);
         Check(NativeMethods.mln_resource_request_pass_through(Handle, Diagnostic));
     }
 
@@ -115,13 +113,12 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public bool SetCancelCallback(ResourceRequestCancelHandler handler)
     {
-        using var read = state.Read(this, "mln_resource_request_set_cancel_callback");
-        using var scope = new NativeCallScope();
+        using var scope = new NativeCallScope(this);
         var nativeHandler = NativeResourceRequestCancelHandler(handler, scope);
         bool outCancelled = default;
         Check(
             NativeMethods.mln_resource_request_set_cancel_callback(
-                read.Handle,
+                Handle,
                 &nativeHandler,
                 &outCancelled,
                 Diagnostic

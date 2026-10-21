@@ -9,12 +9,10 @@ public extension AcquiredFrameHandle {
   /// See `mln_acquired_frame_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func dispose() throws {
-    try nativeClose("mln_acquired_frame_dispose") { raw, diagnostic in
-      mln_acquired_frame_dispose(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeClose { raw, diagnostic in mln_acquired_frame_dispose(
+      raw,
+      diagnostic
+    ) }
   }
 
   /// Copies the producer synchronization for an acquired texture frame.
@@ -27,7 +25,6 @@ public extension AcquiredFrameHandle {
     var raw = mln_gpu_sync_default()
     raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
     return try nativeView(
-      "mln_acquired_frame_get_producer_sync",
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
@@ -50,7 +47,7 @@ public extension AcquiredFrameHandle {
   func getResult() throws -> RenderFrameResult {
     var value0 = mln_render_frame_result()
     value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-    return try nativeInvoke("mln_acquired_frame_get_result") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_acquired_frame_get_result(
         raw,
         &value0,
@@ -66,17 +63,15 @@ public extension AcquiredFrameHandle {
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func release(consumerCompletion: GpuSync) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try handle.closeOnce { live in
-        var raw = live.raw
-        try checkStatus { diagnostic in mln_acquired_frame_release(
-          raw,
-          arena.store(consumerCompletion.nativeValue()),
-          diagnostic
-        ) }
-      }
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    try handle.closeOnce { live in
+      var raw = live.raw
+      try checkStatus { diagnostic in mln_acquired_frame_release(
+        raw,
+        arena.store(consumerCompletion.nativeValue()),
+        diagnostic
+      ) }
     }
   }
 }

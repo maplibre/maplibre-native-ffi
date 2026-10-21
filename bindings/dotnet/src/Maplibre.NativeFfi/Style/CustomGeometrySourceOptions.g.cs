@@ -31,7 +31,7 @@ public sealed record CustomGeometrySourceOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_custom_geometry_source_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyCustomGeometrySourceOptions(
                 NativeMethods.mln_custom_geometry_source_options_default()
             );

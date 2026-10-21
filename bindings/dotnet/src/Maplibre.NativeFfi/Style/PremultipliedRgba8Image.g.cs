@@ -45,7 +45,7 @@ public readonly record struct PremultipliedRgba8Image
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_premultiplied_rgba8_image_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyPremultipliedRgba8Image(
                 NativeMethods.mln_premultiplied_rgba8_image_default()
             );

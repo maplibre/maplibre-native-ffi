@@ -17,9 +17,9 @@ struct NativeAcquiredFrameHandle: NativeHandle {
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeAcquiredFrameHandle>
+  let handle: NativeHandleState<NativeAcquiredFrameHandle>
   init(adopting raw: mln_acquired_frame, parent: RenderSessionHandle) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "AcquiredFrameHandle",
       handle: NativeAcquiredFrameHandle(raw: raw),
       parent: parent
@@ -27,7 +27,7 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -46,16 +46,16 @@ struct NativeGeojsonSourceDataHandle: NativeHandle {
 public final class GeojsonSourceDataHandle: @unchecked Sendable,
   NativeReceiver
 {
-  let handle: NativeHandleBox<NativeGeojsonSourceDataHandle>
+  let handle: NativeHandleState<NativeGeojsonSourceDataHandle>
   init(adopting raw: mln_geojson_source_data) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "GeojsonSourceDataHandle",
       handle: NativeGeojsonSourceDataHandle(raw: raw)
     )
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -73,9 +73,9 @@ struct NativeMapHandle: NativeHandle {
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class MapHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeMapHandle>
+  let handle: NativeHandleState<NativeMapHandle>
   init(adopting raw: mln_map, parent: RuntimeHandle) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "MapHandle",
       handle: NativeMapHandle(raw: raw),
       parent: parent
@@ -83,7 +83,7 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver {
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -101,16 +101,16 @@ struct NativeMapProjectionHandle: NativeHandle {
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeMapProjectionHandle>
+  let handle: NativeHandleState<NativeMapProjectionHandle>
   init(adopting raw: mln_map_projection) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "MapProjectionHandle",
       handle: NativeMapProjectionHandle(raw: raw)
     )
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -127,9 +127,9 @@ struct NativeRenderFrameBatchHandle: NativeHandle {
 /// See `mln_render_frame_batch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeRenderFrameBatchHandle>
+  let handle: NativeHandleState<NativeRenderFrameBatchHandle>
   init(adopting raw: mln_render_frame_batch) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "RenderFrameBatchHandle",
       handle: NativeRenderFrameBatchHandle(raw: raw),
       protectsCopies: true
@@ -137,7 +137,7 @@ public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -155,9 +155,9 @@ struct NativeRenderSessionHandle: NativeHandle {
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeRenderSessionHandle>
+  let handle: NativeHandleState<NativeRenderSessionHandle>
   init(adopting raw: mln_render_session, parent: MapHandle) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "RenderSessionHandle",
       handle: NativeRenderSessionHandle(raw: raw),
       parent: parent
@@ -165,7 +165,7 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -182,16 +182,16 @@ struct NativeResourceRequestHandle: NativeHandle {
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeResourceRequestHandle>
+  let handle: NativeHandleState<NativeResourceRequestHandle>
   init(adopting raw: mln_resource_request) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "ResourceRequestHandle",
       handle: NativeResourceRequestHandle(raw: raw)
     )
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -210,16 +210,16 @@ struct NativeResourceTransformRequestHandle: NativeHandle {
 public final class ResourceTransformRequestHandle: @unchecked Sendable,
   NativeReceiver
 {
-  let handle: NativeHandleBox<NativeResourceTransformRequestHandle>
+  let handle: NativeHandleState<NativeResourceTransformRequestHandle>
   init(adopting raw: mln_resource_transform_request) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "ResourceTransformRequestHandle",
       handle: NativeResourceTransformRequestHandle(raw: raw)
     )
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 
@@ -237,16 +237,16 @@ struct NativeRuntimeHandle: NativeHandle {
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeRuntimeHandle>
+  let handle: NativeHandleState<NativeRuntimeHandle>
   init(adopting raw: mln_runtime) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "RuntimeHandle",
       handle: NativeRuntimeHandle(raw: raw)
     )
   }
 
   public var id: UInt64 {
-    handle.issued.raw
+    handle.value.raw
   }
 }
 

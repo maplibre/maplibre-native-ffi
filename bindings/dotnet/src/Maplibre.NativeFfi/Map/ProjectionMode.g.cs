@@ -29,7 +29,7 @@ public sealed record ProjectionMode
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_projection_mode_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyProjectionMode(NativeMethods.mln_projection_mode_default());
         }
     }

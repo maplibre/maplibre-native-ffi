@@ -11,13 +11,11 @@ public extension RenderFrameBatchHandle {
   func get() throws -> RenderFrameBatchView {
     var value0 = mln_render_frame_batch_view()
     value0.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
-    return try nativeInvoke("mln_render_frame_batch_get") { raw, _, diagnostic in
-      mln_render_frame_batch_get(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try RenderFrameBatchView(raw: value0) }
+    return try nativeInvoke { raw, _, diagnostic in mln_render_frame_batch_get(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { try RenderFrameBatchView(raw: value0) }
   }
 
   /// Releases a frame-result batch.
@@ -25,8 +23,6 @@ public extension RenderFrameBatchHandle {
   /// See `mln_render_frame_batch_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func close() throws {
-    try nativeClose("mln_render_frame_batch_release") { raw in
-      mln_render_frame_batch_release(raw)
-    }
+    try nativeClose { raw in mln_render_frame_batch_release(raw) }
   }
 }

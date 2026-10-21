@@ -40,7 +40,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     internal MlnMapProjection Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -56,9 +56,9 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public CameraOptions GetCamera()
     {
-        using var read = state.Read(this, "mln_map_projection_get_camera");
+        using var call = Enter(this);
         var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        Check(NativeMethods.mln_map_projection_get_camera(read.Handle, &outCamera, Diagnostic));
+        Check(NativeMethods.mln_map_projection_get_camera(Handle, &outCamera, Diagnostic));
         return CopyCameraOptions(outCamera);
     }
 
@@ -71,11 +71,11 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
-        using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel");
+        using var call = Enter(this);
         var outCoordinate = default(mln_lat_lng);
         Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel(
-                read.Handle,
+                Handle,
                 NativeScreenPoint(point),
                 &outCoordinate,
                 Diagnostic
@@ -93,11 +93,11 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
     {
-        using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel_unwrapped");
+        using var call = Enter(this);
         var outCoordinate = default(mln_lat_lng);
         Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
-                read.Handle,
+                Handle,
                 NativeScreenPoint(point),
                 &outCoordinate,
                 Diagnostic
@@ -116,11 +116,11 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public double MetersPerPixelAtLatitude(double latitude)
     {
-        using var read = state.Read(this, "mln_map_projection_meters_per_pixel_at_latitude");
+        using var call = Enter(this);
         double outMetersPerPixel = default;
         Check(
             NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(
-                read.Handle,
+                Handle,
                 latitude,
                 &outMetersPerPixel,
                 Diagnostic
@@ -138,11 +138,11 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
-        using var read = state.Read(this, "mln_map_projection_pixel_for_lat_lng");
+        using var call = Enter(this);
         var outPoint = default(mln_screen_point);
         Check(
             NativeMethods.mln_map_projection_pixel_for_lat_lng(
-                read.Handle,
+                Handle,
                 NativeLatLng(coordinate),
                 &outPoint,
                 Diagnostic
@@ -172,7 +172,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </remarks>
     public void SetCamera(CameraOptions camera)
     {
-        using var call = Enter(this, "mln_map_projection_set_camera");
+        using var call = Enter(this);
         var nativeCamera = NativeCameraOptions(camera);
         Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, Diagnostic));
     }

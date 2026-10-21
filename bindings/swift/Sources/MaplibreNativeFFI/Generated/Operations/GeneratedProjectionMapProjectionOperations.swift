@@ -10,7 +10,7 @@ public extension MapProjectionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func getCamera() throws -> CameraOptions {
     var value0: mln_camera_options = mln_camera_options_default()
-    return try nativeInvoke("mln_map_projection_get_camera") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_get_camera(
         raw,
         &value0,
@@ -25,7 +25,7 @@ public extension MapProjectionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func latLngForPixel(point bindingArg0: ScreenPoint) throws -> LatLng {
     var value0 = mln_lat_lng()
-    return try nativeInvoke("mln_map_projection_lat_lng_for_pixel") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_lat_lng_for_pixel(
         raw,
         bindingArg0.nativeValue(),
@@ -43,7 +43,7 @@ public extension MapProjectionHandle {
     -> LatLng
   {
     var value0 = mln_lat_lng()
-    return try nativeInvoke("mln_map_projection_lat_lng_for_pixel_unwrapped") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_lat_lng_for_pixel_unwrapped(
         raw,
         bindingArg0.nativeValue(),
@@ -61,7 +61,7 @@ public extension MapProjectionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func metersPerPixelAtLatitude(latitude bindingArg0: Double) throws -> Double {
     var value0: Double = 0
-    return try nativeInvoke("mln_map_projection_meters_per_pixel_at_latitude") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_meters_per_pixel_at_latitude(
         raw,
         bindingArg0,
@@ -77,7 +77,7 @@ public extension MapProjectionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func pixelForLatLng(coordinate bindingArg0: LatLng) throws -> ScreenPoint {
     var value0 = mln_screen_point()
-    return try nativeInvoke("mln_map_projection_pixel_for_lat_lng") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_pixel_for_lat_lng(
         raw,
         bindingArg0.nativeValue(),
@@ -92,12 +92,10 @@ public extension MapProjectionHandle {
   /// See `mln_map_projection_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func close() throws {
-    try nativeClose("mln_map_projection_release") { raw, diagnostic in
-      mln_map_projection_release(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeClose { raw, diagnostic in mln_map_projection_release(
+      raw,
+      diagnostic
+    ) }
   }
 
   /// Applies a camera update to a standalone projection.
@@ -105,12 +103,10 @@ public extension MapProjectionHandle {
   /// See `mln_map_projection_set_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func setCamera(camera bindingArg0: CameraOptions) throws {
-    try nativeInvoke("mln_map_projection_set_camera") { raw, arena, diagnostic in
-      mln_map_projection_set_camera(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        diagnostic
-      )
-    }
+    try nativeInvoke { raw, arena, diagnostic in mln_map_projection_set_camera(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      diagnostic
+    ) }
   }
 }

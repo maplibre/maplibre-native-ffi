@@ -144,10 +144,10 @@ private struct RecordedHandle: NativeHandle {
 /// An owner the binding creates from a completion, as a generated creation
 /// does.
 private final class RecordedOwner: NativeReceiver, @unchecked Sendable {
-  let handle: NativeHandleBox<RecordedHandle>
+  let handle: NativeHandleState<RecordedHandle>
 
   init(raw: UInt64) throws {
-    handle = try NativeHandleBox(
+    handle = try NativeHandleState(
       typeName: "late_handle",
       handle: RecordedHandle(raw: raw)
     )

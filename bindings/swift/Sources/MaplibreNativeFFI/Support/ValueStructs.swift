@@ -25,9 +25,9 @@ final class NativeInputArena {
     return pointer
   }
 
-  func use<Handle>(_ owner: NativeHandleBox<Handle>) -> UInt64 {
+  func use<Handle>(_ owner: NativeHandleState<Handle>) -> UInt64 {
     owners.append(owner)
-    return owner.issued.raw
+    return owner.value.raw
   }
 
   func submit(_ body: () throws -> mln_status) rethrows -> mln_status {
@@ -50,7 +50,9 @@ final class NativeInputArena {
 
   static func count<Value: BinaryInteger>(_ count: Int) throws -> Value {
     guard let result = Value(exactly: count)
-    else { throw NativeStringError("array exceeds native count range") }
+    else {
+      throw MaplibreError.invalidArgument("array exceeds native count range")
+    }
     return result
   }
 
@@ -69,7 +71,7 @@ final class NativeInputArena {
                     count: Int) throws -> UnsafePointer<Value>?
   {
     guard values.count == count
-    else { throw NativeStringError("incorrect fixed array length") }
+    else { throw MaplibreError.invalidArgument("incorrect fixed array length") }
     return array(values)
   }
 
@@ -86,7 +88,7 @@ final class NativeInputArena {
 
   func cString(_ value: String) throws -> UnsafePointer<CChar> {
     guard !value.utf8.contains(0)
-    else { throw NativeStringError("embedded null in C string") }
+    else { throw MaplibreError.invalidArgument("embedded null in C string") }
     return array(value.utf8CString.map { $0 })!
   }
 
@@ -96,13 +98,16 @@ final class NativeInputArena {
     guard count >= 0,
           count <= Int.max / max(1, MemoryLayout<Value>.stride)
     else {
-      throw NativeStringError(
+      throw MaplibreError.invalidArgument(
         "native array count is outside the addressable range"
       )
     }
     guard count > 0 else { return [] }
     guard let pointer
-    else { throw NativeStringError("null native array with nonzero count") }
+    else {
+      throw MaplibreError
+        .invalidArgument("null native array with nonzero count")
+    }
     return Array(UnsafeBufferPointer(start: pointer, count: count))
   }
 
@@ -119,11 +124,12 @@ final class NativeInputArena {
           let stride = Int(exactly: stride), stride >= MemoryLayout<Value>.size,
           count <= Int.max / max(1, stride)
     else {
-      throw NativeStringError("invalid native record stride or count")
+      throw MaplibreError
+        .invalidArgument("invalid native record stride or count")
     }
     guard count > 0 else { return [] }
     guard let pointer
-    else { throw NativeStringError("null native record array") }
+    else { throw MaplibreError.invalidArgument("null native record array") }
     let bytes = UnsafeRawPointer(pointer)
     return try (0 ..< count).map { index in
       let item = bytes.advanced(by: index * stride)
@@ -146,7 +152,8 @@ final class NativeInputArena {
           length >= 0,
           offset <= size, length <= size - offset, size == 0 || data != nil
     else {
-      throw NativeStringError("native message slice exceeds its arena")
+      throw MaplibreError
+        .invalidArgument("native message slice exceeds its arena")
     }
     return try NativeString.copyUTF8(
       data: data?.advanced(by: offset),

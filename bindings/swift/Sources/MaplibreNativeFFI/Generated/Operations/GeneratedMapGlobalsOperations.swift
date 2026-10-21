@@ -9,9 +9,7 @@ public extension Maplibre {
   /// See `mln_logical_extent_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   static func logicalExtentDefault() throws -> LogicalExtent {
-    try nativeDirect("mln_logical_extent_default") { _ in
-      LogicalExtent(raw: mln_logical_extent_default())
-    }
+    try nativeDirect { _ in LogicalExtent(raw: mln_logical_extent_default()) }
   }
 
   /// Returns map options initialized for this C API version.
@@ -19,8 +17,6 @@ public extension Maplibre {
   /// See `mln_map_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   static func mapOptionsDefault() throws -> MapOptions {
-    try nativeDirect("mln_map_options_default") { _ in
-      MapOptions(raw: mln_map_options_default())
-    }
+    try nativeDirect { _ in MapOptions(raw: mln_map_options_default()) }
   }
 }

@@ -235,10 +235,11 @@ private func invokeHttpHeaderTransformCallback(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
     responseOutResponse
-  ); return MLN_STATUS_OK } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_http_header_transform_callback",
-    error: error
-  )); return MLN_STATUS_NATIVE_ERROR }
+  ); return MLN_STATUS_OK } catch {
+    reportToStandardError(
+      "mln_http_header_transform_callback failed and native received its fallback: \(error)\n"
+    ); return MLN_STATUS_NATIVE_ERROR
+  }
 }
 
 public final class HttpHeaderTransformResponse: @unchecked Sendable {
@@ -622,10 +623,12 @@ private func invokeResourceProviderCallback(
   {
     decisionOwner.handle.handOff()
   }; return decision.rawValue
-  } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_resource_provider_callback",
-    error: error
-  )); decisionOwner.handle.handOff(); return UInt32.max }
+  } catch {
+    reportToStandardError(
+      "mln_resource_provider_callback failed and native received its fallback: \(error)\n"
+    ); decisionOwner
+      .handle.handOff(); return UInt32.max
+  }
 }
 
 public struct ResourceProviderDecision: RawRepresentable,
@@ -1067,10 +1070,12 @@ private func invokeResourceTransformCallback(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
     ownedRequest
-  ) } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_resource_transform_callback",
-    error: error
-  )); try? ownedRequest.close() }
+  ) } catch {
+    reportToStandardError(
+      "mln_resource_transform_callback failed and native received its fallback: \(error)\n"
+    ); try? ownedRequest
+      .close()
+  }
 }
 
 public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
@@ -1229,10 +1234,9 @@ private func invokeRuntimeEventHandlerCallback(
       .callback?(NativeInputArena.copyArray(events, count: 1)
         .map { try EventBatchView(raw: $0) }[0])
   } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_runtime_event_callback",
-      error: error
-    ))
+    reportToStandardError(
+      "mln_runtime_event_callback failed and native received its fallback: \(error)\n"
+    )
   }
 }
 

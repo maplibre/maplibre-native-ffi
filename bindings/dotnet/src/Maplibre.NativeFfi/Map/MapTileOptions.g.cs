@@ -28,7 +28,7 @@ public sealed record MapTileOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_map_tile_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyMapTileOptions(NativeMethods.mln_map_tile_options_default());
         }
     }

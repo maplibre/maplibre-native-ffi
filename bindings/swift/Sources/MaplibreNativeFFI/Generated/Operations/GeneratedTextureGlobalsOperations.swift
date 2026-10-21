@@ -11,7 +11,7 @@ public extension Maplibre {
   static func metalBorrowedTextureDescriptorDefault() throws
     -> MetalBorrowedTextureDescriptor
   {
-    try nativeDirect("mln_metal_borrowed_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       try MetalBorrowedTextureDescriptor(
         raw: mln_metal_borrowed_texture_descriptor_default()
       )
@@ -25,7 +25,7 @@ public extension Maplibre {
   static func metalOwnedTextureDescriptorDefault() throws
     -> MetalOwnedTextureDescriptor
   {
-    try nativeDirect("mln_metal_owned_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       MetalOwnedTextureDescriptor(
         raw: mln_metal_owned_texture_descriptor_default()
       )
@@ -40,7 +40,7 @@ public extension Maplibre {
   static func openglBorrowedTextureDescriptorDefault() throws
     -> OpenglBorrowedTextureDescriptor
   {
-    try nativeDirect("mln_opengl_borrowed_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       try OpenglBorrowedTextureDescriptor(
         raw: mln_opengl_borrowed_texture_descriptor_default()
       )
@@ -54,7 +54,7 @@ public extension Maplibre {
   static func openglOwnedTextureDescriptorDefault() throws
     -> OpenglOwnedTextureDescriptor
   {
-    try nativeDirect("mln_opengl_owned_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       try OpenglOwnedTextureDescriptor(
         raw: mln_opengl_owned_texture_descriptor_default()
       )
@@ -69,7 +69,7 @@ public extension Maplibre {
   static func vulkanBorrowedTextureDescriptorDefault() throws
     -> VulkanBorrowedTextureDescriptor
   {
-    try nativeDirect("mln_vulkan_borrowed_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       try VulkanBorrowedTextureDescriptor(
         raw: mln_vulkan_borrowed_texture_descriptor_default()
       )
@@ -83,7 +83,7 @@ public extension Maplibre {
   static func vulkanOwnedTextureDescriptorDefault() throws
     -> VulkanOwnedTextureDescriptor
   {
-    try nativeDirect("mln_vulkan_owned_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       VulkanOwnedTextureDescriptor(
         raw: mln_vulkan_owned_texture_descriptor_default()
       )
@@ -98,7 +98,7 @@ public extension Maplibre {
   static func webgpuBorrowedTextureDescriptorDefault() throws
     -> WebgpuBorrowedTextureDescriptor
   {
-    try nativeDirect("mln_webgpu_borrowed_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       try WebgpuBorrowedTextureDescriptor(
         raw: mln_webgpu_borrowed_texture_descriptor_default()
       )
@@ -112,7 +112,7 @@ public extension Maplibre {
   static func webgpuOwnedTextureDescriptorDefault() throws
     -> WebgpuOwnedTextureDescriptor
   {
-    try nativeDirect("mln_webgpu_owned_texture_descriptor_default") { _ in
+    try nativeDirect { _ in
       WebgpuOwnedTextureDescriptor(
         raw: mln_webgpu_owned_texture_descriptor_default()
       )

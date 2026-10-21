@@ -92,10 +92,7 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     {
         get
         {
-            using var call = NativeCall.Enter(
-                null,
-                "mln_vulkan_borrowed_texture_descriptor_default"
-            );
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyVulkanBorrowedTextureDescriptor(
                 NativeMethods.mln_vulkan_borrowed_texture_descriptor_default()
             );

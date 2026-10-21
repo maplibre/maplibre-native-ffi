@@ -12,13 +12,11 @@ public extension RenderSessionHandle {
   func abandon() throws -> RenderAbandonResult {
     var value0 = mln_render_abandon_result()
     value0.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
-    return try nativeInvoke("mln_render_session_abandon") { raw, _, diagnostic in
-      mln_render_session_abandon(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { RenderAbandonResult(raw: value0) }
+    return try nativeInvoke { raw, _, diagnostic in mln_render_session_abandon(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { RenderAbandonResult(raw: value0) }
   }
 
   /// Acquires the oldest rendered frame that is not already acquired. The frame
@@ -28,14 +26,13 @@ public extension RenderSessionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func acquireFrame() throws -> AcquiredFrameHandle? {
     var value0: mln_acquired_frame = 0
-    return try nativeInvoke(
-      "mln_render_session_acquire_frame",
-      absentOn: MLN_STATUS_NOT_READY
-    ) { raw, _, diagnostic in mln_render_session_acquire_frame(
-      raw,
-      &value0,
-      diagnostic
-    ) } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
+    return try nativeInvoke(absentOn: MLN_STATUS_NOT_READY) { raw, _, diagnostic in
+      mln_render_session_acquire_frame(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
   }
 
   /// Ends every frame demand that has not started with
@@ -48,7 +45,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func barrier() async throws {
-    try await nativeUnit("mln_render_session_barrier") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_render_session_barrier(
         raw,
         completion,
@@ -62,7 +59,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_clear_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func clearData() async throws {
-    try await nativeUnit("mln_render_session_clear_data") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_render_session_clear_data(
         raw,
         completion,
@@ -82,7 +79,7 @@ public extension RenderSessionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func createProjection() throws -> MapProjectionHandle {
     var value0: mln_map_projection = 0
-    return try nativeInvoke("mln_render_session_create_projection") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_render_session_create_projection(
         raw,
         &value0,
@@ -96,7 +93,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_detach` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func detach() async throws {
-    try await nativeUnit("mln_render_session_detach") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_render_session_detach(
         raw,
         completion,
@@ -110,12 +107,10 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func dispose() throws {
-    try nativeClose("mln_render_session_dispose") { raw, diagnostic in
-      mln_render_session_dispose(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeClose { raw, diagnostic in mln_render_session_dispose(
+      raw,
+      diagnostic
+    ) }
   }
 
   /// Drains every currently queued terminal frame result into an independently
@@ -125,14 +120,13 @@ public extension RenderSessionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func drainFrameResults() throws -> RenderFrameBatchHandle? {
     var value0: mln_render_frame_batch = 0
-    return try nativeInvoke(
-      "mln_render_session_drain_frame_results",
-      absentOn: MLN_STATUS_NOT_READY
-    ) { raw, _, diagnostic in mln_render_session_drain_frame_results(
-      raw,
-      &value0,
-      diagnostic
-    ) } result: { try RenderFrameBatchHandle(adopting: value0) }
+    return try nativeInvoke(absentOn: MLN_STATUS_NOT_READY) { raw, _, diagnostic in
+      mln_render_session_drain_frame_results(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { try RenderFrameBatchHandle(adopting: value0) }
   }
 
   /// Starts asynchronous renderer diagnostic-log emission.
@@ -140,7 +134,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_dump_debug_logs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func dumpDebugLogs() async throws {
-    try await nativeUnit("mln_render_session_dump_debug_logs") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_render_session_dump_debug_logs(
         raw,
         completion,
@@ -156,7 +150,7 @@ public extension RenderSessionHandle {
   func getCapabilities() throws -> RenderSessionCapabilities {
     var value0 = mln_render_session_capabilities()
     value0.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
-    return try nativeInvoke("mln_render_session_get_capabilities") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_render_session_get_capabilities(
         raw,
         &value0,
@@ -172,7 +166,7 @@ public extension RenderSessionHandle {
   func getSnapshot() throws -> RenderSessionSnapshot {
     var value0 = mln_render_session_snapshot()
     value0.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
-    return try nativeInvoke("mln_render_session_get_snapshot") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_render_session_get_snapshot(
         raw,
         &value0,
@@ -186,7 +180,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_reduce_memory_use` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func reduceMemoryUse() async throws {
-    try await nativeUnit("mln_render_session_reduce_memory_use") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_render_session_reduce_memory_use(
         raw,
         completion,
@@ -205,12 +199,10 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func close() throws {
-    try nativeClose("mln_render_session_release") { raw, diagnostic in
-      mln_render_session_release(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeClose { raw, diagnostic in mln_render_session_release(
+      raw,
+      diagnostic
+    ) }
   }
 
   /// Requests a frame without waiting. Every accepted demand produces one
@@ -220,7 +212,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_request_frame` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func requestFrame(demand bindingArg0: FrameDemand) throws {
-    try nativeInvoke("mln_render_session_request_frame") { raw, arena, diagnostic in
+    try nativeInvoke { raw, arena, diagnostic in
       mln_render_session_request_frame(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -245,7 +237,7 @@ public extension RenderSessionHandle {
   func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_render_session_resize") { raw, _, completion, diagnostic in
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_render_session_resize(
         raw,
         bindingArg0.nativeValue(),
@@ -265,7 +257,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func serviceDriverWork() throws {
-    try nativeInvoke("mln_render_session_service_driver_work") { raw, _, diagnostic in
+    try nativeInvoke { raw, _, diagnostic in
       mln_render_session_service_driver_work(
         raw,
         diagnostic
@@ -276,14 +268,11 @@ public extension RenderSessionHandle {
 
 public extension RenderSessionHandleDiscarding {
   func resize(extent bindingArg0: LogicalExtent) throws {
-    try owner
-      .nativeInvoke("mln_render_session_resize") { raw, _, diagnostic in
-        mln_render_session_resize(
-          raw,
-          bindingArg0.nativeValue(),
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_render_session_resize(
+      raw,
+      bindingArg0.nativeValue(),
+      nil,
+      diagnostic
+    ) }
   }
 }

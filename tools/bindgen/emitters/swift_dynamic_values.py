@@ -314,12 +314,12 @@ def declaration(values, value):
                 for member in union.fields
             )
             encode_lines.append(
-                f'    switch self.{local} {{\n{cases}\n    case .unknown: throw NativeStringError("unknown union variant cannot be submitted")\n    }}'
+                f'    switch self.{local} {{\n{cases}\n    case .unknown: throw MaplibreError.invalidArgument("unknown union variant cannot be submitted")\n    }}'
             )
             continue
         if f.value.kind == "array" and f.value.ctype.kind == "array":
             encode_lines.append(
-                f'    guard self.{local}.count == {f.value.length} else {{ throw NativeStringError("incorrect fixed array length") }}'
+                f'    guard self.{local}.count == {f.value.length} else {{ throw MaplibreError.invalidArgument("incorrect fixed array length") }}'
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")

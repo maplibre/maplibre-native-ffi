@@ -26,7 +26,7 @@ public sealed record CustomMvtVectorSourceOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_custom_mvt_vector_source_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyCustomMvtVectorSourceOptions(
                 NativeMethods.mln_custom_mvt_vector_source_options_default()
             );

@@ -13,7 +13,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     options bindingArg1: CustomGeometrySourceOptions
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_custom_geometry_source") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_add_custom_geometry_source(
         raw,
         arena.view(bindingArg0),
@@ -33,7 +33,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     options bindingArg1: CustomMvtVectorSourceOptions
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_custom_mvt_vector_source") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_add_custom_mvt_vector_source(
         raw,
         arena.view(bindingArg0),
@@ -53,7 +53,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_geojson_source_data") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_geojson_source_data(
         raw,
         arena.view(bindingArg0),
@@ -74,7 +74,7 @@ public extension MapHandle {
     url bindingArg1: String,
     options bindingArg2: GeojsonSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_geojson_source_url") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_add_geojson_source_url(
         raw,
         arena.view(bindingArg0),
@@ -96,7 +96,7 @@ public extension MapHandle {
     coordinates bindingArg1: [LatLng],
     image bindingArg3: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_image_source_image") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_add_image_source_image(
         raw,
         arena.view(bindingArg0),
@@ -119,7 +119,7 @@ public extension MapHandle {
     coordinates bindingArg1: [LatLng],
     url bindingArg3: String
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_image_source_url") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_add_image_source_url(
         raw,
         arena.view(bindingArg0),
@@ -141,7 +141,7 @@ public extension MapHandle {
     layerJson bindingArg0: Data,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_style_layer_json") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_style_layer_json(
         raw,
         arena.view(bindingArg0),
@@ -161,7 +161,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     sourceJson bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_add_style_source_json") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_style_source_json(
         raw,
         arena.view(bindingArg0),
@@ -178,10 +178,9 @@ public extension MapHandle {
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getGlobalState() async throws -> Data {
-    try await nativeStart(
-      "mln_map_get_global_state",
-      convert: { result in try NativeCompletion.data(result) }
-    ) { raw, _, completion, diagnostic in mln_map_get_global_state(
+    try await nativeStart(convert: { result in
+      try NativeCompletion.data(result)
+    }) { raw, _, completion, diagnostic in mln_map_get_global_state(
       raw,
       completion,
       diagnostic
@@ -195,13 +194,11 @@ public extension MapHandle {
   func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
     -> [LatLng]
   {
-    try await nativeStart(
-      "mln_map_get_image_source_coordinates",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_lat_lng.self
-      ).map { LatLng(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in
+    try await nativeStart(convert: { result in try NativeCompletion.values(
+      result,
+      as: mln_lat_lng.self
+    ).map { LatLng(raw: $0) }
+    }) { raw, arena, completion, diagnostic in
       mln_map_get_image_source_coordinates(
         raw,
         arena.view(bindingArg0),
@@ -218,20 +215,17 @@ public extension MapHandle {
   func getStyleImage(imageId bindingArg0: String) async throws
     -> StyleImageInfo?
   {
-    try await nativeStart(
-      "mln_map_get_style_image",
-      convert: { result in
-        if result.pointee
-          .value_count ==
-          0
-        {
-          return nil
-        }; return try StyleImageInfo(raw: NativeCompletion.value(
-          result,
-          as: mln_style_image_info.self
-        ))
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_image(
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count ==
+        0
+      {
+        return nil
+      }; return try StyleImageInfo(raw: NativeCompletion.value(
+        result,
+        as: mln_style_image_info.self
+      ))
+    }) { raw, arena, completion, diagnostic in mln_map_get_style_image(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -246,20 +240,17 @@ public extension MapHandle {
   func getStyleLayer(layerId bindingArg0: String) async throws
     -> StyleLayerInfo?
   {
-    try await nativeStart(
-      "mln_map_get_style_layer",
-      convert: { result in
-        if result.pointee
-          .value_count ==
-          0
-        {
-          return nil
-        }; return try StyleLayerInfo(raw: NativeCompletion.value(
-          result,
-          as: mln_style_layer_info.self
-        ))
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer(
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count ==
+        0
+      {
+        return nil
+      }; return try StyleLayerInfo(raw: NativeCompletion.value(
+        result,
+        as: mln_style_layer_info.self
+      ))
+    }) { raw, arena, completion, diagnostic in mln_map_get_style_layer(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -272,17 +263,14 @@ public extension MapHandle {
   /// See `mln_map_get_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleLayerJson(layerId bindingArg0: String) async throws -> Data? {
-    try await nativeStart(
-      "mln_map_get_style_layer_json",
-      convert: { result in
-        if result.pointee
-          .value_count == 0
-        {
-          return nil
-        }; return try NativeCompletion
-          .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_json(
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count == 0
+      {
+        return nil
+      }; return try NativeCompletion
+        .data(result)
+    }) { raw, arena, completion, diagnostic in mln_map_get_style_layer_json(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -298,23 +286,22 @@ public extension MapHandle {
     layerId bindingArg0: String,
     propertyName bindingArg1: String
   ) async throws -> Data? {
-    try await nativeStart(
-      "mln_map_get_style_layer_property",
-      convert: { result in
-        if result.pointee
-          .value_count == 0
-        {
-          return nil
-        }; return try NativeCompletion
-          .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_property(
-      raw,
-      arena.view(bindingArg0),
-      arena.view(bindingArg1),
-      completion,
-      diagnostic
-    ) }
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count == 0
+      {
+        return nil
+      }; return try NativeCompletion
+        .data(result)
+    }) { raw, arena, completion, diagnostic in
+      mln_map_get_style_layer_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
+      )
+    }
   }
 
   /// Serializes one style light property as a style-spec JSON value.
@@ -324,22 +311,21 @@ public extension MapHandle {
   func getStyleLightProperty(propertyName bindingArg0: String) async throws
     -> Data?
   {
-    try await nativeStart(
-      "mln_map_get_style_light_property",
-      convert: { result in
-        if result.pointee
-          .value_count == 0
-        {
-          return nil
-        }; return try NativeCompletion
-          .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_light_property(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count == 0
+      {
+        return nil
+      }; return try NativeCompletion
+        .data(result)
+    }) { raw, arena, completion, diagnostic in
+      mln_map_get_style_light_property(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
+      )
+    }
   }
 
   /// Copies the complete metadata of one style source.
@@ -349,20 +335,17 @@ public extension MapHandle {
   func getStyleSource(sourceId bindingArg0: String) async throws
     -> StyleSourceInfo?
   {
-    try await nativeStart(
-      "mln_map_get_style_source",
-      convert: { result in
-        if result.pointee
-          .value_count ==
-          0
-        {
-          return nil
-        }; return try StyleSourceInfo(raw: NativeCompletion.value(
-          result,
-          as: mln_style_source_info.self
-        ))
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_source(
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count ==
+        0
+      {
+        return nil
+      }; return try StyleSourceInfo(raw: NativeCompletion.value(
+        result,
+        as: mln_style_source_info.self
+      ))
+    }) { raw, arena, completion, diagnostic in mln_map_get_style_source(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -375,14 +358,15 @@ public extension MapHandle {
   /// See `mln_map_get_style_transition_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleTransitionOptions() async throws -> StyleTransitionOptions {
-    try await nativeStart(
-      "mln_map_get_style_transition_options",
-      copying: StyleTransitionOptions.init(raw:)
-    ) { raw, _, completion, diagnostic in mln_map_get_style_transition_options(
-      raw,
-      completion,
-      diagnostic
-    ) }
+    try await nativeStart(copying: StyleTransitionOptions
+      .init(raw:))
+    { raw, _, completion, diagnostic in
+      mln_map_get_style_transition_options(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
   }
 
   /// Invalidates custom geometry source data inside one geographic region.
@@ -394,7 +378,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     bounds bindingArg1: LatLngBounds
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_invalidate_custom_geometry_source_region") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_invalidate_custom_geometry_source_region(
         raw,
         arena.view(bindingArg0),
@@ -414,7 +398,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_invalidate_custom_geometry_source_tile(
         raw,
         arena.view(bindingArg0),
@@ -434,7 +418,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_invalidate_custom_mvt_vector_source_tile(
         raw,
         arena.view(bindingArg0),
@@ -450,13 +434,11 @@ public extension MapHandle {
   /// See `mln_map_list_style_layers` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func listStyleLayers() async throws -> [StyleLayerInfo] {
-    try await nativeStart(
-      "mln_map_list_style_layers",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_style_layer_info.self
-      ).map { try StyleLayerInfo(raw: $0) } }
-    ) { raw, _, completion, diagnostic in mln_map_list_style_layers(
+    try await nativeStart(convert: { result in try NativeCompletion.values(
+      result,
+      as: mln_style_layer_info.self
+    ).map { try StyleLayerInfo(raw: $0) }
+    }) { raw, _, completion, diagnostic in mln_map_list_style_layers(
       raw,
       completion,
       diagnostic
@@ -468,13 +450,11 @@ public extension MapHandle {
   /// See `mln_map_list_style_sources` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func listStyleSources() async throws -> [StyleSourceInfo] {
-    try await nativeStart(
-      "mln_map_list_style_sources",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_style_source_info.self
-      ).map { try StyleSourceInfo(raw: $0) } }
-    ) { raw, _, completion, diagnostic in mln_map_list_style_sources(
+    try await nativeStart(convert: { result in try NativeCompletion.values(
+      result,
+      as: mln_style_source_info.self
+    ).map { try StyleSourceInfo(raw: $0) }
+    }) { raw, _, completion, diagnostic in mln_map_list_style_sources(
       raw,
       completion,
       diagnostic
@@ -490,7 +470,7 @@ public extension MapHandle {
     layerId bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_move_style_layer") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_move_style_layer(
         raw,
         arena.view(bindingArg0),
@@ -509,7 +489,7 @@ public extension MapHandle {
   func removeStyleImage(imageId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_remove_style_image") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_remove_style_image(
         raw,
         arena.view(bindingArg0),
@@ -527,7 +507,7 @@ public extension MapHandle {
   func removeStyleLayer(layerId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_remove_style_layer") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_remove_style_layer(
         raw,
         arena.view(bindingArg0),
@@ -545,7 +525,7 @@ public extension MapHandle {
   func removeStyleSource(sourceId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_remove_style_source") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_remove_style_source(
         raw,
         arena.view(bindingArg0),
@@ -565,7 +545,7 @@ public extension MapHandle {
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_custom_geometry_source_tile_data") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_custom_geometry_source_tile_data(
         raw,
         arena.view(bindingArg0),
@@ -587,7 +567,7 @@ public extension MapHandle {
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_custom_mvt_vector_source_tile_data(
         raw,
         arena.view(bindingArg0),
@@ -609,7 +589,7 @@ public extension MapHandle {
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_custom_mvt_vector_source_tile_error(
         raw,
         arena.view(bindingArg0),
@@ -630,7 +610,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_geojson_source_data") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_geojson_source_data(
         raw,
         arena.view(bindingArg0),
@@ -650,7 +630,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     enabled bindingArg1: Bool
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_geojson_source_synchronous_tiling(
         raw,
         arena.view(bindingArg0),
@@ -670,7 +650,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     url bindingArg1: String
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_geojson_source_url") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_geojson_source_url(
         raw,
         arena.view(bindingArg0),
@@ -690,7 +670,7 @@ public extension MapHandle {
     propertyName bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_global_state_property") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_global_state_property(
         raw,
         arena.view(bindingArg0),
@@ -710,7 +690,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     coordinates bindingArg1: [LatLng]
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_image_source_coordinates") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_set_image_source_coordinates(
         raw,
         arena.view(bindingArg0),
@@ -731,7 +711,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_image_source_image") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_set_image_source_image(
         raw,
         arena.view(bindingArg0),
@@ -751,7 +731,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     url bindingArg1: String
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_image_source_url") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_image_source_url(
         raw,
         arena.view(bindingArg0),
@@ -772,7 +752,7 @@ public extension MapHandle {
     image bindingArg1: PremultipliedRgba8Image,
     options bindingArg2: StyleImageOptions? = nil
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_image") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_set_style_image(
         raw,
         arena.view(bindingArg0),
@@ -794,7 +774,7 @@ public extension MapHandle {
     propertyName bindingArg1: String,
     value bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_layer_property") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_layer_property(
         raw,
         arena.view(bindingArg0),
@@ -814,7 +794,7 @@ public extension MapHandle {
   func setStyleLightJson(lightJson bindingArg0: Data) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_set_style_light_json") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_light_json(
         raw,
         arena.view(bindingArg0),
@@ -833,7 +813,7 @@ public extension MapHandle {
     propertyName bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_light_property") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_light_property(
         raw,
         arena.view(bindingArg0),
@@ -854,7 +834,7 @@ public extension MapHandle {
     sourceId bindingArg0: String,
     isVolatile bindingArg1: Bool
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_source_volatile") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_source_volatile(
         raw,
         arena.view(bindingArg0),
@@ -875,7 +855,7 @@ public extension MapHandle {
   ) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_set_style_transition_options") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_transition_options(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -892,7 +872,7 @@ public extension MapHandleDiscarding {
     options bindingArg1: CustomGeometrySourceOptions
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_custom_geometry_source") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_add_custom_geometry_source(
           raw,
           arena.view(bindingArg0),
@@ -908,7 +888,7 @@ public extension MapHandleDiscarding {
     options bindingArg1: CustomMvtVectorSourceOptions
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_custom_mvt_vector_source") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_add_custom_mvt_vector_source(
           raw,
           arena.view(bindingArg0),
@@ -924,15 +904,13 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_geojson_source_data") { raw, arena, diagnostic in
-        mln_map_add_geojson_source_data(
-          raw,
-          arena.view(bindingArg0),
-          arena.use(bindingArg1.handle),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_add_geojson_source_data(
+        raw,
+        arena.view(bindingArg0),
+        arena.use(bindingArg1.handle),
+        nil,
+        diagnostic
+      ) }
   }
 
   func addGeojsonSourceUrl(
@@ -941,7 +919,7 @@ public extension MapHandleDiscarding {
     options bindingArg2: GeojsonSourceOptions? = nil
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_geojson_source_url") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_add_geojson_source_url(
           raw,
           arena.view(bindingArg0),
@@ -959,7 +937,7 @@ public extension MapHandleDiscarding {
     image bindingArg3: PremultipliedRgba8Image
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_image_source_image") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_add_image_source_image(
           raw,
           arena.view(bindingArg0),
@@ -978,7 +956,7 @@ public extension MapHandleDiscarding {
     url bindingArg3: String
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_image_source_url") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_add_image_source_url(
           raw,
           arena.view(bindingArg0),
@@ -996,15 +974,13 @@ public extension MapHandleDiscarding {
     beforeLayerId bindingArg1: String? = nil
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_style_layer_json") { raw, arena, diagnostic in
-        mln_map_add_style_layer_json(
-          raw,
-          arena.view(bindingArg0),
-          bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_add_style_layer_json(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        nil,
+        diagnostic
+      ) }
   }
 
   func addStyleSourceJson(
@@ -1012,15 +988,13 @@ public extension MapHandleDiscarding {
     sourceJson bindingArg1: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_add_style_source_json") { raw, arena, diagnostic in
-        mln_map_add_style_source_json(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_add_style_source_json(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        nil,
+        diagnostic
+      ) }
   }
 
   func invalidateCustomGeometrySourceRegion(
@@ -1028,7 +1002,7 @@ public extension MapHandleDiscarding {
     bounds bindingArg1: LatLngBounds
   ) throws {
     try owner
-      .nativeInvoke("mln_map_invalidate_custom_geometry_source_region") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_invalidate_custom_geometry_source_region(
           raw,
           arena.view(bindingArg0),
@@ -1044,7 +1018,7 @@ public extension MapHandleDiscarding {
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
-      .nativeInvoke("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_invalidate_custom_geometry_source_tile(
           raw,
           arena.view(bindingArg0),
@@ -1060,7 +1034,7 @@ public extension MapHandleDiscarding {
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
-      .nativeInvoke("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_invalidate_custom_mvt_vector_source_tile(
           raw,
           arena.view(bindingArg0),
@@ -1075,52 +1049,43 @@ public extension MapHandleDiscarding {
     layerId bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) throws {
-    try owner
-      .nativeInvoke("mln_map_move_style_layer") { raw, arena, diagnostic in
-        mln_map_move_style_layer(
-          raw,
-          arena.view(bindingArg0),
-          bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, arena, diagnostic in mln_map_move_style_layer(
+      raw,
+      arena.view(bindingArg0),
+      bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+      nil,
+      diagnostic
+    ) }
   }
 
   func removeStyleImage(imageId bindingArg0: String) throws {
     try owner
-      .nativeInvoke("mln_map_remove_style_image") { raw, arena, diagnostic in
-        mln_map_remove_style_image(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_image(
+        raw,
+        arena.view(bindingArg0),
+        nil,
+        diagnostic
+      ) }
   }
 
   func removeStyleLayer(layerId bindingArg0: String) throws {
     try owner
-      .nativeInvoke("mln_map_remove_style_layer") { raw, arena, diagnostic in
-        mln_map_remove_style_layer(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_layer(
+        raw,
+        arena.view(bindingArg0),
+        nil,
+        diagnostic
+      ) }
   }
 
   func removeStyleSource(sourceId bindingArg0: String) throws {
     try owner
-      .nativeInvoke("mln_map_remove_style_source") { raw, arena, diagnostic in
-        mln_map_remove_style_source(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_source(
+        raw,
+        arena.view(bindingArg0),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setCustomGeometrySourceTileData(
@@ -1129,7 +1094,7 @@ public extension MapHandleDiscarding {
     data bindingArg2: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_custom_geometry_source_tile_data") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_custom_geometry_source_tile_data(
           raw,
           arena.view(bindingArg0),
@@ -1147,7 +1112,7 @@ public extension MapHandleDiscarding {
     data bindingArg2: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_custom_mvt_vector_source_tile_data(
           raw,
           arena.view(bindingArg0),
@@ -1165,7 +1130,7 @@ public extension MapHandleDiscarding {
     message bindingArg2: String
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_custom_mvt_vector_source_tile_error(
           raw,
           arena.view(bindingArg0),
@@ -1182,15 +1147,13 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_geojson_source_data") { raw, arena, diagnostic in
-        mln_map_set_geojson_source_data(
-          raw,
-          arena.view(bindingArg0),
-          arena.use(bindingArg1.handle),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_geojson_source_data(
+        raw,
+        arena.view(bindingArg0),
+        arena.use(bindingArg1.handle),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setGeojsonSourceSynchronousTiling(
@@ -1198,7 +1161,7 @@ public extension MapHandleDiscarding {
     enabled bindingArg1: Bool
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_geojson_source_synchronous_tiling(
           raw,
           arena.view(bindingArg0),
@@ -1214,15 +1177,13 @@ public extension MapHandleDiscarding {
     url bindingArg1: String
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_geojson_source_url") { raw, arena, diagnostic in
-        mln_map_set_geojson_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_geojson_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setGlobalStateProperty(
@@ -1230,7 +1191,7 @@ public extension MapHandleDiscarding {
     value bindingArg1: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_global_state_property") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_global_state_property(
           raw,
           arena.view(bindingArg0),
@@ -1246,7 +1207,7 @@ public extension MapHandleDiscarding {
     coordinates bindingArg1: [LatLng]
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_image_source_coordinates") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_set_image_source_coordinates(
           raw,
           arena.view(bindingArg0),
@@ -1263,7 +1224,7 @@ public extension MapHandleDiscarding {
     image bindingArg1: PremultipliedRgba8Image
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_image_source_image") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_set_image_source_image(
           raw,
           arena.view(bindingArg0),
@@ -1279,15 +1240,13 @@ public extension MapHandleDiscarding {
     url bindingArg1: String
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_image_source_url") { raw, arena, diagnostic in
-        mln_map_set_image_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_image_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setStyleImage(
@@ -1296,16 +1255,14 @@ public extension MapHandleDiscarding {
     options bindingArg2: StyleImageOptions? = nil
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_image") { raw, arena, diagnostic in
-        try mln_map_set_style_image(
-          raw,
-          arena.view(bindingArg0),
-          arena.store(bindingArg1.nativeValue(arena: arena)),
-          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in try mln_map_set_style_image(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        nil,
+        diagnostic
+      ) }
   }
 
   func setStyleLayerProperty(
@@ -1314,7 +1271,7 @@ public extension MapHandleDiscarding {
     value bindingArg2: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_layer_property") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_style_layer_property(
           raw,
           arena.view(bindingArg0),
@@ -1328,14 +1285,12 @@ public extension MapHandleDiscarding {
 
   func setStyleLightJson(lightJson bindingArg0: Data) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_light_json") { raw, arena, diagnostic in
-        mln_map_set_style_light_json(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_light_json(
+        raw,
+        arena.view(bindingArg0),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setStyleLightProperty(
@@ -1343,7 +1298,7 @@ public extension MapHandleDiscarding {
     value bindingArg1: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_light_property") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_style_light_property(
           raw,
           arena.view(bindingArg0),
@@ -1359,7 +1314,7 @@ public extension MapHandleDiscarding {
     isVolatile bindingArg1: Bool
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_source_volatile") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_style_source_volatile(
           raw,
           arena.view(bindingArg0),
@@ -1374,7 +1329,7 @@ public extension MapHandleDiscarding {
     options bindingArg0: StyleTransitionOptions
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_style_transition_options") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_style_transition_options(
           raw,
           arena.store(bindingArg0.nativeValue()),

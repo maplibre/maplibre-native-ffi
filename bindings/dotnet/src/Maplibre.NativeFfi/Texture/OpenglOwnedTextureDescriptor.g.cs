@@ -33,7 +33,7 @@ public readonly partial record struct OpenglOwnedTextureDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_opengl_owned_texture_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyOpenglOwnedTextureDescriptor(
                 NativeMethods.mln_opengl_owned_texture_descriptor_default()
             );

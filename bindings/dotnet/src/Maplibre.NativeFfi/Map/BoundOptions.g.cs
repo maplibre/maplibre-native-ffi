@@ -33,7 +33,7 @@ public sealed record BoundOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_bound_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyBoundOptions(NativeMethods.mln_bound_options_default());
         }
     }

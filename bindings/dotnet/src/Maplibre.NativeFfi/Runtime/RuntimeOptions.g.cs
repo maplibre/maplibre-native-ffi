@@ -28,7 +28,7 @@ public readonly partial record struct RuntimeOptions(string? AssetPath, string? 
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_runtime_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyRuntimeOptions(NativeMethods.mln_runtime_options_default());
         }
     }

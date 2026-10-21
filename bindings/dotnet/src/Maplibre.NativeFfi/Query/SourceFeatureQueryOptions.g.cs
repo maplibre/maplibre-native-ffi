@@ -35,7 +35,7 @@ public sealed record SourceFeatureQueryOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_source_feature_query_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopySourceFeatureQueryOptions(
                 NativeMethods.mln_source_feature_query_options_default()
             );

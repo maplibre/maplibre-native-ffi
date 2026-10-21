@@ -38,7 +38,7 @@ def operation(plan, values):
         f"""func {method}<Result>(_ body: ({scoped}) throws -> Result) throws -> Result {{
   var raw = {initial}
   raw.size = UInt32(MemoryLayout<{value.native}>.size)
-  return try nativeView("{plan.function.name}", reading: raw, begin: {{ raw, token, diagnostic in {begin} }}, end: {{ {view.end}($0) }}, get: {{ raw, value, diagnostic in {read} }}) {{ raw, scope in try body({scoped}({copied}, scope: scope)) }}
+  return try nativeView(reading: raw, begin: {{ raw, token, diagnostic in {begin} }}, end: {{ {view.end}($0) }}, get: {{ raw, value, diagnostic in {read} }}) {{ raw, scope in try body({scoped}({copied}, scope: scope)) }}
 }}
 """,
         owner_name(view.owner),

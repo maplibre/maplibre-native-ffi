@@ -595,21 +595,20 @@ def emit_operation(
             )
     reads = bool(
         handle_plan
+        and handle_plan.native == "mln_render_frame_batch"
         and not asynchronous
         and outputs
         and function.name != handle_plan.release
     )
     if reads:
-        entry = [f'using var read = state.Read(this, "{function.name}");']
+        entry = ["using var read = state.Read(this);"]
         if scoped:
             entry.append("using var scope = new NativeCallScope();")
         args[0] = "read.Handle"
     elif (scoped or asynchronous) and not plan.scoped_receiver:
-        entry = [
-            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}");'
-        ]
+        entry = [f"using var scope = new NativeCallScope({owner_expression});"]
     else:
-        entry = [f'using var call = Enter({owner_expression}, "{function.name}");']
+        entry = [f"using var call = Enter({owner_expression});"]
         if scoped:
             entry.append("using var scope = new NativeCallScope();")
     prologue = entry + prologue
@@ -635,7 +634,7 @@ def emit_operation(
             "var viewScope = new NativeViewScope();",
             "void* token = null;",
             checked_call(
-                api.functions_by_name[handle_plan.view_begin], "read.Handle, &token"
+                api.functions_by_name[handle_plan.view_begin], "Handle, &token"
             ),
             "try",
             "{",
@@ -934,7 +933,7 @@ def emit(api: Api | BoundApi) -> Emission:
             f"\n    NativeHandleState<{native_type}> INativeOwner<{native_type}>.State => state;\n"
             f"    internal {native_type} Handle => state.Handle;\n"
             "    // Runtime events report their source by this identity.\n"
-            "    public ulong Id => state.IssuedHandle.Value;\n"
+            "    public ulong Id => state.Handle.Value;\n"
             f"    public void Dispose() {{ state.Retire(); }}\n"
         )
         methods[owner].insert(0, declarations)
@@ -1056,7 +1055,7 @@ def emit(api: Api | BoundApi) -> Emission:
             default = (
                 f"    public static {public_type(name)} Default\n    {{\n"
                 "        get\n        {\n"
-                f'            using var call = NativeCall.Enter(null, "{plan.default}");\n'
+                "            using var call = NativeCall.Enter(null);\n"
                 f"            return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
                 "        }\n    }\n"
             )

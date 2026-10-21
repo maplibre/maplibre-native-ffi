@@ -14,7 +14,6 @@ public extension AcquiredFrameHandle {
     var raw = mln_metal_texture_frame()
     raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
     return try nativeView(
-      "mln_acquired_frame_get_metal_texture",
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
@@ -43,7 +42,6 @@ public extension AcquiredFrameHandle {
     var raw = mln_opengl_texture_frame()
     raw.size = UInt32(MemoryLayout<mln_opengl_texture_frame>.size)
     return try nativeView(
-      "mln_acquired_frame_get_opengl_texture",
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
@@ -72,7 +70,6 @@ public extension AcquiredFrameHandle {
     var raw = mln_vulkan_texture_frame()
     raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
     return try nativeView(
-      "mln_acquired_frame_get_vulkan_texture",
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
@@ -101,7 +98,6 @@ public extension AcquiredFrameHandle {
     var raw = mln_webgpu_texture_frame()
     raw.size = UInt32(MemoryLayout<mln_webgpu_texture_frame>.size)
     return try nativeView(
-      "mln_acquired_frame_get_webgpu_texture",
       reading: raw,
       begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,

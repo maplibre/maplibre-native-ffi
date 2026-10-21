@@ -20,7 +20,7 @@ import Testing
   }
 
   var invalid: [UInt8] = [0xFF]
-  #expect(throws: NativeStringError.self) {
+  #expect(throws: MaplibreError.self) {
     try invalid.withUnsafeMutableBufferPointer { buffer in
       try NativeString.copyUTF8(
         data: UnsafeRawPointer(buffer.baseAddress!)
@@ -62,7 +62,7 @@ import Testing
 /// and a 64-bit Vulkan handle keeps its high bits on the way into a record.
 @Test func valuesCheckNarrowingKeepUnknownEnumsAndCarryFullWidthHandles(
 ) throws {
-  #expect(throws: NativeStringError.self) {
+  #expect(throws: MaplibreError.self) {
     let _: UInt32 = try NativeInputArena.count(Int(UInt32.max) + 1)
   }
 
@@ -89,7 +89,7 @@ import Testing
   definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue
   definition.data.geometry = mln_offline_geometry_region_definition()
   definition.data.geometry.geometry = mln_buffer_view(data: nil, size: 1)
-  #expect(throws: NativeStringError.self) {
+  #expect(throws: MaplibreError.self) {
     try OfflineRegionDefinition(raw: definition)
   }
 }

@@ -44,13 +44,11 @@ def consumed(plan, owner, values):
         return (
             f"""public extension {owner} {{
 {doc(values.bound, function.name, "  ")}  func release({", ".join(declarations)}) throws {{
-    try mapNativeFailure {{
-      let arena = NativeInputArena()
-      defer {{ withExtendedLifetime(arena) {{}} }}
-      try handle.closeOnce {{ live in
-        var raw = live.raw
-        {checked(native_call(function, *args))}
-      }}
+    let arena = NativeInputArena()
+    defer {{ withExtendedLifetime(arena) {{}} }}
+    try handle.closeOnce {{ live in
+      var raw = live.raw
+      {checked(native_call(function, *args))}
     }}
   }}
 }}
@@ -63,10 +61,10 @@ def consumed(plan, owner, values):
         return (
             f"""{documented}func close() async throws {{
   guard let future = try startClose() else {{ return }}
-  try await mapNativeFailure {{ try await future.value() }}
+  try await future.value()
 }}
 internal func startClose() throws -> NativeFuture<Void>? {{
-  try nativeStartClose("{function.name}") {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
+  try nativeStartClose {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
 }}
 """,
             owner,
@@ -77,7 +75,7 @@ internal func startClose() throws -> NativeFuture<Void>? {{
     parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
     return (
         f"""{documented}func {method}() throws {{
-  try nativeClose("{function.name}") {{ {parameters} in {call} }}
+  try nativeClose {{ {parameters} in {call} }}
 }}
 """,
         owner,
@@ -135,11 +133,11 @@ def owner_declarations(bound):
         from .swift import doc
 
         chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver {{
-  let handle: NativeHandleBox<{raw}>
+  let handle: NativeHandleState<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
-    handle = try NativeHandleBox(typeName: "{owner}", handle: {raw}(raw: raw){passed})
+    handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
   }}
-  public var id: UInt64 {{ handle.issued.raw }}
+  public var id: UInt64 {{ handle.value.raw }}
 }}
 ''')
     return "\n".join(chunks)

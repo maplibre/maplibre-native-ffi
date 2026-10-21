@@ -40,7 +40,7 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     internal MlnGeojsonSourceData Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -56,7 +56,7 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     /// </remarks>
     public static GeojsonSourceDataHandle Create(byte[] data, GeojsonSourceOptions? options)
     {
-        using var scope = new NativeCallScope(null, "mln_geojson_source_data_create");
+        using var scope = new NativeCallScope(null);
         var nativeOptions = options is null
             ? default(mln_geojson_source_options)
             : NativeGeojsonSourceOptions(options, scope);

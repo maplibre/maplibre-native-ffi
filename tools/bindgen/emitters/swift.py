@@ -208,9 +208,9 @@ def operation(
         call = "try " + call
     doc_comment = doc(value_types.bound, function.name)
     modifier = "" if receiver else "static "
-    target = f'"{function.name}"'
+    target = ""
     if plan.scoped_receiver:
-        target = f'owner: self, "{function.name}"'
+        target = "owner: self"
     signature = f"{modifier}func {method}({', '.join(declarations)})"
     if discard:
         call = native_call(
@@ -238,7 +238,7 @@ def operation(
         return (
             f"""{doc_comment}{signature} throws -> {result} {{
   var value0: {owned.handle.native} = 0
-  return try nativeAttach({target}, as: {result}.init) {{ raw, arena, completion, diagnostic in {call} }} adopt: {{ try {public}(adopting: value0{parent}) }}
+  return try nativeAttach(as: {result}.init) {{ raw, arena, completion, diagnostic in {call} }} adopt: {{ try {public}(adopting: value0{parent}) }}
 }}
 """,
             owner,
@@ -349,9 +349,9 @@ def operation(
                 result += "?"
                 conversion = f"if {'result.pointee.value == nil' if shape == 'array' else 'result.pointee.value_count == 0'} {{ return nil }}; return {conversion}"
             conversion = (
-                f", copying: {copying}"
+                f"copying: {copying}"
                 if copying and not (empty_optional or nullable)
-                else f", convert: {{ result in {conversion} }}"
+                else f"convert: {{ result in {conversion} }}"
             )
         attribute = "@discardableResult\n" if execution == "command" else ""
         returns = "" if result == "Void" else f" -> {result}"
@@ -417,7 +417,11 @@ def operation(
                             f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
                         )
             capture.append(value_types.copy(value, f"value{index}"))
-        absent = f", absentOn: {plan.absence.status}" if plan.absence else ""
+        absent = (
+            f"{', ' if target else ''}absentOn: {plan.absence.status}"
+            if plan.absence
+            else ""
+        )
         declined = next(
             (
                 f"value{index}"

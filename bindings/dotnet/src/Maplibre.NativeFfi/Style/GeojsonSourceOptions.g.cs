@@ -77,7 +77,7 @@ public sealed record GeojsonSourceOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_geojson_source_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyGeojsonSourceOptions(
                 NativeMethods.mln_geojson_source_options_default()
             );

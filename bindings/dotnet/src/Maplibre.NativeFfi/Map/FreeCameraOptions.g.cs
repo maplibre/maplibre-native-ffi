@@ -17,7 +17,7 @@ public sealed record FreeCameraOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_free_camera_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyFreeCameraOptions(
                 NativeMethods.mln_free_camera_options_default()
             );

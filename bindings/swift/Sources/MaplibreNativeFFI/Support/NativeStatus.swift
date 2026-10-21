@@ -1,18 +1,6 @@
 internal import MaplibreNativeC
 import Foundation
 
-struct NativeStatusFailure: Error, Equatable {
-  let rawStatus: Int32
-  let diagnostic: String
-
-  static func swiftNativeError(_ diagnostic: String) -> Self {
-    Self(
-      rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-      diagnostic: diagnostic
-    )
-  }
-}
-
 /// Calls a status-returning native function with a fresh diagnostic and throws
 /// its failure.
 ///
@@ -33,8 +21,8 @@ func checkStatus(
     if status == MLN_STATUS_OK {
       return
     }
-    throw NativeStatusFailure(
-      rawStatus: status.rawValue,
+    throw MaplibreError(
+      status: Status(rawValue: status.rawValue),
       diagnostic: message(of: diagnostic)
     )
   }

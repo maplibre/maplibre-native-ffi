@@ -215,9 +215,8 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
     case let .lineString(item): raw
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING.rawValue; raw.data
       .line_string = try item.nativeValue(arena: arena)
-    case .unknown: throw NativeStringError(
-        "unknown union variant cannot be submitted"
-      )
+    case .unknown: throw MaplibreError
+      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
   }

@@ -10,7 +10,7 @@ public extension Maplibre {
   /// See `mln_c_version` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   static func cVersion() throws -> UInt32 {
-    try nativeDirect("mln_c_version") { _ in mln_c_version() }
+    try nativeDirect { _ in mln_c_version() }
   }
 
   /// Reports the render backends available in this native library build.
@@ -18,7 +18,7 @@ public extension Maplibre {
   /// See `mln_supported_render_backend_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   static func supportedRenderBackendMask() throws -> RenderBackendFlag {
-    try nativeDirect("mln_supported_render_backend_mask") { _ in
+    try nativeDirect { _ in
       RenderBackendFlag(rawValue: mln_supported_render_backend_mask())
     }
   }

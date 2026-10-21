@@ -4,24 +4,31 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private let typeName: String
   private let lock = NSLock()
   private var closed = false
-  private var closing = false
   private let parent: AnyObject?
-  let issued: Handle
+  let value: Handle
+  private let copyLock: NSRecursiveLock?
+  private var copying = false
 
-  init(typeName: String, handle: Handle, parent: AnyObject? = nil) throws {
+  init(
+    typeName: String,
+    handle: Handle,
+    parent: AnyObject? = nil,
+    protectsCopies: Bool = false
+  ) throws {
     guard !handle.isNull else {
       throw MaplibreError
         .invalidArgument("\(typeName) native handle is the null handle")
     }
     self.typeName = typeName
     self.parent = parent
-    issued = handle
+    value = handle
+    copyLock = protectsCopies ? NSRecursiveLock() : nil
   }
 
   deinit {
     if !closed {
       NativeRetirement(
-        handle: issued,
+        handle: value,
         parent: parent,
         typeName: typeName
       ).schedule()
@@ -29,13 +36,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   }
 
   func retire() {
-    let retire = lock.withLock {
-      guard !closed, !closing else { return false }
-      closed = true
-      return true
-    }
-    if retire {
-      disposeUnreceived()
+    guard !lock.withLock({ closed }) else { return }
+    if NativeRetirement(handle: value, parent: parent, typeName: typeName)
+      .dispose(reportLeak: false)
+    {
+      lock.withLock { closed = true }
     }
   }
 
@@ -43,35 +48,30 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     lock.withLock { closed = true }
   }
 
-  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
-    let release = try lock.withLock {
-      guard !closed else { return false }
-      guard !closing
-      else { throw MaplibreError.invalidState("\(typeName) is closing") }
-      closing = true
-      return true
+  /// Batch getters lend memory beyond the native call, until the copy ends.
+  func withHandle<T>(_ body: (Handle) throws -> T) rethrows -> T {
+    guard let copyLock else { return try body(value) }
+    return try copyLock.withLock {
+      copying = true
+      defer { copying = false }
+      return try body(value)
     }
-    guard release else { return }
-    do {
-      try destroy(issued)
-      lock.withLock { closed = true; closing = false }
-    } catch {
-      lock.withLock { closing = false }
-      throw error
-    }
-    withExtendedLifetime(parent) {}
   }
 
-  private func disposeUnreceived() {
-    defer { withExtendedLifetime(parent) {} }
-    let disposed = issued.disposeAbandoned()
-    if !disposed {
-      NativeDiagnostics.report(.leakedHandle(
-        typeName: typeName,
-        handle: issued.raw,
-        detail: "native disposal failed"
-      ))
+  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
+    guard let copyLock else { return try close(destroy) }
+    try copyLock.withLock {
+      guard !copying
+      else { throw MaplibreError.invalidState("Batch is in use") }
+      try close(destroy)
     }
+  }
+
+  private func close(_ destroy: (Handle) throws -> Void) throws {
+    guard !lock.withLock({ closed }) else { return }
+    defer { withExtendedLifetime(parent) {} }
+    try destroy(value)
+    lock.withLock { closed = true }
   }
 }
 
@@ -89,13 +89,20 @@ private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable 
   /// A leaked owner's last reference can disappear inside an unsafe callback.
   func schedule() {
     DispatchQueue.global().async {
-      defer { withExtendedLifetime(self.parent) {} }
-      let disposed = self.handle.disposeAbandoned()
-      NativeDiagnostics.report(.leakedHandle(
-        typeName: self.typeName,
-        handle: self.handle.raw,
-        detail: disposed ? "" : "native disposal failed"
-      ))
+      self.dispose(reportLeak: true)
     }
+  }
+
+  @discardableResult
+  func dispose(reportLeak: Bool) -> Bool {
+    defer { withExtendedLifetime(parent) {} }
+    let disposed = handle.disposeAbandoned()
+    if reportLeak || !disposed {
+      let detail = disposed ? "" : " (native disposal failed)"
+      reportToStandardError(
+        "Leaked \(typeName) native handle 0x\(String(handle.raw, radix: 16))\(detail); close handles explicitly.\n"
+      )
+    }
+    return disposed
   }
 }

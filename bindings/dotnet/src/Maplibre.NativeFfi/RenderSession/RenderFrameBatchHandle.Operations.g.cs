@@ -40,7 +40,7 @@ public sealed unsafe partial class RenderFrameBatchHandle
     internal MlnRenderFrameBatch Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -56,7 +56,7 @@ public sealed unsafe partial class RenderFrameBatchHandle
     /// </remarks>
     public RenderFrameBatchView Get()
     {
-        using var read = state.Read(this, "mln_render_frame_batch_get");
+        using var read = state.Read(this);
         var outView = new mln_render_frame_batch_view
         {
             size = (uint)sizeof(mln_render_frame_batch_view),

@@ -13,10 +13,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_metal_borrowed_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -37,10 +36,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_metal_owned_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -61,10 +59,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_opengl_borrowed_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_opengl_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -85,10 +82,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_opengl_owned_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_opengl_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -109,10 +105,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_vulkan_borrowed_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -133,10 +128,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_vulkan_owned_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -157,10 +151,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_webgpu_borrowed_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -181,10 +174,9 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_webgpu_owned_texture",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),

@@ -9,9 +9,7 @@ public extension Maplibre {
   /// See `mln_log_clear_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logClearCallback() throws {
-    try nativeInvoke("mln_log_clear_callback") { _, _, diagnostic in
-      mln_log_clear_callback(diagnostic)
-    }
+    try nativeInvoke { _, _, diagnostic in mln_log_clear_callback(diagnostic) }
   }
 
   /// Controls which log severities MapLibre Native may dispatch asynchronously.
@@ -19,12 +17,10 @@ public extension Maplibre {
   /// See `mln_log_set_async_severity_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logSetAsyncSeverityMask(mask bindingArg0: LogSeverityMask) throws {
-    try nativeInvoke("mln_log_set_async_severity_mask") { _, _, diagnostic in
-      mln_log_set_async_severity_mask(
-        bindingArg0.nativeValue(),
-        diagnostic
-      )
-    }
+    try nativeInvoke { _, _, diagnostic in mln_log_set_async_severity_mask(
+      bindingArg0.nativeValue(),
+      diagnostic
+    ) }
   }
 
   /// Installs a process-global MapLibre Native log callback.
@@ -32,11 +28,9 @@ public extension Maplibre {
   /// See `mln_log_set_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logSetCallback(handler bindingArg0: LogHandler) throws {
-    try nativeInvoke("mln_log_set_callback") { _, arena, diagnostic in
-      try mln_log_set_callback(
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        diagnostic
-      )
-    }
+    try nativeInvoke { _, arena, diagnostic in try mln_log_set_callback(
+      arena.store(bindingArg0.nativeValue(arena: arena)),
+      diagnostic
+    ) }
   }
 }

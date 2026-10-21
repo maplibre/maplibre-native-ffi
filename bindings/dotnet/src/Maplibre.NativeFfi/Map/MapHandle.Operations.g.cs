@@ -32,7 +32,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     internal MlnMap Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -52,7 +52,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_custom_geometry_source");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_custom_geometry_source(
@@ -79,7 +79,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_custom_mvt_vector_source");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_custom_mvt_vector_source(
@@ -106,7 +106,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_geojson_source_data");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_geojson_source_data(
@@ -134,7 +134,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_geojson_source_url");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_geojson_source_url(
@@ -165,7 +165,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_image_source_image");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_image_source_image(
@@ -195,7 +195,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_image_source_url");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_image_source_url(
@@ -224,7 +224,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_style_layer_json");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_style_layer_json(
@@ -251,7 +251,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_add_style_source_json");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_add_style_source_json(
@@ -277,7 +277,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_apply_camera_delta");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_apply_camera_delta(
@@ -302,7 +302,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_metal_borrowed_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_metal_borrowed_texture(
@@ -329,7 +329,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_metal_owned_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_metal_owned_texture(
@@ -356,7 +356,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_metal_surface");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_metal_surface(
@@ -383,7 +383,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_borrowed_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_opengl_borrowed_texture(
@@ -410,7 +410,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_owned_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_opengl_owned_texture(
@@ -437,7 +437,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_surface");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_opengl_surface(
@@ -464,7 +464,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_borrowed_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_vulkan_borrowed_texture(
@@ -491,7 +491,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_owned_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_vulkan_owned_texture(
@@ -518,7 +518,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_surface");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_vulkan_surface(
@@ -545,7 +545,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_borrowed_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_webgpu_borrowed_texture(
@@ -572,7 +572,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_owned_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_webgpu_owned_texture(
@@ -599,7 +599,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         RenderSessionAttachOptions options
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_surface");
+        using var scope = new NativeCallScope(this);
         return scope.Attach<MlnRenderSession, RenderSessionHandle>(
             (output, completion, diagnostic) =>
                 NativeMethods.mln_map_attach_webgpu_surface(
@@ -626,7 +626,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_begin_command_group");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_begin_command_group(Handle, completion, diagnostic),
@@ -647,7 +647,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_camera_for_geometry");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_camera_options, CameraOptions>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_camera_for_geometry(
@@ -675,7 +675,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_camera_for_lat_lng_bounds");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_camera_options, CameraOptions>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_camera_for_lat_lng_bounds(
@@ -703,7 +703,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_camera_for_lat_lngs");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_camera_options, CameraOptions>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_camera_for_lat_lngs(
@@ -732,7 +732,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_cancel_camera_transition");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_cancel_camera_transition(
@@ -756,7 +756,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_cancel_transitions");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_cancel_transitions(Handle, completion, diagnostic),
@@ -774,7 +774,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public MapProjectionHandle CreateProjection()
     {
-        using var call = Enter(this, "mln_map_create_projection");
+        using var call = Enter(this);
         MlnMapProjection outProjection = default;
         Check(NativeMethods.mln_map_create_projection(Handle, &outProjection, Diagnostic));
         return MapProjectionHandle.Adopt(outProjection);
@@ -789,7 +789,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> DumpDebugLogsAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_dump_debug_logs");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_dump_debug_logs(Handle, completion, diagnostic),
@@ -809,7 +809,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_end_command_group");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_end_command_group(Handle, completion, diagnostic),
@@ -826,7 +826,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraQueryResult> GetCameraAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_camera");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_camera_query_result, CameraQueryResult>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_camera(Handle, completion, diagnostic),
@@ -847,7 +847,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_feature_state");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_feature_state(
@@ -872,7 +872,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<byte[]> GetGlobalStateAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_global_state");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_global_state(Handle, completion, diagnostic),
@@ -893,7 +893,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_image_source_coordinates");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_lat_lng, LatLng>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_image_source_coordinates(
@@ -916,7 +916,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<byte[]> GetLoadedStyleJsonAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_loaded_style_json");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_loaded_style_json(Handle, completion, diagnostic),
@@ -934,9 +934,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public MapSnapshot GetSnapshot()
     {
-        using var read = state.Read(this, "mln_map_get_snapshot");
+        using var call = Enter(this);
         var outSnapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
-        Check(NativeMethods.mln_map_get_snapshot(read.Handle, &outSnapshot, Diagnostic));
+        Check(NativeMethods.mln_map_get_snapshot(Handle, &outSnapshot, Diagnostic));
         return CopyMapSnapshot(outSnapshot);
     }
 
@@ -952,7 +952,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_image");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptional<mln_style_image_info, StyleImageInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_image(
@@ -978,7 +978,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_layer");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptionalValue<mln_style_layer_info, StyleLayerInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_layer(
@@ -1004,7 +1004,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_json");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptional<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_layer_json(
@@ -1031,7 +1031,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_property");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptional<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_layer_property(
@@ -1058,7 +1058,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_light_property");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptional<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_light_property(
@@ -1084,7 +1084,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_source");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptional<mln_style_source_info, StyleSourceInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_source(
@@ -1109,7 +1109,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_transition_options");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_style_transition_options, StyleTransitionOptions>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_transition_options(Handle, completion, diagnostic),
@@ -1127,7 +1127,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<string> GetStyleUrlAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_url");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_buffer_view, string>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_url(Handle, completion, diagnostic),
@@ -1149,10 +1149,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_invalidate_custom_geometry_source_region"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_invalidate_custom_geometry_source_region(
@@ -1179,10 +1176,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_invalidate_custom_geometry_source_tile"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
@@ -1209,10 +1203,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_invalidate_custom_mvt_vector_source_tile"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -1238,7 +1229,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lng_bounds_for_camera");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_lat_lng_bounds, LatLngBounds>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_lat_lng_bounds_for_camera(
@@ -1264,7 +1255,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_lat_lng_bounds_for_camera_unwrapped");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_lat_lng_bounds, LatLngBounds>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(
@@ -1289,7 +1280,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_list_style_layers");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_style_layer_info, StyleLayerInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_list_style_layers(Handle, completion, diagnostic),
@@ -1309,7 +1300,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_list_style_sources");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_style_source_info, StyleSourceInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_list_style_sources(Handle, completion, diagnostic),
@@ -1331,7 +1322,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_move_style_layer");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_move_style_layer(
@@ -1381,7 +1372,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_remove_feature_state");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_remove_feature_state(
@@ -1406,7 +1397,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_remove_style_image");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_remove_style_image(
@@ -1431,7 +1422,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_remove_style_layer");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_remove_style_layer(
@@ -1456,7 +1447,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_remove_style_source");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_remove_style_source(
@@ -1480,7 +1471,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_request_repaint");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_request_repaint(Handle, completion, diagnostic),
@@ -1497,7 +1488,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task RequestStillImageAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_request_still_image");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_request_still_image(Handle, completion, diagnostic),
@@ -1517,7 +1508,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_resize");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_resize(
@@ -1542,7 +1533,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_bounds");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_bounds(
@@ -1569,7 +1560,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_custom_geometry_source_tile_data");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_custom_geometry_source_tile_data(
@@ -1598,10 +1589,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_set_custom_mvt_vector_source_tile_data"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
@@ -1630,10 +1618,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_set_custom_mvt_vector_source_tile_error"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
@@ -1660,7 +1645,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_debug_options");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_debug_options(
@@ -1685,7 +1670,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_event_mask");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_event_mask(Handle, (ulong)mask, completion, diagnostic),
@@ -1706,7 +1691,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_feature_state");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_feature_state(
@@ -1732,7 +1717,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_free_camera_options");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_free_camera_options(
@@ -1758,7 +1743,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_geojson_source_data");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_geojson_source_data(
@@ -1785,10 +1770,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_map_set_geojson_source_synchronous_tiling"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
@@ -1815,7 +1797,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_geojson_source_url");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_geojson_source_url(
@@ -1842,7 +1824,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_global_state_property");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_global_state_property(
@@ -1869,7 +1851,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_image_source_coordinates");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_image_source_coordinates(
@@ -1897,7 +1879,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_image_source_image");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_image_source_image(
@@ -1924,7 +1906,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_image_source_url");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_image_source_url(
@@ -1950,7 +1932,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_projection_mode");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_projection_mode(
@@ -1975,7 +1957,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_rendering_stats_view_enabled");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_rendering_stats_view_enabled(
@@ -2002,7 +1984,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_image");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_image(
@@ -2029,7 +2011,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_json");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_json(
@@ -2056,7 +2038,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_property");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_layer_property(
@@ -2083,7 +2065,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_light_json");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_light_json(
@@ -2110,7 +2092,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_light_property");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_light_property(
@@ -2138,7 +2120,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_source_volatile");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_source_volatile(
@@ -2164,7 +2146,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_transition_options");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_transition_options(
@@ -2189,7 +2171,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_style_url");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_style_url(
@@ -2214,7 +2196,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_tile_options");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_tile_options(
@@ -2239,7 +2221,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_set_viewport_options");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_set_viewport_options(
@@ -2264,7 +2246,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_update_camera");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_update_camera(
@@ -2291,7 +2273,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_custom_geometry_source");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_custom_geometry_source(
@@ -2307,7 +2289,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddCustomMvtVectorSource(string sourceId, CustomMvtVectorSourceOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_custom_mvt_vector_source");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_custom_mvt_vector_source(
@@ -2323,7 +2305,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_geojson_source_data");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_geojson_source_data(
@@ -2339,7 +2321,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddGeojsonSourceUrl(string sourceId, string url, GeojsonSourceOptions? options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_geojson_source_url");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_geojson_source_url(
@@ -2362,7 +2344,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         )
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_image_source_image");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_image_source_image(
@@ -2380,7 +2362,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddImageSourceUrl(string sourceId, LatLng[] coordinates, string url)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_image_source_url");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_image_source_url(
@@ -2398,7 +2380,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_style_layer_json");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_style_layer_json(
@@ -2414,7 +2396,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_add_style_source_json");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_add_style_source_json(
@@ -2430,7 +2412,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void ApplyCameraDelta(CameraDelta delta)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_apply_camera_delta");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_apply_camera_delta(
@@ -2445,7 +2427,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void BeginCommandGroup()
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_begin_command_group");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_begin_command_group(
@@ -2459,7 +2441,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void CancelCameraTransition(ulong transitionId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_cancel_camera_transition");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_cancel_camera_transition(
@@ -2474,7 +2456,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void CancelTransitions()
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_cancel_transitions");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_cancel_transitions(receiverHandle, completion, diagnostic)
@@ -2484,7 +2466,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void DumpDebugLogs()
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_dump_debug_logs");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_dump_debug_logs(receiverHandle, completion, diagnostic)
@@ -2494,7 +2476,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void EndCommandGroup()
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_end_command_group");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_end_command_group(receiverHandle, completion, diagnostic)
@@ -2504,10 +2486,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_invalidate_custom_geometry_source_region"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_invalidate_custom_geometry_source_region(
@@ -2523,10 +2502,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_invalidate_custom_geometry_source_tile"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
@@ -2542,10 +2518,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void InvalidateCustomMvtVectorSourceTile(string sourceId, CanonicalTileId tileId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_invalidate_custom_mvt_vector_source_tile"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -2561,7 +2534,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void MoveStyleLayer(string layerId, string beforeLayerId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_move_style_layer");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_move_style_layer(
@@ -2577,7 +2550,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void RemoveFeatureState(FeatureStateSelector selector)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_remove_feature_state");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_remove_feature_state(
@@ -2592,7 +2565,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void RemoveStyleImage(string imageId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_remove_style_image");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_remove_style_image(
@@ -2607,7 +2580,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void RemoveStyleLayer(string layerId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_remove_style_layer");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_remove_style_layer(
@@ -2622,7 +2595,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void RemoveStyleSource(string sourceId)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_remove_style_source");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_remove_style_source(
@@ -2637,7 +2610,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void RequestRepaint()
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_request_repaint");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_request_repaint(receiverHandle, completion, diagnostic)
@@ -2647,7 +2620,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void Resize(LogicalExtent extent)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_resize");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_resize(
@@ -2662,7 +2635,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetBounds(BoundOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_bounds");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_bounds(
@@ -2681,10 +2654,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         )
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_set_custom_geometry_source_tile_data"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_custom_geometry_source_tile_data(
@@ -2705,10 +2675,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         )
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_set_custom_mvt_vector_source_tile_data"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
@@ -2729,10 +2696,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         )
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_set_custom_mvt_vector_source_tile_error"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
@@ -2749,7 +2713,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetDebugOptions(MapDebugOption options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_debug_options");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_debug_options(
@@ -2764,7 +2728,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetEventMask(RuntimeEventMask mask)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_event_mask");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_event_mask(
@@ -2779,7 +2743,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetFeatureState(FeatureStateSelector selector, byte[] state)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_feature_state");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_feature_state(
@@ -2795,7 +2759,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetFreeCameraOptions(FreeCameraOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_free_camera_options");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_free_camera_options(
@@ -2810,7 +2774,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetGeojsonSourceData(string sourceId, GeojsonSourceDataHandle data)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_geojson_source_data");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_geojson_source_data(
@@ -2826,10 +2790,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetGeojsonSourceSynchronousTiling(string sourceId, bool enabled)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_set_geojson_source_synchronous_tiling"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
@@ -2845,7 +2806,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetGeojsonSourceUrl(string sourceId, string url)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_geojson_source_url");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_geojson_source_url(
@@ -2861,7 +2822,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetGlobalStateProperty(string propertyName, byte[] value)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_global_state_property");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_global_state_property(
@@ -2877,7 +2838,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetImageSourceCoordinates(string sourceId, LatLng[] coordinates)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_coordinates");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_image_source_coordinates(
@@ -2894,7 +2855,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_image");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_image_source_image(
@@ -2910,7 +2871,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetImageSourceUrl(string sourceId, string url)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_image_source_url");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_image_source_url(
@@ -2926,7 +2887,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetProjectionMode(ProjectionMode mode)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_projection_mode");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_projection_mode(
@@ -2941,10 +2902,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetRenderingStatsViewEnabled(bool enabled)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(
-                owner,
-                "mln_map_set_rendering_stats_view_enabled"
-            );
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_rendering_stats_view_enabled(
@@ -2963,7 +2921,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         )
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_image");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_image(
@@ -2982,7 +2940,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleJson(byte[] json)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_json");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_json(
@@ -2997,7 +2955,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleLayerProperty(string layerId, string propertyName, byte[] value)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_layer_property");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_layer_property(
@@ -3014,7 +2972,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleLightJson(byte[] lightJson)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_light_json");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_light_json(
@@ -3029,7 +2987,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleLightProperty(string propertyName, byte[] value)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_light_property");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_light_property(
@@ -3045,7 +3003,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleSourceVolatile(string sourceId, bool isVolatile)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_source_volatile");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_source_volatile(
@@ -3061,7 +3019,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleTransitionOptions(StyleTransitionOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_transition_options");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_transition_options(
@@ -3076,7 +3034,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleUrl(string url)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_style_url");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_style_url(
@@ -3091,7 +3049,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetTileOptions(MapTileOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_tile_options");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_tile_options(
@@ -3106,7 +3064,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetViewportOptions(MapViewportOptions options)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_set_viewport_options");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_set_viewport_options(
@@ -3121,7 +3079,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void UpdateCamera(CameraUpdate update)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_map_update_camera");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_map_update_camera(

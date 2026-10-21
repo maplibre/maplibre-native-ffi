@@ -61,7 +61,7 @@ public sealed record StyleImageOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_style_image_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyStyleImageOptions(
                 NativeMethods.mln_style_image_options_default()
             );

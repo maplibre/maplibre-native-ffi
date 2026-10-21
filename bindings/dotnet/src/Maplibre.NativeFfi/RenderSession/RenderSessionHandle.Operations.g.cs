@@ -59,7 +59,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     internal MlnRenderSession Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -76,12 +76,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public RenderAbandonResult Abandon()
     {
-        using var read = state.Read(this, "mln_render_session_abandon");
+        using var call = Enter(this);
         var outResult = new mln_render_abandon_result
         {
             size = (uint)sizeof(mln_render_abandon_result),
         };
-        Check(NativeMethods.mln_render_session_abandon(read.Handle, &outResult, Diagnostic));
+        Check(NativeMethods.mln_render_session_abandon(Handle, &outResult, Diagnostic));
         return CopyRenderAbandonResult(outResult);
     }
 
@@ -95,7 +95,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public AcquiredFrameHandle? AcquireFrame()
     {
-        using var call = Enter(this, "mln_render_session_acquire_frame");
+        using var call = Enter(this);
         MlnAcquiredFrame outFrame = default;
         if (
             !Present(
@@ -120,7 +120,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task BarrierAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_barrier");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_barrier(Handle, completion, diagnostic),
@@ -137,7 +137,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task ClearDataAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_clear_data");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
@@ -158,7 +158,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public MapProjectionHandle CreateProjection()
     {
-        using var call = Enter(this, "mln_render_session_create_projection");
+        using var call = Enter(this);
         MlnMapProjection outProjection = default;
         Check(
             NativeMethods.mln_render_session_create_projection(Handle, &outProjection, Diagnostic)
@@ -175,7 +175,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task DetachAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_detach");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_detach(Handle, completion, diagnostic),
@@ -194,7 +194,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public RenderFrameBatchHandle? DrainFrameResults()
     {
-        using var call = Enter(this, "mln_render_session_drain_frame_results");
+        using var call = Enter(this);
         MlnRenderFrameBatch outBatch = default;
         if (
             !Present(
@@ -215,7 +215,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_dump_debug_logs");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_dump_debug_logs(Handle, completion, diagnostic),
@@ -232,17 +232,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public RenderSessionCapabilities GetCapabilities()
     {
-        using var read = state.Read(this, "mln_render_session_get_capabilities");
+        using var call = Enter(this);
         var outCapabilities = new mln_render_session_capabilities
         {
             size = (uint)sizeof(mln_render_session_capabilities),
         };
         Check(
-            NativeMethods.mln_render_session_get_capabilities(
-                read.Handle,
-                &outCapabilities,
-                Diagnostic
-            )
+            NativeMethods.mln_render_session_get_capabilities(Handle, &outCapabilities, Diagnostic)
         );
         return CopyRenderSessionCapabilities(outCapabilities);
     }
@@ -256,12 +252,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public RenderSessionSnapshot GetSnapshot()
     {
-        using var read = state.Read(this, "mln_render_session_get_snapshot");
+        using var call = Enter(this);
         var outSnapshot = new mln_render_session_snapshot
         {
             size = (uint)sizeof(mln_render_session_snapshot),
         };
-        Check(NativeMethods.mln_render_session_get_snapshot(read.Handle, &outSnapshot, Diagnostic));
+        Check(NativeMethods.mln_render_session_get_snapshot(Handle, &outSnapshot, Diagnostic));
         return CopyRenderSessionSnapshot(outSnapshot);
     }
 
@@ -283,7 +279,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_query_feature_extensions");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_query_feature_extensions(
@@ -315,7 +311,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_query_rendered_features");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_queried_feature, QueriedFeature>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_query_rendered_features(
@@ -345,7 +341,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_query_source_features");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_queried_feature, QueriedFeature>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_query_source_features(
@@ -374,7 +370,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_read_texture");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_texture_readback_result, TextureReadbackResult>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_read_texture(Handle, completion, diagnostic),
@@ -392,7 +388,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_reduce_memory_use");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_reduce_memory_use(Handle, completion, diagnostic),
@@ -426,7 +422,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public void RequestFrame(FrameDemand demand)
     {
-        using var call = Enter(this, "mln_render_session_request_frame");
+        using var call = Enter(this);
         var nativeDemand = NativeFrameDemand(demand);
         Check(NativeMethods.mln_render_session_request_frame(Handle, &nativeDemand, Diagnostic));
     }
@@ -448,7 +444,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_resize");
+        using var scope = new NativeCallScope(this);
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_resize(
@@ -474,7 +470,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public void ServiceDriverWork()
     {
-        using var call = Enter(this, "mln_render_session_service_driver_work");
+        using var call = Enter(this);
         Check(NativeMethods.mln_render_session_service_driver_work(Handle, Diagnostic));
     }
 
@@ -492,10 +488,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_render_session_set_metal_borrowed_texture_target"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
@@ -520,7 +513,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_set_metal_surface_target");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_metal_surface_target(
@@ -547,10 +540,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_render_session_set_opengl_borrowed_texture_target"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
@@ -575,7 +565,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_set_opengl_surface_target");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_opengl_surface_target(
@@ -602,10 +592,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_render_session_set_vulkan_borrowed_texture_target"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
@@ -630,7 +617,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_set_vulkan_surface_target");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_vulkan_surface_target(
@@ -657,10 +644,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_render_session_set_webgpu_borrowed_texture_target"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
@@ -685,7 +669,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_render_session_set_webgpu_surface_target");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_webgpu_surface_target(
@@ -712,7 +696,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         public void Resize(LogicalExtent extent)
         {
             var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner, "mln_render_session_resize");
+            using var scope = new NativeCallScope(owner);
             scope.Discard(
                 (completion, diagnostic) =>
                     NativeMethods.mln_render_session_resize(

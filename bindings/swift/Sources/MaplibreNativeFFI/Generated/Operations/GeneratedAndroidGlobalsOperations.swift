@@ -12,7 +12,7 @@ public extension Maplibre {
     jniEnv bindingArg0: NativePointer,
     context bindingArg1: NativePointer
   ) throws {
-    try nativeInvoke("mln_android_init") { _, _, diagnostic in mln_android_init(
+    try nativeInvoke { _, _, diagnostic in mln_android_init(
       bindingArg0.unsafeMutableRawPointer,
       bindingArg1.unsafeMutableRawPointer,
       diagnostic

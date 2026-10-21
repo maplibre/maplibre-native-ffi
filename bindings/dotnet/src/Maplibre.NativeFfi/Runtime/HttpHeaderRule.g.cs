@@ -58,7 +58,7 @@ public readonly record struct HttpHeaderRule
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_http_header_rule_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyHttpHeaderRule(NativeMethods.mln_http_header_rule_default());
         }
     }

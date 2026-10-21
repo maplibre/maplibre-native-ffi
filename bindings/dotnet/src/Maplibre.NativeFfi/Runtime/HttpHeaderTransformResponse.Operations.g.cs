@@ -17,7 +17,7 @@ public sealed unsafe partial class HttpHeaderTransformResponse
     /// </remarks>
     public void SetHeader(string name, string value)
     {
-        using var call = Enter(this, "mln_http_header_transform_response_set_header");
+        using var call = Enter(this);
         using var scope = new NativeCallScope();
         Check(
             NativeMethods.mln_http_header_transform_response_set_header(

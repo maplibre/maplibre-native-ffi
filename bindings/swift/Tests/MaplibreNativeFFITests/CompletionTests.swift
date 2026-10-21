@@ -124,7 +124,7 @@ private struct ConversionFailure: Error {}
 /// throw reaches the caller.
 @Test func aRejectedSubmissionFreesItsCompletionState() throws {
   let releases = LockedBox(0)
-  #expect(throws: NativeStatusFailure.self) {
+  #expect(throws: MaplibreError.self) {
     try NativeCompletion.start({ _, _ in MLN_STATUS_INVALID_ARGUMENT }) {
       [sentinel = ReleaseProbe(releases)] _ in
       withExtendedLifetime(sentinel) {}

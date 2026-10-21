@@ -55,7 +55,7 @@ public readonly partial record struct RenderSessionAttachOptions(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_render_session_attach_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyRenderSessionAttachOptions(
                 NativeMethods.mln_render_session_attach_options_default()
             );

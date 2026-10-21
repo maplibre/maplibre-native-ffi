@@ -9,7 +9,7 @@ public extension ResourceRequestHandle {
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func complete(response bindingArg0: ResourceResponse) throws {
-    try nativeInvoke("mln_resource_request_complete") { raw, arena, diagnostic in
+    try nativeInvoke { raw, arena, diagnostic in
       try mln_resource_request_complete(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -24,7 +24,7 @@ public extension ResourceRequestHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func isCancelled() throws -> Bool {
     var value0 = false
-    return try nativeInvoke("mln_resource_request_is_cancelled") { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_resource_request_is_cancelled(
         raw,
         &value0,
@@ -38,12 +38,10 @@ public extension ResourceRequestHandle {
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func passThrough() throws {
-    try nativeInvoke("mln_resource_request_pass_through") { raw, _, diagnostic in
-      mln_resource_request_pass_through(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeInvoke { raw, _, diagnostic in mln_resource_request_pass_through(
+      raw,
+      diagnostic
+    ) }
   }
 
   /// Releases the provider's reference to a resource request handle.
@@ -51,9 +49,7 @@ public extension ResourceRequestHandle {
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func close() throws {
-    try nativeClose("mln_resource_request_release") { raw in
-      mln_resource_request_release(raw)
-    }
+    try nativeClose { raw in mln_resource_request_release(raw) }
   }
 
   /// Registers a callback that runs when MapLibre cancels a C API resource
@@ -67,7 +63,7 @@ public extension ResourceRequestHandle {
     -> Bool
   {
     var value0 = false
-    return try nativeInvoke("mln_resource_request_set_cancel_callback") { raw, arena, diagnostic in
+    return try nativeInvoke { raw, arena, diagnostic in
       let status = try mln_resource_request_set_cancel_callback(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),

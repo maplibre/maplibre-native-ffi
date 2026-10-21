@@ -42,7 +42,7 @@ public readonly partial record struct WebgpuSurfaceDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_webgpu_surface_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyWebgpuSurfaceDescriptor(
                 NativeMethods.mln_webgpu_surface_descriptor_default()
             );

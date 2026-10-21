@@ -41,7 +41,7 @@ public readonly partial record struct MapOptions(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_map_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyMapOptions(NativeMethods.mln_map_options_default());
         }
     }

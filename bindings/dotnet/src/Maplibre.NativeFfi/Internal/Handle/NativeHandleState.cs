@@ -25,7 +25,6 @@ internal sealed unsafe class NativeHandleState<T>
     private readonly object? retainedParent;
     private readonly bool protectsCopies;
     private bool closed;
-    private bool closing;
     private bool copying;
 
     internal NativeHandleState(
@@ -97,11 +96,10 @@ internal sealed unsafe class NativeHandleState<T>
         }
     }
 
-    internal T IssuedHandle => handle;
     internal T Handle => handle;
 
     // Only a batch getter copies pointers after its native lease has ended.
-    internal ReadScope Read(object owner, string operation)
+    internal ReadScope Read(object owner)
     {
         if (protectsCopies)
         {
@@ -161,12 +159,6 @@ internal sealed unsafe class NativeHandleState<T>
         {
             if (closed)
                 return;
-            if (closing)
-                throw new MaplibreException(
-                    global::Maplibre.NativeFfi.Status.InvalidState,
-                    $"{typeName} is closing"
-                );
-            closing = true;
         }
         try
         {
@@ -178,8 +170,6 @@ internal sealed unsafe class NativeHandleState<T>
         }
         finally
         {
-            lock (gate)
-                closing = false;
             GC.KeepAlive(retainedParent);
         }
     }

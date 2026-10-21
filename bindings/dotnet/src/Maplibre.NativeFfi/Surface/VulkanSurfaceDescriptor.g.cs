@@ -37,7 +37,7 @@ public readonly partial record struct VulkanSurfaceDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_vulkan_surface_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyVulkanSurfaceDescriptor(
                 NativeMethods.mln_vulkan_surface_descriptor_default()
             );

@@ -594,10 +594,9 @@ private func invokeCameraTransitionHandlerCallback(
       .callback?(NativeInputArena.copyArray(end, count: 1)
         .map { CameraTransitionEnd(raw: $0) }[0])
   } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_camera_transition_end_callback",
-      error: error
-    ))
+    reportToStandardError(
+      "mln_camera_transition_end_callback failed and native received its fallback: \(error)\n"
+    )
   }
 }
 
@@ -1585,9 +1584,8 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
       .tile_pyramid = try item.nativeValue(arena: arena)
     case let .geometry(item): raw.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
       .rawValue; raw.data.geometry = try item.nativeValue(arena: arena)
-    case .unknown: throw NativeStringError(
-        "unknown union variant cannot be submitted"
-      )
+    case .unknown: throw MaplibreError
+      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
   }

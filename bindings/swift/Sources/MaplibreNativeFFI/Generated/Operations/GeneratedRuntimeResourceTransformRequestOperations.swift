@@ -9,7 +9,7 @@ public extension ResourceTransformRequestHandle {
   /// See `mln_resource_transform_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func complete(url bindingArg0: String) throws {
-    try nativeInvoke("mln_resource_transform_request_complete") { raw, arena, diagnostic in
+    try nativeInvoke { raw, arena, diagnostic in
       mln_resource_transform_request_complete(
         raw,
         arena.view(bindingArg0),
@@ -23,8 +23,6 @@ public extension ResourceTransformRequestHandle {
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func close() throws {
-    try nativeClose("mln_resource_transform_request_release") { raw in
-      mln_resource_transform_request_release(raw)
-    }
+    try nativeClose { raw in mln_resource_transform_request_release(raw) }
   }
 }

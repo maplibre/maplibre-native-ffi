@@ -32,8 +32,8 @@ private final class NativeCompletionState<Value: Sendable>:
           data: raw.diagnostic.data,
           size: raw.diagnostic.size
         )
-        throw NativeStatusFailure(
-          rawStatus: raw.status,
+        throw MaplibreError(
+          status: Status(rawValue: raw.status),
           diagnostic: diagnostic
         )
       }
@@ -184,9 +184,8 @@ enum NativeCompletion {
     guard result.pointee.value_count == 1,
           let value = result.pointee.value
     else {
-      throw NativeStatusFailure.swiftNativeError(
-        "native completion returned no value"
-      )
+      throw MaplibreError(status: .nativeError, diagnostic:
+        "native completion returned no value")
     }
     return value.load(as: Value.self)
   }
@@ -199,9 +198,8 @@ enum NativeCompletion {
   ) throws -> [Value] {
     guard result.pointee.value_count > 0 else { return [] }
     guard let value = result.pointee.value else {
-      throw NativeStatusFailure.swiftNativeError(
-        "native completion returned a null array"
-      )
+      throw MaplibreError(status: .nativeError, diagnostic:
+        "native completion returned a null array")
     }
     return try NativeInputArena.copyStrided(
       value.assumingMemoryBound(to: Value.self),
@@ -216,9 +214,8 @@ enum NativeCompletion {
     let view: mln_buffer_view = try value(result)
     guard view.size > 0 else { return Data() }
     guard let bytes = view.data else {
-      throw NativeStatusFailure.swiftNativeError(
-        "native completion returned a null buffer"
-      )
+      throw MaplibreError(status: .nativeError, diagnostic:
+        "native completion returned a null buffer")
     }
     return Data(bytes: bytes, count: view.size)
   }

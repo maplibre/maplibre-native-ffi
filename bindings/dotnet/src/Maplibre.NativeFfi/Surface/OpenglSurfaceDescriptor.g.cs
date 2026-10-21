@@ -36,7 +36,7 @@ public readonly partial record struct OpenglSurfaceDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_opengl_surface_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyOpenglSurfaceDescriptor(
                 NativeMethods.mln_opengl_surface_descriptor_default()
             );

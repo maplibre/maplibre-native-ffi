@@ -16,7 +16,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static void AndroidInit(NativePointer jniEnv, NativePointer context)
     {
-        using var call = Enter(null, "mln_android_init");
+        using var call = Enter(null);
         Check(
             NativeMethods.mln_android_init(
                 (void*)jniEnv.Address,
@@ -36,7 +36,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static uint CVersion()
     {
-        using var call = Enter(null, "mln_c_version");
+        using var call = Enter(null);
         var returned = NativeMethods.mln_c_version();
         return returned;
     }
@@ -50,7 +50,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static LatLng LatLngForProjectedMeters(ProjectedMeters meters)
     {
-        using var call = Enter(null, "mln_lat_lng_for_projected_meters");
+        using var call = Enter(null);
         var outCoordinate = default(mln_lat_lng);
         Check(
             NativeMethods.mln_lat_lng_for_projected_meters(
@@ -71,7 +71,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static void LogClearCallback()
     {
-        using var call = Enter(null, "mln_log_clear_callback");
+        using var call = Enter(null);
         Check(NativeMethods.mln_log_clear_callback(Diagnostic));
     }
 
@@ -85,7 +85,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static void LogSetAsyncSeverityMask(LogSeverityMask mask)
     {
-        using var call = Enter(null, "mln_log_set_async_severity_mask");
+        using var call = Enter(null);
         Check(NativeMethods.mln_log_set_async_severity_mask((uint)mask, Diagnostic));
     }
 
@@ -98,7 +98,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static void LogSetCallback(LogHandler handler)
     {
-        using var scope = new NativeCallScope(null, "mln_log_set_callback");
+        using var scope = new NativeCallScope(null);
         var nativeHandler = NativeLogHandler(handler, scope);
         Check(NativeMethods.mln_log_set_callback(&nativeHandler, Diagnostic));
         scope.Accept();
@@ -113,7 +113,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static (uint Width, uint Height) LogicalExtentPhysicalSize(LogicalExtent extent)
     {
-        using var call = Enter(null, "mln_logical_extent_physical_size");
+        using var call = Enter(null);
         uint outWidth = default;
         uint outHeight = default;
         Check(
@@ -136,7 +136,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static NetworkStatus NetworkGetStatus()
     {
-        using var call = Enter(null, "mln_network_get_status");
+        using var call = Enter(null);
         uint outStatus = default;
         Check(NativeMethods.mln_network_get_status(&outStatus, Diagnostic));
         return (NetworkStatus)outStatus;
@@ -151,7 +151,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static void NetworkSetStatus(NetworkStatus status)
     {
-        using var call = Enter(null, "mln_network_set_status");
+        using var call = Enter(null);
         Check(NativeMethods.mln_network_set_status((uint)status, Diagnostic));
     }
 
@@ -164,7 +164,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static OpenglContextProviderFlag OpenglSupportedContextProviderMask()
     {
-        using var call = Enter(null, "mln_opengl_supported_context_provider_mask");
+        using var call = Enter(null);
         var returned = NativeMethods.mln_opengl_supported_context_provider_mask();
         return (OpenglContextProviderFlag)returned;
     }
@@ -179,7 +179,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static NativePointer PluginGetRegisterFunctionV1()
     {
-        using var call = Enter(null, "mln_plugin_get_register_function_v1");
+        using var call = Enter(null);
         var returned = NativeMethods.mln_plugin_get_register_function_v1();
         return NativePointer.FromNativeAddress((nint)returned);
     }
@@ -193,7 +193,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static ProjectedMeters ProjectedMetersForLatLng(LatLng coordinate)
     {
-        using var call = Enter(null, "mln_projected_meters_for_lat_lng");
+        using var call = Enter(null);
         var outMeters = default(mln_projected_meters);
         Check(
             NativeMethods.mln_projected_meters_for_lat_lng(
@@ -214,7 +214,7 @@ public static unsafe partial class Maplibre
     /// </remarks>
     public static RenderBackendFlag SupportedRenderBackendMask()
     {
-        using var call = Enter(null, "mln_supported_render_backend_mask");
+        using var call = Enter(null);
         var returned = NativeMethods.mln_supported_render_backend_mask();
         return (RenderBackendFlag)returned;
     }

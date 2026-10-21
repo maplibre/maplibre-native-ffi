@@ -42,7 +42,7 @@ public sealed record CameraDelta
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_camera_delta_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyCameraDelta(NativeMethods.mln_camera_delta_default());
         }
     }

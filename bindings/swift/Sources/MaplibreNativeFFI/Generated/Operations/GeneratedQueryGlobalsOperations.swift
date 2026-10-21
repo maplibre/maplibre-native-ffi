@@ -11,7 +11,7 @@ public extension Maplibre {
   static func renderedFeatureQueryOptionsDefault() throws
     -> RenderedFeatureQueryOptions
   {
-    try nativeDirect("mln_rendered_feature_query_options_default") { _ in
+    try nativeDirect { _ in
       try RenderedFeatureQueryOptions(
         raw: mln_rendered_feature_query_options_default()
       )
@@ -25,7 +25,7 @@ public extension Maplibre {
   static func sourceFeatureQueryOptionsDefault() throws
     -> SourceFeatureQueryOptions
   {
-    try nativeDirect("mln_source_feature_query_options_default") { _ in
+    try nativeDirect { _ in
       try SourceFeatureQueryOptions(
         raw: mln_source_feature_query_options_default()
       )

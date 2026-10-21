@@ -45,7 +45,7 @@ public sealed record AnimationOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_animation_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyAnimationOptions(
                 NativeMethods.mln_animation_options_default()
             );

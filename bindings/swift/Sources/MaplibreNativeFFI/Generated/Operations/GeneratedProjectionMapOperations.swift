@@ -10,12 +10,10 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func createProjection() throws -> MapProjectionHandle {
     var value0: mln_map_projection = 0
-    return try nativeInvoke("mln_map_create_projection") { raw, _, diagnostic in
-      mln_map_create_projection(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try MapProjectionHandle(adopting: value0) }
+    return try nativeInvoke { raw, _, diagnostic in mln_map_create_projection(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { try MapProjectionHandle(adopting: value0) }
   }
 }

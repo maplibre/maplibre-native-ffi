@@ -11,7 +11,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func beginCommandGroup() async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_begin_command_group") { raw, _, completion, diagnostic in
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_begin_command_group(
         raw,
         completion,
@@ -25,10 +25,7 @@ public extension MapHandle {
   /// See `mln_map_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func dispose() throws {
-    try nativeClose("mln_map_dispose") { raw, diagnostic in mln_map_dispose(
-      raw,
-      diagnostic
-    ) }
+    try nativeClose { raw, diagnostic in mln_map_dispose(raw, diagnostic) }
   }
 
   /// Ends the innermost command group that `mln_map_begin_command_group()`
@@ -38,7 +35,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func endCommandGroup() async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_end_command_group") { raw, _, completion, diagnostic in
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_end_command_group(
         raw,
         completion,
@@ -54,10 +51,9 @@ public extension MapHandle {
   func getFeatureState(selector bindingArg0: FeatureStateSelector) async throws
     -> Data
   {
-    try await nativeStart(
-      "mln_map_get_feature_state",
-      convert: { result in try NativeCompletion.data(result) }
-    ) { raw, arena, completion, diagnostic in try mln_map_get_feature_state(
+    try await nativeStart(convert: { result in
+      try NativeCompletion.data(result)
+    }) { raw, arena, completion, diagnostic in try mln_map_get_feature_state(
       raw,
       arena.store(bindingArg0.nativeValue(arena: arena)),
       completion,
@@ -70,10 +66,9 @@ public extension MapHandle {
   /// See `mln_map_get_loaded_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func getLoadedStyleJson() async throws -> Data {
-    try await nativeStart(
-      "mln_map_get_loaded_style_json",
-      convert: { result in try NativeCompletion.data(result) }
-    ) { raw, _, completion, diagnostic in mln_map_get_loaded_style_json(
+    try await nativeStart(convert: { result in
+      try NativeCompletion.data(result)
+    }) { raw, _, completion, diagnostic in mln_map_get_loaded_style_json(
       raw,
       completion,
       diagnostic
@@ -87,13 +82,11 @@ public extension MapHandle {
   func getSnapshot() throws -> MapSnapshot {
     var value0 = mln_map_snapshot()
     value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
-    return try nativeInvoke("mln_map_get_snapshot") { raw, _, diagnostic in
-      mln_map_get_snapshot(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { MapSnapshot(raw: value0) }
+    return try nativeInvoke { raw, _, diagnostic in mln_map_get_snapshot(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { MapSnapshot(raw: value0) }
   }
 
   /// Starts an ordered copy of the last requested style URL.
@@ -101,10 +94,9 @@ public extension MapHandle {
   /// See `mln_map_get_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func getStyleUrl() async throws -> String {
-    try await nativeStart(
-      "mln_map_get_style_url",
-      convert: { result in try NativeCompletion.string(result) }
-    ) { raw, _, completion, diagnostic in mln_map_get_style_url(
+    try await nativeStart(convert: { result in
+      try NativeCompletion.string(result)
+    }) { raw, _, completion, diagnostic in mln_map_get_style_url(
       raw,
       completion,
       diagnostic
@@ -117,17 +109,15 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func close() async throws {
     guard let future = try startClose() else { return }
-    try await mapNativeFailure { try await future.value() }
+    try await future.value()
   }
 
   internal func startClose() throws -> NativeFuture<Void>? {
-    try nativeStartClose("mln_map_release") { raw, completion, diagnostic in
-      mln_map_release(
-        raw,
-        completion,
-        diagnostic
-      )
-    }
+    try nativeStartClose { raw, completion, diagnostic in mln_map_release(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
 
   /// Removes per-feature state from this map.
@@ -140,7 +130,7 @@ public extension MapHandle {
   ) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_remove_feature_state") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_remove_feature_state(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -156,7 +146,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func requestRepaint() async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_request_repaint") { raw, _, completion, diagnostic in
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_request_repaint(
         raw,
         completion,
@@ -170,7 +160,7 @@ public extension MapHandle {
   /// See `mln_map_request_still_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func requestStillImage() async throws {
-    try await nativeUnit("mln_map_request_still_image") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_map_request_still_image(
         raw,
         completion,
@@ -187,14 +177,12 @@ public extension MapHandle {
   func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_resize") { raw, _, completion, diagnostic in
-      mln_map_resize(
-        raw,
-        bindingArg0.nativeValue(),
-        completion,
-        diagnostic
-      )
-    }
+    try await nativeCommand { raw, _, completion, diagnostic in mln_map_resize(
+      raw,
+      bindingArg0.nativeValue(),
+      completion,
+      diagnostic
+    ) }
   }
 
   /// Selects which map-originated event types this map queues.
@@ -205,7 +193,7 @@ public extension MapHandle {
   func setEventMask(mask bindingArg0: RuntimeEventMask) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_map_set_event_mask") { raw, _, completion, diagnostic in
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_set_event_mask(
         raw,
         bindingArg0.nativeValue(),
@@ -224,7 +212,7 @@ public extension MapHandle {
     selector bindingArg0: FeatureStateSelector,
     state bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_feature_state") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_set_feature_state(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -241,7 +229,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setStyleJson(json bindingArg0: Data) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_json") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_json(
         raw,
         arena.view(bindingArg0),
@@ -257,7 +245,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setStyleUrl(url bindingArg0: String) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_style_url") { raw, arena, completion, diagnostic in
+    try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_url(
         raw,
         arena.view(bindingArg0),
@@ -270,30 +258,24 @@ public extension MapHandle {
 
 public extension MapHandleDiscarding {
   func beginCommandGroup() throws {
-    try owner
-      .nativeInvoke("mln_map_begin_command_group") { raw, _, diagnostic in
-        mln_map_begin_command_group(
-          raw,
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_begin_command_group(
+      raw,
+      nil,
+      diagnostic
+    ) }
   }
 
   func endCommandGroup() throws {
-    try owner
-      .nativeInvoke("mln_map_end_command_group") { raw, _, diagnostic in
-        mln_map_end_command_group(
-          raw,
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_end_command_group(
+      raw,
+      nil,
+      diagnostic
+    ) }
   }
 
   func removeFeatureState(selector bindingArg0: FeatureStateSelector) throws {
     try owner
-      .nativeInvoke("mln_map_remove_feature_state") { raw, arena, diagnostic in
+      .nativeInvoke { raw, arena, diagnostic in
         try mln_map_remove_feature_state(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -304,36 +286,29 @@ public extension MapHandleDiscarding {
   }
 
   func requestRepaint() throws {
-    try owner
-      .nativeInvoke("mln_map_request_repaint") { raw, _, diagnostic in
-        mln_map_request_repaint(
-          raw,
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_request_repaint(
+      raw,
+      nil,
+      diagnostic
+    ) }
   }
 
   func resize(extent bindingArg0: LogicalExtent) throws {
-    try owner
-      .nativeInvoke("mln_map_resize") { raw, _, diagnostic in mln_map_resize(
-        raw,
-        bindingArg0.nativeValue(),
-        nil,
-        diagnostic
-      ) }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_resize(
+      raw,
+      bindingArg0.nativeValue(),
+      nil,
+      diagnostic
+    ) }
   }
 
   func setEventMask(mask bindingArg0: RuntimeEventMask) throws {
-    try owner
-      .nativeInvoke("mln_map_set_event_mask") { raw, _, diagnostic in
-        mln_map_set_event_mask(
-          raw,
-          bindingArg0.nativeValue(),
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_event_mask(
+      raw,
+      bindingArg0.nativeValue(),
+      nil,
+      diagnostic
+    ) }
   }
 
   func setFeatureState(
@@ -341,38 +316,30 @@ public extension MapHandleDiscarding {
     state bindingArg1: Data
   ) throws {
     try owner
-      .nativeInvoke("mln_map_set_feature_state") { raw, arena, diagnostic in
-        try mln_map_set_feature_state(
-          raw,
-          arena.store(bindingArg0.nativeValue(arena: arena)),
-          arena.view(bindingArg1),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in try mln_map_set_feature_state(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.view(bindingArg1),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setStyleJson(json bindingArg0: Data) throws {
-    try owner
-      .nativeInvoke("mln_map_set_style_json") { raw, arena, diagnostic in
-        mln_map_set_style_json(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_style_json(
+      raw,
+      arena.view(bindingArg0),
+      nil,
+      diagnostic
+    ) }
   }
 
   func setStyleUrl(url bindingArg0: String) throws {
-    try owner
-      .nativeInvoke("mln_map_set_style_url") { raw, arena, diagnostic in
-        mln_map_set_style_url(
-          raw,
-          arena.view(bindingArg0),
-          nil,
-          diagnostic
-        )
-      }
+    try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_style_url(
+      raw,
+      arena.view(bindingArg0),
+      nil,
+      diagnostic
+    ) }
   }
 }

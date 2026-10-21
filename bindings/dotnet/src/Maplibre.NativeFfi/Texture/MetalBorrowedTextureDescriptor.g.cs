@@ -62,10 +62,7 @@ public readonly record struct MetalBorrowedTextureDescriptor
     {
         get
         {
-            using var call = NativeCall.Enter(
-                null,
-                "mln_metal_borrowed_texture_descriptor_default"
-            );
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyMetalBorrowedTextureDescriptor(
                 NativeMethods.mln_metal_borrowed_texture_descriptor_default()
             );

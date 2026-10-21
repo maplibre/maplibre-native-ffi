@@ -9,9 +9,7 @@ public extension Maplibre {
   /// See `mln_gpu_sync_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func gpuSyncDefault() throws -> GpuSync {
-    try nativeDirect("mln_gpu_sync_default") { _ in
-      GpuSync(raw: mln_gpu_sync_default())
-    }
+    try nativeDirect { _ in GpuSync(raw: mln_gpu_sync_default()) }
   }
 
   /// Computes the physical device-pixel size of a logical extent.
@@ -25,7 +23,7 @@ public extension Maplibre {
   {
     var value0: UInt32 = 0
     var value1: UInt32 = 0
-    return try nativeInvoke("mln_logical_extent_physical_size") { _, _, diagnostic in
+    return try nativeInvoke { _, _, diagnostic in
       mln_logical_extent_physical_size(
         bindingArg0.nativeValue(),
         &value0,
@@ -42,7 +40,7 @@ public extension Maplibre {
   static func openglSupportedContextProviderMask() throws
     -> OpenglContextProviderFlag
   {
-    try nativeDirect("mln_opengl_supported_context_provider_mask") { _ in
+    try nativeDirect { _ in
       OpenglContextProviderFlag(
         rawValue: mln_opengl_supported_context_provider_mask()
       )
@@ -58,7 +56,7 @@ public extension Maplibre {
   static func renderSessionAttachOptionsDefault() throws
     -> RenderSessionAttachOptions
   {
-    try nativeDirect("mln_render_session_attach_options_default") { _ in
+    try nativeDirect { _ in
       try RenderSessionAttachOptions(
         raw: mln_render_session_attach_options_default()
       )

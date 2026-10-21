@@ -28,7 +28,7 @@ public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong T
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_frame_demand_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyFrameDemand(NativeMethods.mln_frame_demand_default());
         }
     }

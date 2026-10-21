@@ -11,10 +11,8 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_read_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func readTexture() async throws -> TextureReadbackResult {
-    try await nativeStart(
-      "mln_render_session_read_texture",
-      copying: { try TextureReadbackResult(raw: $0) }
-    ) { raw, _, completion, diagnostic in mln_render_session_read_texture(
+    try await nativeStart(copying: { try TextureReadbackResult(raw: $0)
+    }) { raw, _, completion, diagnostic in mln_render_session_read_texture(
       raw,
       completion,
       diagnostic
@@ -29,9 +27,7 @@ public extension RenderSessionHandle {
   func setMetalBorrowedTextureTarget(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit(
-      "mln_render_session_set_metal_borrowed_texture_target"
-    ) { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_metal_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -49,9 +45,7 @@ public extension RenderSessionHandle {
   func setOpenglBorrowedTextureTarget(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit(
-      "mln_render_session_set_opengl_borrowed_texture_target"
-    ) { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_opengl_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -69,9 +63,7 @@ public extension RenderSessionHandle {
   func setVulkanBorrowedTextureTarget(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit(
-      "mln_render_session_set_vulkan_borrowed_texture_target"
-    ) { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_vulkan_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -89,9 +81,7 @@ public extension RenderSessionHandle {
   func setWebgpuBorrowedTextureTarget(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit(
-      "mln_render_session_set_webgpu_borrowed_texture_target"
-    ) { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_webgpu_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),

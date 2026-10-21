@@ -36,7 +36,7 @@ public readonly partial record struct MetalSurfaceDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_metal_surface_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyMetalSurfaceDescriptor(
                 NativeMethods.mln_metal_surface_descriptor_default()
             );

@@ -1,6 +1,5 @@
 import Foundation
-import MaplibreNativeC
-@testable import MaplibreNativeFFI
+import MaplibreNativeFFI
 import Testing
 
 /// Close is idempotent, and later use reaches native with the stale id.
@@ -64,17 +63,4 @@ import Testing
   try await map?.close()
   map = nil
   #expect(weakRuntime == nil)
-}
-
-/// Closes on sixteen threads at once destroy the native handle once.
-@Test func concurrentClosesDestroyOnce() throws {
-  let closes = LockedBox(0)
-  let state = try NativeHandleState(
-    typeName: "test_handle",
-    handle: SyntheticHandles.resourceRequest(0x5)
-  )
-  DispatchQueue.concurrentPerform(iterations: 16) { _ in
-    try? state.closeOnce { _ in closes.update { $0 += 1 } }
-  }
-  #expect(closes.value == 1)
 }

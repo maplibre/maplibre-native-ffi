@@ -1,5 +1,4 @@
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Loader;
 using Maplibre.NativeFfi.Internal.Status;
 
@@ -11,7 +10,7 @@ internal static unsafe class NativeCall
     /// Keeps the receiver reachable until the returned scope is disposed.
     /// An operation without a receiver then loads the native library.
     /// </summary>
-    internal static Entry Enter(object? owner, string operation)
+    internal static Entry Enter(object? owner)
     {
         if (owner is null)
             NativeLibraryLoader.EnsureLoaded();

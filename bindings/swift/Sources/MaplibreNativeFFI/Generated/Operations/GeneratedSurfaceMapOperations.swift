@@ -13,17 +13,18 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_metal_surface",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_map_attach_metal_surface(
-      raw,
-      arena.store(bindingArg0.nativeValue()),
-      arena.store(bindingArg1.nativeValue(arena: arena)),
-      &value0,
-      completion,
-      diagnostic
-    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
+      try mln_map_attach_metal_surface(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
+      )
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
   /// Starts attachment of an OpenGL surface target.
@@ -35,17 +36,18 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_opengl_surface",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_map_attach_opengl_surface(
-      raw,
-      arena.store(bindingArg0.nativeValue(arena: arena)),
-      arena.store(bindingArg1.nativeValue(arena: arena)),
-      &value0,
-      completion,
-      diagnostic
-    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
+      try mln_map_attach_opengl_surface(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
+      )
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
   /// Starts attachment of a Vulkan surface target.
@@ -57,17 +59,18 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_vulkan_surface",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_map_attach_vulkan_surface(
-      raw,
-      arena.store(bindingArg0.nativeValue()),
-      arena.store(bindingArg1.nativeValue(arena: arena)),
-      &value0,
-      completion,
-      diagnostic
-    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
+      try mln_map_attach_vulkan_surface(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
+      )
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
   /// Starts attachment of a WebGPU surface target.
@@ -79,16 +82,17 @@ public extension MapHandle {
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
-    return try nativeAttach(
-      "mln_map_attach_webgpu_surface",
-      as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_map_attach_webgpu_surface(
-      raw,
-      arena.store(bindingArg0.nativeValue()),
-      arena.store(bindingArg1.nativeValue(arena: arena)),
-      &value0,
-      completion,
-      diagnostic
-    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    return try nativeAttach(as: RenderSessionAttachment
+      .init)
+    { raw, arena, completion, diagnostic in
+      try mln_map_attach_webgpu_surface(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
+      )
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 }

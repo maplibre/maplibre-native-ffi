@@ -30,7 +30,7 @@ public readonly partial record struct LogicalExtent(uint Width, uint Height, dou
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_logical_extent_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyLogicalExtent(NativeMethods.mln_logical_extent_default());
         }
     }

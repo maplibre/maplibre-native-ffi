@@ -31,7 +31,7 @@ public readonly partial record struct MetalOwnedTextureDescriptor(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_metal_owned_texture_descriptor_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyMetalOwnedTextureDescriptor(
                 NativeMethods.mln_metal_owned_texture_descriptor_default()
             );

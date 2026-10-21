@@ -34,7 +34,7 @@ public readonly partial record struct ResourceRoute(
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_resource_route_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyResourceRoute(NativeMethods.mln_resource_route_default());
         }
     }

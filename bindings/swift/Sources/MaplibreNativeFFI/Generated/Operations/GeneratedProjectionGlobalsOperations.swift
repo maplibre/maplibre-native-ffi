@@ -14,7 +14,7 @@ public extension Maplibre {
     -> LatLng
   {
     var value0 = mln_lat_lng()
-    return try nativeInvoke("mln_lat_lng_for_projected_meters") { _, _, diagnostic in
+    return try nativeInvoke { _, _, diagnostic in
       mln_lat_lng_for_projected_meters(
         bindingArg0.nativeValue(),
         &value0,
@@ -31,7 +31,7 @@ public extension Maplibre {
     -> ProjectedMeters
   {
     var value0 = mln_projected_meters()
-    return try nativeInvoke("mln_projected_meters_for_lat_lng") { _, _, diagnostic in
+    return try nativeInvoke { _, _, diagnostic in
       mln_projected_meters_for_lat_lng(
         bindingArg0.nativeValue(),
         &value0,

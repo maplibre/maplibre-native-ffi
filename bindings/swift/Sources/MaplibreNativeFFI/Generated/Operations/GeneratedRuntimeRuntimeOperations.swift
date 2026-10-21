@@ -9,7 +9,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_clear_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func clearEventHandler() async throws {
-    try await nativeUnit("mln_runtime_clear_event_handler") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_clear_event_handler(
         raw,
         completion,
@@ -23,7 +23,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_clear_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func clearHttpHeaderTransform() async throws {
-    try await nativeUnit("mln_runtime_clear_http_header_transform") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_clear_http_header_transform(
         raw,
         completion,
@@ -37,7 +37,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_clear_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func clearResourceProvider() async throws {
-    try await nativeUnit("mln_runtime_clear_resource_provider") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_clear_resource_provider(
         raw,
         completion,
@@ -51,7 +51,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_clear_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func clearResourceTransform() async throws {
-    try await nativeUnit("mln_runtime_clear_resource_transform") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_clear_resource_transform(
         raw,
         completion,
@@ -65,12 +65,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func dispose() throws {
-    try nativeClose("mln_runtime_dispose") { raw, diagnostic in
-      mln_runtime_dispose(
-        raw,
-        diagnostic
-      )
-    }
+    try nativeClose { raw, diagnostic in mln_runtime_dispose(raw, diagnostic) }
   }
 
   /// Reports which runtime-scoped event types this runtime queues.
@@ -79,13 +74,11 @@ public extension RuntimeHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func getEventMask() throws -> RuntimeEventMask {
     var value0: UInt64 = 0
-    return try nativeInvoke("mln_runtime_get_event_mask") { raw, _, diagnostic in
-      mln_runtime_get_event_mask(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { RuntimeEventMask(rawValue: value0) }
+    return try nativeInvoke { raw, _, diagnostic in mln_runtime_get_event_mask(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { RuntimeEventMask(rawValue: value0) }
   }
 
   /// Starts release of a runtime after checking its children.
@@ -94,17 +87,15 @@ public extension RuntimeHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func close() async throws {
     guard let future = try startClose() else { return }
-    try await mapNativeFailure { try await future.value() }
+    try await future.value()
   }
 
   internal func startClose() throws -> NativeFuture<Void>? {
-    try nativeStartClose("mln_runtime_release") { raw, completion, diagnostic in
-      mln_runtime_release(
-        raw,
-        completion,
-        diagnostic
-      )
-    }
+    try nativeStartClose { raw, completion, diagnostic in mln_runtime_release(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
 
   /// Starts a MapLibre ambient cache maintenance operation for this runtime.
@@ -114,7 +105,7 @@ public extension RuntimeHandle {
   func runAmbientCacheOperation(
     operation bindingArg0: AmbientCacheOperation
   ) async throws {
-    try await nativeUnit("mln_runtime_run_ambient_cache_operation") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_run_ambient_cache_operation(
         raw,
         bindingArg0.nativeValue(),
@@ -129,7 +120,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setEventHandler(handler bindingArg0: RuntimeEventHandler) async throws {
-    try await nativeUnit("mln_runtime_set_event_handler") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_runtime_set_event_handler(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -144,13 +135,11 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setEventMask(mask bindingArg0: RuntimeEventMask) throws {
-    try nativeInvoke("mln_runtime_set_event_mask") { raw, _, diagnostic in
-      mln_runtime_set_event_mask(
-        raw,
-        bindingArg0.nativeValue(),
-        diagnostic
-      )
-    }
+    try nativeInvoke { raw, _, diagnostic in mln_runtime_set_event_mask(
+      raw,
+      bindingArg0.nativeValue(),
+      diagnostic
+    ) }
   }
 
   /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
@@ -160,7 +149,7 @@ public extension RuntimeHandle {
   func setHttpHeaderTransform(
     transform bindingArg0: HttpHeaderTransform
   ) async throws {
-    try await nativeUnit("mln_runtime_set_http_header_transform") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_runtime_set_http_header_transform(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -175,7 +164,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_maximum_ambient_cache_size` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setMaximumAmbientCacheSize(size bindingArg0: UInt64) async throws {
-    try await nativeUnit("mln_runtime_set_maximum_ambient_cache_size") { raw, _, completion, diagnostic in
+    try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_set_maximum_ambient_cache_size(
         raw,
         bindingArg0,
@@ -190,7 +179,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setResourceProvider(provider bindingArg0: ResourceProvider) async throws {
-    try await nativeUnit("mln_runtime_set_resource_provider") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_runtime_set_resource_provider(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -207,7 +196,7 @@ public extension RuntimeHandle {
   func setResourceTransform(
     transform bindingArg0: ResourceTransform
   ) async throws {
-    try await nativeUnit("mln_runtime_set_resource_transform") { raw, arena, completion, diagnostic in
+    try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_runtime_set_resource_transform(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),

@@ -28,7 +28,7 @@ public sealed record CameraOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_camera_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyCameraOptions(NativeMethods.mln_camera_options_default());
         }
     }

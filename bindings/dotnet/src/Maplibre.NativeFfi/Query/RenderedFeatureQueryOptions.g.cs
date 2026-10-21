@@ -34,7 +34,7 @@ public sealed record RenderedFeatureQueryOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_rendered_feature_query_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyRenderedFeatureQueryOptions(
                 NativeMethods.mln_rendered_feature_query_options_default()
             );

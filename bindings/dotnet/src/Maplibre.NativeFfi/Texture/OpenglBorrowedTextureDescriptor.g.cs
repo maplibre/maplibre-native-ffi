@@ -77,10 +77,7 @@ public readonly record struct OpenglBorrowedTextureDescriptor
     {
         get
         {
-            using var call = NativeCall.Enter(
-                null,
-                "mln_opengl_borrowed_texture_descriptor_default"
-            );
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyOpenglBorrowedTextureDescriptor(
                 NativeMethods.mln_opengl_borrowed_texture_descriptor_default()
             );

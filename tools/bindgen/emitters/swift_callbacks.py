@@ -231,7 +231,7 @@ def descriptor(values, plan):
                 " " + fail if fail else ""
             )
         body = (
-            f'  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}'
+            f'  do {{ {invoke} }} catch {{ reportToStandardError("{callback.native} failed and native received its fallback: \\(error)\\n"); {fail} }}'
             if "try " in invoke
             else f"  {invoke}"
         )

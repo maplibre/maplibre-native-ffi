@@ -18,10 +18,9 @@ public extension RenderSessionHandle {
     extensionField bindingArg3: String,
     arguments bindingArg4: Data? = nil
   ) async throws -> Data {
-    try await nativeStart(
-      "mln_render_session_query_feature_extensions",
-      convert: { result in try NativeCompletion.data(result) }
-    ) { raw, arena, completion, diagnostic in
+    try await nativeStart(convert: { result in
+      try NativeCompletion.data(result)
+    }) { raw, arena, completion, diagnostic in
       mln_render_session_query_feature_extensions(
         raw,
         arena.view(bindingArg0),
@@ -43,13 +42,11 @@ public extension RenderSessionHandle {
     geometry bindingArg0: RenderedQueryGeometry,
     options bindingArg1: RenderedFeatureQueryOptions? = nil
   ) async throws -> [QueriedFeature] {
-    try await nativeStart(
-      "mln_render_session_query_rendered_features",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_queried_feature.self
-      ).map { try QueriedFeature(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in
+    try await nativeStart(convert: { result in try NativeCompletion.values(
+      result,
+      as: mln_queried_feature.self
+    ).map { try QueriedFeature(raw: $0) }
+    }) { raw, arena, completion, diagnostic in
       try mln_render_session_query_rendered_features(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -68,13 +65,11 @@ public extension RenderSessionHandle {
     sourceId bindingArg0: String,
     options bindingArg1: SourceFeatureQueryOptions? = nil
   ) async throws -> [QueriedFeature] {
-    try await nativeStart(
-      "mln_render_session_query_source_features",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_queried_feature.self
-      ).map { try QueriedFeature(raw: $0) } }
-    ) { raw, arena, completion, diagnostic in
+    try await nativeStart(convert: { result in try NativeCompletion.values(
+      result,
+      as: mln_queried_feature.self
+    ).map { try QueriedFeature(raw: $0) }
+    }) { raw, arena, completion, diagnostic in
       try mln_render_session_query_source_features(
         raw,
         arena.view(bindingArg0),

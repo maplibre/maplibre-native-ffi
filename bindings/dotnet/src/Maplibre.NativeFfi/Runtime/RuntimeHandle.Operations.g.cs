@@ -35,7 +35,7 @@ public sealed unsafe partial class RuntimeHandle
     internal MlnRuntime Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -51,7 +51,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task ClearEventHandlerAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_clear_event_handler");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_clear_event_handler(Handle, completion, diagnostic),
@@ -68,7 +68,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task ClearHttpHeaderTransformAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_clear_http_header_transform");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_clear_http_header_transform(
@@ -89,7 +89,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task ClearResourceProviderAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_provider");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_clear_resource_provider(Handle, completion, diagnostic),
@@ -106,7 +106,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task ClearResourceTransformAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_transform");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_clear_resource_transform(Handle, completion, diagnostic),
@@ -123,7 +123,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public static RuntimeHandle Create(RuntimeOptions options)
     {
-        using var scope = new NativeCallScope(null, "mln_runtime_create");
+        using var scope = new NativeCallScope(null);
         var nativeOptions = NativeRuntimeOptions(options, scope);
         MlnRuntime outRuntime = default;
         Check(NativeMethods.mln_runtime_create(&nativeOptions, &outRuntime, Diagnostic));
@@ -143,7 +143,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_create_map");
+        using var scope = new NativeCallScope(this);
         return scope.Query<MlnMap, MapHandle>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_create_map(
@@ -170,7 +170,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_create_offline_region");
+        using var scope = new NativeCallScope(this);
         var bufferMetadata = scope.Buffer(metadata);
         return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
@@ -199,7 +199,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_delete_offline_region");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_delete_offline_region(
@@ -221,9 +221,9 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public RuntimeEventMask GetEventMask()
     {
-        using var read = state.Read(this, "mln_runtime_get_event_mask");
+        using var call = Enter(this);
         ulong outMask = default;
-        Check(NativeMethods.mln_runtime_get_event_mask(read.Handle, &outMask, Diagnostic));
+        Check(NativeMethods.mln_runtime_get_event_mask(Handle, &outMask, Diagnostic));
         return (RuntimeEventMask)outMask;
     }
 
@@ -239,7 +239,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_get_offline_region");
+        using var scope = new NativeCallScope(this);
         return scope.QueryOptionalValue<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_get_offline_region(
@@ -265,7 +265,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_get_offline_region_status");
+        using var scope = new NativeCallScope(this);
         return scope.Query<mln_offline_region_status, OfflineRegionStatus>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_get_offline_region_status(
@@ -291,7 +291,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_invalidate_offline_region");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_invalidate_offline_region(
@@ -315,7 +315,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_list_offline_regions");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_list_offline_regions(Handle, completion, diagnostic),
@@ -336,7 +336,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_merge_offline_regions");
+        using var scope = new NativeCallScope(this);
         return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_merge_offline_regions(
@@ -386,7 +386,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_run_ambient_cache_operation");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_run_ambient_cache_operation(
@@ -411,7 +411,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_event_handler");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_event_handler(
@@ -433,7 +433,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public void SetEventMask(RuntimeEventMask mask)
     {
-        using var call = Enter(this, "mln_runtime_set_event_mask");
+        using var call = Enter(this);
         Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask, Diagnostic));
     }
 
@@ -449,7 +449,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_http_header_transform");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_http_header_transform(
@@ -474,7 +474,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_maximum_ambient_cache_size");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
@@ -500,10 +500,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(
-            this,
-            "mln_runtime_set_offline_region_download_state"
-        );
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_offline_region_download_state(
@@ -530,7 +527,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_offline_region_observed");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_offline_region_observed(
@@ -556,7 +553,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_resource_provider");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_resource_provider(
@@ -582,7 +579,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_set_resource_transform");
+        using var scope = new NativeCallScope(this);
         return scope.Run(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_set_resource_transform(
@@ -608,7 +605,7 @@ public sealed unsafe partial class RuntimeHandle
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_runtime_update_offline_region_metadata");
+        using var scope = new NativeCallScope(this);
         var bufferMetadata = scope.Buffer(metadata);
         return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>

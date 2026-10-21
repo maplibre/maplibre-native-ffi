@@ -10,11 +10,9 @@ public extension Maplibre {
   /// See `mln_plugin_get_register_function_v1` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
   static func pluginGetRegisterFunctionV1() throws -> NativePointer {
-    try nativeDirect("mln_plugin_get_register_function_v1") { _ in
-      NativePointer(bitPattern: unsafeBitCast(
-        mln_plugin_get_register_function_v1(),
-        to: UInt.self
-      ))
-    }
+    try nativeDirect { _ in NativePointer(bitPattern: unsafeBitCast(
+      mln_plugin_get_register_function_v1(),
+      to: UInt.self
+    )) }
   }
 }

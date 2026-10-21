@@ -10,7 +10,7 @@ public extension Maplibre {
   /// See `mln_http_header_rule_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func httpHeaderRuleDefault() throws -> HttpHeaderRule {
-    try nativeDirect("mln_http_header_rule_default") { _ in
+    try nativeDirect { _ in
       try HttpHeaderRule(raw: mln_http_header_rule_default())
     }
   }
@@ -21,12 +21,10 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkGetStatus() throws -> NetworkStatus {
     var value0: UInt32 = 0
-    return try nativeInvoke("mln_network_get_status") { _, _, diagnostic in
-      mln_network_get_status(
-        &value0,
-        diagnostic
-      )
-    } result: { NetworkStatus(rawValue: value0) }
+    return try nativeInvoke { _, _, diagnostic in mln_network_get_status(
+      &value0,
+      diagnostic
+    ) } result: { NetworkStatus(rawValue: value0) }
   }
 
   /// Sets MapLibre Native's process-global network status.
@@ -34,12 +32,10 @@ public extension Maplibre {
   /// See `mln_network_set_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkSetStatus(status bindingArg0: NetworkStatus) throws {
-    try nativeInvoke("mln_network_set_status") { _, _, diagnostic in
-      mln_network_set_status(
-        bindingArg0.nativeValue(),
-        diagnostic
-      )
-    }
+    try nativeInvoke { _, _, diagnostic in mln_network_set_status(
+      bindingArg0.nativeValue(),
+      diagnostic
+    ) }
   }
 
   /// Returns an exact-match route for every resource kind.
@@ -47,7 +43,7 @@ public extension Maplibre {
   /// See `mln_resource_route_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func resourceRouteDefault() throws -> ResourceRoute {
-    try nativeDirect("mln_resource_route_default") { _ in
+    try nativeDirect { _ in
       try ResourceRoute(raw: mln_resource_route_default())
     }
   }
@@ -60,13 +56,11 @@ public extension Maplibre {
     -> RuntimeHandle
   {
     var value0: mln_runtime = 0
-    return try nativeInvoke("mln_runtime_create") { _, arena, diagnostic in
-      try mln_runtime_create(
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        &value0,
-        diagnostic
-      )
-    } result: { try RuntimeHandle(adopting: value0) }
+    return try nativeInvoke { _, arena, diagnostic in try mln_runtime_create(
+      arena.store(bindingArg0.nativeValue(arena: arena)),
+      &value0,
+      diagnostic
+    ) } result: { try RuntimeHandle(adopting: value0) }
   }
 
   /// Returns runtime options initialized for this C API version.
@@ -74,7 +68,7 @@ public extension Maplibre {
   /// See `mln_runtime_options_default` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func runtimeOptionsDefault() throws -> RuntimeOptions {
-    try nativeDirect("mln_runtime_options_default") { _ in
+    try nativeDirect { _ in
       try RuntimeOptions(raw: mln_runtime_options_default())
     }
   }
@@ -87,10 +81,7 @@ public extension HttpHeaderTransformResponse {
   /// See `mln_http_header_transform_response_set_header` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setHeader(name bindingArg0: String, value bindingArg1: String) throws {
-    try nativeInvoke(
-      owner: self,
-      "mln_http_header_transform_response_set_header"
-    ) { _, arena, diagnostic in
+    try nativeInvoke(owner: self) { _, arena, diagnostic in
       try mln_http_header_transform_response_set_header(
         nativePointer,
         arena.view(bindingArg0),

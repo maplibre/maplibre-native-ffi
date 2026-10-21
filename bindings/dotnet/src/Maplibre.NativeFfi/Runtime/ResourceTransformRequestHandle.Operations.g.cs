@@ -41,7 +41,7 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     internal MlnResourceTransformRequest Handle => state.Handle;
 
     // Runtime events report their source by this identity.
-    public ulong Id => state.IssuedHandle.Value;
+    public ulong Id => state.Handle.Value;
 
     public void Dispose()
     {
@@ -57,7 +57,7 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// </remarks>
     public void Complete(string url)
     {
-        using var scope = new NativeCallScope(this, "mln_resource_transform_request_complete");
+        using var scope = new NativeCallScope(this);
         Check(
             NativeMethods.mln_resource_transform_request_complete(
                 Handle,

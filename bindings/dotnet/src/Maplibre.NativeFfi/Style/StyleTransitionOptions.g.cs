@@ -33,7 +33,7 @@ public sealed record StyleTransitionOptions
     {
         get
         {
-            using var call = NativeCall.Enter(null, "mln_style_transition_options_default");
+            using var call = NativeCall.Enter(null);
             return GeneratedValues.CopyStyleTransitionOptions(
                 NativeMethods.mln_style_transition_options_default()
             );
