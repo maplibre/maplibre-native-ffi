@@ -1,0 +1,71 @@
+# Throwaway: repeats the .NET example smoke on Windows arm64 to reproduce #899.
+# This branch deletes ci-coverage.yml so that no other CI job runs.
+name: dotnet smoke repro
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  repro:
+    name: repro / ${{ matrix.preset }}
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [windows-arm64-wgl, windows-arm64-vulkan]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: ${{ matrix.preset }}
+      - name: Keep crash dumps
+        shell: pwsh
+        run: |
+          $dumps = Join-Path $env:RUNNER_TEMP "dumps"
+          New-Item -ItemType Directory -Path $dumps -Force | Out-Null
+          $key = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps"
+          New-Item -Path $key -Force | Out-Null
+          Set-ItemProperty -Path $key -Name DumpFolder -Value $dumps -Type ExpandString
+          Set-ItemProperty -Path $key -Name DumpType -Value 1 -Type DWord
+          Set-ItemProperty -Path $key -Name DumpCount -Value 10 -Type DWord
+      - run: mise run build ${{ matrix.preset }}
+      - run: mise run archive-native ${{ matrix.preset }}
+      - run: mise run install-native-package ${{ matrix.preset }} build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz
+      - name: Run the .NET smoke 25 times
+        shell: bash
+        env:
+          MISE_TASK_SKIP: //:build
+        run: |
+          failures=0
+          for i in $(seq 1 25); do
+            echo "::group::iteration $i"
+            if ! mise run //examples/dotnet-map:smoke ${{ matrix.preset }}; then
+              failures=$((failures + 1))
+              echo "::warning::iteration $i failed"
+            fi
+            echo "::endgroup::"
+          done
+          echo "failures: $failures of 25"
+          [[ $failures -eq 0 ]]
+      - name: Upload crash dumps and symbols
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dotnet-smoke-${{ matrix.preset }}
+          path: |
+            ${{ runner.temp }}/dumps
+            build/${{ matrix.preset }}/**/maplibre-native-c.pdb
+            build/${{ matrix.preset }}/**/maplibre-native-c.dll
+          if-no-files-found: ignore
+          retention-days: 3
