@@ -146,27 +146,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Copies the last completed rendered transform into an independent
-    /// projection. Callable from any thread. Returns invalid state before a
-    /// completed render, after an extent or target change, or after detachment.
-    /// The caller owns the returned projection, which remains usable after the
-    /// session is released. out_projection must point to a null handle.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_create_projection</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public MapProjectionHandle CreateProjection()
-    {
-        using var call = Enter(this);
-        MlnMapProjection outProjection = default;
-        Check(
-            NativeMethods.mln_render_session_create_projection(Handle, &outProjection, Diagnostic)
-        );
-        return MapProjectionHandle.Adopt(outProjection);
-    }
-
-    /// <summary>
     /// Starts normal graphics-owner teardown and map detachment.
     /// </summary>
     /// <remarks>

@@ -961,6 +961,41 @@ typedef struct mln_map_viewport_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
 } mln_map_viewport_options;
 
+/**
+ * Everything that a projection depends on: the transform that a published
+ * snapshot or a rendered frame describes.
+ *
+ * Every member is set on output. mln_map_projection_create() reads every
+ * member and requires every field of each nested struct, except
+ * MLN_CAMERA_OPTION_ANCHOR, which it ignores. Camera constraints are map
+ * policy and stay out of the view, because no conversion reads them.
+ *
+ * A later version may append members. mln_map_snapshot and
+ * mln_render_frame_result embed the view as their last member, so their own
+ * size versions that growth.
+ */
+typedef struct mln_map_view {
+  uint32_t size;
+  /**
+   * The camera. Its center is unwrapped: the longitude keeps the visible world
+   * copy and may fall outside -180 to 180. Every field except
+   * MLN_CAMERA_OPTION_ANCHOR is set.
+   */
+  mln_camera_options camera;
+  /**
+   * Logical size and device-pixel scale. A snapshot carries the map's scale
+   * factor, and a frame carries the scale factor of the target that drew it.
+   */
+  mln_logical_extent extent;
+  /** Axonometric mode and skew, with every field set. */
+  mln_projection_mode projection_mode;
+  /**
+   * North orientation, constrain mode, viewport mode, and frustum offset, with
+   * every field set.
+   */
+  mln_map_viewport_options viewport;
+} mln_map_view;
+
 /** Tile prefetch and LOD tuning controls. */
 typedef struct mln_map_tile_options {
   uint32_t size;
@@ -994,10 +1029,6 @@ typedef struct mln_map_snapshot {
   /** Debug overlay mask of mln_map_debug_option values. */
   uint32_t debug_options MLN_BINDING("enum=mln_map_debug_option");
   uint64_t generation;
-  mln_camera_options camera;
-  mln_logical_extent logical_extent;
-  mln_projection_mode projection_mode;
-  mln_map_viewport_options viewport;
   /** True once every requested style and tile resource finished loading. */
   bool fully_loaded;
   bool rendering_stats_view_enabled;
@@ -1030,6 +1061,11 @@ typedef struct mln_map_snapshot {
   mln_map_tile_options tile;
   mln_bound_options bounds;
   mln_free_camera_options free_camera;
+  /**
+   * The map's camera, extent, projection mode, and viewport options.
+   * mln_map_projection_create() converts coordinates for this view.
+   */
+  mln_map_view view;
 } mln_map_snapshot;
 
 /** Camera result borrowed for an ordered camera-query completion. */

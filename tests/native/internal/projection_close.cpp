@@ -15,12 +15,6 @@ namespace {
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
-auto create_projection(mln_map map) -> mln_map_projection {
-  auto projection = mln_map_projection{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_map_create_projection(map, &projection, nullptr));
-  return projection;
-}
-
 constexpr auto origin = mln_lat_lng{.latitude = 0.0, .longitude = 0.0};
 
 auto convert(mln_map_projection projection) -> mln_screen_point {
@@ -54,7 +48,7 @@ void close_waits_for_a_running_conversion() {
   SyncPointScope sync;
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  const auto projection = create_projection(map);
+  const auto projection = mln_test_map_create_projection(map);
   const auto expected = convert(projection);
   const auto calls = sync.hits(SyncPoint::ProjectionCallRunning);
 
@@ -91,7 +85,7 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   SyncPointScope sync;
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  const auto projection = create_projection(map);
+  const auto projection = mln_test_map_create_projection(map);
 
   sync.hold(SyncPoint::ProjectionCallLeased);
   Conversion conversion(projection);

@@ -103,7 +103,7 @@ Each declaration follows these rules, which every binding relies on:
     it moves every later member of its parent.
   - When a sized struct is embedded by value, native ignores its size on input
     and sets it on output, as with the `camera` member of `mln_camera_update`
-    and of `mln_map_snapshot`.
+    and of `mln_map_view`.
   - Small value types, such as coordinates, points, IDs, and `mln_buffer_view`,
     are frozen and carry no size. Changing one means adding a new type.
 

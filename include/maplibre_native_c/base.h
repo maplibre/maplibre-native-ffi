@@ -136,7 +136,7 @@ typedef uint64_t mln_geojson_source_data MLN_BINDING(
   "kind=handle;release=mln_geojson_source_data_release;"
   "dispose=mln_geojson_source_data_release"
 );
-/** A standalone projection of a map's transform state at its creation. */
+/** A standalone projection of one map view. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_release;"
   "dispose=mln_map_projection_release"

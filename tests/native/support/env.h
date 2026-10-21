@@ -89,6 +89,8 @@ mln_status mln_test_map_create_status(
 mln_status mln_test_map_close(mln_map map);
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
 mln_status mln_test_map_get_camera(mln_map map, mln_camera_options* out_camera);
+// Creates a projection of the view in the map's latest published snapshot.
+mln_map_projection mln_test_map_create_projection(mln_map map);
 mln_status mln_test_map_request_repaint(mln_map map);
 mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask);
 mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json);

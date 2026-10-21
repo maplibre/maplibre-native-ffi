@@ -3139,12 +3139,8 @@ func DefaultMapOptions() MapOptions { return copyMapOptions(C.mln_map_options_de
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapSnapshot struct {
 	// Debug overlay mask of mln_map_debug_option values.
-	DebugOptions   MapDebugOption
-	Generation     uint64
-	Camera         CameraOptions
-	LogicalExtent  LogicalExtent
-	ProjectionMode ProjectionMode
-	Viewport       MapViewportOptions
+	DebugOptions MapDebugOption
+	Generation   uint64
 	// True once every requested style and tile resource finished loading.
 	FullyLoaded               bool
 	RenderingStatsViewEnabled bool
@@ -3158,16 +3154,15 @@ type MapSnapshot struct {
 	Tile                         MapTileOptions
 	Bounds                       BoundOptions
 	FreeCamera                   FreeCameraOptions
+	// The map's camera, extent, projection mode, and viewport options.
+	// mln_map_projection_create() converts coordinates for this view.
+	View MapView
 }
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	var result MapSnapshot
 	result.DebugOptions = MapDebugOption(raw.debug_options)
 	result.Generation = uint64(raw.generation)
-	result.Camera = copyCameraOptions(raw.camera)
-	result.LogicalExtent = copyLogicalExtent(raw.logical_extent)
-	result.ProjectionMode = copyProjectionMode(raw.projection_mode)
-	result.Viewport = copyMapViewportOptions(raw.viewport)
 	result.FullyLoaded = bool(raw.fully_loaded)
 	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
 	result.GestureInProgress = bool(raw.gesture_in_progress)
@@ -3176,6 +3171,7 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.Tile = copyMapTileOptions(raw.tile)
 	result.Bounds = copyBoundOptions(raw.bounds)
 	result.FreeCamera = copyFreeCameraOptions(raw.free_camera)
+	result.View = copyMapView(raw.view)
 	return result
 }
 
@@ -3221,6 +3217,45 @@ func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_t
 
 func DefaultMapTileOptions() MapTileOptions {
 	return copyMapTileOptions(C.mln_map_tile_options_default())
+}
+
+// MapView corresponds to mln_map_view. Everything that a projection depends on:
+// the transform that a published snapshot or a rendered frame describes.
+//
+// See mln_map_view in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type MapView struct {
+	// The camera. Its center is unwrapped: the longitude keeps the visible world
+	// copy and may fall outside -180 to 180. Every field except
+	// MLN_CAMERA_OPTION_ANCHOR is set.
+	Camera CameraOptions
+	// Logical size and device-pixel scale. A snapshot carries the map's scale
+	// factor, and a frame carries the scale factor of the target that drew it.
+	Extent LogicalExtent
+	// Axonometric mode and skew, with every field set.
+	ProjectionMode ProjectionMode
+	// North orientation, constrain mode, viewport mode, and frustum offset, with
+	// every field set.
+	Viewport MapViewportOptions
+}
+
+func copyMapView(raw C.mln_map_view) MapView {
+	var result MapView
+	result.Camera = copyCameraOptions(raw.camera)
+	result.Extent = copyLogicalExtent(raw.extent)
+	result.ProjectionMode = copyProjectionMode(raw.projection_mode)
+	result.Viewport = copyMapViewportOptions(raw.viewport)
+	return result
+}
+
+func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
+	raw := C.mln_map_view{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.camera = nativeCameraOptions(input.Camera, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
+	raw.projection_mode = nativeProjectionMode(input.ProjectionMode, arena)
+	raw.viewport = nativeMapViewportOptions(input.Viewport, arena)
+	return raw
 }
 
 // MapViewportOptions corresponds to mln_map_viewport_options. Live map viewport
@@ -4149,6 +4184,12 @@ type RenderFrameResult struct {
 	// without a runtime-event round trip; the host re-arms the demand as each
 	// result arrives.
 	NeedsRepaint bool
+	// The view that this frame drew, from the transform of the map update that it
+	// rendered. A host that displays the frame builds its projection with
+	// mln_map_projection_create() to place overlays where the frame drew their
+	// coordinates. Zero, with a size of zero, unless disposition is
+	// MLN_RENDER_RESULT_RENDERED.
+	View MapView
 }
 
 func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
@@ -4159,6 +4200,7 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 	result.Generation = uint64(raw.generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.NeedsRepaint = bool(raw.needs_repaint)
+	result.View = copyMapView(raw.view)
 	return result
 }
 
@@ -6472,7 +6514,7 @@ func (handle *MapHandle) owner() *bindingOwner {
 }
 
 // MapProjectionHandle corresponds to mln_map_projection. A standalone
-// projection of a map's transform state at its creation.
+// projection of one map view.
 //
 // See mln_map_projection in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
@@ -7234,21 +7276,6 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 	}, completionCommand, true)
 }
 
-// CreateProjection creates a standalone projection from the map's latest
-// published snapshot.
-//
-// See mln_map_create_projection in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapHandle) CreateProjection() (*MapProjectionHandle, error) {
-	var outProjection C.mln_map_projection
-	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_create_projection(C.mln_map(raw), &outProjection, diagnostic))
-	}, func(arena *bindingArena) *MapProjectionHandle {
-		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
-		return adopted
-	})
-}
-
 // DumpDebugLogs submits an ordered debug-log command.
 //
 // See mln_map_dump_debug_logs in the C API reference:
@@ -7503,6 +7530,21 @@ func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string)
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
 	}, completionCommand, true)
+}
+
+// MapProjectionCreate creates a standalone projection of a view, such as the
+// view of a rendered frame or of a map snapshot.
+//
+// See mln_map_projection_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func MapProjectionCreate(view MapView) (*MapProjectionHandle, error) {
+	var outProjection C.mln_map_projection
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_create(bindingStore(nativeMapView(view, arena), arena), &outProjection, diagnostic))
+	}, func(arena *bindingArena) *MapProjectionHandle {
+		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
+		return adopted
+	})
 }
 
 // GetCamera copies the projection camera into out_camera.
@@ -8098,24 +8140,6 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_clear_data(C.mln_render_session(raw), completion, diagnostic))
 	}, completionUnit, false)
-}
-
-// CreateProjection copies the last completed rendered transform into an
-// independent projection. Callable from any thread. Returns invalid state
-// before a completed render, after an extent or target change, or after
-// detachment. The caller owns the returned projection, which remains usable
-// after the session is released. out_projection must point to a null handle.
-//
-// See mln_render_session_create_projection in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) CreateProjection() (*MapProjectionHandle, error) {
-	var outProjection C.mln_map_projection
-	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_create_projection(C.mln_render_session(raw), &outProjection, diagnostic))
-	}, func(arena *bindingArena) *MapProjectionHandle {
-		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
-		return adopted
-	})
 }
 
 // Detach starts normal graphics-owner teardown and map detachment.

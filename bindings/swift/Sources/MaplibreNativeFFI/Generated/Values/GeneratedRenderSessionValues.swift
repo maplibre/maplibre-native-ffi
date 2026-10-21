@@ -182,6 +182,12 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// transition update without a runtime-event round trip; the host re-arms the
   /// demand as each result arrives.
   public var needsRepaint: Bool
+  /// The view that this frame drew, from the transform of the map update that
+  /// it rendered. A host that displays the frame builds its projection with
+  /// `mln_map_projection_create()` to place overlays where the frame drew their
+  /// coordinates. Zero, with a size of zero, unless disposition is
+  /// `MLN_RENDER_RESULT_RENDERED`.
+  public var view: MapView
   public static var `default`: Self {
     Self(raw: mln_render_frame_result())
   }
@@ -192,7 +198,8 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     mapUpdateGeneration: UInt64 = RenderFrameResult.default.mapUpdateGeneration,
     generation: UInt64 = RenderFrameResult.default.generation,
     frameGeneration: UInt64 = RenderFrameResult.default.frameGeneration,
-    needsRepaint: Bool = RenderFrameResult.default.needsRepaint
+    needsRepaint: Bool = RenderFrameResult.default.needsRepaint,
+    view: MapView = RenderFrameResult.default.view
   ) {
     self.disposition = disposition
     self.token = token
@@ -200,6 +207,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     self.generation = generation
     self.frameGeneration = frameGeneration
     self.needsRepaint = needsRepaint
+    self.view = view
   }
 
   init(raw: mln_render_frame_result) {
@@ -209,6 +217,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     generation = raw.generation
     frameGeneration = raw.frame_generation
     needsRepaint = raw.needs_repaint
+    view = MapView(raw: raw.view)
   }
 }
 

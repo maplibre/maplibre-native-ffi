@@ -116,7 +116,7 @@ MLN_API mln_status mln_map_dump_debug_logs(
  * Submits a copied viewport-options command.
  *
  * The committed options are visible through mln_map_get_snapshot as
- * snapshot.viewport.
+ * snapshot.view.viewport.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.

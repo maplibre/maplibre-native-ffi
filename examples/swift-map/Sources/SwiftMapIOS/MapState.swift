@@ -122,7 +122,7 @@ final class MapState {
   /// from the zoom of the latest published camera snapshot.
   func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
     submit { [map] in
-      let zoom = try map.getSnapshot().camera.zoom ?? 0
+      let zoom = try map.getSnapshot().view.camera.zoom ?? 0
       _ = try await map.applyCameraDelta(delta: CameraDelta(
         scale: pow(2.0, (zoom.rounded() + 1) - zoom),
         anchor: anchor,

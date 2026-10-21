@@ -39,6 +39,7 @@ from ._generated_values import (
     MapOptions,
     MapSnapshot,
     MapTileOptions,
+    MapView,
     MapViewportOptions,
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
@@ -644,17 +645,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.cancel_transitions()
-
-    def create_projection(self) -> MapProjectionHandle:
-        """Creates a standalone projection from the map's latest published
-        snapshot.
-
-        See `mln_map_create_projection` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return _adopt_value(
-            self._native.create_projection(), "MapProjectionHandle", None
-        )
 
     def dump_debug_logs(self) -> Future[CommandCompletion]:
         """Submits an ordered debug-log command.
@@ -1376,21 +1366,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.clear_data()
 
-    def create_projection(self) -> MapProjectionHandle:
-        """Copies the last completed rendered transform into an independent
-        projection. Callable from any thread. Returns invalid state before a
-        completed render, after an extent or target change, or after
-        detachment. The caller owns the returned projection, which remains
-        usable after the session is released. out_projection must point to a
-        null handle.
-
-        See `mln_render_session_create_projection` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return _adopt_value(
-            self._native.create_projection(), "MapProjectionHandle", None
-        )
-
     def detach(self) -> Future[None]:
         """Starts normal graphics-owner teardown and map detachment.
 
@@ -2019,6 +1994,18 @@ def logical_extent_physical_size(
     """
     raw = _native.logical_extent_physical_size(extent)
     return LogicalExtentPhysicalSizeResult(raw["width"], raw["height"])
+
+
+def map_projection_create(view: MapView) -> MapProjectionHandle:
+    """Creates a standalone projection of a view, such as the view of a
+    rendered frame or of a map snapshot.
+
+    See `mln_map_projection_create` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    """
+    return _adopt_value(
+        _native.map_projection_create(view), "MapProjectionHandle", None
+    )
 
 
 def network_get_status() -> NetworkStatus:

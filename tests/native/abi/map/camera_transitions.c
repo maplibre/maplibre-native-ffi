@@ -141,7 +141,7 @@ static void observe_end(
   ) {
     observation->snapshot_read = true;
     observation->snapshot_generation = snapshot.generation;
-    observation->snapshot_zoom = snapshot.camera.zoom;
+    observation->snapshot_zoom = snapshot.view.camera.zoom;
   }
 }
 
@@ -291,7 +291,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
 
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, snapshot.camera.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, snapshot.view.camera.zoom);
   TEST_ASSERT_GREATER_THAN_UINT64(started, snapshot.generation);
   TEST_ASSERT_GREATER_THAN_UINT64(
     initial.latest_render_update_generation,
@@ -415,10 +415,10 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
     mln_test_completion_generation(&cancel), atomic_load(&probe.generation)
   );
   mln_test_completion_destroy(&cancel);
-  const double settled = read_settled_snapshot(runtime, map).camera.zoom;
+  const double settled = read_settled_snapshot(runtime, map).view.camera.zoom;
   TEST_ASSERT_TRUE(settled < 18.0);
   TEST_ASSERT_EQUAL_DOUBLE(
-    settled, read_settled_snapshot(runtime, map).camera.zoom
+    settled, read_settled_snapshot(runtime, map).view.camera.zoom
   );
 
   // Cancelling with nothing running commits and changes nothing.
@@ -426,7 +426,7 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
     mln_map_cancel_transitions(map, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_DOUBLE(
-    settled, read_settled_snapshot(runtime, map).camera.zoom
+    settled, read_settled_snapshot(runtime, map).view.camera.zoom
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
 
@@ -486,7 +486,7 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   assert_ended(&zoom, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "zoom");
   assert_ended(&pitch, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "pitch");
   const mln_map_snapshot cancelled = read_settled_snapshot(runtime, map);
-  TEST_ASSERT_TRUE(cancelled.camera.zoom < 18.0);
+  TEST_ASSERT_TRUE(cancelled.view.camera.zoom < 18.0);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
 
   // An identity that no running command carries changes nothing.
@@ -497,7 +497,9 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
     map, UINT64_MAX, &completion.descriptor, NULL
   ));
   const mln_map_snapshot unchanged = read_settled_snapshot(runtime, map);
-  TEST_ASSERT_EQUAL_DOUBLE(cancelled.camera.zoom, unchanged.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(
+    cancelled.view.camera.zoom, unchanged.view.camera.zoom
+  );
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&zoom.calls));
 
@@ -541,7 +543,7 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   update_camera(map, &update);
   mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
-  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.view.camera.zoom);
 
   // BEGIN leaves a running ease alone, and CANCEL ends it.
   mln_test_transition_end probe;
@@ -695,7 +697,7 @@ static void a_delta_carries_its_gesture_phase(void) {
   apply_delta(map, &delta);
   mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
-  TEST_ASSERT_EQUAL_DOUBLE(11.0, snapshot.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(11.0, snapshot.view.camera.zoom);
 
   delta.fields = MLN_CAMERA_DELTA_SCALE;
   delta.scale = 2.0;
@@ -703,7 +705,7 @@ static void a_delta_carries_its_gesture_phase(void) {
   apply_delta(map, &delta);
   snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
-  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.view.camera.zoom);
 
   mln_test_transition_end probe;
   mln_test_transition_end_init(&probe);
@@ -715,7 +717,7 @@ static void a_delta_carries_its_gesture_phase(void) {
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "release");
   snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
-  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.view.camera.zoom);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -826,7 +828,7 @@ static void a_handler_may_submit_a_command(void) {
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "submitting");
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.status));
   TEST_ASSERT_EQUAL_DOUBLE(
-    9.0, read_settled_snapshot(runtime, map).camera.zoom
+    9.0, read_settled_snapshot(runtime, map).view.camera.zoom
   );
 
   mln_test_destroy_map(map);

@@ -10,7 +10,7 @@ void main() {
   test('repeated asynchronous release reaches native', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap();
-    final projection = map.createProjection();
+    final projection = mapProjectionCreate(map.getSnapshot().view);
 
     projection.close();
     projection.close();

@@ -71,22 +71,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Copies the last completed rendered transform into an independent projection. Callable from any
-   * thread. Returns invalid state before a completed render, after an extent or target change, or
-   * after detachment. The caller owns the returned projection, which remains usable after the
-   * session is released. out_projection must point to a null handle.
-   *
-   * See `mln_render_session_create_projection` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  public fun createProjection(): MapProjectionHandle =
-    nativeCall(this, binding) {
-      val out = allocate(8, 8)
-      check(C.mln_render_session_create_projection(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
-    }
-
-  /**
    * Starts normal graphics-owner teardown and map detachment.
    *
    * See `mln_render_session_detach` in the

@@ -117,10 +117,10 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     const uint32_t field = viewport_rows[index].field;
     const uint32_t committed =
       field == MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
-        ? snapshot.viewport.north_orientation
+        ? snapshot.view.viewport.north_orientation
       : field == MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
-        ? snapshot.viewport.constrain_mode
-        : snapshot.viewport.viewport_mode;
+        ? snapshot.view.viewport.constrain_mode
+        : snapshot.view.viewport.viewport_mode;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
       viewport_rows[index].value, committed, label
     );
@@ -133,7 +133,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_MEMORY(
-    &viewport.frustum_offset, &snapshot.viewport.frustum_offset,
+    &viewport.frustum_offset, &snapshot.view.viewport.frustum_offset,
     sizeof(viewport.frustum_offset)
   );
 
@@ -180,11 +180,13 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
       "projection mode",
       mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
     );
-    TEST_ASSERT_BITS_HIGH(mode.fields, snapshot.projection_mode.fields);
-    TEST_ASSERT_EQUAL(mode.axonometric, snapshot.projection_mode.axonometric);
+    TEST_ASSERT_BITS_HIGH(mode.fields, snapshot.view.projection_mode.fields);
+    TEST_ASSERT_EQUAL(
+      mode.axonometric, snapshot.view.projection_mode.axonometric
+    );
     if (pass == 0) {
-      TEST_ASSERT_EQUAL_DOUBLE(0.25, snapshot.projection_mode.x_skew);
-      TEST_ASSERT_EQUAL_DOUBLE(-0.125, snapshot.projection_mode.y_skew);
+      TEST_ASSERT_EQUAL_DOUBLE(0.25, snapshot.view.projection_mode.x_skew);
+      TEST_ASSERT_EQUAL_DOUBLE(-0.125, snapshot.view.projection_mode.y_skew);
     }
     // Then perspective.
     mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
@@ -442,7 +444,7 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   const mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(0, snapshot.debug_options);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_NORTH_ORIENTATION_UP, snapshot.viewport.north_orientation
+    MLN_NORTH_ORIENTATION_UP, snapshot.view.viewport.north_orientation
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_TILE_LOD_MODE_DEFAULT, snapshot.tile.lod_mode);
 
@@ -459,9 +461,9 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   mln_map_snapshot snapshot = read_snapshot(map);
-  TEST_ASSERT_EQUAL_UINT32(512, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(256, snapshot.logical_extent.height);
-  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
+  TEST_ASSERT_EQUAL_UINT32(512, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(256, snapshot.view.extent.height);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
   const uint64_t initial_generation = snapshot.generation;
 
   MLN_TEST_AWAIT_OK(mln_map_resize(
@@ -471,9 +473,9 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_THAN_UINT64(initial_generation, snapshot.generation);
-  TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(48, snapshot.logical_extent.height);
-  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
+  TEST_ASSERT_EQUAL_UINT32(96, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, snapshot.view.extent.height);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
 
   // A resize to the current size publishes no render update.
   const uint64_t render_update = snapshot.latest_render_update_generation;
@@ -503,8 +505,8 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
-  TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
+  TEST_ASSERT_EQUAL_UINT32(96, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
 
   MLN_TEST_INVALID(mln_map_get_snapshot(MLN_HANDLE_NULL, &snapshot, NULL));
   mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
@@ -548,8 +550,8 @@ static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
 
   const mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(committed, snapshot.generation);
-  TEST_ASSERT_EQUAL_UINT32(64, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(32, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(64, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(32, snapshot.view.extent.height);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

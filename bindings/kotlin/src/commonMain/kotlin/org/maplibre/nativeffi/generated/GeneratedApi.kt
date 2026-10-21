@@ -333,6 +333,20 @@ public object GeneratedApi {
     }
 
   /**
+   * Creates a standalone projection of a view, such as the view of a rendered frame or of a map
+   * snapshot.
+   *
+   * See `mln_map_projection_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun mapProjectionCreate(viewValue: MapView): MapProjectionHandle =
+    nativeCall(null, null) {
+      val out = allocate(8, 8)
+      check(C.mln_map_projection_create(writeMapView(viewValue), out, diagnostic))
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
+    }
+
+  /**
    * Returns empty tile tuning options initialized for this C API version.
    *
    * See `mln_map_tile_options_default` in the

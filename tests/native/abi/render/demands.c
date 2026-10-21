@@ -341,17 +341,17 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   TEST_ASSERT_GREATER_THAN_UINT64(old_generation, snapshot.generation);
   mln_map_snapshot map_snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &map_snapshot, NULL));
-  TEST_ASSERT_EQUAL_UINT32(96, map_snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(48, map_snapshot.logical_extent.height);
-  TEST_ASSERT_DOUBLE_WITHIN(0.0, 3.0, map_snapshot.logical_extent.scale_factor);
+  TEST_ASSERT_EQUAL_UINT32(96, map_snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, map_snapshot.view.extent.height);
+  TEST_ASSERT_DOUBLE_WITHIN(0.0, 3.0, map_snapshot.view.extent.scale_factor);
   detach(runtime, map, &fixture);
 }
 
 static void expect_map_size(mln_map map, uint32_t width, uint32_t height) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
-  TEST_ASSERT_EQUAL_UINT32(width, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(height, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(width, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(height, snapshot.view.extent.height);
 }
 
 // Attaching sizes the map to the target, so the first frame renders without

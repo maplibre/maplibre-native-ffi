@@ -111,10 +111,10 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   mln_map_snapshot after_resize = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &after_resize, NULL));
   TEST_ASSERT_EQUAL_UINT32(
-    before_resize.logical_extent.width, after_resize.logical_extent.width
+    before_resize.view.extent.width, after_resize.view.extent.width
   );
   TEST_ASSERT_EQUAL_UINT32(
-    before_resize.logical_extent.height, after_resize.logical_extent.height
+    before_resize.view.extent.height, after_resize.view.extent.height
   );
   MLN_TEST_OK(mln_test_map_request_repaint(map));
 

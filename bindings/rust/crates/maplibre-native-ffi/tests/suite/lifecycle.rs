@@ -10,7 +10,7 @@ use crate::support::*;
 #[test]
 fn releasing_a_handle_twice_reaches_native() {
     let fixture = Fixture::new();
-    let projection = fixture.map().create_projection().unwrap();
+    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     projection.release().unwrap();
     let error = projection.release().unwrap_err();
     assert_eq!(error.status(), Status::InvalidState);
@@ -139,7 +139,7 @@ fn exit_with_live_handles_and_callbacks() -> ! {
     let fixture = Fixture::new();
     fixture.load_style(BACKGROUND_STYLE_JSON);
     log_set_callback(LogHandler::new(|_, _, _, _| 1)).unwrap();
-    let projection = fixture.map().create_projection().unwrap();
+    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
     std::mem::forget((fixture, projection));
     std::process::exit(0);
 }

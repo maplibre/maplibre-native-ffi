@@ -49,8 +49,7 @@ static mln_camera_query_result query_camera(mln_map map) {
 }
 
 static mln_lat_lng coordinate_at(mln_map map, mln_screen_point point) {
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_map_create_projection(map, &projection, NULL));
+  mln_map_projection projection = mln_test_map_create_projection(map);
   mln_lat_lng coordinate = {0};
   MLN_TEST_OK(
     mln_map_projection_lat_lng_for_pixel(projection, point, &coordinate, NULL)
@@ -253,7 +252,7 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
     TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
       queried.generation, snapshot.generation
     );
-    assert_camera_field(row->label, &row->camera, &snapshot.camera);
+    assert_camera_field(row->label, &row->camera, &snapshot.view.camera);
 
     // Every earlier row's field is still in place.
     for (size_t earlier = 0; earlier < index; earlier += 1) {
@@ -440,12 +439,6 @@ static void every_camera_delta_field_follows_its_convention(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_map_projection create_projection(mln_map map) {
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_map_create_projection(map, &projection, NULL));
-  return projection;
-}
-
 static mln_screen_point projected_pixel(
   mln_map_projection projection, mln_lat_lng coordinate
 ) {
@@ -528,10 +521,10 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   // The snapshot the command published holds both the pan and the ease.
   MLN_TEST_OK(probe.read_status);
   TEST_ASSERT_EQUAL_UINT64(generation, probe.snapshot.generation);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, probe.snapshot.camera.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, probe.snapshot.camera.bearing);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, probe.snapshot.view.camera.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, probe.snapshot.view.camera.bearing);
 
-  mln_map_projection projection = create_projection(map);
+  mln_map_projection projection = mln_test_map_create_projection(map);
   const mln_screen_point kept = projected_pixel(projection, dragged);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.x, kept.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);

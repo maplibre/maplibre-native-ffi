@@ -40,11 +40,19 @@ namespace Maplibre.NativeFfi;
 /// renders each transition update without a runtime-event round trip; the host
 /// re-arms the demand as each result arrives.
 /// </param>
+/// <param name="View">
+/// The view that this frame drew, from the transform of the map update that it
+/// rendered. A host that displays the frame builds its projection with
+/// <c>mln_map_projection_create()</c> to place overlays where the frame drew
+/// their coordinates. Zero, with a size of zero, unless disposition is
+/// <c>MLN_RENDER_RESULT_RENDERED</c>.
+/// </param>
 public readonly partial record struct RenderFrameResult(
     RenderResult Disposition,
     ulong Token,
     ulong MapUpdateGeneration,
     ulong Generation,
     ulong FrameGeneration,
-    bool NeedsRepaint
+    bool NeedsRepaint,
+    MapView View
 );

@@ -2123,10 +2123,6 @@ pub struct MapSnapshot {
     /// Debug overlay mask of `mln_map_debug_option` values.
     pub debug_options: MapDebugOption,
     pub generation: u64,
-    pub camera: CameraOptions,
-    pub logical_extent: LogicalExtent,
-    pub projection_mode: ProjectionMode,
-    pub viewport: MapViewportOptions,
     /// True once every requested style and tile resource finished loading.
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
@@ -2141,15 +2137,14 @@ pub struct MapSnapshot {
     pub tile: MapTileOptions,
     pub bounds: BoundOptions,
     pub free_camera: FreeCameraOptions,
+    /// The map's camera, extent, projection mode, and viewport options.
+    /// `mln_map_projection_create()` converts coordinates for this view.
+    pub view: MapView,
 }
 impl MapSnapshot {
     pub const fn new(
         debug_options: MapDebugOption,
         generation: u64,
-        camera: CameraOptions,
-        logical_extent: LogicalExtent,
-        projection_mode: ProjectionMode,
-        viewport: MapViewportOptions,
         fully_loaded: bool,
         rendering_stats_view_enabled: bool,
         gesture_in_progress: bool,
@@ -2158,14 +2153,11 @@ impl MapSnapshot {
         tile: MapTileOptions,
         bounds: BoundOptions,
         free_camera: FreeCameraOptions,
+        view: MapView,
     ) -> Self {
         Self {
             debug_options,
             generation,
-            camera,
-            logical_extent,
-            projection_mode,
-            viewport,
             fully_loaded,
             rendering_stats_view_enabled,
             gesture_in_progress,
@@ -2174,6 +2166,7 @@ impl MapSnapshot {
             tile,
             bounds,
             free_camera,
+            view,
         }
     }
 }
@@ -2182,10 +2175,6 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
         Ok(Self {
             debug_options: unsafe { from_native(raw.debug_options) }?,
             generation: raw.generation,
-            camera: unsafe { from_native(raw.camera) }?,
-            logical_extent: unsafe { from_native(raw.logical_extent) }?,
-            projection_mode: unsafe { from_native(raw.projection_mode) }?,
-            viewport: unsafe { from_native(raw.viewport) }?,
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
             gesture_in_progress: raw.gesture_in_progress,
@@ -2194,6 +2183,7 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
             tile: unsafe { from_native(raw.tile) }?,
             bounds: unsafe { from_native(raw.bounds) }?,
             free_camera: unsafe { from_native(raw.free_camera) }?,
+            view: unsafe { from_native(raw.view) }?,
         })
     }
 }
@@ -2281,6 +2271,63 @@ impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
             lod_mode: unsafe {
                 convert::present(raw.fields, sys::MLN_MAP_TILE_OPTION_LOD_MODE, raw.lod_mode)
             }?,
+        })
+    }
+}
+
+/// Everything that a projection depends on: the transform that a published
+/// snapshot or a rendered frame describes.
+///
+/// See `mln_map_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MapView {
+    /// The camera. Its center is unwrapped: the longitude keeps the visible
+    /// world copy and may fall outside -180 to 180. Every field except
+    /// `MLN_CAMERA_OPTION_ANCHOR` is set.
+    pub camera: CameraOptions,
+    /// Logical size and device-pixel scale. A snapshot carries the map's scale
+    /// factor, and a frame carries the scale factor of the target that drew it.
+    pub extent: LogicalExtent,
+    /// Axonometric mode and skew, with every field set.
+    pub projection_mode: ProjectionMode,
+    /// North orientation, constrain mode, viewport mode, and frustum offset,
+    /// with every field set.
+    pub viewport: MapViewportOptions,
+}
+impl MapView {
+    pub const fn new(
+        camera: CameraOptions,
+        extent: LogicalExtent,
+        projection_mode: ProjectionMode,
+        viewport: MapViewportOptions,
+    ) -> Self {
+        Self {
+            camera,
+            extent,
+            projection_mode,
+            viewport,
+        }
+    }
+}
+impl ToNative<sys::mln_map_view> for MapView {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_view> {
+        let mut raw: sys::mln_map_view = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_map_view>() as _;
+        raw.camera = to_native(&self.camera, arena)?;
+        raw.extent = to_native(&self.extent, arena)?;
+        raw.projection_mode = to_native(&self.projection_mode, arena)?;
+        raw.viewport = to_native(&self.viewport, arena)?;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_map_view> for MapView {
+    unsafe fn from_native(raw: sys::mln_map_view) -> Result<Self> {
+        Ok(Self {
+            camera: unsafe { from_native(raw.camera) }?,
+            extent: unsafe { from_native(raw.extent) }?,
+            projection_mode: unsafe { from_native(raw.projection_mode) }?,
+            viewport: unsafe { from_native(raw.viewport) }?,
         })
     }
 }
@@ -3729,6 +3776,12 @@ pub struct RenderFrameResult {
     /// without a runtime-event round trip; the host re-arms the demand as each
     /// result arrives.
     pub needs_repaint: bool,
+    /// The view that this frame drew, from the transform of the map update that
+    /// it rendered. A host that displays the frame builds its projection with
+    /// `mln_map_projection_create()` to place overlays where the frame drew
+    /// their coordinates. Zero, with a size of zero, unless disposition is
+    /// `MLN_RENDER_RESULT_RENDERED`.
+    pub view: MapView,
 }
 impl RenderFrameResult {
     pub const fn new(
@@ -3738,6 +3791,7 @@ impl RenderFrameResult {
         generation: u64,
         frame_generation: u64,
         needs_repaint: bool,
+        view: MapView,
     ) -> Self {
         Self {
             disposition,
@@ -3746,6 +3800,7 @@ impl RenderFrameResult {
             generation,
             frame_generation,
             needs_repaint,
+            view,
         }
     }
 }
@@ -3758,6 +3813,7 @@ impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
             generation: raw.generation,
             frame_generation: raw.frame_generation,
             needs_repaint: raw.needs_repaint,
+            view: unsafe { from_native(raw.view) }?,
         })
     }
 }

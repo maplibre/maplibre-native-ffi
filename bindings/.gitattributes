@@ -48,6 +48,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/MapSnapshot.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapTileOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapTileOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/MapView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapViewportOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapViewportOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/NorthOrientation.g.cs linguist-generated=true
@@ -283,7 +284,6 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapRuntimeOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedPluginGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionGlobalsOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapProjectionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryRenderSessionOperations.swift linguist-generated=true

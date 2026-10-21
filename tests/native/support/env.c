@@ -254,7 +254,7 @@ mln_status mln_test_map_get_camera(
   const mln_status status =
     mln_map_get_snapshot(map, &snapshot, MLN_TEST_DIAGNOSTIC);
   if (status == MLN_STATUS_OK) {
-    *out_camera = snapshot.camera;
+    *out_camera = snapshot.view.camera;
   }
   return status;
 }
@@ -267,6 +267,16 @@ mln_diagnostic* mln_test_diagnostic(void) {
 }
 
 const char* mln_test_last_error(void) { return test_diagnostic.message; }
+
+mln_map_projection mln_test_map_create_projection(mln_map map) {
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, MLN_TEST_DIAGNOSTIC));
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  MLN_TEST_OK(
+    mln_map_projection_create(&snapshot.view, &projection, MLN_TEST_DIAGNOSTIC)
+  );
+  return projection;
+}
 
 mln_status mln_test_map_request_repaint(mln_map map) {
   const mln_completion completion = mln_test_discard_completion();

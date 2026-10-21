@@ -1172,10 +1172,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// Debug overlay mask of `mln_map_debug_option` values.
   public var debugOptions: MapDebugOption
   public var generation: UInt64
-  public var camera: CameraOptions
-  public var logicalExtent: LogicalExtent
-  public var projectionMode: ProjectionMode
-  public var viewport: MapViewportOptions
   /// True once every requested style and tile resource finished loading.
   public var fullyLoaded: Bool
   public var renderingStatsViewEnabled: Bool
@@ -1189,6 +1185,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var tile: MapTileOptions
   public var bounds: BoundOptions
   public var freeCamera: FreeCameraOptions
+  /// The map's camera, extent, projection mode, and viewport options.
+  /// `mln_map_projection_create()` converts coordinates for this view.
+  public var view: MapView
   public static var `default`: Self {
     Self(raw: mln_map_snapshot())
   }
@@ -1196,10 +1195,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public init(
     debugOptions: MapDebugOption = MapSnapshot.default.debugOptions,
     generation: UInt64 = MapSnapshot.default.generation,
-    camera: CameraOptions = MapSnapshot.default.camera,
-    logicalExtent: LogicalExtent = MapSnapshot.default.logicalExtent,
-    projectionMode: ProjectionMode = MapSnapshot.default.projectionMode,
-    viewport: MapViewportOptions = MapSnapshot.default.viewport,
     fullyLoaded: Bool = MapSnapshot.default.fullyLoaded,
     renderingStatsViewEnabled: Bool = MapSnapshot.default
       .renderingStatsViewEnabled,
@@ -1209,14 +1204,11 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
       .latestRenderUpdateGeneration,
     tile: MapTileOptions = MapSnapshot.default.tile,
     bounds: BoundOptions = MapSnapshot.default.bounds,
-    freeCamera: FreeCameraOptions = MapSnapshot.default.freeCamera
+    freeCamera: FreeCameraOptions = MapSnapshot.default.freeCamera,
+    view: MapView = MapSnapshot.default.view
   ) {
     self.debugOptions = debugOptions
     self.generation = generation
-    self.camera = camera
-    self.logicalExtent = logicalExtent
-    self.projectionMode = projectionMode
-    self.viewport = viewport
     self.fullyLoaded = fullyLoaded
     self.renderingStatsViewEnabled = renderingStatsViewEnabled
     self.gestureInProgress = gestureInProgress
@@ -1225,15 +1217,12 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     self.tile = tile
     self.bounds = bounds
     self.freeCamera = freeCamera
+    self.view = view
   }
 
   init(raw: mln_map_snapshot) {
     debugOptions = MapDebugOption(rawValue: raw.debug_options)
     generation = raw.generation
-    camera = CameraOptions(raw: raw.camera)
-    logicalExtent = LogicalExtent(raw: raw.logical_extent)
-    projectionMode = ProjectionMode(raw: raw.projection_mode)
-    viewport = MapViewportOptions(raw: raw.viewport)
     fullyLoaded = raw.fully_loaded
     renderingStatsViewEnabled = raw.rendering_stats_view_enabled
     gestureInProgress = raw.gesture_in_progress
@@ -1242,6 +1231,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     tile = MapTileOptions(raw: raw.tile)
     bounds = BoundOptions(raw: raw.bounds)
     freeCamera = FreeCameraOptions(raw: raw.free_camera)
+    view = MapView(raw: raw.view)
   }
 }
 
@@ -1340,6 +1330,58 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; raw.lod_mode = item
         .rawValue
     }
+    return raw
+  }
+}
+
+/// Everything that a projection depends on: the transform that a published
+/// snapshot or a rendered frame describes.
+///
+/// See `mln_map_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MapView: Equatable, Hashable, Sendable {
+  /// The camera. Its center is unwrapped: the longitude keeps the visible world
+  /// copy and may fall outside -180 to 180. Every field except
+  /// `MLN_CAMERA_OPTION_ANCHOR` is set.
+  public var camera: CameraOptions
+  /// Logical size and device-pixel scale. A snapshot carries the map's scale
+  /// factor, and a frame carries the scale factor of the target that drew it.
+  public var extent: LogicalExtent
+  /// Axonometric mode and skew, with every field set.
+  public var projectionMode: ProjectionMode
+  /// North orientation, constrain mode, viewport mode, and frustum offset, with
+  /// every field set.
+  public var viewport: MapViewportOptions
+  public static var `default`: Self {
+    Self(raw: mln_map_view())
+  }
+
+  public init(
+    camera: CameraOptions = MapView.default.camera,
+    extent: LogicalExtent = MapView.default.extent,
+    projectionMode: ProjectionMode = MapView.default.projectionMode,
+    viewport: MapViewportOptions = MapView.default.viewport
+  ) {
+    self.camera = camera
+    self.extent = extent
+    self.projectionMode = projectionMode
+    self.viewport = viewport
+  }
+
+  init(raw: mln_map_view) {
+    camera = CameraOptions(raw: raw.camera)
+    extent = LogicalExtent(raw: raw.extent)
+    projectionMode = ProjectionMode(raw: raw.projection_mode)
+    viewport = MapViewportOptions(raw: raw.viewport)
+  }
+
+  func nativeValue() -> mln_map_view {
+    var raw = mln_map_view()
+    raw.size = UInt32(MemoryLayout<mln_map_view>.size)
+    raw.camera = camera.nativeValue()
+    raw.extent = extent.nativeValue()
+    raw.projection_mode = projectionMode.nativeValue()
+    raw.viewport = viewport.nativeValue()
     return raw
   }
 }

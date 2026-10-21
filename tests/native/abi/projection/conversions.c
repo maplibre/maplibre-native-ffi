@@ -38,8 +38,7 @@ static void conversions_invert(void) {
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_map_create_projection(map, &projection, NULL));
+  mln_map_projection projection = mln_test_map_create_projection(map);
 
   const mln_lat_lng coordinates[2] = {
     {.latitude = 0.0, .longitude = 0.0},

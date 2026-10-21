@@ -79,7 +79,7 @@ static void record_event(const mln_runtime_event* event) {
     return;
   }
   record->snapshot_read = true;
-  record->zoom = snapshot.camera.zoom;
+  record->zoom = snapshot.view.camera.zoom;
   record->fully_loaded = snapshot.fully_loaded;
 }
 

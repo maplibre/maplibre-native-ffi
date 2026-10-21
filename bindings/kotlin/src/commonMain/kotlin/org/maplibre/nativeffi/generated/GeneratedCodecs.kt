@@ -97,6 +97,17 @@ internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
 internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
   allocate(16, 8).also { putLogicalExtent(it, value) }
 
+internal fun NativeArena.putMapView(target: Long, value: MapView) {
+  writeU32(target, 232.toUInt())
+  putCameraOptions(target + 8, value.camera)
+  putLogicalExtent(target + 128, value.extent)
+  putProjectionMode(target + 144, value.projectionMode)
+  putMapViewportOptions(target + 176, value.viewport)
+}
+
+internal fun NativeArena.writeMapView(value: MapView): Long =
+  allocate(232, 8).also { putMapView(it, value) }
+
 internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)
   writeF64(target + 8, value.longitude)
@@ -1001,6 +1012,7 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     generation = readU64(source + 24),
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
+    view = readMapView(source + 48),
   )
 
 internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
@@ -1449,18 +1461,15 @@ internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
     debugOptions = MapDebugOption(readU32(source + 4)),
     generation = readU64(source + 8),
-    camera = readCameraOptions(source + 16),
-    logicalExtent = readLogicalExtent(source + 136),
-    projectionMode = readProjectionMode(source + 152),
-    viewport = readMapViewportOptions(source + 184),
-    fullyLoaded = readBool(source + 240),
-    renderingStatsViewEnabled = readBool(source + 241),
-    gestureInProgress = readBool(source + 242),
-    eventMask = RuntimeEventMask(readU64(source + 248)),
-    latestRenderUpdateGeneration = readU64(source + 256),
-    tile = readMapTileOptions(source + 264),
-    bounds = readBoundOptions(source + 320),
-    freeCamera = readFreeCameraOptions(source + 392),
+    fullyLoaded = readBool(source + 16),
+    renderingStatsViewEnabled = readBool(source + 17),
+    gestureInProgress = readBool(source + 18),
+    eventMask = RuntimeEventMask(readU64(source + 24)),
+    latestRenderUpdateGeneration = readU64(source + 32),
+    tile = readMapTileOptions(source + 40),
+    bounds = readBoundOptions(source + 96),
+    freeCamera = readFreeCameraOptions(source + 168),
+    view = readMapView(source + 232),
   )
 
 internal fun readStyleImageInfo(source: Long): StyleImageInfo {
@@ -1529,7 +1538,7 @@ internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
         readAddress(source + 8),
         readSize(source + w(12, 16)),
         readU32(source + 4).toULong(),
-        48,
+        280,
       ) { item ->
         readRenderFrameResult(item)
       },
@@ -1875,6 +1884,14 @@ internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
     priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
   )
 }
+
+internal fun readMapView(source: Long): MapView =
+  MapView(
+    camera = readCameraOptions(source + 8),
+    extent = readLogicalExtent(source + 128),
+    projectionMode = readProjectionMode(source + 144),
+    viewport = readMapViewportOptions(source + 176),
+  )
 
 internal fun readUnitBezier(source: Long): UnitBezier =
   UnitBezier(

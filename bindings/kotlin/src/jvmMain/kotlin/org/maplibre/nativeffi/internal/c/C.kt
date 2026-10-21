@@ -363,8 +363,6 @@ internal actual object C {
     )
   private val mln_map_cancel_transitions =
     Ffm.downcall("mln_map_cancel_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_create_projection =
-    Ffm.downcall("mln_map_create_projection", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_dispose = Ffm.downcall("mln_map_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_dump_debug_logs =
     Ffm.downcall("mln_map_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
@@ -511,6 +509,8 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_map_options_default = Ffm.downcall("mln_map_options_default", mln_map_options)
+  private val mln_map_projection_create =
+    Ffm.downcall("mln_map_projection_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
     Ffm.downcall("mln_map_projection_get_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_lat_lng_for_pixel =
@@ -885,8 +885,6 @@ internal actual object C {
     Ffm.downcall("mln_render_session_barrier", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_clear_data =
     Ffm.downcall("mln_render_session_clear_data", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_create_projection =
-    Ffm.downcall("mln_render_session_create_projection", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_detach =
     Ffm.downcall("mln_render_session_detach", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_dispose =
@@ -1843,9 +1841,6 @@ internal actual object C {
   actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_cancel_transitions.invokeExact(map, completion, outDiagnostic) as Int
 
-  actual fun mln_map_create_projection(map: Long, outProjection: Long, outDiagnostic: Long): Int =
-    mln_map_create_projection.invokeExact(map, outProjection, outDiagnostic) as Int
-
   actual fun mln_map_dispose(map: Long, outDiagnostic: Long): Int =
     mln_map_dispose.invokeExact(map, outDiagnostic) as Int
 
@@ -2062,6 +2057,9 @@ internal actual object C {
   actual fun mln_map_options_default(returned: Long) {
     mln_map_options_default.invokeExact(Ffm.into(returned, mln_map_options)) as MemorySegment
   }
+
+  actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
+    mln_map_projection_create.invokeExact(view, outProjection, outDiagnostic) as Int
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
@@ -2653,13 +2651,6 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int = mln_render_session_clear_data.invokeExact(session, completion, outDiagnostic) as Int
-
-  actual fun mln_render_session_create_projection(
-    session: Long,
-    outProjection: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_create_projection.invokeExact(session, outProjection, outDiagnostic) as Int
 
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_render_session_detach.invokeExact(session, completion, outDiagnostic) as Int

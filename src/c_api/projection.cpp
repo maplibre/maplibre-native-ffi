@@ -6,12 +6,12 @@
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
 
-auto mln_map_create_projection(
-  mln_map map, mln_map_projection* out_projection,
+auto mln_map_projection_create(
+  const mln_map_view* view, mln_map_projection* out_projection,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_projection_create(map, out_projection);
+    return mln::core::map_projection_create(view, out_projection);
   });
 }
 

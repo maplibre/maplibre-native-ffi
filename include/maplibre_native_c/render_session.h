@@ -21,27 +21,6 @@
 extern "C" {
 #endif
 
-/**
- * Copies the last completed rendered transform into an independent projection.
- * Callable from any thread. Returns invalid state before a completed render,
- * after an extent or target change, or after detachment. The caller owns the
- * returned projection, which remains usable after the session is released.
- * out_projection must point to a null handle.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
- *   out_projection is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when session has been released, or the target has
- *   no rendered projection.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_create_projection(
-  mln_render_session session,
-  mln_map_projection* out_projection MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
 /** Terminal disposition of one accepted frame demand. */
 typedef enum mln_render_result : uint32_t {
   /**
@@ -166,6 +145,14 @@ typedef struct mln_render_frame_result {
    * re-arms the demand as each result arrives.
    */
   bool needs_repaint;
+  /**
+   * The view that this frame drew, from the transform of the map update that
+   * it rendered. A host that displays the frame builds its projection with
+   * mln_map_projection_create() to place overlays where the frame drew their
+   * coordinates. Zero, with a size of zero, unless disposition is
+   * MLN_RENDER_RESULT_RENDERED.
+   */
+  mln_map_view view;
 } mln_render_frame_result;
 
 /**

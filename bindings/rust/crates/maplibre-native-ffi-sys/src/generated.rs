@@ -760,10 +760,6 @@ pub struct mln_map_snapshot {
     pub size: u32,
     pub debug_options: u32,
     pub generation: u64,
-    pub camera: mln_camera_options,
-    pub logical_extent: mln_logical_extent,
-    pub projection_mode: mln_projection_mode,
-    pub viewport: mln_map_viewport_options,
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
     pub gesture_in_progress: bool,
@@ -772,6 +768,7 @@ pub struct mln_map_snapshot {
     pub tile: mln_map_tile_options,
     pub bounds: mln_bound_options,
     pub free_camera: mln_free_camera_options,
+    pub view: mln_map_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -784,6 +781,15 @@ pub struct mln_map_tile_options {
     pub lod_pitch_threshold: f64,
     pub lod_zoom_shift: f64,
     pub lod_mode: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_map_view {
+    pub size: u32,
+    pub camera: mln_camera_options,
+    pub extent: mln_logical_extent,
+    pub projection_mode: mln_projection_mode,
+    pub viewport: mln_map_viewport_options,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1036,6 +1042,7 @@ pub struct mln_render_frame_result {
     pub generation: u64,
     pub frame_generation: u64,
     pub needs_repaint: bool,
+    pub view: mln_map_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1928,11 +1935,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_create_projection(
-        map: mln_map,
-        out_projection: *mut mln_map_projection,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_dispose(map: mln_map, out_diagnostic: *mut mln_diagnostic) -> mln_status;
     pub fn mln_map_dump_debug_logs(
         map: mln_map,
@@ -2074,6 +2076,11 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_options_default() -> mln_map_options;
+    pub fn mln_map_projection_create(
+        view: *const mln_map_view,
+        out_projection: *mut mln_map_projection,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_projection_get_camera(
         projection: mln_map_projection,
         out_camera: *mut mln_camera_options,
@@ -2393,11 +2400,6 @@ unsafe extern "C" {
     pub fn mln_render_session_clear_data(
         session: mln_render_session,
         completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_create_projection(
-        session: mln_render_session,
-        out_projection: *mut mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_detach(

@@ -359,10 +359,6 @@ internal unsafe struct mln_map_snapshot
     public uint size;
     public uint debug_options;
     public ulong generation;
-    public mln_camera_options camera;
-    public mln_logical_extent logical_extent;
-    public mln_projection_mode projection_mode;
-    public mln_map_viewport_options viewport;
     public byte fully_loaded;
     public byte rendering_stats_view_enabled;
     public byte gesture_in_progress;
@@ -371,6 +367,7 @@ internal unsafe struct mln_map_snapshot
     public mln_map_tile_options tile;
     public mln_bound_options bounds;
     public mln_free_camera_options free_camera;
+    public mln_map_view view;
 }
 
 internal unsafe struct mln_map_tile_options
@@ -383,6 +380,15 @@ internal unsafe struct mln_map_tile_options
     public double lod_pitch_threshold;
     public double lod_zoom_shift;
     public uint lod_mode;
+}
+
+internal unsafe struct mln_map_view
+{
+    public uint size;
+    public mln_camera_options camera;
+    public mln_logical_extent extent;
+    public mln_projection_mode projection_mode;
+    public mln_map_viewport_options viewport;
 }
 
 internal unsafe struct mln_map_viewport_options
@@ -645,6 +651,7 @@ internal unsafe struct mln_render_frame_result
     public ulong generation;
     public ulong frame_generation;
     public byte needs_repaint;
+    public mln_map_view view;
 }
 
 internal unsafe struct mln_render_session_attach_options

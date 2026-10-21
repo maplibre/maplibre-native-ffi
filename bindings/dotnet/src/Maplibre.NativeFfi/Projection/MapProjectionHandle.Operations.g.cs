@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A standalone projection of a map's transform state at its creation.
+/// A standalone projection of one map view.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_projection</c> in the <see
@@ -45,6 +45,23 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     public void Dispose()
     {
         state.Retire();
+    }
+
+    /// <summary>
+    /// Creates a standalone projection of a view, such as the view of a
+    /// rendered frame or of a map snapshot.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public static MapProjectionHandle Create(MapView view)
+    {
+        using var call = Enter(null);
+        var nativeView = NativeMapView(view);
+        MlnMapProjection outProjection = default;
+        Check(NativeMethods.mln_map_projection_create(&nativeView, &outProjection, Diagnostic));
+        return MapProjectionHandle.Adopt(outProjection);
     }
 
     /// <summary>

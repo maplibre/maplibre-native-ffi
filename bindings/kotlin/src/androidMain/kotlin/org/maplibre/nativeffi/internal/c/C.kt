@@ -407,13 +407,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic
-  actual external fun mln_map_create_projection(
-    map: Long,
-    outProjection: Long,
-    outDiagnostic: Long,
-  ): Int
-
   @JvmStatic actual external fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
 
   @JvmStatic
@@ -589,6 +582,13 @@ internal actual object C {
   ): Int
 
   @CriticalNative @JvmStatic actual external fun mln_map_options_default(returned: Long): Unit
+
+  @JvmStatic
+  actual external fun mln_map_projection_create(
+    view: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int
 
   @JvmStatic
   actual external fun mln_map_projection_get_camera(
@@ -1026,13 +1026,6 @@ internal actual object C {
   actual external fun mln_render_session_clear_data(
     session: Long,
     completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_render_session_create_projection(
-    session: Long,
-    outProjection: Long,
     outDiagnostic: Long,
   ): Int
 

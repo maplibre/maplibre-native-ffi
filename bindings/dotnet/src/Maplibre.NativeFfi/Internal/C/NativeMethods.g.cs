@@ -427,13 +427,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_create_projection(
-        MlnMap map,
-        MlnMapProjection* out_projection,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_dispose(MlnMap map, mln_diagnostic* out_diagnostic);
 
     [LibraryImport(LibraryName)]
@@ -625,6 +618,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_map_options mln_map_options_default();
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_create(
+        mln_map_view* view,
+        MlnMapProjection* out_projection,
+        mln_diagnostic* out_diagnostic
+    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_get_camera(
@@ -1077,13 +1077,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_clear_data(
         MlnRenderSession session,
         mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_create_projection(
-        MlnRenderSession session,
-        MlnMapProjection* out_projection,
         mln_diagnostic* out_diagnostic
     );
 

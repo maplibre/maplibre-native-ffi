@@ -732,20 +732,6 @@ impl MapHandle {
         })
     }
 
-    /// Creates a standalone projection from the map's latest published
-    /// snapshot.
-    ///
-    /// See `mln_map_create_projection` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
-        let mut call = self.inner.call();
-        let mut out_projection = sys::mln_map_projection(0);
-        call.status(|map, out_diagnostic| unsafe {
-            sys::mln_map_create_projection(map, &mut out_projection, out_diagnostic)
-        })?;
-        Ok(MapProjectionHandle::adopt(out_projection, None)?)
-    }
-
     /// Consumes a map handle without observing its asynchronous retirement.
     ///
     /// See `mln_map_dispose` in the

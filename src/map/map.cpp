@@ -39,6 +39,8 @@
 #include <mln/map/map_projection.hpp>
 #include <mln/map/mode.hpp>
 #include <mln/map/projection_mode.hpp>
+#include <mln/map/transform_state.hpp>
+#include <mln/math/angles.hpp>
 #include <mln/renderer/renderer_frontend.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/renderer/update_parameters.hpp>
@@ -2284,24 +2286,6 @@ auto from_native_tile_lod_mode(mln::TileLodMode mode) -> uint32_t {
   return MLN_TILE_LOD_MODE_DEFAULT;
 }
 
-auto from_native_projection_mode(const mln::ProjectionMode& mode)
-  -> mln_projection_mode {
-  auto result = mln::core::projection_mode_default();
-  if (mode.axonometric) {
-    result.fields |= MLN_PROJECTION_MODE_AXONOMETRIC;
-    result.axonometric = *mode.axonometric;
-  }
-  if (mode.xSkew) {
-    result.fields |= MLN_PROJECTION_MODE_X_SKEW;
-    result.x_skew = *mode.xSkew;
-  }
-  if (mode.ySkew) {
-    result.fields |= MLN_PROJECTION_MODE_Y_SKEW;
-    result.y_skew = *mode.ySkew;
-  }
-  return result;
-}
-
 auto to_native_lat_lng(mln_lat_lng coordinate) -> mln::LatLng {
   return mln::LatLng{coordinate.latitude, coordinate.longitude};
 }
@@ -2463,9 +2447,152 @@ auto from_native_free_camera(const mln::FreeCameraOptions& options)
   return result;
 }
 
+// A view's camera carries every field but the anchor, and its zoom, pitch, and
+// field of view stay within MapLibre Native's absolute limits, the only range
+// in which a transform converts coordinates.
+auto validate_map_view(const mln_map_view& view) -> mln_status {
+  constexpr auto camera_fields =
+    static_cast<uint32_t>(MLN_CAMERA_OPTION_CENTER) | MLN_CAMERA_OPTION_ZOOM |
+    MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
+    MLN_CAMERA_OPTION_CENTER_ALTITUDE | MLN_CAMERA_OPTION_PADDING |
+    MLN_CAMERA_OPTION_ROLL | MLN_CAMERA_OPTION_FOV;
+  constexpr auto projection_mode_fields =
+    static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
+    MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
+  constexpr auto viewport_fields =
+    static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
+    MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
+    MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
+    MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+  const auto& camera = view.camera;
+  if (
+    const auto status = validate_camera_fields(&camera); status != MLN_STATUS_OK
+  ) {
+    return status;
+  }
+  if ((camera.fields & camera_fields) != camera_fields) {
+    mln::core::set_thread_error(
+      "view camera must set every field except MLN_CAMERA_OPTION_ANCHOR"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  static const auto limits = mln::TransformState{};
+  if (
+    camera.zoom < mln::util::MIN_ZOOM || camera.zoom > mln::util::MAX_ZOOM ||
+    camera.pitch < mln::util::rad2deg(mln::util::PITCH_MIN) ||
+    camera.pitch > mln::util::rad2deg(mln::util::PITCH_MAX) ||
+    camera.field_of_view < mln::util::rad2deg(limits.getMinFieldOfView()) ||
+    camera.field_of_view > mln::util::rad2deg(limits.getMaxFieldOfView())
+  ) {
+    mln::core::set_thread_error(
+      "view camera zoom, pitch, and field of view must be within MapLibre "
+      "Native's limits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    const auto status = mln::core::validate_logical_extent(
+      view.extent, "view extent dimensions and scale_factor must be positive"
+    );
+    status != MLN_STATUS_OK
+  ) {
+    return status;
+  }
+  const auto& mode = view.projection_mode;
+  if (
+    mode.fields != projection_mode_fields || !std::isfinite(mode.x_skew) ||
+    !std::isfinite(mode.y_skew)
+  ) {
+    mln::core::set_thread_error(
+      "view projection mode must set every field, with finite skews"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if ((view.viewport.fields & viewport_fields) != viewport_fields) {
+    mln::core::set_thread_error("view viewport options must set every field");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto viewport = view.viewport;
+  viewport.size = sizeof(mln_map_viewport_options);
+  return validate_viewport_options(&viewport);
+}
+
+// Assigns a validated view to a fresh transform. A camera jump would wrap the
+// center into the first world copy and clamp zoom and pitch to constraints
+// that the view does not carry, so the state is set directly, with MapLibre
+// Native's widest limits and no constraint until every member is in place.
+auto transform_from_map_view(const mln_map_view& view) -> mln::TransformState {
+  const auto& camera = view.camera;
+  auto state = mln::TransformState{
+    mln::ConstrainMode::None,
+    to_native_viewport_mode(view.viewport.viewport_mode)
+  };
+  state.setMaxZoom(mln::util::MAX_ZOOM);
+  state.setMaxPitch(mln::util::PITCH_MAX);
+  state.setSize(mln::Size{view.extent.width, view.extent.height});
+  state.setNorthOrientation(
+    to_native_north_orientation(view.viewport.north_orientation)
+  );
+  state.setFrustumOffset(to_native_edge_insets(view.viewport.frustum_offset));
+  state.setEdgeInsets(to_native_edge_insets(camera.padding));
+  state.setLatLngZoom(to_native_lat_lng(camera.center), camera.zoom);
+  state.setCenterAltitude(camera.center_altitude);
+  state.setBearing(-mln::util::deg2rad(camera.bearing));
+  state.setPitch(mln::util::deg2rad(camera.pitch));
+  state.setRoll(mln::util::deg2rad(camera.roll));
+  state.setFieldOfView(mln::util::deg2rad(camera.field_of_view));
+  state.setAxonometric(view.projection_mode.axonometric);
+  state.setXSkew(view.projection_mode.x_skew);
+  state.setYSkew(view.projection_mode.y_skew);
+  state.setConstrainMode(
+    to_native_constrain_mode(view.viewport.constrain_mode)
+  );
+  return state;
+}
+
 }  // namespace
 
 namespace mln::core {
+auto map_view_from_transform(
+  const mln::TransformState& transform, double scale_factor
+) -> mln_map_view {
+  auto camera = from_native_camera(transform.getCameraOptions(std::nullopt));
+  // The center keeps its world copy, which a later conversion needs and which
+  // camera options may wrap.
+  camera.center =
+    from_native_lat_lng(transform.getLatLng(mln::LatLng::Unwrapped));
+  const auto size = transform.getSize();
+  return mln_map_view{
+    .size = sizeof(mln_map_view),
+    .camera = camera,
+    .extent =
+      {
+        .width = size.width, .height = size.height, .scale_factor = scale_factor
+      },
+    .projection_mode =
+      {.size = sizeof(mln_projection_mode),
+       .fields = static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
+                 MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW,
+       .axonometric = transform.getAxonometric(),
+       .x_skew = transform.getXSkew(),
+       .y_skew = transform.getYSkew()},
+    .viewport = {
+      .size = sizeof(mln_map_viewport_options),
+      .fields =
+        static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
+        MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
+        MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
+        MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
+      .north_orientation =
+        from_native_north_orientation(transform.getNorthOrientation()),
+      .constrain_mode =
+        from_native_constrain_mode(transform.getConstrainMode()),
+      .viewport_mode = from_native_viewport_mode(transform.getViewportMode()),
+      .frustum_offset = from_native_edge_insets(transform.getFrustumOffset())
+    }
+  };
+}
+
 auto validate_debug_options_input(uint32_t options) -> mln_status {
   return validate_debug_options(options);
 }
@@ -2583,27 +2710,25 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     const auto fully_loaded = live.map->isFullyLoaded();
     const auto gesture = live.map->isGestureInProgress();
     const auto refresh_camera = live.snapshot_camera_dirty;
-    auto camera = mln_camera_options{};
+    auto view = mln_map_view{};
     auto free_camera = mln_free_camera_options{};
-    auto transform = std::optional<mln::TransformState>{};
     if (refresh_camera) {
-      camera = from_native_camera(live.map->getCameraOptions());
+      view = map_view_from_transform(
+        live.map->getTransformState(), live.logical_extent.scale_factor
+      );
       free_camera = from_native_free_camera(live.map->getFreeCameraOptions());
-      transform.emplace(live.map->getTransformState());
     }
     {
       const auto lock = std::scoped_lock{live.snapshot_mutex};
       live.snapshot.generation = generation;
-      live.snapshot.logical_extent = live.logical_extent;
       live.snapshot.event_mask =
         live.event_state->mask.load(std::memory_order_relaxed);
       live.snapshot.fully_loaded = fully_loaded;
       live.snapshot.gesture_in_progress = gesture;
       live.snapshot.latest_render_update_generation = update_generation;
       if (refresh_camera) {
-        live.snapshot.camera = camera;
+        live.snapshot.view = view;
         live.snapshot.free_camera = free_camera;
-        live.snapshot_transform = std::move(*transform);
       }
     }
     live.snapshot_camera_dirty = false;
@@ -2611,27 +2736,10 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     return generation;
   }
 
-  const auto options = live.map->getMapOptions();
   auto snapshot = mln_map_snapshot{
     .size = sizeof(mln_map_snapshot),
     .debug_options = from_native_debug_options(live.map->getDebug()),
     .generation = live.next_snapshot_generation++,
-    .camera = from_native_camera(live.map->getCameraOptions()),
-    .logical_extent = live.logical_extent,
-    .projection_mode =
-      from_native_projection_mode(live.map->getProjectionMode()),
-    .viewport =
-      {.size = sizeof(mln_map_viewport_options),
-       .fields =
-         static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
-         MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
-         MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
-         MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
-       .north_orientation =
-         from_native_north_orientation(options.northOrientation()),
-       .constrain_mode = from_native_constrain_mode(options.constrainMode()),
-       .viewport_mode = from_native_viewport_mode(options.viewportMode()),
-       .frustum_offset = from_native_edge_insets(live.map->getFrustumOffset())},
     .fully_loaded = live.map->isFullyLoaded(),
     .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
     .gesture_in_progress = live.map->isGestureInProgress(),
@@ -2652,14 +2760,15 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
        .lod_zoom_shift = live.map->getTileLodZoomShift(),
        .lod_mode = from_native_tile_lod_mode(live.map->getTileLodMode())},
     .bounds = from_native_bound_options(live.map->getBounds()),
-    .free_camera = from_native_free_camera(live.map->getFreeCameraOptions())
+    .free_camera = from_native_free_camera(live.map->getFreeCameraOptions()),
+    .view = map_view_from_transform(
+      live.map->getTransformState(), live.logical_extent.scale_factor
+    )
   };
   const auto generation = snapshot.generation;
-  auto transform = live.map->getTransformState();
   {
     const std::scoped_lock lock(live.snapshot_mutex);
     live.snapshot = snapshot;
-    live.snapshot_transform = std::move(transform);
   }
   live.snapshot_config_dirty = false;
   live.snapshot_camera_dirty = false;
@@ -4447,9 +4556,13 @@ auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
   return MLN_STATUS_OK;
 }
 
-auto map_projection_create_from_transform(
-  const mln::TransformState& transform, mln_map_projection* out_projection
+auto map_projection_create(
+  const mln_map_view* view, mln_map_projection* out_projection
 ) -> mln_status {
+  if (view == nullptr || view->size < sizeof(mln_map_view)) {
+    set_thread_error("view must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (out_projection == nullptr) {
     set_thread_error("out_projection must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4458,27 +4571,15 @@ auto map_projection_create_from_transform(
     set_thread_error("out_projection must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (const auto status = validate_map_view(*view); status != MLN_STATUS_OK) {
+    return status;
+  }
   auto owned_projection = std::make_shared<MapProjectionObject>();
   owned_projection->projection =
-    std::make_unique<mln::MapProjection>(transform);
+    std::make_unique<mln::MapProjection>(transform_from_map_view(*view));
   *out_projection =
     handle_table<MapProjectionObject>().insert(std::move(owned_projection));
   return MLN_STATUS_OK;
-}
-
-auto map_projection_create(mln_map map, mln_map_projection* out_projection)
-  -> mln_status {
-  auto live = lease_map(map);
-  if (live == nullptr) return recorded_handle_fault_status();
-  if (live->control.is_closing()) {
-    set_thread_error("map is closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  const auto transform = [&]() -> mln::TransformState {
-    const std::scoped_lock lock(live->snapshot_mutex);
-    return live->snapshot_transform;
-  }();
-  return map_projection_create_from_transform(transform, out_projection);
 }
 
 auto map_projection_release(mln_map_projection projection) -> mln_status {

@@ -124,8 +124,8 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
   mln_map_snapshot after = {.size = sizeof(after)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &after, NULL));
   TEST_ASSERT_GREATER_THAN_UINT64(before.generation, after.generation);
-  TEST_ASSERT_EQUAL_UINT32(96, after.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(80, after.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(96, after.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(80, after.view.extent.height);
   TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, after.debug_options);
   mln_camera_options observed;
   MLN_TEST_OK(mln_test_map_get_camera(map, &observed));

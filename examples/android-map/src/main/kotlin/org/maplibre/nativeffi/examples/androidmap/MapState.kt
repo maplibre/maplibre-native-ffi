@@ -94,7 +94,7 @@ internal class MapState(initialViewport: Viewport, styleJson: String? = null) : 
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
   fun zoomToNextWholeLevel(anchor: ScreenPoint) {
-    val zoom = map.getSnapshot().camera.zoom ?: 0.0
+    val zoom = map.getSnapshot().view.camera.zoom ?: 0.0
     delta(
       CameraDelta(
         scale = 2.0.pow(round(zoom) + 1.0 - zoom),

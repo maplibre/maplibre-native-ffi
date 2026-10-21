@@ -844,22 +844,6 @@ fn generated_copy_mln_map_snapshot(
     let dict = PyDict::new(py);
     dict.set_item("debug_options", generated_value(py, value.debug_options)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item(
-        "camera",
-        generated_copy_mln_camera_options(py, &value.camera)?,
-    )?;
-    dict.set_item(
-        "logical_extent",
-        generated_copy_mln_logical_extent(py, &value.logical_extent)?,
-    )?;
-    dict.set_item(
-        "projection_mode",
-        generated_copy_mln_projection_mode(py, &value.projection_mode)?,
-    )?;
-    dict.set_item(
-        "viewport",
-        generated_copy_mln_map_viewport_options(py, &value.viewport)?,
-    )?;
     dict.set_item("fully_loaded", generated_value(py, value.fully_loaded)?)?;
     dict.set_item(
         "rendering_stats_view_enabled",
@@ -886,6 +870,7 @@ fn generated_copy_mln_map_snapshot(
         "free_camera",
         generated_copy_mln_free_camera_options(py, &value.free_camera)?,
     )?;
+    dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -941,6 +926,27 @@ fn generated_copy_mln_map_tile_options(
             value.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0,
             || generated_value(py, value.lod_mode),
         )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_map_view(py: Python<'_>, value: &sys::mln_map_view) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "camera",
+        generated_copy_mln_camera_options(py, &value.camera)?,
+    )?;
+    dict.set_item(
+        "extent",
+        generated_copy_mln_logical_extent(py, &value.extent)?,
+    )?;
+    dict.set_item(
+        "projection_mode",
+        generated_copy_mln_projection_mode(py, &value.projection_mode)?,
+    )?;
+    dict.set_item(
+        "viewport",
+        generated_copy_mln_map_viewport_options(py, &value.viewport)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1502,6 +1508,7 @@ fn generated_copy_mln_render_frame_result(
         generated_value(py, value.frame_generation)?,
     )?;
     dict.set_item("needs_repaint", generated_value(py, value.needs_repaint)?)?;
+    dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3320,6 +3327,20 @@ fn generated_input_mln_map_tile_options<'py>(
         raw.lod_mode = field.extract::<sys::mln_tile_lod_mode>()?;
         raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MODE;
     }
+    Ok(raw)
+}
+
+fn generated_input_mln_map_view<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_map_view> {
+    let mut raw: sys::mln_map_view = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_map_view>() as _;
+    raw.camera = generated_input_mln_camera_options(&value.getattr("camera")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.projection_mode =
+        generated_input_mln_projection_mode(&value.getattr("projection_mode")?, storage)?;
+    raw.viewport = generated_input_mln_map_viewport_options(&value.getattr("viewport")?, storage)?;
     Ok(raw)
 }
 
@@ -5910,18 +5931,6 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = ())]
-    fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_create_projection(handle, &mut out_projection, diagnostic)
-            })
-        }?;
-        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -8194,18 +8203,6 @@ impl RenderSessionHandle {
         }
     }
     #[pyo3(signature = ())]
-    fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_render_session_create_projection(handle, &mut out_projection, diagnostic)
-            })
-        }?;
-        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
     fn detach(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -9533,6 +9530,21 @@ fn logical_extent_physical_size(
 }
 
 #[pyfunction]
+#[pyo3(signature = (view))]
+fn map_projection_create(py: Python<'_>, view: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py);
+    let storage = &mut call.storage;
+    let view_value = generated_input_mln_map_view(&view.clone(), storage)?;
+    let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_map_projection_create(&view_value, &mut out_projection, diagnostic)
+        })
+    }?;
+    unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
+}
+
+#[pyfunction]
 #[pyo3(signature = ())]
 fn network_get_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -9719,6 +9731,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(log_set_async_severity_mask, module)?)?;
     module.add_function(wrap_pyfunction!(log_set_callback, module)?)?;
     module.add_function(wrap_pyfunction!(logical_extent_physical_size, module)?)?;
+    module.add_function(wrap_pyfunction!(map_projection_create, module)?)?;
     module.add_function(wrap_pyfunction!(network_get_status, module)?)?;
     module.add_function(wrap_pyfunction!(network_set_status, module)?)?;
     module.add_function(wrap_pyfunction!(

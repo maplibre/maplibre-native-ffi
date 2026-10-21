@@ -563,10 +563,6 @@ final class mln_map_snapshot extends Struct {
   external int debug_options;
   @Uint64()
   external int generation;
-  external mln_camera_options camera;
-  external mln_logical_extent logical_extent;
-  external mln_projection_mode projection_mode;
-  external mln_map_viewport_options viewport;
   @Bool()
   external bool fully_loaded;
   @Bool()
@@ -580,6 +576,7 @@ final class mln_map_snapshot extends Struct {
   external mln_map_tile_options tile;
   external mln_bound_options bounds;
   external mln_free_camera_options free_camera;
+  external mln_map_view view;
 }
 
 final class mln_map_tile_options extends Struct {
@@ -599,6 +596,15 @@ final class mln_map_tile_options extends Struct {
   external double lod_zoom_shift;
   @Uint32()
   external int lod_mode;
+}
+
+final class mln_map_view extends Struct {
+  @Uint32()
+  external int size;
+  external mln_camera_options camera;
+  external mln_logical_extent extent;
+  external mln_projection_mode projection_mode;
+  external mln_map_viewport_options viewport;
 }
 
 final class mln_map_viewport_options extends Struct {
@@ -915,6 +921,7 @@ final class mln_render_frame_result extends Struct {
   external int frame_generation;
   @Bool()
   external bool needs_repaint;
+  external mln_map_view view;
 }
 
 final class mln_render_session_attach_options extends Struct {
@@ -2871,15 +2878,6 @@ external int mln_map_cancel_transitions(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(mln_map, Pointer<mln_map_projection>, Pointer<mln_diagnostic>)
->()
-external int mln_map_create_projection(
-  int map,
-  Pointer<mln_map_projection> out_projection,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Int32 Function(mln_map, Pointer<mln_diagnostic>)>()
 external int mln_map_dispose(int map, Pointer<mln_diagnostic> out_diagnostic);
 
@@ -3195,6 +3193,19 @@ external int mln_map_move_style_layer(
 
 @Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
+
+@Native<
+  Int32 Function(
+    Pointer<mln_map_view>,
+    Pointer<mln_map_projection>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_create(
+  Pointer<mln_map_view> view,
+  Pointer<mln_map_projection> out_projection,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @Native<
   Int32 Function(
@@ -3986,19 +3997,6 @@ external int mln_render_session_barrier(
 external int mln_render_session_clear_data(
   int session,
   Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_map_projection>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_create_projection(
-  int session,
-  Pointer<mln_map_projection> out_projection,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

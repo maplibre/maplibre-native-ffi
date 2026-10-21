@@ -490,12 +490,13 @@ auto map_lat_lng_bounds_for_camera_unwrapped_start(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion
 ) -> mln_status;
-auto map_projection_create_from_transform(
-  const mln::TransformState& transform, mln_map_projection* out_projection
+// The view that a transform describes, for a snapshot or a rendered frame.
+auto map_view_from_transform(
+  const mln::TransformState& transform, double scale_factor
+) -> mln_map_view;
+auto map_projection_create(
+  const mln_map_view* view, mln_map_projection* out_projection
 ) -> mln_status;
-
-auto map_projection_create(mln_map map, mln_map_projection* out_projection)
-  -> mln_status;
 auto map_projection_release(mln_map_projection projection) -> mln_status;
 auto map_projection_get_camera(
   mln_map_projection projection, mln_camera_options* out_camera

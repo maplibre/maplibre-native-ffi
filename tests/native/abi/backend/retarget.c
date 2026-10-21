@@ -544,8 +544,8 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   MLN_TEST_OK(mln_test_map_fence(map.map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map.map, &snapshot, NULL));
-  TEST_ASSERT_EQUAL_UINT32(width, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(height, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(width, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(height, snapshot.view.extent.height);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
   );

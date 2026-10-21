@@ -96,7 +96,7 @@ struct NativeMapProjectionHandle: NativeHandle {
   }
 }
 
-/// A standalone projection of a map's transform state at its creation.
+/// A standalone projection of one map view.
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

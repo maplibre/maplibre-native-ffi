@@ -633,10 +633,10 @@ void concurrent_resizes_publish_matching_map_and_driver_extents() {
   MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.render.session, &session, nullptr)
   );
-  TEST_ASSERT_EQUAL_UINT32(b.extent.width, map.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(b.extent.height, map.logical_extent.height);
-  TEST_ASSERT_EQUAL_UINT32(map.logical_extent.width, session.extent.width);
-  TEST_ASSERT_EQUAL_UINT32(map.logical_extent.height, session.extent.height);
+  TEST_ASSERT_EQUAL_UINT32(b.extent.width, map.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(b.extent.height, map.view.extent.height);
+  TEST_ASSERT_EQUAL_UINT32(map.view.extent.width, session.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(map.view.extent.height, session.extent.height);
   mln_test_render_request_forced(&fixture.render, 202);
   const auto batch = wait_for_results(fixture, 1);
   TEST_ASSERT_EQUAL_UINT32(

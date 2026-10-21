@@ -2208,6 +2208,148 @@ public class GpuSync(
 }
 
 /**
+ * Geographic coordinate in degrees used by map and projection APIs.
+ *
+ * See `mln_lat_lng` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class LatLng(
+  /** Latitude in degrees, finite and within &#91;-90, 90&#93; on input. */
+  public val latitude: Double = 0.0,
+  /** Longitude in degrees. Input longitude must be finite. */
+  public val longitude: Double = 0.0,
+)
+
+/**
+ * Screen-space inset in logical map pixels.
+ *
+ * See `mln_edge_insets` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class EdgeInsets(
+  public val top: Double = 0.0,
+  public val left: Double = 0.0,
+  public val bottom: Double = 0.0,
+  public val right: Double = 0.0,
+)
+
+/**
+ * Screen-space point in logical map pixels.
+ *
+ * See `mln_screen_point` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ScreenPoint(
+  public val x: Double = 0.0,
+  public val y: Double = 0.0,
+)
+
+/**
+ * Camera fields used by snapshots and camera updates.
+ *
+ * See `mln_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraOptions(
+  public val center: LatLng? = null,
+  public val centerAltitude: Double? = null,
+  public val padding: EdgeInsets? = null,
+  /** Optional screen-space focal point in logical map pixels. */
+  public val anchor: ScreenPoint? = null,
+  public val zoom: Double? = null,
+  public val bearing: Double? = null,
+  public val pitch: Double? = null,
+  public val roll: Double? = null,
+  public val fieldOfView: Double? = null,
+) {
+  public companion object {
+    internal val default: CameraOptions by lazy { GeneratedApi.cameraOptionsDefault() }
+  }
+}
+
+/**
+ * Logical extent in UI pixels and the device-pixel scale.
+ *
+ * See `mln_logical_extent` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class LogicalExtent(
+  /** Width in UI pixels. Defaults to 256. */
+  public val width: UInt = LogicalExtent.default.width,
+  /** Height in UI pixels. Defaults to 256. */
+  public val height: UInt = LogicalExtent.default.height,
+  /** Device pixels per UI pixel. Defaults to 1.0. */
+  public val scaleFactor: Double = LogicalExtent.default.scaleFactor,
+) {
+  public companion object {
+    internal val default: LogicalExtent by lazy { GeneratedApi.logicalExtentDefault() }
+  }
+}
+
+/**
+ * MapLibre axonometric rendering options used for snapshots and commands.
+ *
+ * See `mln_projection_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ProjectionMode(
+  /** Enables a non-perspective axonometric render transform. */
+  public val axonometric: Boolean? = null,
+  /** Native x-skew factor used by the axonometric transform. */
+  public val xSkew: Double? = null,
+  /** Native y-skew factor used by the axonometric transform. */
+  public val ySkew: Double? = null,
+) {
+  public companion object {
+    internal val default: ProjectionMode by lazy { GeneratedApi.projectionModeDefault() }
+  }
+}
+
+/**
+ * Live map viewport and render-transform controls.
+ *
+ * See `mln_map_viewport_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MapViewportOptions(
+  /** One of `mln_north_orientation`. */
+  public val northOrientation: NorthOrientation? = null,
+  /** One of `mln_constrain_mode`. */
+  public val constrainMode: ConstrainMode? = null,
+  /** One of `mln_viewport_mode`. */
+  public val viewportMode: ViewportMode? = null,
+  public val frustumOffset: EdgeInsets? = null,
+) {
+  public companion object {
+    internal val default: MapViewportOptions by lazy { GeneratedApi.mapViewportOptionsDefault() }
+  }
+}
+
+/**
+ * Everything that a projection depends on: the transform that a published snapshot or a rendered
+ * frame describes.
+ *
+ * See `mln_map_view` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MapView(
+  /**
+   * The camera. Its center is unwrapped: the longitude keeps the visible world copy and may fall
+   * outside -180 to 180. Every field except `MLN_CAMERA_OPTION_ANCHOR` is set.
+   */
+  public val camera: CameraOptions = CameraOptions(),
+  /**
+   * Logical size and device-pixel scale. A snapshot carries the map's scale factor, and a frame
+   * carries the scale factor of the target that drew it.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
+  /** Axonometric mode and skew, with every field set. */
+  public val projectionMode: ProjectionMode = ProjectionMode(),
+  /** North orientation, constrain mode, viewport mode, and frustum offset, with every field set. */
+  public val viewport: MapViewportOptions = MapViewportOptions(),
+)
+
+/**
  * Terminal result of one frame demand, held by an owned frame-result batch and copied by
  * `mln_acquired_frame_get_result()`.
  *
@@ -2247,6 +2389,13 @@ public data class RenderFrameResult(
    * result arrives.
    */
   public val needsRepaint: Boolean = false,
+  /**
+   * The view that this frame drew, from the transform of the map update that it rendered. A host
+   * that displays the frame builds its projection with `mln_map_projection_create()` to place
+   * overlays where the frame drew their coordinates. Zero, with a size of zero, unless disposition
+   * is `MLN_RENDER_RESULT_RENDERED`.
+   */
+  public val view: MapView = MapView(),
 )
 
 /**
@@ -2533,19 +2682,6 @@ public data class AnimationOptions(
 }
 
 /**
- * Geographic coordinate in degrees used by map and projection APIs.
- *
- * See `mln_lat_lng` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class LatLng(
-  /** Latitude in degrees, finite and within &#91;-90, 90&#93; on input. */
-  public val latitude: Double = 0.0,
-  /** Longitude in degrees. Input longitude must be finite. */
-  public val longitude: Double = 0.0,
-)
-
-/**
  * Geographic bounds in degrees.
  *
  * See `mln_lat_lng_bounds` in the
@@ -2583,17 +2719,6 @@ public data class BoundOptions(
 }
 
 /**
- * Screen-space point in logical map pixels.
- *
- * See `mln_screen_point` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class ScreenPoint(
-  public val x: Double = 0.0,
-  public val y: Double = 0.0,
-)
-
-/**
  * One atomic relative camera update.
  *
  * See `mln_camera_delta` in the
@@ -2619,19 +2744,6 @@ public data class CameraDelta(
 }
 
 /**
- * Screen-space inset in logical map pixels.
- *
- * See `mln_edge_insets` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class EdgeInsets(
-  public val top: Double = 0.0,
-  public val left: Double = 0.0,
-  public val bottom: Double = 0.0,
-  public val right: Double = 0.0,
-)
-
-/**
  * Optional fitting controls for camera-for-viewport queries.
  *
  * See `mln_camera_fit_options` in the
@@ -2644,29 +2756,6 @@ public data class CameraFitOptions(
 ) {
   public companion object {
     internal val default: CameraFitOptions by lazy { GeneratedApi.cameraFitOptionsDefault() }
-  }
-}
-
-/**
- * Camera fields used by snapshots and camera updates.
- *
- * See `mln_camera_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraOptions(
-  public val center: LatLng? = null,
-  public val centerAltitude: Double? = null,
-  public val padding: EdgeInsets? = null,
-  /** Optional screen-space focal point in logical map pixels. */
-  public val anchor: ScreenPoint? = null,
-  public val zoom: Double? = null,
-  public val bearing: Double? = null,
-  public val pitch: Double? = null,
-  public val roll: Double? = null,
-  public val fieldOfView: Double? = null,
-) {
-  public companion object {
-    internal val default: CameraOptions by lazy { GeneratedApi.cameraOptionsDefault() }
   }
 }
 
@@ -2866,25 +2955,6 @@ public data class ProjectedMeters(
 )
 
 /**
- * Logical extent in UI pixels and the device-pixel scale.
- *
- * See `mln_logical_extent` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class LogicalExtent(
-  /** Width in UI pixels. Defaults to 256. */
-  public val width: UInt = LogicalExtent.default.width,
-  /** Height in UI pixels. Defaults to 256. */
-  public val height: UInt = LogicalExtent.default.height,
-  /** Device pixels per UI pixel. Defaults to 1.0. */
-  public val scaleFactor: Double = LogicalExtent.default.scaleFactor,
-) {
-  public companion object {
-    internal val default: LogicalExtent by lazy { GeneratedApi.logicalExtentDefault() }
-  }
-}
-
-/**
  * Options used when creating a map.
  *
  * See `mln_map_options` in the
@@ -2931,26 +3001,6 @@ public data class MapTileOptions(
 ) {
   public companion object {
     internal val default: MapTileOptions by lazy { GeneratedApi.mapTileOptionsDefault() }
-  }
-}
-
-/**
- * Live map viewport and render-transform controls.
- *
- * See `mln_map_viewport_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class MapViewportOptions(
-  /** One of `mln_north_orientation`. */
-  public val northOrientation: NorthOrientation? = null,
-  /** One of `mln_constrain_mode`. */
-  public val constrainMode: ConstrainMode? = null,
-  /** One of `mln_viewport_mode`. */
-  public val viewportMode: ViewportMode? = null,
-  public val frustumOffset: EdgeInsets? = null,
-) {
-  public companion object {
-    internal val default: MapViewportOptions by lazy { GeneratedApi.mapViewportOptionsDefault() }
   }
 }
 
@@ -3283,25 +3333,6 @@ public data class PremultipliedRgba8Image(
     internal val default: PremultipliedRgba8Image by lazy {
       GeneratedApi.premultipliedRgba8ImageDefault()
     }
-  }
-}
-
-/**
- * MapLibre axonometric rendering options used for snapshots and commands.
- *
- * See `mln_projection_mode` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class ProjectionMode(
-  /** Enables a non-perspective axonometric render transform. */
-  public val axonometric: Boolean? = null,
-  /** Native x-skew factor used by the axonometric transform. */
-  public val xSkew: Double? = null,
-  /** Native y-skew factor used by the axonometric transform. */
-  public val ySkew: Double? = null,
-) {
-  public companion object {
-    internal val default: ProjectionMode by lazy { GeneratedApi.projectionModeDefault() }
   }
 }
 
@@ -3815,10 +3846,6 @@ public data class MapSnapshot(
   /** Debug overlay mask of `mln_map_debug_option` values. */
   public val debugOptions: MapDebugOption,
   public val generation: ULong = 0uL,
-  public val camera: CameraOptions = CameraOptions(),
-  public val logicalExtent: LogicalExtent = LogicalExtent(),
-  public val projectionMode: ProjectionMode = ProjectionMode(),
-  public val viewport: MapViewportOptions = MapViewportOptions(),
   /** True once every requested style and tile resource finished loading. */
   public val fullyLoaded: Boolean = false,
   public val renderingStatsViewEnabled: Boolean = false,
@@ -3834,6 +3861,11 @@ public data class MapSnapshot(
   public val tile: MapTileOptions = MapTileOptions(),
   public val bounds: BoundOptions = BoundOptions(),
   public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
+  /**
+   * The map's camera, extent, projection mode, and viewport options. `mln_map_projection_create()`
+   * converts coordinates for this view.
+   */
+  public val view: MapView = MapView(),
 )
 
 /**

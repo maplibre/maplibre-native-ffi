@@ -2123,14 +2123,6 @@ class MapSnapshot:
 
     generation: int
 
-    camera: CameraOptions
-
-    logical_extent: LogicalExtent
-
-    projection_mode: ProjectionMode
-
-    viewport: MapViewportOptions
-
     fully_loaded: bool
     """True once every requested style and tile resource finished loading."""
 
@@ -2154,15 +2146,16 @@ class MapSnapshot:
 
     free_camera: FreeCameraOptions
 
+    view: MapView
+    """The map's camera, extent, projection mode, and viewport options.
+    `mln_map_projection_create()` converts coordinates for this view.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             debug_options=MapDebugOption(raw["debug_options"]),
             generation=raw["generation"],
-            camera=CameraOptions._from_native(raw["camera"]),
-            logical_extent=LogicalExtent._from_native(raw["logical_extent"]),
-            projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
-            viewport=MapViewportOptions._from_native(raw["viewport"]),
             fully_loaded=raw["fully_loaded"],
             rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
             gesture_in_progress=raw["gesture_in_progress"],
@@ -2171,6 +2164,7 @@ class MapSnapshot:
             tile=MapTileOptions._from_native(raw["tile"]),
             bounds=BoundOptions._from_native(raw["bounds"]),
             free_camera=FreeCameraOptions._from_native(raw["free_camera"]),
+            view=MapView._from_native(raw["view"]),
         )
 
 
@@ -2212,6 +2206,44 @@ class MapTileOptions:
         from . import _native
 
         return cls._from_native(_native._default_map_tile_options())
+
+
+@dataclass(frozen=True, slots=True)
+class MapView:
+    """Everything that a projection depends on: the transform that a published
+    snapshot or a rendered frame describes.
+
+    See `mln_map_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    camera: CameraOptions
+    """The camera. Its center is unwrapped: the longitude keeps the visible
+    world copy and may fall outside -180 to 180. Every field except
+    `MLN_CAMERA_OPTION_ANCHOR` is set.
+    """
+
+    extent: LogicalExtent
+    """Logical size and device-pixel scale. A snapshot carries the map's scale
+    factor, and a frame carries the scale factor of the target that drew it.
+    """
+
+    projection_mode: ProjectionMode
+    """Axonometric mode and skew, with every field set."""
+
+    viewport: MapViewportOptions
+    """North orientation, constrain mode, viewport mode, and frustum offset,
+    with every field set.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            camera=CameraOptions._from_native(raw["camera"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
+            projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
+            viewport=MapViewportOptions._from_native(raw["viewport"]),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -3137,6 +3169,14 @@ class RenderFrameResult:
     arrives.
     """
 
+    view: MapView
+    """The view that this frame drew, from the transform of the map update that
+    it rendered. A host that displays the frame builds its projection with
+    `mln_map_projection_create()` to place overlays where the frame drew
+    their coordinates. Zero, with a size of zero, unless disposition is
+    `MLN_RENDER_RESULT_RENDERED`.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -3146,6 +3186,7 @@ class RenderFrameResult:
             generation=raw["generation"],
             frame_generation=raw["frame_generation"],
             needs_repaint=raw["needs_repaint"],
+            view=MapView._from_native(raw["view"]),
         )
 
 

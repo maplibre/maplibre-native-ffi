@@ -245,8 +245,8 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
 
   MLN_TEST_OK(resize_status);
   MLN_TEST_OK(snapshot_status);
-  TEST_ASSERT_EQUAL_UINT32(extent.width, snapshot.logical_extent.width);
-  TEST_ASSERT_EQUAL_UINT32(extent.height, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(extent.width, snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(extent.height, snapshot.view.extent.height);
   MLN_TEST_OK(map_close_status);
   MLN_TEST_OK(runtime_close_status);
 }

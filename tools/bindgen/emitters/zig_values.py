@@ -9,8 +9,20 @@ def field_default(values, field) -> str | None:
     value = field.value
     if value.default:
         return None
-    public = values.public(value)
-    return ".{}" if value.kind == "record" else f"std.mem.zeroes({public})"
+    if value.kind != "record":
+        return f"std.mem.zeroes({values.public(value)})"
+    # `.{}` builds a record only when each of its public members has a default
+    # too, which a member record with a default function lacks.
+    members = (
+        member
+        for member in value.fields
+        if member.public
+        and member.value.kind == "record"
+        and not (member.presence and member.presence.mask)
+    )
+    if any(field_default(values, member) is None for member in members):
+        return None
+    return ".{}"
 
 
 class Values:

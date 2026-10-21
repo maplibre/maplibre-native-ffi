@@ -68,26 +68,6 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Copies the last completed rendered transform into an independent
-  /// projection.
-  /// Callable from any thread. Returns invalid state before a completed render,
-  /// after an extent or target change, or after detachment. The caller owns the
-  /// returned projection, which remains usable after the session is released.
-  /// out_projection must point to a null handle.
-  ///
-  /// See `mln_render_session_create_projection` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func createProjection() throws -> MapProjectionHandle {
-    var value0: mln_map_projection = 0
-    return try nativeInvoke { raw, _, diagnostic in
-      mln_render_session_create_projection(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try MapProjectionHandle(adopting: value0) }
-  }
-
   /// Starts normal graphics-owner teardown and map detachment.
   ///
   /// See `mln_render_session_detach` in the

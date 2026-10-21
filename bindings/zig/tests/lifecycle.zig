@@ -12,7 +12,7 @@ test "copied handles report native invalid state after release" {
     defer fixture.destroy();
     const map_copy = fixture.map;
     const runtime_copy = fixture.runtime;
-    const projection = try maplibre.mapCreateProjection(fixture.map, null);
+    const projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
     const projection_copy = projection;
 
     try maplibre.mapProjectionRelease(projection, null);

@@ -765,22 +765,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Creates a standalone projection from the map's latest published
-    /// snapshot.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_create_projection</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public MapProjectionHandle CreateProjection()
-    {
-        using var call = Enter(this);
-        MlnMapProjection outProjection = default;
-        Check(NativeMethods.mln_map_create_projection(Handle, &outProjection, Diagnostic));
-        return MapProjectionHandle.Adopt(outProjection);
-    }
-
-    /// <summary>
     /// Submits an ordered debug-log command.
     /// </summary>
     /// <remarks>

@@ -17,31 +17,34 @@ extern "C" {
 #endif
 
 /**
- * Creates a standalone projection from the map's latest published snapshot.
+ * Creates a standalone projection of a view, such as the view of a rendered
+ * frame or of a map snapshot.
  *
- * The projection copies the transform the map published with that snapshot:
- * its camera, logical extent, viewport options, camera constraints and
- * axonometric mode. A projection created after a command's completion
- * therefore observes that command. The caller owns the returned handle, which
- * stays usable after the map and runtime close. out_projection must point to
- * the null handle. This function may be called from any thread.
+ * Conversions match the transform that the view describes, whatever the
+ * map's later camera, size, or constraints. The projection takes the view's
+ * state as it is, with no camera jump, so a world copy, a zoom above the
+ * map's maximum, or a pitch above the map's maximum converts as it was drawn.
+ * The projection carries no camera constraints: mln_map_projection_set_camera()
+ * applies only the view's constrain mode and MapLibre Native's absolute zoom
+ * and pitch limits. For a camera that the map's constraints limit, use the
+ * map's ordered camera queries, such as mln_map_camera_for_lat_lng_bounds().
  *
- * mln_render_session_create_projection() copies the transform of the last
- * frame the session drew. Hit-testing against what is on screen uses the
- * session's projection.
- *
- * Projection calls are synchronous and serialized with each other. A
- * projection never observes map changes made after its creation.
+ * The caller owns the returned handle. out_projection must point to the null
+ * handle. Projection calls are synchronous and serialized with each other.
+ * This function needs no map or session and may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or
- *   out_projection is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when view is null or undersized, a nested
+ *   struct lacks a required field or carries an unknown one, a value is not
+ *   finite or out of range, or the extent has a zero width or height or a
+ *   scale_factor that is not finite and positive; or when out_projection is
+ *   null or does not point to the null handle.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_create_projection(
-  mln_map map, mln_map_projection* out_projection MLN_BINDING("direction=out"),
+MLN_API mln_status mln_map_projection_create(
+  const mln_map_view* view,
+  mln_map_projection* out_projection MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -107,8 +110,12 @@ MLN_API mln_status mln_map_projection_set_camera(
  * Converts a geographic coordinate to a screen point.
  *
  * The output uses logical map pixels with an origin at the top-left of the
- * projection viewport. The result observes every earlier projection setter.
- * This function may be called from any thread.
+ * projection viewport. The coordinate converts in the world copy nearest the
+ * camera center's longitude wrapped to -180 to 180, so for a camera centered
+ * in another world copy, convert pixels to coordinates with
+ * mln_map_projection_lat_lng_for_pixel_unwrapped() instead. The result
+ * observes every earlier projection setter. This function may be called from
+ * any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

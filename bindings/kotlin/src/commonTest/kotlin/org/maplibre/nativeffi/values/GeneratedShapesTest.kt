@@ -78,7 +78,7 @@ class GeneratedShapesTest {
     withMap {
       val camera = CameraOptions(center = LatLng(12.0, 34.0), zoom = 4.0, bearing = 25.0)
       map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
-      val snapshot = map.getSnapshot().camera
+      val snapshot = map.getSnapshot().view.camera
       assertEquals(12.0, assertNotNull(snapshot.center).latitude, 1e-6)
       assertEquals(34.0, assertNotNull(snapshot.center).longitude, 1e-6)
       assertEquals(4.0, assertNotNull(snapshot.zoom), 1e-6)
@@ -87,7 +87,7 @@ class GeneratedShapesTest {
 
       // An update that sets only the zoom leaves every other field where it was.
       map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).awaitCommitted()
-      val updated = map.getSnapshot().camera
+      val updated = map.getSnapshot().view.camera
       assertEquals(6.0, assertNotNull(updated.zoom), 1e-6)
       assertEquals(25.0, assertNotNull(updated.bearing), 1e-6)
 

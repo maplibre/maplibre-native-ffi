@@ -1857,7 +1857,6 @@ auto render_session_set_target(
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_update_generation = 0;
     live->rendered_target_generation = 0;
-    live->rendered_transform.reset();
     live->pending_changes = true;
     live->width = extent.width;
     live->height = extent.height;
@@ -1986,7 +1985,8 @@ namespace {
 
 auto render_session_render_update_on_driver(
   mln_render_session_object& session, mln_render_result* out_result,
-  bool* out_needs_repaint, uint64_t* out_map_update_generation
+  bool* out_needs_repaint, uint64_t* out_map_update_generation,
+  mln_map_view* out_view
 ) -> mln_status {
   auto* live = &session;
   if (!live->attached || !has_backend(live)) {
@@ -2134,7 +2134,7 @@ auto render_session_render_update_on_driver(
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
   // Static maps can return without drawing while style or tile data is pending.
-  // Only a completed frame replaces the target's projection and backend state.
+  // Only a completed frame reports its view and replaces the backend state.
   if (!live->frame_observer.frame_completed()) {
     return MLN_STATUS_OK;
   }
@@ -2153,9 +2153,10 @@ auto render_session_render_update_on_driver(
       return MLN_STATUS_OK;
     }
   }
+  *out_view =
+    map_view_from_transform(update->transformState, live->scale_factor);
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    live->rendered_transform = update->transformState;
     live->rendered_target_generation = live->generation;
     live->rendered_update_generation = update_generation;
     live->pending_changes = false;
@@ -2219,7 +2220,6 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_update_generation = 0;
     live->rendered_target_generation = 0;
-    live->rendered_transform.reset();
     ++live->generation;
   }
   return MLN_STATUS_OK;
@@ -2248,35 +2248,6 @@ auto run_renderer_maintenance(
 }
 
 }  // namespace
-
-auto render_session_projection_create(
-  mln_render_session session, mln_map_projection* out_projection
-) -> mln_status {
-  auto live = lease_render_session(session);
-  if (live == nullptr) return recorded_handle_fault_status();
-  // An output error takes precedence over a missing frame, as it does for
-  // every other call.
-  if (out_projection == nullptr) {
-    set_thread_error("out_projection must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_projection != MLN_HANDLE_NULL) {
-    set_thread_error("out_projection must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto lock = std::scoped_lock{live->control_mutex};
-  if (
-    live->state != MLN_RENDER_SESSION_STATE_ATTACHED ||
-    !live->rendered_transform ||
-    live->rendered_target_generation != live->generation
-  ) {
-    set_thread_error("render session target has no rendered projection");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  return map_projection_create_from_transform(
-    *live->rendered_transform, out_projection
-  );
-}
 
 auto render_session_release(mln_render_session session) -> mln_status {
   const auto live = lease_render_session(session);
@@ -2582,8 +2553,14 @@ auto finish_update_waiting_demands_locked(
     publish_frame_result_locked(
       session,
       mln_render_frame_result{
-        sizeof(mln_render_frame_result), disposition, pending->token,
-        session.map_update_generation, session.generation, 0, false
+        sizeof(mln_render_frame_result),
+        disposition,
+        pending->token,
+        session.map_update_generation,
+        session.generation,
+        0,
+        false,
+        {}
       },
       wakes
     );
@@ -2715,7 +2692,6 @@ auto fail_frame_target(
     session->pending_changes = true;
     session->rendered_update_generation = 0;
     session->rendered_target_generation = 0;
-    session->rendered_transform.reset();
     if (status == MLN_STATUS_NOT_READY) return;
     session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
     ++session->generation;
@@ -2727,9 +2703,14 @@ auto fail_frame_target(
       publish_frame_result_locked(
         *session,
         mln_render_frame_result{
-          sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-          pending->token, session->map_update_generation, session->generation,
-          0, false
+          sizeof(mln_render_frame_result),
+          MLN_RENDER_RESULT_TARGET_NOT_READY,
+          pending->token,
+          session->map_update_generation,
+          session->generation,
+          0,
+          false,
+          {}
         },
         wakes
       );
@@ -2781,6 +2762,7 @@ auto run_frame_demand(
     .generation = 0,
     .frame_generation = 0,
     .needs_repaint = false,
+    .view = {},
   };
   const auto waits_for_update =
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
@@ -2903,6 +2885,7 @@ auto run_frame_demand(
     }
     auto disposition = MLN_RENDER_RESULT_NO_UPDATE;
     auto needs_repaint = false;
+    auto view = mln_map_view{};
     auto metadata = std::any{};
     auto producer_sync =
       mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
@@ -2920,7 +2903,7 @@ auto run_frame_demand(
         presents && (demand->flags & MLN_FRAME_DEMAND_PRESENT) == 0
       };
       const auto status = render_session_render_update_on_driver(
-        *session, &disposition, &needs_repaint, &rendered_map_generation
+        *session, &disposition, &needs_repaint, &rendered_map_generation, &view
       );
       if (status != MLN_STATUS_OK) {
         scope.reset();
@@ -2935,6 +2918,7 @@ auto run_frame_demand(
     result.map_update_generation = rendered_map_generation;
     if (disposition == MLN_RENDER_RESULT_RENDERED) {
       result.needs_repaint = needs_repaint;
+      result.view = view;
       auto metadata_request = RenderFrameMetadata{};
       {
         const auto lock = std::scoped_lock{session->control_mutex};
@@ -2966,6 +2950,7 @@ auto run_frame_demand(
           result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
           result.frame_generation = 0;
           result.needs_repaint = false;
+          result.view = mln_map_view{};
           publish_frame_result(session, result);
           return;
         }
@@ -3001,6 +2986,7 @@ auto run_frame_demand(
   if (result.disposition != MLN_RENDER_RESULT_RENDERED) {
     result.frame_generation = 0;
     result.needs_repaint = false;
+    result.view = mln_map_view{};
   }
   if (
     waits_for_update && result.disposition == MLN_RENDER_RESULT_NO_UPDATE &&
@@ -3103,9 +3089,14 @@ auto render_session_request_frame(
       publish_frame_result_locked(
         *live,
         mln_render_frame_result{
-          sizeof(mln_render_frame_result), MLN_RENDER_RESULT_SUPERSEDED,
-          pending->token, live->map_update_generation, live->generation, 0,
-          false
+          sizeof(mln_render_frame_result),
+          MLN_RENDER_RESULT_SUPERSEDED,
+          pending->token,
+          live->map_update_generation,
+          live->generation,
+          0,
+          false,
+          {}
         },
         wakes
       );
@@ -3659,7 +3650,6 @@ auto make_ordered_resize_work(
           session->pending_changes = true;
           session->rendered_update_generation = 0;
           session->rendered_target_generation = 0;
-          session->rendered_transform.reset();
           resume_update_waiting_demands_locked(*session, wakes);
         }
         completion->complete(MLN_STATUS_OK, {});
@@ -3836,9 +3826,14 @@ auto render_session_barrier_start(
       publish_frame_result_locked(
         *live,
         mln_render_frame_result{
-          sizeof(mln_render_frame_result), MLN_RENDER_RESULT_NO_UPDATE,
-          pending->token, live->map_update_generation, live->generation, 0,
-          false
+          sizeof(mln_render_frame_result),
+          MLN_RENDER_RESULT_NO_UPDATE,
+          pending->token,
+          live->map_update_generation,
+          live->generation,
+          0,
+          false,
+          {}
         },
         wakes
       );
@@ -3935,9 +3930,14 @@ auto finish_detach(const std::shared_ptr<mln_render_session_object>& live)
         publish_frame_result_locked(
           *live,
           mln_render_frame_result{
-            sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-            pending->token, live->map_update_generation, live->generation, 0,
-            false
+            sizeof(mln_render_frame_result),
+            MLN_RENDER_RESULT_TARGET_NOT_READY,
+            pending->token,
+            live->map_update_generation,
+            live->generation,
+            0,
+            false,
+            {}
           },
           wakes
         );
@@ -4179,9 +4179,14 @@ auto abandon_render_session(
         publish_frame_result_locked(
           *live,
           mln_render_frame_result{
-            sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
-            pending->token, live->map_update_generation, live->generation, 0,
-            false
+            sizeof(mln_render_frame_result),
+            MLN_RENDER_RESULT_TARGET_NOT_READY,
+            pending->token,
+            live->map_update_generation,
+            live->generation,
+            0,
+            false,
+            {}
           },
           wakes
         );

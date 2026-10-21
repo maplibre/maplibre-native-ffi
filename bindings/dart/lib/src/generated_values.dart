@@ -1730,6 +1730,205 @@ final class GpuSync extends _Value {
   List<Object?> get _members => [kind, object];
 }
 
+/// Geographic coordinate in degrees used by map and projection APIs.
+///
+/// See `mln_lat_lng` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LatLng extends _Value {
+  const LatLng({this.latitude = 0, this.longitude = 0});
+
+  /// Latitude in degrees, finite and within \[-90, 90\] on input.
+  final double latitude;
+
+  /// Longitude in degrees. Input longitude must be finite.
+  final double longitude;
+
+  @override
+  List<Object?> get _members => [latitude, longitude];
+}
+
+/// Screen-space inset in logical map pixels.
+///
+/// See `mln_edge_insets` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class EdgeInsets extends _Value {
+  const EdgeInsets({
+    this.top = 0,
+    this.left = 0,
+    this.bottom = 0,
+    this.right = 0,
+  });
+  final double top;
+  final double left;
+  final double bottom;
+  final double right;
+
+  @override
+  List<Object?> get _members => [top, left, bottom, right];
+}
+
+/// Screen-space point in logical map pixels.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ScreenPoint extends _Value {
+  const ScreenPoint({this.x = 0, this.y = 0});
+  final double x;
+  final double y;
+
+  @override
+  List<Object?> get _members => [x, y];
+}
+
+/// Camera fields used by snapshots and camera updates.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraOptions extends _Value {
+  CameraOptions({
+    this.center,
+    this.centerAltitude,
+    this.padding,
+    this.anchor,
+    this.zoom,
+    this.bearing,
+    this.pitch,
+    this.roll,
+    this.fieldOfView,
+  });
+  final LatLng? center;
+  final double? centerAltitude;
+  final EdgeInsets? padding;
+
+  /// Optional screen-space focal point in logical map pixels.
+  final ScreenPoint? anchor;
+  final double? zoom;
+  final double? bearing;
+  final double? pitch;
+  final double? roll;
+  final double? fieldOfView;
+
+  @override
+  List<Object?> get _members => [
+    center,
+    centerAltitude,
+    padding,
+    anchor,
+    zoom,
+    bearing,
+    pitch,
+    roll,
+    fieldOfView,
+  ];
+}
+
+/// Logical extent in UI pixels and the device-pixel scale.
+///
+/// See `mln_logical_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LogicalExtent extends _Value {
+  LogicalExtent({int? width, int? height, double? scaleFactor})
+    : width = width ?? logicalExtentDefault().width,
+      height = height ?? logicalExtentDefault().height,
+      scaleFactor = scaleFactor ?? logicalExtentDefault().scaleFactor;
+
+  /// Width in UI pixels. Defaults to 256.
+  final int width;
+
+  /// Height in UI pixels. Defaults to 256.
+  final int height;
+
+  /// Device pixels per UI pixel. Defaults to 1.0.
+  final double scaleFactor;
+
+  @override
+  List<Object?> get _members => [width, height, scaleFactor];
+}
+
+/// MapLibre axonometric rendering options used for snapshots and commands.
+///
+/// See `mln_projection_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ProjectionMode extends _Value {
+  ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
+
+  /// Enables a non-perspective axonometric render transform.
+  final bool? axonometric;
+
+  /// Native x-skew factor used by the axonometric transform.
+  final double? xSkew;
+
+  /// Native y-skew factor used by the axonometric transform.
+  final double? ySkew;
+
+  @override
+  List<Object?> get _members => [axonometric, xSkew, ySkew];
+}
+
+/// Live map viewport and render-transform controls.
+///
+/// See `mln_map_viewport_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MapViewportOptions extends _Value {
+  MapViewportOptions({
+    this.northOrientation,
+    this.constrainMode,
+    this.viewportMode,
+    this.frustumOffset,
+  });
+
+  /// One of `mln_north_orientation`.
+  final NorthOrientation? northOrientation;
+
+  /// One of `mln_constrain_mode`.
+  final ConstrainMode? constrainMode;
+
+  /// One of `mln_viewport_mode`.
+  final ViewportMode? viewportMode;
+  final EdgeInsets? frustumOffset;
+
+  @override
+  List<Object?> get _members => [
+    northOrientation,
+    constrainMode,
+    viewportMode,
+    frustumOffset,
+  ];
+}
+
+/// Everything that a projection depends on: the transform that a published
+/// snapshot or a rendered frame describes.
+///
+/// See `mln_map_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MapView extends _Value {
+  const MapView({
+    required this.camera,
+    required this.extent,
+    required this.projectionMode,
+    required this.viewport,
+  });
+
+  /// The camera. Its center is unwrapped: the longitude keeps the visible world
+  /// copy and may fall outside -180 to 180. Every field except
+  /// `MLN_CAMERA_OPTION_ANCHOR` is set.
+  final CameraOptions camera;
+
+  /// Logical size and device-pixel scale. A snapshot carries the map's scale
+  /// factor, and a frame carries the scale factor of the target that drew it.
+  final LogicalExtent extent;
+
+  /// Axonometric mode and skew, with every field set.
+  final ProjectionMode projectionMode;
+
+  /// North orientation, constrain mode, viewport mode, and frustum offset, with
+  /// every field set.
+  final MapViewportOptions viewport;
+
+  @override
+  List<Object?> get _members => [camera, extent, projectionMode, viewport];
+}
+
 /// Terminal result of one frame demand, held by an owned frame-result batch and
 /// copied by `mln_acquired_frame_get_result()`.
 ///
@@ -1743,6 +1942,7 @@ final class RenderFrameResult extends _Value {
     required this.generation,
     required this.frameGeneration,
     this.needsRepaint = false,
+    required this.view,
   });
 
   /// One `mln_render_result` value.
@@ -1776,6 +1976,13 @@ final class RenderFrameResult extends _Value {
   /// demand as each result arrives.
   final bool needsRepaint;
 
+  /// The view that this frame drew, from the transform of the map update that
+  /// it rendered. A host that displays the frame builds its projection with
+  /// `mln_map_projection_create()` to place overlays where the frame drew their
+  /// coordinates. Zero, with a size of zero, unless disposition is
+  /// `MLN_RENDER_RESULT_RENDERED`.
+  final MapView view;
+
   @override
   List<Object?> get _members => [
     disposition,
@@ -1784,6 +1991,7 @@ final class RenderFrameResult extends _Value {
     generation,
     frameGeneration,
     needsRepaint,
+    view,
   ];
 }
 
@@ -2022,23 +2230,6 @@ final class AnimationOptions extends _Value {
   ];
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs.
-///
-/// See `mln_lat_lng` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class LatLng extends _Value {
-  const LatLng({this.latitude = 0, this.longitude = 0});
-
-  /// Latitude in degrees, finite and within \[-90, 90\] on input.
-  final double latitude;
-
-  /// Longitude in degrees. Input longitude must be finite.
-  final double longitude;
-
-  @override
-  List<Object?> get _members => [latitude, longitude];
-}
-
 /// Geographic bounds in degrees.
 ///
 /// See `mln_lat_lng_bounds` in the
@@ -2093,19 +2284,6 @@ final class BoundOptions extends _Value {
   ];
 }
 
-/// Screen-space point in logical map pixels.
-///
-/// See `mln_screen_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ScreenPoint extends _Value {
-  const ScreenPoint({this.x = 0, this.y = 0});
-  final double x;
-  final double y;
-
-  @override
-  List<Object?> get _members => [x, y];
-}
-
 /// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
@@ -2152,26 +2330,6 @@ final class CameraDelta extends _Value {
   ];
 }
 
-/// Screen-space inset in logical map pixels.
-///
-/// See `mln_edge_insets` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class EdgeInsets extends _Value {
-  const EdgeInsets({
-    this.top = 0,
-    this.left = 0,
-    this.bottom = 0,
-    this.right = 0,
-  });
-  final double top;
-  final double left;
-  final double bottom;
-  final double right;
-
-  @override
-  List<Object?> get _members => [top, left, bottom, right];
-}
-
 /// Optional fitting controls for camera-for-viewport queries.
 ///
 /// See `mln_camera_fit_options` in the
@@ -2184,48 +2342,6 @@ final class CameraFitOptions extends _Value {
 
   @override
   List<Object?> get _members => [padding, bearing, pitch];
-}
-
-/// Camera fields used by snapshots and camera updates.
-///
-/// See `mln_camera_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraOptions extends _Value {
-  CameraOptions({
-    this.center,
-    this.centerAltitude,
-    this.padding,
-    this.anchor,
-    this.zoom,
-    this.bearing,
-    this.pitch,
-    this.roll,
-    this.fieldOfView,
-  });
-  final LatLng? center;
-  final double? centerAltitude;
-  final EdgeInsets? padding;
-
-  /// Optional screen-space focal point in logical map pixels.
-  final ScreenPoint? anchor;
-  final double? zoom;
-  final double? bearing;
-  final double? pitch;
-  final double? roll;
-  final double? fieldOfView;
-
-  @override
-  List<Object?> get _members => [
-    center,
-    centerAltitude,
-    padding,
-    anchor,
-    zoom,
-    bearing,
-    pitch,
-    roll,
-    fieldOfView,
-  ];
 }
 
 /// One atomic absolute camera update.
@@ -2543,29 +2659,6 @@ final class LogHandler {
 
   /// Receives each record.
   final LogCallback callback;
-}
-
-/// Logical extent in UI pixels and the device-pixel scale.
-///
-/// See `mln_logical_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class LogicalExtent extends _Value {
-  LogicalExtent({int? width, int? height, double? scaleFactor})
-    : width = width ?? logicalExtentDefault().width,
-      height = height ?? logicalExtentDefault().height,
-      scaleFactor = scaleFactor ?? logicalExtentDefault().scaleFactor;
-
-  /// Width in UI pixels. Defaults to 256.
-  final int width;
-
-  /// Height in UI pixels. Defaults to 256.
-  final int height;
-
-  /// Device pixels per UI pixel. Defaults to 1.0.
-  final double scaleFactor;
-
-  @override
-  List<Object?> get _members => [width, height, scaleFactor];
 }
 
 /// Caller-owned premultiplied RGBA8 image pixels.
@@ -3460,57 +3553,6 @@ final class FeatureStateSelector extends _Value {
   List<Object?> get _members => [sourceId, sourceLayerId, featureId, stateKey];
 }
 
-/// MapLibre axonometric rendering options used for snapshots and commands.
-///
-/// See `mln_projection_mode` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ProjectionMode extends _Value {
-  ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
-
-  /// Enables a non-perspective axonometric render transform.
-  final bool? axonometric;
-
-  /// Native x-skew factor used by the axonometric transform.
-  final double? xSkew;
-
-  /// Native y-skew factor used by the axonometric transform.
-  final double? ySkew;
-
-  @override
-  List<Object?> get _members => [axonometric, xSkew, ySkew];
-}
-
-/// Live map viewport and render-transform controls.
-///
-/// See `mln_map_viewport_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapViewportOptions extends _Value {
-  MapViewportOptions({
-    this.northOrientation,
-    this.constrainMode,
-    this.viewportMode,
-    this.frustumOffset,
-  });
-
-  /// One of `mln_north_orientation`.
-  final NorthOrientation? northOrientation;
-
-  /// One of `mln_constrain_mode`.
-  final ConstrainMode? constrainMode;
-
-  /// One of `mln_viewport_mode`.
-  final ViewportMode? viewportMode;
-  final EdgeInsets? frustumOffset;
-
-  @override
-  List<Object?> get _members => [
-    northOrientation,
-    constrainMode,
-    viewportMode,
-    frustumOffset,
-  ];
-}
-
 /// Tile prefetch and LOD tuning controls.
 ///
 /// See `mln_map_tile_options` in the
@@ -3554,10 +3596,6 @@ final class MapSnapshot extends _Value {
   const MapSnapshot({
     this.debugOptions = const MapDebugOption.fromRawValue(0),
     required this.generation,
-    required this.camera,
-    required this.logicalExtent,
-    required this.projectionMode,
-    required this.viewport,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
@@ -3566,15 +3604,12 @@ final class MapSnapshot extends _Value {
     required this.tile,
     required this.bounds,
     required this.freeCamera,
+    required this.view,
   });
 
   /// Debug overlay mask of `mln_map_debug_option` values.
   final MapDebugOption debugOptions;
   final BigInt generation;
-  final CameraOptions camera;
-  final LogicalExtent logicalExtent;
-  final ProjectionMode projectionMode;
-  final MapViewportOptions viewport;
 
   /// True once every requested style and tile resource finished loading.
   final bool fullyLoaded;
@@ -3592,14 +3627,14 @@ final class MapSnapshot extends _Value {
   final BoundOptions bounds;
   final FreeCameraOptions freeCamera;
 
+  /// The map's camera, extent, projection mode, and viewport options.
+  /// `mln_map_projection_create()` converts coordinates for this view.
+  final MapView view;
+
   @override
   List<Object?> get _members => [
     debugOptions,
     generation,
-    camera,
-    logicalExtent,
-    projectionMode,
-    viewport,
     fullyLoaded,
     renderingStatsViewEnabled,
     gestureInProgress,
@@ -3608,6 +3643,7 @@ final class MapSnapshot extends _Value {
     tile,
     bounds,
     freeCamera,
+    view,
   ];
 }
 

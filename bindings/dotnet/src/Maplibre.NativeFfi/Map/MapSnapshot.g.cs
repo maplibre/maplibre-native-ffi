@@ -23,13 +23,13 @@ namespace Maplibre.NativeFfi;
 /// at or past it draws map state that includes every command this snapshot
 /// observes, though animations and resource loads finish in later frames.
 /// </param>
+/// <param name="View">
+/// The map's camera, extent, projection mode, and viewport options.
+/// <c>mln_map_projection_create()</c> converts coordinates for this view.
+/// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugOption DebugOptions,
     ulong Generation,
-    CameraOptions Camera,
-    LogicalExtent LogicalExtent,
-    ProjectionMode ProjectionMode,
-    MapViewportOptions Viewport,
     bool FullyLoaded,
     bool RenderingStatsViewEnabled,
     bool GestureInProgress,
@@ -37,5 +37,6 @@ public readonly partial record struct MapSnapshot(
     ulong LatestRenderUpdateGeneration,
     MapTileOptions Tile,
     BoundOptions Bounds,
-    FreeCameraOptions FreeCamera
+    FreeCameraOptions FreeCamera,
+    MapView View
 );

@@ -4,15 +4,6 @@
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
 
-auto mln_render_session_create_projection(
-  mln_render_session session, mln_map_projection* out_projection,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_projection_create(session, out_projection);
-  });
-}
-
 auto mln_frame_demand_default() noexcept -> mln_frame_demand {
   return mln_frame_demand{
     .size = sizeof(mln_frame_demand),

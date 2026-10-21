@@ -674,19 +674,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Creates a standalone projection from the map's latest published snapshot.
-   *
-   * See `mln_map_create_projection` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun createProjection(): MapProjectionHandle =
-    nativeCall(this, binding) {
-      val out = allocate(8, 8)
-      check(C.mln_map_create_projection(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
-    }
-
-  /**
    * Consumes a map handle without observing its asynchronous retirement.
    *
    * See `mln_map_dispose` in the
@@ -805,7 +792,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(456, 8)
+      val out = sized(464, 8)
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }

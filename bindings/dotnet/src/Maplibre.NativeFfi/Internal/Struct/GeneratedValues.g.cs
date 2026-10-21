@@ -968,10 +968,6 @@ internal static unsafe class GeneratedValues
         new(
             (MapDebugOption)value.debug_options,
             value.generation,
-            CopyCameraOptions(value.camera),
-            CopyLogicalExtent(value.logical_extent),
-            CopyProjectionMode(value.projection_mode),
-            CopyMapViewportOptions(value.viewport),
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,
             value.gesture_in_progress != 0,
@@ -979,7 +975,8 @@ internal static unsafe class GeneratedValues
             value.latest_render_update_generation,
             CopyMapTileOptions(value.tile),
             CopyBoundOptions(value.bounds),
-            CopyFreeCameraOptions(value.free_camera)
+            CopyFreeCameraOptions(value.free_camera),
+            CopyMapView(value.view)
         );
 
     internal static MapTileOptions CopyMapTileOptions(mln_map_tile_options value) =>
@@ -1035,6 +1032,28 @@ internal static unsafe class GeneratedValues
             MLN_MAP_TILE_OPTION_LOD_MODE,
             static present => (uint)present
         );
+        return native;
+    }
+
+    internal static MapView CopyMapView(mln_map_view value) =>
+        new(
+            CopyCameraOptions(value.camera),
+            CopyLogicalExtent(value.extent),
+            CopyProjectionMode(value.projection_mode),
+            CopyMapViewportOptions(value.viewport)
+        );
+
+    internal static mln_map_view NativeMapView(MapView value)
+    {
+        Required(value.Camera, "MapView.Camera must not be null.");
+        Required(value.ProjectionMode, "MapView.ProjectionMode must not be null.");
+        Required(value.Viewport, "MapView.Viewport must not be null.");
+        var native = new mln_map_view();
+        native.size = (uint)sizeof(mln_map_view);
+        native.camera = NativeCameraOptions(value.Camera);
+        native.extent = NativeLogicalExtent(value.Extent);
+        native.projection_mode = NativeProjectionMode(value.ProjectionMode);
+        native.viewport = NativeMapViewportOptions(value.Viewport);
         return native;
     }
 
@@ -1663,7 +1682,8 @@ internal static unsafe class GeneratedValues
             value.map_update_generation,
             value.generation,
             value.frame_generation,
-            value.needs_repaint != 0
+            value.needs_repaint != 0,
+            CopyMapView(value.view)
         );
 
     internal static RenderSessionAttachOptions CopyRenderSessionAttachOptions(

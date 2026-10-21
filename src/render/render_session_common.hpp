@@ -23,7 +23,6 @@
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/gfx/renderable.hpp>
 #include <mln/gfx/renderer_backend.hpp>
-#include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/renderer/update_parameters.hpp>
@@ -698,7 +697,6 @@ struct mln_render_session_object
   // The map update generation of the last rendered frame.
   uint64_t rendered_update_generation = 0;
   uint64_t rendered_target_generation = 0;
-  std::optional<mln::TransformState> rendered_transform;
   uint64_t frame_generation = 0;
   bool pending_changes = true;
   // Keeps stale demand work from starting a later demand ahead of a barrier.
@@ -1017,10 +1015,6 @@ auto enqueue_surface_retarget(
   RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
   ValuelessCompletion valueless
 ) -> mln_status;
-auto render_session_projection_create(
-  mln_render_session session, mln_map_projection* out_projection
-) -> mln_status;
-
 auto render_session_release(mln_render_session session) -> mln_status;
 auto render_session_dispose(mln_render_session session) -> mln_status;
 // Disposes a session as render_session_dispose does, except that retirement

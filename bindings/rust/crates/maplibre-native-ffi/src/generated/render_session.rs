@@ -79,23 +79,6 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Copies the last completed rendered transform into an independent
-    /// projection. Callable from any thread. Returns invalid state before a
-    /// completed render, after an extent or target change, or after detachment.
-    /// The caller owns the returned projection, which remains usable after the
-    /// session is released. out_projection must point to a null handle.
-    ///
-    /// See `mln_render_session_create_projection` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
-        let mut call = self.inner.call();
-        let mut out_projection = sys::mln_map_projection(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_create_projection(session, &mut out_projection, out_diagnostic)
-        })?;
-        Ok(MapProjectionHandle::adopt(out_projection, None)?)
-    }
-
     /// Starts normal graphics-owner teardown and map detachment.
     ///
     /// See `mln_render_session_detach` in the

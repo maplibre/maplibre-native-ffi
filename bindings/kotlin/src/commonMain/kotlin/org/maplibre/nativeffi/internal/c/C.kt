@@ -305,8 +305,6 @@ internal expect object C {
 
   fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_create_projection(map: Long, outProjection: Long, outDiagnostic: Long): Int
-
   fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
 
   fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int
@@ -423,6 +421,8 @@ internal expect object C {
   ): Int
 
   fun mln_map_options_default(returned: Long): Unit
+
+  fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
 
@@ -714,12 +714,6 @@ internal expect object C {
   fun mln_render_session_barrier(session: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_clear_data(session: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_render_session_create_projection(
-    session: Long,
-    outProjection: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int
 

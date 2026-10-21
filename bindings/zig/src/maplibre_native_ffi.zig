@@ -55,7 +55,7 @@ pub const Map = owner.Handle("mln_map", struct {
         try status.call(c.mln_map_dispose, .{raw}, null);
     }
 }.dispose);
-/// A standalone projection of a map's transform state at its creation.
+/// A standalone projection of one map view.
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -1618,10 +1618,6 @@ pub const MapSnapshot = struct {
     /// Debug overlay mask of `mln_map_debug_option` values.
     debug_options: MapDebugOption = std.mem.zeroes(MapDebugOption),
     generation: u64 = std.mem.zeroes(u64),
-    camera: CameraOptions,
-    logical_extent: LogicalExtent,
-    projection_mode: ProjectionMode,
-    viewport: MapViewportOptions,
     /// True once every requested style and tile resource finished loading.
     fully_loaded: bool = std.mem.zeroes(bool),
     rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
@@ -1636,14 +1632,13 @@ pub const MapSnapshot = struct {
     tile: MapTileOptions,
     bounds: BoundOptions,
     free_camera: FreeCameraOptions,
+    /// The map's camera, extent, projection mode, and viewport options.
+    /// `mln_map_projection_create()` converts coordinates for this view.
+    view: MapView,
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
             .debug_options = MapDebugOption.fromNative(raw.debug_options),
             .generation = raw.generation,
-            .camera = CameraOptions.fromNative(raw.camera),
-            .logical_extent = LogicalExtent.fromNative(raw.logical_extent),
-            .projection_mode = ProjectionMode.fromNative(raw.projection_mode),
-            .viewport = MapViewportOptions.fromNative(raw.viewport),
             .fully_loaded = raw.fully_loaded,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .gesture_in_progress = raw.gesture_in_progress,
@@ -1652,6 +1647,7 @@ pub const MapSnapshot = struct {
             .tile = MapTileOptions.fromNative(raw.tile),
             .bounds = BoundOptions.fromNative(raw.bounds),
             .free_camera = FreeCameraOptions.fromNative(raw.free_camera),
+            .view = MapView.fromNative(raw.view),
         };
     }
 };
@@ -1706,6 +1702,43 @@ pub const MapTileOptions = struct {
             .lod_pitch_threshold = if (raw.fields & c.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0) raw.lod_pitch_threshold else null,
             .lod_zoom_shift = if (raw.fields & c.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0) raw.lod_zoom_shift else null,
             .lod_mode = if (raw.fields & c.MLN_MAP_TILE_OPTION_LOD_MODE != 0) TileLodMode.fromNative(raw.lod_mode) else null,
+        };
+    }
+};
+
+/// Everything that a projection depends on: the transform that a published
+/// snapshot or a rendered frame describes.
+///
+/// See `mln_map_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MapView = struct {
+    /// The camera. Its center is unwrapped: the longitude keeps the visible
+    /// world copy and may fall outside -180 to 180. Every field except
+    /// `MLN_CAMERA_OPTION_ANCHOR` is set.
+    camera: CameraOptions,
+    /// Logical size and device-pixel scale. A snapshot carries the map's scale
+    /// factor, and a frame carries the scale factor of the target that drew it.
+    extent: LogicalExtent,
+    /// Axonometric mode and skew, with every field set.
+    projection_mode: ProjectionMode,
+    /// North orientation, constrain mode, viewport mode, and frustum offset,
+    /// with every field set.
+    viewport: MapViewportOptions,
+    pub fn toNative(self: MapView) c.mln_map_view {
+        var raw = std.mem.zeroes(c.mln_map_view);
+        raw.size = @sizeOf(c.mln_map_view);
+        raw.camera = self.camera.toNative();
+        raw.extent = self.extent.toNative();
+        raw.projection_mode = self.projection_mode.toNative();
+        raw.viewport = self.viewport.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_map_view) MapView {
+        return .{
+            .camera = CameraOptions.fromNative(raw.camera),
+            .extent = LogicalExtent.fromNative(raw.extent),
+            .projection_mode = ProjectionMode.fromNative(raw.projection_mode),
+            .viewport = MapViewportOptions.fromNative(raw.viewport),
         };
     }
 };
@@ -2775,6 +2808,12 @@ pub const RenderFrameResult = struct {
     /// without a runtime-event round trip; the host re-arms the demand as each
     /// result arrives.
     needs_repaint: bool = std.mem.zeroes(bool),
+    /// The view that this frame drew, from the transform of the map update that
+    /// it rendered. A host that displays the frame builds its projection with
+    /// `mln_map_projection_create()` to place overlays where the frame drew
+    /// their coordinates. Zero, with a size of zero, unless disposition is
+    /// `MLN_RENDER_RESULT_RENDERED`.
+    view: MapView,
     pub fn fromNative(raw: c.mln_render_frame_result) RenderFrameResult {
         return .{
             .disposition = RenderResult.fromNative(raw.disposition),
@@ -2783,6 +2822,7 @@ pub const RenderFrameResult = struct {
             .generation = raw.generation,
             .frame_generation = raw.frame_generation,
             .needs_repaint = raw.needs_repaint,
+            .view = MapView.fromNative(raw.view),
         };
     }
 };
@@ -5627,14 +5667,6 @@ pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) stat
     return call.submit("mln_map_cancel_transitions", .handle, map, call.command, null, diagnostic, .{});
 }
 
-/// Creates a standalone projection from the map's latest published snapshot.
-///
-/// See `mln_map_create_projection` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapCreateProjection(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
-    return call.invoke("mln_map_create_projection", .handle, map, null, diagnostic, .{call.adopt(MapProjection)});
-}
-
 /// Consumes a map handle without observing its asynchronous retirement.
 ///
 /// See `mln_map_dispose` in the
@@ -5842,6 +5874,15 @@ pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]con
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn mapOptionsDefault() status.Error!MapOptions {
     return call.direct("mln_map_options_default", .none, {}, MapOptions, null, .{});
+}
+
+/// Creates a standalone projection of a view, such as the view of a rendered
+/// frame or of a map snapshot.
+///
+/// See `mln_map_projection_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionCreate(allocator: std.mem.Allocator, view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+    return call.invoke("mln_map_projection_create", .none, {}, allocator, diagnostic, .{ view, call.adopt(MapProjection) });
 }
 
 /// Copies the projection camera into out_camera.
@@ -6371,18 +6412,6 @@ pub fn renderSessionBarrier(session: RenderSession, diagnostic: ?*diagnostics.Di
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn renderSessionClearData(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_render_session_clear_data", .handle, session, call.unit, null, diagnostic, .{});
-}
-
-/// Copies the last completed rendered transform into an independent projection.
-/// Callable from any thread. Returns invalid state before a completed render,
-/// after an extent or target change, or after detachment. The caller owns the
-/// returned projection, which remains usable after the session is released.
-/// out_projection must point to a null handle.
-///
-/// See `mln_render_session_create_projection` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionCreateProjection(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
-    return call.invoke("mln_render_session_create_projection", .handle, session, null, diagnostic, .{call.adopt(MapProjection)});
 }
 
 /// Starts normal graphics-owner teardown and map detachment.
