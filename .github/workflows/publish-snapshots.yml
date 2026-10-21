@@ -32,7 +32,7 @@ concurrency:
 jobs:
   plan:
     name: plan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 240
     permissions:
       actions: read
@@ -52,7 +52,7 @@ jobs:
       publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -110,7 +110,7 @@ jobs:
     name: .NET packages
     needs:
       - plan
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     if: ${{ needs.plan.outputs.publish_dotnet == 'true' }}
     permissions:
@@ -120,7 +120,7 @@ jobs:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       SNAPSHOT_VERSION: ${{ needs.plan.outputs.dotnet_snapshot_version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -150,7 +150,7 @@ jobs:
     needs:
       - plan
       - stage-dotnet
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       actions: read
@@ -158,7 +158,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -197,19 +197,19 @@ jobs:
         include:
           - backend: vulkan
             preset: linux-gnu-x64-vulkan
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - backend: opengl
             preset: linux-gnu-x64-egl
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - backend: metal
             preset: macos-arm64-metal
-            runner: macos-26
+            runner: blacksmith-6vcpu-macos-26
             macos_deployment_target: "14.3"
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       SNAPSHOT_VERSION: ${{ needs.plan.outputs.snapshot_version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -258,7 +258,7 @@ jobs:
     needs:
       - plan
       - stage-python
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       actions: read
@@ -266,7 +266,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -295,7 +295,7 @@ jobs:
       - plan
       - python-index
       - dotnet-feed
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     # Preserve live feeds when either package staging job fails.
     if: >-
@@ -313,7 +313,7 @@ jobs:
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           # The pages quote the latest release versions from the release tags.
@@ -366,7 +366,7 @@ jobs:
       - docs-pages
     # Deploy a site that preserved a failed package feed.
     if: ${{ !cancelled() && needs.docs-pages.result == 'success' }}
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       pages: write
@@ -424,14 +424,14 @@ jobs:
     # Only components that published get their state tag moved, so a failed or
     # skipped component is retried by the next run.
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       contents: write
     env:
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
@@ -473,7 +473,7 @@ jobs:
 
   required:
     name: publishing-required
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     # A skipped job is the gate doing its work, so only real failures are red.
     if: ${{ always() }}
