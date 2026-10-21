@@ -82,8 +82,17 @@ try {
   # Detached execution avoids waiting for handles inherited by build daemons.
   & $psexec -accepteula -nobanner -d -s -i $session -w (Get-Location).Path `
     $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $launcher $payload
-  if ($LASTEXITCODE -ne 0) { throw "PsExec could not start the console command" }
-  while (-not (Test-Path $completion)) { Start-Sleep -Milliseconds 250 }
+  # In detached mode PsExec returns the child's process ID, not an exit status.
+  $consoleProcessId = $LASTEXITCODE
+  Write-Output "Console process ID: $consoleProcessId"
+  while (-not (Test-Path $completion)) {
+    $process = Get-Process -Id $consoleProcessId -ErrorAction SilentlyContinue
+    if (($null -eq $process -or $process.SessionId -ne $session) -and
+        -not (Test-Path $completion)) {
+      throw "Console process $consoleProcessId exited without a completion status"
+    }
+    Start-Sleep -Milliseconds 250
+  }
   $result = [int](Get-Content -Raw $completion)
 } finally {
   if (Test-Path $log) { Get-Content $log }
