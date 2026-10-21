@@ -983,6 +983,13 @@ MLN_API mln_status mln_render_session_set_webgpu_borrowed_texture_target(
  * value_count of one. Its pixel bytes are borrowed for the duration of the
  * callback; copy anything the host keeps.
  *
+ * On browser WebGPU the readback finishes on a later driver service, after the
+ * graphics thread's event loop delivers the mapped copy; see
+ * mln_render_session_service_driver_work(). The session's later driver work
+ * runs after it. A readback that abandon or disposal ends while its copy maps
+ * still reads and releases the library's staging buffer when that event loop
+ * delivers the map. A lost device fails the readback.
+ *
  * Returns:
  * - MLN_STATUS_OK when the readback is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or

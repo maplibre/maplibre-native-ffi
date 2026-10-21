@@ -44,6 +44,16 @@ bool mln_test_await(
   const char* what
 );
 
+// mln_test_await() for a wait that the calling thread's browser event loop must
+// run through: a WebGPU buffer map finishes there, on the thread that issued
+// it. On browser WebGPU the thread suspends through JSPI between checks, so
+// the caller must be the thread's own code, never a callback that the event
+// loop runs, where the suspension throws. Elsewhere this is mln_test_await().
+bool mln_test_await_on_event_loop(
+  bool (*ready)(void* context), void* context, mln_test_deadline deadline,
+  const char* what
+);
+
 // A flag one thread sets and another waits for.
 void mln_test_flag_set(atomic_bool* flag);
 // Waits for the flag within the default deadline.

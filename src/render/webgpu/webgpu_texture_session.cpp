@@ -3,17 +3,16 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
 // The WebGPU backend builds only against the emdawnwebgpu port, which supplies
-// webgpu.h.
-#include <emscripten/emscripten.h>
-
-// Include WebGPU headers first to define WEBGPU_H_ before MapLibre WebGPU
+// webgpu.h. Its headers come first to define WEBGPU_H_ before MapLibre's WebGPU
 // headers.
 #include <webgpu/webgpu.h>
 #include <webgpu/webgpu_cpp.h>
@@ -40,9 +39,6 @@ constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
 // readback stages the padded rows and unpacks them.
 constexpr uint32_t readback_row_alignment = 256;
 constexpr uint32_t readback_bytes_per_pixel = 4;
-// A stalled device must release the readback wait even if no callback arrives.
-constexpr uint32_t readback_yield_milliseconds = 1;
-constexpr uint32_t readback_yield_attempts = 5000;
 
 using mln::core::WebGPUBorrowedTarget;
 
@@ -182,21 +178,28 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return *this;
   }
 
-  // Copies the rendered texture into a mappable buffer and waits for the map.
-  // Only a session-owned texture reaches here; a caller's texture need not
-  // carry CopySrc usage.
+  // The C API reads this backend through start_readback(), and nothing else
+  // reads it.
+  mln::PremultipliedImage readStillImage() override { return {}; }
+
+  // Copies the rendered texture into a mappable buffer and starts mapping it,
+  // then returns before the map finishes. Only a session-owned texture reaches
+  // here; a caller's texture need not carry CopySrc usage.
   //
-  // wgpuInstanceWaitAny is unusable: a non-zero timeout is legal only on an
-  // instance created with the TimedWaitAny feature, and the host's instance is
-  // optional. A spontaneous callback needs no instance, and yielding to the
-  // browser's job queue is what lets it arrive.
-  mln::PremultipliedImage readStillImage() override {
+  // The map finishes once the device's thread yields to its event loop, and
+  // then `on_ready` runs. No thread waits for it: a call from the browser main
+  // thread cannot suspend, and wgpuInstanceWaitAny takes a timeout only on an
+  // instance created with the TimedWaitAny feature, which the host's optional
+  // instance need not be.
+  auto start_readback(std::function<void()> on_ready)
+    -> std::shared_ptr<mln::core::TextureReadback> {
     const auto size = getSize();
     if (
       device_ == nullptr || queue_ == nullptr || texture_ == nullptr ||
       size.width == 0 || size.height == 0
     ) {
-      return {};
+      mln::core::set_thread_error("WebGPU texture is not available to read");
+      return nullptr;
     }
 
     const auto row_stride = size.width * readback_bytes_per_pixel;
@@ -211,19 +214,38 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     buffer_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
     auto* const staging = wgpuDeviceCreateBuffer(device_, &buffer_desc);
     if (staging == nullptr) {
-      return {};
+      mln::core::set_thread_error("WebGPU readback buffer creation failed");
+      return nullptr;
     }
 
     if (!copy_texture_into(staging, aligned_row_stride, size)) {
       wgpuBufferRelease(staging);
-      return {};
+      mln::core::set_thread_error("WebGPU readback copy failed");
+      return nullptr;
     }
 
-    auto image = map_buffer_into_image(
-      staging, mapped_size, size, row_stride, aligned_row_stride
+    auto readback = std::make_shared<MappedReadback>(
+      staging, mapped_size, size, row_stride, aligned_row_stride,
+      std::move(on_ready)
     );
-    wgpuBufferRelease(staging);
-    return image;
+    WGPUBufferMapCallbackInfo callback_info{};
+    callback_info.mode = WGPUCallbackMode_AllowSpontaneous;
+    callback_info.callback = MappedReadback::on_mapped;
+    callback_info.userdata1 = new std::shared_ptr<MappedReadback>(readback);
+    const auto future = wgpuBufferMapAsync(
+      staging, WGPUMapMode_Read, 0, mapped_size, callback_info
+    );
+    if (future.id == 0) {
+      // A refused map never calls back, so the reference and the buffer that
+      // the callback would release are released here.
+      delete static_cast<std::shared_ptr<MappedReadback>*>(
+        callback_info.userdata1
+      );
+      wgpuBufferRelease(staging);
+      mln::core::set_thread_error("WebGPU refused the readback buffer map");
+      return nullptr;
+    }
+    return readback;
   }
 
   mln::gfx::RendererBackend* getRendererBackend() override { return this; }
@@ -371,76 +393,110 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return true;
   }
 
-  // Shared because WebGPU still delivers the callback after a wait gives up, so
-  // state on the waiting frame's stack would be written after it is gone.
-  struct MapState {
-    std::atomic<WGPUMapAsyncStatus> status{WGPUMapAsyncStatus_Error};
-    std::atomic_bool completed{false};
-  };
+  // A readback whose staging buffer is mapping. The map callback owns the
+  // buffer and is the only place that releases it, so every WebGPU call stays
+  // on the device's thread whatever happens to the session meanwhile. The
+  // callback holds a reference of its own, so this outlives a session that is
+  // gone before the map finishes.
+  class MappedReadback final : public mln::core::TextureReadback {
+   public:
+    MappedReadback(
+      WGPUBuffer staging, uint64_t mapped_size, mln::Size size,
+      uint32_t row_stride, uint32_t aligned_row_stride,
+      std::function<void()> on_ready
+    )
+        : staging_(staging),
+          mapped_size_(mapped_size),
+          size_(size),
+          row_stride_(row_stride),
+          aligned_row_stride_(aligned_row_stride),
+          on_ready_(std::move(on_ready)) {}
 
-  // Maps the staged copy and unpacks its padded rows into an image. The map
-  // resolves on the browser's job queue, so this thread yields rather than
-  // spins: emscripten_sleep suspends through JSPI and lets that queue run. The
-  // wait is bounded so a device that never answers fails the read.
-  auto map_buffer_into_image(
-    WGPUBuffer staging, uint64_t mapped_size, mln::Size size,
-    uint32_t row_stride, uint32_t aligned_row_stride
-  ) -> mln::PremultipliedImage {
-    auto const state = std::make_shared<MapState>();
-    WGPUBufferMapCallbackInfo callback_info{};
-    callback_info.mode = WGPUCallbackMode_AllowSpontaneous;
-    callback_info.callback = [](
-                               WGPUMapAsyncStatus status,
-                               WGPUStringView /*message*/, void* user_data,
-                               void* /*reserved*/
-                             ) {
-      // Takes back the reference handed to the callback; WebGPU promises
-      // exactly one delivery.
-      const std::unique_ptr<std::shared_ptr<MapState>> owner(
-        static_cast<std::shared_ptr<MapState>*>(user_data)
-      );
-      (*owner)->status.store(status, std::memory_order_relaxed);
-      (*owner)->completed.store(true, std::memory_order_release);
-    };
-    callback_info.userdata1 = new std::shared_ptr<MapState>(state);
-    wgpuBufferMapAsync(
-      staging, WGPUMapMode_Read, 0, mapped_size, callback_info
-    );
+    [[nodiscard]] auto ready() const noexcept -> bool override {
+      return done_.load(std::memory_order_acquire);
+    }
 
-    for (uint32_t attempt = 0; attempt < readback_yield_attempts; ++attempt) {
-      if (state->completed.load(std::memory_order_acquire)) {
-        break;
+    auto take() -> mln::PremultipliedImage override {
+      if (!image_.valid()) {
+        mln::core::set_thread_error(
+          failure_.empty() ? "WebGPU readback did not produce an image"
+                           : failure_.c_str()
+        );
       }
-      emscripten_sleep(readback_yield_milliseconds);
-    }
-    if (
-      !state->completed.load(std::memory_order_acquire) ||
-      state->status.load(std::memory_order_relaxed) !=
-        WGPUMapAsyncStatus_Success
-    ) {
-      return {};
+      return std::move(image_);
     }
 
-    const auto* const mapped = static_cast<const uint8_t*>(
-      wgpuBufferGetConstMappedRange(staging, 0, mapped_size)
-    );
-    if (mapped == nullptr) {
-      wgpuBufferUnmap(staging);
-      return {};
-    }
-
-    auto data = std::make_unique<uint8_t[]>(
-      static_cast<size_t>(row_stride) * size.height
-    );
-    for (uint32_t row = 0; row < size.height; ++row) {
-      std::memcpy(
-        data.get() + static_cast<size_t>(row) * row_stride,
-        mapped + static_cast<size_t>(row) * aligned_row_stride, row_stride
+    // Runs on the device's thread, from its event loop, outside any library
+    // call. WebGPU promises exactly one delivery, which takes back the
+    // reference that start_readback() handed to it. A lost device delivers a
+    // failed status, so the readback fails rather than staying pending.
+    static void on_mapped(
+      WGPUMapAsyncStatus status, WGPUStringView message, void* user_data,
+      void* /*reserved*/
+    ) noexcept {
+      const std::unique_ptr<std::shared_ptr<MappedReadback>> owner(
+        static_cast<std::shared_ptr<MappedReadback>*>(user_data)
       );
+      (*owner)->finish(status, message);
     }
-    wgpuBufferUnmap(staging);
-    return {size, std::move(data)};
-  }
+
+   private:
+    void finish(WGPUMapAsyncStatus status, WGPUStringView message) noexcept {
+      try {
+        if (status == WGPUMapAsyncStatus_Success) {
+          unpack();
+          wgpuBufferUnmap(staging_);
+        } else {
+          failure_ = "WebGPU readback buffer map failed (status " +
+                     std::to_string(static_cast<int>(status)) +
+                     "): " + text(message);
+        }
+      } catch (...) {
+        image_ = {};
+      }
+      wgpuBufferRelease(staging_);
+      staging_ = nullptr;
+      done_.store(true, std::memory_order_release);
+      if (on_ready_) on_ready_();
+    }
+
+    // Copies the mapped copy's padded rows into a tightly packed image.
+    void unpack() {
+      const auto* const mapped = static_cast<const uint8_t*>(
+        wgpuBufferGetConstMappedRange(staging_, 0, mapped_size_)
+      );
+      if (mapped == nullptr) {
+        failure_ = "WebGPU readback buffer has no mapped range";
+        return;
+      }
+      auto data = std::make_unique<uint8_t[]>(
+        static_cast<size_t>(row_stride_) * size_.height
+      );
+      for (uint32_t row = 0; row < size_.height; ++row) {
+        std::memcpy(
+          data.get() + static_cast<size_t>(row) * row_stride_,
+          mapped + static_cast<size_t>(row) * aligned_row_stride_, row_stride_
+        );
+      }
+      image_ = mln::PremultipliedImage{size_, std::move(data)};
+    }
+
+    static auto text(WGPUStringView view) -> std::string {
+      if (view.data == nullptr) return {};
+      return view.length == WGPU_STRLEN ? std::string{view.data}
+                                        : std::string{view.data, view.length};
+    }
+
+    WGPUBuffer staging_;
+    uint64_t mapped_size_;
+    mln::Size size_;
+    uint32_t row_stride_;
+    uint32_t aligned_row_stride_;
+    std::function<void()> on_ready_;
+    std::atomic_bool done_{false};
+    mln::PremultipliedImage image_;
+    std::string failure_;
+  };
 
   void initializeContext(const mln_webgpu_context_descriptor& context) {
     if (context.instance != nullptr) {
@@ -1071,6 +1127,11 @@ class WebGPUTextureSessionBackend final
     return backend_;
   }
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
+
+  auto start_readback(std::function<void()> on_ready)
+    -> std::shared_ptr<mln::core::TextureReadback> override {
+    return backend_.start_readback(std::move(on_ready));
+  }
 
   auto set_webgpu_borrowed_target(const WebGPUBorrowedTarget& target)
     -> mln_status override {

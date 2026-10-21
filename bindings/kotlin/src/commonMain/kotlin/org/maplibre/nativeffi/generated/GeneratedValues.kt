@@ -3361,7 +3361,10 @@ public data class RenderSessionAttachOptions(
   public val producerSyncKind: GpuSyncKind = RenderSessionAttachOptions.default.producerSyncKind,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   public val frameWake: Wake = RenderSessionAttachOptions.default.frameWake,
-  /** Wakes the graphics receiver when caller-driver work is available. */
+  /**
+   * Wakes the graphics receiver when caller-driver work is available, including work that a
+   * finished driver result releases.
+   */
   public val driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake,
   /**
    * Host lock on the graphics queue, disabled by default. Only Vulkan targets accept an enabled

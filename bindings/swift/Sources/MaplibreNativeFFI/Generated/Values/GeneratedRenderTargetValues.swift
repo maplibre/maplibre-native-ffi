@@ -441,7 +441,8 @@ public struct RenderSessionAttachOptions: Sendable {
   public var producerSyncKind: GpuSyncKind
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
-  /// Wakes the graphics receiver when caller-driver work is available.
+  /// Wakes the graphics receiver when caller-driver work is available,
+  /// including work that a finished driver result releases.
   public var driverWorkWake: Wake
   /// Host lock on the graphics queue, disabled by default. Only Vulkan targets
   /// accept an enabled lock; other backends fail the attach with

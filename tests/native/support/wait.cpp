@@ -13,6 +13,41 @@
 
 #include "harness.h"
 
+// Only the browser WebGPU preset links JSPI, and only its waits need the event
+// loop to run.
+#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+#define MLN_TEST_AWAIT_ON_EVENT_LOOP 1
+#include <emscripten/em_js.h>
+
+// Suspends the calling thread until `*word` no longer holds `seen` or
+// `timeout_ms` passes, while its event loop runs. A word that already moved,
+// which a condition that services the session can do itself, still yields one
+// task, so the loop runs on every round.
+// clang-format off
+EM_ASYNC_JS(void, mln_test_wait_for_pulse, (const int32_t* word, int32_t seen, double timeout_ms), {
+  const waited = Atomics.waitAsync(HEAP32, word >> 2, seen, timeout_ms);
+  if (waited.async) {
+    await waited.value;
+    return;
+  }
+  await new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
+});
+// clang-format on
+
+// Wakes every thread waiting on `*word`. Any thread may notify, the browser
+// main thread included.
+EM_JS(void, mln_test_notify_pulse, (const int32_t* word), {
+  Atomics.notify(HEAP32, word >> 2);
+});
+#endif
+
 namespace {
 
 constexpr auto default_wait_milliseconds = std::uint64_t{10000};
@@ -24,6 +59,10 @@ struct Pulse {
   std::mutex mutex;
   std::condition_variable condition;
   std::uint64_t generation = 0;
+#if defined(MLN_TEST_AWAIT_ON_EVENT_LOOP)
+  // The pulse count again, as a word that a waiter on the event loop waits on.
+  std::atomic<std::int32_t> word = 0;
+#endif
 };
 
 auto pulse() -> Pulse& {
@@ -176,6 +215,10 @@ extern "C" void mln_test_pulse(void) {
     state.generation += 1;
   }
   state.condition.notify_all();
+#if defined(MLN_TEST_AWAIT_ON_EVENT_LOOP)
+  state.word.fetch_add(1);
+  mln_test_notify_pulse(reinterpret_cast<const std::int32_t*>(&state.word));
+#endif
 }
 
 extern "C" auto mln_test_pulse_wake(void) -> mln_wake {
@@ -214,6 +257,35 @@ extern "C" auto mln_test_await(
       [&state, seen] { return state.generation != seen; }
     );
   }
+}
+
+extern "C" auto mln_test_await_on_event_loop(
+  bool (*ready)(void* context), void* context, mln_test_deadline deadline,
+  const char* what
+) -> bool {
+#if defined(MLN_TEST_AWAIT_ON_EVENT_LOOP)
+  static_assert(std::atomic<std::int32_t>::is_always_lock_free);
+  mln_test_watchdog_note(what);
+  auto& state = pulse();
+  for (;;) {
+    const auto seen = state.word.load();
+    if (ready(context)) {
+      mln_test_watchdog_note(nullptr);
+      return true;
+    }
+    const auto left = remaining(deadline);
+    if (left.count() == 0) {
+      mln_test_watchdog_note(nullptr);
+      return false;
+    }
+    mln_test_wait_for_pulse(
+      reinterpret_cast<const std::int32_t*>(&state.word), seen,
+      static_cast<double>(std::min(left, recheck_interval).count())
+    );
+  }
+#else
+  return mln_test_await(ready, context, deadline, what);
+#endif
 }
 
 extern "C" void mln_test_flag_set(atomic_bool* flag) {

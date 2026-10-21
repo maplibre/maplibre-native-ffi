@@ -1,6 +1,6 @@
 #include <any>
 #include <cstdint>
-#include <cstring>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -498,18 +498,35 @@ auto validate_live_attached_texture(
 
 namespace {
 
-auto texture_read_premultiplied_rgba8(
-  mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
-  mln_texture_image_info* out_info
+// A readback that the backend finished before returning it.
+class CompletedTextureReadback final : public TextureReadback {
+ public:
+  explicit CompletedTextureReadback(mln::PremultipliedImage image)
+      : image_(std::move(image)) {}
+
+  [[nodiscard]] auto ready() const noexcept -> bool override { return true; }
+
+  auto take() -> mln::PremultipliedImage override {
+    if (!image_.valid()) {
+      set_thread_error("texture readback did not produce an image");
+    }
+    return std::move(image_);
+  }
+
+ private:
+  mln::PremultipliedImage image_;
+};
+
+// Checks that `texture` can be read back now and describes the image that a
+// readback produces.
+auto prepare_readback(
+  mln_render_session texture, mln_render_session_object*& out_live,
+  mln_texture_image_info& out_info
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
-  }
-  if (out_info == nullptr) {
-    set_thread_error("out_info must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (live->texture.mode != TextureSessionMode::Owned) {
     set_thread_error("texture session does not support CPU readback");
@@ -536,45 +553,14 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("texture readback byte length is too large");
     return MLN_STATUS_INVALID_STATE;
   }
-  const auto byte_length = static_cast<size_t>(stride) * live->physical_height;
 
-  *out_info = mln_texture_image_info{
+  out_live = live;
+  out_info = mln_texture_image_info{
     .width = live->physical_width,
     .height = live->physical_height,
     .stride = stride,
-    .byte_length = byte_length
+    .byte_length = static_cast<size_t>(stride) * live->physical_height
   };
-
-  if (out_data == nullptr && out_data_capacity == 0) {
-    return MLN_STATUS_OK;
-  }
-  if (out_data == nullptr || out_data_capacity < byte_length) {
-    set_thread_error("out_data capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* renderer_backend = live->texture.backend->renderer_backend();
-  if (renderer_backend == nullptr) {
-    set_thread_error("texture session renderer backend is not available");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  auto current = ScopedCurrentScheduler{live->scheduler};
-  auto guard = mln::gfx::BackendScope{*renderer_backend};
-  auto image = live->texture.backend->headless_backend().readStillImage();
-  if (!image.valid()) {
-    set_thread_error("texture readback did not produce an image");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  if (
-    image.size.width != live->physical_width ||
-    image.size.height != live->physical_height || image.stride() != stride ||
-    image.bytes() != byte_length
-  ) {
-    set_thread_error("texture readback image layout did not match the session");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-
-  std::memcpy(out_data, image.data.get(), image.bytes());
   return MLN_STATUS_OK;
 }
 
@@ -583,7 +569,40 @@ struct TextureReadbackResult {
   mln_texture_image_info info{};
 };
 
+// Checks a finished readback against the image that `info` describes, which
+// the readback captured when it started, and copies it into `out_result`.
+auto readback_result(
+  const mln_texture_image_info& info, const mln::PremultipliedImage& image,
+  std::any& out_result
+) -> mln_status {
+  if (!image.valid()) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  if (
+    image.size.width != info.width || image.size.height != info.height ||
+    image.stride() != info.stride || image.bytes() != info.byte_length
+  ) {
+    set_thread_error("texture readback image layout did not match the session");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  out_result = TextureReadbackResult{
+    .bytes = std::string(
+      reinterpret_cast<const char*>(image.data.get()), image.bytes()
+    ),
+    .info = info,
+  };
+  return MLN_STATUS_OK;
+}
+
 }  // namespace
+
+auto TextureSessionBackend::start_readback(std::function<void()> on_ready)
+  -> std::shared_ptr<TextureReadback> {
+  (void)on_ready;
+  return std::make_shared<CompletedTextureReadback>(
+    headless_backend().readStillImage()
+  );
+}
 
 auto texture_read_premultiplied_rgba8_start(
   mln_render_session texture, const mln_completion* completion
@@ -591,21 +610,38 @@ auto texture_read_premultiplied_rgba8_start(
   return enqueue_driver_result_operation(
     texture,
     [](mln_render_session_object& target, std::any& result) {
-      auto readback = TextureReadbackResult{
-        .bytes = {},
-        .info = {},
-      };
-      auto status = texture_read_premultiplied_rgba8(
-        target.self, nullptr, 0, &readback.info
-      );
+      mln_render_session_object* live = nullptr;
+      auto info = mln_texture_image_info{};
+      const auto status = prepare_readback(target.self, live, info);
       if (status != MLN_STATUS_OK) return status;
-      readback.bytes.resize(readback.info.byte_length);
-      status = texture_read_premultiplied_rgba8(
-        target.self, reinterpret_cast<uint8_t*>(readback.bytes.data()),
-        readback.bytes.size(), &readback.info
-      );
-      if (status == MLN_STATUS_OK) result = std::move(readback);
-      return status;
+
+      auto* renderer_backend = live->texture.backend->renderer_backend();
+      if (renderer_backend == nullptr) {
+        set_thread_error("texture session renderer backend is not available");
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      auto readback = std::shared_ptr<TextureReadback>{};
+      {
+        auto current = ScopedCurrentScheduler{live->scheduler};
+        auto guard = mln::gfx::BackendScope{*renderer_backend};
+        readback = live->texture.backend->start_readback(
+          [session = live->weak_from_this()]() { resume_driver_work(session); }
+        );
+      }
+      if (readback == nullptr) return MLN_STATUS_NATIVE_ERROR;
+      if (readback->ready()) {
+        return readback_result(info, readback->take(), result);
+      }
+      // The copy is already submitted, so a later generation cannot change
+      // what it reads, and the finish checks the image against `info`.
+      result = PendingDriverResult{
+        .ready = [readback]() { return readback->ready(); },
+        .finish =
+          [readback, info](std::any& finished) {
+            return readback_result(info, readback->take(), finished);
+          },
+      };
+      return MLN_STATUS_OK;
     },
     completion,
     [](

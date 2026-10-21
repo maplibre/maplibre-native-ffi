@@ -3234,7 +3234,9 @@ class RenderSessionAttachOptions:
     driver_work_wake: Wake = field(
         default_factory=lambda: RenderSessionAttachOptions.default().driver_work_wake
     )
-    """Wakes the graphics receiver when caller-driver work is available."""
+    """Wakes the graphics receiver when caller-driver work is available,
+    including work that a finished driver result releases.
+    """
 
     queue_lock: QueueLock = field(
         default_factory=lambda: RenderSessionAttachOptions.default().queue_lock

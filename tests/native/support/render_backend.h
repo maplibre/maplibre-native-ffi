@@ -51,6 +51,16 @@ bool mln_test_render_fixture_create_with_driver(
   mln_test_backend_attach_fn attach, uint32_t driver
 );
 
+#if defined(__EMSCRIPTEN__)
+// mln_test_render_fixture_create_with() for a session that the browser main
+// thread services from its first service on, so its backend initializes
+// there.
+bool mln_test_render_fixture_create_serviced_on_main_thread(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach
+);
+#endif
+
 // Shared with the backends that attach fixtures of their own.
 void mln_test_render_count_wake(void* user_data);
 void mln_test_render_reserve_session(void);

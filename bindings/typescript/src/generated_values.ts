@@ -2118,7 +2118,8 @@ export interface RenderSessionAttachOptions {
    */
   frameWake?: Wake;
   /**
-   * Wakes the graphics receiver when caller-driver work is available.
+   * Wakes the graphics receiver when caller-driver work is available, including
+   * work that a finished driver result releases.
    */
   driverWorkWake?: Wake;
 }

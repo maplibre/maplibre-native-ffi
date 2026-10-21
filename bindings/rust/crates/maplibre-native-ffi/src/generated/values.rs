@@ -3875,7 +3875,8 @@ pub struct RenderSessionAttachOptions {
     pub producer_sync_kind: GpuSyncKind,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,
-    /// Wakes the graphics receiver when caller-driver work is available.
+    /// Wakes the graphics receiver when caller-driver work is available,
+    /// including work that a finished driver result releases.
     pub driver_work_wake: Wake,
     /// Host lock on the graphics queue, disabled by default. Only Vulkan
     /// targets accept an enabled lock; other backends fail the attach with

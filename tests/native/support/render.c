@@ -1,8 +1,12 @@
-
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "render.h"
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
+#endif
 
 #include "env.h"
 #include "render_backend.h"
@@ -68,16 +72,38 @@ void mln_test_render_count_wake(void* user_data) {
   mln_test_pulse();
 }
 
+typedef struct service_call {
+  const mln_test_render_fixture* fixture;
+  mln_status status;
+} service_call;
+
+static void service_here(void* context) {
+  service_call* call = context;
+  call->status = mln_render_session_service_driver_work(
+    call->fixture->session, MLN_TEST_DIAGNOSTIC
+  );
+}
+
 mln_status mln_test_render_fixture_service(
   const mln_test_render_fixture* fixture
 ) {
   if (fixture->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     return MLN_STATUS_OK;
   }
-
-  return mln_render_session_service_driver_work(
-    fixture->session, MLN_TEST_DIAGNOSTIC
-  );
+  service_call call = {.fixture = fixture, .status = MLN_STATUS_NATIVE_ERROR};
+#if defined(__EMSCRIPTEN__)
+  if (fixture->serviced_on_main_thread) {
+    if (!emscripten_proxy_sync(
+          emscripten_proxy_get_system_queue(),
+          emscripten_main_runtime_thread_id(), service_here, &call
+        )) {
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    return call.status;
+  }
+#endif
+  service_here(&call);
+  return call.status;
 }
 
 typedef struct step_state {
@@ -103,7 +129,7 @@ mln_status mln_test_render_step_until(
     .context = context,
     .service_status = MLN_STATUS_OK,
   };
-  if (!mln_test_await(step_ready, &step, deadline, what)) {
+  if (!mln_test_await_on_event_loop(step_ready, &step, deadline, what)) {
     return MLN_STATUS_NOT_READY;
   }
   return step.service_status;
@@ -148,9 +174,10 @@ bool mln_test_render_fixture_create_with(
   );
 }
 
-bool mln_test_render_fixture_create_with_driver(
+static bool create_fixture(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach, uint32_t driver
+  mln_test_backend_attach_fn attach, uint32_t driver,
+  bool serviced_on_main_thread
 ) {
   if (map == MLN_HANDLE_NULL || fixture == NULL) {
     return false;
@@ -158,6 +185,7 @@ bool mln_test_render_fixture_create_with_driver(
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
   fixture->driver = driver;
+  fixture->serviced_on_main_thread = serviced_on_main_thread;
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
@@ -221,6 +249,22 @@ bool mln_test_render_fixture_create_with_driver(
   mln_test_render_track_session(fixture);
   return true;
 }
+
+bool mln_test_render_fixture_create_with_driver(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach, uint32_t driver
+) {
+  return create_fixture(map, fixture, attach, driver, false);
+}
+
+#if defined(__EMSCRIPTEN__)
+bool mln_test_render_fixture_create_serviced_on_main_thread(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach
+) {
+  return create_fixture(map, fixture, attach, mln_test_backend_driver(), true);
+}
+#endif
 
 mln_status mln_test_render_fixture_start_attach(
   mln_map map, const mln_render_session_attach_options* options,

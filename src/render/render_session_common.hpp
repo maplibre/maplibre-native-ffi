@@ -27,6 +27,7 @@
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/renderer/update_parameters.hpp>
 #include <mln/util/feature.hpp>
+#include <mln/util/image.hpp>
 #include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
@@ -190,6 +191,22 @@ struct RenderFrameMetadata {
   double scale_factor = 1.0;
 };
 
+// A CPU readback of a texture session's rendered texture. ready() may be read
+// on any thread. take() runs once, on the driver, after ready() holds; an
+// invalid image fails the read with the reason in the thread error.
+class TextureReadback {
+ public:
+  TextureReadback() = default;
+  TextureReadback(const TextureReadback&) = delete;
+  auto operator=(const TextureReadback&) -> TextureReadback& = delete;
+  TextureReadback(TextureReadback&&) = delete;
+  auto operator=(TextureReadback&&) -> TextureReadback& = delete;
+  virtual ~TextureReadback() = default;
+
+  [[nodiscard]] virtual auto ready() const noexcept -> bool = 0;
+  virtual auto take() -> mln::PremultipliedImage = 0;
+};
+
 class TextureSessionBackend {
  public:
   TextureSessionBackend() = default;
@@ -267,9 +284,19 @@ class TextureSessionBackend {
     );
   }
 
-  // Whether headless_backend().readStillImage() produces an image. False makes
-  // the C API answer UNSUPPORTED instead of reporting an empty image.
+  // Whether start_readback() produces an image. False makes the C API answer
+  // UNSUPPORTED instead of reporting an empty image.
   [[nodiscard]] virtual auto supports_readback() const -> bool { return true; }
+
+  // Starts a CPU readback of the rendered texture. Runs on the driver, with the
+  // session's scheduler current and the backend in scope. A backend whose
+  // graphics API delivers the copy through the graphics thread's event loop
+  // returns a readback that is not ready yet, and calls `on_ready` once, on
+  // that thread, when its take() can run. Null fails the read with the reason
+  // in the thread error. The default reads at once through
+  // headless_backend().readStillImage().
+  virtual auto start_readback(std::function<void()> on_ready)
+    -> std::shared_ptr<TextureReadback>;
 
   virtual void prepare_render_resources() {}
   virtual auto after_render(
@@ -663,6 +690,21 @@ struct RenderTextureState {
 struct RenderDriverWork {
   std::function<void()> execute;
   std::function<void()> abandon;
+  // Empty for work the driver runs as soon as it reaches it. Otherwise the
+  // item, and every item behind it, waits at the front of the queue until this
+  // holds. Read under the session's control_mutex, on any thread.
+  std::function<bool()> ready{};
+};
+
+// What a driver result's work leaves as its result to finish the result on a
+// later driver service, once the graphics thread's event loop delivers what it
+// waits for. The session's later driver work waits behind it. `ready` may be
+// read on any thread. `finish` runs on the driver once `ready` holds, and
+// fills the result as the work would have. Whatever makes `ready` hold then
+// calls resume_driver_work().
+struct PendingDriverResult {
+  std::function<bool()> ready;
+  std::function<mln_status(std::any&)> finish;
 };
 
 }  // namespace mln::core
@@ -804,6 +846,8 @@ struct HandleTraits<mln_acquired_frame_object> {
 
 using RenderDriverCallable =
   std::function<mln_status(mln_render_session_object&)>;
+// Driver result work. Returning MLN_STATUS_OK with a PendingDriverResult as the
+// result finishes the operation on a later driver service.
 using RenderDriverResultCallable =
   std::function<mln_status(mln_render_session_object&, std::any&)>;
 
@@ -817,6 +861,12 @@ auto enqueue_driver_result_operation(
   mln_render_session session, RenderDriverResultCallable work,
   const mln_completion* completion, CompletionOperation::Delivery transfer
 ) -> mln_status;
+// Wakes the driver for the work that a pending driver result held back, once
+// the result is ready. Safe on any thread, including inside the graphics API
+// callback that made it ready. Does nothing when the session is gone.
+auto resume_driver_work(
+  const std::weak_ptr<mln_render_session_object>& session
+) noexcept -> void;
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
   const mln_render_session* out_session, const mln_completion* completion,

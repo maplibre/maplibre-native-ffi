@@ -1588,7 +1588,10 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * A host that drives a session on its own graphics thread stops driver service
  * first. Abandon returns once the session's in-flight driver call has ended,
  * so an exit path can end a session that is mid-frame. A disposed session's
- * graphics calls have ended once its wake release callbacks have run.
+ * graphics calls have ended once its wake release callbacks have run. A browser
+ * WebGPU readback whose copy is still mapping is the one exception to both
+ * paths: the library releases its own staging buffer when the graphics
+ * thread's event loop delivers the map; see mln_render_session_abandon().
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

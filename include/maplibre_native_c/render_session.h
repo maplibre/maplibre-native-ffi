@@ -586,6 +586,14 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * context must be current. Core-worker sessions return
  * MLN_STATUS_INVALID_STATE.
  *
+ * A driver result can finish on a later service, once the graphics thread's
+ * event loop delivers what the result waits for: a browser WebGPU readback
+ * waits for its copy to map. The session's later driver work waits behind that
+ * result, so a service runs none of it until the event loop delivers the
+ * result and the driver-work wake fires. A browser host returns the graphics
+ * thread to its event loop between service calls, or waits for the wake in a
+ * way that runs that loop.
+ *
  * Returns:
  * - MLN_STATUS_OK once queued driver work has been serviced.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
@@ -663,11 +671,15 @@ MLN_API mln_status mln_render_session_detach(
  * The host keeps the target's graphics objects valid until the call returns,
  * and must not hold the queue lock while it waits on the abandoning thread.
  * After the call returns, no library thread touches them and the host may
- * destroy them. The one exception is a kept Vulkan object: it is a child of
- * the host's VkDevice, and a kept swapchain is also a child of its
- * VkSurfaceKHR, so the host keeps those parents until the process exits. A
- * Vulkan GPU that hangs without reporting device loss blocks the call. Do not
- * call from a MapLibre worker callback.
+ * destroy them. One exception is a kept Vulkan object: it is a child of the
+ * host's VkDevice, and a kept swapchain is also a child of its VkSurfaceKHR,
+ * so the host keeps those parents until the process exits. The other
+ * exception is a browser WebGPU readback whose copy is still mapping: when the
+ * graphics thread's event loop later delivers the map, the library reads and
+ * releases its own staging buffer there. The buffer keeps what it needs of the
+ * host's device alive, so the host may still release its objects. A Vulkan GPU
+ * that hangs without reporting device loss blocks the call. Do not call from a
+ * MapLibre worker callback.
  *
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was

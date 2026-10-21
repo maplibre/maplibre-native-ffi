@@ -131,7 +131,10 @@ typedef struct mln_render_session_attach_options {
   uint32_t producer_sync_kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
-  /** Wakes the graphics receiver when caller-driver work is available. */
+  /**
+   * Wakes the graphics receiver when caller-driver work is available,
+   * including work that a finished driver result releases.
+   */
   mln_wake driver_work_wake;
   /**
    * Host lock on the graphics queue, disabled by default. Only Vulkan targets
