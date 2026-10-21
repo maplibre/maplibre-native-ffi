@@ -149,6 +149,29 @@ infrastructure step that `ci/retry.py` lists.
 snapshot workflow publishes, and `mise run ci:check-snapshot-scopes` keeps every
 tracked path classified.
 
+### Debug on a CI runner
+
+Use [Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox) to run
+individual commands against local changes on a runner with CI's dependencies.
+Authenticate with `blacksmith auth login`; your account needs access to the
+MapLibre organization in Blacksmith.
+
+Warm the Linux job from your branch, then use the returned ID to sync local
+changes over rsync and run a command:
+
+```bash
+blacksmith testbox warmup .github/workflows/blacksmith-testbox.yml --job linux --ref <branch>
+blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
+```
+
+Replace the test command with `mise run //bindings/<lang>:test <preset>` to test
+a binding. The Linux job prepares x64 GNU and musl presets with EGL or Vulkan.
+Android/OHOS emulators, Emscripten, and Linux ARM64 need separate target setup
+or runners. The `macos` job mirrors CI's Apple setup, but the pinned Testbox
+actions use Linux-specific commands; confirm upstream macOS support before using
+that job. Warmup prepares dependencies and waits for commands; it runs no tests
+itself.
+
 ## Code coverage
 
 Code coverage is a local tool for deciding which suite a test belongs in. CI

@@ -1,0 +1,55 @@
+name: Blacksmith Testbox
+
+on:
+  workflow_dispatch:
+    inputs:
+      testbox_id:
+        description: Blacksmith Testbox session ID
+        required: true
+        type: string
+
+# begin-testbox authenticates with the VM metadata service's sticky disk token.
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 120
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
+        with:
+          testbox_id: ${{ inputs.testbox_id }}
+      # Matches the broad Linux target job, including source/submodule sync.
+      # Covers x64 GNU and musl presets with EGL or Vulkan; ARM64 needs CI's
+      # blacksmith-4vcpu-ubuntu-2404-arm runner. Android/OHOS emulators and
+      # Emscripten need their target-specific setup-ci-deps inputs and SDKs.
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-gnu-x64-egl
+          zig: true
+          save-toolchains: true
+      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
+
+  macos:
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 120
+    # Upstream v2 uses /proc/cmdline, ss, and GNU stat. Testbox session support
+    # on this macOS runner needs upstream confirmation before use.
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
+        with:
+          testbox_id: ${{ inputs.testbox_id }}
+      # Matches the broad macOS target job. Apple simulator tasks boot on demand.
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: macos-arm64-metal
+          zig: true
+          save-toolchains: true
+      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
