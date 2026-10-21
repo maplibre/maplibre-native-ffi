@@ -102,6 +102,11 @@ export default defineConfig({
               link: "/reference/swift/documentation/maplibrenativeffi/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
+            {
+              label: "TypeScript API",
+              link: "/reference/typescript/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {

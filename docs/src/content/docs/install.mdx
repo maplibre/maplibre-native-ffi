@@ -253,6 +253,44 @@ from the repository name rather than from the manifest, so name it as
 Install the [C library](#build-against-a-prefix), then export `PKG_CONFIG_PATH`
 before you build.
 
+### TypeScript
+
+<Aside type="caution" title="Build from source">
+  The TypeScript binding publishes no packages yet. Build it from a checkout of
+  this repository and install the tarballs that it packs.
+</Aside>
+
+The TypeScript binding serves Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later
+releases of each, on Linux with glibc and on macOS. It does not support Windows
+yet. In the checkout, pack the binding for your preset, then install the three
+tarballs into your project with npm:
+
+```bash frame="terminal"
+mise run //bindings/typescript:pack linux-gnu-x64-vulkan
+npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
+```
+
+The tarballs are the `@maplibre/native-ffi` facade, the backend package for the
+preset's backend, and the addon package for the preset's platform. The addon
+embeds the native library. When several backend packages are installed, set
+`MAPLIBRE_NATIVE_FFI_BACKEND` to `opengl`, `metal`, or `vulkan`.
+
+The facade is an ES module. CommonJS code loads it with `require()`, which
+loads ES modules on these releases. Bun loads it from the same `node_modules`
+directory. Deno imports it as `npm:@maplibre/native-ffi`, resolves that from
+`node_modules` because the project has a `package.json`, and runs with the
+permissions that loading the addon needs:
+
+```bash frame="terminal"
+deno run --allow-ffi --allow-read --allow-env main.ts
+```
+
+On OpenHarmony, ArkTS imports the addon by library name from the application's
+`libs/<abi>` directory, and the application ships the SDK's `libc++_shared.so`
+beside it. Build `libmaplibre_native_ffi.so` with
+`mise -E ohos run //bindings/typescript:build <preset>`, and bundle
+`bindings/typescript/src/arkts.ts` into the application.
+
 ### Zig
 
 <SnapshotOnly />

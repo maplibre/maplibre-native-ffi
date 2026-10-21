@@ -70,3 +70,15 @@ revision follows every earlier tag in the same epoch and month. The tag month
 must be the current UTC month, and the tagged commit must belong to `main` and
 have a successful main CI run. A release workflow repeats the tag checks before
 it publishes the release family.
+
+## Snapshot versions
+
+Snapshots publish from `main` with a prerelease version in each channel's own
+format. The stamp is the UTC minute of the publishing run.
+
+| Component | Channel                               | Version                      |
+| --------- | ------------------------------------- | ---------------------------- |
+| Native    | `unstable-native-snapshot` prerelease | `0.0.0-dev.YYYYMMDDHHMM`     |
+| Kotlin    | Maven Central snapshots               | `0.1.0-SNAPSHOT`             |
+| Python    | GitHub Pages package index            | `0.1.0.devYYYYMMDDHHMM`      |
+| .NET      | GitHub Pages NuGet feed               | `0.1.0-preview.YYYYMMDDHHMM` |

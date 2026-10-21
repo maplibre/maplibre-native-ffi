@@ -85,6 +85,14 @@ mkdir -p public/reference
 cp -a ../build/docc/. public/reference/swift/
 '''
 
+[tasks."api:typescript"]
+depends = ["//bindings/typescript:api"]
+run = '''
+rm -rf public/reference/typescript
+mkdir -p public/reference
+cp -a ../bindings/typescript/build/typedoc/. public/reference/typescript/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
@@ -96,6 +104,7 @@ run = [
   { task = "api:dotnet" },
   { task = "api:go" },
   { task = "api:swift" },
+  { task = "api:typescript" },
 ]
 
 [tasks.install]

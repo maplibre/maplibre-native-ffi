@@ -12,8 +12,8 @@ src/                      C++ implementation and render backends
   testing/                Unexported seams for the internal test suite
 tools/bindgen/            Generator from headers to bindings, and the header
                           ABI rules (see README.md)
-bindings/<language>/      Kotlin, Rust, Swift, Zig, .NET, Python, Go, Dart:
-                          generated code over a handwritten runtime
+bindings/<language>/      Kotlin, Rust, Swift, Zig, .NET, Python, Go, Dart,
+                          TypeScript: generated code over a handwritten runtime
 tests/
   native/                 C suites for native behavior (see README.md)
   bindgen/                Generator tests and protocol fixtures
