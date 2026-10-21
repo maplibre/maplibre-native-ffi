@@ -8,9 +8,9 @@
 overview = """
 This repository is a C API for MapLibre Native, the C++ map renderer vendored as
 a git submodule with carried patches. Language bindings (Rust, Zig, Kotlin,
-Swift, .NET, Go, Python, Dart) wrap the C API, and small example apps use them.
-Mise defines tools and tasks, CMake presets define native targets, and Gradle
-builds the Android and Kotlin packages.
+Swift, .NET, Go, Python, Dart, TypeScript) wrap the C API, and small example
+apps use them. Mise defines tools and tasks, CMake presets define native
+targets, and Gradle builds the Android and Kotlin packages.
 
 Every CI job installs the mise toolchain for its operating system, builds the
 native library for one target with CMake, and runs that target's binding tests
@@ -71,9 +71,9 @@ standalone = true
 covers = """
 Linux x64 with glibc, OpenGL (EGL) and Vulkan. Runs the C API tests, the test
 suites of every binding (Rust, Zig, Kotlin JVM and Native, Swift, .NET, Go,
-Python) and the Dart build, and the example builds. This is the general correctness
-check for native code, bindings, examples, and build logic shared by all
-platforms.
+Python, TypeScript under Node, Bun, and Deno) and the Dart build, and the
+example builds. This is the general correctness check for native code,
+bindings, examples, and build logic shared by all platforms.
 """
 targets = ["linux-gnu-x64-*"]
 
@@ -176,8 +176,9 @@ jobs = ["android-multi"]
 id = "ohos"
 covers = """
 OpenHarmony on ARM64 and x64 with OpenGL ES (EGL) and Vulkan, built with the
-OpenHarmony SDK. The x64 jobs run the C API, Rust, and Go tests in the Oniro
-emulator; the ARM64 jobs only build. Catches OpenHarmony SDK and platform problems.
+OpenHarmony SDK. The x64 jobs run the C API, Rust, Go, and TypeScript (ArkTS)
+tests in the Oniro emulator; the ARM64 jobs only build. Catches OpenHarmony SDK
+and platform problems.
 """
 paths = ["cmake/platform/ohos.cmake", "mise.ohos.*"]
 targets = ["ohos-*"]

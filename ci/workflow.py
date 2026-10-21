@@ -222,6 +222,7 @@ def ohos_commands(preset: str) -> list[str]:
     return [
         f"mise run //bindings/rust:{action} {preset}",
         f"mise run //bindings/go:{action} {preset}",
+        f"mise run //bindings/typescript:{action} {preset}",
     ]
 
 

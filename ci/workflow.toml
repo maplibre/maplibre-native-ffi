@@ -140,6 +140,13 @@ commands = [{ task = "//bindings/python:test" }]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/dart:test" }]
 
+# The TypeScript suite runs under Node, Bun, and Deno in turn, and loads the
+# packages that it packs and installs. The binding does not support Windows yet;
+# see bindings/typescript/README.md.
+[[suites]]
+platforms = ["linux-gnu", "macos"]
+commands = [{ task = "//bindings/typescript:test" }]
+
 # Run Rust browser tests against the Emscripten build.
 [[suites]]
 platforms = ["emscripten"]
