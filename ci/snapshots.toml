@@ -46,7 +46,6 @@ shared = [
   ".github/actions/**",
   "ci/**",
   "!ci/*release.py",
-  "!ci/select_*",
   "!ci/tests/**",
   ".gitattributes",
 

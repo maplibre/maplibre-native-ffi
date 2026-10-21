@@ -107,3 +107,20 @@ commands = [{ task = "//bindings/dart:build" }]
 [[suites]]
 platforms = ["emscripten"]
 commands = [{ task = "//bindings/rust:test" }]
+
+# The jobs that each coverage unit in `.config/rubberstamp.yml` owns. Rubberstamp
+# plans which units a pull request runs. `targets` matches native target
+# presets, and `jobs` names the other jobs. Every job except hygiene belongs to
+# exactly one unit, and a packaging job also runs the target jobs it consumes.
+[units]
+docs = { jobs = ["docs"] }
+linux-x64 = { targets = ["linux-gnu-x64-*"] }
+linux-arm64 = { targets = ["linux-gnu-arm64-*"] }
+linux-musl = { targets = ["linux-musl-*"] }
+macos = { targets = ["macos-*"] }
+apple-mobile = { targets = ["ios-*", "tvos-*"], jobs = ["apple-xcframework"] }
+windows = { targets = ["windows-*"] }
+android = { targets = ["android-*"], jobs = ["android-multi"] }
+ohos = { targets = ["ohos-*"] }
+web = { targets = ["emscripten-*"] }
+maven = { jobs = ["kotlin-maven"] }

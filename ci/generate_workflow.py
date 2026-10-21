@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import difflib
 import io
-import json
 import pathlib
 import re
 import sys
@@ -15,7 +14,7 @@ from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 from ci.action_pins import catalog
-from ci.coverage import HYGIENE, dependencies, job_name
+from ci.coverage import HYGIENE, dependencies, job_name, job_units
 from ci.workflow import (
     LINUX_RUNNER,
     SMALL_RUNNER,
@@ -285,38 +284,48 @@ def kotlin_maven_job(needs: list[str]) -> dict:
 
 
 def plan_job() -> dict:
+    # The action reports every unit on anything but a ready plan, and it never
+    # fails the job. The job timeout leaves room for its own 600 second wait.
     return {
         "runs-on": SMALL_RUNNER,
-        "timeout-minutes": 10,
+        "timeout-minutes": 15,
         "if": OPEN,
-        "outputs": {"jobs": "${{ steps.plan.outputs.jobs }}"},
-        "steps": [
-            # Selection compares the pull request head with its merge base and
-            # with heads that earlier runs tested; blobs load on demand.
-            checkout(SMALL_RUNNER, **{"fetch-depth": 0, "filter": "blob:none"}),
-            run(
-                "bash .mise/tasks/ci/plan",
-                id="plan",
-                env={
-                    "GH_TOKEN": "${{ github.token }}",
-                    "TYPESAFE_API_KEY": "${{ secrets.TYPESAFE_API_KEY }}",
-                },
-            ),
-        ],
+        "outputs": {
+            "all": "${{ steps.plan.outputs.all }}",
+            "units": "${{ steps.plan.outputs.units }}",
+        },
+        "steps": [action("sargunv/rubberstamp/actions/plan", id="plan")],
     }
+
+
+def gate(units: list[str]) -> str:
+    """Run a job when the plan runs every unit or any of these units."""
+    return " || ".join(
+        [
+            "fromJSON(needs.plan.outputs.all)",
+            *(
+                f"contains(fromJSON(needs.plan.outputs.units), '{unit}')"
+                for unit in units
+            ),
+        ]
+    )
 
 
 def ci_workflow(source: dict, presets: dict) -> dict:
     rows = target_rows(source, presets)
     needs = dependencies(source, presets)
-    jobs = {HYGIENE: hygiene_job(), "docs": docs_job()}
+    running = job_units(source, presets)
+    jobs = {"docs": docs_job()}
     jobs.update({f"target-{row['preset']}": target_job(row) for row in rows})
     jobs["android-multi"] = android_multi_job(needs["android-multi"])
     jobs["apple-xcframework"] = apple_xcframework_job(needs["apple-xcframework"])
     jobs["kotlin-maven"] = kotlin_maven_job(needs["kotlin-maven"])
     for name, job in jobs.items():
         job["needs"] = ["plan", *job.get("needs", [])]
-        job["if"] = f"contains(fromJSON(needs.plan.outputs.jobs), '{name}')"
+        job["if"] = gate(running[name])
+    # Hygiene always runs, without waiting for the plan.
+    jobs = {HYGIENE: {**hygiene_job(), "if": OPEN}, **jobs}
+    # A skipped job passes a required check, so a failed plan must fail this one.
     required = {
         "name": "ci-required",
         "runs-on": SMALL_RUNNER,
@@ -326,16 +335,12 @@ def ci_workflow(source: dict, presets: dict) -> dict:
         "steps": [
             run(
                 'test "$PLAN" = success &&\n'
-                'jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED" '
-                "  '(($selected - $expected) | length == 0)\n"
-                "   and all($expected[]; . as $job | $results[$job].result ==\n"
-                '     (if $selected | index($job) then "success" else "skipped" end))\'\n',
-                name="Require every selected job",
+                'jq -e -n --argjson results "$RESULTS" '
+                '\'all($results[]; .result == "success" or .result == "skipped")\'\n',
+                name="Require every planned job",
                 env={
                     "PLAN": "${{ needs.plan.result }}",
-                    "EXPECTED": json.dumps(sorted(jobs)),
                     "RESULTS": "${{ toJSON(needs) }}",
-                    "SELECTED": "${{ needs.plan.outputs.jobs }}",
                 },
             )
         ],
@@ -347,7 +352,7 @@ def ci_workflow(source: dict, presets: dict) -> dict:
             "workflow_dispatch": None,
             "pull_request": {"types": ["opened", "synchronize", "reopened"]},
         },
-        "permissions": {"contents": "read", "actions": "read"},
+        "permissions": {"contents": "read"},
         "concurrency": {
             "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}",
             "cancel-in-progress": "${{ github.event.action == 'synchronize' }}",

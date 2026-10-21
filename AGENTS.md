@@ -63,8 +63,10 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-Applicable CI jobs are selected automatically. If the selection looks wrong,
-trigger a manual run (`gh workflow run CI --ref <branch>`).
+Rubberstamp plans which CI coverage units each pull request runs. The plan job's
+summary links to the Rubberstamp dashboard with the reason for each unit. If the
+plan looks wrong, trigger a manual run (`gh workflow run CI --ref <branch>`) to
+run every unit.
 
 ## Project Invariants
 
