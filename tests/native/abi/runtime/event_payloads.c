@@ -667,7 +667,7 @@ static void failed_loads_report_their_text(void) {
       &fixture, runtime, map, still_diagnostic, sizeof(still_diagnostic)
     )
   );
-  MLN_TEST_OK(mln_test_map_fence(map));
+  // The failed style command queued its loading-failed event before completing.
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE_FAILURE, log, &context);
   mln_test_render_fixture_destroy(&fixture);
@@ -822,7 +822,6 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(render_still_image(&fixture, runtime, map, NULL, 0));
-  MLN_TEST_OK(mln_test_map_fence(map));
 
   event_log* log = &scenario_log;
   log_reset(log);

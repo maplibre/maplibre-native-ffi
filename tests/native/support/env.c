@@ -716,12 +716,9 @@ void mln_test_load_style_and_wait(mln_map map, mln_buffer_view json) {
   MLN_TEST_OK(
     mln_map_set_style_json(map, json, &applied.descriptor, MLN_TEST_DIAGNOSTIC)
   );
-  MLN_TEST_OK(mln_test_completion_settle(&applied));
   // MapLibre parses an inline document and notifies its observer inside the
-  // command, so the events the load produces are queued once it commits. The
-  // fence only orders this thread behind the runtime worker's own follow-up
-  // work.
-  MLN_TEST_OK(mln_test_map_fence(map));
+  // command, so the events the load produces are queued once it commits.
+  MLN_TEST_OK(mln_test_completion_settle(&applied));
 }
 
 bool mln_test_reclaim_thread_resources(void) {
