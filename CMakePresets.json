@@ -141,6 +141,7 @@
       "hidden": true,
       "inherits": "_single-config",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "$env{ProgramFiles}/LLVM/bin/clang-cl.exe",
         "CMAKE_CXX_COMPILER": "$env{ProgramFiles}/LLVM/bin/clang-cl.exe",
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",

@@ -140,3 +140,91 @@ auto WorkerThread::join() -> void {
 #endif
 
 }  // namespace mln::core
+
+#ifdef _WIN32
+// Throwaway diagnostics for #899: print a symbolized stack when this DLL's C
+// runtime aborts or terminates.
+#include <windows.h>
+// dbghelp.h needs windows.h first.
+#include <dbghelp.h>
+
+#include <csignal>
+#include <cstdio>
+#include <cstring>
+#include <exception>
+#pragma comment(lib, "dbghelp.lib")
+
+namespace {
+
+void repro_print_exception() {
+  try {
+    if (auto current = std::current_exception()) std::rethrow_exception(current);
+    std::fprintf(stderr, "repro: no exception in flight\n");
+  } catch (const std::exception& error) {
+    std::fprintf(stderr, "repro: exception in flight: %s\n", error.what());
+  } catch (...) {
+    std::fprintf(stderr, "repro: a non-std exception in flight\n");
+  }
+}
+
+void repro_print_stack(const char* why) {
+  void* frames[96];
+  const auto count = CaptureStackBackTrace(0, 96, frames, nullptr);
+  const auto process = GetCurrentProcess();
+  SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+  SymInitialize(process, nullptr, TRUE);
+  std::fprintf(stderr, "repro: %s on thread %lu\n", why, GetCurrentThreadId());
+  repro_print_exception();
+  alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 512];
+  for (USHORT index = 0; index < count; ++index) {
+    const auto address = reinterpret_cast<DWORD64>(frames[index]);
+    HMODULE module = nullptr;
+    char path[MAX_PATH] = "?";
+    GetModuleHandleExA(
+      GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+      static_cast<LPCSTR>(frames[index]), &module
+    );
+    if (module != nullptr) GetModuleFileNameA(module, path, MAX_PATH);
+    const char* name = std::strrchr(path, '\\');
+    name = name != nullptr ? name + 1 : path;
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = 511;
+    DWORD64 displacement = 0;
+    const bool has_symbol =
+      SymFromAddr(process, address, &displacement, symbol) != FALSE;
+    IMAGEHLP_LINE64 line{};
+    line.SizeOfStruct = sizeof line;
+    DWORD line_displacement = 0;
+    const bool has_line =
+      SymGetLineFromAddr64(process, address, &line_displacement, &line) !=
+      FALSE;
+    std::fprintf(
+      stderr, "repro:   #%02u %s+0x%llx %s+0x%llx %s:%lu\n", index, name,
+      static_cast<unsigned long long>(
+        address - reinterpret_cast<DWORD64>(module)
+      ),
+      has_symbol ? symbol->Name : "?",
+      static_cast<unsigned long long>(displacement),
+      has_line ? line.FileName : "", has_line ? line.LineNumber : 0UL
+    );
+  }
+  std::fflush(stderr);
+}
+
+void repro_on_abort(int) { repro_print_stack("abort"); }
+
+void repro_on_terminate() {
+  repro_print_stack("terminate");
+  std::abort();
+}
+
+const bool repro_installed = [] {
+  std::signal(SIGABRT, repro_on_abort);
+  std::set_terminate(repro_on_terminate);
+  return true;
+}();
+
+}  // namespace
+#endif
