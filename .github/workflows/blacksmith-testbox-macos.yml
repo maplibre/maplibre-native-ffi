@@ -1,6 +1,8 @@
 name: Blacksmith Testbox macOS
 
 on:
+  push:
+    branches: [chore/testbox-session-env]
   workflow_dispatch:
     inputs:
       testbox_id:
@@ -14,6 +16,7 @@ permissions:
 
 jobs:
   macos:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 120
     steps:
