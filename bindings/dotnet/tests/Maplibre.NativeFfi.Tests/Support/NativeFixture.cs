@@ -131,15 +131,29 @@ internal sealed class NativeFixture : IAsyncDisposable
     {
         try
         {
-            if (Map is not null)
+            if (Map is not null && IsLive(() => Map.GetSnapshot()))
                 await Map.CloseAsync();
         }
         finally
         {
-            if (Runtime is not null)
+            if (Runtime is not null && IsLive(() => Runtime.GetEventMask()))
                 await Runtime.CloseAsync();
             // Runtime teardown retires the event handler before the semaphore is disposed.
             events.Dispose();
+        }
+    }
+
+    private static bool IsLive(Action probe)
+    {
+        try
+        {
+            probe();
+            return true;
+        }
+        catch (global::Maplibre.NativeFfi.Error.MaplibreException error)
+            when (error.Status == Status.InvalidState)
+        {
+            return false;
         }
     }
 }

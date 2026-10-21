@@ -7,7 +7,7 @@
 "ERR-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeStatusTests.cs::AnUnknownStatusKeepsItsValueAndDiagnostic"
 "ERR-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeLibraryLoaderTests.cs::ALibraryWithAnotherAbiVersionIsRejected"
 "ERR-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ADrainBeforeAnyDemandReturnsNull"
-"LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ClosingAHandleTwiceClosesItOnce"
+"LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative"
 "LIFE-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds"
 "LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ABorrowedFrameViewExpiresWithItsScope"
 "LIFE-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::AnAbandonedHandleIsDisposedAndReportedAsALeak"
@@ -21,7 +21,6 @@
 "COMP-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::DiscardedCommandsAreFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACallbackIsRootedUntilNativeReleasesIt"
 "CB-02" = { na = "Native registrations strongly root their callbacks until release; a callback that captures its receiver needs explicit close" }
-"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
 "CB-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderExceptionIsContainedAndFailsTheRequest"
 "CB-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderCanAnswerLaterThroughItsDecisionHandle"
 "CB-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceTransformTests.cs::AScopedResponseExpiresWithItsCallbackAndRejectsOtherThreads"

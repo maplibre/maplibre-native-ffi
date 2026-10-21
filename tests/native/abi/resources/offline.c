@@ -740,10 +740,7 @@ typedef struct download_watch {
   mln_offline_region_status status;
 } download_watch;
 
-static bool download_completed(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
+static bool download_completed(const mln_runtime_event* event, void* context) {
   download_watch* watch = context;
   if (
     event->type != MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED ||

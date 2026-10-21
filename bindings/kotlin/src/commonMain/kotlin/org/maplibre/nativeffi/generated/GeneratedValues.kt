@@ -4465,9 +4465,10 @@ public data class RuntimeEvent(
    * for the per-type meaning.
    */
   public val code: Int = 0,
+  /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
+  public val message: String = "",
   /** Typed payload selected by payload_type. */
   public val payload: RuntimeEventPayload,
-  public val message: String = "",
 )
 
 /**

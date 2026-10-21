@@ -321,13 +321,18 @@ def decision_trampoline(values, callback, name, public):
         else callback_parameter_capture(values, p, locals_by_name[p.name])
         for p in arguments
     )
+    failure = (
+        f"sys::{callback.failure}"
+        if callback.failure.startswith("MLN_")
+        else callback.failure
+    )
     return f"""unsafe extern "C" fn {name}({raw_arguments}) -> {raw} {{
     let _scope = maplibre_core::callback::CallbackScope::enter();
-    let Ok(decision_handle) = {owner}::adopt({locals_by_name[decision.parameter]}, None) else {{ return u32::MAX; }};
+    let Ok(decision_handle) = {owner}::adopt({locals_by_name[decision.parameter]}, None) else {{ return {failure}; }};
     let request_state = std::sync::Arc::clone(&decision_handle.inner);
     // SAFETY: native keeps the registration alive throughout this callback.
     let state = unsafe {{ callback::state::<Self>({locals_by_name[callback.context]}) }};
-    let decision = callback::invoke("{callback.native}", u32::MAX, || Ok(callback::require(&state.{public})?({copies}).as_raw()));
+    let decision = callback::invoke("{callback.native}", {failure}, || Ok(callback::require(&state.{public})?({copies}).as_raw()));
     if decision != sys::{decision.accept} {{ request_state.hand_off(); }}
     decision
 }}"""

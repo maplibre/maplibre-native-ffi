@@ -9,7 +9,6 @@ class Values:
         self.bound = bound
         self.used: dict[str, ValuePlan] = {}
         self.directions: dict[str, set[str]] = {}
-        self.item_buffers = {}
 
     def scalar(self, value: ValuePlan) -> str:
         canonical = value.ctype.canonical
@@ -87,8 +86,6 @@ class Values:
             add(self, value)
             return self.public(value)
         if value.kind in {"reference", "array"}:
-            if value.item_buffer:
-                self.item_buffers[value.element.native] = value.item_buffer
             self.add(value.element, direction)
         if value.kind == "enum":
             self.used[value.native] = value

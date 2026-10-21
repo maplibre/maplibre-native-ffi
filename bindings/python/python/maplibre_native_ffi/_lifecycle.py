@@ -15,11 +15,6 @@ class NativeHandleMixin:
     _native: Any
 
     @property
-    def closed(self) -> bool:
-        """Return whether the private native handle has been closed."""
-        return bool(self._native.closed)
-
-    @property
     def id(self) -> int:
         """Return the native handle ID that runtime events report as a source.
 
@@ -29,7 +24,10 @@ class NativeHandleMixin:
         return int(self._native.id)
 
     def close(self) -> object:
-        """Release the private native handle exactly once.
+        """Release the private native handle.
+
+        Synchronous close is idempotent. Repeated asynchronous releases reach
+        native and report an invalid-state error.
 
         A handle whose release reports asynchronous teardown returns a future
         here. Leaving the ``with`` block discards it, so a host that must
@@ -52,7 +50,7 @@ class NativeHandleMixin:
         # Finalizers cannot report warning-delivery failures, including during
         # interpreter shutdown when Python globals may be partially torn down.
         with suppress(BaseException):
-            if not getattr(self, "closed", True):
+            if hasattr(self, "_native") and not self._native._is_closed:
                 warnings.warn(
                     f"{self._handle_name} was not explicitly closed",
                     ResourceWarning,

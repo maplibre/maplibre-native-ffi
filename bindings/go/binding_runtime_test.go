@@ -62,8 +62,7 @@ func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	}
 }
 
-// The layout of a native array or message range is checked before the binding
-// reads it.
+// Native arrays and buffer views are checked before the binding reads them.
 func TestNativeLayoutsAreChecked(t *testing.T) {
 	expect := func(want error, what string, call func()) {
 		t.Helper()
@@ -79,14 +78,11 @@ func TestNativeLayoutsAreChecked(t *testing.T) {
 		t.Fatalf("bindingElement(2) = %p, want %p", got, &storage[2])
 	}
 
-	arena := []byte("abcdef")
-	pointer := unsafe.Pointer(&arena[0])
-	expect(StatusNativeError, "an offset past the arena", func() { bindingArenaString(pointer, 6, 7, 0) })
-	expect(StatusNativeError, "a range past the arena", func() { bindingArenaString(pointer, 6, 4, 3) })
-	expect(StatusNativeError, "a message in a null arena", func() { bindingArenaString(nil, 6, 0, 1) })
 	expect(StatusNativeError, "bytes from a null buffer", func() { bindingBytes(nil, 1) })
-	if got := bindingArenaString(pointer, 6, 2, 3); got != "cde" {
-		t.Fatalf("bindingArenaString(2, 3) = %q, want cde", got)
+	expect(StatusNativeError, "text from a null buffer", func() { bindingString(nil, 1) })
+	text := []byte("abcdef")
+	if got := bindingString(unsafe.Pointer(&text[2]), 3); got != "cde" {
+		t.Fatalf("bindingString = %q, want cde", got)
 	}
 }
 

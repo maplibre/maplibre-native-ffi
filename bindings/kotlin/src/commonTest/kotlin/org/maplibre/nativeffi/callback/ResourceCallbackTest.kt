@@ -219,7 +219,7 @@ class ResourceCallbackTest {
             .exceptionOrNull()
       }
       assertEquals(null, answered, "answering after the callback returned")
-      assertTrue(request.isClosed)
+      assertFailsWithStatus(Status.INVALID_STATE) { request.complete(REWRITTEN_URL) }
       // The online source cannot load the rewritten scheme.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
       runtime.clearResourceTransform().awaitWithin("the transform clear")

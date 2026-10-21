@@ -46,10 +46,9 @@ struct EventDeliveryItem final : DeliveryItem {
 
   auto append(mln_runtime_event event, std::string_view message) -> void {
     message = event_message(message);
-    event.message_size = static_cast<uint32_t>(message.size());
-    event.message_offset = message.empty() ? 0 : messages.size();
+    event.message = mln_buffer_view{.data = nullptr, .size = message.size()};
     // Reserve both before changing their sizes. A failed reserve can move
-    // storage, so refresh the borrowed pointers on either exit.
+    // storage, so refresh the event span on either exit.
     try {
       if (events.size() == events.capacity()) {
         events.reserve(std::max(std::size_t{16}, events.size() * 2));
@@ -67,14 +66,23 @@ struct EventDeliveryItem final : DeliveryItem {
     refresh();
   }
 
+  // Finalize pointers after the item leaves the queue: appends can move the
+  // shared message storage while the item is still queued.
+  auto finalize() noexcept -> void {
+    auto offset = std::size_t{0};
+    for (auto& event : events) {
+      if (event.message.size == 0) continue;
+      event.message.data = messages.data() + offset;
+      offset += event.message.size + 1;
+    }
+  }
+
   auto refresh() noexcept -> void {
     batch_view = mln_event_batch_view{
       .size = sizeof(mln_event_batch_view),
       .event_size = sizeof(mln_runtime_event),
       .events = events.data(),
       .event_count = events.size(),
-      .messages = messages.empty() ? nullptr : messages.data(),
-      .messages_size = messages.size(),
     };
   }
 };
@@ -255,6 +263,8 @@ auto DeliveryQueueState::drain(mln_delivery_batch_view& view)
   }
   while (items != nullptr) {
     auto* next = std::exchange(items->next, nullptr);
+    if (items->view.type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS)
+      static_cast<EventDeliveryItem*>(items)->finalize();
     batch->views.push_back(items->view);
     batch->items.emplace_back(items);
     items = next;

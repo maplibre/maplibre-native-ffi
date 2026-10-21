@@ -6,10 +6,10 @@ internal static unsafe class RuntimeStructs
 {
     internal static string CopyUtf8(sbyte* pointer, nuint byteLength)
     {
-        if (pointer is null || byteLength == 0)
-        {
+        if (byteLength == 0)
             return string.Empty;
-        }
+        if (pointer is null)
+            throw new InvalidOperationException("Native string has null data with a nonzero size.");
 
         return Marshal.PtrToStringUTF8((nint)pointer, checked((int)byteLength)) ?? string.Empty;
     }

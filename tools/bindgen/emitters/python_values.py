@@ -94,7 +94,6 @@ class Values:
         self.defaults: set[str] = set()
         self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
-        self.item_buffers = {}
 
     def fail(self, plan: ValuePlan, reason: str) -> NoReturn:
         raise ModelError([f"Python: {plan.native}: {reason}"])
@@ -129,8 +128,6 @@ class Values:
         if plan.kind == "buffer" and plan.encoding in {"utf8", "bytes", "json"}:
             return
         if plan.kind in {"reference", "array"} and plan.element:
-            if plan.item_buffer:
-                self.item_buffers[plan.element.native] = plan.item_buffer
             self.supported(plan.element, input=input)
             return
         if plan.kind != "record":
@@ -309,10 +306,6 @@ class Values:
             item = self.copy(
                 plan.element, "element" if plan.stride else "*element", scope=scope
             )
-            if plan.item_buffer:
-                arena = plan.item_buffer
-                content = f"generated_arena_string({scope}.{rust_field(arena.data)}, {scope}.{rust_field(arena.size)}, element.{rust_field(arena.offset)}, element.{rust_field(arena.length)})?"
-                item = f'{{ let item = {item}; item.bind(py).cast::<PyDict>()?.set_item("{arena.field}", unsafe {{ {content} }})?; item }}'
             body = f"generated_list(py, {values}, |element| {ok(item)})?"
             if plan.nullable and plan.ctype.kind != "array":
                 body = optional_copy(f"!{expr}.is_null()", body)
@@ -551,9 +544,6 @@ class Values:
         rust, python = [], []
         fields, copies, public_copies = list(extra_fields), [], []
         for member, value, field in self.members(plan):
-            arena = self.item_buffers.get(name)
-            if arena and member in {arena.offset, arena.length}:
-                continue
             if value is None:
                 fields.append(f"    {member}: bool = False")
                 copies.append(
@@ -600,12 +590,6 @@ class Values:
             public_copies.append(
                 f"{member}={self.facade_copy(value, f'raw[{member!r}]')}"
             )
-        if arena := self.item_buffers.get(name):
-            fields.append(
-                f"    {arena.field}: str\n"
-                + docs.docstring(self.api.doc(f"{name}.{arena.field}"), "    ")
-            )
-            public_copies.append(f"{arena.field}=raw[{arena.field!r}]")
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"
             + docs.docstring(self.api.doc(name), "    ")

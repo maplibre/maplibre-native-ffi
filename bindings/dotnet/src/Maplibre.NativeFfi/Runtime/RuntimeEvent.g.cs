@@ -28,6 +28,9 @@ namespace Maplibre.NativeFfi;
 /// carries an <c>mln_camera_change_mode</c>, a MapLibre Native error ordinal,
 /// or 0. See <c>mln_runtime_event_type</c> for the per-type meaning.
 /// </param>
+/// <param name="Message">
+/// Borrowed UTF-8 message bytes, empty when this event carries no message.
+/// </param>
 /// <param name="Payload">
 /// Typed payload selected by payload_type.
 /// </param>
@@ -37,8 +40,8 @@ public readonly partial record struct RuntimeEvent(
     ulong Source,
     ulong Generation,
     int Code,
-    RuntimeEvent.PayloadValue Payload,
-    string Message
+    string Message,
+    RuntimeEvent.PayloadValue Payload
 )
 {
     public abstract record PayloadValue

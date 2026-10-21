@@ -56,7 +56,7 @@ def unsupported(function: Function | Record, reason: str) -> ModelError:
 
 # Members every handle owner defines. The release operation alone becomes
 # `close`; any other operation with one of these names would shadow a member.
-OWNER_MEMBERS = {"state", "closed", "close", "id"}
+OWNER_MEMBERS = {"state", "close", "id"}
 LOCAL_NAMES = {
     "self",
     "py",
@@ -299,9 +299,9 @@ def operation(
             f"        let handle = self.scope.pointer(self.native)? as *mut sys::{native_owner};"
         )
     elif plan.consumes or abandon:
-        closed = "completed_python_future(py)" if plan.completion else "Ok(py.None())"
+        idempotent = "false" if plan.completion else "true"
         setup += [
-            f"        let Some({'mut ' if plan.consumes else ''}reservation) = self.reserve()? else {{ return {closed}; }};",
+            f"        let Some({'mut ' if plan.consumes else ''}reservation) = self.reserve({idempotent})? else {{ return Ok(py.None()); }};",
             "        let mut handle = reservation.handle();"
             if receiver_pointer
             else "        let handle = reservation.handle();",
@@ -872,7 +872,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     files["python/maplibre_native_ffi/_native.pyi"] = (
         f"# {notice}\nfrom concurrent.futures import Future\nfrom typing import Any, Callable\nfrom ._completion import CommandCompletion\nfrom ._generated_values import *\n\n"
         + "\n".join(
-            f"class _{owner}:\n    closed: bool\n    id: int\n{''.join(methods)}"
+            f"class _{owner}:\n    _is_closed: bool\n    id: int\n{''.join(methods)}"
             for owner, methods in sorted(stubs.items())
             if owner
         )

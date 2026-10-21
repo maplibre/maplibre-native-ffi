@@ -10,7 +10,7 @@
 "ERR-03" = "A status that the C API declares as absence returns the language's empty form instead of an error"
 
 # Handle lifecycle
-"LIFE-01" = "Closing a handle twice is safe and the second close does nothing"
+"LIFE-01" = "A synchronous close is idempotent, and an asynchronous release reaches native even after close"
 "LIFE-02" = "A close the native side refuses leaves the handle usable, and a later close succeeds"
 "LIFE-03" = "A borrow in progress on another thread holds off a close until the borrow ends"
 "LIFE-04" = "An abandoned handle is disposed off the callback stack, and the leak is reported through the binding's public output"
@@ -28,7 +28,6 @@
 # Callbacks
 "CB-01" = "A callback registration is rooted while native holds it and released when native releases it, including when the registration is rejected"
 "CB-02" = "A registered callback does not keep its receiver alive"
-"CB-03" = "A call the admission policy forbids inside a callback fails, and an allowed one succeeds"
 "CB-04" = "An error thrown by a callback is contained and reported through the language's idiom"
 "CB-05" = "A resource provider can hand a request to a decision handle and answer it later"
 "CB-06" = "A scoped response object rejects use after its callback returns and use from another thread"

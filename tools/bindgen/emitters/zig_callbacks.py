@@ -120,7 +120,7 @@ def parts(values, value):
                 next(p.value for p in plan.parameters if p.name == decision.parameter)
             )
             decision_setup = f"const request = {request_type}.adopt({raw_request}); "
-            action = f"const result = {call} catch |err| {{ {report} return std.math.maxInt(u32); }}; {transfer}return result.toNative();"
+            action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return result.toNative();"
         ownership_setup = "var ownership_transferred = false; " if owned else ""
         body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):

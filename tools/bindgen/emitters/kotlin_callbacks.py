@@ -235,16 +235,11 @@ def callback_argument(parameter, values):
     raise Unsupported("callback argument requires another Kotlin rule")
 
 
-# The decision that a provider which throws answers. No decision has this
-# value, so native fails the request rather than pass it to the network.
-UNKNOWN_DECISION = "-1"
-
-
 def callback_site(site_name, callback_value, member, root_type, values):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
     decision = callback.decision
-    failure = UNKNOWN_DECISION if decision else failure_literal(callback, values)
+    failure = failure_literal(callback, values)
     result = carrier(callback.result, values)
     parameters = []
     for parameter in callback.parameters:

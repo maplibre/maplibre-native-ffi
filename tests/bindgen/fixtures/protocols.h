@@ -502,21 +502,12 @@ typedef enum mln_delivery_type : uint32_t {
 
 #ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
 // A callback registration that native may decline through an output. The
-// cancel callback's owner is a ticket it borrows, so it may call back only into
-// the ticket that registers it.
+// cancel callback borrows the ticket that registers it.
 typedef unsigned long long mln_ticket
   BIND("kind=handle;release=mln_ticket_release");
 typedef void (*mln_ticket_release_context)(void* context);
-#ifdef MLN_PROTOCOL_DECISION
-#define MLN_PROTOCOL_TICKET_CALLS                                \
-  "mln_ticket_answer,mln_ticket_cancelled,mln_ticket_on_cancel," \
-  "mln_ticket_release"
-#else
-#define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
-#endif
 typedef void (*mln_ticket_cancel)(void* context, mln_ticket ticket) BIND(
-  "reentry=protocol;reentry_owner=ticket;"
-  "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS
+  "borrowed_owner=ticket"
 );
 typedef struct mln_ticket_cancel_handler {
   unsigned int size;
@@ -546,12 +537,8 @@ typedef struct mln_ticket_response {
   unsigned code;
 } mln_ticket_response;
 typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticket) BIND(
-  "enum=mln_decision;failure=MLN_DECISION_"
-  "DELEGATE;" MLN_PROTOCOL_TICKET_DELIVERY
-  "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM;"
-  "decision_pass=MLN_DECISION_DELEGATE;"
-  "complete=mln_ticket_answer;cancelled=mln_ticket_cancelled;"
-  "cancel_registration=mln_ticket_on_cancel"
+  "enum=mln_decision;failure=4294967295;" MLN_PROTOCOL_TICKET_DELIVERY
+  "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM"
 );
 typedef struct mln_ticket_provider {
   mln_ticket_provider_callback callback;

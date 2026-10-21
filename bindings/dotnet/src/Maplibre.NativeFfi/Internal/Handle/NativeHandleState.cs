@@ -25,7 +25,8 @@ internal sealed unsafe class NativeHandleState<T>
     private readonly object? retainedParent;
     private readonly bool protectsCopies;
     private bool closed;
-    private bool copying;
+    private int readers;
+    private bool releasing;
 
     internal NativeHandleState(
         T handle,
@@ -103,8 +104,12 @@ internal sealed unsafe class NativeHandleState<T>
     {
         if (protectsCopies)
         {
-            Monitor.Enter(gate);
-            copying = true;
+            lock (gate)
+            {
+                if (releasing)
+                    throw InUse();
+                readers++;
+            }
         }
         return new(this, owner);
     }
@@ -117,8 +122,8 @@ internal sealed unsafe class NativeHandleState<T>
         {
             if (state.protectsCopies)
             {
-                state.copying = false;
-                Monitor.Exit(state.gate);
+                lock (state.gate)
+                    state.readers--;
             }
             GC.KeepAlive(owner);
         }
@@ -131,34 +136,22 @@ internal sealed unsafe class NativeHandleState<T>
         GC.SuppressFinalize(this);
     }
 
-    internal void Close() => Release(destroy);
+    internal void Close(bool idempotent = true) => Release(destroy, idempotent);
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);
 
-    internal void Release(StatusDestroy<T> release)
-    {
-        if (!protectsCopies)
-        {
-            ReleaseCore(release);
-            return;
-        }
-        lock (gate)
-        {
-            if (copying)
-                throw new MaplibreException(
-                    global::Maplibre.NativeFfi.Status.InvalidState,
-                    "Batch is in use"
-                );
-            ReleaseCore(release);
-        }
-    }
+    private static MaplibreException InUse() =>
+        new(global::Maplibre.NativeFfi.Status.InvalidState, "Batch is in use");
 
-    private void ReleaseCore(StatusDestroy<T> release)
+    internal void Release(StatusDestroy<T> release, bool idempotent = true)
     {
         lock (gate)
         {
-            if (closed)
+            if (protectsCopies && (readers != 0 || releasing))
+                throw InUse();
+            if (idempotent && closed)
                 return;
+            releasing = protectsCopies;
         }
         try
         {
@@ -170,6 +163,8 @@ internal sealed unsafe class NativeHandleState<T>
         }
         finally
         {
+            lock (gate)
+                releasing = false;
             GC.KeepAlive(retainedParent);
         }
     }

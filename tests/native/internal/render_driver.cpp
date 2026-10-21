@@ -550,6 +550,102 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
   destroy_fixture(fixture);
 }
 
+// Scheduler service may drain results, but cannot take a demand submitted
+// after the work that changes its target extent.
+void scheduler_service_preserves_a_forced_demand_after_a_resize() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  static_cast<void>(mln_test_render_until_idle(
+    fixture.runtime, fixture.map, &fixture.render, nullptr
+  ));
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  const auto live = mln::core::lease_render_session(fixture.render.session);
+  live->scheduler.schedule([] {});
+  auto resize = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.render.session, mln_logical_extent{32, 48, 1.0}, &resize.descriptor,
+    nullptr
+  ));
+  mln_test_render_request_forced(&fixture.render, 201);
+  MLN_TEST_OK(mln_test_map_fence(fixture.map));
+  MLN_TEST_OK(blocker.finish(fixture.render));
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &resize)
+  );
+  mln_test_completion_destroy(&resize);
+  const auto batch = wait_for_results(fixture, 1);
+  TEST_ASSERT_EQUAL_UINT64(201, batch_result(batch, 0).token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, batch_result(batch, 0).disposition
+  );
+  mln_render_frame_batch_release(batch);
+  destroy_fixture(fixture);
+}
+
+struct ConcurrentResize {
+  mln_render_session session;
+  mln_logical_extent extent;
+  mln_test_completion* completion;
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void submit_concurrent_resize(void* context) {
+  auto& submission = *static_cast<ConcurrentResize*>(context);
+  submission.status = mln_render_session_resize(
+    submission.session, submission.extent, &submission.completion->descriptor,
+    nullptr
+  );
+}
+
+void concurrent_resizes_publish_matching_map_and_driver_extents() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto first = mln_test_completion_default(0);
+  auto second = mln_test_completion_default(0);
+  auto a = ConcurrentResize{fixture.render.session, {32, 48, 1.0}, &first};
+  auto b = ConcurrentResize{fixture.render.session, {48, 32, 1.0}, &second};
+  points.hold(SyncPoint::RenderExtentPublished);
+  auto* submitting_a = mln_test_thread_start(submit_concurrent_resize, &a);
+  TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderExtentPublished, 1));
+  auto* submitting_b = mln_test_thread_start(submit_concurrent_resize, &b);
+  TEST_ASSERT_TRUE(
+    points.wait_for_hits(SyncPoint::RenderExtentSubmissionStarted, 2)
+  );
+  points.release(SyncPoint::RenderExtentPublished);
+  mln_test_thread_join(submitting_a);
+  mln_test_thread_join(submitting_b);
+  MLN_TEST_OK(a.status);
+  MLN_TEST_OK(b.status);
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &first)
+  );
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &second)
+  );
+  mln_test_completion_destroy(&first);
+  mln_test_completion_destroy(&second);
+  auto map = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
+  auto session =
+    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(fixture.map, &map, nullptr));
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.render.session, &session, nullptr)
+  );
+  TEST_ASSERT_EQUAL_UINT32(b.extent.width, map.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(b.extent.height, map.logical_extent.height);
+  TEST_ASSERT_EQUAL_UINT32(map.logical_extent.width, session.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(map.logical_extent.height, session.extent.height);
+  mln_test_render_request_forced(&fixture.render, 202);
+  const auto batch = wait_for_results(fixture, 1);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, batch_result(batch, 0).disposition
+  );
+  mln_render_frame_batch_release(batch);
+  destroy_fixture(fixture);
+}
+
 // Requests a forced frame for a case that holds the call that renders it
 // after the call publishes its result: the window in which a host that acted
 // on the result reaches abandon before the call ends, which no public fence
@@ -1329,6 +1425,8 @@ MLN_TEST_GROUP {
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(if_needed_demands_supersede_and_forced_demands_render);
   RUN_TEST(supersession_preserves_a_forced_demand_after_a_resize);
+  RUN_TEST(scheduler_service_preserves_a_forced_demand_after_a_resize);
+  RUN_TEST(concurrent_resizes_publish_matching_map_and_driver_extents);
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);

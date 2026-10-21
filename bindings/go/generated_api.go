@@ -2608,7 +2608,6 @@ func copyEventBatchView(raw C.mln_event_batch_view) EventBatchView {
 		for i := range result {
 			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
 			result[i] = copyRuntimeEvent(item)
-			result[i].Message = bindingArenaString(unsafe.Pointer(raw.messages), uint64(raw.messages_size), uint64(item.message_offset), uint64(item.message_size))
 		}
 		return result
 	}()
@@ -4630,9 +4629,10 @@ type RuntimeEvent struct {
 	// carries an mln_camera_change_mode, a MapLibre Native error ordinal, or 0. See
 	// mln_runtime_event_type for the per-type meaning.
 	Code int32
+	// Borrowed UTF-8 message bytes, empty when this event carries no message.
+	Message string
 	// Typed payload selected by payload_type.
 	Payload RuntimeEventPayload
-	Message string
 }
 
 func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
@@ -4642,6 +4642,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.Source = uint64(raw.source)
 	result.Generation = uint64(raw.generation)
 	result.Code = int32(raw.code)
+	result.Message = bindingString(raw.message.data, uint64(raw.message.size))
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
@@ -9299,7 +9300,7 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 
 //export mlnGo_mln_resource_provider_callback
 func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request_info, native_handle C.mln_resource_request) (result C.uint32_t) {
-	result = ^C.uint32_t(0)
+	result = 4294967295
 	request := adoptResourceRequestHandle(uint64(native_handle), nil)
 	defer func() {
 		if uint32(result) != uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
@@ -9310,7 +9311,7 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_provider_callback", failure)
-			result = ^C.uint32_t(0)
+			result = 4294967295
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceProvider](native_user_data)

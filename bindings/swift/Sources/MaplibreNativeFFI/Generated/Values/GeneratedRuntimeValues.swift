@@ -74,16 +74,7 @@ public struct EventBatchView: Equatable, Hashable, Sendable {
       raw.events,
       count: raw.event_count,
       stride: raw.event_size
-    ) { item, bytes in try RuntimeEvent(
-      raw: item,
-      recordBytes: bytes,
-      message: NativeInputArena.copyUTF8Slice(
-        data: raw.messages,
-        size: raw.messages_size,
-        offset: item.message_offset,
-        length: item.message_size
-      )
-    ) }
+    ) { item, bytes in try RuntimeEvent(raw: item, recordBytes: bytes) }
   }
 }
 
@@ -606,19 +597,17 @@ private func invokeResourceProviderCallback(
   request: UnsafePointer<mln_resource_request_info>?,
   handle: mln_resource_request
 ) -> UInt32 {
-  guard let user_data
-  else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
+  guard let user_data else { return 4_294_967_295 }
   let box = Unmanaged<GeneratedCallbackBox<ResourceProvider>>
     .fromOpaque(user_data).takeUnretainedValue()
   guard let decisionOwner = try? ResourceRequestHandle(adopting: handle)
-  else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
+  else { return 4_294_967_295 }
   do { let decision = try box.value.callback?(
     NativeInputArena.copyArray(request, count: 1)
       .map { try ResourceRequestInfo(raw: $0) }[0],
     decisionOwner
-  ) ??
-    ResourceProviderDecision(rawValue: MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
-      .rawValue); if decision.rawValue != MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+  ) ?? ResourceProviderDecision(rawValue: 4_294_967_295); if decision
+    .rawValue != MLN_RESOURCE_PROVIDER_DECISION_HANDLE
     .rawValue
   {
     decisionOwner.handle.handOff()
@@ -627,7 +616,7 @@ private func invokeResourceProviderCallback(
     reportToStandardError(
       "mln_resource_provider_callback failed and native received its fallback: \(error)\n"
     ); decisionOwner
-      .handle.handOff(); return UInt32.max
+      .handle.handOff(); return 4_294_967_295
   }
 }
 
@@ -1102,7 +1091,6 @@ public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
-  public var message: String
   /// One of `mln_runtime_event_type`.
   public var type: RuntimeEventType
   /// One of `mln_runtime_event_source_type`.
@@ -1116,6 +1104,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
   /// 0. See `mln_runtime_event_type` for the per-type meaning.
   public var code: Int32
+  /// Borrowed UTF-8 message bytes, empty when this event carries no message.
+  public var message: String
   /// Typed payload selected by payload_type.
   public var payload: RuntimeEventPayload
   public static var `default`: Self {
@@ -1123,34 +1113,36 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 
   public init(
-    message: String = "",
     type: RuntimeEventType = .init(rawValue: 0),
     sourceType: RuntimeEventSourceType = .init(rawValue: 0),
     source: UInt64 = 0,
     generation: UInt64 = 0,
     code: Int32 = 0,
+    message: String = "",
     payload: RuntimeEventPayload = .default
   ) {
-    self.message = message
     self.type = type
     self.sourceType = sourceType
     self.source = source
     self.generation = generation
     self.code = code
+    self.message = message
     self.payload = payload
   }
 
   init(
     raw: mln_runtime_event,
-    recordBytes: UnsafeRawBufferPointer? = nil,
-    message: String = ""
+    recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
-    self.message = message
     type = RuntimeEventType(rawValue: raw.type)
     sourceType = RuntimeEventSourceType(rawValue: raw.source_type)
     source = raw.source
     generation = raw.generation
     code = raw.code
+    message = try NativeString.copyUTF8(
+      data: raw.message.data,
+      size: raw.message.size
+    )
     payload = try { () throws -> RuntimeEventPayload in
       switch raw
         .payload_type

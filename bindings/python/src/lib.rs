@@ -488,12 +488,6 @@ where
     Ok(future)
 }
 
-fn completed_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let future = new_python_future(py)?;
-    future.call_method1("set_result", (py.None(),))?;
-    Ok(future.unbind())
-}
-
 fn py_none(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(native_error("unit completion returned a value"));

@@ -480,8 +480,7 @@ typedef union mln_runtime_event_payload {
 /**
  * One delivered runtime event.
  *
- * Events have a fixed stride and hold no pointers, so a host can copy a whole
- * batch with one memory copy.
+ * Message bytes are borrowed for the callback or delivery batch lifetime.
  *
  * Step through an array of these by mln_event_batch_view.event_size rather
  * than by the size of this struct: a later version may add a member to
@@ -525,16 +524,8 @@ typedef struct mln_runtime_event {
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
   uint32_t payload_type MLN_BINDING("enum=mln_runtime_event_payload_type");
-  /**
-   * Byte offset of this event's message inside
-   * mln_event_batch_view.messages. Zero when message_size is 0.
-   */
-  uint64_t message_offset;
-  /**
-   * Number of message bytes, excluding the trailing null terminator that
-   * follows them in the arena. Zero when this event carries no message.
-   */
-  uint32_t message_size;
+  /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
+  mln_buffer_view message;
   /** Typed payload selected by payload_type. */
   mln_runtime_event_payload payload MLN_BINDING(
     "tag=payload_type;empty_variant=MLN_RUNTIME_EVENT_PAYLOAD_NONE"
@@ -556,21 +547,10 @@ typedef struct mln_event_batch_view {
    */
   uint32_t event_size;
   /** Borrowed array of event_count events in queue order. */
-  const mln_runtime_event* events MLN_BINDING(
-    "length=event_count;stride=event_size;item_name=message;"
-    "item_buffer=messages;item_buffer_size=messages_size;"
-    "item_offset=message_offset;item_length=message_size;"
-    "item_encoding=utf8"
-  );
+  const mln_runtime_event* events
+    MLN_BINDING("length=event_count;stride=event_size");
   /** Number of events in events. */
   size_t event_count;
-  /**
-   * Borrowed message arena holding every event's message bytes, each followed
-   * by a null terminator. Null when messages_size is 0.
-   */
-  const char* messages MLN_BINDING("length=messages_size;encoding=bytes");
-  /** Number of bytes in messages, including every terminator. */
-  size_t messages_size;
 } mln_event_batch_view;
 
 /**
@@ -812,17 +792,12 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
  *
  * The callback and user_data must be thread-safe. The C API invokes
  * release_user_data after the final callback returns. url and out_response are
- * borrowed for the callback duration. Callback implementations call only
- * mln_http_header_transform_response_set_header() and return promptly. A non-OK
+ * borrowed for the callback duration. Callbacks return promptly and must not
+ * wait for work that only their own thread can advance. A non-OK
  * result discards every header collected during the invocation and lets the
  * request proceed unchanged.
  */
-MLN_BINDING(
-  "failure=MLN_STATUS_NATIVE_ERROR;"
-  "reentry=protocol;"
-  "reentry_owner=out_response;"
-  "reentry_calls=mln_http_header_transform_response_set_header"
-)
+MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
 typedef mln_status (*mln_http_header_transform_callback)(
   void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
   const char* url,
@@ -986,10 +961,8 @@ typedef struct mln_resource_response {
  *   be called from any thread.
  * - Providers must release handled request handles after they no longer need to
  *   complete or observe cancellation.
- * - The callback must be thread-safe, return quickly, and must not call map or
- *   runtime C API functions.
- * - The callback may call resource request handle functions for the provided
- *   handle.
+ * - The callback must be thread-safe and return quickly. It may call the C API,
+ *   but must not wait for runtime work that only its own thread can advance.
  * - The C API invokes release_user_data after the final callback returns.
  *
  * A provider in queue mode answers MLN_RESOURCE_PROVIDER_DECISION_HANDLE
@@ -998,23 +971,10 @@ typedef struct mln_resource_response {
  */
 MLN_BINDING(
   "enum=mln_resource_provider_decision;"
-  "failure=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
+  "failure=4294967295;"
   "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST;"
   "decision_handle=handle;"
-  "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
-  "decision_pass=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
-  "complete=mln_resource_request_complete;"
-  "resume=mln_resource_request_pass_through;"
-  "cancelled=mln_resource_request_is_cancelled;"
-  "cancel_registration=mln_resource_request_set_cancel_callback;"
-  "reentry=protocol;"
-  "reentry_owner=handle;"
-  "reentry_calls="
-  "mln_resource_request_complete,"
-  "mln_resource_request_pass_through,"
-  "mln_resource_request_is_cancelled,"
-  "mln_resource_request_set_cancel_callback,"
-  "mln_resource_request_release"
+  "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE"
 )
 typedef uint32_t (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request_info* request,
@@ -1029,9 +989,9 @@ typedef uint32_t (*mln_resource_provider_callback)(
  * is the runtime's native scheduler thread when a committed map or runtime
  * command discards the request, such as a style change or map destruction, and
  * a MapLibre worker thread otherwise; it is never a host thread. The callback
- * must be thread-safe, return quickly, and must not call map or runtime C API
- * functions. It may call resource request handle functions for the cancelled
- * handle, including mln_resource_request_release().
+ * must be thread-safe and return quickly. It may call the C API, including
+ * mln_resource_request_release(), but must not wait for runtime work that only
+ * its own thread can advance.
  *
  * handle is the cancelled request, borrowed for the callback; the provider's
  * own reference to it is unchanged.
@@ -1041,14 +1001,7 @@ typedef uint32_t (*mln_resource_provider_callback)(
  */
 MLN_BINDING(
   "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL;"
-  "reentry=protocol;"
-  "reentry_owner=handle;"
-  "reentry_calls="
-  "mln_resource_request_complete,"
-  "mln_resource_request_pass_through,"
-  "mln_resource_request_is_cancelled,"
-  "mln_resource_request_set_cancel_callback,"
-  "mln_resource_request_release"
+  "borrowed_owner=handle"
 )
 typedef void (*mln_resource_request_cancel_callback)(
   void* user_data, mln_resource_request handle

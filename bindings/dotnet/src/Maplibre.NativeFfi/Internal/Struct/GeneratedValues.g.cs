@@ -548,17 +548,7 @@ internal static unsafe class GeneratedValues
         {
             var record = (byte*)value.events + checked((nuint)index * value.event_size);
             var item = *(mln_runtime_event*)record;
-            if (
-                item.message_offset > value.messages_size
-                || item.message_size > value.messages_size - item.message_offset
-                || (item.message_size != 0 && value.messages == null)
-            )
-                throw new InvalidOperationException("Invalid native item buffer.");
-            var message = RuntimeStructs.CopyUtf8(
-                (byte*)value.messages + item.message_offset,
-                item.message_size
-            );
-            copied[index] = CopyRuntimeEvent(item, message, record, value.event_size);
+            copied[index] = CopyRuntimeEvent(item, record, value.event_size);
         }
         return copied;
     }
@@ -1657,12 +1647,16 @@ internal static unsafe class GeneratedValues
         {
             var record = (byte*)value.results + checked((nuint)index * value.result_size);
             var item = *(mln_render_frame_result*)record;
-            copied[index] = CopyRenderFrameResult(item);
+            copied[index] = CopyRenderFrameResult(item, record, value.result_size);
         }
         return copied;
     }
 
-    internal static RenderFrameResult CopyRenderFrameResult(mln_render_frame_result value) =>
+    internal static RenderFrameResult CopyRenderFrameResult(
+        mln_render_frame_result value,
+        byte* record = null,
+        nuint recordSize = 0
+    ) =>
         new(
             (RenderResult)value.disposition,
             value.token,
@@ -1825,8 +1819,7 @@ internal static unsafe class GeneratedValues
                     CopyResourceRequestInfo(NativeCallScope.Read(request)),
                     owned
                 )
-                ?? (ResourceProviderDecision)
-                    mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+                ?? (ResourceProviderDecision)4294967295;
             if (
                 decision
                 != (ResourceProviderDecision)
@@ -1840,7 +1833,7 @@ internal static unsafe class GeneratedValues
             NativeCallbackFailure.Report("mln_resource_provider_callback", error);
             if (owned is not null)
                 ((INativeOwner<MlnResourceRequest>)owned).State.HandOff();
-            return unchecked((uint)(-1));
+            return unchecked((uint)(4294967295));
         }
     }
 
@@ -2032,7 +2025,6 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeEvent CopyRuntimeEvent(
         mln_runtime_event value,
-        string message = "",
         byte* record = null,
         nuint recordSize = 0
     ) =>
@@ -2042,6 +2034,7 @@ internal static unsafe class GeneratedValues
             value.source,
             value.generation,
             value.code,
+            RuntimeStructs.CopyUtf8((sbyte*)value.message.data, value.message.size),
             value.payload_type switch
             {
                 (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME =>
@@ -2094,8 +2087,7 @@ internal static unsafe class GeneratedValues
                                     )
                         )
                 ),
-            },
-            message
+            }
         );
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]

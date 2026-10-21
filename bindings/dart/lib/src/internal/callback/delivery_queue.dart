@@ -78,24 +78,15 @@ final class DeliveryRegistration {
   final int token;
   final Zone zone = Zone.current;
   final Map<int, DeliveryHandler> handlers;
-  final _retired = Completer<void>();
 
   /// Runs once native code retires the registration, or the binding retires
   /// one that native code refused.
   void Function()? onRetired;
 
-  /// Whether the registration has retired.
-  bool get closed => _retired.isCompleted;
-
-  /// Completes once the registration retires.
-  Future<void> get released => _retired.future;
-
   /// Retires a registration that native code refused.
   void reject() => _queue._retire(token);
 
   void _finish() {
-    if (_retired.isCompleted) return;
-    _retired.complete();
     onRetired?.call();
   }
 }
@@ -223,8 +214,9 @@ final class DeliveryQueue implements Finalizable {
           );
           if (status == nativeStatusNativeError) {
             // The deliveries stay queued. A pending completion may get no
-            // later push to wake the queue, so drain again on the next turn.
-            Timer.run(_drain);
+            // later push to wake the queue. Back off so persistent allocation
+            // failure leaves the isolate free to run other work.
+            Timer(const Duration(milliseconds: 50), _drain);
             return false;
           }
           if (status != nativeStatusOk) return false;

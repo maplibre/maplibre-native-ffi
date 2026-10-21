@@ -37,7 +37,7 @@ void a_failed_event_append_keeps_the_published_events_readable() {
   const auto& events = *view.deliveries[0].payload.runtime_events.events;
   TEST_ASSERT_TRUE(threw);
   TEST_ASSERT_EQUAL_size_t(1, events.event_count);
-  TEST_ASSERT_EQUAL_STRING("first", events.messages);
+  TEST_ASSERT_EQUAL_STRING("first", events.events[0].message.data);
   mln::delivery::release_delivery_batch(batch);
   queue.push_event(event, "later", nullptr);
   TEST_ASSERT_EQUAL_INT(2, wakes.load());

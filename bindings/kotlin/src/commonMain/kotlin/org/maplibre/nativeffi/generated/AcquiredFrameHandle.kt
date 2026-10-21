@@ -24,9 +24,6 @@ internal constructor(
   public val id: ULong
     get() = binding.handle.toULong()
 
-  public val isClosed: Boolean
-    get() = binding.isReleased
-
   public override fun close() {
     release()
   }

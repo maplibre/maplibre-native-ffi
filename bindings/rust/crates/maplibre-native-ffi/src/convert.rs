@@ -456,29 +456,6 @@ unsafe fn strided_values<T: Copy>(
     Ok(unsafe { maplibre_core::ptr::strided_records(pointer, count, stride) }?.collect())
 }
 
-/// Copies a UTF-8 range from a native batch's shared message storage.
-///
-/// # Safety
-/// The data pointer must address `size` readable bytes.
-pub(crate) unsafe fn arena_string<P>(
-    data: *const P,
-    size: impl TryInto<usize>,
-    offset: impl TryInto<usize>,
-    count: impl TryInto<usize>,
-) -> Result<String> {
-    let (offset, count) = (length(offset)?, length(count)?);
-    let end = offset
-        .checked_add(count)
-        .ok_or_else(|| Error::invalid_argument("native message range overflow"))?;
-    // SAFETY: the caller guarantees size readable bytes.
-    let bytes = unsafe { slice(data.cast::<u8>(), length(size)?) }?;
-    let value = bytes
-        .get(offset..end)
-        .ok_or_else(|| Error::invalid_argument("native message range is outside its batch"))?;
-    String::from_utf8(value.to_vec())
-        .map_err(|_| Error::invalid_argument("native message is invalid UTF-8"))
-}
-
 /// Declares an open C enum: one variant per known value, and `$unknown` for a
 /// value this binding predates, which converts back unchanged.
 macro_rules! native_enum {
@@ -645,8 +622,10 @@ mod tests {
             event.source = 0xabcd_0000_0000_0000 | index as u64;
             event.generation = 0x1_0000_0000 + index as u64;
             event.payload_type = payload_type;
-            event.message_offset = offset;
-            event.message_size = length;
+            event.message = sys::mln_buffer_view {
+                data: messages.as_ptr().wrapping_add(offset).cast(),
+                size: length,
+            };
             // SAFETY: the storage holds a full stride for every event, and the
             // write does not rely on its alignment.
             unsafe {
@@ -663,8 +642,6 @@ mod tests {
         raw.event_size = stride as u32;
         raw.events = storage.as_ptr().cast();
         raw.event_count = events.len();
-        raw.messages = messages.as_ptr().cast();
-        raw.messages_size = messages.len();
 
         // SAFETY: every pointer in the view addresses the storage above.
         let view = unsafe { crate::EventBatchView::from_native(raw) }.unwrap();

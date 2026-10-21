@@ -11,12 +11,6 @@ class Values:
         self.used = {}
         self.attachments = {}
         self.views = {}
-        self.item_buffers = {
-            field.value.element.native: field.value.item_buffer
-            for value in bound.values.values()
-            for field in value.fields
-            if field.value.item_buffer and field.value.element
-        }
 
     def public(self, value):
         from .swift_dynamic_values import public

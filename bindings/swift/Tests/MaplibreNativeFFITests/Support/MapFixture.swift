@@ -100,11 +100,28 @@ final class MapFixture: Sendable {
   /// Closes the map, if the test left it open, and then the runtime, waiting
   /// for native teardown so no native thread outlives the test.
   func close() async {
-    do { try await map.close() } catch {
+    do {
+      if try isLive({ _ = try map.getSnapshot() }) {
+        try await map.close()
+      }
+    } catch {
       Issue.record("closing the fixture map failed: \(error)")
     }
-    do { try await runtime.close() } catch {
+    do {
+      if try isLive({ _ = try runtime.getEventMask() }) {
+        try await runtime.close()
+      }
+    } catch {
       Issue.record("closing the fixture runtime failed: \(error)")
+    }
+  }
+
+  private func isLive(_ probe: () throws -> Void) throws -> Bool {
+    do {
+      try probe()
+      return true
+    } catch let error as MaplibreError where error.status == .invalidState {
+      return false
     }
   }
 

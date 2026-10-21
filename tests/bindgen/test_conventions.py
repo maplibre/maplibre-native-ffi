@@ -79,8 +79,8 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         bound = compile_api(parse(REGISTRATION))
         notify = bound.callbacks["notify"]
         self.assertEqual(
-            (notify.failure, notify.reentry, notify.context),
-            ("contain", "allow", "context"),
+            (notify.failure, notify.context),
+            ("contain", "context"),
         )
         message = notify.parameters[1].value
         self.assertEqual(
@@ -151,33 +151,14 @@ void use_options(const options *value);
 typedef enum decision : unsigned { PASS = 0, TAKE = 1 } decision;
 typedef unsigned long long request BIND("kind=handle;release=request_close");
 void request_close(request value);
-typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;failure=PASS;ANNOTATION");
+typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;failure=PASS");
 """
-        # A list names each function, so one absent entry fails.
-        with self.assertRaisesRegex(
-            ModelError, "reentry_calls names an absent function 'missing'"
-        ):
-            validate(
-                parse(
-                    source.replace(
-                        "ANNOTATION",
-                        "reentry=protocol;reentry_owner=handle;"
-                        "reentry_calls=request_close,missing",
-                    )
-                )
-            )
         with self.assertRaisesRegex(
             ModelError, "release names an absent function 'missing'"
         ):
-            validate(
-                parse(
-                    source.replace(";ANNOTATION", "").replace(
-                        "release=request_close", "release=missing"
-                    )
-                )
-            )
+            validate(parse(source.replace("release=request_close", "release=missing")))
 
-    def test_a_callback_that_borrows_its_owner_calls_back_into_its_receiver(
+    def test_a_callback_borrows_its_registration_receiver(
         self,
     ):
         source = """
@@ -185,7 +166,7 @@ typedef unsigned long long request BIND("kind=handle;release=request_close");
 typedef unsigned long long other BIND("kind=handle;release=other_close");
 void request_close(request value);
 void other_close(other value);
-typedef void (*cancel)(void *context, request owner) BIND("reentry=protocol;reentry_owner=owner;reentry_calls=request_close");
+typedef void (*cancel)(void *context, request owner) BIND("borrowed_owner=owner");
 typedef void (*release)(void *context);
 typedef struct watcher { unsigned size; cancel callback; void *context BIND("kind=context"); release retire; } watcher BIND("kind=callback_registration;release=retire");
 mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diagnostic);
@@ -194,9 +175,9 @@ mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diag
         self.assertTrue(bound.values["watcher"].registration.receiver_owned)
         for before, after, error in (
             (
-                "reentry_owner=owner",
-                "reentry_owner=missing",
-                "reentry_owner names an absent parameter 'missing'",
+                "borrowed_owner=owner",
+                "borrowed_owner=missing",
+                "borrowed_owner names an absent parameter 'missing'",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):

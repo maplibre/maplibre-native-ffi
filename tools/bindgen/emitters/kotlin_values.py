@@ -160,7 +160,6 @@ class Values:
         self.abi = Abi(bound.source)
         self.used = {}
         self.views = set()
-        self.item_buffers = {}
         self.multiple = {}
         self.attachments = {}
         self.writers = {}
@@ -199,13 +198,9 @@ class Values:
                 "tag",
                 "context",
                 "stride",
-                "arena",
                 "delivery_queue",
             }
         }
-        if value.native in self.item_buffers:
-            arena = self.item_buffers[value.native]
-            controls |= {arena.offset, arena.length}
         controls |= {
             f.presence.mask for f in value.fields if f.presence and f.presence.mask
         }
@@ -232,8 +227,6 @@ class Values:
         if value.kind == "buffer" and (value.buffer_form == "view" or value.length):
             return
         if value.kind == "array" and value.element:
-            if value.item_buffer:
-                self.item_buffers[value.element.native] = value.item_buffer
             if value.element.kind not in {"record", "buffer", "scalar", "enum"}:
                 raise Unsupported("array element needs a Kotlin storage rule")
             self.check(value.element)
@@ -417,23 +410,6 @@ class Values:
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"
                     + (" = " + default if default is not None else "")
-                )
-            if value.native in self.item_buffers:
-                arena = self.item_buffers[value.native]
-                typed.append(
-                    (
-                        identifier(arena.field),
-                        "String" if arena.encoding == "utf8" else "ByteArray",
-                    )
-                )
-                args.append(
-                    doc(self.bound, f"{value.native}.{arena.field}", "  ")
-                    + f"  public val {identifier(arena.field)}: "
-                    + (
-                        'String = ""'
-                        if arena.encoding == "utf8"
-                        else "ByteArray = byteArrayOf()"
-                    )
                 )
             args.extend(
                 f"{doc(self.bound, flag.name, '  ')}  public val {self.flag_name(value, flag)}: Boolean = false"
@@ -827,13 +803,6 @@ class Values:
         parameters = "source: Long"
         if scoped:
             parameters += ", scope: ViewScope? = null"
-        if value.native in self.item_buffers:
-            item = self.item_buffers[value.native]
-            parameters += ", message: " + (
-                'String = ""'
-                if item.encoding == "utf8"
-                else "ByteArray = byteArrayOf()"
-            )
         locals = []
         for field in value.fields:
             if field.role == "presence_mask":
@@ -841,14 +810,6 @@ class Values:
                 locals.append(
                     f"val {identifier(field.name)} = read{suffix}({self.at('source', value, field.name)})"
                 )
-        for field in self.fields(value):
-            if field.value.item_buffer:
-                item = field.value.item_buffer
-                local = identifier(field.name)
-                locals.append(
-                    f"val {local}Data = readAddress({self.at('source', value, item.data)})"
-                )
-                locals.append(f"val {local}Size = {self.read_count(value, item.size)}")
         arguments = []
         for flag in value.mask_flags:
             arguments.append(
@@ -863,10 +824,6 @@ class Values:
             if presence and presence.mask:
                 decoded = f"if ({self.present('source', value, presence.mask, presence.bit)}) {decoded} else null"
             arguments.append(f"{member} = {decoded}")
-        if value.native in self.item_buffers:
-            arguments.append(
-                f"{identifier(self.item_buffers[value.native].field)} = message"
-            )
         body = f"{public}(" + ", ".join(arguments) + ")"
         if scoped:
             body += ".also { it.bindingScope = scope }"
@@ -896,36 +853,16 @@ class Values:
             element = value.element
             if value.stride:
                 stride = self.read_count(record, value.stride)
-                item = self.decode_item(
-                    element, "item", value.item_buffer, record, identifier(field.name)
-                )
+                item = self.decode_item(element, "item")
                 return f"readStrided({pointer}, {count}, {stride}, {self.element_size(element)}) {{ item -> {item} }}"
-            item = self.decode_item(element, "item", None, record)
+            item = self.decode_item(element, "item")
             return f"readArray({pointer}, {count}, {self.element_size(element)}.toLong()) {{ item -> {item} }}"
         return self.decode(value, address, scope)
 
-    def decode_item(self, element, address, item_buffer, record, local=None):
+    def decode_item(self, element, address):
         if element.kind == "buffer":
             return self.decode(element, address)
-        reader = self.read(element)
-        if not item_buffer:
-            return f"{reader}({address})"
-        data = local + "Data"
-        size = local + "Size"
-        offset = self.item_count(element, address, item_buffer.offset)
-        length = self.item_count(element, address, item_buffer.length)
-        message = f"readItem({data}, {size}, {offset}, {length})"
-        if item_buffer.encoding == "utf8":
-            message += ".decodeToString()"
-        return f"{reader}({address}, {message})"
-
-    def item_count(self, element, address, path):
-        """An item field's offset or length, read as a ULong."""
-        value = self.field_plan(element, path).value
-        decoded = self.decode(value, self.at(address, element, path))
-        if value.kind != "scalar":
-            return f"({decoded}).toULong()"
-        return decoded if self.accessor(value)[1] == "ULong" else f"{decoded}.toULong()"
+        return f"{self.read(element)}({address})"
 
     def read_count(self, record, path):
         field = self.field_plan(record, path)

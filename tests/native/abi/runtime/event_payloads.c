@@ -108,10 +108,10 @@ static void log_drain_quietly(mln_runtime runtime, event_log* log) {
       recorded_event* record = &log->events[log->count];
       log->count += 1;
       record->event = *event;
-      const size_t length = event->message_size < sizeof(record->message) - 1
-                              ? event->message_size
+      const size_t length = event->message.size < sizeof(record->message) - 1
+                              ? event->message.size
                               : sizeof(record->message) - 1;
-      memcpy(record->message, batch.messages + event->message_offset, length);
+      if (length != 0) memcpy(record->message, event->message.data, length);
       record->message[length] = '\0';
     }
   }
@@ -322,10 +322,10 @@ static void check_event_against_row(
     );
   }
   if (row->message == MESSAGE_NONE) {
-    TEST_ASSERT_EQUAL_UINT32(0, event->message_size);
-    TEST_ASSERT_EQUAL_UINT64(0, event->message_offset);
+    TEST_ASSERT_EQUAL_UINT32(0, event->message.size);
+    TEST_ASSERT_NULL(event->message.data);
   } else {
-    TEST_ASSERT_GREATER_THAN_UINT32(0, event->message_size);
+    TEST_ASSERT_GREATER_THAN_UINT32(0, event->message.size);
     if (row->expected_message != NULL) {
       TEST_ASSERT_EQUAL_STRING(row->expected_message, record->message);
     }

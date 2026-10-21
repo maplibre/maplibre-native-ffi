@@ -58,10 +58,7 @@ static void request_next(replacement_wait* wait) {
   wait->pending = true;
 }
 
-static bool note_settlement(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
+static bool note_settlement(const mln_runtime_event* event, void* context) {
   replacement_wait* wait = context;
   if (event->generation < wait->generation) return false;
   TEST_ASSERT_NOT_EQUAL_UINT32(

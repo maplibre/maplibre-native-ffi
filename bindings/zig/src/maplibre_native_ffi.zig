@@ -884,11 +884,7 @@ pub const EventBatchView = struct {
                 const copied = try allocator.alloc(RuntimeEvent, raw.event_count);
                 for (0..raw.event_count) |index| {
                     const item = try marshal.stridedAt(c.mln_runtime_event, raw.events, raw.event_count, raw.event_size, index);
-                    copied[index] = blk_item: {
-                        var converted = try RuntimeEvent.fromNative(allocator, item);
-                        converted.message = try marshal.copyArenaString(allocator, raw.messages, raw.messages_size, item.message_offset, item.message_size);
-                        break :blk_item converted;
-                    };
+                    copied[index] = try RuntimeEvent.fromNative(allocator, item);
                 }
                 break :blk copied;
             },
@@ -3214,7 +3210,7 @@ pub const ResourceProvider = struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_provider_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_provider_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_provider_callback, 2)) status.Error!marshal.CallbackResult(c.mln_resource_provider_callback) {
                 const state = callback.Registration(ResourceProvider).get(callback_arg_0);
                 const host = state.value.callback orelse {
-                    return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+                    return 4294967295;
                 };
                 const request = ResourceRequest.adopt(callback_arg_2);
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
@@ -3222,13 +3218,13 @@ pub const ResourceProvider = struct {
                 const allocator = arena.allocator();
                 const result = host(state.value.context, try ResourceRequestInfo.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), request) catch |err| {
                     callback.reportError("mln_resource_provider_callback", err);
-                    return std.math.maxInt(u32);
+                    return 4294967295;
                 };
                 return result.toNative();
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2) catch |err| {
             callback.reportError("mln_resource_provider_callback", err);
-            return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+            return 4294967295;
         };
     }
 };
@@ -3525,7 +3521,6 @@ pub const ResourceUsage = enum(u32) {
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEvent = struct {
-    message: []const u8 = &.{},
     /// One of `mln_runtime_event_type`.
     type: RuntimeEventType = std.mem.zeroes(RuntimeEventType),
     /// One of `mln_runtime_event_source_type`.
@@ -3539,18 +3534,19 @@ pub const RuntimeEvent = struct {
     /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
     /// 0. See `mln_runtime_event_type` for the per-type meaning.
     code: i32 = std.mem.zeroes(i32),
+    /// Borrowed UTF-8 message bytes, empty when this event carries no message.
+    message: []const u8 = &.{},
     /// Typed payload selected by payload_type.
     payload: RuntimeEventPayload = .{ .unknown = 0 },
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event) status.Error!RuntimeEvent {
-        _ = allocator;
         return .{
-            .message = &.{},
             .type = RuntimeEventType.fromNative(raw.type),
             .source_type = RuntimeEventSourceType.fromNative(raw.source_type),
             .source = raw.source,
             .generation = raw.generation,
             .code = raw.code,
+            .message = try marshal.copyView(allocator, raw.message),
             .payload = switch (raw.payload_type) {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => .{ .render_frame = RuntimeEventRenderFrame.fromNative(raw.payload.render_frame) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => .{ .render_map = RuntimeEventRenderMap.fromNative(raw.payload.render_map) },

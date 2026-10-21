@@ -216,8 +216,6 @@ internal unsafe struct mln_event_batch_view
     public uint event_size;
     public mln_runtime_event* events;
     public nuint event_count;
-    public sbyte* messages;
-    public nuint messages_size;
 }
 
 internal unsafe struct mln_feature_state_selector
@@ -813,8 +811,7 @@ internal unsafe struct mln_runtime_event
     public ulong generation;
     public int code;
     public uint payload_type;
-    public ulong message_offset;
-    public uint message_size;
+    public mln_buffer_view message;
     public mln_runtime_event_payload payload;
 }
 

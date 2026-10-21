@@ -232,7 +232,7 @@ def completion_query(
         public = public_type(native)
         copy = (
             f"static value => Copy{public}(value)"
-            if native in values.item_buffers
+            if native in values.strided_records
             else f"Copy{public}"
         )
         if shape == "array":
@@ -346,7 +346,7 @@ def emit_operation(
             (
                 method(
                     "public Task CloseAsync()",
-                    ["state.Close();", "return teardown;"],
+                    ["state.Close(idempotent: false);", "return teardown;"],
                 )
                 + "\n    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
                 + method(

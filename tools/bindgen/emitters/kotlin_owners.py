@@ -96,8 +96,9 @@ def owner(bound, native, plans):
             "   */\n"
             "  public val id: ULong get() = binding.handle.toULong()"
         ),
-        "  public val isClosed: Boolean get() = binding.isReleased",
     ]
+    if native in {"mln_map", "mln_render_session"}:
+        body.append("  public val isClosed: Boolean get() = binding.isReleased")
     if closes and not closes.inherited:
         body.append(
             f"  public override fun close() {{ {closes.method}() }}"

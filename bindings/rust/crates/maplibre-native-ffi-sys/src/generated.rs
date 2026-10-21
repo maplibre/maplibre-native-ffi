@@ -622,8 +622,6 @@ pub struct mln_event_batch_view {
     pub event_size: u32,
     pub events: *const mln_runtime_event,
     pub event_count: usize,
-    pub messages: *const std::ffi::c_char,
-    pub messages_size: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1189,8 +1187,7 @@ pub struct mln_runtime_event {
     pub generation: u64,
     pub code: i32,
     pub payload_type: u32,
-    pub message_offset: u64,
-    pub message_size: u32,
+    pub message: mln_buffer_view,
     pub payload: mln_runtime_event_payload,
 }
 #[repr(C)]

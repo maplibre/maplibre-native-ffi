@@ -19,7 +19,8 @@ Register each configuration on the runtime.
 
 Callbacks can run concurrently on native threads. Protect shared state and
 return quickly. Keep registered callback state reachable until native code
-releases it. Release host locks that callbacks acquire before closing the runtime.
+releases it. Release host locks that callbacks acquire before closing the
+runtime.
 
 ## Rewrite a URL
 
@@ -64,11 +65,7 @@ Register the transform, and clear or replace it when credentials change.
 ### Platform support
 
 Header transforms are unavailable on OpenHarmony and in the browser. Use a
-provider there. <Code code={region(providerSnippet, "pass-through")} lang="c" title="resource-provider.c" />
-
-A queue provider can also pass through a request after draining and taking its
-handle. Routes reduce queue traffic; the host still decides whether to serve
-each routed request. A released queue or failed request copy fails the request.
+provider there.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html)
 covers redirect handling and the request paths that bypass transforms.
@@ -95,8 +92,9 @@ loading its resources.
 
 For asynchronous I/O, retain the request handle, complete it when the bytes
 arrive, and release it after completion or cancellation. If host lookup declines
-the request later, pass its handle to native loading and then release it. A cancelled request no
-longer needs a response; use a cancel callback to stop an in-flight fetch.
+the request later, pass its handle to native loading and then release it. A
+cancelled request no longer needs a response; use a cancel callback to stop an
+in-flight fetch.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 

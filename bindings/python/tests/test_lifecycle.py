@@ -17,21 +17,25 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
 
     with mln.runtime_create() as runtime:
         with result(runtime.create_map()) as map_handle:
-            assert not map_handle.closed
-        assert map_handle.closed
-        assert result(map_handle.close()) is None
+            assert map_handle.get_snapshot() is not None
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            result(map_handle.close())
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,
         ):
             map_handle.get_snapshot()
-    assert runtime.closed
-    runtime.close()
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
+        runtime.close()
 
     data = mln.geojson_source_data_create(b'{"type":"FeatureCollection","features":[]}')
     data.close()
     data.close()
-    assert data.closed
 
 
 def test_a_handle_id_names_its_events_and_outlives_close(
@@ -52,11 +56,13 @@ def test_a_refused_close_leaves_the_handle_usable(
         harness.runtime.close()
     assert raised.value.status == mln.Status.INVALID_STATE
 
-    assert not harness.runtime.closed
     assert result(harness.runtime.clear_resource_transform()) is None
     result(map_handle.close())
     result(harness.runtime.close())
-    assert harness.runtime.closed
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
+        harness.runtime.get_event_mask()
 
 
 def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(

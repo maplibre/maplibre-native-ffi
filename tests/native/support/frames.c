@@ -128,9 +128,8 @@ typedef struct idle_wait {
 
 // Idle ends the wait. Each finished frame's statistics replace the ones before.
 static bool record_idle_or_stats(
-  const mln_runtime_event* event, const char* messages, void* context
+  const mln_runtime_event* event, void* context
 ) {
-  (void)messages;
   idle_wait* wait = context;
   if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
     wait->idle = true;

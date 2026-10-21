@@ -228,15 +228,13 @@ mln_status create(const settings *options, mln_diagnostic *out_diagnostic);
         self.assertEqual(api.values["signals"].registration.release, "retire")
         self.assertEqual(api.callbacks["notify"].context, "state")
 
-    def test_strided_items_resolve_their_message_arena(self):
+    def test_strided_items_resolve_borrowed_message_views(self):
         source = """
-typedef struct item { unsigned int offset; unsigned int count; } item;
+typedef struct item { mln_buffer_view message; } item;
 typedef struct batch {
  unsigned int stride;
- const item *items BIND("length=count;stride=stride;item_name=message;item_buffer=bytes;item_buffer_size=byte_count;item_offset=offset;item_length=count;item_encoding=utf8");
+ const item *items BIND("length=count;stride=stride");
  unsigned int count;
- const char *bytes BIND("length=byte_count;encoding=bytes");
- unsigned int byte_count;
 } batch;
 mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
@@ -262,8 +260,8 @@ mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
         self.assertEqual(
             next(
                 f.value for f in callbacks.values["batch"].fields if f.name == "items"
-            ).item_buffer,
-            value.item_buffer,
+            ).element,
+            value.element,
         )
         with self.assertRaisesRegex(ModelError, "input reconstruction contract"):
             bind(
@@ -277,20 +275,10 @@ mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
             )
         roles = {field.name: field.role for field in api.values["batch"].fields}
         self.assertEqual(roles["stride"], "stride")
-        self.assertEqual(roles["bytes"], "arena")
-        self.assertEqual(roles["byte_count"], "count")
-        self.assertEqual(
-            (value.item_buffer.field, value.item_buffer.data, value.item_buffer.offset),
-            ("message", "bytes", "offset"),
-        )
+        self.assertEqual(value.element.fields[0].value.kind, "buffer")
         with self.assertRaisesRegex(ModelError, "stride requires"):
             bind(
                 self.parse(source.replace("stride=stride", "stride=missing")),
-                require_complete=True,
-            )
-        with self.assertRaisesRegex(ModelError, "absent storage"):
-            bind(
-                self.parse(source.replace("item_offset=offset", "item_offset=missing")),
                 require_complete=True,
             )
 
@@ -519,7 +507,7 @@ typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
 typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
-typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel");
+typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("accepted_unless=cancelled") mln_status on_cancel(
@@ -530,20 +518,9 @@ void release_request(request value);
         decision = model.callbacks["provider"].decision
         assert decision is not None
         self.assertEqual(
-            (decision.parameter, decision.accept, decision.complete),
-            ("ticket", "CLAIM", "answer"),
+            (decision.parameter, decision.accept),
+            ("ticket", "CLAIM"),
         )
-        self.assertIsNone(decision.resume)
-        resumed = (
-            source.replace("complete=answer;", "complete=answer;resume=resume_request;")
-            + "\nmln_status resume_request(request value, mln_diagnostic *out_diagnostic);\n"
-        )
-        resumed_decision = (
-            bind(self.parse(resumed), require_complete=True)
-            .callbacks["provider"]
-            .decision
-        )
-        self.assertEqual(resumed_decision.resume, "resume_request")
         self.assertEqual(decision.handle.release_consumes, "always")
         (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
@@ -551,8 +528,11 @@ void release_request(request value);
             ("release", "cancelled"),
         )
         for before, after, error in (
-            ("decision_accept=CLAIM", "decision_accept=DELEGATE", "distinct values"),
-            ("complete=answer", "complete=is_missing", "immediate status operation"),
+            (
+                "decision_accept=CLAIM",
+                "decision_accept=MISSING",
+                "decision_accept must name",
+            ),
             (
                 "decision_handle=ticket",
                 "decision_handle=absent",
@@ -757,10 +737,10 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
             ("release", "cancelled"),
         )
         # The cancel callback borrows its owner, which the host never
-        # receives, so it calls back only into the ticket that registers it.
+        # receives because the registration already retains that owner.
         callback = model.callbacks["mln_ticket_cancel"]
         self.assertEqual(
-            (callback.reentry_policy.owner_parameter,),
+            (callback.borrowed_owner,),
             ("ticket",),
         )
         self.assertEqual(callback.arguments, ())

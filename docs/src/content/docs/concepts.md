@@ -21,17 +21,16 @@ ready; it must return promptly without blocking or waiting for the receiver.
 Each callback's API reference states its threading and reentry rules.
 
 Some hosts, such as Dart isolates and JavaScript engines, run host code on their
-own event loop. Such a host sets a
+own event loop. Every registration whose callback the host need not answer on a
+native thread accepts a
 [delivery queue](/maplibre-native-ffi/reference/c/delivery_8h.html) in place of
-the callback of a completion, the event handler, the log handler, or a resource
-provider. Native code then answers any decision itself, copies the payload into
-the queue, and wakes the host, which drains the copies on its own event loop.
-Transforms must answer inside the call, so they take native rules instead of a
-callback, and a resource provider takes routes that choose which requests reach
-it. Queue delivery finishes when native code inserts the result or discards it
-after queue release. Runtime shutdown can finish before the host drains those
-deliveries. The host retains its delivery tokens until it handles or abandons
-them.
+its callback. Native code copies the payload into the queue and wakes the host,
+which drains the copies on its own event loop. Only the HTTP header transform
+requires an answer inside the call, so it takes native rules for these hosts. A
+resource provider takes routes that choose which requests reach it. Queue
+delivery finishes when native code inserts the result or discards it after queue
+release. Runtime shutdown can finish before the host drains those deliveries.
+The host retains its delivery tokens until it handles or abandons them.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) covers
 runtime options and shutdown. The

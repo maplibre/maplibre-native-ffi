@@ -91,9 +91,7 @@ def sources(values, plan):
             if ret == "void"
             else "result = "
             + (
-                f"^{values.c_type(callback.result)}(0)"
-                if callback.decision
-                else "C." + callback.failure
+                "C." + callback.failure
                 if callback.failure.startswith("MLN_")
                 else callback.failure
             )

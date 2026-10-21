@@ -66,15 +66,6 @@ pub fn stridedAt(comptime T: type, pointer: ?[*]const T, count: usize, stride: u
     return @as(*align(1) const T, @ptrCast(bytes + index * stride)).*;
 }
 
-pub fn copyArenaString(allocator: std.mem.Allocator, pointer: ?[*]const u8, size: usize, raw_offset: anytype, raw_length: anytype) status.Error![]const u8 {
-    const offset = std.math.cast(usize, raw_offset) orelse return error.NativeError;
-    const length = std.math.cast(usize, raw_length) orelse return error.NativeError;
-    if (offset > size or length > size - offset) return error.NativeError;
-    if (length == 0) return &.{};
-    const bytes = pointer orelse return error.NativeError;
-    return allocator.dupe(u8, bytes[offset..][0..length]);
-}
-
 pub fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Error![]const u8 {
     if (raw.size == 0) return &.{};
     if (raw.size > std.math.maxInt(isize)) return error.NativeError;

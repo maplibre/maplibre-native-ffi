@@ -29,7 +29,6 @@
 "COMP-06" = "bindings/dart/test/completion_test.dart::discarded commands are fenced and synchronous rejection throws"
 "CB-01" = "bindings/dart/test/queue_registration_test.dart::a callback root is released by a removal, a map close, or a refusal"
 "CB-02" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
-"CB-03" = { na = "Every Dart callback runs from a drained delivery after the native call has returned, so no binding call can run inside a native callback and the binding has no admission policy" }
 "CB-04" = "bindings/dart/test/resource_provider_test.dart::a provider callback error reaches its zone and fails the request"
 "CB-05" = "bindings/dart/test/resource_provider_test.dart::a provider answers a request after its callback returns"
 "CB-06" = { na = "The Dart binding exposes no scoped response object: the header transform is a native rule table, and providers and resource transforms answer through transferable handles (CB-05, CB-11)" }

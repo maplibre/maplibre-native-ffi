@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
+using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -9,20 +12,92 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class HandleLifecycleTests
 {
     [Fact]
-    public async Task ClosingAHandleTwiceClosesItOnce()
+    public async Task SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
 
         await map.CloseAsync();
-        await map.CloseAsync();
-        await map.DisposeAsync();
+        Assert.Equal(
+            Status.InvalidState,
+            Assert
+                .Throws<MaplibreException>(() =>
+                {
+                    _ = map.CloseAsync();
+                })
+                .Status
+        );
+        Assert.Equal(
+            Status.InvalidState,
+            Assert
+                .Throws<MaplibreException>(() =>
+                {
+                    _ = map.DisposeAsync();
+                })
+                .Status
+        );
+        map.Dispose();
+        map.Dispose();
 
-        var teardown = runtime.CloseAsync();
-        var again = runtime.CloseAsync();
-        await teardown;
-        await again;
+        await runtime.CloseAsync();
+        Assert.Equal(
+            Status.InvalidState,
+            Assert
+                .Throws<MaplibreException>(() =>
+                {
+                    _ = runtime.CloseAsync();
+                })
+                .Status
+        );
         runtime.Dispose();
+        runtime.Dispose();
+    }
+
+    [Fact]
+    public async Task BorrowedCopiesAllowReadersAndRefuseConcurrentRelease()
+    {
+        var state = CreateCopyProtectedState();
+        using var entered = new SemaphoreSlim(0);
+        using var leave = new SemaphoreSlim(0);
+        var elapsed = Stopwatch.StartNew();
+        var reader = Task.Run(
+            () =>
+            {
+                using var read = state.Read(state);
+                entered.Release();
+                TestWaits.Wait(leave, elapsed, "the borrowed copy to finish");
+            },
+            TestWaits.Token
+        );
+        try
+        {
+            await TestWaits.WaitAsync(entered, elapsed, "the borrowed copy to start");
+            Assert.Equal(
+                Status.InvalidState,
+                Assert.Throws<MaplibreException>(() => state.Close()).Status
+            );
+            ReadAgain(state);
+        }
+        finally
+        {
+            leave.Release();
+            await reader;
+        }
+        state.Close();
+    }
+
+    private static unsafe NativeHandleState<MlnRuntime> CreateCopyProtectedState() =>
+        new(
+            SyntheticHandles.Runtime(1),
+            (_, _) => mln_status.MLN_STATUS_OK,
+            "test batch",
+            protectsCopies: true
+        );
+
+    private static void ReadAgain(NativeHandleState<MlnRuntime> state)
+    {
+        using var read = state.Read(state);
+        Assert.Equal(SyntheticHandles.Runtime(1), read.Handle);
     }
 
     [Fact]

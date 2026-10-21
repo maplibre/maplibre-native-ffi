@@ -56,7 +56,6 @@ class Values:
         self.enums = {}
         self.inputs = set()
         self.unions = {}
-        self.arenas = {}
         self.views = {}
 
     def fail(self, value, reason):
@@ -83,8 +82,6 @@ class Values:
             if value.encoding not in {"utf8", "bytes", "json"}:
                 self.fail(value, "buffer requires encoding")
         elif value.kind in {"reference", "array"} and value.element:
-            if value.item_buffer:
-                self.arenas[value.element.native] = value.item_buffer
             self.require(value.element, input)
         elif value.kind == "record":
             members = list(self.members(value))
@@ -152,9 +149,6 @@ class Values:
     def members(self, value):
         for f in value.fields:
             if not f.public:
-                continue
-            arena = self.arenas.get(value.native)
-            if arena and f.name in {arena.offset, arena.length}:
                 continue
             yield (
                 name(f.name),
@@ -226,11 +220,7 @@ class Values:
                 else f"unsafe.Sizeof(*{source})"
             )
             copy = self.copy(elem, "item")
-            enrichment = ""
-            if value.item_buffer:
-                arena = value.item_buffer
-                enrichment = f"result[i].{name(arena.field)} = bindingArenaString(unsafe.Pointer({scope}.{native_identifier(arena.data)}), uint64({scope}.{native_identifier(arena.size)}), uint64(item.{native_identifier(arena.offset)}), uint64(item.{native_identifier(arena.length)}));"
-            return f"func() {output} {{ {f'if {source} == nil {{ return nil }}; ' if value.nullable else ''}length := bindingLength(uint64({count})); result := make({output}, length); for i := range result {{ item := *(*C.{ctype})(bindingElement(unsafe.Pointer({source}), i, uint64({stride}), unsafe.Sizeof(*{source}), unsafe.Alignof(*{source}))); result[i] = {copy}; {enrichment} }}; return result }}()"
+            return f"func() {output} {{ {f'if {source} == nil {{ return nil }}; ' if value.nullable else ''}length := bindingLength(uint64({count})); result := make({output}, length); for i := range result {{ item := *(*C.{ctype})(bindingElement(unsafe.Pointer({source}), i, uint64({stride}), unsafe.Sizeof(*{source}), unsafe.Alignof(*{source}))); result[i] = {copy}; }}; return result }}()"
         if value.kind == "union":
             tag = f"{scope}.{native_identifier(value.tag)}"
             arms = []
@@ -411,11 +401,6 @@ class Values:
                         doc(self.api, f"{native}.{member}", None)
                         + f"{name(member)} {signature(self, callback)}"
                     )
-            if arena := self.arenas.get(native):
-                fields.append(
-                    doc(self.api, f"{native}.{arena.field}", None)
-                    + f"{name(arena.field)} string"
-                )
             body = (
                 "\n" + "\n".join(fields) + "\n"
                 if any("//" in field for field in fields)

@@ -56,7 +56,7 @@ typedef enum MLN_BINDING(
  * Takes or returns the host's lock on the queue that a session shares with it.
  * Native code relies on the lock being held or released when the call returns.
  */
-MLN_BINDING("reentry=forbid;synchronous=true")
+MLN_BINDING("synchronous=true")
 typedef void (*mln_queue_lock_callback)(void* user_data);
 
 /**

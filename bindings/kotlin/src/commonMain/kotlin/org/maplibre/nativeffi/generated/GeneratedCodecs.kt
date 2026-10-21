@@ -1845,25 +1845,18 @@ internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
-internal fun readEventBatchView(source: Long): EventBatchView {
-  val eventsData = readAddress(source + w(16, 24))
-  val eventsSize = readSize(source + w(20, 32))
-  return EventBatchView(
+internal fun readEventBatchView(source: Long): EventBatchView =
+  EventBatchView(
     events =
       readStrided(
         readAddress(source + 8),
         readSize(source + w(12, 16)),
         readU32(source + 4).toULong(),
-        120,
+        w(112, 120),
       ) { item ->
-        readRuntimeEvent(
-          item,
-          readItem(eventsData, eventsSize, readU64(item + 32), readU32(item + 40).toULong())
-            .decodeToString(),
-        )
+        readRuntimeEvent(item)
       },
   )
-}
 
 internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
@@ -2072,36 +2065,36 @@ internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
 internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
   allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
-internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent =
+internal fun readRuntimeEvent(source: Long): RuntimeEvent =
   RuntimeEvent(
     type = RuntimeEventType(readU32(source)),
     sourceType = RuntimeEventSourceType(readU32(source + 4)),
     source = readU64(source + 8),
     generation = readU64(source + 16),
     code = readI32(source + 24),
+    message = readViewString(source + 32),
     payload =
       readU32(source + 28).let { tag ->
         when (tag) {
-          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + 48))
-          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + 48))
-          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 48))
+          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48)))
+          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + w(40, 48)))
+          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48)))
           5u ->
             RuntimeEventPayload.OfflineRegionStatus(
-              readRuntimeEventOfflineRegionStatus(source + 48),
+              readRuntimeEventOfflineRegionStatus(source + w(40, 48)),
             )
           6u ->
             RuntimeEventPayload.OfflineRegionResponseError(
-              readRuntimeEventOfflineRegionResponseError(source + 48),
+              readRuntimeEventOfflineRegionResponseError(source + w(40, 48)),
             )
           7u ->
             RuntimeEventPayload.OfflineRegionTileCountLimit(
-              readRuntimeEventOfflineRegionTileCountLimit(source + 48),
+              readRuntimeEventOfflineRegionTileCountLimit(source + w(40, 48)),
             )
           0u -> RuntimeEventPayload.None
-          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
+          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + w(40, 48), 72))
         }
       },
-    message = message,
   )
 
 internal fun readResourceRange(source: Long): ResourceRange =

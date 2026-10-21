@@ -22,9 +22,7 @@ typedef struct style_outcome {
 
 // Accepts the map's style-loaded event, or its loading failure with the
 // message copied out.
-static bool style_settled(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
+static bool style_settled(const mln_runtime_event* event, void* context) {
   style_outcome* outcome = context;
   if (event->source != outcome->map) {
     return false;
@@ -35,12 +33,11 @@ static bool style_settled(
   }
   if (
     event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED &&
-    event->message_size < outcome->capacity
+    event->message.size < outcome->capacity
   ) {
-    memcpy(
-      outcome->message, messages + event->message_offset, event->message_size
-    );
-    outcome->message[event->message_size] = '\0';
+    if (event->message.size != 0)
+      memcpy(outcome->message, event->message.data, event->message.size);
+    outcome->message[event->message.size] = '\0';
     return true;
   }
   return false;

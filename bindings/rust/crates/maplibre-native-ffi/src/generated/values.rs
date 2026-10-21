@@ -1116,21 +1116,7 @@ pub struct EventBatchView {
 impl FromNative<sys::mln_event_batch_view> for EventBatchView {
     unsafe fn from_native(raw: sys::mln_event_batch_view) -> Result<Self> {
         Ok(Self {
-            events: unsafe { convert::strided_items(raw.events, raw.event_count, raw.event_size) }?
-                .into_iter()
-                .map(|item| -> Result<RuntimeEvent> {
-                    let mut value: RuntimeEvent = unsafe { from_native(item) }?;
-                    value.message = unsafe {
-                        convert::arena_string(
-                            raw.messages,
-                            raw.messages_size,
-                            item.message_offset,
-                            item.message_size,
-                        )
-                    }?;
-                    Ok(value)
-                })
-                .collect::<Result<Vec<_>>>()?,
+            events: unsafe { convert::copy_strided(raw.events, raw.event_count, raw.event_size) }?,
         })
     }
 }
@@ -4302,12 +4288,12 @@ impl ResourceProvider {
     ) -> u32 {
         let _scope = maplibre_core::callback::CallbackScope::enter();
         let Ok(decision_handle) = ResourceRequestHandle::adopt(handle, None) else {
-            return u32::MAX;
+            return 4294967295;
         };
         let request_state = std::sync::Arc::clone(&decision_handle.inner);
         // SAFETY: native keeps the registration alive throughout this callback.
         let state = unsafe { callback::state::<Self>(user_data) };
-        let decision = callback::invoke("mln_resource_provider_callback", u32::MAX, || {
+        let decision = callback::invoke("mln_resource_provider_callback", 4294967295, || {
             Ok(callback::require(&state.callback)?(
                 unsafe { convert::copy_reference(request) }?,
                 decision_handle,
@@ -4691,7 +4677,6 @@ pub enum ResourceUsage: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RuntimeEvent {
-    pub message: String,
     /// One of `mln_runtime_event_type`.
     pub r#type: RuntimeEventType,
     /// One of `mln_runtime_event_source_type`.
@@ -4705,18 +4690,20 @@ pub struct RuntimeEvent {
     /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
     /// 0. See `mln_runtime_event_type` for the per-type meaning.
     pub code: i32,
+    /// Borrowed UTF-8 message bytes, empty when this event carries no message.
+    pub message: String,
     /// Typed payload selected by payload_type.
     pub payload: RuntimeEventPayload,
 }
 impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
     unsafe fn from_native(raw: sys::mln_runtime_event) -> Result<Self> {
         Ok(Self {
-            message: String::new(),
             r#type: unsafe { from_native(raw.type_) }?,
             source_type: unsafe { from_native(raw.source_type) }?,
             source: raw.source,
             generation: raw.generation,
             code: raw.code,
+            message: unsafe { from_native(raw.message) }?,
             payload: match raw.payload_type {
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => {
                     RuntimeEventPayload::RenderFrame(unsafe {

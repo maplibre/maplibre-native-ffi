@@ -359,7 +359,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task CloseAsync()
     {
-        state.Close();
+        state.Close(idempotent: false);
         return teardown;
     }
 

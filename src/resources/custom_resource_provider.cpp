@@ -369,12 +369,10 @@ void fail_locked(
 void queue_request_cancel(
   void* registration, mln_resource_request handle
 ) noexcept {
-  static_cast<void>(
-    static_cast<const mln::delivery::QueuedRegistration*>(registration)
-      ->push<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
-        mln_resource_request_cancel_delivery{.handle = handle}
-      )
-  );
+  static_cast<mln::delivery::QueuedRegistration*>(registration)
+    ->push_reserved<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
+      mln_resource_request_cancel_delivery{.handle = handle}
+    );
 }
 
 // Runs the registered cancel callback, if any, for a request that has not been
@@ -748,6 +746,9 @@ auto set_resource_request_cancel_callback(
   if (queue != nullptr) {
     registration = std::make_unique<mln::delivery::QueuedRegistration>(
       std::move(queue), handler->user_data
+    );
+    registration->reserve<MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL>(
+      mln_resource_request_cancel_delivery{.handle = handle}
     );
   }
   const std::scoped_lock lock(live->mutex);

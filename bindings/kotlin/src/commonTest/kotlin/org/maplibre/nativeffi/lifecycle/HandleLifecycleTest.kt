@@ -31,11 +31,10 @@ class HandleLifecycleTest {
     val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
     data.close()
     data.close()
-    assertTrue(data.isClosed)
 
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     runtime.release().awaitWithin("the runtime teardown")
-    assertTrue(runtime.isClosed)
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
     // Native refuses a released handle, whether to release it again or to use it.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.clearResourceTransform() }
@@ -49,12 +48,12 @@ class HandleLifecycleTest {
     // Native refuses to release a runtime with a live map, so the call throws and the runtime
     // stays usable.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
-    assertFalse(runtime.isClosed)
+    runtime.getEventMask()
     runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")
-    assertTrue(runtime.isClosed)
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
   }
 
   @Test

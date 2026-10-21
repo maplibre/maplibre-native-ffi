@@ -210,6 +210,54 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
   );
 }
 
+void a_queued_cancel_precedes_retirement_when_allocations_fail() {
+  auto loop = mln::util::RunLoop{};
+  auto handle = mln_resource_request{MLN_HANDLE_NULL};
+  auto request = mln::core::request_custom_resource(
+    mln::Resource::style("custom://queued-cancel"), "custom://queued-cancel",
+    [](
+      void* data, const mln_resource_request_info*, mln_resource_request value
+    ) -> uint32_t {
+      *static_cast<mln_resource_request*>(data) = value;
+      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    },
+    &handle, [](const mln::Response&) {},
+    [](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
+      return nullptr;
+    }
+  );
+  auto queue = mln_delivery_queue{MLN_HANDLE_NULL};
+  const auto options =
+    mln_delivery_queue_options{.size = sizeof(mln_delivery_queue_options)};
+  MLN_TEST_OK(mln_delivery_queue_create(&options, &queue, nullptr));
+  const auto handler = mln_resource_request_cancel_handler{
+    .size = sizeof(mln_resource_request_cancel_handler), .queue = queue
+  };
+  auto cancelled = false;
+  MLN_TEST_OK(mln_resource_request_set_cancel_callback(
+    handle, &handler, &cancelled, nullptr
+  ));
+  TEST_ASSERT_FALSE(cancelled);
+  {
+    const auto faults = mln::native_tests::AllocationFaults{};
+    request.reset();
+  }
+  auto batch = mln_delivery_batch{MLN_HANDLE_NULL};
+  auto view = mln_delivery_batch_view{.size = sizeof(mln_delivery_batch_view)};
+  MLN_TEST_OK(mln_delivery_queue_drain(queue, &batch, &view, nullptr));
+  TEST_ASSERT_EQUAL_size_t(2, view.delivery_count);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL, view.deliveries[0].type
+  );
+  TEST_ASSERT_EQUAL_UINT64(
+    handle, view.deliveries[0].payload.resource_request_cancel.handle
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, view.deliveries[1].type);
+  mln_delivery_batch_release(batch);
+  mln_resource_request_release(handle);
+  mln_delivery_queue_release(queue);
+}
+
 void pass_through_retry_starts_native_after_scheduling_failure() {
   for (auto budget = std::size_t{0}; budget < 8; ++budget) {
     auto loop = mln::util::RunLoop{};
@@ -291,6 +339,7 @@ MLN_TEST_GROUP {
   RUN_TEST(reserved_decisions_are_cancelled_with_the_native_request);
   RUN_TEST(a_failed_provider_copy_delivers_with_persistent_allocation_failure);
   RUN_TEST(pass_through_retry_starts_native_after_scheduling_failure);
+  RUN_TEST(a_queued_cancel_precedes_retirement_when_allocations_fail);
   RUN_TEST(rejected_provider_registration_queues_no_retirement);
   RUN_TEST(rejected_callback_registrations_never_release_caller_data);
 }

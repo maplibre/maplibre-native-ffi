@@ -17,7 +17,6 @@ class Values:
     def __init__(self, bound):
         self.bound = bound
         self.used = {}
-        self.item_buffers = {}
 
     def native_type(self, value):
         return (
@@ -92,8 +91,6 @@ class Values:
             self.used[value.native] = value
             return
         if value.kind in {"array", "reference"}:
-            if value.item_buffer:
-                self.item_buffers[value.element.native] = value.item_buffer
             self.add(value.element)
         if value.kind == "union":
             if not value.tag or any(

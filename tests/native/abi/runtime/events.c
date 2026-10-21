@@ -103,9 +103,7 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
       TEST_ASSERT_EQUAL_UINT64(map, event->source);
       map_sourced += 1;
     }
-    TEST_ASSERT_TRUE(
-      (size_t)event->message_offset + event->message_size <= view.messages_size
-    );
+    if (event->message.size != 0) TEST_ASSERT_NOT_NULL(event->message.data);
   }
   TEST_ASSERT_GREATER_THAN_size_t(0, map_sourced);
 
@@ -114,9 +112,8 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_delivery_batch_release(batch);
 }
 
-// Two text-bearing events in one batch point at distinct arena ranges, and each
-// range holds that event's own bytes.
-static void the_message_arena_carries_one_range_per_event(void) {
+// Message views retain each event's bytes until the delivery batch is released.
+static void each_event_carries_its_message(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first = mln_test_create_map(runtime);
   mln_map second = mln_test_create_map(runtime);
@@ -130,42 +127,37 @@ static void the_message_arena_carries_one_range_per_event(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(second));
 
+  mln_delivery_batch delivery = MLN_HANDLE_NULL;
   mln_event_batch_view batch = {.size = sizeof(batch)};
-  MLN_TEST_OK(mln_test_drain_events(runtime, &batch));
+  MLN_TEST_OK(mln_test_drain_event_delivery(runtime, &delivery, &batch, NULL));
 
   size_t failures = 0;
-  uint32_t first_offset = 0;
-  uint32_t second_offset = 0;
+  mln_buffer_view retained[2] = {0};
+  char copied[2][512] = {0};
   for (size_t index = 0; index < batch.event_count; index += 1) {
     const mln_runtime_event* event = batch_event(&batch, index);
     if (event->type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
       continue;
     }
-    TEST_ASSERT_GREATER_THAN_UINT32(0, event->message_size);
-    TEST_ASSERT_TRUE(
-      (size_t)event->message_offset + event->message_size <= batch.messages_size
-    );
-    // The arena null-terminates each message, so a host reads a range as a C
-    // string without copying it first.
-    TEST_ASSERT_EQUAL_CHAR(
-      '\0', batch.messages[event->message_offset + event->message_size]
-    );
-    TEST_ASSERT_EQUAL_size_t(
-      event->message_size, strlen(batch.messages + event->message_offset)
-    );
-    if (failures == 0) {
-      first_offset = event->message_offset;
-    } else {
-      second_offset = event->message_offset;
-    }
+    TEST_ASSERT_GREATER_THAN_UINT32(0, event->message.size);
+    TEST_ASSERT_NOT_NULL(event->message.data);
+    TEST_ASSERT_LESS_THAN_size_t(2, failures);
+    TEST_ASSERT_LESS_OR_EQUAL_size_t(sizeof(copied[0]), event->message.size);
+    retained[failures] = event->message;
+    memcpy(copied[failures], event->message.data, event->message.size);
     failures += 1;
   }
   TEST_ASSERT_EQUAL_size_t(2, failures);
-  TEST_ASSERT_NOT_EQUAL_UINT32(first_offset, second_offset);
 
   mln_test_destroy_map(second);
   mln_test_destroy_map(first);
   mln_test_destroy_runtime(runtime);
+  for (size_t index = 0; index < failures; index += 1) {
+    TEST_ASSERT_EQUAL_MEMORY(
+      copied[index], retained[index].data, retained[index].size
+    );
+  }
+  mln_delivery_batch_release(delivery);
 }
 
 // The masks change from any thread, and the runtime setter rejects unknown
@@ -382,5 +374,5 @@ MLN_TEST_GROUP {
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
-  RUN_TEST(the_message_arena_carries_one_range_per_event);
+  RUN_TEST(each_event_carries_its_message);
 }

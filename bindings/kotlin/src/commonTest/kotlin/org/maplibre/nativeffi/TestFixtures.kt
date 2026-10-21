@@ -51,7 +51,14 @@ internal fun <T> runSuspendTest(block: suspend CoroutineScope.() -> T): T = runB
 private val AsyncReleasable.isReleased: Boolean
   get() =
     when (this) {
-      is RuntimeHandle -> isClosed
+      is RuntimeHandle ->
+        try {
+          getEventMask()
+          false
+        } catch (error: MaplibreException) {
+          if (error.status != Status.INVALID_STATE) throw error
+          true
+        }
       is MapHandle -> isClosed
       else -> false
     }

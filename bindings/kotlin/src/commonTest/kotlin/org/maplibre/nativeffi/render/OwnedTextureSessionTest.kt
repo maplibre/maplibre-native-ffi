@@ -3,10 +3,8 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.TestThread
@@ -81,7 +79,7 @@ class OwnedTextureSessionTest {
       }
       assertFailsWith<IllegalStateException> { escaped!!.kind }
       frame.release()
-      assertTrue(frame.isClosed)
+      assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
     }
   }
 
@@ -103,13 +101,12 @@ class OwnedTextureSessionTest {
       try {
         entered.awaitWithin("the borrow to start on the other thread")
         assertFailsWithStatus(Status.BUSY) { frame.release() }
-        assertFalse(frame.isClosed)
       } finally {
         leave.complete(Unit)
         borrower.join()
       }
       frame.release()
-      assertTrue(frame.isClosed)
+      assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
     }
   }
 

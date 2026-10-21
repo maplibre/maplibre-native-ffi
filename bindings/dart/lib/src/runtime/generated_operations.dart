@@ -2617,16 +2617,13 @@ _readRuntimeEventOfflineRegionTileCountLimit(
 RuntimeEvent _readRuntimeEvent(
   raw.mln_runtime_event source, {
   Uint8List Function()? rawRecord,
-  String message = '',
 }) => RuntimeEvent(
   type: RuntimeEventType.fromRawValue(source.type),
   sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
   source: uint64FromNative(source.source),
   generation: uint64FromNative(source.generation),
   code: source.code,
-  messageOffset: uint64FromNative(source.message_offset),
-  messageSize: source.message_size,
-  message: message,
+  message: utf8.decode(_copyBufferView(source.message)),
   payload: switch (source.payload_type) {
     1 => RuntimeEventPayloadRenderFrame(
       _readRuntimeEventRenderFrame(source.payload.render_frame),
@@ -2684,18 +2681,6 @@ EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
                       .cast<raw.mln_runtime_event>()
                       .cast<Uint8>()
                       .asTypedList(source.event_size),
-              message: _arenaUtf8(
-                source.messages.cast(),
-                source.messages_size,
-                (source.events.cast<Uint8>() + index * source.event_size)
-                    .cast<raw.mln_runtime_event>()
-                    .ref
-                    .message_offset,
-                (source.events.cast<Uint8>() + index * source.event_size)
-                    .cast<raw.mln_runtime_event>()
-                    .ref
-                    .message_size,
-              ),
             ),
           ),
         );

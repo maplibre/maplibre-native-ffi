@@ -126,12 +126,12 @@ mln_status mln_map_entry(mln_map map, const mln_completion *completion, mln_diag
         api = self.parse("""
 typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy");
 mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
-mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         result = python.coverage(api)
         # The release alone becomes close.
         self.assertEqual(result["generated"], ["mln_host_destroy"])
-        self.assertIn("owner member", result["unsupported"]["mln_host_closed"])
+        self.assertIn("owner member", result["unsupported"]["mln_host_id"])
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse(groups=("tagged_union",))

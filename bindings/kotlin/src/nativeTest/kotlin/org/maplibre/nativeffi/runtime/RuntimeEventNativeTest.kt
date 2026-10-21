@@ -22,6 +22,8 @@ class RuntimeEventNativeTest {
       val stride = sizeOf<mln_runtime_event>() + STRIDE_PADDING
       val bytes = allocArray<ByteVar>(stride * STRIDED_EVENT_COUNT)
       memset(bytes, PADDING_BYTE.toInt(), (stride * STRIDED_EVENT_COUNT).convert())
+      val messages = allocArray<ByteVar>(STRIDED_MESSAGES.size)
+      STRIDED_MESSAGES.forEachIndexed { index, byte -> messages[index] = byte }
       repeat(STRIDED_EVENT_COUNT) { index ->
         val event = (bytes + index * stride)!!.reinterpret<mln_runtime_event>().pointed
         event.type = stridedEventType(index).toUInt()
@@ -30,22 +32,18 @@ class RuntimeEventNativeTest {
         event.generation = stridedGeneration(index)
         event.code = stridedCode(index)
         event.payload_type = stridedPayloadType(index).toUInt()
-        event.message_offset = stridedMessageOffset(index).toULong()
-        event.message_size = stridedMessageSize(index).toUInt()
+        event.message.data = messages + stridedMessageOffset(index)
+        event.message.size = stridedMessageSize(index).convert()
         val payload = event.payload.ptr.reinterpret<ByteVar>()
         memset(payload, 0, payloadSize.convert())
         payload[0] = stridedPayloadFirstByte(index)
         payload[payloadSize - 1] = PAYLOAD_LAST_BYTE
       }
-      val messages = allocArray<ByteVar>(STRIDED_MESSAGES.size)
-      STRIDED_MESSAGES.forEachIndexed { index, byte -> messages[index] = byte }
       val view = alloc<mln_event_batch_view>()
       view.size = sizeOf<mln_event_batch_view>().toUInt()
       view.event_size = stride.toUInt()
       view.events = bytes.reinterpret()
       view.event_count = STRIDED_EVENT_COUNT.convert()
-      view.messages = messages
-      view.messages_size = STRIDED_MESSAGES.size.convert()
       // The decoded batch owns copies, so overwriting the source afterwards changes nothing.
       readEventBatchView(view.ptr.toLong()).events.also {
         memset(bytes, 0, (stride * STRIDED_EVENT_COUNT).convert())

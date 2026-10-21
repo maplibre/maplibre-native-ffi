@@ -2,8 +2,9 @@ import Foundation
 import MaplibreNativeFFI
 import Testing
 
-/// Close is idempotent, and later use reaches native with the stale id.
-@Test func closingAHandleTwiceDoesNothingTheSecondTime() async throws {
+/// Synchronous close is idempotent; asynchronous release reaches native.
+@Test func synchronousCloseIsIdempotentAndAsyncReleaseReachesNative(
+) async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(json: emptyStyle)
     let data = try Maplibre.geojsonSourceDataCreate(
@@ -16,6 +17,11 @@ import Testing
       try await fixture.map.addGeojsonSourceData(sourceId: "late", data: data)
     }
     #expect(error?.status == .invalidState)
+    try await fixture.map.close()
+    let repeated = await expectMaplibreError(.invalidState) {
+      try await fixture.map.close()
+    }
+    #expect(repeated?.status == .invalidState)
   }
 }
 

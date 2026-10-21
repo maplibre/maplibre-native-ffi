@@ -43,11 +43,6 @@ def element(value):
 def validate_input(function, name, value):
     if value.kind == "handle" or value.registration:
         return
-    if value.item_buffer:
-        raise failure(
-            function,
-            f"parameter {name}: packed item-buffer inputs require an encoding adapter",
-        )
     if value.element:
         validate_input(function, name, value.element)
     for field in value.fields:
@@ -84,10 +79,6 @@ def copier(plan, values):
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)
     if result.kind == "array":
-        if result.item_buffer:
-            raise failure(
-                plan.function, "array results with an item buffer need a record copy"
-            )
         item = result.element
         values.add(item)
         copy = f"call.slice({values.public(item)}, {values.native_type(item)})"

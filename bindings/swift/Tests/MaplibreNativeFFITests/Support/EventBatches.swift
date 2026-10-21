@@ -11,9 +11,7 @@ func rawRuntimeEvent(
   source: UInt64 = 1,
   generation: UInt64 = 0,
   code: Int32 = 0,
-  payloadType: UInt32 = MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue,
-  messageOffset: UInt64 = 0,
-  messageSize: UInt32 = 0
+  payloadType: UInt32 = MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue
 ) -> mln_runtime_event {
   var event = mln_runtime_event()
   event.type = type
@@ -22,24 +20,7 @@ func rawRuntimeEvent(
   event.generation = generation
   event.code = code
   event.payload_type = payloadType
-  event.message_offset = messageOffset
-  event.message_size = messageSize
   return event
-}
-
-/// Packs each message and its terminator into one arena the way the C API does,
-/// and reports where each message starts.
-func packMessageArena(
-  _ messages: [String]
-) -> (bytes: [UInt8], offsets: [UInt64]) {
-  var bytes: [UInt8] = []
-  var offsets: [UInt64] = []
-  for message in messages {
-    offsets.append(UInt64(bytes.count))
-    bytes.append(contentsOf: Array(message.utf8))
-    bytes.append(0)
-  }
-  return (bytes, offsets)
 }
 
 /// One batch a test built over storage it owns.
@@ -52,13 +33,13 @@ struct SynthesizedEventBatch {
 }
 
 /// Runs `body` with a batch whose records step by `stride`, so a decode test
-/// drives strides, message offsets, and payload kinds the C API does not yet
+/// drives strides, message views, and payload kinds the C API does not yet
 /// produce. Bytes past each record's known fields stay zero unless
 /// `payloadWindows` names them, keyed by event index.
 func withSynthesizedEventBatch<Result>(
   events: [mln_runtime_event],
   stride: Int = MemoryLayout<mln_runtime_event>.size,
-  messages: [UInt8] = [],
+  messages: [String] = [],
   payloadWindows: [Int: [UInt8]] = [:],
   _ body: (SynthesizedEventBatch) throws -> Result
 ) throws -> Result {
@@ -73,11 +54,22 @@ func withSynthesizedEventBatch<Result>(
     repeating: 0,
     count: stride * events.count / 8 + 1
   )
-  var messageStorage = messages + [0]
+  var messageStorage: [UInt8] = messages
+    .flatMap { Array($0.utf8) + [UInt8(0)] } + [0]
   return try recordStorage.withUnsafeMutableBytes { records in
     try messageStorage.withUnsafeMutableBytes { arena in
       let recordBase = try #require(records.baseAddress)
-      for (index, event) in events.enumerated() {
+      var messageOffset = 0
+      for (index, original) in events.enumerated() {
+        var event = original
+        if index < messages.count {
+          let length = messages[index].utf8.count
+          event.message = mln_buffer_view(
+            data: arena.baseAddress?.advanced(by: messageOffset),
+            size: length
+          )
+          messageOffset += length + 1
+        }
         let record = recordBase.advanced(by: index * stride)
         record.storeBytes(of: event, as: mln_runtime_event.self)
         guard let window = payloadWindows[index] else { continue }
@@ -97,11 +89,6 @@ func withSynthesizedEventBatch<Result>(
         : UnsafeRawPointer(recordBase)
         .assumingMemoryBound(to: mln_runtime_event.self)
       batch.event_count = events.count
-      batch.messages = try messages.isEmpty
-        ? nil
-        : UnsafeRawPointer(#require(arena.baseAddress))
-        .assumingMemoryBound(to: CChar.self)
-      batch.messages_size = messages.count
       return try body(SynthesizedEventBatch(
         batch: batch,
         records: records,

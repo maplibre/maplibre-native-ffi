@@ -112,9 +112,6 @@ def decode(values, value, source, context="raw"):
             else f"const copied = try allocator.alloc({values.public(value.element)}, {count});"
         )
         copied = decode(values, value.element, "item", context)
-        if value.item_buffer:
-            buf = value.item_buffer
-            copied = f"blk_item: {{ var converted = {copied}; converted.{identifier(buf.field)} = try marshal.copyArenaString(allocator, {context}.{identifier(buf.data)}, {context}.{identifier(buf.size)}, item.{identifier(buf.offset)}, item.{identifier(buf.length)}); break :blk_item converted; }}"
         if value.stride:
             return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try marshal.stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
         return f"blk: {{ {storage} for ({items}, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"
@@ -149,16 +146,7 @@ def declaration(values, value):
             value.registration.user_data,
             value.registration.release,
         }
-    item_buffer = values.item_buffers.get(value.native)
-    if item_buffer:
-        fields.append(
-            doc(values.bound, f"{value.native}.{item_buffer.field}", "    ")
-            + f"    {identifier(item_buffer.field)}: []const u8 = &.{{}},"
-        )
-        captures.append(f"            .{identifier(item_buffer.field)} = &.{{}},")
     for field in value.fields:
-        if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
-            continue
         if field.name in hidden:
             continue
         raw = f"raw.{identifier(field.name)}"
@@ -174,8 +162,6 @@ def declaration(values, value):
             continue
         if field.role == "count":
             array = next(f for f in value.fields if f.value.length == field.name)
-            if array.role == "arena":
-                continue
             expression = f"self.{identifier(array.name)}"
             length = (
                 f"if ({expression}) |items| items.len else 0"

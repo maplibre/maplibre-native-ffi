@@ -222,10 +222,3 @@ Uint8List _copyBufferView(raw.mln_buffer_view view) {
   }
   return Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
 }
-
-String _arenaUtf8(Pointer<Uint8> data, int size, int offset, int length) {
-  if (offset < 0 || length < 0 || offset > size || length > size - offset) {
-    throwInvalidState('native message slice exceeds its arena');
-  }
-  return length == 0 ? '' : utf8.decode((data + offset).asTypedList(length));
-}

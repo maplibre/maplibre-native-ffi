@@ -114,18 +114,6 @@ internal fun readViewString(address: Long): String = readView(address).decodeToS
 internal fun readViewStringOrNull(address: Long): String? =
   readViewOrNull(address)?.decodeToString()
 
-/**
- * Copies the [length]-byte window at [offset] of the [size]-byte item arena at [data], refusing a
- * window that reaches outside the arena.
- */
-internal fun readItem(data: Long, size: ULong, offset: ULong, length: ULong): ByteArray {
-  val (total, start, count) = Triple(size.toLong(), offset.toLong(), length.toLong())
-  require(total >= 0 && start in 0..total && count in 0..(total - start)) {
-    "native item lies outside its arena"
-  }
-  return readBytes(data + start, length)
-}
-
 /** Copies [count] elements of [stride] bytes each, starting at [pointer]. */
 internal inline fun <T> readArray(
   pointer: Long,

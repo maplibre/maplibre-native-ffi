@@ -169,10 +169,10 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.state().handle.read().map_err(map_error)
     }
 
-    /// Takes the handle for a call that consumes it, or `None` once closed.
-    fn reserve(&self) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
+    /// Takes the handle for a consuming call; an idempotent close skips a released handle.
+    fn reserve(&self, idempotent: bool) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
         let state = self.state();
-        if state.handle.is_released() {
+        if idempotent && state.handle.is_released() {
             return Ok(None);
         }
         state.handle.reserve().map(Some).map_err(map_error)
@@ -229,7 +229,7 @@ macro_rules! generated_owner {
         #[pymethods]
         impl $owner {
             #[getter]
-            fn closed(&self) -> bool {
+            fn _is_closed(&self) -> bool {
                 self.state().is_closed()
             }
 

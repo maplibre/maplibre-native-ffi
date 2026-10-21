@@ -1249,7 +1249,8 @@ auto enqueue_work(
 }
 
 auto service_scheduler_work(
-  const std::shared_ptr<mln_render_session_object>& session
+  const std::shared_ptr<mln_render_session_object>& session,
+  std::shared_ptr<const mln_frame_demand> expected
 ) noexcept -> void;
 
 using RenderDriverWorkFactory = std::function<RenderDriverWork(
@@ -1631,7 +1632,14 @@ auto start_attach_render_session(
             live->scheduler_service_queued = true;
             push_driver_work_locked(
               *live,
-              RenderDriverWork{[live]() { service_scheduler_work(live); }, {}},
+              RenderDriverWork{
+                [live, expected = live->demands.empty()
+                                    ? nullptr
+                                    : live->demands.front()]() {
+                  service_scheduler_work(live, expected);
+                },
+                {}
+              },
               wakes
             );
           }
@@ -1876,32 +1884,24 @@ auto render_session_set_target(
 
 namespace {
 
-// Queues a target replacement and sizes the map to the replacement's extent.
-// Submissions from one thread size the map in the order they were made, along
-// with session resizes, which size it the same way; submissions that race from
-// two threads can post their map resizes in the other order. The map heads for
-// the extent from the last accepted command. The snapshot reports the applied
-// extent until the replacement runs.
+// Publishes both portions under the control lock so extent-changing
+// submissions reach the map and driver in the same order.
 auto submit_retarget(
   mln_render_session session, const mln_logical_extent& extent,
   RenderDriverCallable work, std::shared_ptr<Completion> completion,
   const ValuelessCompletion& valueless, RenderDriverAdmission admit
 ) -> mln_status {
   auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
-  auto map = mln_map{MLN_HANDLE_NULL};
-  admit.commit =
-    [&map, commit = std::move(admit.commit)](mln_render_session_object& live) {
-      if (commit) commit(live);
-      map = live.map;
-    };
-  const auto status = submit_driver_work(
+  admit.commit = [extent,
+                  commit =
+                    std::move(admit.commit)](mln_render_session_object& live) {
+    if (commit) commit(live);
+    static_cast<void>(map_post_resize(live.map, extent.width, extent.height));
+  };
+  return submit_driver_work(
     session, nullptr, std::move(deliver), make_work, admit,
     std::move(completion)
   );
-  if (status == MLN_STATUS_OK) {
-    static_cast<void>(map_post_resize(map, extent.width, extent.height));
-  }
-  return status;
 }
 
 }  // namespace
@@ -2643,9 +2643,9 @@ auto deliver_pending_session_work(
 // stranding the tile results that a still image or the next update needs
 // behind a demand that happens to render.
 auto service_scheduler_work(
-  const std::shared_ptr<mln_render_session_object>& session
+  const std::shared_ptr<mln_render_session_object>& session,
+  std::shared_ptr<const mln_frame_demand> expected
 ) noexcept -> void {
-  auto expected = std::shared_ptr<const mln_frame_demand>{};
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     session->scheduler_service_queued = false;
@@ -2655,7 +2655,6 @@ auto service_scheduler_work(
     ) {
       return;
     }
-    if (!session->demands.empty()) expected = session->demands.front();
   }
   deliver_pending_session_work(session);
   if (expected) run_frame_demand(session, expected);
@@ -3689,6 +3688,7 @@ auto render_session_resize_start(
   if (valid != MLN_STATUS_OK) return valid;
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
+  mln::testing::hit(mln::testing::SyncPoint::RenderExtentSubmissionStarted);
   auto runtime = std::shared_ptr<RuntimeObject>{};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -3779,20 +3779,20 @@ auto render_session_resize_start(
       },
     .queue = MLN_HANDLE_NULL,
   };
-  const auto post =
-    map_post_resize(live->map, extent.width, extent.height, &map_completion);
-  if (post != MLN_STATUS_OK)
-    return fail_on_worker(post, thread_last_error_message());
-  static_cast<void>(context.release());
-  // A detach that starts after the checks above must not find this resize
-  // queued behind its own work, where it would run against released backends.
+  // Publish the map and driver work together. A concurrent extent change
+  // must follow this submission on both queues.
   {
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state == MLN_RENDER_SESSION_STATE_ATTACHED) {
-      // Accepted before the driver can take the work, so the driver, rather
-      // than this thread, delivers a completion that finishes early.
       auto work = make_ordered_resize_work(live, joined, extent);
+      const auto post = map_post_resize(
+        live->map, extent.width, extent.height, &map_completion
+      );
+      if (post != MLN_STATUS_OK)
+        return fail_on_worker(post, thread_last_error_message());
+      static_cast<void>(context.release());
+      mln::testing::hit(mln::testing::SyncPoint::RenderExtentPublished);
       if (async.completion) async.completion->accept();
       push_driver_work_locked(*live, std::move(work), wakes);
       return MLN_STATUS_OK;

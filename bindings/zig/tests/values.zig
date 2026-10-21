@@ -75,19 +75,15 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     records[0].event.source = 0xfeed_0000_0000_0001;
     records[0].event.generation = 0x1_0000_0002;
     records[0].event.payload_type = 77;
-    records[0].event.message_offset = 0;
-    records[0].event.message_size = 6;
+    records[0].event.message = .{ .data = messages.ptr, .size = 6 };
     records[0].newer_fields = @splat(0xa5);
     records[1].event.type = @backingInt(maplibre.RuntimeEventType.map_style_loaded);
-    records[1].event.message_offset = 7;
-    records[1].event.message_size = 6;
+    records[1].event.message = .{ .data = messages.ptr + 7, .size = 6 };
     var raw = std.mem.zeroes(RawBatch);
     raw.size = @sizeOf(RawBatch);
     raw.event_size = @sizeOf(Record);
     raw.events = &records[0].event;
     raw.event_count = records.len;
-    raw.messages = messages.ptr;
-    raw.messages_size = messages.len;
 
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();

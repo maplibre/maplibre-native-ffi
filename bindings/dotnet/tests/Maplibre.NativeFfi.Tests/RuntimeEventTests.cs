@@ -8,17 +8,14 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed unsafe class RuntimeEventTests
 {
     [Fact]
-    public void EventCopyRejectsInvalidStrideAndMessageSlices()
+    public void EventCopyRejectsInvalidStrideAndMessageViews()
     {
-        var record = new mln_runtime_event { message_offset = 3, message_size = 2 };
-        byte message = 0;
+        var record = new mln_runtime_event { message = new mln_buffer_view { size = 2 } };
         var batch = new mln_event_batch_view
         {
             event_size = (uint)sizeof(mln_runtime_event) - 1,
             events = &record,
             event_count = 1,
-            messages = (sbyte*)&message,
-            messages_size = 1,
         };
         Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyEventBatchView(batch));
         batch.event_size++;
@@ -31,7 +28,7 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void CopiesEveryMessageAndTypedPayloadAtTheBatchStride()
     {
-        var arena = new EventBatches.MessageArena();
+        using var arena = new EventBatches.MessageArena();
         var renderError = arena.Add("render failed");
         var sourceId = arena.Add("source-1");
         var events = new[]
@@ -41,8 +38,7 @@ public sealed unsafe class RuntimeEventTests
                 type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
                 source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
                 payload_type = (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-                message_offset = renderError.Offset,
-                message_size = renderError.Size,
+                message = renderError,
             },
             new mln_runtime_event
             {
@@ -50,8 +46,7 @@ public sealed unsafe class RuntimeEventTests
                 source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
                 payload_type = (uint)
                     mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-                message_offset = sourceId.Offset,
-                message_size = sourceId.Size,
+                message = sourceId,
                 payload = new mln_runtime_event_payload
                 {
                     tile_action = new mln_runtime_event_tile_action
@@ -71,7 +66,7 @@ public sealed unsafe class RuntimeEventTests
         };
 
         // A batch from a newer library steps by a wider stride than this binding's record.
-        var copied = EventBatches.Decode(events, arena.Bytes, EventBatches.Stride + 24);
+        var copied = EventBatches.Decode(events, EventBatches.Stride + 24);
 
         Assert.Equal(
             [RuntimeEventType.MapRenderError, RuntimeEventType.MapTileAction],
@@ -109,7 +104,7 @@ public sealed unsafe class RuntimeEventTests
             records[index] = (byte)(index - payloadOffset + 1);
         }
 
-        var copied = EventBatches.DecodeRecordBytes(records, [], 1, stride);
+        var copied = EventBatches.DecodeRecordBytes(records, 1, stride);
 
         var runtimeEvent = Assert.Single(copied);
         Assert.Equal(4242u, (uint)runtimeEvent.Type);
@@ -134,7 +129,7 @@ public sealed unsafe class RuntimeEventTests
     {
         // A batch count that no managed array can index fails instead of wrapping around.
         Assert.Throws<OverflowException>(() =>
-            EventBatches.DecodeRecordBytes([], [], (nuint)int.MaxValue + 1, EventBatches.Stride)
+            EventBatches.DecodeRecordBytes([], (nuint)int.MaxValue + 1, EventBatches.Stride)
         );
 
         var events = new[]
@@ -148,7 +143,7 @@ public sealed unsafe class RuntimeEventTests
             },
             new mln_runtime_event { type = uint.MaxValue },
         };
-        var copied = EventBatches.Decode(events, [], EventBatches.Stride);
+        var copied = EventBatches.Decode(events, EventBatches.Stride);
 
         Assert.Equal(ulong.MaxValue, copied[0].Source);
         Assert.Equal(int.MinValue, copied[0].Code);

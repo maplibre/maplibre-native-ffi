@@ -163,7 +163,19 @@ class Harness:
 
     def close(self) -> None:
         for map_handle in self._maps:
-            if not map_handle.closed:
-                result(map_handle.close())
-        if not self.runtime.closed:
-            result(self.runtime.close())
+            close_if_live(map_handle)
+        close_if_live(self.runtime)
+
+
+def close_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
+    """Close a fixture owner unless native already retired it."""
+    try:
+        if isinstance(owner, mln.MapHandle):
+            owner.get_snapshot()
+        else:
+            owner.get_event_mask()
+    except mln.MaplibreError as error:
+        if error.status == mln.Status.INVALID_STATE:
+            return
+        raise
+    result(owner.close())

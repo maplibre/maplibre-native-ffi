@@ -221,8 +221,8 @@ def descriptor(values, plan):
         )
         if callback.decision:
             decision = callback.decision
-            invoke = f"let decision = {call} ?? {values.public(callback.result)}(rawValue: {callback.failure}{suffix}); if decision.rawValue != {decision.accept}{suffix} {{ decisionOwner.handle.handOff() }}; return decision.rawValue"
-            fail = "decisionOwner.handle.handOff(); return UInt32.max"
+            invoke = f"let decision = {call} ?? {values.public(callback.result)}(rawValue: {callback.failure}{suffix}); if decision.rawValue != {decision.accept}.rawValue {{ decisionOwner.handle.handOff() }}; return decision.rawValue"
+            fail = f"decisionOwner.handle.handOff(); return {callback.failure}{suffix}"
 
         if responses:
             invoke += f"; return MLN_STATUS_OK{suffix}"

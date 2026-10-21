@@ -453,9 +453,9 @@ typedef struct mln_custom_geometry_source_options {
    * its callback state to each accepted command and frees that state here. Null
    * means the host needs no release.
    *
-   * This callback must not call the C API. Free callback state and return.
-   * Schedule native owner cleanup after this callback returns. Null in queue
-   * mode.
+   * Free callback state and return promptly. The callback may call the C API,
+   * but must not wait for runtime work that only its own thread can advance.
+   * Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**
@@ -503,9 +503,9 @@ typedef struct mln_custom_mvt_vector_source_options {
    * its callback state to each accepted command and frees that state here.
    * Null means the host needs no release.
    *
-   * This callback must not call the C API. Free callback state and return.
-   * Schedule native owner cleanup after this callback returns. Null in queue
-   * mode.
+   * Free callback state and return promptly. The callback may call the C API,
+   * but must not wait for runtime work that only its own thread can advance.
+   * Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**

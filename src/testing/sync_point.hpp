@@ -45,6 +45,12 @@ enum class SyncPoint : std::uint8_t {
   // result or completion that work published, and is about to end. The call
   // stays in flight until the handler returns.
   RenderDriverExited,
+  // A resize has queued its map extent and is about to queue its driver work.
+  // The control lock is held, so another submission waits until this returns.
+  RenderExtentPublished,
+  // A resize has leased its session and is about to inspect attachment. No
+  // lock is held.
+  RenderExtentSubmissionStarted,
   // A render session's driver call has published a frame demand's result,
   // which the host can drain, and is about to finish the demand. The call
   // stays in flight until the handler returns. No lock is held.

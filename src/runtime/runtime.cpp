@@ -566,8 +566,7 @@ auto push_offline_region_event(
     .generation = 0,
     .code = 0,
     .payload_type = payload_type,
-    .message_offset = 0,
-    .message_size = 0,
+    .message = {},
     .payload = payload
   };
   registration->push(event, message);
@@ -2422,16 +2421,15 @@ auto RuntimeEventRegistration::push(
   } else {
     if (process_exiting()) return;
     const auto text = delivery::event_message(message);
-    event.message_size = static_cast<uint32_t>(text.size());
-    event.message_offset = 0;
+    event.message = mln_buffer_view{
+      .data = text.empty() ? nullptr : text.data(), .size = text.size()
+    };
     // The callback borrows this span; bindings copy it before returning.
     const mln_event_batch_view events = {
       .size = sizeof(events),
       .event_size = sizeof(event),
       .events = &event,
       .event_count = 1,
-      .messages = text.empty() ? nullptr : text.data(),
-      .messages_size = text.empty() ? 0 : text.size() + 1,
     };
     callback(context->user_data(), &events);
   }
@@ -2678,8 +2676,7 @@ auto map_event(
     .generation = generation,
     .code = code,
     .payload_type = payload_type,
-    .message_offset = 0,
-    .message_size = 0,
+    .message = {},
     .payload = payload
   };
 }

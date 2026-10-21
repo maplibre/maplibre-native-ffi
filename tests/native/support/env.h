@@ -158,9 +158,9 @@ size_t mln_test_drain_all(mln_runtime runtime);
 // The same, counting the events whose type matches.
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type);
 
-// Returns true to end an event wait. `messages` is the batch's message block.
+// Returns true to end an event wait. Message bytes belong to the event.
 typedef bool (*mln_test_event_match)(
-  const mln_runtime_event* event, const char* messages, void* context
+  const mln_runtime_event* event, void* context
 );
 
 // Drains until `match` accepts an event, blocking on the event handler's

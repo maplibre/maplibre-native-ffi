@@ -198,7 +198,6 @@ def sources(values, plan):
                 f"decision_state = Some(Arc::clone(&decision_owner.cast_bound::<{decision_owner}>(py).unwrap().borrow().state));"
                 + scope
             )
-            failure = "u32::MAX"
             result = "result.extract::<u32>()"
         returns = (
             ""

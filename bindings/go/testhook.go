@@ -101,28 +101,20 @@ func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []Runtime
 	stride = max(stride, unsafe.Sizeof(C.mln_runtime_event{}))
 	storage := C.calloc(C.size_t(max(len(events), 1)), C.size_t(stride))
 	defer C.free(storage)
-	var arena []byte
 	for index, event := range events {
 		raw := event.raw
 		if event.message != "" {
-			raw.message_offset = C.uint64_t(len(arena))
-			raw.message_size = C.uint32_t(len(event.message))
-			arena = append(append(arena, event.message...), 0)
+			message := C.CBytes([]byte(event.message))
+			defer C.free(message)
+			raw.message = C.mln_buffer_view{data: message, size: C.size_t(len(event.message))}
 		}
 		*(*C.mln_runtime_event)(unsafe.Add(storage, uintptr(index)*stride)) = raw
 	}
-	var messages unsafe.Pointer
-	if len(arena) != 0 {
-		messages = C.CBytes(arena)
-		defer C.free(messages)
-	}
 	return copyEventBatchView(C.mln_event_batch_view{
-		size:          C.uint32_t(unsafe.Sizeof(C.mln_event_batch_view{})),
-		event_size:    C.uint32_t(stride),
-		events:        (*C.mln_runtime_event)(storage),
-		event_count:   C.size_t(len(events)),
-		messages:      (*C.char)(messages),
-		messages_size: C.size_t(len(arena)),
+		size:        C.uint32_t(unsafe.Sizeof(C.mln_event_batch_view{})),
+		event_size:  C.uint32_t(stride),
+		events:      (*C.mln_runtime_event)(storage),
+		event_count: C.size_t(len(events)),
 	}).Events
 }
 

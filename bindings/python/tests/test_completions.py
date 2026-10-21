@@ -170,7 +170,11 @@ def test_a_map_that_arrives_after_its_claimed_wait_is_cancelled_is_disposed(
 
     with leak_reports() as reports:
         source.set_result(raw)
-        assert raw.closed
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            raw.get_snapshot()
         # Runtime retirement waits for every map, so this resolves only once
         # the discarded map has retired.
         assert result(harness.runtime.close()) is None

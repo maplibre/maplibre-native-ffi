@@ -534,22 +534,7 @@ fn generated_copy_mln_event_batch_view(
         generated_list(
             py,
             unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
-            |element| {
-                Ok({
-                    let item = generated_copy_mln_runtime_event(py, &element)?;
-                    item.bind(py)
-                        .cast::<PyDict>()?
-                        .set_item("message", unsafe {
-                            generated_arena_string(
-                                value.messages,
-                                value.messages_size,
-                                element.message_offset,
-                                element.message_size,
-                            )?
-                        })?;
-                    item
-                })
-            },
+            |element| generated_copy_mln_runtime_event(py, &element),
         )?,
     )?;
     Ok(dict.into_any().unbind())
@@ -1643,7 +1628,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     let mut decision_state = None;
 
     let outcome = generated_invoke(
-        || u32::MAX,
+        || 4294967295,
         |py| {
             let decision_owner = unsafe { ResourceRequestHandle::adopt(py, handle, Vec::new()) }?;
             decision_state = Some(Arc::clone(
@@ -1654,7 +1639,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                     .state,
             ));
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(u32::MAX);
+                return Ok(4294967295);
             };
             let result = callback.bind(py).call1((
                 {
@@ -1814,6 +1799,7 @@ fn generated_copy_mln_runtime_event(
     dict.set_item("source", generated_value(py, value.source)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("code", generated_value(py, value.code)?)?;
+    dict.set_item("message", generated_text(py, value.message)?)?;
     dict.set_item(
         "payload",
         match value.payload_type {
@@ -4682,7 +4668,7 @@ impl AcquiredFrameHandle {
         let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
         let consumer_completion_value =
             generated_input_mln_gpu_sync(&consumer_completion.clone(), storage)?;
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -4701,7 +4687,7 @@ impl GeojsonSourceDataHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -6591,8 +6577,8 @@ impl MapHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
-            return completed_python_future(py);
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
         };
         let handle = reservation.handle();
         let convert = py_none;
@@ -8093,7 +8079,7 @@ impl MapProjectionHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -8136,7 +8122,7 @@ impl RenderFrameBatchHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -8151,7 +8137,7 @@ impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn abandon(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(reservation) = self.reserve()? else {
+        let Some(reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -8440,7 +8426,7 @@ impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -8764,7 +8750,7 @@ impl ResourceRequestHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -8822,7 +8808,7 @@ impl ResourceTransformRequestHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
+        let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
@@ -9087,8 +9073,8 @@ impl RuntimeHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve()? else {
-            return completed_python_future(py);
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
         };
         let handle = reservation.handle();
         let convert = py_none;

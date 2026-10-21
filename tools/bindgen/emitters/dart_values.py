@@ -228,7 +228,6 @@ class Values:
                 "count",
                 "tag",
                 "stride",
-                "arena",
                 "delivery_queue",
             }
         }
@@ -485,10 +484,6 @@ class Values:
                 parent = expression.rsplit(".", 1)[0]
                 pointer = f"({expression}.cast<Uint8>() + index * {parent}.{value.stride}).cast<{self.ffi(value.element)}>()"
                 item_expression = pointer + ".ref"
-                extra = ""
-                if value.item_buffer:
-                    item_buffer = value.item_buffer
-                    extra = f", {item_buffer.field}: _arenaUtf8({parent}.{item_buffer.data}.cast(), {parent}.{item_buffer.size}, {item_expression}.{item_buffer.offset}, {item_expression}.{item_buffer.length})"
                 # Only a record that ends in a tagged union keeps the raw bytes
                 # an unknown variant forwards.
                 raw_record = (
@@ -497,7 +492,7 @@ class Values:
                     and len(self.fields(value.element)) > 1
                     else ""
                 )
-                item = f"_read{public_name(value.element.native)}({item_expression}{raw_record}{extra})"
+                item = f"_read{public_name(value.element.native)}({item_expression}{raw_record})"
             else:
                 item = self.copy(value.element, item_expression)
             result = f"List<{self.public(value.element)}>.unmodifiable(List.generate({count}, (index) => {item}))"
@@ -843,25 +838,6 @@ class Values:
             reads.append(
                 f"    {name}: {self.copy(field.value, 'source.' + field.name)},"
             )
-        item_buffer = next(
-            (
-                field.value.item_buffer
-                for record in self.bound.values.values()
-                for field in record.fields
-                if field.value.kind == "array"
-                and field.value.element
-                and field.value.element.native == value.native
-                and field.value.item_buffer
-            ),
-            None,
-        )
-        if item_buffer:
-            arguments.append(f"this.{item_buffer.field} = ''")
-            fields.append(
-                doc(self.bound, f"{value.native}.{item_buffer.field}", "  ")
-                + f"  final String {item_buffer.field};"
-            )
-            reads.append(f"    {item_buffer.field}: {item_buffer.field},")
         arguments.append(f"required this.{identifier(union.name)}")
         fields.append(f"  final {payload} {identifier(union.name)};")
         declarations = [
@@ -920,7 +896,7 @@ class Values:
             + "\n".join(writes)
             + f"\n  switch(value.{identifier(union.name)}) {{\n"
             + "\n".join(cases)
-            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source, {{Uint8List Function()? rawRecord{', String ' + item_buffer.field + " = ''" if item_buffer else ''}}}) => {public}(\n"
+            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source, {{Uint8List Function()? rawRecord}}) => {public}(\n"
             + "\n".join(reads)
             + "\n);\n"
         )

@@ -167,14 +167,9 @@ def decode(values, value, source, context="raw"):
     if value.kind == "reference":
         return f"try NativeInputArena.copyArray({source}, count: 1).map {{ {decode(values, value.element, '$0', context)} }}[0]"
     if value.kind == "array" and value.stride:
-        info = value.item_buffer
-        extra = ""
-        if info:
-            copier = "copyUTF8" if info.encoding == "utf8" else "copyData"
-            extra = f", {identifier(camel(info.field))}: NativeInputArena.{copier}Slice(data: {context}.{identifier(info.data)}, size: {context}.{identifier(info.size)}, offset: item.{identifier(info.offset)}, length: item.{identifier(info.length)})"
         item = (
-            f"item, bytes in try {values.public(value.element)}(raw: item, recordBytes: bytes{extra})"
-            if dynamic(value.element) or extra
+            f"item, bytes in try {values.public(value.element)}(raw: item, recordBytes: bytes)"
+            if dynamic(value.element)
             else f"item, _ in {values.public(value.element)}(raw: item)"
         )
         return f"try NativeInputArena.copyStrided({source}, count: {context}.{identifier(value.length)}, stride: {context}.{identifier(value.stride)}) {{ {item} }}"
@@ -237,37 +232,10 @@ def declaration(values, value):
     )
     typ = values.public(value)
     fields, args, init, encode_lines, decode_lines = [], [], [], [], []
-    controls = {
-        name
-        for field in value.fields
-        if field.value.item_buffer
-        for name in (
-            field.value.item_buffer.data,
-            field.value.item_buffer.size,
-            field.value.stride,
-        )
-    }
-    item = values.item_buffers.get(value.native)
-    extra_parameters = ""
-    if item:
-        controls.update((item.offset, item.length))
-        local = identifier(camel(item.field))
-        typ_ = "String" if item.encoding == "utf8" else "Data"
-        empty = '""' if item.encoding == "utf8" else "Data()"
-        fields.append(
-            doc(values.bound, f"{value.native}.{item.field}", "  ")
-            + f"  public var {local}: {typ_}"
-        )
-        args.append(f"{local}: {typ_} = {empty}")
-        init.append(f"    self.{local} = {local}")
-        decode_lines.append(f"    self.{local} = {local}")
-        extra_parameters = f", {local}: {typ_} = {empty}"
     for field in value.fields:
         if field.role == "presence_mask":
             encode_lines.append(f"    raw.{identifier(field.name)} = 0")
     for f in value.fields:
-        if f.name in controls:
-            continue
         raw, local = f"raw.{identifier(f.name)}", identifier(camel(f.name))
         if f.role == "size":
             encode_lines.append(
@@ -364,7 +332,7 @@ def declaration(values, value):
     return raw
   }}
 """
-        if value.native in values.bound.inputs and not controls
+        if value.native in values.bound.inputs
         else ""
     )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
@@ -374,7 +342,7 @@ def declaration(values, value):
   public init({", ".join(args)}) {{
 {chr(10).join(init)}
   }}
-  init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil{extra_parameters}) throws {{
+  init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil) throws {{
 {chr(10).join(decode_lines)}
   }}
 {encoder}}}

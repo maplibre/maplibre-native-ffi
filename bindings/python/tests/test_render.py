@@ -28,6 +28,7 @@ from support import (
     TIMEOUT,
     Harness,
     Signal,
+    close_if_live,
     leak_reports,
     result,
 )
@@ -296,10 +297,10 @@ class OwnedTexture:
                 raise AssertionError("the graphics thread did not stop")
         # No driver call is in flight once servicing stops, so the session
         # can be destroyed.
-        if release and self.session is not None and not self.session.closed:
+        if release and self.session is not None:
             self.session.close()
-        if release and self.map is not None and not self.map.closed:
-            result(self.map.close())
+        if release and self.map is not None:
+            close_if_live(self.map)
         if self._service is not None:
             self._release = release
             self._finish.set()
@@ -314,7 +315,7 @@ class OwnedTexture:
         if self._closed:
             return
         try:
-            if self.session is not None and not self.session.closed:
+            if self.session is not None:
                 result(self.session.detach())
         except BaseException:
             with contextlib.suppress(Exception):
@@ -397,8 +398,7 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
 
         assert target.with_texture(frame, inspect) != 0
         with frame:
-            assert not frame.closed
-        assert frame.closed
+            frame.get_result()
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,
@@ -435,14 +435,17 @@ def test_a_borrow_on_another_thread_holds_off_close(
                 mln.MaplibreError, check=lambda error: error.status == mln.Status.BUSY
             ):
                 frame.close()
-            assert not frame.closed
         finally:
             release.set()
             borrower.join()
 
         assert not failures
         frame.close()
-        assert frame.closed
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            frame.get_result()
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
@@ -468,8 +471,11 @@ def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
                 return _texture_name(backend, view)
 
             assert target.with_texture(frame, inspect) != 0
-            assert not frame.closed
-        assert frame.closed
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            frame.get_result()
 
 
 _SHUTDOWN_WITH_AN_ATTACHED_SESSION = """

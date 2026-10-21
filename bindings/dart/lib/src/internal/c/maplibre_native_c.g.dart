@@ -384,9 +384,6 @@ final class mln_event_batch_view extends Struct {
   external Pointer<mln_runtime_event> events;
   @Size()
   external int event_count;
-  external Pointer<Char> messages;
-  @Size()
-  external int messages_size;
 }
 
 final class mln_feature_state_selector extends Struct {
@@ -1135,10 +1132,7 @@ final class mln_runtime_event extends Struct {
   external int code;
   @Uint32()
   external int payload_type;
-  @Uint64()
-  external int message_offset;
-  @Uint32()
-  external int message_size;
+  external mln_buffer_view message;
   external mln_runtime_event_payload payload;
 }
 

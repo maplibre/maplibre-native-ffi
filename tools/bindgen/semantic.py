@@ -80,11 +80,6 @@ class DecisionPlan:
     parameter: str
     handle: HandlePlan
     accept: str
-    pass_through: str
-    complete: str
-    cancelled: str
-    cancel_registration: str
-    resume: str | None = None
 
 
 @dataclass(frozen=True)
@@ -100,7 +95,7 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    # Whether a callback's reentry owner is a handle that only names the
+    # Whether a callback's borrowed owner is a handle that only names the
     # receiver of the call that registers it, which the host's callback
     # already holds.
     receiver_owned: bool = False
@@ -115,16 +110,6 @@ class CallbackResponsePlan:
 
 
 @dataclass(frozen=True)
-class ItemBufferPlan:
-    field: str
-    data: str
-    size: str
-    offset: str
-    length: str
-    encoding: str
-
-
-@dataclass(frozen=True)
 class ValuePlan:
     kind: str
     native: str
@@ -136,7 +121,6 @@ class ValuePlan:
     optional: str | None = None
     length: str | None = None
     stride: str | None = None
-    item_buffer: ItemBufferPlan | None = None
     fields: tuple[FieldPlan, ...] = ()
     element: ValuePlan | None = None
     handle: HandlePlan | None = None
@@ -160,7 +144,7 @@ class ValuePlan:
 
 
 # Field roles that hold control state: a struct's size, reserved space, an
-# array's count or stride, an item arena, a presence mask, a union tag, a
+# array's count or stride, a presence mask, a union tag, a
 # callback context, a registration's release callback, and a registration's
 # delivery queue, which a binding runtime sets in place of the callback.
 CONTROL_ROLES = frozenset(
@@ -169,7 +153,6 @@ CONTROL_ROLES = frozenset(
         "reserved",
         "count",
         "stride",
-        "arena",
         "presence_mask",
         "tag",
         "context",
@@ -201,13 +184,6 @@ class ParameterPlan:
 
 
 @dataclass(frozen=True)
-class CallbackReentryPlan:
-    # The callback parameter that identifies the owner.
-    owner_parameter: str
-    operations: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class DeliveryPlan:
     """How a queue carries a copy of one callback's arguments.
 
@@ -229,8 +205,7 @@ class CallbackPlan:
     failure: str | None = None
     decision: DecisionPlan | None = None
     context: str | None = None
-    reentry: str = "allow"
-    reentry_policy: CallbackReentryPlan | None = None
+    borrowed_owner: str | None = None
     status: bool = False
     # How a delivery queue carries the call, for a registration in queue mode.
     delivery: DeliveryPlan | None = None
@@ -238,19 +213,6 @@ class CallbackPlan:
     # returns, so a binding must run it on the calling thread rather than
     # deliver it later, even when it returns nothing.
     synchronous: bool = False
-
-    @property
-    def borrowed_owner(self) -> str | None:
-        """The handle parameter that only names the reentry owner, which the
-        host's callback already holds, or None. A decision handle is the
-        host's to adopt, so it is not one."""
-        policy = self.reentry_policy
-        if policy is None or (
-            self.decision and self.decision.parameter == policy.owner_parameter
-        ):
-            return None
-        owner = next(p for p in self.parameters if p.name == policy.owner_parameter)
-        return owner.name if owner.value.kind == "handle" else None
 
     @property
     def arguments(self) -> tuple[ParameterPlan, ...]:
@@ -508,7 +470,6 @@ class ValueAttributes(TypedDict):
     optional: str | None
     length: str | None
     stride: str | None
-    item_buffer: ItemBufferPlan | None
 
 
 class Binder:
@@ -611,16 +572,6 @@ class Binder:
             "optional": metadata.get("optional"),
             "length": metadata.get("length"),
             "stride": metadata.get("stride"),
-            "item_buffer": ItemBufferPlan(
-                metadata["item_name"],
-                metadata["item_buffer"],
-                metadata["item_buffer_size"],
-                metadata["item_offset"],
-                metadata["item_length"],
-                metadata["item_encoding"],
-            )
-            if "item_buffer" in metadata
-            else None,
         }
         if metadata.get("kind") == "native_pointer":
             return ValuePlan(kind="native_pointer", **common)
@@ -765,9 +716,7 @@ class Binder:
                 for member in fields:
                     if member.value.stride:
                         storage_roles[member.value.stride] = "stride"
-                    if member.value.item_buffer:
-                        storage_roles[member.value.item_buffer.data] = "arena"
-                        storage_roles[member.value.item_buffer.size] = "count"
+
                 fields = [
                     replace(member, role=storage_roles[member.name])
                     if member.name in storage_roles
@@ -938,14 +887,12 @@ class Binder:
                     validate_input_lifetime(member.value)
 
             def validate_input_layout(item, parameter_name=parameter.name):
-                if (
-                    item.stride
-                    or item.item_buffer
-                    or any(member.role in {"stride", "arena"} for member in item.fields)
+                if item.stride or any(
+                    member.role in {"stride"} for member in item.fields
                 ):
                     raise ModelError(
                         [
-                            f"{context} parameter {parameter_name}: strided or arena-backed record requires an input reconstruction contract"
+                            f"{context} parameter {parameter_name}: strided record requires an input reconstruction contract"
                         ]
                     )
                 if item.element:
@@ -1332,8 +1279,7 @@ class Binder:
             typedef.metadata["failure"],
             self.decision(typedef),
             contexts[0] if contexts else None,
-            typedef.metadata.get("reentry", "allow"),
-            self.callback_reentry(typedef),
+            typedef.metadata.get("borrowed_owner"),
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
             delivery=self.delivery(typedef),
@@ -1352,23 +1298,6 @@ class Binder:
         )
         return DeliveryPlan(constant, member.name, type_name(member.type))
 
-    def callback_reentry(self, typedef) -> CallbackReentryPlan | None:
-        metadata = typedef.metadata
-        if metadata.get("reentry") != "protocol":
-            return None
-        owner = metadata["reentry_owner"]
-        parameter = next((p for p in typedef.parameters if p.name == owner), None)
-        if parameter is None:
-            raise ModelError(
-                [
-                    f"{typedef.location}: {typedef.name}: reentry_owner names no parameter"
-                ]
-            )
-        return CallbackReentryPlan(
-            parameter.name,
-            tuple(metadata["reentry_calls"].split(",")),
-        )
-
     def decision(self, typedef) -> DecisionPlan | None:
         metadata = typedef.metadata
         if "decision_handle" not in metadata:
@@ -1380,11 +1309,6 @@ class Binder:
             parameter.name,
             self.handles[type_name(parameter.type)],
             metadata["decision_accept"],
-            metadata["decision_pass"],
-            metadata["complete"],
-            metadata["cancelled"],
-            metadata["cancel_registration"],
-            metadata.get("resume"),
         )
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:

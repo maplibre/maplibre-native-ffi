@@ -205,19 +205,6 @@ func bindingString(pointer unsafe.Pointer, count uint64) string {
 	return string(unsafe.Slice((*byte)(pointer), length))
 }
 
-func bindingArenaString(pointer unsafe.Pointer, size, offset, count uint64) string {
-	if offset > size || count > size-offset {
-		panic(bindingFailure{newBindingError(StatusNativeError, "invalid native message range")})
-	}
-	if count == 0 {
-		return ""
-	}
-	if pointer == nil {
-		panic(bindingFailure{newBindingError(StatusNativeError, "null native message arena")})
-	}
-	return bindingString(unsafe.Add(pointer, bindingLength(offset)), count)
-}
-
 type bindingState struct {
 	typeName string
 	raw      uint64

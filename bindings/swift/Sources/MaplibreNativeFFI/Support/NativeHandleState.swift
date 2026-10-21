@@ -6,8 +6,9 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private var closed = false
   private let parent: AnyObject?
   let value: Handle
-  private let copyLock: NSRecursiveLock?
-  private var copying = false
+  private let protectsCopies: Bool
+  private var readers = 0
+  private var releasing = false
 
   init(
     typeName: String,
@@ -22,7 +23,7 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     self.typeName = typeName
     self.parent = parent
     value = handle
-    copyLock = protectsCopies ? NSRecursiveLock() : nil
+    self.protectsCopies = protectsCopies
   }
 
   deinit {
@@ -49,27 +50,41 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   }
 
   /// Batch getters lend memory beyond the native call, until the copy ends.
-  func withHandle<T>(_ body: (Handle) throws -> T) rethrows -> T {
-    guard let copyLock else { return try body(value) }
-    return try copyLock.withLock {
-      copying = true
-      defer { copying = false }
-      return try body(value)
+  func withHandle<T>(_ body: (Handle) throws -> T) throws -> T {
+    if protectsCopies {
+      try lock.withLock {
+        guard !releasing
+        else { throw MaplibreError.invalidState("Batch is in use") }
+        readers += 1
+      }
     }
+    defer {
+      if protectsCopies {
+        lock.withLock { readers -= 1 }
+      }
+    }
+    return try body(value)
   }
 
-  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
-    guard let copyLock else { return try close(destroy) }
-    try copyLock.withLock {
-      guard !copying
-      else { throw MaplibreError.invalidState("Batch is in use") }
-      try close(destroy)
+  func closeOnce(
+    idempotent: Bool = true,
+    _ destroy: (Handle) throws -> Void
+  ) throws {
+    let shouldClose = try lock.withLock {
+      if protectsCopies, readers != 0 || releasing {
+        throw MaplibreError.invalidState("Batch is in use")
+      }
+      if idempotent, closed {
+        return false
+      }
+      releasing = protectsCopies
+      return true
     }
-  }
-
-  private func close(_ destroy: (Handle) throws -> Void) throws {
-    guard !lock.withLock({ closed }) else { return }
-    defer { withExtendedLifetime(parent) {} }
+    guard shouldClose else { return }
+    defer {
+      lock.withLock { releasing = false }
+      withExtendedLifetime(parent) {}
+    }
     try destroy(value)
     lock.withLock { closed = true }
   }

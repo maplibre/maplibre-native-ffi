@@ -32,7 +32,6 @@
 "COMP-06" = "bindings/go/completion_test.go::TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError"
 "CB-01" = "bindings/go/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"
 "CB-02" = "bindings/go/callbacks_test.go::TestCallbackDoesNotKeepItsReceiverAlive"
-"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
 "CB-04" = "bindings/go/callbacks_test.go::TestCallbackPanicIsContained"
 "CB-05" = "bindings/go/callbacks_test.go::TestProviderAnswersADeferredRequest"
 "CB-06" = "bindings/go/callbacks_test.go::TestScopedResponseRejectsLateAndForeignUse"

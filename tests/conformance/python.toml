@@ -21,7 +21,6 @@
 "COMP-06" = "bindings/python/tests/test_completions.py::test_discarded_commands_are_fenced_and_sync_rejection_raises"
 "CB-01" = "bindings/python/tests/test_callbacks.py::test_a_registration_is_rooted_until_native_releases_it"
 "CB-02" = "bindings/python/tests/test_callbacks.py::test_a_registered_callback_does_not_keep_its_receiver_alive"
-"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
 "CB-04" = "bindings/python/tests/test_callbacks.py::test_an_exception_in_a_callback_is_reported_and_contained"
 "CB-05" = "bindings/python/tests/test_callbacks.py::test_a_provider_can_answer_a_request_later_from_another_thread"
 "CB-06" = "bindings/python/tests/test_callbacks.py::test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread"

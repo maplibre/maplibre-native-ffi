@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import replace
 
 from .. import docs
 from ..compiler import compile_api
@@ -85,11 +84,11 @@ class Values:
         self.plans: dict[str, ValuePlan] = {}
         self.enum_names: set[str] = set()
         self.mask_enums: set[str] = set()
-        self.item_buffers = {
-            field.value.element.native: field.value.item_buffer
+        self.strided_records = {
+            field.value.element.native
             for value in self.bound.values.values()
             for field in value.fields
-            if field.value.item_buffer and field.value.element
+            if field.value.stride and field.value.element
         }
 
     def record(self, name: str) -> ValuePlan:
@@ -192,27 +191,7 @@ class Values:
             for field in plan.fields
             if field.presence and field.presence.mask
         }
-        item_buffer = self.item_buffers.get(plan.native)
-        if item_buffer:
-            controls.update((item_buffer.offset, item_buffer.length))
         fields = tuple(field for field in plan.fields if field.name not in controls)
-        if item_buffer:
-            prototype = next(
-                field for field in plan.fields if field.name == item_buffer.offset
-            )
-            fields += (
-                replace(
-                    prototype,
-                    name=item_buffer.field,
-                    value=replace(
-                        prototype.value,
-                        kind="buffer",
-                        native="mln_buffer_view",
-                        buffer_form="view",
-                        encoding=item_buffer.encoding,
-                    ),
-                ),
-            )
         return fields
 
     def members(self, plan: ValuePlan) -> tuple[tuple[str, FieldPlan], ...]:
@@ -451,9 +430,7 @@ class Values:
         )
 
     def can_encode(self, plan: ValuePlan) -> bool:
-        if plan.native in self.item_buffers or any(
-            field.value.stride or field.value.item_buffer for field in plan.fields
-        ):
+        if any(field.value.stride for field in plan.fields):
             return False
         if plan.response:
             return False
@@ -485,11 +462,7 @@ class Values:
         values = []
         members = self.members(plan)
         for name, field in members:
-            if (
-                item_buffer := self.item_buffers.get(plan.native)
-            ) and field.name == item_buffer.field:
-                expression = "message"
-            elif field.value.stride:
+            if field.value.stride:
                 expression = (
                     f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
                 )
@@ -513,7 +486,7 @@ class Values:
                 raw_bytes = (
                     f"NativeCallScope.CopyValueBytes(value.{member(field.name)})"
                 )
-                if plan.native in self.item_buffers:
+                if plan.native in self.strided_records:
                     offset = f"(nuint)Marshal.OffsetOf<{plan.native}>(nameof({plan.native}.{member(field.name)}))"
                     raw_bytes = f"record == null ? {raw_bytes} : NativeCallScope.CopyArray<byte>(record + {offset}, recordSize - {offset})"
                 arms.append(
@@ -565,8 +538,8 @@ class Values:
         else:
             copied = "new(" + ", ".join(values) + ")"
         extra = (
-            ', string message = "", byte* record = null, nuint recordSize = 0'
-            if plan.native in self.item_buffers
+            ", byte* record = null, nuint recordSize = 0"
+            if plan.native in self.strided_records
             else ""
         )
         declaration = f"    private static {public_name(plan.native)} Copy{public_name(plan.native)}({plan.native} value{extra}) => {copied};\n"
@@ -576,7 +549,6 @@ class Values:
                 continue
             native = self.raw_type(array.element)
             public = self.public_type(array.element)
-            item_buffer = array.item_buffer
             declaration += (
                 f"    private static {public}[] Copy{public_name(plan.native)}{pascal(field.name)}({plan.native} value)\n    {{\n"
                 f"        var count = checked((int)value.{member(array.length)});\n"
@@ -586,16 +558,12 @@ class Values:
                 f"            var record = (byte*)value.{member(field.name)} + checked((nuint)index * value.{member(array.stride)});\n"
                 f"            var item = *({native}*)record;\n"
             )
-            if item_buffer:
-                declaration += (
-                    f'            if (item.{member(item_buffer.offset)} > value.{member(item_buffer.size)} || item.{member(item_buffer.length)} > value.{member(item_buffer.size)} - item.{member(item_buffer.offset)} || (item.{member(item_buffer.length)} != 0 && value.{member(item_buffer.data)} == null)) throw new InvalidOperationException("Invalid native item buffer.");\n'
-                    f"            var message = RuntimeStructs.CopyUtf8((byte*)value.{member(item_buffer.data)} + item.{member(item_buffer.offset)}, item.{member(item_buffer.length)});\n"
-                    f"            copied[index] = Copy{public_name(array.element.native)}(item, message, record, value.{member(array.stride)});\n"
-                )
-            else:
-                declaration += (
-                    f"            copied[index] = {self.copy(array.element, 'item')};\n"
-                )
+            copied = (
+                f"Copy{public_name(array.element.native)}(item, record, value.{member(array.stride)})"
+                if array.element.native in self.strided_records
+                else self.copy(array.element, "item")
+            )
+            declaration += f"            copied[index] = {copied};\n"
             declaration += "        }\n        return copied;\n    }\n"
         return declaration
 
@@ -828,7 +796,11 @@ class Values:
                 )
                 accept = self.constant(decision.accept)
                 raw = self.raw_type(callback.result)
-                failure = self.constant(callback.failure)
+                failure = (
+                    self.constant(callback.failure)
+                    if callback.failure.startswith("MLN_")
+                    else callback.failure
+                )
                 methods.append(
                     "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                     f"    private static {raw} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
@@ -838,7 +810,7 @@ class Values:
                     f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
                     f"            if (decision != ({self.public_type(callback.result)}){accept}) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff();\n"
                     f"            return ({raw})decision;\n"
-                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); if (owned is not null) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff(); return unchecked(({raw})(-1)); }}\n    }}\n'
+                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); if (owned is not null) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff(); return unchecked(({raw})({failure})); }}\n    }}\n'
                 )
                 continue
             responses = [

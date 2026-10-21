@@ -319,7 +319,7 @@ def completion_decode(value, values):
     bare = replace(value, nullable=False, optional=None)
     if value.kind == "array":
         element = value.element
-        item = values.decode_item(element, "it", None, None)
+        item = values.decode_item(element, "it")
         expression = (
             "readStrided(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), "
             f"CompletionBridge.valueSize(result), {values.element_size(element)}) {{ {item} }}"

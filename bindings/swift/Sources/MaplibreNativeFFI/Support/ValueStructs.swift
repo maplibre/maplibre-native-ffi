@@ -140,27 +140,6 @@ final class NativeInputArena {
     }
   }
 
-  static func copyUTF8Slice<
-    Size: BinaryInteger,
-    Offset: BinaryInteger,
-    Length: BinaryInteger
-  >(
-    data: UnsafeRawPointer?, size: Size, offset: Offset, length: Length
-  ) throws -> String {
-    guard let size = Int(exactly: size), let offset = Int(exactly: offset),
-          let length = Int(exactly: length), size >= 0, offset >= 0,
-          length >= 0,
-          offset <= size, length <= size - offset, size == 0 || data != nil
-    else {
-      throw MaplibreError
-        .invalidArgument("native message slice exceeds its arena")
-    }
-    return try NativeString.copyUTF8(
-      data: data?.advanced(by: offset),
-      size: length
-    )
-  }
-
   func view(_ text: String) -> mln_buffer_view {
     view(Data(text.utf8))
   }

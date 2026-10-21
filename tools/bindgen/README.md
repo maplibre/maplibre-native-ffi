@@ -177,7 +177,7 @@ consumption follows the release function's return type.
 | First struct member `uint32_t size` | `kind=size`                                                                                           |
 | Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`                      |
 | `kind=reserved` member              | Zeroed reserved storage                                                                               |
-| Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                                |
+| Callback typedef                    | a void callback has `failure=contain`                                                                 |
 | Handle typedef                      | `parent=none`; its operations begin with its own name                                                 |
 | Callback registration               | `user_data` names its one `kind=context` member                                                       |
 | Record typedef                      | `default_function` names the one function that takes no arguments and returns the record              |
@@ -223,20 +223,14 @@ These keys state what a C shape cannot:
   passes a callback registration, because an absent call publishes nothing.
   Dart, Go, Rust, Swift, and Zig return any output as absent; .NET, Kotlin, and
   Python return only an owned handle as absent.
-- `resume=` on a decision callback optionally names a second terminal operation
-  on its handle. Bindings treat it like completion for handle ownership and
-  callback admission; it takes only the handle and diagnostic.
 - `accepted_unless=` on a function names a boolean output that, when set on
   success, reports that native kept nothing from the function's one callback
   registration, as `out_cancelled` does for
   `mln_resource_request_set_cancel_callback`. The caller still owns that
   registration, so a binding releases its roots before returning.
-- `reentry_owner=` on a protocol callback names the parameter whose operations
-  the callback may call. A handle parameter that is not a decision handle only
-  names the owner, as `mln_resource_request_cancel_callback`'s `handle` does:
-  the host's callback already holds that owner, so a binding keeps the parameter
-  for its reentry scope and leaves it out of the host's callback. Such a
-  callback may call back only into the receiver of the call that registers it.
+- `borrowed_owner=` on a callback names a borrowed handle parameter that
+  identifies the registration's receiver. The host's callback already holds that
+  owner, so bindings leave the redundant parameter out of its signature.
 
 `capture=manual` on a delivery record leaves its native capture to the core.
 Runtime events use this to share record and message storage across a batch.
@@ -255,9 +249,9 @@ No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment
 states the threads that it runs on.
 
-An annotation that names another declaration, such as `reentry_calls`,
-`complete` or `cancel_registration`, must name one that exists; the schema
-reports the name that does not resolve.
+An annotation that names another declaration, such as `release=` or
+`borrowed_owner=`, must name one that exists; the schema reports the name that
+does not resolve.
 
 ## Document a declaration
 
@@ -313,16 +307,16 @@ or callback that returns a registration.
 The plan also names each public member once, and an emitter only converts its
 case and escapes keywords:
 
-| Plan field              | Rule                                                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                                              |
-| `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                                 |
-| `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                                 |
-| `MaskFlag.member`       | The flag constant without its enum's shared prefix                                                          |
-| `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release, delivery queue |
-| `OperationPlan.status`  | Whether the function returns the status enum                                                                |
-| `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs                        |
-| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                                   |
+| Plan field              | Rule                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                                       |
+| `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                          |
+| `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                          |
+| `MaskFlag.member`       | The flag constant without its enum's shared prefix                                                   |
+| `FieldPlan.public`      | False for a control role: size, reserved, count, stride, mask, tag, context, release, delivery queue |
+| `OperationPlan.status`  | Whether the function returns the status enum                                                         |
+| `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs                 |
+| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                            |
 
 `native_results.py` writes `src/completion/completion_result_generated.inc`,
 which specializes `CompletionResult` for each completion function other than a

@@ -3630,6 +3630,9 @@ class RuntimeEvent:
     0. See `mln_runtime_event_type` for the per-type meaning.
     """
 
+    message: str
+    """Borrowed UTF-8 message bytes, empty when this event carries no message."""
+
     payload: (
         RuntimeEventRenderFrameVariant
         | RuntimeEventRenderMapVariant
@@ -3642,8 +3645,6 @@ class RuntimeEvent:
     )
     """Typed payload selected by payload_type."""
 
-    message: str
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -3652,6 +3653,7 @@ class RuntimeEvent:
             source=raw["source"],
             generation=raw["generation"],
             code=raw["code"],
+            message=raw["message"],
             payload=_copy_variant(
                 raw["payload"],
                 {
@@ -3664,7 +3666,6 @@ class RuntimeEvent:
                 },
                 0,
             ),
-            message=raw["message"],
         )
 
 

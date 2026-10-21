@@ -4731,9 +4731,7 @@ final class RuntimeEvent {
     required this.source,
     required this.generation,
     this.code = 0,
-    required this.messageOffset,
-    this.messageSize = 0,
-    this.message = '',
+    required this.message,
     required this.payload,
   });
 
@@ -4755,13 +4753,7 @@ final class RuntimeEvent {
   /// 0. See `mln_runtime_event_type` for the per-type meaning.
   final int code;
 
-  /// Byte offset of this event's message inside
-  /// `mln_event_batch_view.messages`. Zero when message_size is 0.
-  final BigInt messageOffset;
-
-  /// Number of message bytes, excluding the trailing null terminator that
-  /// follows them in the arena. Zero when this event carries no message.
-  final int messageSize;
+  /// Borrowed UTF-8 message bytes, empty when this event carries no message.
   final String message;
   final RuntimeEventPayload payload;
 }

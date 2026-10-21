@@ -323,10 +323,7 @@ static const immediate_case immediate_cases[] = {
      MLN_ANIMATION_OPTION_EASING},
 };
 
-static bool is_immediate_change(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
+static bool is_immediate_change(const mln_runtime_event* event, void* context) {
   return event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
          event->code == MLN_CAMERA_CHANGE_MODE_IMMEDIATE &&
          event->generation == *(const uint64_t*)context;

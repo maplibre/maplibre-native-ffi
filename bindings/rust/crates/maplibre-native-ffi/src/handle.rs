@@ -134,7 +134,6 @@ macro_rules! native_owner {
             pub fn id(&self) -> u64 {
                 self.inner.id()
             }
-
         }
     };
 }

@@ -606,7 +606,7 @@ static bool drain_until_match(void* context) {
       const mln_runtime_event* event =
         (const mln_runtime_event*)((const char*)batch.events +
                                    (index * batch.event_size));
-      matched = search->match(event, batch.messages, search->context);
+      matched = search->match(event, search->context);
     }
   }
 }
@@ -640,7 +640,7 @@ size_t mln_test_drain_counting_matching(
       const mln_runtime_event* event =
         (const mln_runtime_event*)((const char*)batch.events +
                                    (index * batch.event_size));
-      if (match(event, batch.messages, context)) {
+      if (match(event, context)) {
         total += 1;
       }
     }
@@ -655,9 +655,7 @@ typedef struct event_copy {
   size_t message_capacity;
 } event_copy;
 
-static bool copy_matching_event(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
+static bool copy_matching_event(const mln_runtime_event* event, void* context) {
   event_copy* copy = context;
   if (
     event->type != copy->type ||
@@ -669,12 +667,12 @@ static bool copy_matching_event(
     *copy->out_event = *event;
   }
   if (copy->out_message != NULL && copy->message_capacity > 0) {
-    size_t copied = event->message_size;
+    size_t copied = event->message.size;
     if (copied > copy->message_capacity - 1) {
       copied = copy->message_capacity - 1;
     }
     if (copied > 0) {
-      memcpy(copy->out_message, messages + event->message_offset, copied);
+      memcpy(copy->out_message, event->message.data, copied);
     }
     copy->out_message[copied] = '\0';
   }

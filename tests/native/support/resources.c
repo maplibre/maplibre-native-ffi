@@ -95,7 +95,7 @@ bool mln_test_await_loading_failure(
            runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, &event,
            out_message, capacity
          ) &&
-         event.message_size < capacity;
+         event.message.size < capacity;
 }
 
 typedef struct style_outcome {
@@ -104,9 +104,7 @@ typedef struct style_outcome {
   char message[512];
 } style_outcome;
 
-static bool style_settled(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
+static bool style_settled(const mln_runtime_event* event, void* context) {
   style_outcome* outcome = context;
   if (event->source != outcome->map) {
     return false;
@@ -116,10 +114,10 @@ static bool style_settled(
     return true;
   }
   if (event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
-    const size_t size = event->message_size < sizeof(outcome->message)
-                          ? event->message_size
+    const size_t size = event->message.size < sizeof(outcome->message)
+                          ? event->message.size
                           : sizeof(outcome->message) - 1;
-    memcpy(outcome->message, messages + event->message_offset, size);
+    if (size != 0) memcpy(outcome->message, event->message.data, size);
     outcome->message[size] = '\0';
     return true;
   }

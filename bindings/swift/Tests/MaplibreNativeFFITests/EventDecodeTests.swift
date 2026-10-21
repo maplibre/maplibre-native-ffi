@@ -15,30 +15,25 @@ import Testing
     MemoryLayout<mln_runtime_event>.offset(of: \.payload)
   )
   let window = (0 ..< stride - payloadOffset).map { UInt8($0 & 0xFF) }
-  let arena = packMessageArena(["opaque", "second"])
   let event = rawRuntimeEvent(
     type: 0x4242,
     sourceType: 9,
     source: 0x77,
     generation: 0x1_0000_0005,
     code: -12,
-    payloadType: 0xBEEF,
-    messageOffset: arena.offsets[0],
-    messageSize: 6
+    payloadType: 0xBEEF
   )
 
   // The second event decodes only when the walk steps by the reported stride.
   let known = rawRuntimeEvent(
     type: 8,
-    source: 0x22,
-    messageOffset: arena.offsets[1],
-    messageSize: 6
+    source: 0x22
   )
 
   let batch = try withSynthesizedEventBatch(
     events: [event, known],
     stride: stride,
-    messages: arena.bytes,
+    messages: ["opaque", "second"],
     payloadWindows: [0: window]
   ) { synthesized in
     let batch = try EventBatchView(raw: synthesized.batch)

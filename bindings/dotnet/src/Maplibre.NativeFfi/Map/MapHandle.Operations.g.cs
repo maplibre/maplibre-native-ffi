@@ -1345,7 +1345,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task CloseAsync()
     {
-        state.Close();
+        state.Close(idempotent: false);
         return teardown;
     }
 

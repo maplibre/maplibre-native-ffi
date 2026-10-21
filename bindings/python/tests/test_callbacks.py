@@ -270,7 +270,6 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     ]
     # A request handle passed through with its callback closes with it.
     assert len(passed_through) == 1
-    assert passed_through[0].closed
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
@@ -314,7 +313,10 @@ def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
     worker = threading.Thread(target=answer)
     worker.start()
     worker.join(TIMEOUT)
-    assert request.closed
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
+        request.complete("unsupported://again.json")
     # The online source cannot load the rewritten scheme.
     harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
     result(harness.runtime.clear_resource_transform())

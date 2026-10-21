@@ -16,28 +16,22 @@ internal static unsafe class EventBatches
     /// Decodes events laid out at a caller-chosen stride, so a decoder that indexed events by its
     /// own record size reads the wrong bytes.
     /// </summary>
-    internal static IReadOnlyList<RuntimeEvent> Decode(
-        mln_runtime_event[] events,
-        byte[] messages,
-        uint eventSize
-    )
+    internal static IReadOnlyList<RuntimeEvent> Decode(mln_runtime_event[] events, uint eventSize)
     {
         var records = new byte[checked(events.Length * (int)eventSize)];
         for (var index = 0; index < events.Length; index++)
             MemoryMarshal.Write(records.AsSpan(index * (int)eventSize), in events[index]);
-        return DecodeRecordBytes(records, messages, (nuint)events.Length, eventSize);
+        return DecodeRecordBytes(records, (nuint)events.Length, eventSize);
     }
 
     /// <summary>Decodes a batch whose event records the caller laid out byte by byte.</summary>
     internal static IReadOnlyList<RuntimeEvent> DecodeRecordBytes(
         byte[] records,
-        byte[] messages,
         nuint eventCount,
         uint eventSize
     )
     {
         fixed (byte* recordBytes = records)
-        fixed (byte* messageBytes = messages)
         {
             var batch = new mln_event_batch_view
             {
@@ -45,30 +39,29 @@ internal static unsafe class EventBatches
                 event_size = eventSize,
                 events = (mln_runtime_event*)recordBytes,
                 event_count = eventCount,
-                messages = (sbyte*)messageBytes,
-                messages_size = (nuint)messages.Length,
             };
             return GeneratedValues.CopyEventBatchView(batch).Events;
         }
     }
 
-    /// <summary>
-    /// A message arena laid out the way a drain lays one out: every message is followed by a null
-    /// terminator, and each event records its own offset into the bytes.
-    /// </summary>
-    internal sealed class MessageArena
+    /// <summary>Owns message views until the decoder copies their bytes.</summary>
+    internal sealed class MessageArena : IDisposable
     {
-        private readonly List<byte> bytes = [];
+        private readonly List<nint> allocations = [];
 
-        internal (uint Offset, uint Size) Add(string message)
+        internal mln_buffer_view Add(string message)
         {
             var encoded = Encoding.UTF8.GetBytes(message);
-            var offset = (uint)bytes.Count;
-            bytes.AddRange(encoded);
-            bytes.Add(0);
-            return (offset, (uint)encoded.Length);
+            var data = (byte*)NativeMemory.Alloc((nuint)encoded.Length);
+            encoded.CopyTo(new Span<byte>(data, encoded.Length));
+            allocations.Add((nint)data);
+            return new mln_buffer_view { data = data, size = (nuint)encoded.Length };
         }
 
-        internal byte[] Bytes => [.. bytes];
+        public void Dispose()
+        {
+            foreach (var data in allocations)
+                NativeMemory.Free((void*)data);
+        }
     }
 }

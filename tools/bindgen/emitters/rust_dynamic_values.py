@@ -91,12 +91,7 @@ def decode(values, value, source, context="raw"):
             # An optional record member takes a presence bit, so only a
             # pointer-shaped value is nullable.
             raise Unsupported(f"{source}: a copied record holds a nullable reference")
-        if (
-            value.kind == "array"
-            and value.ctype.kind != "array"
-            and not value.stride
-            and not value.item_buffer
-        ):
+        if value.kind == "array" and value.ctype.kind != "array" and not value.stride:
             return f"unsafe {{ convert::copy_optional_array({source}, {count(value, context)}) }}?"
         copied = decode(
             values, replace(value, nullable=False, optional=None), source, context
@@ -111,20 +106,6 @@ def decode(values, value, source, context="raw"):
     if value.kind == "array":
         if value.ctype.kind == "array":
             return f"unsafe {{ convert::copy_fixed({source}) }}?"
-        if value.item_buffer:
-            buffer = value.item_buffer
-            items = (
-                f"unsafe {{ convert::strided_items({source}, {count(value, context)}, {context}.{native_identifier(value.stride)}) }}?"
-                if value.stride
-                else f"unsafe {{ convert::items({source}, {count(value, context)}) }}?"
-            )
-            element = values.public(value.element)
-            content = f"unsafe {{ convert::arena_string({context}.{buffer.data}, {context}.{buffer.size}, item.{buffer.offset}, item.{buffer.length}) }}?"
-            return (
-                f"{items}.into_iter().map(|item| -> Result<{element}> {{ "
-                f"let mut value: {element} = unsafe {{ from_native(item) }}?; "
-                f"value.{identifier(buffer.field)} = {content}; Ok(value) }}).collect::<Result<Vec<_>>>()?"
-            )
         if value.stride:
             return f"unsafe {{ convert::copy_strided({source}, {count(value, context)}, {context}.{native_identifier(value.stride)}) }}?"
         return f"unsafe {{ convert::copy_array({source}, {count(value, context)}) }}?"
@@ -184,24 +165,13 @@ def declaration(values, value):
             f"convert::set_flag(&mut raw.{mask}, sys::{flag.name}, self.{local});"
         )
         copies.append(f"{local}: raw.{mask} & sys::{flag.name} != 0,")
-    item_buffer = values.item_buffers.get(value.native)
-    if item_buffer:
-        fields.append(
-            doc(values.bound, f"{value.native}.{item_buffer.field}", "    ")
-            + f"    pub {identifier(item_buffer.field)}: String,"
-        )
-        copies.append(f"{identifier(item_buffer.field)}: String::new(),")
     for field in value.fields:
-        if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
-            continue
         place, local = f"raw.{native_identifier(field.name)}", identifier(field.name)
         if field.role == "count":
             arrays = [f for f in value.fields if f.value.length == field.name]
             if not arrays:
                 raise Unsupported(f"{value.native}.{field.name}: count has no array")
             array = arrays[0]
-            if array.role == "arena":
-                continue
             source = f"self.{identifier(array.name)}"
             length = (
                 f"{source}.as_ref().map_or(0, |items| items.len())"

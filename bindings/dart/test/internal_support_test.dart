@@ -137,8 +137,8 @@ void main() {
       unknown.generation = 0x100000005;
       unknown.code = 17;
       unknown.payload_type = 0xf00d;
-      unknown.message_offset = 0;
-      unknown.message_size = 14;
+      unknown.message.data = messages.cast();
+      unknown.message.size = 14;
       final unknownWindow = (events + payloadOffset).asTypedList(
         eventSize - payloadOffset,
       );
@@ -161,8 +161,6 @@ void main() {
       batch.ref.event_size = eventSize;
       batch.ref.events = events.cast<raw.mln_runtime_event>();
       batch.ref.event_count = 2;
-      batch.ref.messages = messages.cast<Char>();
-      batch.ref.messages_size = messageBytes.length;
       final decoded = decodeRuntimeEventBatchForTesting(batch.ref);
       // Every field is copied before the drain returns, so overwriting the
       // arena cannot change what the host already holds.

@@ -163,7 +163,7 @@ extension NativeReceiver {
     ) -> mln_status
   ) throws -> NativeFuture<Void>? {
     var future: NativeFuture<Void>?
-    try handle.closeOnce { live in
+    try handle.closeOnce(idempotent: false) { live in
       future = try NativeCompletion.startUnit { call(live.raw, $0, $1) }
     }
     return future

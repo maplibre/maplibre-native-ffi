@@ -6,7 +6,7 @@ from ._completion import CommandCompletion
 from ._generated_values import *
 
 class _AcquiredFrameHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def with_metal_texture(self) -> Any: ...
     def with_opengl_texture(self) -> Any: ...
@@ -17,17 +17,17 @@ class _AcquiredFrameHandle:
     def close(self, consumer_completion: GpuSync | None = None) -> Any: ...
 
 class _GeojsonSourceDataHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def close(self) -> Any: ...
 
 class _HttpHeaderTransformResponseScope:
-    closed: bool
+    _is_closed: bool
     id: int
     def set_header(self, name: str, value: str) -> Any: ...
 
 class _MapHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions | None = None
@@ -385,7 +385,7 @@ class _MapHandle:
     def _discard_update_camera(self, update: CameraUpdate | None = None) -> None: ...
 
 class _MapProjectionHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def get_camera(self) -> Any: ...
     def lat_lng_for_pixel(self, point: ScreenPoint) -> Any: ...
@@ -396,13 +396,13 @@ class _MapProjectionHandle:
     def set_camera(self, camera: CameraOptions | None = None) -> Any: ...
 
 class _RenderFrameBatchHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def get(self) -> Any: ...
     def close(self) -> Any: ...
 
 class _RenderSessionHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def abandon(self) -> Any: ...
     def acquire_frame(self) -> Any: ...
@@ -465,7 +465,7 @@ class _RenderSessionHandle:
     ) -> Future[None]: ...
 
 class _ResourceRequestHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def complete(self, response: ResourceResponse) -> Any: ...
     def is_cancelled(self) -> Any: ...
@@ -474,13 +474,13 @@ class _ResourceRequestHandle:
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> Any: ...
 
 class _ResourceTransformRequestHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def complete(self, url: str) -> Any: ...
     def close(self) -> Any: ...
 
 class _RuntimeHandle:
-    closed: bool
+    _is_closed: bool
     id: int
     def clear_event_handler(self) -> Future[None]: ...
     def clear_http_header_transform(self) -> Future[None]: ...

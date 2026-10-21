@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:mirrors';
 
@@ -19,14 +20,29 @@ Object? _field(Object target, String name, [LibraryMirror? library]) =>
     reflect(target).getField(_symbol(name, library ?? _runtime)).reflectee
         as Object?;
 
-/// The one callback registration that owner still roots, or null.
-DeliveryRegistration? singleRegistrationProbeForTesting(Object owner) {
-  final roots = _field(owner, '_callbackRoots')!;
-  final queued = _field(roots, 'queued') as Set<DeliveryRegistration>;
-  return queued.isEmpty ? null : queued.single;
+/// Observes the runtime's retirement hook without adding state to registrations.
+final class RegistrationProbe {
+  RegistrationProbe(DeliveryRegistration registration) {
+    final previous = registration.onRetired;
+    registration.onRetired = () {
+      previous?.call();
+      _retired.complete();
+    };
+  }
+
+  final _retired = Completer<void>();
+  bool get closed => _retired.isCompleted;
+  Future<void> get released => _retired.future;
 }
 
-DeliveryRegistration? logRegistrationProbeForTesting() {
+/// The one callback registration that owner still roots, or null.
+RegistrationProbe? singleRegistrationProbeForTesting(Object owner) {
+  final roots = _field(owner, '_callbackRoots')!;
+  final queued = _field(roots, 'queued') as Set<DeliveryRegistration>;
+  return queued.isEmpty ? null : RegistrationProbe(queued.single);
+}
+
+RegistrationProbe? logRegistrationProbeForTesting() {
   final registrations =
       _field(isolateDeliveryQueue, '_registrations', _queue)
           as Map<int, WeakReference<DeliveryRegistration>>;
@@ -37,7 +53,7 @@ DeliveryRegistration? logRegistrationProbeForTesting() {
         (registration) =>
             registration.handlers.containsKey(raw.MLN_DELIVERY_TYPE_LOG_RECORD),
       );
-  return pending.isEmpty ? null : pending.last;
+  return pending.isEmpty ? null : RegistrationProbe(pending.last);
 }
 
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(

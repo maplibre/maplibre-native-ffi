@@ -328,27 +328,6 @@ unsafe fn generated_strided_values<T: Copy>(
     unsafe { maplibre_core::ptr::strided_records(data, count, stride) }.map_err(map_error)
 }
 
-unsafe fn generated_arena_string<P>(
-    data: *const P,
-    size: impl TryInto<usize>,
-    offset: impl TryInto<usize>,
-    length: impl TryInto<usize>,
-) -> PyResult<String> {
-    let (size, offset, length) = (
-        generated_count(size)?,
-        generated_count(offset)?,
-        generated_count(length)?,
-    );
-    let data = data.cast::<u8>();
-    if offset > size || length > size - offset {
-        return Err(native_error("native message is outside its arena"));
-    }
-    let arena = unsafe { generated_slice(data, size)? };
-    std::str::from_utf8(&arena[offset..offset + length])
-        .map(str::to_owned)
-        .map_err(|_| native_error("native message is not UTF-8"))
-}
-
 fn generated_count(count: impl TryInto<usize>) -> PyResult<usize> {
     count
         .try_into()

@@ -40,7 +40,7 @@ COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"}
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
-# ownership=value, encoding=utf8, and reentry=allow, so a header never writes
+# ownership=value, encoding=utf8, so a header never writes
 # them; an absent nullable means false. The semantic layer supplies
 # lifetime=completion for an array completion result and discardable
 # completions for commands.
@@ -53,7 +53,6 @@ ANNOTATION_VALUES = {
     "nullable": frozenset({"true"}),
     "optional": frozenset({"empty"}),
     "lifetime": frozenset({"call", "owner", "process"}),
-    "reentry": frozenset({"forbid", "protocol"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
 }
@@ -87,12 +86,6 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "empty_variant",
         "kind",
         "stride",
-        "item_name",
-        "item_buffer",
-        "item_buffer_size",
-        "item_offset",
-        "item_length",
-        "item_encoding",
     }
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
@@ -108,17 +101,10 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "user_data",
         "failure",
         "enum",
-        "reentry",
-        "reentry_calls",
-        "reentry_owner",
+        "borrowed_owner",
         "abandon",
         "decision_handle",
         "decision_accept",
-        "decision_pass",
-        "complete",
-        "resume",
-        "cancelled",
-        "cancel_registration",
         "delivery",
         "synchronous",
     }
@@ -328,17 +314,20 @@ class Conventions:
         return defaults
 
     def typedef(self, typedef) -> dict[str, str]:
-        """A callback allows reentry and contains a failure it cannot report; a
+        """A callback contains a failure it cannot report; a
         handle has no parent, and its operations begin with its own name; a
         registration's user data is its context field; and a record's default
         value comes from the one function that takes nothing and returns it."""
         explicit = typedef.metadata
         defaults = {}
         signature = typedef.type.pointee if typedef.type.kind == "pointer" else None
-        if signature is not None and signature.kind == "function":
-            defaults["reentry"] = "allow"
-            if signature.result is not None and signature.result.kind == "void":
-                defaults["failure"] = "contain"
+        if (
+            signature is not None
+            and signature.kind == "function"
+            and signature.result is not None
+            and signature.result.kind == "void"
+        ):
+            defaults["failure"] = "contain"
         if explicit.get("kind") == "handle":
             defaults.update(parent="none")
         record = self.records.get(typedef.name)
@@ -769,54 +758,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{fcontext}: stride requires an array pointer and unsigned byte count"
                     )
-            item_keys = {
-                "item_name",
-                "item_buffer",
-                "item_buffer_size",
-                "item_offset",
-                "item_length",
-                "item_encoding",
-            }
-            if item_keys & field.metadata.keys():
-                if not item_keys <= field.metadata.keys():
-                    errors.append(
-                        f"{fcontext}: item buffer slice requires all relationships"
-                    )
-                else:
-                    child = field.type.pointee
-                    data = field_path(record.name, field.metadata["item_buffer"])
-                    size = field_path(record.name, field.metadata["item_buffer_size"])
-                    offset = (
-                        field_path(
-                            child.declaration or "", field.metadata["item_offset"]
-                        )
-                        if child
-                        else None
-                    )
-                    length = (
-                        field_path(
-                            child.declaration or "", field.metadata["item_length"]
-                        )
-                        if child
-                        else None
-                    )
-                    if (
-                        field.type.kind != "pointer"
-                        or "length" not in field.metadata
-                        or not all((data, size, offset, length))
-                    ):
-                        errors.append(
-                            f"{fcontext}: item buffer slice names absent storage or item fields"
-                        )
-                    elif (
-                        data.type.kind != "pointer"
-                        or data.metadata.get("length")
-                        != field.metadata["item_buffer_size"]
-                        or field.metadata["item_encoding"] not in ENCODINGS
-                    ):
-                        errors.append(
-                            f"{fcontext}: item buffer slice requires a counted byte arena and encoding"
-                        )
             if "enum" in field.metadata and field.metadata["enum"] not in {
                 enum.name for enum in api.enums
             }:
@@ -953,36 +894,24 @@ def validate(api: Api) -> None:
                         and operation.return_type.kind != "void"
                     ):
                         errors.append(f"{context}: release must return status or void")
-        if typedef.metadata.get("reentry") == "protocol":
-            owner = reentry_owner(typedef)
-            names = tuple(
-                filter(None, typedef.metadata.get("reentry_calls", "").split(","))
+        if "borrowed_owner" in typedef.metadata:
+            parameter = next(
+                (
+                    p
+                    for p in typedef.parameters
+                    if p.name == typedef.metadata["borrowed_owner"]
+                ),
+                None,
             )
-            if owner is None or not names:
+            handle = (
+                api.typedefs_by_name.get(parameter.type.declaration or "")
+                if parameter
+                else None
+            )
+            if handle is None or handle.metadata.get("kind") != "handle":
                 errors.append(
-                    f"{context}: protocol reentry requires an owner parameter and operations"
+                    f"{context}: borrowed_owner requires a callback handle parameter"
                 )
-            for name in names:
-                operation = api.functions_by_name.get(name)
-                receiver = (
-                    operation.parameters[0].type
-                    if operation and operation.parameters
-                    else None
-                )
-                receiver = receiver.pointee or receiver if receiver else None
-                if (
-                    receiver is None
-                    or owner is None
-                    or receiver.declaration != owner.declaration
-                    or operation.metadata.get("execution") != "immediate"
-                ):
-                    errors.append(
-                        f"{context}: reentry operation must be an immediate operation on the declared owner"
-                    )
-        elif "reentry_owner" in typedef.metadata or "reentry_calls" in typedef.metadata:
-            errors.append(
-                f"{context}: reentry owner and operations require protocol mode"
-            )
         signature = typedef.type.pointee
         if signature is not None and signature.kind == "function":
             failure = typedef.metadata.get("failure")
@@ -1014,18 +943,11 @@ def validate(api: Api) -> None:
             errors.append(
                 f"{context}: a synchronous callback cannot be delivered through a queue"
             )
-        decision_keys = {
-            "decision_handle",
-            "decision_accept",
-            "decision_pass",
-            "complete",
-            "cancelled",
-            "cancel_registration",
-        }
-        if (decision_keys | {"resume"}) & typedef.metadata.keys():
+        decision_keys = {"decision_handle", "decision_accept"}
+        if decision_keys & typedef.metadata.keys():
             if not decision_keys <= typedef.metadata.keys():
                 errors.append(
-                    f"{context}: decision requires handle, both outcomes, completion, cancellation, registration, and retirement wait"
+                    f"{context}: decision requires a handle and an accepted outcome"
                 )
                 continue
             parameter = next(
@@ -1045,33 +967,12 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: decision_handle requires a callback handle parameter"
                 )
-                continue
-            outcomes = [
-                enum_constants.get(typedef.metadata[key])
-                for key in ("decision_accept", "decision_pass")
-            ]
-            if (
-                any(value is None for value in outcomes)
-                or outcomes[0][0] != outcomes[1][0]
-                or outcomes[0][1] == outcomes[1][1]
-            ):
+            if enum_constants.get(typedef.metadata["decision_accept"], (None,))[
+                0
+            ] != typedef.metadata.get("enum"):
                 errors.append(
-                    f"{context}: decision outcomes require distinct values of one enum"
+                    f"{context}: decision_accept must name a value of the callback enum"
                 )
-            for key in ("complete", "cancelled", "cancel_registration", "resume"):
-                if key not in typedef.metadata:
-                    continue
-                operation = api.functions_by_name.get(typedef.metadata[key])
-                if (
-                    operation is None
-                    or not operation.parameters
-                    or operation.parameters[0].type.declaration != handle.name
-                    or not is_status(operation.return_type)
-                    or has_completion(operation)
-                ):
-                    errors.append(
-                        f"{context}: {key} requires an immediate status operation on the decision handle"
-                    )
     for enum in api.enums:
         errors.extend(
             metadata_errors(
@@ -1246,16 +1147,11 @@ FUNCTION_REFERENCES = {
         "view_begin",
         "view_end",
         "default_function",
-        "complete",
-        "resume",
-        "cancelled",
-        "cancel_registration",
-        "reentry_calls",
     ),
 }
 PARAMETER_REFERENCES = {
     "function": ("view_owner", "accepted_unless"),
-    "typedef": ("decision_handle", "reentry_owner"),
+    "typedef": ("decision_handle", "borrowed_owner"),
 }
 
 
@@ -1287,16 +1183,6 @@ def reference_errors(api: Api) -> list[str]:
     for typedef in api.typedefs:
         check("typedef", typedef, f"{typedef.location}: {typedef.name}")
     return errors
-
-
-def reentry_owner(typedef):
-    """The type whose operations a protocol callback may call: the type of its
-    `reentry_owner` parameter."""
-    name = typedef.metadata.get("reentry_owner")
-    return next(
-        (p.type.pointee or p.type for p in typedef.parameters if p.name == name),
-        None,
-    )
 
 
 def registration_parameters(api: Api, function: Function) -> list:
@@ -1383,9 +1269,12 @@ def callback_result_errors(
             else None
         )
     if enum:
-        if enum_constants.get(value, (None,))[0] != enum:
-            return [f"{context}: {key} must name a value of {enum}"]
-        return []
+        if enum_constants.get(value, (None,))[0] == enum:
+            return []
+        try:
+            int(value, 0)
+        except ValueError:
+            return [f"{context}: {key} must name a value of {enum} or an integer"]
     bounds = (
         INTEGER_RANGES.get(result.canonical.removeprefix("const ")) if result else None
     )

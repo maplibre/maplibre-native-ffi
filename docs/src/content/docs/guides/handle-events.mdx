@@ -46,9 +46,9 @@ Read the structured payload according to its type.
 A host whose runtime cannot run code on a native thread, such as a JavaScript
 engine, receives every callback it need not answer at once through a delivery
 queue: completions, log records, resource requests and their cancellations,
-camera transition ends, runtime event spans, and custom source tile fetches and cancels. It creates
-one queue with a wake, and sets that queue in place of the callbacks of each
-registration.
+resource transform requests, camera transition ends, runtime event spans, and
+custom source tile fetches and cancels. It creates one queue with a wake, and
+sets that queue in place of the callbacks of each registration.
 
 The wake schedules a drain on the host loop and returns promptly. A queue
 that receives log records also follows the log callback restrictions: its wake
