@@ -327,6 +327,9 @@ ci:
         - cmake/toolchains/emscripten.cmake
         - cmake/mln_ffi_emscripten.cmake
         - mise.emscripten.*
+        - bindings/kotlin/src/wasmJs*
+        - bindings/kotlin/wasm/*
+        - bindings/kotlin/karma.config.d/*
     maven:
       covers: >-
         Assembles and verifies the Kotlin Maven repository from every native
