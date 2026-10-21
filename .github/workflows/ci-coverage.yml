@@ -1535,11 +1535,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-x64-vulkan')
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
-    runs-on: windows-2022
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -1608,11 +1608,11 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-x64-wgl')
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
-    runs-on: windows-2022
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
