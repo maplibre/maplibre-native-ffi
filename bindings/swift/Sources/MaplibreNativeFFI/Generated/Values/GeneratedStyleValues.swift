@@ -73,9 +73,9 @@ public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  public var fetchTile: (@Sendable (CanonicalTileId) -> Void)?
   /// Optional best-effort tile cancel callback. Null in queue mode.
-  public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  public var cancelTile: (@Sendable (CanonicalTileId) -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
   public var tolerance: Double?
@@ -84,8 +84,8 @@ public struct CustomGeometrySourceOptions: Sendable {
   public var clip: Bool?
   public var wrap: Bool?
   public init(
-    fetchTile: (@Sendable (CanonicalTileId) throws -> Void)? = nil,
-    cancelTile: (@Sendable (CanonicalTileId) throws -> Void)? = nil,
+    fetchTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
+    cancelTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
     minZoom: Double? = CustomGeometrySourceOptions.default.minZoom,
     maxZoom: Double? = CustomGeometrySourceOptions.default.maxZoom,
     tolerance: Double? = CustomGeometrySourceOptions.default.tolerance,
@@ -182,12 +182,7 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_fetch_tile_callback",
-      error: error
-    ))
-  }
+  box.value.fetchTile?(CanonicalTileId(raw: tile_id))
 }
 
 private func invokeCustomGeometrySourceOptionsCancelTile(
@@ -197,12 +192,7 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_cancel_tile_callback",
-      error: error
-    ))
-  }
+  box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
 /// Field mask values for `mln_custom_mvt_vector_source_options`.
@@ -229,14 +219,14 @@ public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
   /// Tile fetch callback. Required in callback mode; null in queue mode.
-  public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  public var fetchTile: (@Sendable (CanonicalTileId) -> Void)?
   /// Optional best-effort tile cancel callback. Null in queue mode.
-  public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  public var cancelTile: (@Sendable (CanonicalTileId) -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
   public init(
-    fetchTile: (@Sendable (CanonicalTileId) throws -> Void)? = nil,
-    cancelTile: (@Sendable (CanonicalTileId) throws -> Void)? = nil,
+    fetchTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
+    cancelTile: (@Sendable (CanonicalTileId) -> Void)? = nil,
     minZoom: Double? = CustomMvtVectorSourceOptions.default.minZoom,
     maxZoom: Double? = CustomMvtVectorSourceOptions.default.maxZoom
   ) {
@@ -293,12 +283,7 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_fetch_tile_callback",
-      error: error
-    ))
-  }
+  box.value.fetchTile?(CanonicalTileId(raw: tile_id))
 }
 
 private func invokeCustomMvtVectorSourceOptionsCancelTile(
@@ -308,12 +293,7 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_source_cancel_tile_callback",
-      error: error
-    ))
-  }
+  box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
 /// Field mask values for `mln_geojson_source_options`.
@@ -854,8 +834,8 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_image_text_fit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -865,6 +845,14 @@ public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   public static let stretchOrShrink: StyleImageTextFit = .init(rawValue: 0)
   public static let stretchOnly: StyleImageTextFit = .init(rawValue: 1)
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "STRETCH_OR_SHRINK"
+    case 1: return "STRETCH_ONLY"
+    case 2: return "PROPORTIONAL"
+    default: return "StyleImageTextFit(\(rawValue))"
+    }
+  }
 }
 
 /// One style layer, borrowed for a completion callback.
@@ -932,9 +920,8 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_layer_visibility` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
-  Equatable,
-  Hashable, Sendable
+public struct StyleLayerVisibility: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -943,14 +930,21 @@ public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
 
   public static let visible: StyleLayerVisibility = .init(rawValue: 0)
   public static let none: StyleLayerVisibility = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "VISIBLE"
+    case 1: return "NONE"
+    default: return "StyleLayerVisibility(\(rawValue))"
+    }
+  }
 }
 
 /// DEM raster encoding values.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -959,6 +953,13 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
 
   public static let mapbox: StyleRasterDemEncoding = .init(rawValue: 0)
   public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "MAPBOX"
+    case 1: return "TERRARIUM"
+    default: return "StyleRasterDemEncoding(\(rawValue))"
+    }
+  }
 }
 
 /// Complete metadata of one style source, borrowed for a completion callback.
@@ -1121,8 +1122,8 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1139,14 +1140,29 @@ public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
   public static let annotations: StyleSourceType = .init(rawValue: 7)
   public static let customVector: StyleSourceType = .init(rawValue: 8)
   public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
+  public var description: String {
+    switch rawValue {
+    case 0: return "UNKNOWN"
+    case 1: return "VECTOR"
+    case 2: return "RASTER"
+    case 3: return "RASTER_DEM"
+    case 4: return "GEOJSON"
+    case 5: return "IMAGE"
+    case 6: return "VIDEO"
+    case 7: return "ANNOTATIONS"
+    case 8: return "CUSTOM_VECTOR"
+    case 9: return "CUSTOM_MVT_VECTOR"
+    default: return "StyleSourceType(\(rawValue))"
+    }
+  }
 }
 
 /// Tile URL coordinate scheme values.
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct StyleTileScheme: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1155,6 +1171,13 @@ public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let xyz: StyleTileScheme = .init(rawValue: 0)
   public static let tms: StyleTileScheme = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "XYZ"
+    case 1: return "TMS"
+    default: return "StyleTileScheme(\(rawValue))"
+    }
+  }
 }
 
 /// Field mask values for `mln_style_transition_options`.
@@ -1237,8 +1260,9 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleVectorTileEncoding: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct StyleVectorTileEncoding: RawRepresentable,
+  CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1247,4 +1271,11 @@ public struct StyleVectorTileEncoding: RawRepresentable, NativeOpenValue,
 
   public static let mvt: StyleVectorTileEncoding = .init(rawValue: 0)
   public static let mlt: StyleVectorTileEncoding = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "MVT"
+    case 1: return "MLT"
+    default: return "StyleVectorTileEncoding(\(rawValue))"
+    }
+  }
 }

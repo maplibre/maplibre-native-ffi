@@ -1,50 +1,50 @@
-/// Holds a public handle's native handle and reports its lifecycle and close
-/// failures as ``MaplibreError``. Its only stored property is the lock-guarded
-/// `NativeHandleState`, so the box itself is safe to share. Each public handle
-/// chooses whether its API contract permits sharing.
+import Foundation
+
+/// Shares ownership state between the public handle and its calls.
 class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   private let state: NativeHandleState<Handle>
+  private let copyLock: NSRecursiveLock?
+  private var copying = false
 
   init(
     typeName: String,
     handle: Handle,
     parent: AnyObject? = nil,
-    pendingDecision: Bool = false
+    protectsCopies: Bool = false
   ) throws {
     state = try NativeHandleState(
       typeName: typeName,
       handle: handle,
-      parent: parent,
-      pendingDecision: pendingDecision
+      parent: parent
     )
-  }
-
-  var isClosed: Bool {
-    state.isClosed
+    copyLock = protectsCopies ? NSRecursiveLock() : nil
   }
 
   var issued: Handle {
     state.issued
   }
 
-  func borrow() throws -> NativeHandleRead<Handle> {
-    try state.borrow()
+  /// Batch getters lend memory beyond the native call, until the copy ends.
+  func withHandle<T>(_ body: (Handle) throws -> T) rethrows -> T {
+    guard let copyLock else { return try body(issued) }
+    return try copyLock.withLock {
+      copying = true
+      defer { copying = false }
+      return try body(issued)
+    }
   }
 
-  func requireLive() throws -> Handle {
-    try state.requireLive()
+  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
+    guard let copyLock else { return try state.closeOnce(destroy) }
+    try copyLock.withLock {
+      guard !copying
+      else { throw MaplibreError.invalidState("Batch is in use") }
+      try state.closeOnce(destroy)
+    }
   }
 
-  func closeOnce(_ destroy: @escaping (Handle) throws -> Void) throws {
-    try mapNativeFailure { try state.closeOnce(destroy) }
-  }
-
-  func beginClaim() throws -> NativeClaim {
-    try state.beginClaim()
-  }
-
-  func finishDecision(accepted: Bool) -> Bool {
-    state.finishDecision(accepted: accepted)
+  func handOff() {
+    state.handOff()
   }
 
   func retire() {

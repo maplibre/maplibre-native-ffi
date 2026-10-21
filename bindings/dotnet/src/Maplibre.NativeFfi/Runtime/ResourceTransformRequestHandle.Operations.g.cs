@@ -39,15 +39,12 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     NativeHandleState<MlnResourceTransformRequest> INativeOwner<MlnResourceTransformRequest>.State =>
         state;
     internal MlnResourceTransformRequest Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_resource_transform_request_release");
         state.Retire();
     }
 
@@ -80,7 +77,6 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_resource_transform_request_release");
         state.Close();
     }
 }

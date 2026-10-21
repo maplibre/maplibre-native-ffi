@@ -17,42 +17,6 @@ public sealed class ResourceProviderTests
         new() { Status = ResourceResponseStatus.Ok, Bytes = NativeFixture.EmptyStyle };
 
     [Fact]
-    public async Task AProviderMayAnswerButNotReenterTheRuntime()
-    {
-        NativeFixture? owner = null;
-        ResourceRequestHandle? retained = null;
-        string? requested = null;
-        Exception? reentry = null;
-        await using var fixture = await NativeFixture.CreateAsync(
-            provider: new ResourceProvider
-            {
-                Callback = (request, handle) =>
-                {
-                    requested = request.RequestedUrl;
-                    retained = handle;
-                    reentry = Record.Exception(() =>
-                    {
-                        _ = owner!.Runtime.ClearResourceTransformAsync(TestWaits.Token);
-                    });
-                    handle.Complete(StyleResponse());
-                    return ResourceProviderDecision.PassThrough;
-                },
-            }
-        );
-        owner = fixture;
-
-        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
-
-        Assert.Equal(StyleUrl, requested);
-        Assert.IsType<InvalidOperationException>(reentry);
-        Assert.NotNull(retained);
-        using (retained)
-            Assert.False(retained.IsClosed);
-        Assert.True(retained.IsClosed);
-    }
-
-    [Fact]
     public async Task AProviderCanAnswerLaterThroughItsDecisionHandle()
     {
         var received = new TaskCompletionSource<ResourceRequestHandle>(
@@ -63,16 +27,14 @@ public sealed class ResourceProviderTests
         using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         // Native rejects a malformed etag while the request stays open for another answer.
-        Assert.Throws<InvalidArgumentException>(() =>
+        Assert.Throws<MaplibreException>(() =>
             handle.Complete(
                 new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
             )
         );
-        Assert.False(handle.IsClosed);
         handle.Complete(StyleResponse());
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
 
-        Assert.False(handle.IsClosed);
         handle.Close();
     }
 
@@ -139,10 +101,10 @@ public sealed class ResourceProviderTests
         );
     }
 
-    // A provider's exception is contained: native receives a pass-through, and the exception goes
+    // A provider's exception is contained: native receives an unknown decision, and the exception goes
     // to the CallbackException handlers.
     [Fact]
-    public unsafe void AProviderExceptionIsContainedAndPassesTheRequestThrough()
+    public unsafe void AProviderExceptionIsContainedAndFailsTheRequest()
     {
         ResourceRequestInfo? copied = null;
         ResourceRequestHandle? escaped = null;
@@ -156,8 +118,7 @@ public sealed class ResourceProviderTests
                 return;
             lock (reports)
                 reports.Add(report);
-            // The handler runs on the provider's stack, where the binding refuses every native
-            // call.
+            // This callback permits status-returning native calls.
             reentry = Record.Exception(() => Maplibre.NetworkGetStatus());
         };
         using var scope = new NativeCallScope();
@@ -189,7 +150,7 @@ public sealed class ResourceProviderTests
         try
         {
             Assert.Equal(
-                (uint)ResourceProviderDecision.PassThrough,
+                uint.MaxValue,
                 native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
             );
         }
@@ -200,7 +161,7 @@ public sealed class ResourceProviderTests
 
         var report = Assert.Single(reports);
         Assert.Equal("mln_resource_provider_callback", report.Callback);
-        Assert.IsType<InvalidOperationException>(reentry);
+        Assert.Null(reentry);
         // The request is copied before the callback runs, so native reusing its memory afterwards
         // leaves the copy intact.
         ((byte*)bytes.data)[0] = 99;
@@ -209,7 +170,6 @@ public sealed class ResourceProviderTests
         Assert.Equal(new ResourceRange(0, 7), copied.Range);
         Assert.Equal([1, 2, 3], copied.PriorData);
         Assert.NotNull(escaped);
-        Assert.True(escaped.IsClosed);
     }
 
     [Fact]
@@ -286,48 +246,8 @@ public sealed class ResourceProviderTests
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
 
         Assert.NotNull(escaped);
-        Assert.True(escaped.IsClosed);
         Assert.Equal(0, calls);
-        Assert.Throws<InvalidStateException>(() => escaped.IsCancelled());
-    }
-
-    [Fact]
-    public unsafe void DecisionStatePreservesAcceptedAndInFlightCompletionButRollsBackRejection()
-    {
-        var released = 0;
-        NativeHandleState<MlnResourceRequest> Create() =>
-            new(
-                SyntheticHandles.ResourceRequest(1),
-                (_, _) =>
-                {
-                    released++;
-                    return mln_status.MLN_STATUS_OK;
-                },
-                "Request",
-                pendingDecision: true
-            );
-        var rejected = Create();
-        using (rejected.BeginClaim()) { }
-        Assert.False(rejected.FinishDecision(false));
-        Assert.True(rejected.IsClosed);
-        Assert.Equal(0, released);
-        var accepted = Create();
-        using (var claim = accepted.BeginClaim())
-            claim.Accept();
-        Assert.True(accepted.FinishDecision(false));
-        accepted.Close();
-        Assert.Equal(1, released);
-        var inFlight = Create();
-        using (inFlight.BeginClaim())
-            Assert.True(inFlight.FinishDecision(false));
-        inFlight.Close();
-        Assert.Equal(2, released);
-        var explicitlyClosed = Create();
-        explicitlyClosed.Close();
-        explicitlyClosed.Close();
-        Assert.True(explicitlyClosed.FinishDecision(false));
-        Assert.True(explicitlyClosed.IsClosed);
-        Assert.Equal(3, released);
+        Assert.Throws<MaplibreException>(() => escaped.IsCancelled());
     }
 
     /// <summary>A provider that keeps each request to answer later.</summary>

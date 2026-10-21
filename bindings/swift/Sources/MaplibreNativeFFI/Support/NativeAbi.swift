@@ -24,15 +24,13 @@ enum NativeAbi {
     }
   }
 
-  static func mismatch(actual: UInt32) -> MaplibreError? {
+  static func mismatch(actual: UInt32) -> AbiVersionMismatchError? {
     if actual == expectedCAbiVersion {
       return nil
     }
-    return MaplibreError(
-      kind: .abiVersionMismatch,
-      rawStatus: nil,
-      diagnostic: "MapLibre Native C ABI version \(actual) is incompatible "
-        + "with this binding; expected \(expectedCAbiVersion)."
+    return AbiVersionMismatchError(
+      expected: expectedCAbiVersion,
+      actual: actual
     )
   }
 }

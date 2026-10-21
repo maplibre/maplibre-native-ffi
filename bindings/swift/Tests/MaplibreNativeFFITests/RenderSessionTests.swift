@@ -151,15 +151,17 @@ private func withOwnedTextureSession<Result>(
       #expect(try view.height == 32)
       #expect(try rendered.graphics
         .withTextureView(of: first) { try $0.width } == 32)
-      let inUse = MaplibreError.invalidState("AcquiredFrameHandle is in use")
-      #expect(throws: inUse) {
+      do {
         try first.release(consumerCompletion: .default)
+        Issue.record("release inside a view should be busy")
+      } catch let error as MaplibreError {
+        #expect(error.status == .busy)
       }
       do {
         _ = try session.abandon()
         Issue.record("abandon inside a frame view should be refused")
       } catch let error as MaplibreError {
-        #expect(error.kind == .busy)
+        #expect(error.status == .busy)
       }
       return view
     }
@@ -181,7 +183,9 @@ private func withOwnedTextureSession<Result>(
       #expect(try session.getSnapshot().acquiredFrameCount == 1)
       withExtendedLifetime(frame) {}
     }
-    #expect(try session.getSnapshot().acquiredFrameCount == 0)
+    try await awaitCondition("the abandoned frame to retire") {
+      try session.getSnapshot().acquiredFrameCount == 0
+    }
   }
 }
 

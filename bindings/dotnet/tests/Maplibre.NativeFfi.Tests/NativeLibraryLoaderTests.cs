@@ -11,17 +11,12 @@ public sealed class NativeLibraryLoaderTests
     [Fact]
     public void ALibraryWithAnotherAbiVersionIsRejected()
     {
-        var error = Assert.Throws<MaplibreException>(() =>
+        var error = Assert.Throws<AbiVersionMismatchException>(() =>
             NativeLibraryLoader.ValidateAbiVersion(NativeLibraryLoader.ExpectedAbiVersion + 1)
         );
 
-        Assert.Equal(MaplibreStatus.AbiMismatch, error.Status);
-        Assert.Null(error.RawStatus);
-        Assert.Contains(
-            $"expected {NativeLibraryLoader.ExpectedAbiVersion}",
-            error.Diagnostic,
-            StringComparison.Ordinal
-        );
+        Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion, error.Expected);
+        Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion + 1, error.Actual);
     }
 
     // The suite's module initializer resolves the library through the standard lookup, so an

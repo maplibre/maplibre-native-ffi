@@ -4,19 +4,11 @@ import Foundation
 struct NativeStatusFailure: Error, Equatable {
   let rawStatus: Int32
   let diagnostic: String
-  let isNativeStatus: Bool
-
-  init(rawStatus: Int32, diagnostic: String, isNativeStatus: Bool = true) {
-    self.rawStatus = rawStatus
-    self.diagnostic = diagnostic
-    self.isNativeStatus = isNativeStatus
-  }
 
   static func swiftNativeError(_ diagnostic: String) -> Self {
     Self(
       rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-      diagnostic: diagnostic,
-      isNativeStatus: false
+      diagnostic: diagnostic
     )
   }
 }

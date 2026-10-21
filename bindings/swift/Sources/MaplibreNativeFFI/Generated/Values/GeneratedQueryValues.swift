@@ -242,8 +242,8 @@ public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
 ///
 /// See `mln_rendered_query_geometry_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct RenderedQueryGeometryType: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct RenderedQueryGeometryType: RawRepresentable,
+  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -253,6 +253,14 @@ public struct RenderedQueryGeometryType: RawRepresentable, NativeOpenValue,
   public static let point: RenderedQueryGeometryType = .init(rawValue: 1)
   public static let box: RenderedQueryGeometryType = .init(rawValue: 2)
   public static let lineString: RenderedQueryGeometryType = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 1: return "POINT"
+    case 2: return "BOX"
+    case 3: return "LINE_STRING"
+    default: return "RenderedQueryGeometryType(\(rawValue))"
+    }
+  }
 }
 
 /// Screen-space box in logical map pixels.

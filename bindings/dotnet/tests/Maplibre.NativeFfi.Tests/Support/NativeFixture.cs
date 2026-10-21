@@ -131,12 +131,12 @@ internal sealed class NativeFixture : IAsyncDisposable
     {
         try
         {
-            if (!Map.IsClosed)
+            if (Map is not null)
                 await Map.CloseAsync();
         }
         finally
         {
-            if (!Runtime.IsClosed)
+            if (Runtime is not null)
                 await Runtime.CloseAsync();
             // Runtime teardown retires the event handler before the semaphore is disposed.
             events.Dispose();

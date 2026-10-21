@@ -22,7 +22,7 @@ def closure_type(values, callback):
         )
         else values.public(callback.result)
     )
-    return f"@Sendable ({', '.join(parameters)}) throws -> {result}"
+    return f"@Sendable ({', '.join(parameters)}) -> {result}"
 
 
 def raw_type(type_):
@@ -141,14 +141,8 @@ def descriptor(values, plan):
         if plan.native in values.bound.returned
         else "  public static var `default`: Self { Self() }\n"
     )
-    # A callback that calls back only into the receiver that registered it
-    # carries that receiver weakly, so the native root does not keep it alive.
-    rooted = (
-        "NativeOwnedCallback(owner: arena.receiver, value: self)"
-        if registration.receiver_owned
-        else "self"
-    )
-    stored = f"NativeOwnedCallback<{public}>" if registration.receiver_owned else public
+    rooted = "self"
+    stored = public
     declarations = f"""{doc(values.bound, plan.native)}public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
@@ -217,45 +211,34 @@ def descriptor(values, plan):
             setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(parameter.value.handle)}(adopting: {identifier(parameter.name)}) else {{ {parameter.value.handle.release}({identifier(parameter.name)}); {fail or 'return'} }}\n"
         if callback.decision:
             decision = callback.decision
-            setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}, pendingDecision: true) else {{ {fail} }}\n"
-        guard = ""
-        if callback.reentry_policy:
-            policy = callback.reentry_policy
-            operations = ", ".join(f'"{operation}"' for operation in policy.operations)
-            declarations += f"private let allowed{public}{name(field.name)}: Set<String> = [{operations}]\n"
-            policy_owner = (
-                "decisionOwner"
-                if callback.decision
-                else "receiver"
-                if registration.receiver_owned
-                else "response" + name(policy.owner_parameter)
-            )
-            guard = f"  let admission = NativeCallbackGuard.enter(owner: {policy_owner}, operations: allowed{public}{name(field.name)})\n  defer {{ admission.end() }}\n"
-        elif callback.reentry == "forbid":
-            guard = "  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])\n  defer { admission.end() }\n"
-        value = "box.value.value" if registration.receiver_owned else "box.value"
-        if registration.receiver_owned:
-            setup += f"  guard let receiver = box.value.owner else {{ {fail or 'return'} }}\n"
+            setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}) else {{ {fail} }}\n"
+        value = "box.value"
         call = f"{value}.{identifier(camel(field.name))}?({args})"
         invoke = (
-            f"try {call}"
+            f"{call}"
             if result == "Void" or responses
-            else f"return try {call} ?? {callback.failure}{suffix}"
+            else f"return {call} ?? {callback.failure}{suffix}"
         )
         if callback.decision:
             decision = callback.decision
-            invoke = f"let accepted = try {call}.rawValue == {decision.accept}{suffix}; return decisionOwner.handle.finishDecision(accepted: accepted) ? {decision.accept}{suffix} : {decision.pass_through}{suffix}"
-            fail = f"return decisionOwner.handle.finishDecision(accepted: false) ? {decision.accept}{suffix} : {decision.pass_through}{suffix}"
+            invoke = f"let decision = {call} ?? {values.public(callback.result)}(rawValue: {callback.failure}{suffix}); if decision.rawValue != {decision.accept}{suffix} {{ decisionOwner.handle.handOff() }}; return decision.rawValue"
+            fail = "decisionOwner.handle.handOff(); return UInt32.max"
+
         if responses:
             invoke += f"; return MLN_STATUS_OK{suffix}"
         if owned:
             fail = " ".join(f"try? owned{name(p.name)}.close();" for p in owned) + (
                 " " + fail if fail else ""
             )
+        body = (
+            f'  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}'
+            if "try " in invoke
+            else f"  {invoke}"
+        )
         declarations += f"""private func invoke{public}{name(field.name)}({parameters}) -> {result} {{
   guard let {identifier(callback.context)} else {{ {"return " + callback.failure + suffix if result != "Void" else "return"} }}
   let box = Unmanaged<GeneratedCallbackBox<{stored}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()
-{setup}{guard}  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}
+{setup}{body}
 }}
 """
     return declarations

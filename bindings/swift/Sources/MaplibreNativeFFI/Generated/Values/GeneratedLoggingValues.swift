@@ -7,8 +7,8 @@ import Foundation
 ///
 /// See `mln_log_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
-  Sendable
+public struct LogEvent: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -32,6 +32,28 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let crash: LogEvent = .init(rawValue: 14)
   public static let glyph: LogEvent = .init(rawValue: 15)
   public static let timing: LogEvent = .init(rawValue: 16)
+  public var description: String {
+    switch rawValue {
+    case 0: return "GENERAL"
+    case 1: return "SETUP"
+    case 2: return "SHADER"
+    case 3: return "PARSE_STYLE"
+    case 4: return "PARSE_TILE"
+    case 5: return "RENDER"
+    case 6: return "STYLE"
+    case 7: return "DATABASE"
+    case 8: return "HTTP_REQUEST"
+    case 9: return "SPRITE"
+    case 10: return "IMAGE"
+    case 11: return "GRAPHICS_BACKEND"
+    case 12: return "JNI"
+    case 13: return "ANDROID"
+    case 14: return "CRASH"
+    case 15: return "GLYPH"
+    case 16: return "TIMING"
+    default: return "LogEvent(\(rawValue))"
+    }
+  }
 }
 
 /// Process-global log callback or queue state.
@@ -40,10 +62,10 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
   /// Receives each record.
-  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
+  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String)
     -> UInt32)?
-  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,
-                                    String) throws -> UInt32)? = nil)
+  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64, String)
+      -> UInt32)? = nil)
   {
     self.callback = callback
   }
@@ -74,8 +96,6 @@ private func invokeLogHandlerCallback(
   guard let user_data else { return 0 }
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
     .takeUnretainedValue()
-  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
-  defer { admission.end() }
   do { return try box.value.callback?(
     LogSeverity(rawValue: severity),
     LogEvent(rawValue: event),
@@ -91,8 +111,8 @@ private func invokeLogHandlerCallback(
 ///
 /// See `mln_log_severity` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-public struct LogSeverity: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct LogSeverity: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -102,6 +122,14 @@ public struct LogSeverity: RawRepresentable, NativeOpenValue, Equatable,
   public static let info: LogSeverity = .init(rawValue: 1)
   public static let warning: LogSeverity = .init(rawValue: 2)
   public static let error: LogSeverity = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 1: return "INFO"
+    case 2: return "WARNING"
+    case 3: return "ERROR"
+    default: return "LogSeverity(\(rawValue))"
+    }
+  }
 }
 
 /// Bitmask values for log severities dispatched asynchronously.

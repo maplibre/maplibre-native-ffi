@@ -6,15 +6,14 @@ using Maplibre.NativeFfi.Internal.Pointer;
 namespace Maplibre.NativeFfi.Internal.Memory;
 
 /// <summary>
-/// The scope of one generated operation. It checks that the calling thread may
-/// enter the operation, keeps the receiver reachable and borrowed handles open
-/// until disposal, and submits completions, accepting the scope's
+/// The scope of one generated operation. It keeps the receiver and handle
+/// arguments reachable until disposal and submits completions, accepting its
 /// registrations once native code admits the operation.
 /// </summary>
 internal sealed unsafe partial class NativeCallScope
 {
     private readonly INativeOwner? owner;
-    private List<INativeReader>? readers;
+    private List<object>? arguments;
 
     internal NativeCallScope(INativeOwner? owner, string operation)
     {
@@ -23,8 +22,7 @@ internal sealed unsafe partial class NativeCallScope
     }
 
     /// <summary>
-    /// Borrows the handle of an owner argument for this call, so the owner
-    /// cannot release it while native code reads it.
+    /// Keeps an owner argument reachable for this call and returns its raw id.
     /// </summary>
     internal T Use<T>(
         INativeOwner<T>? argument,
@@ -33,18 +31,8 @@ internal sealed unsafe partial class NativeCallScope
         where T : unmanaged, IMlnHandle
     {
         ArgumentNullException.ThrowIfNull(argument, name);
-        var state = argument.State;
-        var handle = state.BeginRead();
-        try
-        {
-            (readers ??= []).Add(state);
-        }
-        catch
-        {
-            state.EndRead();
-            throw;
-        }
-        return handle;
+        (arguments ??= []).Add(argument);
+        return argument.State.Handle;
     }
 
     /// <summary>Encodes a NUL-terminated string parameter, which cannot carry an embedded NUL.</summary>
@@ -55,9 +43,8 @@ internal sealed unsafe partial class NativeCallScope
     {
         ArgumentNullException.ThrowIfNull(text, name);
         if (text.Contains('\0'))
-            throw new InvalidArgumentException(
-                MaplibreStatus.InvalidArgument,
-                null,
+            throw new MaplibreException(
+                global::Maplibre.NativeFfi.Status.InvalidArgument,
                 $"{name} contains an embedded NUL character.",
                 null
             );
@@ -72,7 +59,7 @@ internal sealed unsafe partial class NativeCallScope
     internal void Discard(CompletionSubmit submit)
     {
         NativeCall.Check(submit(null, NativeCall.Diagnostic));
-        Accept(registrations is null ? null : owner?.CallbackOwner);
+        Accept();
     }
 
     internal Task Run(CompletionSubmit submit, CancellationToken cancellationToken) =>
@@ -162,16 +149,14 @@ internal sealed unsafe partial class NativeCallScope
         var attachment = NativeCompletion.SubmitUnit(
             (completion, diagnostic) => submit(output, completion, diagnostic)
         );
-        var created = adopt(*output, attachment);
-        Accept(registrations is null ? null : created.CallbackOwner);
-        return created;
+        Accept();
+        return adopt(*output, attachment);
     }
 
-    // An operation's registrations live as long as its receiver, or the process
-    // when it has none.
+    // Native releases accepted registrations when their callbacks are quiescent.
     private Task<T> Accepted<T>(Task<T> task)
     {
-        Accept(registrations is null ? null : owner?.CallbackOwner);
+        Accept();
         return task;
     }
 
@@ -187,10 +172,8 @@ internal sealed unsafe partial class NativeCallScope
 
     partial void EndOperation()
     {
-        if (readers is not null)
-            foreach (var reader in readers)
-                reader.EndRead();
-        readers = null;
+        GC.KeepAlive(arguments);
+        arguments = null;
         GC.KeepAlive(owner);
     }
 }

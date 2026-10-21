@@ -18,9 +18,9 @@ public sealed unsafe partial class ResourceRequestHandle
 {
     private readonly NativeHandleState<MlnResourceRequest> state;
 
-    internal ResourceRequestHandle(MlnResourceRequest handle, bool pendingDecision = false)
+    internal ResourceRequestHandle(MlnResourceRequest handle)
     {
-        state = new(handle, Abandon, nameof(ResourceRequestHandle), Abandon, pendingDecision);
+        state = new(handle, Abandon, nameof(ResourceRequestHandle), Abandon);
     }
 
     internal static ResourceRequestHandle Adopt(MlnResourceRequest handle) =>
@@ -38,22 +38,14 @@ public sealed unsafe partial class ResourceRequestHandle
 
     NativeHandleState<MlnResourceRequest> INativeOwner<MlnResourceRequest>.State => state;
     internal MlnResourceRequest Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_resource_request_release");
         state.Retire();
     }
-
-    internal static ResourceRequestHandle BorrowDecision(MlnResourceRequest handle) =>
-        new(handle, true);
-
-    internal bool FinishDecision(bool accepted) => state.FinishDecision(accepted);
 
     /// <summary>
     /// Completes a C API resource provider request.
@@ -66,10 +58,8 @@ public sealed unsafe partial class ResourceRequestHandle
     {
         using var scope = new NativeCallScope(this, "mln_resource_request_complete");
         var nativeResponse = NativeResourceResponse(response, scope);
-        using var claim = state.BeginClaim();
         Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse, Diagnostic));
         scope.Accept();
-        claim.Accept();
     }
 
     /// <summary>
@@ -100,9 +90,7 @@ public sealed unsafe partial class ResourceRequestHandle
     public void PassThrough()
     {
         using var call = Enter(this, "mln_resource_request_pass_through");
-        using var claim = state.BeginClaim();
         Check(NativeMethods.mln_resource_request_pass_through(Handle, Diagnostic));
-        claim.Accept();
     }
 
     /// <summary>
@@ -114,7 +102,6 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_resource_request_release");
         state.Close();
     }
 
@@ -129,7 +116,7 @@ public sealed unsafe partial class ResourceRequestHandle
     public bool SetCancelCallback(ResourceRequestCancelHandler handler)
     {
         using var read = state.Read(this, "mln_resource_request_set_cancel_callback");
-        using var scope = new NativeCallScope() { Receiver = this };
+        using var scope = new NativeCallScope();
         var nativeHandler = NativeResourceRequestCancelHandler(handler, scope);
         bool outCancelled = default;
         Check(
@@ -141,7 +128,7 @@ public sealed unsafe partial class ResourceRequestHandle
             )
         );
         if (!outCancelled)
-            scope.Accept(CallbackOwner);
+            scope.Accept();
         return outCancelled;
     }
 }

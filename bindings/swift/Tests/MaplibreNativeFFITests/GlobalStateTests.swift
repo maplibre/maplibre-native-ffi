@@ -8,9 +8,7 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// The log callback, the diagnostic handler, and the leak report's standard
-/// error belong to the process, so the tests that touch them run one at a
-/// time.
+/// Tests that change the process log callback or standard error run in order.
 @Suite(.serialized)
 struct GlobalStateTests {
   /// Replacing the log callback releases the registration it replaces, and
@@ -47,9 +45,8 @@ struct GlobalStateTests {
     }
   }
 
-  /// A handle abandoned inside a callback is disposed after the callback, off
-  /// its stack, and reported once on standard error, whether or not its
-  /// disposal succeeds.
+  /// Abandoned handles are disposed on a worker and reported once to standard
+  /// error.
   @Test func anAbandonedHandleIsDisposedOffTheCallbackStackAndReported(
   ) async throws {
     let capture = try StandardErrorCapture()
@@ -77,16 +74,7 @@ struct GlobalStateTests {
   /// a caller, so the binding disposes it without reporting a leak.
   @Test func aHandleArrivingAfterItsWaitIsCancelledIsRetiredWithoutAReport(
   ) async throws {
-    let reports = LockedBox([String]())
-    Maplibre.setDiagnosticHandler { diagnostic in
-      // Tests in other suites run concurrently, so only this handle counts.
-      if case let .leakedHandle(typeName, _, _) = diagnostic,
-         typeName == "late_handle"
-      {
-        reports.update { $0.append(typeName) }
-      }
-    }
-    defer { Maplibre.setDiagnosticHandler(nil) }
+    let capture = try StandardErrorCapture()
     let held = LockedBox<mln_completion?>(nil)
     let future = try NativeCompletion.start({ completion, _ in
       held.update { $0 = completion.pointee }
@@ -113,74 +101,10 @@ struct GlobalStateTests {
     #expect(RecordedHandle.disposals.value.contains(
       RecordedHandle.Disposal(raw: 0x5, insideACallback: false)
     ))
-    #expect(reports.value.isEmpty)
-  }
-
-  /// A provider that throws is contained: the binding passes the request
-  /// through, so the map reports the load failure it would have without a
-  /// provider, and the request the callback saw is closed. The diagnostic
-  /// handler receives the error.
-  @Test func aThrowingProviderPassesTheRequestThroughAndIsReported(
-  ) async throws {
-    let reports = LockedBox([String]())
-    Maplibre.setDiagnosticHandler { diagnostic in
-      // Tests in other suites run concurrently, so only this error counts.
-      if case let .callbackError(callback, error) = diagnostic,
-         error is ProviderFailure
-      {
-        reports.update { $0.append(callback) }
-      }
-    }
-    defer { Maplibre.setDiagnosticHandler(nil) }
-    try await withMapFixture { fixture in
-      let seen = LockedBox<ResourceRequestHandle?>(nil)
-      try await installProvider(
-        on: fixture.runtime,
-        for: "custom://throwing.json"
-      ) { handle in
-        seen.update { $0 = handle }
-        throw ProviderFailure()
-      }
-      try await fixture.map.setStyleUrl(url: "custom://throwing.json")
-      let failure = try await fixture.awaitEvent("the pass-through failure") {
-        $0.type == .mapLoadingFailed && $0.message.contains("custom")
-      }
-      #expect(failure != nil)
-      #expect(try #require(seen.value).isClosed)
-    }
-    #expect(reports.value == ["mln_resource_provider_callback"])
-  }
-
-  /// A callback error reaches the handler on the callback's stack, so the
-  /// handler may not reenter native, even for a callback such as the wake
-  /// callback that admits every native call.
-  @Test func theHandlerOfACallbackErrorCannotCallNative() {
-    let refusals = LockedBox([Bool]())
-    Maplibre.setDiagnosticHandler { diagnostic in
-      // Tests in other suites run concurrently, so only this error counts.
-      guard case let .callbackError(_, error) = diagnostic,
-            error is WakeFailure else { return }
-      let refused: Bool
-      do {
-        _ = try Maplibre.networkGetStatus()
-        refused = false
-      } catch {
-        refused = (error as? MaplibreError)?.kind == .invalidState
-      }
-      refusals.update { $0.append(refused) }
-    }
-    defer { Maplibre.setDiagnosticHandler(nil) }
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_wake_callback",
-      error: WakeFailure()
-    ))
-    #expect(refusals.value == [true])
+    capture.finish()
+    #expect(!capture.text.contains("late_handle"))
   }
 }
-
-private struct ProviderFailure: Error {}
-
-private struct WakeFailure: Error {}
 
 private func recordingHandler(
   into records: LockedBox<[LogSeverity]>,
@@ -208,7 +132,8 @@ private struct RecordedHandle: NativeHandle {
   let raw: UInt64
 
   func disposeAbandoned() -> Bool {
-    let inside = NativeCallbackGuard.isActive
+    let inside = Thread.current
+      .threadDictionary["MaplibreNativeFFITests.callback"] != nil
     Self.disposals.update {
       $0.append(Disposal(raw: raw, insideACallback: inside))
     }
@@ -229,12 +154,13 @@ private final class RecordedOwner: NativeReceiver, @unchecked Sendable {
   }
 }
 
-/// Drops the last references to live handle states while a callback guard is
-/// active, as a callback that abandons its handles does: one whose disposal
-/// fails and one whose disposal succeeds.
+/// Drops handles whose disposal fails or succeeds.
 private func abandonInsideACallback() throws {
-  let scope = NativeCallbackGuard.enter(owner: nil, operations: [])
-  defer { scope.end() }
+  Thread.current.threadDictionary["MaplibreNativeFFITests.callback"] = true
+  defer {
+    Thread.current.threadDictionary
+      .removeObject(forKey: "MaplibreNativeFFITests.callback")
+  }
   for raw: UInt64 in [0x3, 0x4] {
     _ = try NativeHandleState(
       typeName: "leaky_handle",

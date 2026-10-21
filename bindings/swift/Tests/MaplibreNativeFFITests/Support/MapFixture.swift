@@ -18,15 +18,18 @@ func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
   ResourceProvider { request, handle in
     let url = request.requestedUrl ?? ""
     if let bytes = routes[url] {
-      try handle.complete(response: ResourceResponse(status: .ok, bytes: bytes))
+      try! handle.complete(response: ResourceResponse(
+        status: .ok,
+        bytes: bytes
+      ))
     } else {
-      try handle.complete(response: ResourceResponse(
+      try! handle.complete(response: ResourceResponse(
         status: .error,
         errorReason: .notFound,
         errorMessage: "the test fixture serves no \(url)"
       ))
     }
-    try handle.close()
+    try! handle.close()
     return .handle
   }
 }
@@ -142,7 +145,7 @@ func withMapFixture<Result>(
 /// Expects `body` to throw a ``MaplibreError`` of `kind`, and returns it.
 @discardableResult
 func expectMaplibreError(
-  _ kind: MaplibreErrorKind,
+  _ kind: Status,
   sourceLocation: SourceLocation = #_sourceLocation,
   _ body: () async throws -> some Any
 ) async -> MaplibreError? {
@@ -150,7 +153,7 @@ func expectMaplibreError(
     _ = try await body()
     Issue.record("expected a \(kind) error", sourceLocation: sourceLocation)
   } catch let error as MaplibreError {
-    #expect(error.kind == kind, sourceLocation: sourceLocation)
+    #expect(error.status == kind, sourceLocation: sourceLocation)
     return error
   } catch {
     Issue.record("expected a MaplibreError, got \(error)",

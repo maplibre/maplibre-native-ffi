@@ -66,10 +66,6 @@ public extension AcquiredFrameHandle {
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func release(consumerCompletion: GpuSync) throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_acquired_frame_release"
-    )
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }

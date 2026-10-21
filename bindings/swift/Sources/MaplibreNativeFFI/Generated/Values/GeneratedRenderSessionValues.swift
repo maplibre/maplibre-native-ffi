@@ -77,8 +77,8 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct RenderAbandonDisposition: RawRepresentable,
+  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -89,6 +89,13 @@ public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
   public static let clean: RenderAbandonDisposition = .init(rawValue: 0)
   /// Abandon kept graphics resources that it could not safely destroy.
   public static let quarantined: RenderAbandonDisposition = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "CLEAN"
+    case 1: return "QUARANTINED"
+    default: return "RenderAbandonDisposition(\(rawValue))"
+    }
+  }
 }
 
 public struct RenderAbandonResult: Equatable, Hashable, Sendable {
@@ -209,8 +216,8 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
 ///
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct RenderResult: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -232,6 +239,15 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
   public static let targetNotReady: RenderResult = .init(rawValue: 3)
   /// A newer IF_NEEDED demand with the same flags replaced this demand.
   public static let superseded: RenderResult = .init(rawValue: 4)
+  public var description: String {
+    switch rawValue {
+    case 0: return "RENDERED"
+    case 1: return "NO_UPDATE"
+    case 3: return "TARGET_NOT_READY"
+    case 4: return "SUPERSEDED"
+    default: return "RenderResult(\(rawValue))"
+    }
+  }
 }
 
 /// Any-thread render-session snapshot.
@@ -301,8 +317,8 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
 ///
 /// See `mln_render_session_state` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-public struct RenderSessionState: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -315,4 +331,15 @@ public struct RenderSessionState: RawRepresentable, NativeOpenValue, Equatable,
   public static let detached: RenderSessionState = .init(rawValue: 4)
   public static let targetLost: RenderSessionState = .init(rawValue: 5)
   public static let abandoned: RenderSessionState = .init(rawValue: 6)
+  public var description: String {
+    switch rawValue {
+    case 1: return "ATTACHING"
+    case 2: return "ATTACHED"
+    case 3: return "DETACHING"
+    case 4: return "DETACHED"
+    case 5: return "TARGET_LOST"
+    case 6: return "ABANDONED"
+    default: return "RenderSessionState(\(rawValue))"
+    }
+  }
 }

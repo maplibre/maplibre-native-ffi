@@ -8,13 +8,11 @@ namespace Maplibre.NativeFfi.Internal;
 internal static unsafe class NativeCall
 {
     /// <summary>
-    /// Checks that the calling thread may enter <paramref name="operation"/>
-    /// and keeps its receiver reachable until the returned scope is disposed.
+    /// Keeps the receiver reachable until the returned scope is disposed.
     /// An operation without a receiver then loads the native library.
     /// </summary>
     internal static Entry Enter(object? owner, string operation)
     {
-        NativeCallbackGuard.EnsureAllowed(owner, operation);
         if (owner is null)
             NativeLibraryLoader.EnsureLoaded();
         return new Entry(owner);

@@ -671,13 +671,7 @@ class Values:
             )
             lines.append(f"        if ({condition})")
             lines.append("        {")
-            # A callback that calls back only into the receiver that
-            # registered it carries that receiver.
-            rooted = (
-                "new NativeOwnedCallback(value with { }, scope.Receiver!)"
-                if plan.registration.receiver_owned
-                else "value with { }"
-            )
+            rooted = "value with { }"
             lines.append(
                 f"            native.{member(plan.registration.user_data)} = scope.Register({rooted});"
             )
@@ -814,23 +808,6 @@ class Values:
             field = next(field for field in plan.fields if field.name == name)
             callback = self.bound.callbacks[field.value.native]
             restriction = ""
-            if callback.reentry_policy:
-                policy = callback.reentry_policy
-                table = "Allowed" + public_name(plan.native) + pascal(name)
-                operations = ", ".join(f'"{item}"' for item in policy.operations)
-                methods.append(
-                    f"    private static readonly string[] {table} = [{operations}];\n"
-                )
-                owner_expression = (
-                    "owned"
-                    if callback.decision
-                    else "receiver.Owner"
-                    if plan.registration.receiver_owned
-                    else "response" + pascal(policy.owner_parameter)
-                )
-                restriction = f"            using var restriction = NativeCallbackGuard.Restrict({owner_expression}, {table});\n"
-            elif callback.reentry == "forbid":
-                restriction = "            using var restriction = NativeCallbackGuard.ForbidReentry();\n"
             args = ", ".join(
                 f"{self.raw_type(parameter.value)} {member(parameter.name)}"
                 for parameter in callback.parameters
@@ -856,11 +833,12 @@ class Values:
                     "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                     f"    private static {raw} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
                     f"        {owner}? owned = null;\n        try\n        {{\n"
-                    f"            owned = {owner}.BorrowDecision({member(decision.parameter)});\n"
+                    f"            owned = {owner}.Adopt({member(decision.parameter)});\n"
                     f"{restriction}"
                     f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
-                    f"            return owned.FinishDecision(decision == ({self.public_type(callback.result)}){accept}) ? ({raw}){accept} : ({raw})decision;\n"
-                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); try {{ return owned is not null && owned.FinishDecision(false) ? ({raw}){accept} : ({raw}){failure}; }} catch {{ return ({raw}){accept}; }} }}\n    }}\n'
+                    f"            if (decision != ({self.public_type(callback.result)}){accept}) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff();\n"
+                    f"            return ({raw})decision;\n"
+                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); if (owned is not null) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff(); return unchecked(({raw})(-1)); }}\n    }}\n'
                 )
                 continue
             responses = [
@@ -906,9 +884,6 @@ class Values:
                 f"response{pascal(parameter.name)}.Expire();" for parameter in responses
             )
             root = f"NativeCallbackRoot.Value({member(callback.context)})"
-            if plan.registration.receiver_owned:
-                setup += f"            var receiver = (NativeOwnedCallback){root};\n"
-                root = "receiver.Callback"
             invoke = f"(({public_name(plan.native)}){root}).{pascal(name)}?.Invoke({converted});"
             if responses:
                 invoke = f"try {{ {invoke} }} finally {{ {cleanup} }}"
@@ -1008,9 +983,10 @@ class Values:
             name = public_name(plan.native)
             return (
                 f"public sealed unsafe partial class {name}\n{{\n"
-                f"    private readonly global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackScope<{plan.native}> scope;\n"
-                f"    internal {name}({plan.native}* pointer) => scope = new(pointer);\n"
-                f"    internal {plan.native}* Pointer => scope.Pointer;\n"
+                f"    private readonly {plan.native}* pointer;\n"
+                "    private readonly NativeViewScope scope = new();\n"
+                f"    internal {name}({plan.native}* pointer) => this.pointer = pointer;\n"
+                f"    internal {plan.native}* Pointer {{ get {{ scope.EnsureActive(); return pointer; }} }}\n"
                 "    internal void Expire() => scope.Expire();\n}\n"
             )
         if self.union_only(plan):

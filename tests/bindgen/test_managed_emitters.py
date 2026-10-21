@@ -190,12 +190,6 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
             (root / "NativeCallbackRoot.cs").write_text(
                 (runtime.parent.parent / "Callback/NativeCallbackRoot.cs").read_text()
             )
-            (root / "NativeCallbackOwner.cs").write_text(
-                (runtime.parent.parent / "Callback/NativeCallbackOwner.cs").read_text()
-            )
-            (root / "NativeCallbackGuard.cs").write_text(
-                (runtime.parent.parent / "Callback/NativeCallbackGuard.cs").read_text()
-            )
             (root / "ValueArray.cs").write_text(
                 (runtime.parent.parent / "ValueArray.cs").read_text()
             )
@@ -211,12 +205,15 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
                 dotnet_native.generate(compile_api(api))["Internal/C/NativeTypes.g.cs"]
             )
             errors = runtime.parent.parent.parent / "Error"
-            for name in (
-                "MaplibreStatus.cs",
-                "MaplibreException.cs",
-                "InvalidArgumentException.cs",
-            ):
-                (root / name).write_text((errors / name).read_text())
+            (root / "MaplibreException.cs").write_text(
+                (errors / "MaplibreException.cs").read_text()
+            )
+            status = next(
+                source
+                for path, source in dotnet.emit(api).files.items()
+                if path.endswith("/Status.g.cs")
+            )
+            (root / "Status.g.cs").write_text(status)
             (root / "Program.cs").write_text(
                 """
 using Maplibre.NativeFfi.Internal;
@@ -265,7 +262,7 @@ namespace Maplibre.NativeFfi.Internal.C {
     try {
       NativeSnapshot(copy with { Camera = null! }, scope);
       Check(false);
-    } catch (Maplibre.NativeFfi.Error.InvalidArgumentException error) {
+    } catch (Maplibre.NativeFfi.Error.MaplibreException error) {
       Check(error.Diagnostic == "Snapshot.Camera must not be null.");
     }
     // A field named after a C# keyword keeps its value in both directions.

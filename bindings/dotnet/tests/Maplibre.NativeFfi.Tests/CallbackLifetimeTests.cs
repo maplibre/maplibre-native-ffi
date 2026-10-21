@@ -24,7 +24,7 @@ public sealed class CallbackLifetimeTests
 
         // Native validates the zoom range before it takes the registration.
         var (rejection, rejected) = AddRejectedCapturingSource(fixture.Map);
-        Assert.IsType<InvalidArgumentException>(rejection);
+        Assert.IsType<MaplibreException>(rejection);
         Assert.False(Gc.IsAlive(rejected));
     }
 
@@ -87,7 +87,7 @@ public sealed class CallbackLifetimeTests
         Assert.False(Gc.IsAlive(captured));
 
         var (rejection, rejected) = ApplyRejectedCapturingDelta(fixture.Map);
-        Assert.IsType<InvalidArgumentException>(rejection);
+        Assert.IsType<MaplibreException>(rejection);
         Assert.False(Gc.IsAlive(rejected));
     }
 
@@ -136,17 +136,17 @@ public sealed class CallbackLifetimeTests
         return (rejection, new WeakReference(captured));
     }
 
-    // A callback that captures the map it is registered on forms a cycle through the map's
-    // callback roots, which the collector reclaims once nothing else holds the map.
+    // Native holds a strong root until the registration is released.
     [Fact]
-    public async Task ACallbackDoesNotKeepItsReceiverAlive()
+    public async Task ACallbackKeepsItsReceiverAliveUntilExplicitClose()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var map = RegisterCallbackCapturingItsMap(runtime);
 
         Gc.Collect();
 
-        Assert.False(map.IsAlive);
+        Assert.True(map.IsAlive);
+        await ((MapHandle)map.Target!).CloseAsync();
         // The finalizer disposed the map, so the runtime has no live child to refuse its close.
         await runtime.CloseAsync();
     }

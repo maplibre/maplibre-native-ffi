@@ -26,17 +26,8 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeAcquiredFrameHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -63,17 +54,8 @@ public final class GeojsonSourceDataHandle: @unchecked Sendable,
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeGeojsonSourceDataHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -100,16 +82,8 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeMapHandle {
-    try handle.requireLive()
   }
 }
 
@@ -135,17 +109,8 @@ public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeMapProjectionHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -166,21 +131,13 @@ public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
   init(adopting raw: mln_render_frame_batch) throws {
     handle = try NativeHandleBox(
       typeName: "RenderFrameBatchHandle",
-      handle: NativeRenderFrameBatchHandle(raw: raw)
+      handle: NativeRenderFrameBatchHandle(raw: raw),
+      protectsCopies: true
     )
-  }
-
-  public var isClosed: Bool {
-    handle.isClosed
   }
 
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeRenderFrameBatchHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -207,17 +164,8 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeRenderSessionHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -235,28 +183,15 @@ struct NativeResourceRequestHandle: NativeHandle {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeResourceRequestHandle>
-  init(
-    adopting raw: mln_resource_request,
-    pendingDecision: Bool = false
-  ) throws {
+  init(adopting raw: mln_resource_request) throws {
     handle = try NativeHandleBox(
       typeName: "ResourceRequestHandle",
-      handle: NativeResourceRequestHandle(raw: raw),
-      pendingDecision: pendingDecision
+      handle: NativeResourceRequestHandle(raw: raw)
     )
-  }
-
-  public var isClosed: Bool {
-    handle.isClosed
   }
 
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeResourceRequestHandle {
-    try handle
-      .requireLive()
   }
 }
 
@@ -283,18 +218,8 @@ public final class ResourceTransformRequestHandle: @unchecked Sendable,
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws
-    -> NativeResourceTransformRequestHandle
-  {
-    try handle.requireLive()
   }
 }
 
@@ -320,17 +245,8 @@ public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
   public var id: UInt64 {
     handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeRuntimeHandle {
-    try handle
-      .requireLive()
   }
 }
 

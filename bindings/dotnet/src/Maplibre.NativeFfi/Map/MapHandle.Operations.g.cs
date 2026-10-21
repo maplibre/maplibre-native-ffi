@@ -30,15 +30,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     NativeHandleState<MlnMap> INativeOwner<MlnMap>.State => state;
     internal MlnMap Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_map_dispose");
         state.Retire();
     }
 
@@ -1357,7 +1354,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task CloseAsync()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_map_release");
         state.Close();
         return teardown;
     }

@@ -167,21 +167,21 @@ internal sealed class RenderFixture : IDisposable
     {
         try
         {
-            if (Session is { IsClosed: false })
+            if (Session is not null)
                 DetachAndClose();
         }
         finally
         {
             try
             {
-                if (Map is { IsClosed: false })
+                if (Map is not null)
                     Complete(Map.CloseAsync());
             }
             finally
             {
                 try
                 {
-                    if (Runtime is { IsClosed: false })
+                    if (Runtime is not null)
                         Complete(Runtime.CloseAsync());
                 }
                 finally

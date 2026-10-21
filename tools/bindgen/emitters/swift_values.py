@@ -257,4 +257,20 @@ class Values:
         conformance = (
             "OptionSet" if value.enum_kind == "bitmask" else "RawRepresentable"
         )
-        return f"{doc(self.bound, value.native)}public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n}}\n"
+        description = ""
+        if value.enum_kind != "bitmask":
+            conformance += ", CustomStringConvertible"
+            cases = "\n".join(
+                f'case {number}: return "{key.removeprefix(prefix)}"'
+                for number, key in {
+                    number: key for key, number in value.enum_values
+                }.items()
+            )
+            description = f'''  public var description: String {{
+    switch rawValue {{
+{cases}
+    default: return "{public}(\\(rawValue))"
+    }}
+  }}
+'''
+        return f"{doc(self.bound, value.native)}public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n{description}}}\n"

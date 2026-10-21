@@ -30,12 +30,8 @@ Cancelling a task that awaits an operation ends the wait with
 `CancellationError`. The native work still finishes, and the binding disposes a
 value that arrives afterwards, such as a created map.
 
-Native cannot receive a Swift error, so the binding catches an error that a
-callback throws and returns the callback's declared failure value to native. The
-binding reports the error as a `MaplibreDiagnostic.callbackError`, which names
-the C callback type, to the handler that `Maplibre.setDiagnosticHandler`
-installs. The same handler receives a `leakedHandle` diagnostic when the last
-reference to an open handle goes away; the binding disposes that handle, and the
-diagnostic's detail says when the disposal failed. Without a handler, each
-diagnostic goes to standard error. A `callbackError` reaches the handler on the
-native callback's stack, where the binding refuses every native call.
+Callbacks are non-throwing. A callback can call the C API through the binding;
+native reports an invalid-state status where reentry is unsafe. The binding
+reports callback decoding failures and leaked handles to standard error. When
+the last reference to an open handle goes away, the binding disposes the handle
+and reports whether disposal succeeded.

@@ -13,7 +13,7 @@
 "ERR-03" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aDrainBeforeAnyDemandReturnsNil"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
 "LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"
-"LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"
+"LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aFrameViewExpiresWithItsScopeAndHoldsOffAbandon"
 "LIFE-04" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::anAbandonedHandleIsDisposedOffTheCallbackStackAndReported"
 "LIFE-05" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aMapKeepsItsRuntimeAlive"
 "LIFE-06" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aHandleIdNamesItsEventsAndOutlivesClose"
@@ -25,8 +25,8 @@
 "COMP-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::discardedCommandsAreFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationIsRootedUntilNativeReleasesIt"
 "CB-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aCancelCallbackDoesNotKeepItsRequestAlive"
-"CB-03" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderCallbackAdmitsOnlyItsRequestsCalls"
-"CB-04" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::aThrowingProviderPassesTheRequestThroughAndIsReported"
+"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
+"CB-04" = { na = "Swift callbacks are non-throwing" }
 "CB-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderAnswersATakenRequestLater"
 "CB-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aHeaderResponseExpiresWithItsCallback"
 "CB-07" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::replacingTheLogCallbackReleasesThePreviousOne"

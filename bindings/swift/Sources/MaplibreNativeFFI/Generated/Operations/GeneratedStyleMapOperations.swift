@@ -54,10 +54,10 @@ public extension MapHandle {
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand("mln_map_add_geojson_source_data") { raw, arena, completion, diagnostic in
-      try mln_map_add_geojson_source_data(
+      mln_map_add_geojson_source_data(
         raw,
         arena.view(bindingArg0),
-        arena.borrow(bindingArg1.handle),
+        arena.use(bindingArg1.handle),
         completion,
         diagnostic
       )
@@ -631,10 +631,10 @@ public extension MapHandle {
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand("mln_map_set_geojson_source_data") { raw, arena, completion, diagnostic in
-      try mln_map_set_geojson_source_data(
+      mln_map_set_geojson_source_data(
         raw,
         arena.view(bindingArg0),
-        arena.borrow(bindingArg1.handle),
+        arena.use(bindingArg1.handle),
         completion,
         diagnostic
       )
@@ -892,7 +892,7 @@ public extension MapHandleDiscarding {
     options bindingArg1: CustomGeometrySourceOptions
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_custom_geometry_source") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_custom_geometry_source") { raw, arena, diagnostic in
         try mln_map_add_custom_geometry_source(
           raw,
           arena.view(bindingArg0),
@@ -908,7 +908,7 @@ public extension MapHandleDiscarding {
     options bindingArg1: CustomMvtVectorSourceOptions
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_custom_mvt_vector_source") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_custom_mvt_vector_source") { raw, arena, diagnostic in
         try mln_map_add_custom_mvt_vector_source(
           raw,
           arena.view(bindingArg0),
@@ -924,11 +924,11 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_geojson_source_data") { raw, arena, diagnostic in
-        try mln_map_add_geojson_source_data(
+      .nativeInvoke("mln_map_add_geojson_source_data") { raw, arena, diagnostic in
+        mln_map_add_geojson_source_data(
           raw,
           arena.view(bindingArg0),
-          arena.borrow(bindingArg1.handle),
+          arena.use(bindingArg1.handle),
           nil,
           diagnostic
         )
@@ -941,7 +941,7 @@ public extension MapHandleDiscarding {
     options bindingArg2: GeojsonSourceOptions? = nil
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_geojson_source_url") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_geojson_source_url") { raw, arena, diagnostic in
         try mln_map_add_geojson_source_url(
           raw,
           arena.view(bindingArg0),
@@ -959,7 +959,7 @@ public extension MapHandleDiscarding {
     image bindingArg3: PremultipliedRgba8Image
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_image_source_image") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_image_source_image") { raw, arena, diagnostic in
         try mln_map_add_image_source_image(
           raw,
           arena.view(bindingArg0),
@@ -978,7 +978,7 @@ public extension MapHandleDiscarding {
     url bindingArg3: String
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_image_source_url") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_image_source_url") { raw, arena, diagnostic in
         try mln_map_add_image_source_url(
           raw,
           arena.view(bindingArg0),
@@ -996,7 +996,7 @@ public extension MapHandleDiscarding {
     beforeLayerId bindingArg1: String? = nil
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_style_layer_json") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_style_layer_json") { raw, arena, diagnostic in
         mln_map_add_style_layer_json(
           raw,
           arena.view(bindingArg0),
@@ -1012,7 +1012,7 @@ public extension MapHandleDiscarding {
     sourceJson bindingArg1: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_add_style_source_json") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_add_style_source_json") { raw, arena, diagnostic in
         mln_map_add_style_source_json(
           raw,
           arena.view(bindingArg0),
@@ -1028,7 +1028,7 @@ public extension MapHandleDiscarding {
     bounds bindingArg1: LatLngBounds
   ) throws {
     try owner
-      .nativeDiscard("mln_map_invalidate_custom_geometry_source_region") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_invalidate_custom_geometry_source_region") { raw, arena, diagnostic in
         mln_map_invalidate_custom_geometry_source_region(
           raw,
           arena.view(bindingArg0),
@@ -1044,7 +1044,7 @@ public extension MapHandleDiscarding {
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
-      .nativeDiscard("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, diagnostic in
         mln_map_invalidate_custom_geometry_source_tile(
           raw,
           arena.view(bindingArg0),
@@ -1060,7 +1060,7 @@ public extension MapHandleDiscarding {
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
-      .nativeDiscard("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, diagnostic in
         mln_map_invalidate_custom_mvt_vector_source_tile(
           raw,
           arena.view(bindingArg0),
@@ -1076,7 +1076,7 @@ public extension MapHandleDiscarding {
     beforeLayerId bindingArg1: String? = nil
   ) throws {
     try owner
-      .nativeDiscard("mln_map_move_style_layer") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_move_style_layer") { raw, arena, diagnostic in
         mln_map_move_style_layer(
           raw,
           arena.view(bindingArg0),
@@ -1089,7 +1089,7 @@ public extension MapHandleDiscarding {
 
   func removeStyleImage(imageId bindingArg0: String) throws {
     try owner
-      .nativeDiscard("mln_map_remove_style_image") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_remove_style_image") { raw, arena, diagnostic in
         mln_map_remove_style_image(
           raw,
           arena.view(bindingArg0),
@@ -1101,7 +1101,7 @@ public extension MapHandleDiscarding {
 
   func removeStyleLayer(layerId bindingArg0: String) throws {
     try owner
-      .nativeDiscard("mln_map_remove_style_layer") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_remove_style_layer") { raw, arena, diagnostic in
         mln_map_remove_style_layer(
           raw,
           arena.view(bindingArg0),
@@ -1113,7 +1113,7 @@ public extension MapHandleDiscarding {
 
   func removeStyleSource(sourceId bindingArg0: String) throws {
     try owner
-      .nativeDiscard("mln_map_remove_style_source") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_remove_style_source") { raw, arena, diagnostic in
         mln_map_remove_style_source(
           raw,
           arena.view(bindingArg0),
@@ -1129,7 +1129,7 @@ public extension MapHandleDiscarding {
     data bindingArg2: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_custom_geometry_source_tile_data") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_custom_geometry_source_tile_data") { raw, arena, diagnostic in
         mln_map_set_custom_geometry_source_tile_data(
           raw,
           arena.view(bindingArg0),
@@ -1147,7 +1147,7 @@ public extension MapHandleDiscarding {
     data bindingArg2: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, diagnostic in
         mln_map_set_custom_mvt_vector_source_tile_data(
           raw,
           arena.view(bindingArg0),
@@ -1165,7 +1165,7 @@ public extension MapHandleDiscarding {
     message bindingArg2: String
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, diagnostic in
         mln_map_set_custom_mvt_vector_source_tile_error(
           raw,
           arena.view(bindingArg0),
@@ -1182,11 +1182,11 @@ public extension MapHandleDiscarding {
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_geojson_source_data") { raw, arena, diagnostic in
-        try mln_map_set_geojson_source_data(
+      .nativeInvoke("mln_map_set_geojson_source_data") { raw, arena, diagnostic in
+        mln_map_set_geojson_source_data(
           raw,
           arena.view(bindingArg0),
-          arena.borrow(bindingArg1.handle),
+          arena.use(bindingArg1.handle),
           nil,
           diagnostic
         )
@@ -1198,7 +1198,7 @@ public extension MapHandleDiscarding {
     enabled bindingArg1: Bool
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, diagnostic in
         mln_map_set_geojson_source_synchronous_tiling(
           raw,
           arena.view(bindingArg0),
@@ -1214,7 +1214,7 @@ public extension MapHandleDiscarding {
     url bindingArg1: String
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_geojson_source_url") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_geojson_source_url") { raw, arena, diagnostic in
         mln_map_set_geojson_source_url(
           raw,
           arena.view(bindingArg0),
@@ -1230,7 +1230,7 @@ public extension MapHandleDiscarding {
     value bindingArg1: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_global_state_property") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_global_state_property") { raw, arena, diagnostic in
         mln_map_set_global_state_property(
           raw,
           arena.view(bindingArg0),
@@ -1246,7 +1246,7 @@ public extension MapHandleDiscarding {
     coordinates bindingArg1: [LatLng]
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_image_source_coordinates") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_image_source_coordinates") { raw, arena, diagnostic in
         try mln_map_set_image_source_coordinates(
           raw,
           arena.view(bindingArg0),
@@ -1263,7 +1263,7 @@ public extension MapHandleDiscarding {
     image bindingArg1: PremultipliedRgba8Image
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_image_source_image") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_image_source_image") { raw, arena, diagnostic in
         try mln_map_set_image_source_image(
           raw,
           arena.view(bindingArg0),
@@ -1279,7 +1279,7 @@ public extension MapHandleDiscarding {
     url bindingArg1: String
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_image_source_url") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_image_source_url") { raw, arena, diagnostic in
         mln_map_set_image_source_url(
           raw,
           arena.view(bindingArg0),
@@ -1296,7 +1296,7 @@ public extension MapHandleDiscarding {
     options bindingArg2: StyleImageOptions? = nil
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_image") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_image") { raw, arena, diagnostic in
         try mln_map_set_style_image(
           raw,
           arena.view(bindingArg0),
@@ -1314,7 +1314,7 @@ public extension MapHandleDiscarding {
     value bindingArg2: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_layer_property") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_layer_property") { raw, arena, diagnostic in
         mln_map_set_style_layer_property(
           raw,
           arena.view(bindingArg0),
@@ -1328,7 +1328,7 @@ public extension MapHandleDiscarding {
 
   func setStyleLightJson(lightJson bindingArg0: Data) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_light_json") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_light_json") { raw, arena, diagnostic in
         mln_map_set_style_light_json(
           raw,
           arena.view(bindingArg0),
@@ -1343,7 +1343,7 @@ public extension MapHandleDiscarding {
     value bindingArg1: Data
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_light_property") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_light_property") { raw, arena, diagnostic in
         mln_map_set_style_light_property(
           raw,
           arena.view(bindingArg0),
@@ -1359,7 +1359,7 @@ public extension MapHandleDiscarding {
     isVolatile bindingArg1: Bool
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_source_volatile") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_source_volatile") { raw, arena, diagnostic in
         mln_map_set_style_source_volatile(
           raw,
           arena.view(bindingArg0),
@@ -1374,7 +1374,7 @@ public extension MapHandleDiscarding {
     options bindingArg0: StyleTransitionOptions
   ) throws {
     try owner
-      .nativeDiscard("mln_map_set_style_transition_options") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_style_transition_options") { raw, arena, diagnostic in
         mln_map_set_style_transition_options(
           raw,
           arena.store(bindingArg0.nativeValue()),

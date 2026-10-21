@@ -38,15 +38,12 @@ public sealed unsafe partial class GeojsonSourceDataHandle
 
     NativeHandleState<MlnGeojsonSourceData> INativeOwner<MlnGeojsonSourceData>.State => state;
     internal MlnGeojsonSourceData Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_release");
         state.Retire();
     }
 
@@ -85,7 +82,6 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_release");
         state.Close();
     }
 }

@@ -18,8 +18,11 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
   do {
     _ = try Maplibre.keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
     check(false, "a mismatched C ABI version was not reported")
-  } catch let error as MaplibreError {
-    check(error.kind == .abiVersionMismatch, "ABI mismatch: \(error)")
+  } catch let error as AbiVersionMismatchError {
+    check(
+      error.expected == expectedCAbiVersion && error.actual != error.expected,
+      "ABI mismatch: \(error)"
+    )
   }
   exit(0)
 }
@@ -70,7 +73,7 @@ do {
   check(false, "native failure was not reported")
 } catch let error as MaplibreError {
   check(
-    error.kind == .invalidArgument && error.rawStatus == -1,
+    error.status == .invalidArgument,
     "status: \(error)"
   )
   check(
@@ -90,7 +93,7 @@ do {
   check(false, "an exhausted parcel was not reported")
 } catch let error as MaplibreError {
   check(
-    error.kind == .invalidArgument && error.diagnostic == "exhausted",
+    error.status == .invalidArgument && error.diagnostic == "exhausted",
     "exhausted parcel: \(error)"
   )
 }

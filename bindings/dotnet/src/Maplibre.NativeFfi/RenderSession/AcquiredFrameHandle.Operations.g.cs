@@ -36,15 +36,12 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
 
     NativeHandleState<MlnAcquiredFrame> INativeOwner<MlnAcquiredFrame>.State => state;
     internal MlnAcquiredFrame Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_acquired_frame_dispose");
         state.Retire();
     }
 
@@ -249,7 +246,6 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     /// </remarks>
     public void Release(GpuSync consumerCompletion)
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_acquired_frame_release");
         using var scope = new NativeCallScope();
         state.Release(
             (live, diagnostic) =>

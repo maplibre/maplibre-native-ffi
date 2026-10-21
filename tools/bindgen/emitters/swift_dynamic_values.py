@@ -357,18 +357,14 @@ def declaration(values, value):
                 f"  public static func {identifier(camel(variant.name))}(_ value: {values.public(variant.value)}) -> Self {{ Self({identifier(camel(field.name))}: .{identifier(camel(variant.name))}(value)) }}"
             )
     initial = f"{value.default}()" if value.default else f"{value.native}()"
-    if controls:
-        encode_lines = [
-            '    throw NativeStringError("borrowed arena snapshots cannot be submitted")'
-        ]
     encoder = (
         f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
-    {"" if controls else "var raw = " + initial}
+    var raw = {initial}
 {chr(10).join(encode_lines)}
-    {"" if controls else "return raw"}
+    return raw
   }}
 """
-        if value.native in values.bound.inputs
+        if value.native in values.bound.inputs and not controls
         else ""
     )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{

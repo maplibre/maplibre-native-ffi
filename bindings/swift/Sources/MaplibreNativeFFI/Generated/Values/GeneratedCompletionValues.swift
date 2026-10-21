@@ -7,8 +7,8 @@ import Foundation
 ///
 /// See `mln_command_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
-public struct CommandDisposition: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct CommandDisposition: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -19,4 +19,13 @@ public struct CommandDisposition: RawRepresentable, NativeOpenValue, Equatable,
   public static let superseded: CommandDisposition = .init(rawValue: 1)
   public static let failed: CommandDisposition = .init(rawValue: 2)
   public static let cancelled: CommandDisposition = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 0: return "COMMITTED"
+    case 1: return "SUPERSEDED"
+    case 2: return "FAILED"
+    case 3: return "CANCELLED"
+    default: return "CommandDisposition(\(rawValue))"
+    }
+  }
 }

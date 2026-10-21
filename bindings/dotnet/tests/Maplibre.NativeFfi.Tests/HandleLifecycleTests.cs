@@ -17,11 +17,9 @@ public sealed class HandleLifecycleTests
         await map.CloseAsync();
         await map.CloseAsync();
         await map.DisposeAsync();
-        Assert.True(map.IsClosed);
 
         var teardown = runtime.CloseAsync();
         var again = runtime.CloseAsync();
-        Assert.True(runtime.IsClosed);
         await teardown;
         await again;
         runtime.Dispose();
@@ -46,35 +44,32 @@ public sealed class HandleLifecycleTests
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         using var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
 
-        var error = Assert.Throws<InvalidStateException>(() =>
+        var error = Assert.Throws<MaplibreException>(() =>
         {
             _ = runtime.CloseAsync();
         });
-        Assert.Equal((int)MaplibreStatus.InvalidState, error.RawStatus);
+        Assert.Equal(Status.InvalidState, error.Status);
         Assert.Contains("live or pending children", error.Diagnostic, StringComparison.Ordinal);
-        Assert.False(runtime.IsClosed);
         await runtime.ClearResourceTransformAsync(TestWaits.Token);
 
         await map.CloseAsync();
         await runtime.CloseAsync();
-        Assert.True(runtime.IsClosed);
     }
 
     [Fact]
-    public async Task AClosedHandleRejectsCallsBeforeTheyReachNative()
+    public async Task AClosedHandlePassesItsStaleIdToNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
         await map.CloseAsync();
         await runtime.CloseAsync();
 
-        var error = Assert.Throws<InvalidStateException>(() =>
+        var error = Assert.Throws<MaplibreException>(() =>
         {
             _ = map.RequestRepaintAsync(TestWaits.Token);
         });
 
-        Assert.Null(error.RawStatus);
-        Assert.Equal("MapHandle is closed", error.Diagnostic);
+        Assert.Equal(Status.InvalidState, error.Status);
     }
 
     [Fact]

@@ -44,7 +44,6 @@ def consumed(plan, owner, values):
         return (
             f"""public extension {owner} {{
 {doc(values.bound, function.name, "  ")}  func release({", ".join(declarations)}) throws {{
-    try NativeCallbackGuard.check(owner: self, operation: "{function.name}")
     try mapNativeFailure {{
       let arena = NativeInputArena()
       defer {{ withExtendedLifetime(arena) {{}} }}
@@ -92,10 +91,6 @@ def owner_name(handle):
     return name(handle.stem) + "Handle"
 
 
-def decision_handles(bound):
-    return set(bound.decisions)
-
-
 def public_handles(bound):
     def handles(value):
         if value.handle:
@@ -129,16 +124,14 @@ def owner_declarations(bound):
         chunks.append(
             f"struct {raw}: NativeHandle {{ let raw: UInt64; func disposeAbandoned() -> Bool {{ {body} }} }}\n"
         )
-        decision = handle.native in decision_handles(bound)
         parent = (
             f", parent: {owner_name(bound.handles[handle.parent])}"
             if handle.parent
             else ""
         )
         passed = ", parent: parent" if handle.parent else ""
-        if decision:
-            parent += ", pendingDecision: Bool = false"
-            passed += ", pendingDecision: pendingDecision"
+        if handle.native == "mln_render_frame_batch":
+            passed += ", protectsCopies: true"
         from .swift import doc
 
         chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver {{
@@ -146,9 +139,7 @@ def owner_declarations(bound):
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleBox(typeName: "{owner}", handle: {raw}(raw: raw){passed})
   }}
-  public var isClosed: Bool {{ handle.isClosed }}
   public var id: UInt64 {{ handle.issued.raw }}
-  func requireLiveHandle() throws -> {raw} {{ try handle.requireLive() }}
 }}
 ''')
     return "\n".join(chunks)

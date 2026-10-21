@@ -26,8 +26,9 @@ public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
 ///
 /// See `mln_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
-  Sendable
+public struct Status: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: Int32
   public init(rawValue: Int32) {
@@ -55,4 +56,20 @@ public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let notReady: Status = .init(rawValue: -9)
   /// A call named an ID with no live object behind it.
   public static let notFound: Status = .init(rawValue: -10)
+  public var description: String {
+    switch rawValue {
+    case 0: return "OK"
+    case -1: return "INVALID_ARGUMENT"
+    case -2: return "INVALID_STATE"
+    case -3: return "WRONG_THREAD"
+    case -4: return "UNSUPPORTED"
+    case -5: return "NATIVE_ERROR"
+    case -6: return "CANCELLED"
+    case -7: return "BUSY"
+    case -8: return "TARGET_LOST"
+    case -9: return "NOT_READY"
+    case -10: return "NOT_FOUND"
+    default: return "Status(\(rawValue))"
+    }
+  }
 }

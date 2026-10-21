@@ -58,6 +58,10 @@ internal static class NativeValues
     internal static void Required(object? value, string message)
     {
         if (value is null)
-            throw new InvalidArgumentException(MaplibreStatus.InvalidArgument, null, message, null);
+            throw new MaplibreException(
+                global::Maplibre.NativeFfi.Status.InvalidArgument,
+                message,
+                null
+            );
     }
 }

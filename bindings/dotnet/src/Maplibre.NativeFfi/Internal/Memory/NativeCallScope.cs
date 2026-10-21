@@ -23,12 +23,6 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
 
     internal NativeCallScope() { }
 
-    /// <summary>
-    /// The owner whose operation registers callbacks through this scope, which
-    /// a callback that may call back only into that owner records.
-    /// </summary>
-    internal object? Receiver { get; init; }
-
     internal void* Register(object descriptor)
     {
         var root = new NativeCallbackRoot(descriptor);
@@ -44,14 +38,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         return root.Pointer;
     }
 
-    internal void Accept(NativeCallbackOwner? owner = null)
-    {
-        accepted = true;
-        if (registrations is null)
-            return;
-        foreach (var root in registrations)
-            root.Retain(owner ?? NativeCallbackOwner.Global);
-    }
+    internal void Accept() => accepted = true;
 
     private T* Allocate<T>(int count)
         where T : unmanaged

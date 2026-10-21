@@ -3,8 +3,8 @@
 internal import MaplibreNativeC
 import Foundation
 
-public struct AmbientCacheOperation: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -15,14 +15,23 @@ public struct AmbientCacheOperation: RawRepresentable, NativeOpenValue,
   public static let packDatabase: AmbientCacheOperation = .init(rawValue: 2)
   public static let invalidate: AmbientCacheOperation = .init(rawValue: 3)
   public static let clear: AmbientCacheOperation = .init(rawValue: 4)
+  public var description: String {
+    switch rawValue {
+    case 1: return "RESET_DATABASE"
+    case 2: return "PACK_DATABASE"
+    case 3: return "INVALIDATE"
+    case 4: return "CLEAR"
+    default: return "AmbientCacheOperation(\(rawValue))"
+    }
+  }
 }
 
 /// Camera change kinds reported by camera will-change and did-change events.
 ///
 /// See `mln_camera_change_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -33,6 +42,13 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let immediate: CameraChangeMode = .init(rawValue: 0)
   /// The camera moved as part of an animated transition.
   public static let animated: CameraChangeMode = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "IMMEDIATE"
+    case 1: return "ANIMATED"
+    default: return "CameraChangeMode(\(rawValue))"
+    }
+  }
 }
 
 /// A borrowed span of runtime events in one delivery.
@@ -171,12 +187,12 @@ public struct HttpHeaderTransform: Sendable {
     ResourceKind,
     String,
     HttpHeaderTransformResponse
-  ) throws -> Void)?
+  ) -> Void)?
   /// Header rules for a transform without a callback; empty with one.
   public var rules: [HttpHeaderRule]
   public init(
-    callback: (@Sendable (ResourceKind, String,
-                          HttpHeaderTransformResponse) throws -> Void)? = nil,
+    callback: (@Sendable (ResourceKind, String, HttpHeaderTransformResponse)
+      -> Void)? = nil,
     rules: [HttpHeaderRule] = []
   ) {
     self.callback = callback
@@ -203,8 +219,6 @@ public struct HttpHeaderTransform: Sendable {
   }
 }
 
-private let allowedHttpHeaderTransformCallback: Set<String> =
-  ["mln_http_header_transform_response_set_header"]
 private func invokeHttpHeaderTransformCallback(
   user_data: UnsafeMutableRawPointer?,
   kind: UInt32,
@@ -217,11 +231,6 @@ private func invokeHttpHeaderTransformCallback(
   guard let out_response else { return MLN_STATUS_NATIVE_ERROR }
   let responseOutResponse = HttpHeaderTransformResponse(pointer: out_response)
   defer { responseOutResponse.expire() }
-  let admission = NativeCallbackGuard.enter(
-    owner: responseOutResponse,
-    operations: allowedHttpHeaderTransformCallback
-  )
-  defer { admission.end() }
   do { try box.value.callback?(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
@@ -248,8 +257,8 @@ public final class HttpHeaderTransformResponse: @unchecked Sendable {
   }
 }
 
-public struct NetworkStatus: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct NetworkStatus: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -258,10 +267,17 @@ public struct NetworkStatus: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let online: NetworkStatus = .init(rawValue: 1)
   public static let offline: NetworkStatus = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 1: return "ONLINE"
+    case 2: return "OFFLINE"
+    default: return "NetworkStatus(\(rawValue))"
+    }
+  }
 }
 
-public struct OfflineRegionDefinitionType: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct OfflineRegionDefinitionType: RawRepresentable,
+  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -271,10 +287,17 @@ public struct OfflineRegionDefinitionType: RawRepresentable, NativeOpenValue,
   public static let tilePyramid: OfflineRegionDefinitionType =
     .init(rawValue: 1)
   public static let geometry: OfflineRegionDefinitionType = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 1: return "TILE_PYRAMID"
+    case 2: return "GEOMETRY"
+    default: return "OfflineRegionDefinitionType(\(rawValue))"
+    }
+  }
 }
 
-public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct OfflineRegionDownloadState: RawRepresentable,
+  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -283,6 +306,13 @@ public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
 
   public static let inactive: OfflineRegionDownloadState = .init(rawValue: 0)
   public static let active: OfflineRegionDownloadState = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "INACTIVE"
+    case 1: return "ACTIVE"
+    default: return "OfflineRegionDownloadState(\(rawValue))"
+    }
+  }
 }
 
 /// Offline region status snapshot.
@@ -348,9 +378,8 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
 ///
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RenderMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable,
-  Sendable
+public struct RenderMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -359,6 +388,13 @@ public struct RenderMode: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let partial: RenderMode = .init(rawValue: 0)
   public static let full: RenderMode = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "PARTIAL"
+    case 1: return "FULL"
+    default: return "RenderMode(\(rawValue))"
+    }
+  }
 }
 
 /// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
@@ -403,8 +439,8 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ResourceErrorReason: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -417,10 +453,21 @@ public struct ResourceErrorReason: RawRepresentable, NativeOpenValue, Equatable,
   public static let connection: ResourceErrorReason = .init(rawValue: 3)
   public static let rateLimit: ResourceErrorReason = .init(rawValue: 4)
   public static let other: ResourceErrorReason = .init(rawValue: 5)
+  public var description: String {
+    switch rawValue {
+    case 0: return "NONE"
+    case 1: return "NOT_FOUND"
+    case 2: return "SERVER"
+    case 3: return "CONNECTION"
+    case 4: return "RATE_LIMIT"
+    case 5: return "OTHER"
+    default: return "ResourceErrorReason(\(rawValue))"
+    }
+  }
 }
 
-public struct ResourceKind: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ResourceKind: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -435,6 +482,19 @@ public struct ResourceKind: RawRepresentable, NativeOpenValue, Equatable,
   public static let spriteImage: ResourceKind = .init(rawValue: 5)
   public static let spriteJson: ResourceKind = .init(rawValue: 6)
   public static let image: ResourceKind = .init(rawValue: 7)
+  public var description: String {
+    switch rawValue {
+    case 0: return "UNKNOWN"
+    case 1: return "STYLE"
+    case 2: return "SOURCE"
+    case 3: return "TILE"
+    case 4: return "GLYPHS"
+    case 5: return "SPRITE_IMAGE"
+    case 6: return "SPRITE_JSON"
+    case 7: return "IMAGE"
+    default: return "ResourceKind(\(rawValue))"
+    }
+  }
 }
 
 /// The resource kinds that a route or rule matches, one bit per
@@ -462,8 +522,8 @@ public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let all: ResourceKindMask = .init(rawValue: 255)
 }
 
-public struct ResourceLoadingMethod: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -473,10 +533,18 @@ public struct ResourceLoadingMethod: RawRepresentable, NativeOpenValue,
   public static let all: ResourceLoadingMethod = .init(rawValue: 0)
   public static let cacheOnly: ResourceLoadingMethod = .init(rawValue: 1)
   public static let networkOnly: ResourceLoadingMethod = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "ALL"
+    case 1: return "CACHE_ONLY"
+    case 2: return "NETWORK_ONLY"
+    default: return "ResourceLoadingMethod(\(rawValue))"
+    }
+  }
 }
 
-public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -485,6 +553,13 @@ public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let regular: ResourcePriority = .init(rawValue: 0)
   public static let low: ResourcePriority = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "REGULAR"
+    case 1: return "LOW"
+    default: return "ResourcePriority(\(rawValue))"
+    }
+  }
 }
 
 /// Resource provider state.
@@ -493,13 +568,12 @@ public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
   /// Decides each request that the routes leave to the provider.
-  public var callback: (@Sendable (ResourceRequestInfo,
-                                   ResourceRequestHandle) throws
-      -> ResourceProviderDecision)?
+  public var callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
+    -> ResourceProviderDecision)?
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle) throws
+    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
       -> ResourceProviderDecision)? = nil,
     routes: [ResourceRoute] = []
   ) {
@@ -526,13 +600,6 @@ public struct ResourceProvider: Sendable {
   }
 }
 
-private let allowedResourceProviderCallback: Set<String> = [
-  "mln_resource_request_complete",
-  "mln_resource_request_pass_through",
-  "mln_resource_request_is_cancelled",
-  "mln_resource_request_set_cancel_callback",
-  "mln_resource_request_release",
-]
 private func invokeResourceProviderCallback(
   user_data: UnsafeMutableRawPointer?,
   request: UnsafePointer<mln_resource_request_info>?,
@@ -542,35 +609,27 @@ private func invokeResourceProviderCallback(
   else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
   let box = Unmanaged<GeneratedCallbackBox<ResourceProvider>>
     .fromOpaque(user_data).takeUnretainedValue()
-  guard let decisionOwner = try? ResourceRequestHandle(
-    adopting: handle,
-    pendingDecision: true
-  ) else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
-  let admission = NativeCallbackGuard.enter(
-    owner: decisionOwner,
-    operations: allowedResourceProviderCallback
-  )
-  defer { admission.end() }
-  do { let accepted = try box.value.callback?(
+  guard let decisionOwner = try? ResourceRequestHandle(adopting: handle)
+  else { return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue }
+  do { let decision = try box.value.callback?(
     NativeInputArena.copyArray(request, count: 1)
       .map { try ResourceRequestInfo(raw: $0) }[0],
     decisionOwner
-  ).rawValue == MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-    .rawValue; return decisionOwner.handle
-    .finishDecision(accepted: accepted) ? MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-    .rawValue : MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
-  } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_resource_provider_callback",
-      error: error
-    )); return decisionOwner.handle
-      .finishDecision(accepted: false) ? MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-      .rawValue : MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
-  }
+  ) ??
+    ResourceProviderDecision(rawValue: MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+      .rawValue); if decision.rawValue != MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+    .rawValue
+  {
+    decisionOwner.handle.handOff()
+  }; return decision.rawValue
+  } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_resource_provider_callback",
+    error: error
+  )); decisionOwner.handle.handOff(); return UInt32.max }
 }
 
-public struct ResourceProviderDecision: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct ResourceProviderDecision: RawRepresentable,
+  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -579,6 +638,13 @@ public struct ResourceProviderDecision: RawRepresentable, NativeOpenValue,
 
   public static let passThrough: ResourceProviderDecision = .init(rawValue: 0)
   public static let handle: ResourceProviderDecision = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "PASS_THROUGH"
+    case 1: return "HANDLE"
+    default: return "ResourceProviderDecision(\(rawValue))"
+    }
+  }
 }
 
 /// Inclusive byte range of a resource request.
@@ -614,8 +680,8 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRequestCancelHandler: Sendable {
   /// Required in callback mode; null in queue mode.
-  public var callback: (@Sendable () throws -> Void)?
-  public init(callback: (@Sendable () throws -> Void)? = nil) {
+  public var callback: (@Sendable () -> Void)?
+  public init(callback: (@Sendable () -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -632,45 +698,21 @@ public struct ResourceRequestCancelHandler: Sendable {
       .callback = callback == nil ? nil :
       invokeResourceRequestCancelHandlerCallback
     if callback != nil {
-      raw.user_data = arena.callback(NativeOwnedCallback(
-        owner: arena.receiver,
-        value: self
-      ))
+      raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
     }
     return raw
   }
 }
 
-private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
-  "mln_resource_request_complete",
-  "mln_resource_request_pass_through",
-  "mln_resource_request_is_cancelled",
-  "mln_resource_request_set_cancel_callback",
-  "mln_resource_request_release",
-]
 private func invokeResourceRequestCancelHandlerCallback(
   user_data: UnsafeMutableRawPointer?,
   handle _: mln_resource_request
 ) {
   guard let user_data else { return }
-  let box =
-    Unmanaged<
-      GeneratedCallbackBox<NativeOwnedCallback<ResourceRequestCancelHandler>>
-    >
+  let box = Unmanaged<GeneratedCallbackBox<ResourceRequestCancelHandler>>
     .fromOpaque(user_data).takeUnretainedValue()
-  guard let receiver = box.value.owner else { return }
-  let admission = NativeCallbackGuard.enter(
-    owner: receiver,
-    operations: allowedResourceRequestCancelHandlerCallback
-  )
-  defer { admission.end() }
-  do { try box.value.value.callback?() } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_resource_request_cancel_callback",
-      error: error
-    ))
-  }
+  box.value.callback?()
 }
 
 /// Field mask values for `mln_resource_request_info`.
@@ -889,8 +931,8 @@ public struct ResourceResponseField: OptionSet, NativeOpenValue, Equatable,
 ///
 /// See `mln_resource_response_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -901,6 +943,15 @@ public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
   public static let error: ResourceResponseStatus = .init(rawValue: 1)
   public static let noContent: ResourceResponseStatus = .init(rawValue: 2)
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 0: return "OK"
+    case 1: return "ERROR"
+    case 2: return "NO_CONTENT"
+    case 3: return "NOT_MODIFIED"
+    default: return "ResourceResponseStatus(\(rawValue))"
+    }
+  }
 }
 
 /// One request pattern that a resource provider claims.
@@ -946,8 +997,8 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -956,6 +1007,13 @@ public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
 
   public static let permanent: ResourceStoragePolicy = .init(rawValue: 0)
   public static let volatile: ResourceStoragePolicy = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "PERMANENT"
+    case 1: return "VOLATILE"
+    default: return "ResourceStoragePolicy(\(rawValue))"
+    }
+  }
 }
 
 /// Resource transform state.
@@ -968,12 +1026,12 @@ public struct ResourceTransform: Sendable {
     ResourceKind,
     String,
     ResourceTransformRequestHandle
-  ) throws -> Void)?
+  ) -> Void)?
   public init(callback: (@Sendable (
     ResourceKind,
     String,
     ResourceTransformRequestHandle
-  ) throws -> Void)? = nil) {
+  ) -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -1015,8 +1073,8 @@ private func invokeResourceTransformCallback(
   )); try? ownedRequest.close() }
 }
 
-public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1025,6 +1083,13 @@ public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let online: ResourceUsage = .init(rawValue: 0)
   public static let offline: ResourceUsage = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "ONLINE"
+    case 1: return "OFFLINE"
+    default: return "ResourceUsage(\(rawValue))"
+    }
+  }
 }
 
 /// One delivered runtime event.
@@ -1129,8 +1194,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
 /// See `mln_runtime_event_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventHandler: Sendable {
-  public var callback: (@Sendable (EventBatchView) throws -> Void)?
-  public init(callback: (@Sendable (EventBatchView) throws -> Void)? = nil) {
+  public var callback: (@Sendable (EventBatchView) -> Void)?
+  public init(callback: (@Sendable (EventBatchView) -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -1325,8 +1390,9 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
 ///
 /// See `mln_runtime_event_payload_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct RuntimeEventPayloadType: RawRepresentable,
+  CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1343,6 +1409,18 @@ public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
     .init(rawValue: 6)
   public static let offlineRegionTileCountLimit: RuntimeEventPayloadType =
     .init(rawValue: 7)
+  public var description: String {
+    switch rawValue {
+    case 0: return "NONE"
+    case 1: return "RENDER_FRAME"
+    case 2: return "RENDER_MAP"
+    case 4: return "TILE_ACTION"
+    case 5: return "OFFLINE_REGION_STATUS"
+    case 6: return "OFFLINE_REGION_RESPONSE_ERROR"
+    case 7: return "OFFLINE_REGION_TILE_COUNT_LIMIT"
+    default: return "RuntimeEventPayloadType(\(rawValue))"
+    }
+  }
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
@@ -1405,8 +1483,8 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
 ///
 /// See `mln_runtime_event_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventSourceType: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1415,6 +1493,13 @@ public struct RuntimeEventSourceType: RawRepresentable, NativeOpenValue,
 
   public static let runtime: RuntimeEventSourceType = .init(rawValue: 0)
   public static let map: RuntimeEventSourceType = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "RUNTIME"
+    case 1: return "MAP"
+    default: return "RuntimeEventSourceType(\(rawValue))"
+    }
+  }
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
@@ -1447,8 +1532,8 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
 ///
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1479,6 +1564,30 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 21)
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 23)
+  public var description: String {
+    switch rawValue {
+    case 1: return "MAP_CAMERA_WILL_CHANGE"
+    case 2: return "MAP_CAMERA_IS_CHANGING"
+    case 3: return "MAP_CAMERA_DID_CHANGE"
+    case 4: return "MAP_STYLE_LOADED"
+    case 5: return "MAP_LOADING_STARTED"
+    case 6: return "MAP_LOADING_FINISHED"
+    case 7: return "MAP_LOADING_FAILED"
+    case 8: return "MAP_IDLE"
+    case 10: return "MAP_RENDER_ERROR"
+    case 13: return "MAP_RENDER_FRAME_STARTED"
+    case 14: return "MAP_RENDER_FRAME_FINISHED"
+    case 15: return "MAP_RENDER_MAP_STARTED"
+    case 16: return "MAP_RENDER_MAP_FINISHED"
+    case 17: return "MAP_STYLE_IMAGE_MISSING"
+    case 18: return "MAP_TILE_ACTION"
+    case 19: return "OFFLINE_REGION_STATUS_CHANGED"
+    case 20: return "OFFLINE_REGION_RESPONSE_ERROR"
+    case 21: return "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
+    case 23: return "MAP_SOURCE_CHANGED"
+    default: return "RuntimeEventType(\(rawValue))"
+    }
+  }
 }
 
 /// Options used when creating a runtime.
@@ -1567,8 +1676,8 @@ public struct TileId: Equatable, Hashable, Sendable {
 ///
 /// See `mln_tile_operation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct TileOperation: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct TileOperation: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1584,6 +1693,20 @@ public struct TileOperation: RawRepresentable, NativeOpenValue, Equatable,
   public static let error: TileOperation = .init(rawValue: 6)
   public static let cancelled: TileOperation = .init(rawValue: 7)
   public static let null: TileOperation = .init(rawValue: 8)
+  public var description: String {
+    switch rawValue {
+    case 0: return "REQUESTED_FROM_CACHE"
+    case 1: return "REQUESTED_FROM_NETWORK"
+    case 2: return "LOAD_FROM_NETWORK"
+    case 3: return "LOAD_FROM_CACHE"
+    case 4: return "START_PARSE"
+    case 5: return "END_PARSE"
+    case 6: return "ERROR"
+    case 7: return "CANCELLED"
+    case 8: return "NULL"
+    default: return "TileOperation(\(rawValue))"
+    }
+  }
 }
 
 /// How a rule or route compares its url against a request URL.

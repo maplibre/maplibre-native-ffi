@@ -4,12 +4,20 @@ namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class HttpHeaderTransformResponse
 {
-    private readonly global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackScope<mln_http_header_transform_response> scope;
+    private readonly mln_http_header_transform_response* pointer;
+    private readonly NativeViewScope scope = new();
 
     internal HttpHeaderTransformResponse(mln_http_header_transform_response* pointer) =>
-        scope = new(pointer);
+        this.pointer = pointer;
 
-    internal mln_http_header_transform_response* Pointer => scope.Pointer;
+    internal mln_http_header_transform_response* Pointer
+    {
+        get
+        {
+            scope.EnsureActive();
+            return pointer;
+        }
+    }
 
     internal void Expire() => scope.Expire();
 }

@@ -57,15 +57,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     NativeHandleState<MlnRenderSession> INativeOwner<MlnRenderSession>.State => state;
     internal MlnRenderSession Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_dispose");
         state.Retire();
     }
 
@@ -415,7 +412,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_release");
         state.Close();
     }
 

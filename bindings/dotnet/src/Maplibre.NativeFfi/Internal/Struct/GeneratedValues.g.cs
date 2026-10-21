@@ -804,11 +804,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    private static readonly string[] AllowedHttpHeaderTransformCallback =
-    [
-        "mln_http_header_transform_response_set_header",
-    ];
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static mln_status InvokeHttpHeaderTransformCallback(
         void* user_data,
@@ -820,10 +815,6 @@ internal static unsafe class GeneratedValues
         try
         {
             var responseOutResponse = new HttpHeaderTransformResponse(out_response);
-            using var restriction = NativeCallbackGuard.Restrict(
-                responseOutResponse,
-                AllowedHttpHeaderTransformCallback
-            );
             try
             {
                 ((HttpHeaderTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
@@ -922,7 +913,6 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            using var restriction = NativeCallbackGuard.ForbidReentry();
             var answer = ((LogHandler)NativeCallbackRoot.Value(user_data)).Callback;
             return answer is null
                 ? 0
@@ -1607,7 +1597,6 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            using var restriction = NativeCallbackGuard.ForbidReentry();
             ((QueueLock)NativeCallbackRoot.Value(user_data)).Lock?.Invoke();
         }
         catch (Exception error)
@@ -1621,7 +1610,6 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            using var restriction = NativeCallbackGuard.ForbidReentry();
             ((QueueLock)NativeCallbackRoot.Value(user_data)).Unlock?.Invoke();
         }
         catch (Exception error)
@@ -1821,15 +1809,6 @@ internal static unsafe class GeneratedValues
             value.total_draw_call_count
         );
 
-    private static readonly string[] AllowedResourceProviderCallback =
-    [
-        "mln_resource_request_complete",
-        "mln_resource_request_pass_through",
-        "mln_resource_request_is_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-    ];
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint InvokeResourceProviderCallback(
         void* user_data,
@@ -1840,11 +1819,7 @@ internal static unsafe class GeneratedValues
         ResourceRequestHandle? owned = null;
         try
         {
-            owned = ResourceRequestHandle.BorrowDecision(handle);
-            using var restriction = NativeCallbackGuard.Restrict(
-                owned,
-                AllowedResourceProviderCallback
-            );
+            owned = ResourceRequestHandle.Adopt(handle);
             var decision =
                 ((ResourceProvider)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
                     CopyResourceRequestInfo(NativeCallScope.Read(request)),
@@ -1852,28 +1827,20 @@ internal static unsafe class GeneratedValues
                 )
                 ?? (ResourceProviderDecision)
                     mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-            return owned.FinishDecision(
+            if (
                 decision
-                    == (ResourceProviderDecision)
-                        mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+                != (ResourceProviderDecision)
+                    mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
             )
-                ? (uint)mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-                : (uint)decision;
+                ((INativeOwner<MlnResourceRequest>)owned).State.HandOff();
+            return (uint)decision;
         }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_resource_provider_callback", error);
-            try
-            {
-                return owned is not null && owned.FinishDecision(false)
-                    ? (uint)mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-                    : (uint)
-                        mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-            }
-            catch
-            {
-                return (uint)mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-            }
+            if (owned is not null)
+                ((INativeOwner<MlnResourceRequest>)owned).State.HandOff();
+            return unchecked((uint)(-1));
         }
     }
 
@@ -1901,15 +1868,6 @@ internal static unsafe class GeneratedValues
     internal static ResourceRange CopyResourceRange(mln_resource_range value) =>
         new(value.start, value.end);
 
-    private static readonly string[] AllowedResourceRequestCancelHandlerCallback =
-    [
-        "mln_resource_request_complete",
-        "mln_resource_request_pass_through",
-        "mln_resource_request_is_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-    ];
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeResourceRequestCancelHandlerCallback(
         void* user_data,
@@ -1918,12 +1876,7 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            var receiver = (NativeOwnedCallback)NativeCallbackRoot.Value(user_data);
-            using var restriction = NativeCallbackGuard.Restrict(
-                receiver.Owner,
-                AllowedResourceRequestCancelHandlerCallback
-            );
-            ((ResourceRequestCancelHandler)receiver.Callback).Callback?.Invoke();
+            ((ResourceRequestCancelHandler)NativeCallbackRoot.Value(user_data)).Callback?.Invoke();
         }
         catch (Exception error)
         {
@@ -1940,9 +1893,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_resource_request_cancel_handler);
         if (value.Callback is not null)
         {
-            native.user_data = scope.Register(
-                new NativeOwnedCallback(value with { }, scope.Receiver!)
-            );
+            native.user_data = scope.Register(value with { });
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null
                 ? null

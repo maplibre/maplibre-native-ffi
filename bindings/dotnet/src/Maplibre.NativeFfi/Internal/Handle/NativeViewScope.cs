@@ -1,3 +1,5 @@
+using Maplibre.NativeFfi.Error;
+
 namespace Maplibre.NativeFfi.Internal.Pointer;
 
 internal sealed class NativeViewScope
@@ -8,7 +10,8 @@ internal sealed class NativeViewScope
     internal void EnsureActive()
     {
         if (!active || thread != Environment.CurrentManagedThreadId)
-            throw new InvalidOperationException(
+            throw new MaplibreException(
+                global::Maplibre.NativeFfi.Status.InvalidState,
                 "This native view is valid only inside its synchronous callback."
             );
     }

@@ -173,7 +173,7 @@ def operation(
                 arguments.append(f"arena.store({converted.replace('$0', local)})")
         elif value_plan and value_plan.kind == "handle":
             declarations.append(f"{label}: {value_types.public(value_plan)}")
-            arguments.append(f"try arena.borrow({local}.handle)")
+            arguments.append(f"arena.use({local}.handle)")
         elif value_plan and value_plan.kind in {"scalar", "native_pointer"}:
             declarations.append(f"{label}: {value_types.public(value_plan)}")
             arguments.append(value_types.native(value_plan, local))
@@ -195,7 +195,7 @@ def operation(
                 function, f"parameter {param.name}: unsupported {native(param.type)}"
             )
     method = camel(plan.member)
-    if method in {"close", "requireLiveHandle", "deinit"}:
+    if method in {"close", "deinit"}:
         raise unsupported(function, "method name is reserved by the handle runtime")
     method = identifier(method)
     args = [
@@ -208,13 +208,7 @@ def operation(
         call = "try " + call
     doc_comment = doc(value_types.bound, function.name)
     modifier = "" if receiver else "static "
-    claim = any(
-        callback.decision
-        and function.name in (callback.decision.complete, callback.decision.resume)
-        for callback in value_types.bound.callbacks.values()
-    )
-    access = ", .claim" if claim else ""
-    target = f'"{function.name}"{access}'
+    target = f'"{function.name}"'
     if plan.scoped_receiver:
         target = f'owner: self, "{function.name}"'
     signature = f"{modifier}func {method}({', '.join(declarations)})"
@@ -225,7 +219,7 @@ def operation(
         if "try " in call:
             call = "try " + call
         return (
-            f"{signature} throws {{\n  try owner.nativeDiscard({target}) {{ raw, arena, diagnostic in {call} }}\n}}\n",
+            f"{signature} throws {{\n  try owner.nativeInvoke({target}) {{ raw, arena, diagnostic in {call} }}\n}}\n",
             owner + "Discarding",
         )
     if outputs and completion:

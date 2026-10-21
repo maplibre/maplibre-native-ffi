@@ -302,7 +302,6 @@ def emit_operation(
         if factory
         else "Maplibre"
     )
-    guard = f'NativeCallbackGuard.EnsureAllowed(this, "{function.name}");'
     handle_plan = bound.handles.get(receiver)
     if (
         plan.consumes
@@ -329,7 +328,6 @@ def emit_operation(
             method(
                 f"public void Release({', '.join(declarations)})",
                 [
-                    guard,
                     "using var scope = new NativeCallScope();",
                     f"state.Release((live, diagnostic) => {call});",
                 ],
@@ -348,7 +346,7 @@ def emit_operation(
             (
                 method(
                     "public Task CloseAsync()",
-                    [guard, "state.Close();", "return teardown;"],
+                    ["state.Close();", "return teardown;"],
                 )
                 + "\n    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
                 + method(
@@ -595,47 +593,26 @@ def emit_operation(
             raise Unsupported(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
-    decision_completion = any(
-        function.name in (decision.complete, decision.resume)
-        for decision in bound.decisions.values()
-    )
     reads = bool(
         handle_plan
         and not asynchronous
         and outputs
         and function.name != handle_plan.release
     )
-    # Entering checks the callback guard, keeps the receiver reachable, and, for
-    # an owner-less operation, loads the native library. A scope that enters
-    # for its receiver roots registrations in it, so only an owner can.
-    # A registration whose callback calls back only into this receiver
-    # records it through the scope.
-    receiver_init = (
-        " { Receiver = this }"
-        if handle_plan
-        and any(
-            values.record(registration.descriptor).registration.receiver_owned
-            for registration in plan.registrations
-        )
-        else ""
-    )
     if reads:
         entry = [f'using var read = state.Read(this, "{function.name}");']
         if scoped:
-            entry.append(f"using var scope = new NativeCallScope(){receiver_init};")
+            entry.append("using var scope = new NativeCallScope();")
         args[0] = "read.Handle"
     elif (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [
-            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}"){receiver_init};'
+            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}");'
         ]
     else:
         entry = [f'using var call = Enter({owner_expression}, "{function.name}");']
         if scoped:
-            entry.append(f"using var scope = new NativeCallScope(){receiver_init};")
-    # The claim follows argument conversion, so an argument error leaves the
-    # request open.
-    claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
-    prologue = entry + prologue + claim
+            entry.append("using var scope = new NativeCallScope();")
+    prologue = entry + prologue
     if discard:
         prologue.insert(0, "var receiverHandle = owner.Handle;")
         args[0] = "receiverHandle"
@@ -710,8 +687,8 @@ def emit_operation(
             constructor = f"{result_type}.Adopt({parent}{local})"
             if plan.registrations:
                 body += [
+                    "scope.Accept();",
                     f"var owner = {constructor};",
-                    "scope.Accept(owner.CallbackOwner);",
                     "return owner;",
                 ]
             else:
@@ -747,7 +724,7 @@ def emit_operation(
         ):
             return (
                 owners[receiver],
-                f"    public void Close() {{ {guard} state.Close(); }}\n",
+                "    public void Close() { state.Close(); }\n",
                 records | values.plans.keys(),
             )
         if function.return_type.kind != "void" and not plan.status:
@@ -790,11 +767,7 @@ def emit_operation(
             raise Unsupported("absence requires an owned handle output")
         body = prologue + [checked_call(function, arguments)]
         if scoped:
-            accept = (
-                "scope.Accept(CallbackOwner);"
-                if handle_plan and plan.registrations
-                else "scope.Accept();"
-            )
+            accept = "scope.Accept();"
             # A rejected registration stores nothing, so the scope releases it.
             rejected = next(
                 (
@@ -807,8 +780,6 @@ def emit_operation(
             if rejected:
                 accept = f"if (!{camel(rejected)}) {accept}"
             body.append(accept)
-        if decision_completion:
-            body.append("claim.Accept();")
         if result is not None:
             body.append(f"return {result};")
     else:
@@ -894,7 +865,6 @@ def emit(api: Api | BoundApi) -> Emission:
             )
         )
     }
-    decision_handles = set(bound.decisions)
     created_handles.update(native for native in owners if owners[native] in methods)
     async_disposable: set[str] = set()
     for native in sorted(created_handles):
@@ -918,17 +888,8 @@ def emit(api: Api | BoundApi) -> Emission:
             and any(output.handle.native == native for output in plan.owned_outputs)
             for plan in bound.operations
         )
-        decision_owner = native in decision_handles
-        extra = (
-            ", Task completion"
-            if immediate_completion
-            else ", bool pendingDecision = false"
-            if decision_owner
-            else ""
-        )
+        extra = ", Task completion" if immediate_completion else ""
         extra_argument = ", completion" if immediate_completion else ""
-        # Adopt takes no pendingDecision, because a pending decision is
-        # borrowed through BorrowDecision.
         adopt_extra = ", Task completion" if immediate_completion else ""
         cleanup = handle.dispose or handle.release
         cleanup_function = api.functions_by_name[cleanup]
@@ -959,7 +920,7 @@ def emit(api: Api | BoundApi) -> Emission:
                 "Completion = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
             )
         constructor.append(
-            f"state = new(handle, {destroy}, nameof({owner}), Abandon{', pendingDecision' if decision_owner else ''}{', retainedParent: parent' if handle.parent else ''});"
+            f"state = new(handle, {destroy}, nameof({owner}), Abandon{', protectsCopies: true' if handle.native == 'mln_render_frame_batch' else ''}{', retainedParent: parent' if handle.parent else ''});"
         )
         declarations = (
             "".join(f"    {field}\n" for field in fields)
@@ -972,14 +933,10 @@ def emit(api: Api | BoundApi) -> Emission:
             f"\n    private static mln_status Abandon({native_type} live, mln_diagnostic* diagnostic) {abandon}\n"
             f"\n    NativeHandleState<{native_type}> INativeOwner<{native_type}>.State => state;\n"
             f"    internal {native_type} Handle => state.Handle;\n"
-            "    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;\n"
             "    // Runtime events report their source by this identity.\n"
             "    public ulong Id => state.IssuedHandle.Value;\n"
-            "    public bool IsClosed => state.IsClosed;\n"
-            f'    public void Dispose() {{ NativeCallbackGuard.EnsureAllowed(this, "{cleanup}"); state.Retire(); }}\n'
+            f"    public void Dispose() {{ state.Retire(); }}\n"
         )
-        if decision_owner:
-            declarations += f"    internal static {owner} BorrowDecision({native_type} handle) => new(handle, true);\n    internal bool FinishDecision(bool accepted) => state.FinishDecision(accepted);\n"
         methods[owner].insert(0, declarations)
     used_records = default_records | (
         set().union(*records.values()) if records else set()

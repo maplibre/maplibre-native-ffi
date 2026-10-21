@@ -9,8 +9,6 @@ internal static class NativeLibraryLoader
 {
     internal const uint ExpectedAbiVersion = 0;
 
-    private const string LibraryPathSwitch = "Maplibre.NativeFfi.LibraryPath";
-    private const string LibraryDirsSwitch = "Maplibre.NativeFfi.LibraryDirs";
     private const string LibraryPathEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH";
     private const string LibraryDirsEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS";
 
@@ -47,9 +45,8 @@ internal static class NativeLibraryLoader
             }
             catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
             {
-                throw new UnsupportedFeatureException(
-                    MaplibreStatus.Unsupported,
-                    null,
+                throw new MaplibreException(
+                    global::Maplibre.NativeFfi.Status.Unsupported,
                     $"MapLibre Native C library could not be loaded from '{libraryPath}'.",
                     error
                 );
@@ -143,8 +140,7 @@ internal static class NativeLibraryLoader
         catch (EntryPointNotFoundException error)
         {
             throw new MaplibreException(
-                MaplibreStatus.AbiMismatch,
-                null,
+                global::Maplibre.NativeFfi.Status.InvalidState,
                 "MapLibre Native C library does not export the required mln_c_version entry point.",
                 error
             );
@@ -182,9 +178,8 @@ internal static class NativeLibraryLoader
         }
         catch (DllNotFoundException error)
         {
-            throw new UnsupportedFeatureException(
-                MaplibreStatus.Unsupported,
-                null,
+            throw new MaplibreException(
+                global::Maplibre.NativeFfi.Status.Unsupported,
                 "MapLibre Native C library could not be loaded.",
                 error
             );
@@ -192,8 +187,7 @@ internal static class NativeLibraryLoader
         catch (EntryPointNotFoundException error)
         {
             throw new MaplibreException(
-                MaplibreStatus.AbiMismatch,
-                null,
+                global::Maplibre.NativeFfi.Status.InvalidState,
                 "MapLibre Native C library does not export the required mln_c_version entry point.",
                 error
             );
@@ -210,22 +204,11 @@ internal static class NativeLibraryLoader
             return;
         }
 
-        throw new MaplibreException(
-            MaplibreStatus.AbiMismatch,
-            null,
-            $"MapLibre Native C ABI version {actualVersion} is incompatible with this binding; expected {ExpectedAbiVersion}.",
-            null
-        );
+        throw new AbiVersionMismatchException(ExpectedAbiVersion, actualVersion);
     }
 
     private static IEnumerable<string> CandidatePaths()
     {
-        var switchPath = AppContext.GetData(LibraryPathSwitch) as string;
-        if (!string.IsNullOrWhiteSpace(switchPath))
-        {
-            yield return switchPath;
-        }
-
         var environmentPath = Environment.GetEnvironmentVariable(LibraryPathEnvironment);
         if (!string.IsNullOrWhiteSpace(environmentPath))
         {
@@ -275,9 +258,8 @@ internal static class NativeLibraryLoader
             catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
             {
                 LoadedRuntimeDependencies.Remove(fullPath);
-                throw new UnsupportedFeatureException(
-                    MaplibreStatus.Unsupported,
-                    null,
+                throw new MaplibreException(
+                    global::Maplibre.NativeFfi.Status.Unsupported,
                     $"MapLibre Native runtime dependency could not be loaded from '{fullPath}'.",
                     error
                 );
@@ -287,11 +269,6 @@ internal static class NativeLibraryLoader
 
     private static IEnumerable<string> CandidateLibraryDirs()
     {
-        foreach (var directory in SplitLibraryDirs(AppContext.GetData(LibraryDirsSwitch) as string))
-        {
-            yield return directory;
-        }
-
         foreach (
             var directory in SplitLibraryDirs(
                 Environment.GetEnvironmentVariable(LibraryDirsEnvironment)

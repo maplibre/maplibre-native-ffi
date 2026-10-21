@@ -1,7 +1,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-// Copy borrowed outputs while the receiver is held. Input storage and callback
+// Copy borrowed outputs while their storage is held. Input storage and callback
 // registrations stay live until the native call settles.
 
 protocol NativeReceiver: AnyObject {
@@ -15,14 +15,6 @@ extension NativeReceiver {
   func retireUnreceived() {
     handle.retire()
   }
-}
-
-enum NativeAccess {
-  /// The call borrows the receiver, which holds off its close.
-  case live
-  /// The call borrows the receiver and claims its pending decision, which the
-  /// call accepts when it succeeds.
-  case claim
 }
 
 /// A native call that reports a status into a diagnostic. It receives the
@@ -42,32 +34,22 @@ typealias NativeStartCall = (
 
 extension NativeReceiver {
   private func withNative<T>(
-    _ operation: String,
-    _ access: NativeAccess,
+    _: String,
     _ body: (UInt64, NativeInputArena) throws -> T
   ) throws -> T {
-    try NativeCallbackGuard.check(owner: self, operation: operation)
     defer { withExtendedLifetime(self) {} }
-    let arena = NativeInputArena(receiver: self)
+    let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
-    let read = try handle.borrow()
-    defer { read.end() }
-    guard access == .claim else { return try body(read.handle.raw, arena) }
-    let claim = try handle.beginClaim()
-    defer { claim.end() }
-    let value = try body(read.handle.raw, arena)
-    claim.accept()
-    return value
+    return try handle.withHandle { try body($0.raw, arena) }
   }
 
   func nativeInvoke<T>(
     _ operation: String,
-    _ access: NativeAccess = .live,
     _ call: NativeStatusCall,
     result: () throws -> T
   ) throws -> T {
     try mapNativeFailure {
-      try withNative(operation, access) { raw, arena in
+      try withNative(operation) { raw, arena in
         try checkedCall(call, raw, arena)
         return try result()
       }
@@ -76,27 +58,21 @@ extension NativeReceiver {
 
   func nativeInvoke(
     _ operation: String,
-    _ access: NativeAccess = .live,
     _ call: NativeStatusCall
   ) throws {
-    try nativeInvoke(operation, access, call) { () }
-  }
-
-  func nativeDiscard(_ operation: String, _ call: NativeStatusCall) throws {
-    try nativeInvoke(operation, .live, call)
+    try nativeInvoke(operation, call) { () }
   }
 
   /// Calls a status-returning function like `nativeInvoke`, except that
   /// `absent` reports that native published no output, and returns nil.
   func nativeInvoke<T>(
     _ operation: String,
-    _ access: NativeAccess = .live,
     absentOn absent: mln_status,
     _ call: NativeStatusCall,
     result: () throws -> T
   ) throws -> T? {
     var present = true
-    return try nativeInvoke(operation, access, { raw, arena, diagnostic in
+    return try nativeInvoke(operation, { raw, arena, diagnostic in
       let status = try call(raw, arena, diagnostic)
       guard status == absent else { return status }
       present = false
@@ -106,12 +82,11 @@ extension NativeReceiver {
 
   func nativeStart<T: Sendable>(
     _ operation: String,
-    _ access: NativeAccess = .live,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> T,
     _ call: NativeStartCall
   ) async throws -> T {
     try await awaitNative {
-      try withNative(operation, access) { raw, arena in
+      try withNative(operation) { raw, arena in
         try NativeCompletion.start({ completion, diagnostic in
           try arena.submit { try call(raw, arena, completion, diagnostic) }
         }, convert: convert)
@@ -121,21 +96,19 @@ extension NativeReceiver {
 
   func nativeStart<Raw, T: Sendable>(
     _ operation: String,
-    _ access: NativeAccess = .live,
     copying copy: @escaping (Raw) throws -> T,
     _ call: NativeStartCall
   ) async throws -> T {
-    try await nativeStart(operation, access, convert: { result in
+    try await nativeStart(operation, convert: { result in
       try copy(NativeCompletion.value(result))
     }, call)
   }
 
   func nativeUnit(
     _ operation: String,
-    _ access: NativeAccess = .live,
     _ call: NativeStartCall
   ) async throws {
-    try await nativeStart(operation, access, convert: { _ in () }, call)
+    try await nativeStart(operation, convert: { _ in () }, call)
   }
 
   /// Starts a command and awaits its disposition, which reports a failed or
@@ -143,11 +116,10 @@ extension NativeReceiver {
   @discardableResult
   func nativeCommand(
     _ operation: String,
-    _ access: NativeAccess = .live,
     _ call: NativeStartCall
   ) async throws -> CommandCompletion {
     try await awaitNative {
-      try withNative(operation, access) { raw, arena in
+      try withNative(operation) { raw, arena in
         try NativeCompletion.startCommand { completion, diagnostic in
           try arena.submit { try call(raw, arena, completion, diagnostic) }
         }
@@ -160,7 +132,7 @@ extension NativeReceiver {
   /// `body` receives the filled value with the binding scope that expires when
   /// `body` returns.
   func nativeView<Raw, T>(
-    _ operation: String,
+    _: String,
     reading raw: Raw,
     begin: (
       UInt64,
@@ -175,51 +147,48 @@ extension NativeReceiver {
     ) -> mln_status,
     _ body: (Raw, NativeViewScope) throws -> T
   ) throws -> T {
-    try NativeCallbackGuard.check(owner: self, operation: operation)
     return try mapNativeFailure {
-      let access = try handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
+      defer { withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus { begin(access.handle.raw, &token, $0) }
+      try checkStatus { begin(handle.issued.raw, &token, $0) }
       let scope = NativeViewScope()
       defer { scope.expire(); end(token) }
       var raw = raw
-      try checkStatus { get(access.handle.raw, &raw, $0) }
+      try checkStatus { get(handle.issued.raw, &raw, $0) }
       return try body(raw, scope)
     }
   }
 
   func nativeClose(
-    _ operation: String,
+    _: String,
     _ call: @escaping (UInt64, UnsafeMutablePointer<mln_diagnostic>)
       -> mln_status
   ) throws {
-    try NativeCallbackGuard.check(owner: self, operation: operation)
     try mapNativeFailure {
       try handle.closeOnce { live in try checkStatus { call(live.raw, $0) } }
     }
   }
 
   func nativeClose(
-    _ operation: String,
+    _: String,
     _ call: @escaping (UInt64) -> Void
   ) throws {
-    try NativeCallbackGuard.check(owner: self, operation: operation)
     try mapNativeFailure { try handle.closeOnce { live in call(live.raw) } }
   }
 
   func nativeStartClose(
-    _ operation: String,
+    _: String,
     _ call: @escaping (
       UInt64,
       UnsafePointer<mln_completion>,
       UnsafeMutablePointer<mln_diagnostic>
     ) -> mln_status
   ) throws -> NativeFuture<Void>? {
-    try NativeCallbackGuard.check(owner: self, operation: operation)
     var future: NativeFuture<Void>?
-    try handle.closeOnce { live in
-      future = try NativeCompletion.startUnit { call(live.raw, $0, $1) }
+    try mapNativeFailure {
+      try handle.closeOnce { live in
+        future = try NativeCompletion.startUnit { call(live.raw, $0, $1) }
+      }
     }
     return future
   }
@@ -234,7 +203,7 @@ extension NativeReceiver {
     adopt: () throws -> Owner
   ) throws -> Attachment {
     try mapNativeFailure {
-      try withNative(operation, .live) { raw, arena in
+      try withNative(operation) { raw, arena in
         let future = try NativeCompletion.startUnit { completion, diagnostic in
           try arena.submit { try call(raw, arena, completion, diagnostic) }
         }
@@ -260,7 +229,7 @@ private func checkedCall(
 
 private func withNative<T>(
   owner: AnyObject?,
-  _ operation: String,
+  _: String,
   _ body: (NativeInputArena) throws -> T
 ) throws -> T {
   // An entry point without a receiver can be a program's first call, so it
@@ -268,7 +237,6 @@ private func withNative<T>(
   if owner == nil {
     try NativeAbi.ensureCompatible()
   }
-  try NativeCallbackGuard.check(owner: owner, operation: operation)
   let arena = NativeInputArena()
   defer { withExtendedLifetime(arena) {} }
   return try body(arena)

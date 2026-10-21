@@ -9,13 +9,13 @@ public extension ResourceRequestHandle {
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func complete(response bindingArg0: ResourceResponse) throws {
-    try nativeInvoke("mln_resource_request_complete",
-                     .claim)
-    { raw, arena, diagnostic in try mln_resource_request_complete(
-      raw,
-      arena.store(bindingArg0.nativeValue(arena: arena)),
-      diagnostic
-    ) }
+    try nativeInvoke("mln_resource_request_complete") { raw, arena, diagnostic in
+      try mln_resource_request_complete(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        diagnostic
+      )
+    }
   }
 
   /// Reports whether MapLibre has cancelled a C API resource provider request.
@@ -38,12 +38,12 @@ public extension ResourceRequestHandle {
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func passThrough() throws {
-    try nativeInvoke("mln_resource_request_pass_through",
-                     .claim)
-    { raw, _, diagnostic in mln_resource_request_pass_through(
-      raw,
-      diagnostic
-    ) }
+    try nativeInvoke("mln_resource_request_pass_through") { raw, _, diagnostic in
+      mln_resource_request_pass_through(
+        raw,
+        diagnostic
+      )
+    }
   }
 
   /// Releases the provider's reference to a resource request handle.

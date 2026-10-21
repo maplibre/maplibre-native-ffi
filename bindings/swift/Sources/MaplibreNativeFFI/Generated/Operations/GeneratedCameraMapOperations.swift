@@ -335,7 +335,7 @@ public extension MapHandle {
 public extension MapHandleDiscarding {
   func applyCameraDelta(delta bindingArg0: CameraDelta) throws {
     try owner
-      .nativeDiscard("mln_map_apply_camera_delta") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_apply_camera_delta") { raw, arena, diagnostic in
         try mln_map_apply_camera_delta(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -347,7 +347,7 @@ public extension MapHandleDiscarding {
 
   func cancelCameraTransition(transitionId bindingArg0: UInt64) throws {
     try owner
-      .nativeDiscard("mln_map_cancel_camera_transition") { raw, _, diagnostic in
+      .nativeInvoke("mln_map_cancel_camera_transition") { raw, _, diagnostic in
         mln_map_cancel_camera_transition(
           raw,
           bindingArg0,
@@ -359,7 +359,7 @@ public extension MapHandleDiscarding {
 
   func cancelTransitions() throws {
     try owner
-      .nativeDiscard("mln_map_cancel_transitions") { raw, _, diagnostic in
+      .nativeInvoke("mln_map_cancel_transitions") { raw, _, diagnostic in
         mln_map_cancel_transitions(
           raw,
           nil,
@@ -370,7 +370,7 @@ public extension MapHandleDiscarding {
 
   func dumpDebugLogs() throws {
     try owner
-      .nativeDiscard("mln_map_dump_debug_logs") { raw, _, diagnostic in
+      .nativeInvoke("mln_map_dump_debug_logs") { raw, _, diagnostic in
         mln_map_dump_debug_logs(
           raw,
           nil,
@@ -381,7 +381,7 @@ public extension MapHandleDiscarding {
 
   func setBounds(options bindingArg0: BoundOptions) throws {
     try owner
-      .nativeDiscard("mln_map_set_bounds") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_bounds") { raw, arena, diagnostic in
         mln_map_set_bounds(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -393,7 +393,7 @@ public extension MapHandleDiscarding {
 
   func setDebugOptions(options bindingArg0: MapDebugOption) throws {
     try owner
-      .nativeDiscard("mln_map_set_debug_options") { raw, _, diagnostic in
+      .nativeInvoke("mln_map_set_debug_options") { raw, _, diagnostic in
         mln_map_set_debug_options(
           raw,
           bindingArg0.nativeValue(),
@@ -405,7 +405,7 @@ public extension MapHandleDiscarding {
 
   func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) throws {
     try owner
-      .nativeDiscard("mln_map_set_free_camera_options") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_free_camera_options") { raw, arena, diagnostic in
         mln_map_set_free_camera_options(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -417,7 +417,7 @@ public extension MapHandleDiscarding {
 
   func setProjectionMode(mode bindingArg0: ProjectionMode) throws {
     try owner
-      .nativeDiscard("mln_map_set_projection_mode") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_projection_mode") { raw, arena, diagnostic in
         mln_map_set_projection_mode(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -429,7 +429,7 @@ public extension MapHandleDiscarding {
 
   func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) throws {
     try owner
-      .nativeDiscard("mln_map_set_rendering_stats_view_enabled") { raw, _, diagnostic in
+      .nativeInvoke("mln_map_set_rendering_stats_view_enabled") { raw, _, diagnostic in
         mln_map_set_rendering_stats_view_enabled(
           raw,
           bindingArg0,
@@ -441,7 +441,7 @@ public extension MapHandleDiscarding {
 
   func setTileOptions(options bindingArg0: MapTileOptions) throws {
     try owner
-      .nativeDiscard("mln_map_set_tile_options") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_tile_options") { raw, arena, diagnostic in
         mln_map_set_tile_options(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -453,7 +453,7 @@ public extension MapHandleDiscarding {
 
   func setViewportOptions(options bindingArg0: MapViewportOptions) throws {
     try owner
-      .nativeDiscard("mln_map_set_viewport_options") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_set_viewport_options") { raw, arena, diagnostic in
         mln_map_set_viewport_options(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -465,7 +465,7 @@ public extension MapHandleDiscarding {
 
   func updateCamera(update bindingArg0: CameraUpdate) throws {
     try owner
-      .nativeDiscard("mln_map_update_camera") { raw, arena, diagnostic in
+      .nativeInvoke("mln_map_update_camera") { raw, arena, diagnostic in
         try mln_map_update_camera(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),

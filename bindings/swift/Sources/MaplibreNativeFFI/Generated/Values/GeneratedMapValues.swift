@@ -560,10 +560,8 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionHandler: Sendable {
-  public var callback: (@Sendable (CameraTransitionEnd) throws -> Void)?
-  public init(callback: (@Sendable (CameraTransitionEnd) throws -> Void)? =
-    nil)
-  {
+  public var callback: (@Sendable (CameraTransitionEnd) -> Void)?
+  public init(callback: (@Sendable (CameraTransitionEnd) -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -607,8 +605,9 @@ private func invokeCameraTransitionHandlerCallback(
 ///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraTransitionOutcome: RawRepresentable, NativeOpenValue,
-  Equatable, Hashable, Sendable
+public struct CameraTransitionOutcome: RawRepresentable,
+  CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -624,6 +623,14 @@ public struct CameraTransitionOutcome: RawRepresentable, NativeOpenValue,
   public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the transitions ended.
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "COMPLETED"
+    case 1: return "CANCELLED"
+    case 2: return "CLOSED"
+    default: return "CameraTransitionOutcome(\(rawValue))"
+    }
+  }
 }
 
 /// One atomic absolute camera update.
@@ -676,8 +683,8 @@ public struct CameraUpdate: Sendable {
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraUpdateMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -687,14 +694,22 @@ public struct CameraUpdateMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let jump: CameraUpdateMode = .init(rawValue: 0)
   public static let ease: CameraUpdateMode = .init(rawValue: 1)
   public static let fly: CameraUpdateMode = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "JUMP"
+    case 1: return "EASE"
+    case 2: return "FLY"
+    default: return "CameraUpdateMode(\(rawValue))"
+    }
+  }
 }
 
 /// Map constraint modes used by `mln_map_viewport_options`.
 ///
 /// See `mln_constrain_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ConstrainMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ConstrainMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -705,6 +720,15 @@ public struct ConstrainMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let heightOnly: ConstrainMode = .init(rawValue: 1)
   public static let widthAndHeight: ConstrainMode = .init(rawValue: 2)
   public static let screen: ConstrainMode = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 0: return "NONE"
+    case 1: return "HEIGHT_ONLY"
+    case 2: return "WIDTH_AND_HEIGHT"
+    case 3: return "SCREEN"
+    default: return "ConstrainMode(\(rawValue))"
+    }
+  }
 }
 
 /// Screen-space inset in logical map pixels.
@@ -905,8 +929,8 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct GesturePhase: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -925,6 +949,16 @@ public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
   /// Cancels transitions running after the camera write, then clears the
   /// gesture flag.
   public static let cancel: GesturePhase = .init(rawValue: 4)
+  public var description: String {
+    switch rawValue {
+    case 0: return "NONE"
+    case 1: return "BEGIN"
+    case 2: return "UPDATE"
+    case 3: return "END"
+    case 4: return "CANCEL"
+    default: return "GesturePhase(\(rawValue))"
+    }
+  }
 }
 
 /// Geographic coordinate in degrees used by map and projection APIs.
@@ -1058,8 +1092,8 @@ public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
 ///
 /// See `mln_map_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
-  Sendable
+public struct MapMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1072,6 +1106,14 @@ public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let `static`: MapMode = .init(rawValue: 1)
   /// Produces one-off still images for a single tile.
   public static let tile: MapMode = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "CONTINUOUS"
+    case 1: return "STATIC"
+    case 2: return "TILE"
+    default: return "MapMode(\(rawValue))"
+    }
+  }
 }
 
 /// Options used when creating a map.
@@ -1389,8 +1431,8 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_north_orientation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct NorthOrientation: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1401,6 +1443,15 @@ public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
   public static let right: NorthOrientation = .init(rawValue: 1)
   public static let down: NorthOrientation = .init(rawValue: 2)
   public static let left: NorthOrientation = .init(rawValue: 3)
+  public var description: String {
+    switch rawValue {
+    case 0: return "UP"
+    case 1: return "RIGHT"
+    case 2: return "DOWN"
+    case 3: return "LEFT"
+    default: return "NorthOrientation(\(rawValue))"
+    }
+  }
 }
 
 /// Geometry offline region definition.
@@ -1837,8 +1888,8 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
 ///
 /// See `mln_tile_lod_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct TileLodMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct TileLodMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1847,6 +1898,13 @@ public struct TileLodMode: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let `default`: TileLodMode = .init(rawValue: 0)
   public static let distance: TileLodMode = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "DEFAULT"
+    case 1: return "DISTANCE"
+    default: return "TileLodMode(\(rawValue))"
+    }
+  }
 }
 
 /// Cubic easing curve for animated camera transitions.
@@ -1932,8 +1990,8 @@ public struct Vec3: Equatable, Hashable, Sendable {
 ///
 /// See `mln_viewport_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ViewportMode: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
+public struct ViewportMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
@@ -1942,4 +2000,11 @@ public struct ViewportMode: RawRepresentable, NativeOpenValue, Equatable,
 
   public static let `default`: ViewportMode = .init(rawValue: 0)
   public static let flippedY: ViewportMode = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "DEFAULT"
+    case 1: return "FLIPPED_Y"
+    default: return "ViewportMode(\(rawValue))"
+    }
+  }
 }

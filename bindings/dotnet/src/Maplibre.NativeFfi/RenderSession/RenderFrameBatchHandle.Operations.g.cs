@@ -20,7 +20,7 @@ public sealed unsafe partial class RenderFrameBatchHandle
 
     internal RenderFrameBatchHandle(MlnRenderFrameBatch handle)
     {
-        state = new(handle, Abandon, nameof(RenderFrameBatchHandle), Abandon);
+        state = new(handle, Abandon, nameof(RenderFrameBatchHandle), Abandon, protectsCopies: true);
     }
 
     internal static RenderFrameBatchHandle Adopt(MlnRenderFrameBatch handle) =>
@@ -38,15 +38,12 @@ public sealed unsafe partial class RenderFrameBatchHandle
 
     NativeHandleState<MlnRenderFrameBatch> INativeOwner<MlnRenderFrameBatch>.State => state;
     internal MlnRenderFrameBatch Handle => state.Handle;
-    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
     // Runtime events report their source by this identity.
     public ulong Id => state.IssuedHandle.Value;
-    public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_render_frame_batch_release");
         state.Retire();
     }
 
@@ -77,7 +74,6 @@ public sealed unsafe partial class RenderFrameBatchHandle
     /// </remarks>
     public void Close()
     {
-        NativeCallbackGuard.EnsureAllowed(this, "mln_render_frame_batch_release");
         state.Close();
     }
 }

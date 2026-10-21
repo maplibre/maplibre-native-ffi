@@ -106,12 +106,11 @@ public sealed class RenderTests
                     // The view borrows the frame, so neither the session nor the frame can end
                     // while it is in scope.
                     var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
-                    Assert.Equal(MaplibreStatus.Busy, busy.Status);
-                    var inUse = Assert.Throws<InvalidStateException>(() =>
+                    Assert.Equal(Status.Busy, busy.Status);
+                    var inUse = Assert.Throws<MaplibreException>(() =>
                         frame.Release(GpuSync.Default)
                     );
-                    Assert.Equal("AcquiredFrameHandle is in use", inUse.Diagnostic);
-                    Assert.Null(inUse.RawStatus);
+                    Assert.Equal(Status.Busy, inUse.Status);
                     escaped = width;
                 }
                 switch (backend)
@@ -128,10 +127,9 @@ public sealed class RenderTests
                 }
 
                 Assert.NotNull(escaped);
-                Assert.Throws<InvalidOperationException>(() => escaped());
+                Assert.Throws<MaplibreException>(() => escaped());
                 frame.Release(GpuSync.Default);
-                Assert.True(frame.IsClosed);
-                Assert.Throws<InvalidStateException>(() => frame.GetResult());
+                Assert.Throws<MaplibreException>(() => frame.GetResult());
             }
         );
     }
@@ -162,9 +160,9 @@ public sealed class RenderTests
         var thread = new Thread(() => crossThread = Record.Exception(() => frame.Image));
         thread.Start();
         thread.Join();
-        Assert.IsType<InvalidOperationException>(crossThread);
+        Assert.IsType<MaplibreException>(crossThread);
 
         scope.Expire();
-        Assert.Throws<InvalidOperationException>(() => frame.ImageView);
+        Assert.Throws<MaplibreException>(() => frame.ImageView);
     }
 }

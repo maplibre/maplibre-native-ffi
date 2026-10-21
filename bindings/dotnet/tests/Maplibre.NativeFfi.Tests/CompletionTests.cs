@@ -15,7 +15,7 @@ public sealed class CompletionTests
         // A later command on the same map completes after the discarded one.
         await fixture.Map.RequestRepaintAsync(TestWaits.Token);
         Assert.Equal(MapDebugOption.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
-        Assert.Throws<InvalidArgumentException>(() =>
+        Assert.Throws<MaplibreException>(() =>
             fixture.Map.Discarding.Resize(
                 new LogicalExtent
                 {
@@ -120,7 +120,7 @@ public sealed class CompletionTests
     {
         var (error, captured) = SubmitRejected();
 
-        Assert.IsType<InvalidArgumentException>(error);
+        Assert.IsType<MaplibreException>(error);
         Assert.False(Gc.IsAlive(captured));
     }
 
@@ -151,7 +151,7 @@ public sealed class CompletionTests
         var completion = await fixture.Map.RemoveStyleSourceAsync("missing", TestWaits.Token);
 
         Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-        Assert.Equal((int)MaplibreStatus.NotFound, completion.RawStatus);
+        Assert.Equal((int)Status.NotFound, completion.RawStatus);
         Assert.NotEmpty(completion.Diagnostic);
     }
 

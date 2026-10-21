@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
@@ -41,9 +42,9 @@ public sealed class ResourceTransformTests
             native.callback(native.user_data, 1, url, &response)
         );
         Assert.Equal("transform-test://é/style.json", copied);
-        Assert.IsType<InvalidOperationException>(crossThread);
+        Assert.IsType<MaplibreException>(crossThread);
         Assert.NotNull(retained);
-        Assert.Throws<InvalidOperationException>(() => retained.SetHeader("X-Test", "late"));
+        Assert.Throws<MaplibreException>(() => retained.SetHeader("X-Test", "late"));
     }
 
     [Fact]
@@ -84,7 +85,6 @@ public sealed class ResourceTransformTests
             request.Complete("unsupported://rewritten.json");
             request.Close();
         });
-        Assert.True(request.IsClosed);
         // The online source cannot load the rewritten scheme.
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
         await fixture.Runtime.ClearResourceTransformAsync(TestWaits.Token);

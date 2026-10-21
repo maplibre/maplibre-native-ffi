@@ -10,8 +10,8 @@ import Foundation
 /// See `mln_wake` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 public struct Wake: Sendable {
-  public var callback: (@Sendable () throws -> Void)?
-  public init(callback: (@Sendable () throws -> Void)? = nil) {
+  public var callback: (@Sendable () -> Void)?
+  public init(callback: (@Sendable () -> Void)? = nil) {
     self.callback = callback
   }
 
@@ -34,10 +34,5 @@ private func invokeWakeCallback(user_data: UnsafeMutableRawPointer?) {
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<Wake>>.fromOpaque(user_data)
     .takeUnretainedValue()
-  do { try box.value.callback?() } catch {
-    NativeDiagnostics.report(.callbackError(
-      callback: "mln_wake_callback",
-      error: error
-    ))
-  }
+  box.value.callback?()
 }

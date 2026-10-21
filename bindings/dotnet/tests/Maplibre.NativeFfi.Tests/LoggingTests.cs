@@ -49,10 +49,9 @@ public sealed class LoggingTests
     }
 
     [Fact]
-    public unsafe void TheLogTrampolineCopiesUnknownValuesRejectsReentryAndContainsExceptions()
+    public unsafe void TheLogTrampolineCopiesUnknownValuesAndContainsExceptions()
     {
         (uint Severity, uint Event, long Code, string Message)? copied = null;
-        var rejectedReentry = false;
         Func<LogSeverity, LogEvent, long, string, uint> callback = (
             severity,
             @event,
@@ -61,14 +60,6 @@ public sealed class LoggingTests
         ) =>
         {
             copied = ((uint)severity, (uint)@event, code, message);
-            try
-            {
-                _ = Maplibre.CVersion();
-            }
-            catch (InvalidOperationException)
-            {
-                rejectedReentry = true;
-            }
             throw new FormatException("Host callback failed.");
         };
         using var scope = new NativeCallScope();
@@ -76,8 +67,6 @@ public sealed class LoggingTests
 
         Assert.Equal(0u, handler.callback(handler.user_data, 999, 998, 42, scope.CString("é")));
         Assert.Equal((999u, 998u, 42L, "é"), copied);
-        Assert.True(rejectedReentry);
-        // The guard ends with the callback, so the thread may call native again.
         _ = Maplibre.CVersion();
     }
 }

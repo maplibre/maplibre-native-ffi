@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Memory;
+using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
 using Xunit;
 
@@ -36,12 +37,10 @@ public sealed unsafe class GeneratedCallbackTests
     }
 
     [Fact]
-    public void RetiringAnOwnerRetainsCallbacksUntilNativeReleaseAndContainsStaleDispatch()
+    public void RegistrationsStayRootedUntilNativeRelease()
     {
-        var owner = new NativeCallbackOwner();
-        var first = PrepareOwned(owner);
-        owner.Retire();
-        var late = PrepareOwned(owner);
+        var first = PrepareOwned();
+        var late = PrepareOwned();
         Gc.Collect();
         Assert.True(first.Root.IsAlive);
         Assert.True(late.Root.IsAlive);
@@ -51,22 +50,77 @@ public sealed unsafe class GeneratedCallbackTests
         Gc.Collect();
         Assert.False(first.Root.IsAlive);
         Assert.False(late.Root.IsAlive);
-        first.Native.fetch_tile(first.Native.user_data, default);
-        first.Native.release_user_data(first.Native.user_data);
+    }
+
+    [Fact]
+    public void FailedOwnerConstructionKeepsAcceptedCallbacksUntilNativeRelease()
+    {
+        var (native, root) = PrepareFailedOwner();
+        Gc.Collect();
+        Assert.True(root.IsAlive);
+        native.fetch_tile(native.user_data, default);
+        native.release_user_data(native.user_data);
+        Gc.Collect();
+        Assert.False(root.IsAlive);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (mln_custom_geometry_source_options Native, WeakReference Root) PrepareOwned(
-        NativeCallbackOwner owner
-    )
+    private static (
+        mln_custom_geometry_source_options Native,
+        WeakReference Root
+    ) PrepareFailedOwner()
     {
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeCustomGeometrySourceOptions(
-            new CustomGeometrySourceOptions { FetchTile = _ => GC.KeepAlive(owner) },
+            new CustomGeometrySourceOptions { FetchTile = _ => { } },
             scope
         );
         var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
-        scope.Accept(owner);
+        var disposed = false;
+        var failure = new FormatException("Owner construction failed.");
+        Assert.Same(
+            failure,
+            Assert.Throws<FormatException>(() =>
+                scope.Attach<MlnRuntime, RuntimeHandle>(
+                    (output, completion, _) =>
+                    {
+                        *output = SyntheticHandles.Runtime(1234);
+                        var result = new mln_completion_result
+                        {
+                            size = (uint)sizeof(mln_completion_result),
+                            status = (int)mln_status.MLN_STATUS_OK,
+                        };
+                        completion->callback(completion->user_data, &result);
+                        completion->release_user_data(completion->user_data);
+                        return mln_status.MLN_STATUS_OK;
+                    },
+                    (handle, _) =>
+                        NativeHandleState<MlnRuntime>.Adopt<RuntimeHandle>(
+                            handle,
+                            () => throw failure,
+                            (_, _) =>
+                            {
+                                disposed = true;
+                                return mln_status.MLN_STATUS_OK;
+                            }
+                        )
+                )
+            )
+        );
+        Assert.True(disposed);
+        return (native, weak);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (mln_custom_geometry_source_options Native, WeakReference Root) PrepareOwned()
+    {
+        using var scope = new NativeCallScope();
+        var native = GeneratedValues.NativeCustomGeometrySourceOptions(
+            new CustomGeometrySourceOptions { FetchTile = _ => { } },
+            scope
+        );
+        var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
+        scope.Accept();
         return (native, weak);
     }
 }

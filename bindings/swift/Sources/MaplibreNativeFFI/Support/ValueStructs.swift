@@ -6,15 +6,9 @@ import Foundation
 final class NativeInputArena {
   private var buffers: [UnsafeMutableRawBufferPointer] = []
   private var callbacks: [UnsafeMutableRawPointer] = []
-  private var reads: [AnyObject] = []
+  private var owners: [AnyObject] = []
   private var declined = false
-  /// The owner whose operation this arena serves, which a callback that calls
-  /// back only into that owner records. It is nil for a global call.
-  private(set) weak var receiver: AnyObject?
-
-  init(receiver: AnyObject? = nil) {
-    self.receiver = receiver
-  }
+  init() {}
 
   deinit {
     for callback in callbacks {
@@ -31,10 +25,9 @@ final class NativeInputArena {
     return pointer
   }
 
-  func borrow<Handle>(_ owner: NativeHandleBox<Handle>) throws -> UInt64 {
-    let access = try owner.borrow()
-    reads.append(access)
-    return access.handle.raw
+  func use<Handle>(_ owner: NativeHandleBox<Handle>) -> UInt64 {
+    owners.append(owner)
+    return owner.issued.raw
   }
 
   func submit(_ body: () throws -> mln_status) rethrows -> mln_status {
@@ -183,16 +176,7 @@ final class GeneratedCallbackBox<Value> {
   }
 }
 
-/// A callback whose reentry policy admits calls on the handle that registered
-/// it. The owner is weak so a native root does not keep its handle alive.
-struct NativeOwnedCallback<Value> {
-  weak var owner: AnyObject?
-  let value: Value
-}
-
 func releaseGeneratedCallback(_ pointer: UnsafeMutableRawPointer?) {
-  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
-  defer { admission.end() }
   guard let pointer else { return }
   Unmanaged<AnyObject>.fromOpaque(pointer).release()
 }

@@ -35,12 +35,12 @@ public sealed class GeneratedValueTests
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before", TestWaits.Token));
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.
-        var error = Assert.Throws<InvalidArgumentException>(() =>
+        var error = Assert.Throws<MaplibreException>(() =>
         {
             _ = fixture.Map.SetStyleUrlAsync("style\0.json", TestWaits.Token);
         });
         Assert.Contains("embedded NUL", error.Diagnostic, StringComparison.Ordinal);
-        Assert.NotNull(error.RawStatus);
+        Assert.Equal(Status.InvalidArgument, error.Status);
     }
 
     [Fact]

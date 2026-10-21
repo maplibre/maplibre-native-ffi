@@ -155,12 +155,11 @@ private struct ConversionFailure: Error {}
     do {
       teardown = try runtime.startClose()
       return true
-    } catch let error as MaplibreError where error.kind == .invalidState {
+    } catch let error as MaplibreError where error.status == .invalidState {
       return false
     }
   }
   try await teardown?.value()
-  #expect(runtime.isClosed)
 }
 
 /// A command that native accepts and then fails reports the failure as its

@@ -16,7 +16,7 @@ import Testing
     let error = await expectMaplibreError(.invalidArgument) {
       try await fixture.map.setStyleUrl(url: "custom://a\0b.json")
     }
-    #expect(error?.rawStatus != nil)
+    #expect(error?.status == .invalidArgument)
   }
 
   var invalid: [UInt8] = [0xFF]
