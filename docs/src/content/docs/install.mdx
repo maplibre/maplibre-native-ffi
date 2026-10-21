@@ -123,18 +123,16 @@ dependencies {
   Gradle builds inside this repository, such as its test suite, can use it.
 </Aside>
 
-The `wasmJs` target runs Kotlin on the browser page and calls a browser module
-of the C library. A module carries one backend. Build the module for the preset
-of your backend:
+Build the browser module for your backend's preset, then serve
+`maplibre-native-kotlin.mjs` and `maplibre-native-kotlin.wasm` from
+`bindings/kotlin/wasm/build/<preset>/install` side by side, from a cross-origin
+isolated page as [Web](#web) describes.
 
 ```bash frame="terminal"
 mise -E emscripten run //bindings/kotlin:wasm-module emscripten-wasm32-webgl
 ```
 
-Serve `maplibre-native-kotlin.mjs` and `maplibre-native-kotlin.wasm` from
-`bindings/kotlin/wasm/build/<preset>/install` as static files, side by side.
-Load the module by its URL before any other call. `loadModule` suspends until
-the module instantiates:
+Load the module by its URL before any other call:
 
 ```kotlin title="Main.kt"
 import org.maplibre.nativeffi.Maplibre
@@ -144,44 +142,8 @@ suspend fun main() {
 }
 ```
 
-The page must be cross-origin isolated, as [Web](#web) describes.
-
-A caller-driven render session renders with the page's own `GPUDevice` and
-canvas context, or with its `WebGL2RenderingContext`. `BrowserGraphics` imports
-each object into the module as the handle that a render target descriptor takes.
-The host closes each import after every session that names it has detached or
-been destroyed:
-
-```kotlin title="Main.kt"
-import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
-import org.maplibre.nativeffi.generated.WebgpuSurfaceDescriptor
-import org.maplibre.nativeffi.render.BrowserGraphics
-import org.maplibre.nativeffi.render.NativePointer
-
-// gpuDevice and canvasContext are the page's GPUDevice and GPUCanvasContext,
-// preferredFormat is navigator.gpu.getPreferredCanvasFormat(), and the canvas
-// is width by height CSS pixels at devicePixelRatio scale.
-val extent = LogicalExtent(width.toUInt(), height.toUInt(), devicePixelRatio)
-val device = BrowserGraphics.importWebgpuDevice(gpuDevice)
-val surface = BrowserGraphics.importWebgpuSurface(canvasContext)
-val descriptor =
-  WebgpuSurfaceDescriptor(
-    extent,
-    WebgpuContextDescriptor(NativePointer.NULL_POINTER, device.pointer, NativePointer.NULL_POINTER),
-    surface.pointer,
-    BrowserGraphics.webgpuTextureFormat(preferredFormat),
-  )
-```
-
-The page cannot run Kotlin while MapLibre waits for a callback's answer, so
-three registrations take their own form on Kotlin/Wasm. `QueuedLogHandler` and
-`QueuedResourceProvider` receive each call after native has answered it: native
-consumes the log record, and keeps the request for the callback to serve or
-pass through. `HttpHeaderTransformRules` holds only header rules, which the
-browser module refuses. The JVM, Android, and Kotlin/Native take `LogHandler`,
-`ResourceProvider`, and `HttpHeaderTransform`, whose callbacks answer native on
-its thread.
+`BrowserGraphics` imports the page's `GPUDevice`, canvas context, or
+`WebGL2RenderingContext` as the handles that render target descriptors take.
 
 ### .NET
 
@@ -463,8 +425,7 @@ provider.
 Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
 provider.
 
-A browser module runs its threads as Workers that share its memory, so the page
-that loads it must be cross-origin isolated. Serve the page with the
-`Cross-Origin-Opener-Policy: same-origin` and
+A page that loads a browser module must be cross-origin isolated: serve it with
+the `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp` headers. The module reserves a
 fixed 512 MB heap.
