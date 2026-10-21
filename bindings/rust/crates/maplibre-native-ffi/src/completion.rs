@@ -113,7 +113,8 @@ unsafe extern "C" fn complete<T>(
             Some(convert) => match catch_unwind(AssertUnwindSafe(|| convert(raw))) {
                 Ok(result) => result,
                 Err(payload) => {
-                    crate::callback::report_panic("mln_completion_callback", payload);
+                    // A panic payload can itself panic when dropped across this C boundary.
+                    std::mem::forget(payload);
                     Err(Error::new(
                         crate::Status::NativeError,
                         "completion conversion panicked",

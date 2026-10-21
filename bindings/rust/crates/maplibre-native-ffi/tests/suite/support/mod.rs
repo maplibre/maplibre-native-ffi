@@ -56,6 +56,47 @@ pub fn capture_reports() -> mpsc::Receiver<Report> {
     reports
 }
 
+/// Checks that a void callback contains a panic and reports it on every target.
+pub fn assert_panicking_void_callback_is_reported() {
+    let _global = global_state();
+    let reports = capture_reports();
+    let fixture = Fixture::new();
+    let update = CameraUpdate {
+        mode: CameraUpdateMode::Ease,
+        camera: CameraOptions {
+            zoom: Some(4.0),
+            ..Default::default()
+        },
+        animation: AnimationOptions {
+            duration_ms: Some(60_000.0),
+            transition_id: Some(u64::MAX),
+            end_handler: CameraTransitionHandler::new(|_| {
+                std::panic::resume_unwind(Box::new("the camera end handler panicked"));
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    wait_for(fixture.map().update_camera(&update));
+    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
+    let deadline = Instant::now() + timeout();
+    let error = loop {
+        let report = reports
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .unwrap();
+        if let Report::CallbackError {
+            callback: "mln_camera_transition_end_callback",
+            error,
+        } = report
+        {
+            break error;
+        }
+    };
+    set_reporter(None);
+    assert_eq!(error.status(), Status::NativeError);
+    assert_eq!(error.diagnostic(), "callback panicked");
+}
+
 /// The handles that the captured reports name as leaked.
 pub fn leaks(reports: &mpsc::Receiver<Report>) -> Vec<NativeHandleLeak> {
     reports

@@ -127,37 +127,7 @@ fn a_registered_callback_does_not_keep_its_runtime_alive() {
 
 #[test]
 fn a_panicking_void_callback_is_contained_and_reported() {
-    let _global = global_state();
-    let reports = capture_reports();
-    let fixture = Fixture::new();
-    let update = CameraUpdate {
-        mode: CameraUpdateMode::Ease,
-        camera: CameraOptions {
-            zoom: Some(4.0),
-            ..Default::default()
-        },
-        animation: AnimationOptions {
-            duration_ms: Some(60_000.0),
-            transition_id: Some(u64::MAX),
-            end_handler: CameraTransitionHandler::new(|_| {
-                std::panic::resume_unwind(Box::new("the camera end handler panicked"));
-            }),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    wait_for(fixture.map().update_camera(&update));
-    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
-    let report = reports.recv_timeout(timeout()).unwrap();
-    set_reporter(None);
-    match report {
-        Report::CallbackError { callback, error } => {
-            assert_eq!(callback, "mln_camera_transition_end_callback");
-            assert_eq!(error.status(), Status::NativeError);
-            assert_eq!(error.diagnostic(), "callback panicked");
-        }
-        other => panic!("unexpected report: {other:?}"),
-    }
+    assert_panicking_void_callback_is_reported();
 }
 
 #[test]

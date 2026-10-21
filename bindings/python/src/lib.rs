@@ -446,7 +446,10 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
     let _scope = maplibre_core::callback::CallbackScope::enter();
     if !user_data.is_null() {
         // SAFETY: native releases accepted completion state exactly once.
-        drop(unsafe { Box::from_raw(user_data.cast::<PyCompletionBridge>()) });
+        let bridge = unsafe { Box::from_raw(user_data.cast::<PyCompletionBridge>()) };
+        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(bridge))) {
+            generated_report_panic(payload);
+        }
     }
 }
 

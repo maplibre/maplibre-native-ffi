@@ -46,6 +46,7 @@ fn report_error(callback: &'static str, error: Error) {
     report(Report::CallbackError { callback, error });
 }
 
+/// Reports a panic that the `callback` trampoline caught, leaking its payload.
 pub(crate) fn report_panic(callback: &'static str, payload: Box<dyn std::any::Any + Send>) {
     // A panic payload can itself panic when dropped across this C boundary.
     std::mem::forget(payload);

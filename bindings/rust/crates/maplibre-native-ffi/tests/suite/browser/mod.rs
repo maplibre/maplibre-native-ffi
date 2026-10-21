@@ -135,6 +135,11 @@ fn a_completion_resolves_while_the_browser_runs_its_loop() {
 }
 
 #[test]
+fn a_panicking_void_callback_is_contained_and_reported() {
+    assert_panicking_void_callback_is_reported();
+}
+
+#[test]
 fn a_provider_answers_a_style_request_in_the_browser() {
     let fixture = Fixture::new();
     wait_for(fixture.runtime().set_resource_provider(serving_provider(

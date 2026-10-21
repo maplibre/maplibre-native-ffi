@@ -10,11 +10,11 @@
 //! `std::sync::Weak` reference. Capturing a strong `Arc` of that owner creates a
 //! reference cycle that requires an explicit clear or release.
 //!
-//! Native cannot receive a Rust error or panic from a callback, so the binding
-//! contains both and returns a failure value to native.
-//! Errors and caught panics go to the reporter that [`set_reporter`] installs,
-//! as [`Report::CallbackError`], or to standard error when none is installed.
-//! A panic also reaches the standard panic hook as usual.
+//! The binding contains callback errors and panics and returns a failure value
+//! to native. Failures that no caller can receive go to the reporter that
+//! [`set_reporter`] installs, as [`Report::CallbackError`], or to standard error
+//! when none is installed. A completion conversion panic resolves its future
+//! with an error. A panic also reaches the standard panic hook as usual.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
