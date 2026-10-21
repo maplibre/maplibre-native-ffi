@@ -54,44 +54,48 @@ jobs:
           Expand-Archive procdump.zip -DestinationPath "$env:RUNNER_TEMP\procdump"
           Get-ChildItem "$env:RUNNER_TEMP\procdump"
           Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers" -Recurse -Filter cdb.exe -ErrorAction SilentlyContinue | Select-Object FullName
-      - name: Run the .NET example 25 times under ProcDump
+      - name: Run the .NET example under ProcDump, per variant
         shell: bash
         env:
           MLN_EXAMPLE_SMOKE: "1"
         run: |
           exe=$(find build/dotnet/${{ matrix.preset }} -name 'Maplibre.NativeFfi.Examples.DotnetMap.exe' | head -1)
-          echo "example: $exe"
+          dir=$(dirname "$exe")
           procdump="$RUNNER_TEMP/procdump/procdump64a.exe"
-          dumps="$RUNNER_TEMP/dumps"
-          mkdir -p "$dumps"
-          failures=0
-          for i in $(seq 1 25); do
-            for mode in owned-texture borrowed-texture; do
-              echo "::group::iteration $i $mode"
-              "$procdump" -accepteula -e -x "$(cygpath -w "$dumps")" "$(cygpath -w "$exe")" "$mode" > procdump.log 2>&1
-              status=$?
-              cat procdump.log
-              if grep -q "Dump count reached\|Dump 1 complete" procdump.log; then
-                failures=$((failures + 1))
-                echo "::warning::iteration $i $mode crashed"
-              fi
-              echo "::endgroup::"
+          d3d12=$(ls "$RUNNER_TEMP"/mesa-d3d12-*/opengl32.dll | head -1)
+          echo "example: $exe; d3d12 opengl32: $d3d12"
+          run_variant() {
+            local variant=$1
+            local dumps="$RUNNER_TEMP/dumps/$variant"
+            mkdir -p "$dumps"
+            for i in $(seq 1 25); do
+              for mode in owned-texture borrowed-texture; do
+                echo "::group::$variant $i $mode"
+                "$procdump" -accepteula -e -x "$(cygpath -w "$dumps")" "$(cygpath -w "$exe")" "$mode" 2>&1 | iconv -f UTF-16LE -t UTF-8 2>/dev/null | tr -d '\r' | grep -v '^\s*$' | tail -5
+                echo "::endgroup::"
+              done
             done
-          done
-          echo "crashes: $failures"
-          ls -la "$dumps"
-          [[ $failures -eq 0 ]]
+            echo "$variant crashes: $(ls "$dumps" | grep -c '\.dmp$') of 50 runs"
+          }
+          # llvmpipe rasterizes on the calling thread, so a crash shows the GL call.
+          LP_NUM_THREADS=0 run_variant llvmpipe-single-thread
+          # Mesa's d3d12 driver on WARP replaces llvmpipe.
+          cp "$d3d12" "$dir/opengl32.dll"
+          GALLIUM_DRIVER=d3d12 LIBGL_ALWAYS_SOFTWARE=true run_variant d3d12
+          rm "$dir/opengl32.dll"
       - name: Analyze dumps with cdb
         if: ${{ always() }}
         shell: pwsh
         run: |
-          $cdb = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers" -Recurse -Filter cdb.exe -ErrorAction SilentlyContinue | Where-Object FullName -like '*arm64*' | Select-Object -First 1
-          if (-not $cdb) { Write-Output "no arm64 cdb"; exit 0 }
-          $pdb = (Get-ChildItem build/${{ matrix.preset }} -Recurse -Filter maplibre-native-c.pdb | Select-Object -First 1).DirectoryName
+          $cdb = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers\arm64" -Filter cdb.exe | Select-Object -First 1
+          $pdb = (Get-ChildItem build -Recurse -Filter maplibre-native-c.pdb | Select-Object -First 1).DirectoryName
+          Write-Output "pdb dir: $pdb"
           $sym = "$pdb;srv*$env:RUNNER_TEMP\symbols*https://msdl.microsoft.com/download/symbols"
-          Get-ChildItem "$env:RUNNER_TEMP\dumps" -Filter *.dmp | Select-Object -First 3 | ForEach-Object {
-            Write-Output "=== $($_.Name)"
-            & $cdb.FullName -z $_.FullName -y $sym -lines -c ".ecxr; kn 60; ~*kn 25; q"
+          Get-ChildItem "$env:RUNNER_TEMP\dumps" -Directory | ForEach-Object {
+            Get-ChildItem $_.FullName -Filter *.dmp | Select-Object -First 2 | ForEach-Object {
+              Write-Output "=== $($_.FullName)"
+              & $cdb.FullName -z $_.FullName -y $sym -lines -c ".ecxr; kn 40; ~*kn 30; q"
+            }
           }
       - name: Upload crash dumps and symbols
         if: ${{ always() }}
