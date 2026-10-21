@@ -613,14 +613,18 @@ static uint32_t deny_every_request(
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
-static bool offline_error_logged(void* context) {
+static bool offline_events_logged(void* context) {
   scenario_context* scenario = context;
   log_drain_quietly(scenario->runtime, &scenario_log);
   return scenario_log.drain_failed || scenario_log.overflowed ||
-         log_contains(
-           &scenario_log, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-           scenario->runtime
-         );
+         (log_contains(
+            &scenario_log, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
+            scenario->runtime
+          ) &&
+          log_contains(
+            &scenario_log, MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
+            scenario->runtime
+          ));
 }
 
 static void deny_requests(mln_runtime runtime) {
@@ -714,15 +718,14 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     &completion.descriptor, NULL
   ));
   TEST_ASSERT_TRUE(mln_test_await(
-    offline_error_logged, &context, mln_test_deadline_default(),
-    "an offline response error"
+    offline_events_logged, &context, mln_test_deadline_default(),
+    "offline status and response error events"
   ));
   log_drain(runtime, &scenario_log);
   MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_runtime_fence(runtime));
   log_drain(runtime, &scenario_log);
   check_scenario_rows(SCENARIO_OFFLINE, &scenario_log, &context);
 

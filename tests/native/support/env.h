@@ -71,17 +71,11 @@ const char* mln_test_last_error(void);
 mln_runtime mln_test_create_runtime(void);
 // The same, from options the case fills in, with an event delivery queue.
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
-// Fences the runtime worker: each helper submits a call that runs on the
-// worker after every earlier submission to it and waits for its completion.
-// A snapshot read after it observes earlier discarded commands. Neither can
-// fence work that the runtime worker starts on its own, such as handling a
-// frame that a render session finished.
-//
-// The map fence queries the map's style URL, which publishes nothing.
+// Queries the map's style URL after earlier commands and waits for the result.
+// A snapshot read after it observes earlier discarded commands. The query
+// publishes nothing and cannot fence work that the runtime worker starts on
+// its own, such as handling a frame that a render session finished.
 mln_status mln_test_map_fence(mln_map map);
-// The runtime fence clears the runtime's resource transform, for a case that
-// has no map and sets no transform.
-mln_status mln_test_runtime_fence(mln_runtime runtime);
 mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(

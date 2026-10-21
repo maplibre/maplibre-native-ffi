@@ -38,8 +38,8 @@ constexpr auto lookup_probe_style_url = "custom://lookup-probe.json";
 // An unknown decision becomes a handled provider error.
 constexpr auto provider_error_decision = UINT32_MAX;
 
-// A second runtime on its own thread, which fences its worker once its trigger
-// says the first runtime is inside the wait under test.
+// A second runtime on its own thread, which releases once its trigger says the
+// first runtime is inside the wait under test.
 struct OtherRuntime {
   std::atomic_bool ready = false;
   std::atomic_bool call_done = false;
@@ -67,9 +67,8 @@ void run_other_runtime(void* argument) {
   static_cast<void>(
     other.sync_points->wait_for_hits(other.point, other.hits.load())
   );
-  other.status = mln_test_runtime_fence(runtime);
+  other.status = mln_test_runtime_close(runtime);
   mln_test_flag_set(&other.call_done);
-  static_cast<void>(mln_test_runtime_close(runtime));
 }
 
 // Blocks until the other runtime's call returns, which it cannot do while

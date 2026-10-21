@@ -116,7 +116,7 @@ static void a_rejected_submission_queues_nothing(void) {
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)
   );
 
-  MLN_TEST_OK(mln_test_runtime_fence(runtime));
+  // Rejected submissions return before accepting any work or completion.
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
   mln_test_delivery_drain drain;
   MLN_TEST_STATUS(

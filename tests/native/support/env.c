@@ -327,33 +327,16 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
   }
 }
 
-static mln_status settle_fence(
-  mln_status status, mln_test_completion* completion
-) {
-  if (status != MLN_STATUS_OK) {
-    mln_test_completion_reject(completion);
-    mln_test_completion_destroy(completion);
-    return status;
-  }
-  return mln_test_completion_settle(completion);
-}
-
 mln_status mln_test_map_fence(mln_map map) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  return settle_fence(
-    mln_map_get_style_url(map, &completion.descriptor, MLN_TEST_DIAGNOSTIC),
-    &completion
-  );
-}
-
-mln_status mln_test_runtime_fence(mln_runtime runtime) {
-  mln_test_completion completion = mln_test_completion_default(0);
-  return settle_fence(
-    mln_runtime_clear_resource_transform(
-      runtime, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    ),
-    &completion
-  );
+  const mln_status status =
+    mln_map_get_style_url(map, &completion.descriptor, MLN_TEST_DIAGNOSTIC);
+  if (status != MLN_STATUS_OK) {
+    mln_test_completion_reject(&completion);
+    mln_test_completion_destroy(&completion);
+    return status;
+  }
+  return mln_test_completion_settle(&completion);
 }
 
 void mln_test_destroy_map(mln_map map) {

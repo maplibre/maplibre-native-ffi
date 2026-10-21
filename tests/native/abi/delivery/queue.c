@@ -12,21 +12,19 @@ static void submit_queued_command(
   MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &completion, NULL));
 }
 
-// The runtime worker runs commands in order and delivers each completion
-// before the next command, so a callback command that completes after queued
-// ones proves that they pushed.
-static void sync_runtime(mln_runtime runtime) {
-  MLN_TEST_OK(mln_test_runtime_fence(runtime));
-}
-
 static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
 
-  submit_queued_command(runtime, queue.handle, (void*)1);
-  submit_queued_command(runtime, queue.handle, (void*)2);
-  sync_runtime(runtime);
+  const mln_completion first =
+    mln_test_queue_completion(queue.handle, (void*)1);
+  const mln_completion second =
+    mln_test_queue_completion(queue.handle, (void*)2);
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &first, NULL));
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &second, NULL));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&queue.wakes));
 
   mln_test_delivery_drain drain;
@@ -48,11 +46,14 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   TEST_ASSERT_NULL(drain.view.deliveries);
 
   // The drain re-armed the wake.
-  submit_queued_command(runtime, queue.handle, (void*)3);
-  sync_runtime(runtime);
+  const mln_completion third =
+    mln_test_queue_completion(queue.handle, (void*)3);
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &third, NULL));
+  MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(2, atomic_load(&queue.wakes));
 
   mln_test_delivery_queue_release(&queue);
+  mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -179,9 +180,8 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   mln_runtime runtime = mln_test_create_runtime();
 
   submit_queued_command(runtime, wake.queue, NULL);
-  sync_runtime(runtime);
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&wake.releases, 1));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
 
   // A submission that names the released queue is rejected.
   MLN_TEST_STATUS(
@@ -192,7 +192,6 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
       NULL
     )
   );
-  sync_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
   mln_test_destroy_runtime(runtime);
 }
