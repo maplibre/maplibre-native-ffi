@@ -25,7 +25,7 @@ jobs:
       units: ${{ steps.plan.outputs.units }}
     steps:
       - id: plan
-        uses: sargunv/rubberstamp/actions/plan@47440548e8efa43a2bef678a1ed87957dd4c4719 # main
+        uses: sargunv/rubberstamp/actions/plan@971af366b2649956a949eb48f2670cc66ba43988 # main
   hygiene:
     name: hygiene
     runs-on: blacksmith-4vcpu-ubuntu-2404

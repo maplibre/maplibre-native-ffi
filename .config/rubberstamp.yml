@@ -171,6 +171,8 @@ labels:
 # regardless, and `*` also matches `/` in those patterns. `ci/workflow.toml`
 # maps each unit to its jobs.
 ci:
+  # Only this workflow's successful runs count as units passing.
+  workflow: .github/workflows/ci-coverage.yml
   context: >-
     Every CI job installs the mise toolchain for its operating system, builds
     the native library for one target with CMake, and runs that target's binding
