@@ -21,6 +21,7 @@ from ci.workflow import (
     SMALL_RUNNER,
     load_configuration,
     runner,
+    suite_commands,
     target_rows,
 )
 
@@ -485,6 +486,16 @@ def windows_probe_workflow(source: dict, presets: dict) -> dict:
         return f"./ci/with-windows-console.ps1 -Command @({arguments})"
 
     workflow = ci_workflow(source, presets)
+    desktop_source = {
+        **source,
+        "suites": [
+            {
+                **suite,
+                "commands": [c for c in suite["commands"] if c.get("display")],
+            }
+            for suite in source["suites"]
+        ],
+    }
     selected = {"target-windows-x64-wgl", "target-windows-x64-vulkan"}
     jobs = workflow["jobs"]
     # Keep the coverage generator and required check intact. This draft's plan
@@ -514,11 +525,15 @@ def windows_probe_workflow(source: dict, presets: dict) -> dict:
                 **{"timeout-minutes": 3},
             ),
         )
+        display_commands = set(
+            suite_commands(desktop_source, name.removeprefix("target-"))
+        )
         for step in job["steps"]:
             if step.get("id", "").startswith("suite-"):
                 step["timeout-minutes"] = 15
-                step["shell"] = "pwsh"
-                step["run"] = console_command(step["run"])
+                if step["id"] == "suite-1" or step["run"] in display_commands:
+                    step["shell"] = "pwsh"
+                    step["run"] = console_command(step["run"])
         native_index = next(
             i for i, step in enumerate(job["steps"]) if step.get("id") == "suite-1"
         )

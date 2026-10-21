@@ -2508,16 +2508,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/rust:test', 'windows-x64-wgl')
+        run: mise run //bindings/rust:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//examples/rust-map:check', 'windows-x64-wgl')
+        run: mise run //examples/rust-map:check windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2529,9 +2527,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/zig:test', 'windows-x64-wgl')
+        run: mise run //bindings/zig:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2543,18 +2540,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//examples/zig-readback:smoke', 'windows-x64-wgl')
+        run: mise run //examples/zig-readback:smoke windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
           GALLIUM_DRIVER: d3d12
           LIBGL_ALWAYS_SOFTWARE: 'true'
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/kotlin:test', 'windows-x64-wgl')
+        run: mise run //bindings/kotlin:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2577,9 +2572,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/dotnet:test', 'windows-x64-wgl')
+        run: mise run //bindings/dotnet:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2591,16 +2585,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/python:test', 'windows-x64-wgl')
+        run: mise run //bindings/python:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/dart:test', 'windows-x64-wgl')
+        run: mise run //bindings/dart:test windows-x64-wgl
         timeout-minutes: 15
-        shell: pwsh
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2681,16 +2673,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/rust:test', 'windows-x64-vulkan')
+        run: mise run //bindings/rust:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//examples/rust-map:check', 'windows-x64-vulkan')
+        run: mise run //examples/rust-map:check windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2702,9 +2692,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/zig:test', 'windows-x64-vulkan')
+        run: mise run //bindings/zig:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2716,23 +2705,20 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//examples/zig-readback:smoke', 'windows-x64-vulkan')
+        run: mise run //examples/zig-readback:smoke windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/kotlin:test', 'windows-x64-vulkan')
+        run: mise run //bindings/kotlin:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//examples/compose-map:build', 'windows-x64-vulkan')
+        run: mise run //examples/compose-map:build windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2744,9 +2730,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/dotnet:test', 'windows-x64-vulkan')
+        run: mise run //bindings/dotnet:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2758,16 +2743,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/python:test', 'windows-x64-vulkan')
+        run: mise run //bindings/python:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: ./ci/with-windows-console.ps1 -Command @('mise', 'run', '//bindings/dart:test', 'windows-x64-vulkan')
+        run: mise run //bindings/dart:test windows-x64-vulkan
         timeout-minutes: 15
-        shell: pwsh
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
