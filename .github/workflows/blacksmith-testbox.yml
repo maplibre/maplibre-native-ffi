@@ -32,24 +32,28 @@ jobs:
           target: linux-gnu-x64-egl
           zig: true
           save-toolchains: true
-      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
-
-  macos:
-    runs-on: blacksmith-6vcpu-macos-26
-    timeout-minutes: 120
-    # Upstream v2 uses /proc/cmdline, ss, and GNU stat. Testbox session support
-    # on this macOS runner needs upstream confirmation before use.
-    steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
-        with:
-          persist-credentials: false
-      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
-        with:
-          testbox_id: ${{ inputs.testbox_id }}
-      # Matches the broad macOS target job. Apple simulator tasks boot on demand.
-      - uses: ./.github/actions/setup-ci-deps
-        with:
-          target: macos-arm64-metal
-          zig: true
-          save-toolchains: true
+      - name: Preserve the environment for Testbox SSH commands
+        shell: bash
+        run: |
+          # SSH shells read .bashrc before Ubuntu's non-interactive early return.
+          # Keep toolchain/setup exports, excluding credentials and step-local state.
+          umask 077
+          (
+            temp_prefix=$RUNNER_TEMP
+            path=()
+            IFS=: read -ra entries <<< "$PATH"
+            for entry in "${entries[@]}"; do
+              [[ "$entry" == "$RUNNER_TEMP"* ]] || path+=("$entry")
+            done
+            PATH="$(IFS=:; echo "${path[*]}")"
+            for name in $(compgen -e); do
+              case "$name" in
+                ACTIONS_*|INPUT_*|RUNNER_*|GITHUB_TOKEN|GITHUB_ENV|GITHUB_PATH|GITHUB_OUTPUT|GITHUB_STATE|GITHUB_STEP_SUMMARY|GITHUB_ACTION*|SSH_*|BASH_ENV|ENV|PWD|OLDPWD|SHLVL|*_TOKEN*|*_SECRET*|*_PASSWORD*|*_KEY*|*_CREDENTIAL*)
+                  unset "$name" ;;
+                *) [[ "${!name}" != *"${temp_prefix:?}"* ]] || unset "$name" ;;
+              esac
+            done
+            export -p
+          ) > ~/.testbox-env
+          sed -i '1i [ -f ~/.testbox-env ] && . ~/.testbox-env' ~/.bashrc
       - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
