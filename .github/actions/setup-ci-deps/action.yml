@@ -297,6 +297,25 @@ runs:
       shell: pwsh
       run: '"GRADLE_ACTIONS_SKIP_BUILD_RESULT_CAPTURE=true" >> $env:GITHUB_ENV'
 
+    # The Kotlin/Wasm suite's Gradle plugin downloads Node.js and Yarn into
+    # Gradle User Home, outside the directories that setup-gradle saves, and
+    # installs its Karma and webpack tooling under ~/.kotlin. The Kotlin version
+    # in the version catalog fixes all three, so the key is that file's hash,
+    # and an exact hit skips the save.
+    - name: Cache Kotlin/Wasm tooling
+      if:
+        ${{ inputs.gradle == 'true' && startsWith(inputs.target, 'emscripten-')
+        }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.gradle/nodejs
+          ~/.gradle/yarn
+          ~/.kotlin/kotlin-npm-tooling
+        key:
+          ${{ runner.os }}-${{ runner.arch }}-kotlin-wasm-tooling-v1-${{
+          hashFiles('gradle/libs.versions.toml') }}
+
     - name: Trim Windows PATH before mise activation
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
