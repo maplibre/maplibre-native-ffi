@@ -123,5 +123,6 @@ kind or an area.
 
 - Follow the PR template. Write **Summary** and **Test plan** in at most one
   sentence each, and follow [AI_POLICY.md](AI_POLICY.md).
-- Applicable CI jobs are selected automatically. If the selection looks wrong,
-  trigger a manual run (`gh workflow run CI --ref <branch>`).
+- Rubberstamp plans which CI coverage units each pull request runs, and the plan
+  job's summary links to the reason for each unit. If the plan looks wrong,
+  trigger a manual run (`gh workflow run CI --ref <branch>`) to run every unit.

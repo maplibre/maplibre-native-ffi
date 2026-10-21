@@ -12,30 +12,21 @@ on:
       - reopened
 permissions:
   contents: read
-  actions: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 jobs:
   plan:
     runs-on: blacksmith-2vcpu-ubuntu-2404
-    timeout-minutes: 10
+    timeout-minutes: 15
     if: github.event.pull_request.state != 'closed'
     outputs:
-      jobs: ${{ steps.plan.outputs.jobs }}
+      all: ${{ steps.plan.outputs.all }}
+      units: ${{ steps.plan.outputs.units }}
     steps:
-      - name: Check out repository
-        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          filter: blob:none
       - name: Plan coverage
         id: plan
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
-        run: bash .mise/tasks/ci/plan
+        uses: sargunv/rubberstamp/actions/plan@971af366b2649956a949eb48f2670cc66ba43988 # main
   hygiene:
     name: hygiene
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -66,9 +57,7 @@ jobs:
           git update-index -q --refresh
           git diff --exit-code -- . ':(exclude)mise*.lock'
           git diff --cached --exit-code -- . ':(exclude)mise*.lock'
-    needs:
-      - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'hygiene')
+    if: github.event.pull_request.state != 'closed'
   docs:
     name: docs
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -92,7 +81,7 @@ jobs:
       - run: mise run //docs:build
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'docs')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'docs')
   target-linux-gnu-x64-egl:
     name: target / linux-gnu-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -247,7 +236,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-x64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -401,7 +390,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-x64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -556,7 +545,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-arm64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -700,7 +689,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-gnu-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-musl-x64-egl:
     name: target / linux-musl-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -758,7 +747,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-x64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-linux-musl-x64-vulkan:
     name: target / linux-musl-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -816,7 +805,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-x64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -874,7 +863,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-arm64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -932,7 +921,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-linux-musl-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -991,7 +980,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-emscripten-wasm32-webgl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'web')
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1045,7 +1034,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-emscripten-wasm32-webgpu')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'web')
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1192,7 +1181,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-macos-arm64-vulkan:
     name: target / macos-arm64-vulkan
     runs-on: blacksmith-6vcpu-macos-26
@@ -1333,7 +1322,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-macos-arm64-egl:
     name: target / macos-arm64-egl
     runs-on: blacksmith-6vcpu-macos-26
@@ -1464,7 +1453,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-macos-arm64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-ios-arm64-metal:
     name: target / ios-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1528,7 +1517,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-ios-simulator-arm64-metal:
     name: target / ios-simulator-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1598,7 +1587,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-simulator-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-ios-maccatalyst-arm64-metal:
     name: target / ios-maccatalyst-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1651,7 +1640,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ios-maccatalyst-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1705,7 +1694,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-tvos-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1765,7 +1754,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-tvos-simulator-arm64-metal')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-arm-egl:
     name: target / android-arm-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1841,7 +1830,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-arm-vulkan:
     name: target / android-arm-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1917,7 +1906,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-arm64-egl:
     name: target / android-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1993,7 +1982,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-arm64-vulkan:
     name: target / android-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2069,7 +2058,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-x64-egl:
     name: target / android-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2156,7 +2145,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-x64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-android-x64-vulkan:
     name: target / android-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2243,7 +2232,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-android-x64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-ohos-arm64-egl:
     name: target / ohos-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2300,7 +2289,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-arm64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2357,7 +2346,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2420,7 +2409,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-x64-egl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2477,15 +2466,15 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-ohos-x64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -2602,15 +2591,15 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-x64-wgl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -2720,7 +2709,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-x64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-arm64-wgl:
     name: target / windows-arm64-wgl
     runs-on: windows-11-arm
@@ -2821,7 +2810,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-arm64-wgl')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -2915,7 +2904,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'target-windows-arm64-vulkan')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   android-multi:
     name: Android multi-ABI packaging
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2947,7 +2936,7 @@ jobs:
           pattern: native-package-android-*-${{ github.sha }}
           path: build/packages/native/android-multi-input
       - run: mise run //:kotlin:verify-android-multi-abi build/packages/native/android-multi-input
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'android-multi')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android')
   apple-xcframework:
     name: Apple XCFramework
     runs-on: blacksmith-6vcpu-macos-26
@@ -2987,7 +2976,7 @@ jobs:
           path: build/packages/native/dist/MaplibreNativeC.xcframework.zip
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'apple-xcframework')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
   kotlin-maven:
     name: Kotlin Maven
     permissions:
@@ -3023,7 +3012,7 @@ jobs:
       sha: ${{ github.sha }}
       verified_retention_days: ${{ github.event_name == 'pull_request' && 7 || 30 }}
       version: ${{ github.event_name == 'pull_request' && format('0.1.0-pr{0}.{1}', github.event.pull_request.number, github.run_id) || '0.1.0-SNAPSHOT' }}
-    if: contains(fromJSON(needs.plan.outputs.jobs), 'kotlin-maven')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'maven')
   required:
     name: ci-required
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -3069,14 +3058,10 @@ jobs:
       - apple-xcframework
       - kotlin-maven
     steps:
-      - name: Require every selected job
+      - name: Require every planned job
         env:
           PLAN: ${{ needs.plan.result }}
-          EXPECTED: '["android-multi", "apple-xcframework", "docs", "hygiene", "kotlin-maven", "target-android-arm-egl", "target-android-arm-vulkan", "target-android-arm64-egl", "target-android-arm64-vulkan", "target-android-x64-egl", "target-android-x64-vulkan", "target-emscripten-wasm32-webgl", "target-emscripten-wasm32-webgpu", "target-ios-arm64-metal", "target-ios-maccatalyst-arm64-metal", "target-ios-simulator-arm64-metal", "target-linux-gnu-arm64-egl", "target-linux-gnu-arm64-vulkan", "target-linux-gnu-x64-egl", "target-linux-gnu-x64-vulkan", "target-linux-musl-arm64-egl", "target-linux-musl-arm64-vulkan", "target-linux-musl-x64-egl", "target-linux-musl-x64-vulkan", "target-macos-arm64-egl", "target-macos-arm64-metal", "target-macos-arm64-vulkan", "target-ohos-arm64-egl", "target-ohos-arm64-vulkan", "target-ohos-x64-egl", "target-ohos-x64-vulkan", "target-tvos-arm64-metal", "target-tvos-simulator-arm64-metal", "target-windows-arm64-vulkan", "target-windows-arm64-wgl", "target-windows-x64-vulkan", "target-windows-x64-wgl"]'
           RESULTS: ${{ toJSON(needs) }}
-          SELECTED: ${{ needs.plan.outputs.jobs }}
         run: |
           test "$PLAN" = success &&
-          jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED"   '(($selected - $expected) | length == 0)
-             and all($expected[]; . as $job | $results[$job].result ==
-               (if $selected | index($job) then "success" else "skipped" end))'
+          jq -e -n --argjson results "$RESULTS" 'all($results[]; .result == "success" or .result == "skipped")'
