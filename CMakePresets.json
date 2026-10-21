@@ -24,14 +24,14 @@
       "name": "_linux-x64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/zig-linux.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/zig-linux.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "x64" }
     },
     {
       "name": "_linux-arm64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/zig-linux.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/zig-linux.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "arm64" }
     },
     {
@@ -50,7 +50,7 @@
       "name": "_macos-arm64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/apple.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/apple.cmake",
       "cacheVariables": {
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "CMAKE_OSX_DEPLOYMENT_TARGET": "14.3",
@@ -61,7 +61,7 @@
       "name": "_ios-arm64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/apple.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/apple.cmake",
       "cacheVariables": {
         "CMAKE_SYSTEM_NAME": "iOS",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
@@ -72,7 +72,7 @@
       "name": "_tvos-arm64",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/apple.cmake",
+      "toolchainFile": "${fileDir}/cmake/toolchains/apple.cmake",
       "cacheVariables": {
         "CMAKE_SYSTEM_NAME": "tvOS",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
@@ -112,7 +112,7 @@
       "name": "_emscripten-wasm32",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/toolchains/emscripten.cmake"
+      "toolchainFile": "${fileDir}/cmake/toolchains/emscripten.cmake"
     },
     {
       "name": "_ohos-arm64",

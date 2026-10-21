@@ -12,6 +12,12 @@ ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
   "linux",
   "macos",
 ] }
+# hypium, the OpenHarmony test runner, which the TypeScript binding's ArkTS
+# suite bundles. The suite parses the report it prints, so it is pinned.
+"http:hypium" = { version = "1.0.29", url = "https://ohpm.openharmony.cn/ohpm/@ohos/hypium/-/hypium-{{ version }}.har", format = "tar.gz", checksum = "sha256:c81d27c4098d9d3beafffa9602e5f45388bf8107a766bdbca1c8494e67074798", bin_path = ".", os = [
+  "linux",
+  "macos",
+] }
 
 [hooks]
 # Register the plugin before the first SDK installation resolves it. The root

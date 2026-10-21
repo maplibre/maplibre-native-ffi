@@ -3,9 +3,10 @@ local file = require("file")
 
 -- The archive holds one directory per host, each a set of component archives, and
 -- mise leaves whatever prefix the publisher used above them in place. Reduce that
--- to the components for this host, then unpack the native and device-tool
+-- to the components for this host, then unpack the native, device-tool, and ArkTS
 -- components, so the install directory looks the same whichever archive produced
--- it.
+-- it. The ArkTS component carries `es2abc`, which compiles an application's
+-- modules into the bytecode that a HAP holds.
 
 local function quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
@@ -64,7 +65,7 @@ function PLUGIN:PostInstall(ctx)
   )
 
   local archives = {}
-  for _, component in ipairs({ "native", "toolchains" }) do
+  for _, component in ipairs({ "native", "toolchains", "ets" }) do
     local matches = lines(
       run(
         "find "
@@ -99,5 +100,9 @@ function PLUGIN:PostInstall(ctx)
   local hdc = root .. "/toolchains/hdc"
   if not file.exists(hdc) then
     error("the installed SDK has no device connector at " .. hdc)
+  end
+  local es2abc = root .. "/ets/build-tools/ets-loader/bin/ark/build/bin/es2abc"
+  if not file.exists(es2abc) then
+    error("the installed SDK has no ArkTS bytecode compiler at " .. es2abc)
   end
 end

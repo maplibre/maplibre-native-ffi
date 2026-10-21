@@ -57,6 +57,8 @@ updates:
     groups:
       gradle:
         patterns: ["*"]
+  # The root covers every pnpm workspace package: the TypeScript binding and
+  # the docs site.
   - package-ecosystem: npm
     directory: /
     schedule:
