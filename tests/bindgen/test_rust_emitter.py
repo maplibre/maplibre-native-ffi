@@ -117,6 +117,7 @@ class RustEmitterTests(unittest.TestCase):
                 clang.run(
                     self,
                     "-c",
+                    "-fPIC",
                     *(f"-D{define}" for define in defines),
                     f"-I{FIXTURES}",
                     str(source),

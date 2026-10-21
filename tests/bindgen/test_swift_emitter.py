@@ -61,6 +61,7 @@ class SwiftEmitterTests(unittest.TestCase):
                 self,
                 "-std=c2x",
                 "-c",
+                "-fPIC",
                 f"-I{FIXTURES}",
                 str(PROTOCOLS_STUB),
                 "-o",
