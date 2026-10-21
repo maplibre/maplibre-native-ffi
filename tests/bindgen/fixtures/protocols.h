@@ -83,13 +83,16 @@ typedef struct mln_buffer_view {
   MLN_PROTOCOL_SIZE size;
 } mln_buffer_view;
 
-#ifdef MLN_PROTOCOL_QUEUE
-// The delivery queue and the kinds of delivery it carries, which the
-// registrations below name before the rest of the delivery protocol.
+#if defined(MLN_PROTOCOL_QUEUE) || defined(MLN_PROTOCOL_COMPLETION_RUNTIME)
 typedef unsigned long long mln_delivery_queue BIND(
   "kind=handle;release=mln_delivery_queue_release;"
   "dispose=mln_delivery_queue_release"
 );
+void mln_delivery_queue_release(mln_delivery_queue queue);
+#endif
+
+#ifdef MLN_PROTOCOL_QUEUE
+// The delivery batch and payload kinds that the registrations below use.
 typedef unsigned long long mln_delivery_batch BIND(
   "kind=handle;release=mln_delivery_batch_release;"
   "dispose=mln_delivery_batch_release"
@@ -128,11 +131,6 @@ typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );
 typedef void (*mln_user_data_release)(void* user_data);
-#ifndef MLN_PROTOCOL_QUEUE
-typedef unsigned long long mln_delivery_queue
-  BIND("kind=handle;release=mln_delivery_queue_release");
-void mln_delivery_queue_release(mln_delivery_queue queue);
-#endif
 typedef struct mln_completion {
   uint32_t size;
   mln_completion_callback callback;
@@ -656,7 +654,6 @@ typedef struct mln_delivery_batch_view {
     BIND("length=delivery_count;stride=delivery_size");
   size_t delivery_count;
 } mln_delivery_batch_view;
-void mln_delivery_queue_release(mln_delivery_queue queue);
 mln_status mln_delivery_queue_drain(
   mln_delivery_queue queue, mln_delivery_batch* out_batch BIND("direction=out"),
   mln_delivery_batch_view* out_view BIND("direction=out"),
