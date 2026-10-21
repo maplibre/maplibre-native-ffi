@@ -744,9 +744,6 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
             ("ticket",),
         )
         self.assertEqual(callback.arguments, ())
-        self.assertTrue(
-            model.values["mln_ticket_cancel_handler"].registration.receiver_owned
-        )
 
     def test_disposal_support_requires_a_handle_consumer(self):
         source = """

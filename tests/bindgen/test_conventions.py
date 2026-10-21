@@ -171,8 +171,7 @@ typedef void (*release)(void *context);
 typedef struct watcher { unsigned size; cancel callback; void *context BIND("kind=context"); release retire; } watcher BIND("kind=callback_registration;release=retire");
 mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diagnostic);
 """
-        bound = compile_api(parse(source))
-        self.assertTrue(bound.values["watcher"].registration.receiver_owned)
+        compile_api(parse(source))
         for before, after, error in (
             (
                 "borrowed_owner=owner",

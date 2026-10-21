@@ -95,10 +95,6 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    # Whether a callback's borrowed owner is a handle that only names the
-    # receiver of the call that registers it, which the host's callback
-    # already holds.
-    receiver_owned: bool = False
     # The member that names a delivery queue in place of the callback, or None.
     queue: str | None = None
 
@@ -756,12 +752,6 @@ class Binder:
                         ),
                         record_metadata["user_data"],
                         record_metadata["release"],
-                        any(
-                            self.callbacks[member.value.native].borrowed_owner
-                            for member in fields
-                            if member.value.kind == "callback"
-                            and member.name != record_metadata["release"]
-                        ),
                         next(
                             (
                                 member.name
