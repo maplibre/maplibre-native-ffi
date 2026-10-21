@@ -184,20 +184,28 @@ export function defineDisposers(
     asyncDispose?: symbol;
     dispose?: symbol;
   };
-  const define = (symbol: symbol | undefined, method: string | undefined) => {
+  const define = (
+    symbol: symbol | undefined,
+    method: string | undefined,
+    value: (this: Record<string, () => unknown>) => unknown,
+  ) => {
     if (symbol === undefined || method === undefined) {
       return;
     }
     Object.defineProperty(owner.prototype, symbol, {
       configurable: true,
       writable: true,
-      value(this: Record<string, () => unknown>) {
-        return this[method]!();
-      },
+      value,
     });
   };
-  define(symbols.asyncDispose, asyncClose ?? syncClose);
-  define(symbols.dispose, syncClose);
+  const asyncMethod = asyncClose ?? syncClose;
+  // An async disposer returns a Promise even when it falls back to close().
+  define(symbols.asyncDispose, asyncMethod, async function () {
+    await this[asyncMethod!]!();
+  });
+  define(symbols.dispose, syncClose, function () {
+    return this[syncClose!]!();
+  });
 }
 
 /**
@@ -229,7 +237,8 @@ export class ViewScope {
     this.#active++;
     try {
       const result = body(this);
-      if (result instanceof Promise) {
+      // Any thenable, from this realm or another, would outlive the scope.
+      if (typeof (result as { then?: unknown } | null)?.then === "function") {
         throw new TypeError("a view callback must complete synchronously");
       }
       return result;
