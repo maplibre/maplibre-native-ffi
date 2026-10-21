@@ -68,6 +68,7 @@ PROJECT_LABELS = {
     "bindings-kotlin-android": "Kotlin/Android",
     "bindings-kotlin-jvm": "Kotlin/JVM",
     "bindings-kotlin-native": "Kotlin/Native",
+    "bindings-kotlin-wasm": "Kotlin/Wasm",
     "bindings-typescript": "TypeScript",
 }
 
@@ -119,6 +120,8 @@ def command_support(command: str) -> list[tuple[str, str]]:
             preset = command.rsplit(" ", 1)[-1]
             if preset.startswith(("ios-simulator-", "tvos-simulator-")):
                 return [("bindings-kotlin-native", "tested")]
+            if preset.startswith("emscripten-"):
+                return [("bindings-kotlin-wasm", "tested")]
             # The test task runs the JVM suite on every host preset and adds
             # the Kotlin/Native suite where the binding declares a target.
             rows = [("bindings-kotlin-jvm", "tested")]
