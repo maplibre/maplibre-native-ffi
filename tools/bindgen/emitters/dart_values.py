@@ -686,10 +686,10 @@ class Values:
         Dart sets the isolate's delivery queue in place of the callbacks, with
         a token as user_data. Native code answers each call and queues a copy,
         which the queue's wake delivers to this isolate, where an unset
-        callback drops it. A registration without any callback stays
-        disabled. The registering owner roots the registration until native
-        code retires it, and a registration that native code rejects retires
-        at once.
+        callback drops it. A queue replaces the primary callback, so its
+        absence leaves the queue unset for native validation. The registering
+        owner roots the registration until native code retires it, and a
+        registration that native code rejects retires at once.
         """
         public = public_name(value.native)
         fields = self.queue_callbacks(value)
@@ -709,9 +709,9 @@ class Values:
             )
         disabled = (
             "    if ("
-            + " && ".join(f"value.{identifier(f.name)} == null" for f in fields)
+            + f"value.{identifier(fields[0].name)} == null"
             + ") { return _NativeRegistration(result, () {}, arena.releaseAll); }\n"
-            if all(field.value.nullable for field in fields)
+            if fields[0].value.nullable
             else ""
         )
         conversion = (

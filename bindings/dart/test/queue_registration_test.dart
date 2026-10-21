@@ -13,6 +13,44 @@ CustomGeometrySourceOptions _geometrySource({int? tileSize}) =>
 
 void main() {
   test(
+    'a cancel-only source surfaces native rejection without rooting',
+    () async {
+      final fixture = await openRuntime();
+      final map = await fixture.openStyledMap();
+      for (final add in [
+        () => map.addCustomGeometrySource(
+          'cancel-only-geometry',
+          CustomGeometrySourceOptions(cancelTile: (_) {}),
+        ),
+        () => map.addCustomMvtVectorSource(
+          'cancel-only-mvt',
+          CustomMvtVectorSourceOptions(cancelTile: (_) {}),
+        ),
+      ]) {
+        expect(
+          add,
+          throwsA(
+            isA<MaplibreException>()
+                .having(
+                  (error) => error.status,
+                  'status',
+                  Status.invalidArgument,
+                )
+                .having(
+                  (error) => error.diagnostic,
+                  'diagnostic',
+                  contains(
+                    'requires exactly one of a callback and a delivery queue',
+                  ),
+                ),
+          ),
+        );
+        expect(singleRegistrationProbeForTesting(map), isNull);
+      }
+    },
+  );
+
+  test(
     'a callback root is released by a removal, a map close, or a refusal',
     () async {
       final fixture = await openRuntime();

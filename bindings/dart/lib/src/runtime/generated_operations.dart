@@ -566,7 +566,7 @@ _prepareCustomGeometrySourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
       result.ref.wrap = value.wrap!;
     }
-    if (value.fetchTile == null && value.cancelTile == null) {
+    if (value.fetchTile == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
@@ -627,7 +627,7 @@ _prepareCustomMvtVectorSourceOptions(
       result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
-    if (value.fetchTile == null && value.cancelTile == null) {
+    if (value.fetchTile == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
