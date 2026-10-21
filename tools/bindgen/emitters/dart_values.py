@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .. import docs
+from .. import async_hosts, docs
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix
@@ -147,59 +147,21 @@ class Values:
                 self.check(field.value)
         self.used[value.native] = value
 
+    # How each registration reaches this isolate; see async_hosts.py.
     def wake_callback(self, callback):
-        """Whether a callback only asks to be called again, which a Dart wake
-        posts to the isolate: it takes nothing but its context, returns
-        nothing, and native does not wait for it."""
-        return (
-            bool(callback.context)
-            and not callback.parameters[1:]
-            and callback.result.native == "void"
-            and not callback.synchronous
-            and not callback.delivery
-        )
+        return async_hosts.wake_callback(callback)
 
     def wake(self, value):
-        """Whether a registration is a wake: its one callback is a wake
-        callback, and it carries no queue."""
-        if not value.registration or value.registration.queue:
-            return False
-        callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
-        return len(callbacks) == 1 and self.wake_callback(
-            self.bound.callbacks[callbacks[0].value.native]
-        )
+        return async_hosts.is_wake(self.bound, value)
 
     def queue_callbacks(self, value):
-        """The callbacks of a registration that a delivery queue carries, or
-        none. Dart sets the registration's queue in place of every callback,
-        so every callback must have a delivery."""
-        if not value.registration or not value.registration.queue:
-            return []
-        fields = [f for f in value.fields if f.name in value.registration.callbacks]
-        if not all(self.bound.callbacks[f.value.native].delivery for f in fields):
-            return []
-        return fields
+        return async_hosts.queue_callbacks(self.bound, value)
 
     def omitted(self, field):
-        """Whether Dart leaves a callback field unset: an optional callback that
-        must answer on its native thread and has no queue delivery, such as a
-        transform's, whose registration then applies native rules."""
-        if field.value.kind != "callback" or not field.value.nullable:
-            return False
-        callback = self.bound.callbacks[field.value.native]
-        return (
-            callback.delivery is None
-            and callback.result.native != "void"
-            and not callback.synchronous
-        )
+        return async_hosts.omitted(self.bound, field)
 
     def rules_only(self, value):
-        """Whether Dart writes a registration without any callback, so native
-        rules answer in place of the host."""
-        if not value.registration:
-            return False
-        fields = [f for f in value.fields if f.name in value.registration.callbacks]
-        return bool(fields) and all(self.omitted(f) for f in fields)
+        return async_hosts.rules_only(self.bound, value)
 
     def check_delivery(self, callback):
         """Accept a delivered callback whose copied arguments Dart can decode."""
@@ -243,21 +205,7 @@ class Values:
         return tuple(f for f in value.fields if f.name not in controls)
 
     def left_disabled(self, value):
-        """Whether a field keeps its native default, a disabled registration.
-
-        Dart runs host code only on its isolate, so it cannot run a synchronous
-        callback that native code calls on its own thread. A registration with
-        one has no Dart form. A record that holds it and has a native default
-        value keeps the field disabled, as that default provides it.
-        """
-        if not value.registration:
-            return False
-        callbacks = [
-            f.value for f in value.fields if f.name in value.registration.callbacks
-        ]
-        return all(callback.nullable for callback in callbacks) and any(
-            self.bound.callbacks[callback.native].synchronous for callback in callbacks
-        )
+        return async_hosts.left_disabled(self.bound, value)
 
     def public(self, value):
         # An owned handle names its owner class, as a borrowed one does;

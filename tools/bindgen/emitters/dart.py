@@ -6,6 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import replace
 
+from tools.bindgen import async_hosts
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api
@@ -666,31 +667,11 @@ def coverage(api: Api | BoundApi):
     _, generated, unsupported, values = lower(api)
     bound = values.bound
     # A callback that must answer on its native thread has no Dart form, so its
-    # registration carries native rules instead. The operations that only such
-    # a callback calls, through the response records it writes, have no caller.
-    for value in list(values.used.values()):
-        if not value.registration:
-            continue
-        for field in value.fields:
-            if not values.omitted(field):
-                continue
-            callback = bound.callbacks[field.value.native]
-            responses = {
-                parameter.value.element.native
-                for parameter in callback.parameters
-                if parameter.direction == "out" and parameter.value.element
-            }
-            for plan in bound.operations:
-                receiver = next(
-                    (
-                        p.value.element.native
-                        for p in (*plan.inputs, *plan.outputs)
-                        if p.name == plan.scoped_receiver and p.value.element
-                    ),
-                    None,
-                )
-                if plan.scoped_receiver and receiver in responses:
-                    unsupported.pop(plan.name, None)
+    # registration carries native rules instead, and the operations that only
+    # such a callback calls have no caller.
+    registrations = [v for v in values.used.values() if v.registration]
+    for name in async_hosts.rule_answered_operations(bound, registrations):
+        unsupported.pop(name, None)
     return {
         "generated": generated,
         "unsupported": unsupported,
