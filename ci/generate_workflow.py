@@ -474,11 +474,53 @@ def retry_workflow() -> dict:
     }
 
 
+def windows_probe_workflow(source: dict, presets: dict) -> dict:
+    """Temporarily run only Windows x64 while investigating Blacksmith."""
+    workflow = ci_workflow(source, presets)
+    selected = {"target-windows-x64-wgl", "target-windows-x64-vulkan"}
+    jobs = workflow["jobs"]
+    # Keep the coverage generator and required check intact. This draft's plan
+    # is fixed, so Rubberstamp cannot expand it to unrelated targets.
+    jobs["plan"]["outputs"] = {"all": "false", "units": '["windows"]'}
+    for name, job in jobs.items():
+        if name in {"plan", "required"}:
+            continue
+        if name not in selected:
+            job["needs"] = list(dict.fromkeys(["plan", *job.get("needs", [])]))
+            job["if"] = "fromJSON(needs.plan.outputs.all)"
+            continue
+        job["steps"].insert(
+            1,
+            run(
+                "./ci/windows-desktop-probe.ps1",
+                name="Inspect Windows desktop and session",
+                shell="pwsh",
+            ),
+        )
+        for step in job["steps"]:
+            if step.get("id", "").startswith("suite-"):
+                step["timeout-minutes"] = 15
+        job["steps"].insert(
+            -1,
+            action(
+                "actions/upload-artifact",
+                {
+                    "name": f"diagnostics-{name}",
+                    "path": f"build/{name.removeprefix('target-')}/Testing/Temporary/",
+                    "if-no-files-found": "warn",
+                },
+                name="Upload native test diagnostics",
+                **{"if": "always()"},
+            ),
+        )
+    return workflow
+
+
 def workflows(source: dict, presets: dict) -> dict[str, dict]:
     return {
         # A closed pull request runs the workflow file in its frozen merge ref,
         # so the old ci.yml path stays disabled in the repository settings.
-        "ci-coverage.yml": ci_workflow(source, presets),
+        "ci-coverage.yml": windows_probe_workflow(source, presets),
         "ci-retry.yml": retry_workflow(),
     }
 

@@ -70,10 +70,9 @@ def backend(preset: str) -> str:
     return value
 
 
-# Blacksmith runs CI through its open source program. Windows stays on
-# GitHub-hosted runners, as in maplibre-compose: the smoke tasks and surface
-# tests open windows, and Blacksmith's Windows runners have no interactive
-# desktop.
+# Blacksmith runs CI through its open source program. Windows ARM64 uses
+# GitHub-hosted runners. Windows x64 uses Mesa software drivers for the native
+# suites and the windowed smoke apps.
 LINUX_RUNNER = "blacksmith-4vcpu-ubuntu-2404"
 LINUX_ARM_RUNNER = "blacksmith-4vcpu-ubuntu-2404-arm"
 MACOS_RUNNER = "blacksmith-6vcpu-macos-26"
@@ -97,7 +96,11 @@ def runner(preset: str) -> str:
     }:
         return MACOS_RUNNER
     if target_platform == "windows":
-        return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
+        return (
+            "windows-11-arm"
+            if target_architecture == "arm64"
+            else "blacksmith-4vcpu-windows-2025"
+        )
     if target_platform in {"android", "emscripten", "ohos"}:
         return LINUX_RUNNER
     raise SystemExit(f"error: cannot determine runner from preset {preset!r}")

@@ -21,8 +21,8 @@ jobs:
     timeout-minutes: 15
     if: github.event.pull_request.state != 'closed'
     outputs:
-      all: ${{ steps.plan.outputs.all }}
-      units: ${{ steps.plan.outputs.units }}
+      all: 'false'
+      units: '["windows"]'
     steps:
       - name: Plan coverage
         id: plan
@@ -57,7 +57,9 @@ jobs:
           git update-index -q --refresh
           git diff --exit-code -- . ':(exclude)mise*.lock'
           git diff --cached --exit-code -- . ':(exclude)mise*.lock'
-    if: github.event.pull_request.state != 'closed'
+    if: fromJSON(needs.plan.outputs.all)
+    needs:
+      - plan
   docs:
     name: docs
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -81,7 +83,7 @@ jobs:
       - run: mise run //docs:build
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'docs')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-gnu-x64-egl:
     name: target / linux-gnu-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -236,7 +238,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -390,7 +392,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -545,7 +547,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -689,7 +691,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-musl-x64-egl:
     name: target / linux-musl-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -747,7 +749,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-musl-x64-vulkan:
     name: target / linux-musl-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -805,7 +807,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -863,7 +865,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
+    if: fromJSON(needs.plan.outputs.all)
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
@@ -921,7 +923,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
+    if: fromJSON(needs.plan.outputs.all)
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -971,7 +973,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'web')
+    if: fromJSON(needs.plan.outputs.all)
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1021,7 +1023,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'web')
+    if: fromJSON(needs.plan.outputs.all)
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1168,7 +1170,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-macos-arm64-vulkan:
     name: target / macos-arm64-vulkan
     runs-on: blacksmith-6vcpu-macos-26
@@ -1309,7 +1311,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-macos-arm64-egl:
     name: target / macos-arm64-egl
     runs-on: blacksmith-6vcpu-macos-26
@@ -1440,7 +1442,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'macos') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-ios-arm64-metal:
     name: target / ios-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1504,7 +1506,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-ios-simulator-arm64-metal:
     name: target / ios-simulator-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1574,7 +1576,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-ios-maccatalyst-arm64-metal:
     name: target / ios-maccatalyst-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1627,7 +1629,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
+    if: fromJSON(needs.plan.outputs.all)
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1681,7 +1683,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
     runs-on: blacksmith-6vcpu-macos-26
@@ -1741,7 +1743,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-arm-egl:
     name: target / android-arm-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1817,7 +1819,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-arm-vulkan:
     name: target / android-arm-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1893,7 +1895,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-arm64-egl:
     name: target / android-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -1969,7 +1971,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-arm64-vulkan:
     name: target / android-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2045,7 +2047,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-x64-egl:
     name: target / android-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2132,7 +2134,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-android-x64-vulkan:
     name: target / android-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2219,7 +2221,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-ohos-arm64-egl:
     name: target / ohos-arm64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2276,7 +2278,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
+    if: fromJSON(needs.plan.outputs.all)
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2333,7 +2335,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
+    if: fromJSON(needs.plan.outputs.all)
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2396,7 +2398,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
+    if: fromJSON(needs.plan.outputs.all)
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2453,17 +2455,20 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'ohos')
+    if: fromJSON(needs.plan.outputs.all)
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
-    runs-on: windows-2022
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
+      - name: Inspect Windows desktop and session
+        shell: pwsh
+        run: ./ci/windows-desktop-probe.ps1
       - name: Set up CI dependencies
         uses: ./.github/actions/setup-ci-deps
         id: setup
@@ -2478,6 +2483,7 @@ jobs:
       - id: suite-1
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test windows-x64-wgl
+        timeout-minutes: 15
       - name: Archive native artifact
         id: archive
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -2491,31 +2497,37 @@ jobs:
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2523,6 +2535,7 @@ jobs:
           GALLIUM_DRIVER: d3d12
           LIBGL_ALWAYS_SOFTWARE: 'true'
         run: mise run //bindings/kotlin:test windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2530,6 +2543,7 @@ jobs:
           GALLIUM_DRIVER: d3d12
           LIBGL_ALWAYS_SOFTWARE: 'true'
         run: mise run //examples/compose-map:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2537,26 +2551,31 @@ jobs:
           GALLIUM_DRIVER: d3d12
           LIBGL_ALWAYS_SOFTWARE: 'true'
         run: mise run //examples/lwjgl-map:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/dotnet-map:smoke windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-13
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-wgl
+        timeout-minutes: 15
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-x64-wgl
+        timeout-minutes: 15
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2572,6 +2591,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload native test diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diagnostics-target-windows-x64-wgl
+          path: build/windows-x64-wgl/Testing/Temporary/
+          if-no-files-found: warn
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
@@ -2581,14 +2607,17 @@ jobs:
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
-    runs-on: windows-2022
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
+      - name: Inspect Windows desktop and session
+        shell: pwsh
+        run: ./ci/windows-desktop-probe.ps1
       - name: Set up CI dependencies
         uses: ./.github/actions/setup-ci-deps
         id: setup
@@ -2602,6 +2631,7 @@ jobs:
       - id: suite-1
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run test windows-x64-vulkan
+        timeout-minutes: 15
       - name: Archive native artifact
         id: archive
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -2615,66 +2645,79 @@ jobs:
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-4
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:smoke windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:smoke windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:smoke windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:smoke windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/dotnet-map:smoke windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-13
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-vulkan
+        timeout-minutes: 15
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-x64-vulkan
+        timeout-minutes: 15
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2690,6 +2733,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload native test diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diagnostics-target-windows-x64-vulkan
+          path: build/windows-x64-vulkan/Testing/Temporary/
+          if-no-files-found: warn
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
@@ -2797,7 +2847,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -2891,7 +2941,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   android-multi:
     name: Android multi-ABI packaging
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -2923,7 +2973,7 @@ jobs:
           pattern: native-package-android-*-${{ github.sha }}
           path: build/packages/native/android-multi-input
       - run: mise run //:kotlin:verify-android-multi-abi build/packages/native/android-multi-input
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'android')
+    if: fromJSON(needs.plan.outputs.all)
   apple-xcframework:
     name: Apple XCFramework
     runs-on: blacksmith-6vcpu-macos-26
@@ -2963,7 +3013,7 @@ jobs:
           path: build/packages/native/dist/MaplibreNativeC.xcframework.zip
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'apple-mobile')
+    if: fromJSON(needs.plan.outputs.all)
   kotlin-maven:
     name: Kotlin Maven
     permissions:
@@ -2999,7 +3049,7 @@ jobs:
       sha: ${{ github.sha }}
       verified_retention_days: ${{ github.event_name == 'pull_request' && 7 || 30 }}
       version: ${{ github.event_name == 'pull_request' && format('0.1.0-pr{0}.{1}', github.event.pull_request.number, github.run_id) || '0.1.0-SNAPSHOT' }}
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all)
   required:
     name: ci-required
     runs-on: blacksmith-2vcpu-ubuntu-2404
